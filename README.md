@@ -272,6 +272,23 @@ Some additional minor differences include:
 - Double-click on a node in the Slipnet to see details about it.
 - An admin page for database and help text management.
 
+## Future Direction
+
+Petacat is not an end state. It's a foundation for a longer-running set of
+questions about whether perception, analogy-making, learning, and
+self-awareness might really be one thing seen at different levels of
+abstraction — the bet underneath Hofstadter's whole programme, spelled out
+one step further. Four open threads worth pulling on are sketched in
+[FUTURE_DIRECTION.md](FUTURE_DIRECTION.md): a self/other grounding at the
+base of the slipnet, a generalised perceptual workspace that escapes the
+26-letter box, evolutionary tuning of the system's own configuration, and
+an interactive-curiosity mechanism in which understanding the teacher's
+answer is itself an analogy problem solved by the same machinery.
+
+That document is an invitation to a conversation, not a roadmap. If any of
+it resonates — or breaks, or sparks a different direction — please reach
+out.
+
 ## Author
 
 Petacat is written and maintained by **Mishkin Berteig** — software developer
