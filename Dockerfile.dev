@@ -1,0 +1,25 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Install system deps for asyncpg (needs libpq)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc libpq-dev postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python deps directly (source is bind-mounted later)
+RUN pip install --no-cache-dir \
+    "fastapi>=0.115" \
+    "uvicorn[standard]>=0.32" \
+    "sqlalchemy[asyncio]>=2.0" \
+    "asyncpg>=0.30" \
+    "alembic>=1.14" \
+    "pydantic>=2.10" \
+    "websockets>=14.0" \
+    "pytest>=8.0" \
+    "pytest-asyncio>=0.24" \
+    "httpx>=0.28"
+
+# Source is bind-mounted at /app via volumes in docker-compose.dev.yml
+EXPOSE 8000 5173
+CMD ["uvicorn", "server.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

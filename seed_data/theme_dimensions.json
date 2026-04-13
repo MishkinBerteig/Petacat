@@ -1,0 +1,48 @@
+{
+  "cluster_types": ["top-bridge", "bottom-bridge", "vertical-bridge"],
+  "dimensions": [
+    {
+      "slipnet_node": "plato-letter-category",
+      "valid_relations": ["identity", "successor", "predecessor", "diff"]
+    },
+    {
+      "slipnet_node": "plato-string-position-category",
+      "valid_relations": ["identity", "opposite", "diff"]
+    },
+    {
+      "slipnet_node": "plato-alphabetic-position-category",
+      "valid_relations": ["identity", "opposite"]
+    },
+    {
+      "slipnet_node": "plato-direction-category",
+      "valid_relations": ["identity", "opposite"]
+    },
+    {
+      "slipnet_node": "plato-bond-category",
+      "valid_relations": ["identity", "opposite", "diff"]
+    },
+    {
+      "slipnet_node": "plato-group-category",
+      "valid_relations": ["identity", "opposite", "diff"]
+    },
+    {
+      "slipnet_node": "plato-length",
+      "valid_relations": ["identity", "successor", "predecessor", "diff"]
+    },
+    {
+      "slipnet_node": "plato-object-category",
+      "valid_relations": ["identity", "diff"]
+    },
+    {
+      "slipnet_node": "plato-bond-facet",
+      "valid_relations": ["identity", "diff"]
+    }
+  ],
+  "answer_description_theme_types": [
+    "plato-alphabetic-position-category",
+    "plato-string-position-category",
+    "plato-direction-category",
+    "plato-group-category",
+    "plato-bond-facet"
+  ]
+}

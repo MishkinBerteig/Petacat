@@ -1,0 +1,62 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: petacat-db
+    environment:
+      POSTGRES_DB: petacat
+      POSTGRES_USER: petacat
+      POSTGRES_PASSWORD: dev
+    volumes:
+      - petacat-pgdata:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U petacat"]
+      interval: 2s
+      retries: 10
+    networks:
+      - petacat-net
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: petacat-app
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://petacat:dev@db:5432/petacat
+      TEST_DATABASE_URL: postgresql+asyncpg://petacat:dev@db:5432/petacat_test
+      SEED_DATA_DIR: /app/seed_data
+      PYTHONPATH: /app
+      PYTHONDONTWRITEBYTECODE: "1"
+    ports:
+      - "8100:8000"
+    volumes:
+      - .:/app
+    working_dir: /app
+    command: uvicorn server.main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - petacat-net
+
+  frontend:
+    image: node:22-alpine
+    container_name: petacat-frontend
+    working_dir: /app/client
+    volumes:
+      - ./client:/app/client
+    ports:
+      - "5175:5173"
+    command: sh -c "npm install && npm run dev"
+    environment:
+      VITE_API_URL: http://localhost:8100
+    networks:
+      - petacat-net
+
+networks:
+  petacat-net:
+    name: petacat-net
+
+volumes:
+  petacat-pgdata:

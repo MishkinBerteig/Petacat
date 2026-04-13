@@ -1,0 +1,356 @@
+[
+  {
+    "name": "plato-a",
+    "short_name": "a",
+    "conceptual_depth": 10,
+    "description": "Platonic concept of the letter 'a'. As the first letter of the alphabet, it has a special property link to alphabetic-first. It is connected to 'b' via a successor link but has no predecessor, making it an edge letter. Letters are the most concrete nodes in the Slipnet (conceptual depth 10), representing the atomic elements of the letter-string microworld."
+  },
+  {
+    "name": "plato-b",
+    "short_name": "b",
+    "conceptual_depth": 10,
+    "description": "Platonic concept of the letter 'b'. Connected to 'a' via a predecessor link and to 'c' via a successor link. Like all letter nodes, it is an instance of the letter-category concept and receives activation when the letter 'b' appears in workspace strings."
+  },
+  {
+    "name": "plato-c",
+    "short_name": "c",
+    "conceptual_depth": 10,
+    "description": "Platonic concept of the letter 'c'. Connected to 'b' via a predecessor link and to 'd' via a successor link. Like all letter nodes, it is an instance of the letter-category concept and receives activation when the letter 'c' appears in workspace strings."
+  },
+  {
+    "name": "plato-d",
+    "short_name": "d",
+    "conceptual_depth": 10,
+    "description": "Platonic concept of the letter 'd'. Connected to 'c' via a predecessor link and to 'e' via a successor link. Like all letter nodes, it is an instance of the letter-category concept and receives activation when the letter 'd' appears in workspace strings."
+  },
+  {
+    "name": "plato-e",
+    "short_name": "e",
+    "conceptual_depth": 10,
+    "description": "Platonic concept of the letter 'e'. Connected to 'd' via a predecessor link and to 'f' via a successor link. Like all letter nodes, it is an instance of the letter-category concept and receives activation when the letter 'e' appears in workspace strings."
+  },
+  {
+    "name": "plato-f",
+    "short_name": "f",
+    "conceptual_depth": 10,
+    "description": "Platonic concept of the letter 'f'. Connected to 'e' via a predecessor link and to 'g' via a successor link. Like all letter nodes, it is an instance of the letter-category concept and receives activation when the letter 'f' appears in workspace strings."
+  },
+  {
+    "name": "plato-g",
+    "short_name": "g",
+    "conceptual_depth": 10,
+    "description": "Platonic concept of the letter 'g'. Connected to 'f' via a predecessor link and to 'h' via a successor link. Like all letter nodes, it is an instance of the letter-category concept and receives activation when the letter 'g' appears in workspace strings."
+  },
+  {
+    "name": "plato-h",
+    "short_name": "h",
+    "conceptual_depth": 10,
+    "description": "Platonic concept of the letter 'h'. Connected to 'g' via a predecessor link and to 'i' via a successor link. Like all letter nodes, it is an instance of the letter-category concept and receives activation when the letter 'h' appears in workspace strings."
+  },
+  {
+    "name": "plato-i",
+    "short_name": "i",
+    "conceptual_depth": 10,
+    "description": "Platonic concept of the letter 'i'. Connected to 'h' via a predecessor link and to 'j' via a successor link. Like all letter nodes, it is an instance of the letter-category concept and receives activation when the letter 'i' appears in workspace strings."
+  },
+  {
+    "name": "plato-j",
+    "short_name": "j",
+    "conceptual_depth": 10,
+    "description": "Platonic concept of the letter 'j'. Connected to 'i' via a predecessor link and to 'k' via a successor link. Like all letter nodes, it is an instance of the letter-category concept and receives activation when the letter 'j' appears in workspace strings."
+  },
+  {
+    "name": "plato-k",
+    "short_name": "k",
+    "conceptual_depth": 10,
+    "description": "Platonic concept of the letter 'k'. Connected to 'j' via a predecessor link and to 'l' via a successor link. Like all letter nodes, it is an instance of the letter-category concept and receives activation when the letter 'k' appears in workspace strings."
+  },
+  {
+    "name": "plato-l",
+    "short_name": "l",
+    "conceptual_depth": 10,
+    "description": "Platonic concept of the letter 'l'. Connected to 'k' via a predecessor link and to 'm' via a successor link. Like all letter nodes, it is an instance of the letter-category concept and receives activation when the letter 'l' appears in workspace strings."
+  },
+  {
+    "name": "plato-m",
+    "short_name": "m",
+    "conceptual_depth": 10,
+    "description": "Platonic concept of the letter 'm'. Connected to 'l' via a predecessor link and to 'n' via a successor link. Like all letter nodes, it is an instance of the letter-category concept and receives activation when the letter 'm' appears in workspace strings."
+  },
+  {
+    "name": "plato-n",
+    "short_name": "n",
+    "conceptual_depth": 10,
+    "description": "Platonic concept of the letter 'n'. Connected to 'm' via a predecessor link and to 'o' via a successor link. Like all letter nodes, it is an instance of the letter-category concept and receives activation when the letter 'n' appears in workspace strings."
+  },
+  {
+    "name": "plato-o",
+    "short_name": "o",
+    "conceptual_depth": 10,
+    "description": "Platonic concept of the letter 'o'. Connected to 'n' via a predecessor link and to 'p' via a successor link. Like all letter nodes, it is an instance of the letter-category concept and receives activation when the letter 'o' appears in workspace strings."
+  },
+  {
+    "name": "plato-p",
+    "short_name": "p",
+    "conceptual_depth": 10,
+    "description": "Platonic concept of the letter 'p'. Connected to 'o' via a predecessor link and to 'q' via a successor link. Like all letter nodes, it is an instance of the letter-category concept and receives activation when the letter 'p' appears in workspace strings."
+  },
+  {
+    "name": "plato-q",
+    "short_name": "q",
+    "conceptual_depth": 10,
+    "description": "Platonic concept of the letter 'q'. Connected to 'p' via a predecessor link and to 'r' via a successor link. Like all letter nodes, it is an instance of the letter-category concept and receives activation when the letter 'q' appears in workspace strings."
+  },
+  {
+    "name": "plato-r",
+    "short_name": "r",
+    "conceptual_depth": 10,
+    "description": "Platonic concept of the letter 'r'. Connected to 'q' via a predecessor link and to 's' via a successor link. Like all letter nodes, it is an instance of the letter-category concept and receives activation when the letter 'r' appears in workspace strings."
+  },
+  {
+    "name": "plato-s",
+    "short_name": "s",
+    "conceptual_depth": 10,
+    "description": "Platonic concept of the letter 's'. Connected to 'r' via a predecessor link and to 't' via a successor link. Like all letter nodes, it is an instance of the letter-category concept and receives activation when the letter 's' appears in workspace strings."
+  },
+  {
+    "name": "plato-t",
+    "short_name": "t",
+    "conceptual_depth": 10,
+    "description": "Platonic concept of the letter 't'. Connected to 's' via a predecessor link and to 'u' via a successor link. Like all letter nodes, it is an instance of the letter-category concept and receives activation when the letter 't' appears in workspace strings."
+  },
+  {
+    "name": "plato-u",
+    "short_name": "u",
+    "conceptual_depth": 10,
+    "description": "Platonic concept of the letter 'u'. Connected to 't' via a predecessor link and to 'v' via a successor link. Like all letter nodes, it is an instance of the letter-category concept and receives activation when the letter 'u' appears in workspace strings."
+  },
+  {
+    "name": "plato-v",
+    "short_name": "v",
+    "conceptual_depth": 10,
+    "description": "Platonic concept of the letter 'v'. Connected to 'u' via a predecessor link and to 'w' via a successor link. Like all letter nodes, it is an instance of the letter-category concept and receives activation when the letter 'v' appears in workspace strings."
+  },
+  {
+    "name": "plato-w",
+    "short_name": "w",
+    "conceptual_depth": 10,
+    "description": "Platonic concept of the letter 'w'. Connected to 'v' via a predecessor link and to 'x' via a successor link. Like all letter nodes, it is an instance of the letter-category concept and receives activation when the letter 'w' appears in workspace strings."
+  },
+  {
+    "name": "plato-x",
+    "short_name": "x",
+    "conceptual_depth": 10,
+    "description": "Platonic concept of the letter 'x'. Connected to 'w' via a predecessor link and to 'y' via a successor link. Like all letter nodes, it is an instance of the letter-category concept and receives activation when the letter 'x' appears in workspace strings."
+  },
+  {
+    "name": "plato-y",
+    "short_name": "y",
+    "conceptual_depth": 10,
+    "description": "Platonic concept of the letter 'y'. Connected to 'x' via a predecessor link and to 'z' via a successor link. Like all letter nodes, it is an instance of the letter-category concept and receives activation when the letter 'y' appears in workspace strings."
+  },
+  {
+    "name": "plato-z",
+    "short_name": "z",
+    "conceptual_depth": 10,
+    "description": "Platonic concept of the letter 'z'. As the last letter of the alphabet, it has a special property link to alphabetic-last. It is connected to 'y' via a predecessor link but has no successor, making it an edge letter. This boundary property creates interesting analogy problems (e.g., 'abc -> abd; xyz -> ?') where the successor of 'z' does not exist."
+  },
+  {
+    "name": "plato-one",
+    "short_name": "one",
+    "conceptual_depth": 30,
+    "description": "Represents the numeric concept of the length one. Used to describe single-letter groups or strings of length one. Connected to 'two' via a successor link. As an instance of the length category, it participates in analogies where group sizes matter, enabling slippages between letter-category and length dimensions."
+  },
+  {
+    "name": "plato-two",
+    "short_name": "two",
+    "conceptual_depth": 30,
+    "description": "Represents the numeric concept of the length two. Used to describe groups or strings containing two elements. Connected to 'one' via a predecessor link and to 'three' via a successor link. Participates in length-based descriptions that can enable abstract analogies between strings with different surface structures."
+  },
+  {
+    "name": "plato-three",
+    "short_name": "three",
+    "conceptual_depth": 30,
+    "description": "Represents the numeric concept of the length three. Used to describe groups or strings containing three elements. Connected to 'two' via a predecessor link and to 'four' via a successor link. Central to the classic 'abc -> abd; mrrjjj -> ?' problem where the 1-2-3 length pattern is discovered."
+  },
+  {
+    "name": "plato-four",
+    "short_name": "four",
+    "conceptual_depth": 30,
+    "description": "Represents the numeric concept of the length four. Used to describe groups or strings containing four elements. Connected to 'three' via a predecessor link and to 'five' via a successor link. Participates in length-based descriptions that support analogies involving group size patterns."
+  },
+  {
+    "name": "plato-five",
+    "short_name": "five",
+    "conceptual_depth": 30,
+    "description": "Represents the numeric concept of the length five. Used to describe groups or strings containing five elements. Connected to 'four' via a predecessor link but has no successor, serving as the upper bound of the number chain. Participates in length-based descriptions for larger groups."
+  },
+  {
+    "name": "plato-leftmost",
+    "short_name": "lmost",
+    "conceptual_depth": 40,
+    "description": "Represents the string-position concept of being leftmost (first in reading order) within a string. An instance of string-position-category, it is used to describe objects occupying the first position. Connected to rightmost via an opposite sliplink, enabling the crucial leftmost-to-rightmost slippage that underlies many creative analogies. Also linked to the direction concepts left (via identity) and right (via opposite)."
+  },
+  {
+    "name": "plato-rightmost",
+    "short_name": "rmost",
+    "conceptual_depth": 40,
+    "description": "Represents the string-position concept of being rightmost (last in reading order) within a string. An instance of string-position-category, it is used to describe objects occupying the final position. Connected to leftmost via an opposite sliplink. Also linked to right (via identity) and left (via opposite). Frequently relevant in rules like 'replace rightmost letter by successor'."
+  },
+  {
+    "name": "plato-middle",
+    "short_name": "middle",
+    "conceptual_depth": 40,
+    "description": "Represents the string-position concept of being in the middle of a string. An instance of string-position-category, it applies to objects that are neither leftmost nor rightmost and the string has more than two elements. Less commonly involved in slippages than leftmost or rightmost, but relevant for strings of odd length."
+  },
+  {
+    "name": "plato-single",
+    "short_name": "single",
+    "conceptual_depth": 40,
+    "description": "Represents the string-position concept of being the sole element in a string of length one. An instance of string-position-category. Connected to whole via a lateral sliplink, since a single letter in a one-element string is both the single element and the whole string. This slippage enables flexible handling of singleton strings."
+  },
+  {
+    "name": "plato-whole",
+    "short_name": "whole",
+    "conceptual_depth": 40,
+    "description": "Represents the string-position concept of a group that spans an entire string. An instance of string-position-category, it describes spanning groups (groups that encompass all elements of a string). Connected to single via a lateral sliplink. Important for identifying when a string has been fully organized into a single top-level group."
+  },
+  {
+    "name": "plato-alphabetic-first",
+    "short_name": "first",
+    "conceptual_depth": 60,
+    "description": "Represents the alphabetic-position concept of being first in the alphabet, i.e., being the letter 'a'. An instance of alphabetic-position-category. Connected to alphabetic-last via an opposite sliplink, enabling the first-to-last slippage. The letter 'a' has a property link to this node. This concept participates in abstract descriptions that strengthen bridges when objects share the property of being alphabetically first."
+  },
+  {
+    "name": "plato-alphabetic-last",
+    "short_name": "last",
+    "conceptual_depth": 60,
+    "description": "Represents the alphabetic-position concept of being last in the alphabet, i.e., being the letter 'z'. An instance of alphabetic-position-category. Connected to alphabetic-first via an opposite sliplink. The letter 'z' has a property link to this node. Critical in 'xyz' problems where recognizing 'z' as alphabetically last enables the creative answer 'wyz' through an alphabetic-first-to-alphabetic-last slippage."
+  },
+  {
+    "name": "plato-left",
+    "short_name": "left",
+    "conceptual_depth": 40,
+    "description": "Represents the directional concept of leftward (toward the beginning of a string). An instance of direction-category, it describes the internal direction of bonds and groups that proceed from right to left (e.g., predecessor groups like 'cba'). Connected to right via an opposite sliplink. Linked to leftmost via identity and to rightmost via opposite, connecting position and direction concepts."
+  },
+  {
+    "name": "plato-right",
+    "short_name": "right",
+    "conceptual_depth": 40,
+    "description": "Represents the directional concept of rightward (toward the end of a string). An instance of direction-category, it describes the internal direction of bonds and groups that proceed from left to right (e.g., successor groups like 'abc'). Connected to left via an opposite sliplink. Linked to rightmost via identity and to leftmost via opposite, connecting position and direction concepts."
+  },
+  {
+    "name": "plato-predecessor",
+    "short_name": "pred",
+    "conceptual_depth": 50,
+    "description": "Represents the bond type of predecessorship, the relation between two adjacent objects where the second is the alphabetic predecessor of the first (e.g., 'b' followed by 'a'). An instance of bond-category. Connected to successor via an opposite sliplink, enabling the predecessor-to-successor slippage central to many analogies. Has an associated group type link to predgrp. Its intrinsic link length of 60 makes it moderately abstract."
+  },
+  {
+    "name": "plato-successor",
+    "short_name": "succ",
+    "conceptual_depth": 50,
+    "description": "Represents the bond type of successorship, the relation between two adjacent objects where the second is the alphabetic successor of the first (e.g., 'a' followed by 'b'). An instance of bond-category. Connected to predecessor via an opposite sliplink. Has an associated group type link to succgrp. Also labels the lateral links between adjacent letter nodes (a->b, b->c, etc.) and number nodes (one->two, etc.) in the Slipnet."
+  },
+  {
+    "name": "plato-sameness",
+    "short_name": "same",
+    "conceptual_depth": 80,
+    "description": "Represents the bond type of sameness, the relation between two adjacent identical objects (e.g., 'j' followed by 'j'). An instance of bond-category. Has high conceptual depth (80) because sameness is a deep, abstract concept. Has an associated group type link to samegrp, and a lateral link to letter-category. Its intrinsic link length of 0 reflects that identical concepts have zero conceptual distance."
+  },
+  {
+    "name": "plato-predgrp",
+    "short_name": "predgrp",
+    "conceptual_depth": 50,
+    "description": "Represents the group type of predecessor-group: a group of objects bonded by predecessor relations, reading right-to-left in the alphabet (e.g., 'cba'). An instance of group-category. Connected to succgrp via an opposite sliplink. Has associated bond-category link back to predecessor and a lateral link to length, enabling length-based analogies."
+  },
+  {
+    "name": "plato-succgrp",
+    "short_name": "succgrp",
+    "conceptual_depth": 50,
+    "description": "Represents the group type of successor-group: a group of objects bonded by successor relations, reading left-to-right in the alphabet (e.g., 'abc'). An instance of group-category. Connected to predgrp via an opposite sliplink. Has associated bond-category link back to successor and a lateral link to length, enabling length-based analogies. Central to the classic 'abc' interpretation."
+  },
+  {
+    "name": "plato-samegrp",
+    "short_name": "samegrp",
+    "conceptual_depth": 80,
+    "description": "Represents the group type of sameness-group: a group of identical objects bonded by sameness relations (e.g., 'jjj'). An instance of group-category. Has high conceptual depth (80) reflecting the abstract nature of sameness. Has associated bond-category link back to sameness, and lateral links to both letter-category and length, enabling the crucial letter-category-to-length slippage in problems like 'abc -> abd; mrrjjj -> ?'."
+  },
+  {
+    "name": "plato-identity",
+    "short_name": "Identity",
+    "conceptual_depth": 90,
+    "description": "Represents the concept-mapping relation of identity: two concepts in a bridge are the same (e.g., rightmost maps to rightmost). One of the two fundamental mapping relations alongside opposite. Has very high conceptual depth (90) and an intrinsic link length of 0, meaning identity mappings contribute strongly to bridge quality. Identity mappings support bridges without introducing any conceptual slippage."
+  },
+  {
+    "name": "plato-opposite",
+    "short_name": "Opposite",
+    "conceptual_depth": 90,
+    "description": "Represents the concept-mapping relation of opposition: two concepts in a bridge are opposites (e.g., leftmost maps to rightmost). Labels the sliplinks connecting opposite pairs (left/right, successor/predecessor, first/last, leftmost/rightmost, predgrp/succgrp). Has very high conceptual depth (90) but an intrinsic link length of 80, meaning opposite slippages are conceptually deep but require significant activation to shrink the link and enable the slippage."
+  },
+  {
+    "name": "plato-letter",
+    "short_name": "letter",
+    "conceptual_depth": 20,
+    "description": "Represents the object-category concept of a single letter. An instance of object-category, it is used to describe workspace objects that are individual letters (as opposed to groups). Has low conceptual depth (20) reflecting its concrete nature. Connected to group via a lateral sliplink, enabling the letter-to-group slippage that allows single letters to be mapped to groups across strings in analogies."
+  },
+  {
+    "name": "plato-group",
+    "short_name": "group",
+    "conceptual_depth": 80,
+    "description": "Represents the object-category concept of a group. An instance of object-category, it is used to describe workspace objects that are structured collections of letters or sub-groups bonded by a common relation. Has high conceptual depth (80) reflecting the abstract nature of grouping. Connected to letter via a lateral sliplink. Becomes activated when groups are built in the workspace, exerting top-down pressure to find more groups."
+  },
+  {
+    "name": "plato-letter-category",
+    "short_name": "LetterCtgy",
+    "conceptual_depth": 30,
+    "description": "A category node representing the dimension of letter identity: which letter of the alphabet an object is. All 26 letter nodes (a-z) are instances of this category. Also serves as an instance of bond-facet, since bonds between letters can be based on letter-category (e.g., 'a' succeeded by 'b'). Connected to length via a lateral sliplink, enabling the critical letter-category-to-length slippage in problems like 'abc -> abd; mrrjjj -> ?'."
+  },
+  {
+    "name": "plato-string-position-category",
+    "short_name": "StringPos",
+    "conceptual_depth": 70,
+    "description": "A category node representing the dimension of positional location within a string. Its instances are leftmost, rightmost, middle, single, and whole. Has moderately high conceptual depth (70) reflecting the importance of positional information in analogy-making. Codelets use this category to generate top-down descriptions of where objects sit within their strings."
+  },
+  {
+    "name": "plato-alphabetic-position-category",
+    "short_name": "AlphaPos",
+    "conceptual_depth": 80,
+    "description": "A category node representing the dimension of alphabetic position: whether a letter is first or last in the alphabet. Its instances are alphabetic-first and alphabetic-last. Has high conceptual depth (80) because recognizing alphabetic boundaries enables deep analogies. Used in top-down codelet generation and becomes relevant when letters 'a' or 'z' appear in the problem."
+  },
+  {
+    "name": "plato-direction-category",
+    "short_name": "Direction",
+    "conceptual_depth": 70,
+    "description": "A category node representing the dimension of directional orientation. Its instances are left and right. Has moderately high conceptual depth (70). Describes whether bonds and groups proceed leftward or rightward through a string. Direction slippages (left-to-right) are important for analogies involving reversed or mirrored string structures."
+  },
+  {
+    "name": "plato-bond-category",
+    "short_name": "BondCtgy",
+    "conceptual_depth": 80,
+    "description": "A category node representing the dimension of bond types between adjacent objects. Its instances are predecessor, successor, and sameness. Has high conceptual depth (80). Characterizes the nature of relationships within strings and serves as an organizing dimension for themes in the Themespace. Bond-category slippages (e.g., successor-to-predecessor) are central to many analogies."
+  },
+  {
+    "name": "plato-group-category",
+    "short_name": "GroupCtgy",
+    "conceptual_depth": 80,
+    "description": "A category node representing the dimension of group types. Its instances are predgrp, succgrp, and samegrp. Has high conceptual depth (80). Labels the lateral links connecting bond types to their associated group types (e.g., sameness -> samegrp). Group-category serves as an organizing dimension for themes in the Themespace, characterizing the structural nature of groups."
+  },
+  {
+    "name": "plato-length",
+    "short_name": "Length",
+    "conceptual_depth": 60,
+    "description": "A category node representing the dimension of numeric length (how many elements a group or string contains). Its instances are the number nodes one through five. Also serves as an instance of bond-facet, since bonds between groups can be based on length (e.g., groups of length 1, 2, 3 forming a successor sequence). Connected to letter-category via a lateral sliplink, and to all three group types via lateral links. The letter-category-to-length slippage is one of the most important conceptual slippages in Metacat."
+  },
+  {
+    "name": "plato-object-category",
+    "short_name": "ObjectCtgy",
+    "conceptual_depth": 90,
+    "description": "A category node representing the dimension of object type. Its instances are letter and group. Has very high conceptual depth (90) reflecting the deep abstraction of categorizing workspace objects. The letter-to-group slippage under this category enables objects of fundamentally different types to be mapped onto each other across strings, which is essential for cross-domain-like analogies within the letter-string microworld."
+  },
+  {
+    "name": "plato-bond-facet",
+    "short_name": "BondFacet",
+    "conceptual_depth": 90,
+    "description": "A category node representing the dimension along which bonds are compared: the 'facet' of objects that bonds relate. Its instances are letter-category and length. Has very high conceptual depth (90) because the choice of bond facet is a highly abstract decision. When bonds are based on letter-category, objects are related by their letter identities (a->b->c); when based on length, objects are related by their sizes (1->2->3). This choice is central to how analogies are constructed."
+  }
+]

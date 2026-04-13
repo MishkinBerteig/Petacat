@@ -1,0 +1,239 @@
+{
+  "posting_rules": [
+    {
+      "codelet_type": "bottom-up-bond-scout",
+      "direction": "bottom_up",
+      "urgency_when_posted": 35,
+      "posting_formula": "average_intra_string_unhappiness / 100",
+      "count_formula": "num_unrelated_objects_based",
+      "count_values": {"few": 2, "some": 4, "many": 6},
+      "condition": "always"
+    },
+    {
+      "codelet_type": "top-down-bond-scout:category",
+      "direction": "top_down",
+      "urgency_when_posted": null,
+      "urgency_formula": "conceptual_depth * activation",
+      "posting_formula": "average_intra_string_unhappiness / 100",
+      "count_formula": "num_unrelated_objects_based",
+      "count_values": {"few": 2, "some": 4, "many": 6},
+      "condition": "slipnode_fully_active",
+      "triggering_slipnodes": ["plato-predecessor", "plato-successor", "plato-sameness"]
+    },
+    {
+      "codelet_type": "top-down-bond-scout:direction",
+      "direction": "top_down",
+      "urgency_when_posted": null,
+      "urgency_formula": "conceptual_depth * activation",
+      "posting_formula": "average_intra_string_unhappiness / 100",
+      "count_formula": "num_unrelated_objects_based",
+      "count_values": {"few": 2, "some": 4, "many": 6},
+      "condition": "slipnode_fully_active",
+      "triggering_slipnodes": ["plato-left", "plato-right"]
+    },
+    {
+      "codelet_type": "top-down-group-scout:category",
+      "direction": "top_down",
+      "urgency_when_posted": null,
+      "urgency_formula": "conceptual_depth * activation",
+      "posting_formula": "average_intra_string_unhappiness / 100",
+      "count_formula": "num_ungrouped_objects_based",
+      "count_values": {"none": 0, "few": 1, "some": 2, "many": 3},
+      "condition": "slipnode_fully_active_and_bonds_exist",
+      "triggering_slipnodes": ["plato-predgrp", "plato-succgrp", "plato-samegrp"]
+    },
+    {
+      "codelet_type": "top-down-group-scout:direction",
+      "direction": "top_down",
+      "urgency_when_posted": null,
+      "urgency_formula": "conceptual_depth * activation",
+      "posting_formula": "average_intra_string_unhappiness / 100",
+      "count_formula": "num_ungrouped_objects_based",
+      "count_values": {"none": 0, "few": 1, "some": 2, "many": 3},
+      "condition": "slipnode_fully_active_and_bonds_exist",
+      "triggering_slipnodes": ["plato-left", "plato-right"]
+    },
+    {
+      "codelet_type": "group-scout:whole-string",
+      "direction": "bottom_up",
+      "urgency_when_posted": 35,
+      "posting_formula": "average_intra_string_unhappiness / 100",
+      "count_formula": "num_ungrouped_objects_based",
+      "count_values": {"none": 0, "few": 1, "some": 2, "many": 3},
+      "condition": "bonds_exist"
+    },
+    {
+      "codelet_type": "bottom-up-bridge-scout",
+      "direction": "bottom_up",
+      "urgency_when_posted": 35,
+      "posting_formula": "(100 - min_mapping_strength) / 100",
+      "count_formula": "num_unmapped_objects_based",
+      "count_values": {"few": 2, "some": 5, "many": 6},
+      "condition": "always"
+    },
+    {
+      "codelet_type": "important-object-bridge-scout",
+      "direction": "bottom_up",
+      "urgency_when_posted": 35,
+      "posting_formula": "(100 - min_mapping_strength) / 100",
+      "count_formula": "num_unmapped_objects_based",
+      "count_values": {"few": 2, "some": 5, "many": 6},
+      "condition": "always"
+    },
+    {
+      "codelet_type": "bottom-up-description-scout",
+      "direction": "bottom_up",
+      "urgency_when_posted": 35,
+      "posting_formula": "average_unhappiness / 100",
+      "count_formula": "fixed",
+      "count_values": {"fixed": 2},
+      "condition": "always"
+    },
+    {
+      "codelet_type": "top-down-description-scout",
+      "direction": "top_down",
+      "urgency_when_posted": null,
+      "urgency_formula": "conceptual_depth * activation",
+      "posting_formula": "average_unhappiness / 100",
+      "count_formula": "fixed",
+      "count_values": {"fixed": 2},
+      "condition": "slipnode_fully_active",
+      "triggering_slipnodes": ["plato-string-position-category", "plato-alphabetic-position-category", "plato-length"]
+    },
+    {
+      "codelet_type": "rule-scout",
+      "direction": "bottom_up",
+      "urgency_when_posted": 35,
+      "posting_formula": "1.0 if possible_rule_types else 0.5",
+      "count_formula": "max(1, 2 * num_possible_rule_types)",
+      "condition": "always"
+    },
+    {
+      "codelet_type": "answer-finder",
+      "direction": "bottom_up",
+      "urgency_when_posted": null,
+      "urgency_formula": "100 - temperature",
+      "posting_formula": "(100 - temperature) / 100",
+      "count_formula": "fixed",
+      "count_values": {"fixed": 1},
+      "condition": "not_justify_mode_and_supported_top_rule_exists"
+    },
+    {
+      "codelet_type": "answer-justifier",
+      "direction": "bottom_up",
+      "urgency_when_posted": null,
+      "urgency_formula": "100 - temperature",
+      "posting_formula": "(100 - temperature) / 100",
+      "count_formula": "fixed",
+      "count_values": {"fixed": 1},
+      "condition": "justify_mode_and_supported_rule_exists"
+    },
+    {
+      "codelet_type": "breaker",
+      "direction": "bottom_up",
+      "urgency_when_posted": 7,
+      "posting_formula": "temperature / 100",
+      "count_formula": "fixed",
+      "count_values": {"fixed": 1},
+      "condition": "always"
+    },
+    {
+      "codelet_type": "thematic-bridge-scout",
+      "direction": "thematic",
+      "urgency_when_posted": null,
+      "urgency_formula": "max_positive_theme_activation",
+      "posting_formula": "max_positive_theme_activation / 100",
+      "count_formula": "round(10 * max_inter_string_unhappiness / 100)",
+      "condition": "self_watching_enabled_and_active_themes_exist"
+    },
+    {
+      "codelet_type": "progress-watcher",
+      "direction": "bottom_up",
+      "urgency_when_posted": 49,
+      "posting_formula": "1.0 if thematic_pressure else 0.25",
+      "count_formula": "fixed",
+      "count_values": {"fixed": 2},
+      "condition": "self_watching_enabled"
+    },
+    {
+      "codelet_type": "jootser",
+      "direction": "bottom_up",
+      "urgency_when_posted": 49,
+      "posting_formula": "0.4 if within_snag_or_clamp_period else 0.1",
+      "count_formula": "fixed",
+      "count_values": {"fixed": 2, "justify_mode": 1},
+      "condition": "self_watching_enabled"
+    }
+  ],
+  "initial_codelets": {
+    "types": ["bottom-up-bond-scout", "bottom-up-bridge-scout"],
+    "urgency": 21,
+    "count_formula": "2 * num_workspace_objects"
+  },
+  "codelet_patterns": {
+    "top-down-codelet-pattern": [
+      ["top-down-bond-scout:direction", 77],
+      ["top-down-group-scout:direction", 77],
+      ["top-down-bond-scout:category", 77],
+      ["top-down-group-scout:category", 77],
+      ["top-down-description-scout", 77],
+      ["bond-evaluator", 91],
+      ["bond-builder", 91],
+      ["group-evaluator", 91],
+      ["group-builder", 91],
+      ["description-evaluator", 91],
+      ["description-builder", 91]
+    ],
+    "bottom-up-codelet-pattern": [
+      ["bottom-up-bond-scout", 77],
+      ["bond-evaluator", 91],
+      ["bond-builder", 91],
+      ["group-scout:whole-string", 77],
+      ["group-evaluator", 91],
+      ["group-builder", 91],
+      ["bottom-up-bridge-scout", 77],
+      ["important-object-bridge-scout", 77],
+      ["bridge-evaluator", 91],
+      ["bridge-builder", 91],
+      ["bottom-up-description-scout", 77],
+      ["description-evaluator", 91],
+      ["description-builder", 91],
+      ["rule-scout", 77],
+      ["rule-evaluator", 91],
+      ["rule-builder", 91]
+    ],
+    "thematic-codelet-pattern": [
+      ["thematic-bridge-scout", 91]
+    ],
+    "rule-codelet-pattern": [
+      ["rule-scout", 77],
+      ["rule-evaluator", 91],
+      ["rule-builder", 91]
+    ],
+    "bond-codelet-pattern": [
+      ["bottom-up-bond-scout", 77],
+      ["bond-evaluator", 91],
+      ["bond-builder", 91]
+    ],
+    "group-codelet-pattern": [
+      ["group-scout:whole-string", 77],
+      ["group-evaluator", 91],
+      ["group-builder", 91]
+    ],
+    "bridge-codelet-pattern": [
+      ["bottom-up-bridge-scout", 77],
+      ["important-object-bridge-scout", 77],
+      ["bridge-evaluator", 91],
+      ["bridge-builder", 91]
+    ],
+    "description-codelet-pattern": [
+      ["bottom-up-description-scout", 77],
+      ["description-evaluator", 91],
+      ["description-builder", 91]
+    ],
+    "answer-codelet-pattern": [
+      ["answer-finder", 91],
+      ["answer-justifier", 91]
+    ]
+  }
+}

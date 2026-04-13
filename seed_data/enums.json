@@ -1,0 +1,95 @@
+{
+  "run_statuses": [
+    {"name": "initialized", "display_label": "Initialized", "sort_order": 0, "description": "Run created but not yet started"},
+    {"name": "running", "display_label": "Running", "sort_order": 1, "description": "Actively executing codelets"},
+    {"name": "paused", "display_label": "Paused", "sort_order": 2, "description": "Execution paused (breakpoint or stop flag)"},
+    {"name": "answer_found", "display_label": "Answer Found", "sort_order": 3, "description": "An answer was discovered or justified"},
+    {"name": "halted", "display_label": "Halted", "sort_order": 4, "description": "Execution halted (max steps reached)"},
+    {"name": "gave_up", "display_label": "Gave Up", "sort_order": 5, "description": "System gave up after exhausting alternatives"}
+  ],
+  "event_types": [
+    {"name": "bond_built", "display_label": "Bond Built", "sort_order": 0, "description": "A bond was built between adjacent objects"},
+    {"name": "bond_broken", "display_label": "Bond Broken", "sort_order": 1, "description": "A bond was broken"},
+    {"name": "group_built", "display_label": "Group Built", "sort_order": 2, "description": "A group was formed"},
+    {"name": "group_broken", "display_label": "Group Broken", "sort_order": 3, "description": "A group was broken"},
+    {"name": "bridge_built", "display_label": "Bridge Built", "sort_order": 4, "description": "A bridge was established between strings"},
+    {"name": "bridge_broken", "display_label": "Bridge Broken", "sort_order": 5, "description": "A bridge was broken"},
+    {"name": "rule_built", "display_label": "Rule Built", "sort_order": 6, "description": "A transformation rule was discovered"},
+    {"name": "rule_broken", "display_label": "Rule Broken", "sort_order": 7, "description": "A rule was broken"},
+    {"name": "description_built", "display_label": "Description Built", "sort_order": 8, "description": "A description was attached to an object"},
+    {"name": "answer_found", "display_label": "Answer Found", "sort_order": 9, "description": "An answer was discovered"},
+    {"name": "snag", "display_label": "Snag", "sort_order": 10, "description": "A progress stall was detected"},
+    {"name": "clamp_start", "display_label": "Clamp Start", "sort_order": 11, "description": "A clamp period began"},
+    {"name": "clamp_end", "display_label": "Clamp End", "sort_order": 12, "description": "A clamp period ended"},
+    {"name": "jootsing", "display_label": "Jootsing", "sort_order": 13, "description": "Jumping out of the system — escaping repetitive failure"},
+    {"name": "theme_activated", "display_label": "Theme Activated", "sort_order": 14, "description": "A theme pattern was activated"},
+    {"name": "concept_mapping_built", "display_label": "Concept Mapping Built", "sort_order": 15, "description": "A concept mapping was established"}
+  ],
+  "bridge_types": [
+    {"name": "top", "display_label": "Top", "sort_order": 0, "description": "Horizontal bridge: initial <-> modified"},
+    {"name": "bottom", "display_label": "Bottom", "sort_order": 1, "description": "Horizontal bridge: target <-> answer"},
+    {"name": "vertical", "display_label": "Vertical", "sort_order": 2, "description": "Vertical bridge: initial <-> target, modified <-> answer"}
+  ],
+  "bridge_orientations": [
+    {"name": "horizontal", "display_label": "Horizontal", "sort_order": 0, "description": "Top or bottom bridge (within a row)"},
+    {"name": "vertical", "display_label": "Vertical", "sort_order": 1, "description": "Cross-row bridge"}
+  ],
+  "clause_types": [
+    {"name": "intrinsic", "display_label": "Intrinsic", "sort_order": 0, "description": "Change to an individual object"},
+    {"name": "extrinsic", "display_label": "Extrinsic", "sort_order": 1, "description": "Group-level change"},
+    {"name": "verbatim", "display_label": "Verbatim", "sort_order": 2, "description": "Literal letter sequence"}
+  ],
+  "rule_types": [
+    {"name": "top", "display_label": "Top", "sort_order": 0, "description": "Describes initial -> modified transformation"},
+    {"name": "bottom", "display_label": "Bottom", "sort_order": 1, "description": "Describes target -> answer transformation"}
+  ],
+  "theme_types": [
+    {"name": "top_bridge", "display_label": "Top Bridge", "sort_order": 0, "description": "Theme cluster for top (initial<->modified) bridges"},
+    {"name": "bottom_bridge", "display_label": "Bottom Bridge", "sort_order": 1, "description": "Theme cluster for bottom (target<->answer) bridges"},
+    {"name": "vertical_bridge", "display_label": "Vertical Bridge", "sort_order": 2, "description": "Theme cluster for vertical bridges"}
+  ],
+  "proposal_levels": [
+    {"name": "proposed", "display_label": "Proposed", "sort_order": 1, "description": "Structure has been proposed by a scout codelet"},
+    {"name": "evaluated", "display_label": "Evaluated", "sort_order": 2, "description": "Structure has been evaluated for strength"},
+    {"name": "built", "display_label": "Built", "sort_order": 3, "description": "Structure has been built into the workspace"}
+  ],
+  "link_types": [
+    {"name": "category", "display_label": "Category", "sort_order": 0, "description": "Category link (e.g., letter -> letter-category)"},
+    {"name": "instance", "display_label": "Instance", "sort_order": 1, "description": "Instance link (e.g., letter-category -> a)"},
+    {"name": "property", "display_label": "Property", "sort_order": 2, "description": "Property link"},
+    {"name": "lateral", "display_label": "Lateral", "sort_order": 3, "description": "Lateral link between peers (e.g., a -> b via successor)"},
+    {"name": "lateral_sliplink", "display_label": "Lateral Sliplink", "sort_order": 4, "description": "Lateral slippage link (e.g., leftmost <-> rightmost via opposite)"}
+  ],
+  "codelet_families": [
+    {"name": "answer", "display_label": "Answer", "sort_order": 0, "description": "Answer-finding and justification codelets"},
+    {"name": "bond", "display_label": "Bond", "sort_order": 1, "description": "Bond scout, evaluator, and builder codelets"},
+    {"name": "breaker", "display_label": "Breaker", "sort_order": 2, "description": "Structure-breaking codelets"},
+    {"name": "bridge", "display_label": "Bridge", "sort_order": 3, "description": "Bridge scout, evaluator, and builder codelets"},
+    {"name": "description", "display_label": "Description", "sort_order": 4, "description": "Description scout, evaluator, and builder codelets"},
+    {"name": "group", "display_label": "Group", "sort_order": 5, "description": "Group scout, evaluator, and builder codelets"},
+    {"name": "meta", "display_label": "Meta", "sort_order": 6, "description": "Meta-level codelets (progress-watcher, jootser)"},
+    {"name": "rule", "display_label": "Rule", "sort_order": 7, "description": "Rule scout, evaluator, and builder codelets"}
+  ],
+  "codelet_phases": [
+    {"name": "scout", "display_label": "Scout", "sort_order": 0, "description": "Explores for potential structures"},
+    {"name": "evaluator", "display_label": "Evaluator", "sort_order": 1, "description": "Evaluates proposed structures"},
+    {"name": "builder", "display_label": "Builder", "sort_order": 2, "description": "Builds evaluated structures"},
+    {"name": "other", "display_label": "Other", "sort_order": 3, "description": "Other codelet types (breaker, progress-watcher, etc.)"}
+  ],
+  "posting_directions": [
+    {"name": "bottom_up", "display_label": "Bottom-Up", "sort_order": 0, "description": "Data-driven, posted based on workspace state"},
+    {"name": "top_down", "display_label": "Top-Down", "sort_order": 1, "description": "Concept-driven, posted by active slipnet nodes"},
+    {"name": "thematic", "display_label": "Thematic", "sort_order": 2, "description": "Theme-driven, posted by active themes"}
+  ],
+  "param_value_types": [
+    {"name": "int", "display_label": "Integer", "sort_order": 0, "description": "Integer parameter value"},
+    {"name": "float", "display_label": "Float", "sort_order": 1, "description": "Floating-point parameter value"},
+    {"name": "bool", "display_label": "Boolean", "sort_order": 2, "description": "Boolean parameter value"},
+    {"name": "string", "display_label": "String", "sort_order": 3, "description": "String parameter value"},
+    {"name": "json", "display_label": "JSON", "sort_order": 4, "description": "JSON parameter value"}
+  ],
+  "demo_modes": [
+    {"name": "discovery", "display_label": "Discovery", "sort_order": 0, "description": "Discover the answer to the analogy problem"},
+    {"name": "justification", "display_label": "Justification", "sort_order": 1, "description": "Justify a given answer to the analogy problem"}
+  ]
+}

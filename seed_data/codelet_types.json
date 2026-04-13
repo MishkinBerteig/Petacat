@@ -1,0 +1,272 @@
+[
+  {
+    "name": "bottom-up-bond-scout",
+    "family": "bond",
+    "phase": "scout",
+    "default_urgency": 35,
+    "description": "Randomly chooses an object from the workspace (weighted by intra-string salience), picks a neighbor, selects a bond facet, determines descriptors and bond category, and proposes a bond between them if compatible.",
+    "source_file": "bonds.ss",
+    "source_line": 187,
+    "execute_body": "# Bottom-up bond scout: choose object, neighbor, propose bond\nfrom server.engine.workspace_objects import Letter\n\nobj = choose_object('intra')\nif obj is None:\n    fizzle()\n\nneighbor = choose_neighbor(obj)\nif neighbor is None:\n    fizzle()\n\n# Find bond facets both objects share\nobj_facets = [d.description_type for d in obj.descriptions\n              if any(lk.to_node.name == 'plato-bond-facet'\n                     for lk in d.description_type.category_links)]\nneighbor_facets = [d.description_type for d in neighbor.descriptions\n                   if any(lk.to_node.name == 'plato-bond-facet'\n                          for lk in d.description_type.category_links)]\ncommon_facets = [f for f in obj_facets if f in neighbor_facets]\nif not common_facets:\n    fizzle()\n\n# Choose a bond facet weighted by activation\nfacet_weights = [max(0.1, f.activation) for f in common_facets]\nbond_facet = weighted_pick(common_facets, facet_weights)\n\n# Get descriptors for this facet\nobj_desc = None\nneighbor_desc = None\nfor d in obj.descriptions:\n    if d.description_type is bond_facet:\n        obj_desc = d.descriptor\n        break\nfor d in neighbor.descriptions:\n    if d.description_type is bond_facet:\n        neighbor_desc = d.descriptor\n        break\nif obj_desc is None or neighbor_desc is None:\n    fizzle()\n\n# Determine bond category\nbond_cat = get_bond_category(obj_desc, neighbor_desc)\nif bond_cat is None:\n    fizzle()\n\n# Determine direction\ndirection = None\nsameness = get_node('plato-sameness')\nif bond_cat is not sameness:\n    if obj.left_string_pos < neighbor.left_string_pos:\n        direction = get_node('plato-right')\n    else:\n        direction = get_node('plato-left')\n\npropose_bond(obj, neighbor, bond_cat, bond_facet, obj_desc, neighbor_desc, direction)\n"
+  },
+  {
+    "name": "top-down-bond-scout:category",
+    "family": "bond",
+    "phase": "scout",
+    "default_urgency": null,
+    "description": "Top-down scout driven by an active bond-category slipnet node. Chooses a string, picks an object and neighbor, then proposes a bond of the specified category if the descriptors match.",
+    "source_file": "bonds.ss",
+    "source_line": 217,
+    "execute_body": "# Top-down bond scout by category\nbond_cat_node = args.get('slipnode')\nif bond_cat_node is None:\n    fizzle()\n\nstring = choose_string()\nobj = choose_string_object(string, 'intra')\nif obj is None:\n    fizzle()\n\nneighbor = choose_neighbor(obj)\nif neighbor is None:\n    fizzle()\n\n# Try letter-category facet first\nbond_facet = get_node('plato-letter-category')\nobj_desc = None\nneighbor_desc = None\nfor d in obj.descriptions:\n    if d.description_type is bond_facet:\n        obj_desc = d.descriptor\nfor d in neighbor.descriptions:\n    if d.description_type is bond_facet:\n        neighbor_desc = d.descriptor\n\nif obj_desc is None or neighbor_desc is None:\n    fizzle()\n\nactual_cat = get_bond_category(obj_desc, neighbor_desc)\nif actual_cat is not bond_cat_node:\n    fizzle()\n\ndirection = None\nsameness = get_node('plato-sameness')\nif actual_cat is not sameness:\n    if obj.left_string_pos < neighbor.left_string_pos:\n        direction = get_node('plato-right')\n    else:\n        direction = get_node('plato-left')\n\npropose_bond(obj, neighbor, actual_cat, bond_facet, obj_desc, neighbor_desc, direction)\n"
+  },
+  {
+    "name": "top-down-bond-scout:direction",
+    "family": "bond",
+    "phase": "scout",
+    "default_urgency": null,
+    "description": "Top-down scout driven by an active direction slipnet node. Chooses a string, picks an object, selects the neighbor in the specified direction, and proposes a directed bond.",
+    "source_file": "bonds.ss",
+    "source_line": 269,
+    "execute_body": "# Top-down bond scout by direction\ndir_node = args.get('slipnode')\nif dir_node is None:\n    fizzle()\n\nstring = choose_string()\nobj = choose_string_object(string, 'intra')\nif obj is None:\n    fizzle()\n\n# Pick neighbor in the specified direction\nif dir_node.name == 'plato-left':\n    if obj.left_string_pos == 0:\n        fizzle()\n    neighbor_obj = string.get_object_at(obj.left_string_pos - 1)\nelse:\n    if obj.right_string_pos >= string.length - 1:\n        fizzle()\n    neighbor_obj = string.get_object_at(obj.right_string_pos + 1)\n\nif neighbor_obj is None:\n    fizzle()\n\nbond_facet = get_node('plato-letter-category')\nobj_desc = None\nneighbor_desc = None\nfor d in obj.descriptions:\n    if d.description_type is bond_facet:\n        obj_desc = d.descriptor\nfor d in neighbor_obj.descriptions:\n    if d.description_type is bond_facet:\n        neighbor_desc = d.descriptor\n\nif obj_desc is None or neighbor_desc is None:\n    fizzle()\n\nbond_cat = get_bond_category(obj_desc, neighbor_desc)\nif bond_cat is None or bond_cat is get_node('plato-sameness'):\n    fizzle()\n\npropose_bond(obj, neighbor_obj, bond_cat, bond_facet, obj_desc, neighbor_desc, dir_node)\n"
+  },
+  {
+    "name": "bond-evaluator",
+    "family": "bond",
+    "phase": "evaluator",
+    "default_urgency": null,
+    "description": "Evaluates a proposed bond's strength and probabilistically accepts or rejects it.",
+    "source_file": "bonds.ss",
+    "source_line": 339,
+    "execute_body": "# Bond evaluator\nbond = args.get('structure')\nif bond is None:\n    fizzle()\n\nif not evaluate_structure(bond):\n    fizzle()\n\n# Post a bond-builder\npost_codelet('bond-builder', round(bond.strength), structure=bond)\n"
+  },
+  {
+    "name": "bond-builder",
+    "family": "bond",
+    "phase": "builder",
+    "default_urgency": null,
+    "description": "Attempts to build an evaluated bond. Fights incompatible structures, breaks losers, builds the bond.",
+    "source_file": "bonds.ss",
+    "source_line": 354,
+    "execute_body": "# Bond builder\nbond = args.get('structure')\nif bond is None:\n    fizzle()\n\n# Verify objects still exist in workspace\nif bond.from_object.string is None or bond.to_object.string is None:\n    fizzle()\n\nbuild_structure(bond)\n\n# Activate bond category and direction in slipnet\nif bond.bond_category and bond.bond_category.name in slipnet.nodes:\n    slipnet.nodes[bond.bond_category.name].activation = min(100, slipnet.nodes[bond.bond_category.name].activation + 50)\nif bond.direction and bond.direction.name in slipnet.nodes:\n    slipnet.nodes[bond.direction.name].activation = min(100, slipnet.nodes[bond.direction.name].activation + 50)\n"
+  },
+  {
+    "name": "top-down-group-scout:category",
+    "family": "group",
+    "phase": "scout",
+    "default_urgency": null,
+    "description": "Top-down scout driven by an active group-category slipnet node. Chooses a string, picks an object, scans adjacent bonds matching the group category, and proposes a group.",
+    "source_file": "groups.ss",
+    "source_line": 418,
+    "execute_body": "# Top-down group scout by category\n# Scheme: groups.ss:418-486 — uses scan-bonds with count limit\nfrom server.engine.groups import Group\n\ngrp_cat_node = args.get('slipnode')\nif grp_cat_node is None:\n    fizzle()\n\nstring = choose_string()\nif not string.bonds:\n    fizzle()\n\nobj = choose_string_object(string, 'intra')\nif obj is None:\n    fizzle()\n\n# Find the associated bond category\nbond_cat = None\nfor lk in grp_cat_node.lateral_links:\n    if lk.label_node and lk.label_node.name == 'plato-bond-category':\n        bond_cat = lk.to_node\n        break\nif bond_cat is None:\n    fizzle()\n\n# Scan limit from probability distribution over [1..string_length]\n# Scheme: workspace-strings.ss:56-59 — weighted by index^2\nmax_scan = rng.randint(string.length) + 1\n\n# Scan right for matching bonds (count-limited per Scheme scan-bonds)\nobjects = [obj]\nbonds = []\ncurrent = obj\nfor _scan in range(max_scan):\n    b = current.right_bond\n    if b is None or not b.is_built:\n        break\n    if b.bond_category is not bond_cat:\n        break\n    objects.append(b.right_object)\n    bonds.append(b)\n    current = b.right_object\n\nif len(objects) < 2:\n    fizzle()\n\ndirection = bonds[0].direction if bonds else None\nbond_facet = bonds[0].bond_facet if bonds else get_node('plato-letter-category')\n\ngroup = Group(string, grp_cat_node, bond_facet, direction, objects, bonds)\ngroup.time_stamp = codelet_count\npost_codelet('group-evaluator', round(grp_cat_node.activation), structure=group)\n"
+  },
+  {
+    "name": "top-down-group-scout:direction",
+    "family": "group",
+    "phase": "scout",
+    "default_urgency": null,
+    "description": "Top-down scout driven by an active direction slipnet node. Chooses a string, picks an object, scans bonds in the specified direction, and proposes a group.",
+    "source_file": "groups.ss",
+    "source_line": 489,
+    "execute_body": "# Top-down group scout by direction\n# Scheme: groups.ss:489-544 — uses scan-bonds with count limit\nfrom server.engine.groups import Group\n\ndir_node = args.get('slipnode')\nif dir_node is None:\n    fizzle()\n\nstring = choose_string()\nif not string.bonds:\n    fizzle()\n\nobj = choose_string_object(string, 'intra')\nif obj is None:\n    fizzle()\n\n# Find initial bond in specified direction\ninitial_bond = None\nif dir_node.name == 'plato-right' and obj.right_bond and obj.right_bond.is_built:\n    if obj.right_bond.direction is dir_node:\n        initial_bond = obj.right_bond\nelif dir_node.name == 'plato-left' and obj.left_bond and obj.left_bond.is_built:\n    if obj.left_bond.direction is dir_node:\n        initial_bond = obj.left_bond\n\nif initial_bond is None:\n    fizzle()\n\nbond_cat = initial_bond.bond_category\nobjects = [obj]\nbonds = [initial_bond]\ncurrent = initial_bond.right_object if dir_node.name == 'plato-right' else initial_bond.left_object\nobjects.append(current)\n\n# Count-limited scan (Scheme: scan-bonds with max-num-to-scan)\nmax_scan = rng.randint(string.length) + 1\nfor _scan in range(max_scan):\n    next_bond = current.right_bond if dir_node.name == 'plato-right' else current.left_bond\n    if next_bond is None or not next_bond.is_built:\n        break\n    if next_bond.bond_category is not bond_cat or next_bond.direction is not dir_node:\n        break\n    next_obj = next_bond.right_object if dir_node.name == 'plato-right' else next_bond.left_object\n    objects.append(next_obj)\n    bonds.append(next_bond)\n    current = next_obj\n\nif len(objects) < 2:\n    fizzle()\n\n# Find group category from bond category\ngrp_cat = None\nfor lk in bond_cat.lateral_links:\n    if lk.label_node and lk.label_node.name == 'plato-group-category':\n        grp_cat = lk.to_node\n        break\nif grp_cat is None:\n    fizzle()\n\nbond_facet = bonds[0].bond_facet\ngroup = Group(string, grp_cat, bond_facet, dir_node, objects, bonds)\ngroup.time_stamp = codelet_count\npost_codelet('group-evaluator', round(dir_node.activation), structure=group)\n"
+  },
+  {
+    "name": "group-scout:whole-string",
+    "family": "group",
+    "phase": "scout",
+    "default_urgency": 35,
+    "description": "Bottom-up scout that attempts to form a group spanning an entire string.",
+    "source_file": "groups.ss",
+    "source_line": 545,
+    "execute_body": "# Whole-string group scout\n# Scheme: groups.ss:545-580 — walks bonds from leftmost to rightmost\nfrom server.engine.groups import Group\n\nstring = choose_string()\nif not string.bonds:\n    fizzle()\n\n# Check if bonds span the whole string\nletters = string.letters\nif len(letters) < 2:\n    fizzle()\n\n# Walk right bonds from leftmost letter (bounded by string length)\nobjects = [letters[0]]\nbonds = []\ncurrent = letters[0]\nfor _scan in range(string.length):\n    b = current.right_bond\n    if b is None or not b.is_built:\n        break\n    objects.append(b.right_object)\n    bonds.append(b)\n    current = b.right_object\n    if current is letters[-1]:\n        break\n\nif current is not letters[-1] or len(bonds) == 0:\n    fizzle()\n\n# Check all bonds have same category\nfirst_cat = bonds[0].bond_category\nif not all(b.bond_category is first_cat for b in bonds):\n    fizzle()\n\ndirection = bonds[0].direction\nbond_facet = bonds[0].bond_facet\n\n# Find group category\ngrp_cat = None\nfor lk in first_cat.lateral_links:\n    if lk.label_node and lk.label_node.name == 'plato-group-category':\n        grp_cat = lk.to_node\n        break\nif grp_cat is None:\n    fizzle()\n\ngroup = Group(string, grp_cat, bond_facet, direction, objects, bonds)\ngroup.time_stamp = codelet_count\npost_codelet('group-evaluator', 35, structure=group)\n"
+  },
+  {
+    "name": "group-evaluator",
+    "family": "group",
+    "phase": "evaluator",
+    "default_urgency": null,
+    "description": "Evaluates a proposed group's strength. If accepted, posts a group-builder.",
+    "source_file": "groups.ss",
+    "source_line": 582,
+    "execute_body": "# Group evaluator\ngroup = args.get('structure')\nif group is None:\n    fizzle()\n\nif not evaluate_structure(group):\n    fizzle()\n\npost_codelet('group-builder', round(group.strength), structure=group)\n"
+  },
+  {
+    "name": "group-builder",
+    "family": "group",
+    "phase": "builder",
+    "default_urgency": null,
+    "description": "Attempts to build an evaluated group.",
+    "source_file": "groups.ss",
+    "source_line": 622,
+    "execute_body": "# Group builder\ngroup = args.get('structure')\nif group is None:\n    fizzle()\n\n# Verify constituent bonds still exist\nfor b in group.group_bonds:\n    if not b.is_built:\n        fizzle()\n\nbuild_structure(group)\n\n# Activate group category and direction\nif group.group_category.name in slipnet.nodes:\n    slipnet.nodes[group.group_category.name].activation = min(100, slipnet.nodes[group.group_category.name].activation + 50)\nif group.direction and group.direction.name in slipnet.nodes:\n    slipnet.nodes[group.direction.name].activation = min(100, slipnet.nodes[group.direction.name].activation + 50)\n"
+  },
+  {
+    "name": "bottom-up-bridge-scout",
+    "family": "bridge",
+    "phase": "scout",
+    "default_urgency": 35,
+    "description": "Randomly selects a bridge type weighted by inverse mapping strength, chooses two objects, computes concept-mappings, and proposes a bridge.",
+    "source_file": "bridges.ss",
+    "source_line": 895,
+    "execute_body": "# Bottom-up bridge scout\nfrom server.engine.bridges import Bridge, BRIDGE_TOP, BRIDGE_BOTTOM, BRIDGE_VERTICAL\nfrom server.engine.concept_mappings import ConceptMapping\n\n# Choose bridge type weighted by inverse mapping strength\ntypes_and_strings = [('top', BRIDGE_TOP, workspace.initial_string, workspace.modified_string)]\ntypes_and_strings.append(('vertical', BRIDGE_VERTICAL, workspace.initial_string, workspace.target_string))\nif justify_mode:\n    types_and_strings.append(('bottom', BRIDGE_BOTTOM, workspace.target_string, workspace.answer_string))\n\nweights = [max(0.1, 100 - mapping_strength(t[0])) for t in types_and_strings]\nchosen = weighted_pick(types_and_strings, weights)\nbt_name, bt, string1, string2 = chosen\n\nif string2 is None:\n    fizzle()\n\n# Choose objects from each string weighted by inter-string salience\nkey = 'horizontal_inter' if bt != BRIDGE_VERTICAL else 'vertical_inter'\nobj1 = choose_string_object(string1, key)\nobj2 = choose_string_object(string2, key)\nif obj1 is None or obj2 is None:\n    fizzle()\n\n# Compute concept mappings between descriptions\ncms = []\nfor d1 in obj1.descriptions:\n    for d2 in obj2.descriptions:\n        if d1.description_type is d2.description_type:\n            label = None\n            if d1.descriptor is d2.descriptor:\n                label = get_node('plato-identity')\n            else:\n                for lk in d1.descriptor.outgoing_links:\n                    if lk.to_node is d2.descriptor and lk.label_node:\n                        label = lk.label_node\n                        break\n            cm = ConceptMapping(d1.description_type, d1.descriptor, d2.description_type, d2.descriptor, label)\n            cms.append(cm)\n\nif not cms:\n    fizzle()\n\nbridge = Bridge(obj1, obj2, bt, cms)\nbridge.time_stamp = codelet_count\navg_strength = sum(cm.strength() for cm in cms) / len(cms)\npost_codelet('bridge-evaluator', round(avg_strength), structure=bridge)\n"
+  },
+  {
+    "name": "important-object-bridge-scout",
+    "family": "bridge",
+    "phase": "scout",
+    "default_urgency": 35,
+    "description": "Selects a bridge type, chooses object1 by relative importance, finds a matching object2 via distinguishing descriptions.",
+    "source_file": "bridges.ss",
+    "source_line": 966,
+    "execute_body": "# Important-object bridge scout\nfrom server.engine.bridges import Bridge, BRIDGE_TOP, BRIDGE_BOTTOM, BRIDGE_VERTICAL\nfrom server.engine.concept_mappings import ConceptMapping\n\ntypes_and_strings = [('top', BRIDGE_TOP, workspace.initial_string, workspace.modified_string)]\ntypes_and_strings.append(('vertical', BRIDGE_VERTICAL, workspace.initial_string, workspace.target_string))\nif justify_mode:\n    types_and_strings.append(('bottom', BRIDGE_BOTTOM, workspace.target_string, workspace.answer_string))\n\nweights = [max(0.1, 100 - mapping_strength(t[0])) for t in types_and_strings]\nchosen = weighted_pick(types_and_strings, weights)\nbt_name, bt, string1, string2 = chosen\n\nif string2 is None:\n    fizzle()\n\n# Choose obj1 by relative importance\nobjects1 = string1.objects\nif not objects1:\n    fizzle()\nimport_weights = [max(0.1, o.relative_importance) for o in objects1]\nobj1 = weighted_pick(objects1, import_weights)\n\n# Pick a distinguishing description\nrelevant = [d for d in obj1.descriptions if d.is_relevant() and d.is_distinguishing()]\nif not relevant:\n    fizzle()\ndesc_weights = [max(0.1, d.descriptor.conceptual_depth) for d in relevant]\nchosen_desc = weighted_pick(relevant, desc_weights)\n\n# Search for obj2 with matching descriptor\n_found = False\nfor obj2 in string2.objects:\n    if _found:\n        break\n    for d2 in obj2.descriptions:\n        if d2.description_type is chosen_desc.description_type and d2.descriptor is chosen_desc.descriptor:\n            cms = []\n            for dd1 in obj1.descriptions:\n                for dd2 in obj2.descriptions:\n                    if dd1.description_type is dd2.description_type:\n                        label = None\n                        if dd1.descriptor is dd2.descriptor:\n                            label = get_node('plato-identity')\n                        else:\n                            for lk in dd1.descriptor.outgoing_links:\n                                if lk.to_node is dd2.descriptor and lk.label_node:\n                                    label = lk.label_node\n                                    break\n                        cms.append(ConceptMapping(dd1.description_type, dd1.descriptor, dd2.description_type, dd2.descriptor, label))\n            if cms:\n                bridge = Bridge(obj1, obj2, bt, cms)\n                bridge.time_stamp = codelet_count\n                avg_s = sum(cm.strength() for cm in cms) / len(cms)\n                post_codelet('bridge-evaluator', round(avg_s), structure=bridge)\n                _found = True\n                break\n\nif not _found:\n    fizzle()\n"
+  },
+  {
+    "name": "bridge-evaluator",
+    "family": "bridge",
+    "phase": "evaluator",
+    "default_urgency": null,
+    "description": "Evaluates a proposed bridge's strength and probabilistically accepts or rejects it.",
+    "source_file": "bridges.ss",
+    "source_line": 1149,
+    "execute_body": "# Bridge evaluator\nbridge = args.get('structure')\nif bridge is None:\n    fizzle()\n\nif not evaluate_structure(bridge):\n    fizzle()\n\npost_codelet('bridge-builder', round(bridge.strength), structure=bridge)\n"
+  },
+  {
+    "name": "bridge-builder",
+    "family": "bridge",
+    "phase": "builder",
+    "default_urgency": null,
+    "description": "Builds an evaluated bridge into the workspace.",
+    "source_file": "bridges.ss",
+    "source_line": 1183,
+    "execute_body": "# Bridge builder\nbridge = args.get('structure')\nif bridge is None:\n    fizzle()\n\n# Verify both objects still exist\nif bridge.object1.string is None or bridge.object2.string is None:\n    fizzle()\n\nbuild_structure(bridge)\n\n# Activate concept-mapping descriptors\nfor cm in bridge.concept_mappings:\n    for node_name in [cm.descriptor1.name, cm.descriptor2.name]:\n        if node_name in slipnet.nodes:\n            slipnet.nodes[node_name].activation = min(100, slipnet.nodes[node_name].activation + 30)\n"
+  },
+  {
+    "name": "bottom-up-description-scout",
+    "family": "description",
+    "phase": "scout",
+    "default_urgency": 35,
+    "description": "Chooses an object, selects a relevant description, follows property links, and proposes a new description.",
+    "source_file": "descriptions.ss",
+    "source_line": 105,
+    "execute_body": "# Bottom-up description scout\nobj = choose_object('intra')\nif obj is None:\n    fizzle()\n\n# Choose a relevant description weighted by activation\nrelevant = [d for d in obj.descriptions if d.is_relevant()]\nif not relevant:\n    fizzle()\n\nweights = [max(0.1, d.descriptor.activation) for d in relevant]\nchosen = weighted_pick(relevant, weights)\n\n# Follow property links from the descriptor\nproperty_links = chosen.descriptor.property_links\nif not property_links:\n    fizzle()\n\n# Pick a property link\nlink = rng.pick(property_links)\nnew_descriptor = link.to_node\n\n# Find the description type for this new descriptor\nnew_desc_type = None\nfor lk in new_descriptor.category_links:\n    new_desc_type = lk.to_node\n    break\nif new_desc_type is None:\n    fizzle()\n\n# Check if this description already exists\nfor d in obj.descriptions:\n    if d.description_type is new_desc_type and d.descriptor is new_descriptor:\n        fizzle()\n\npropose_description(obj, new_desc_type, new_descriptor)\n"
+  },
+  {
+    "name": "top-down-description-scout",
+    "family": "description",
+    "phase": "scout",
+    "default_urgency": null,
+    "description": "Top-down scout driven by an active description-type slipnet node. Chooses an object and proposes a description of the specified type.",
+    "source_file": "descriptions.ss",
+    "source_line": 127,
+    "execute_body": "# Top-down description scout\ndesc_type_node = args.get('slipnode')\nif desc_type_node is None:\n    fizzle()\n\nobj = choose_object('intra')\nif obj is None:\n    fizzle()\n\n# Check if object already has this description type\nfor d in obj.descriptions:\n    if d.description_type is desc_type_node:\n        fizzle()\n\n# Find possible descriptors for this type\npossible = []\nfor inst_link in desc_type_node.instance_links:\n    candidate = inst_link.to_node\n    possible.append(candidate)\n\nif not possible:\n    fizzle()\n\n# Choose a descriptor weighted by activation\nweights = [max(0.1, d.activation) for d in possible]\ndescriptor = weighted_pick(possible, weights)\n\npropose_description(obj, desc_type_node, descriptor)\n"
+  },
+  {
+    "name": "description-evaluator",
+    "family": "description",
+    "phase": "evaluator",
+    "default_urgency": null,
+    "description": "Evaluates a proposed description and probabilistically accepts or rejects it.",
+    "source_file": "descriptions.ss",
+    "source_line": 143,
+    "execute_body": "# Description evaluator\ndesc = args.get('structure')\nif desc is None:\n    fizzle()\n\n# Activate the descriptor\nif desc.descriptor.name in slipnet.nodes:\n    slipnet.nodes[desc.descriptor.name].activation = min(100, slipnet.nodes[desc.descriptor.name].activation + 30)\n\nif not evaluate_structure(desc):\n    fizzle()\n\npost_codelet('description-builder', round(desc.strength), structure=desc)\n"
+  },
+  {
+    "name": "description-builder",
+    "family": "description",
+    "phase": "builder",
+    "default_urgency": null,
+    "description": "Builds an evaluated description by attaching it to its object.",
+    "source_file": "descriptions.ss",
+    "source_line": 156,
+    "execute_body": "# Description builder\ndesc = args.get('structure')\nif desc is None:\n    fizzle()\n\nif desc.object is None or desc.object.string is None:\n    fizzle()\n\n# Check not already present\nfor d in desc.object.descriptions:\n    if d.description_type is desc.description_type and d.descriptor is desc.descriptor:\n        fizzle()\n\nbuild_structure(desc)\n\n# Activate type and descriptor\nfor node_name in [desc.description_type.name, desc.descriptor.name]:\n    if node_name in slipnet.nodes:\n        slipnet.nodes[node_name].activation = min(100, slipnet.nodes[node_name].activation + 50)\n"
+  },
+  {
+    "name": "rule-scout",
+    "family": "rule",
+    "phase": "scout",
+    "default_urgency": 63,
+    "description": "Discovers transformation rules by examining horizontal bridges.",
+    "source_file": "rules.ss",
+    "source_line": 397,
+    "execute_body": "# Rule scout\nfrom server.engine.rules import Rule, RuleClause, RuleChange, RULE_TOP, CLAUSE_INTRINSIC\n\ntop_bridges = get_built_bridges('top')\nif not top_bridges:\n    fizzle()\n\n# Build rule clauses from bridge concept mappings\nclauses = []\nfor bridge in top_bridges:\n    for cm in bridge.concept_mappings:\n        if cm.is_slippage:\n            change = RuleChange(\n                dimension=cm.description_type1,\n                from_descriptor=cm.descriptor1,\n                to_descriptor=cm.descriptor2,\n                relation=cm.label,\n            )\n            obj_desc = (cm.description_type1, cm.descriptor1)\n            clause = RuleClause(\n                clause_type=CLAUSE_INTRINSIC,\n                object_description=obj_desc,\n                changes=[change],\n            )\n            clauses.append(clause)\n\nif not clauses:\n    fizzle()\n\nrule = Rule(RULE_TOP, clauses)\nrule.time_stamp = codelet_count\nrule.supporting_bridges = list(top_bridges)\nrule.compute_quality(meta)\nrule.transcribe_to_english()\n\npost_codelet('rule-evaluator', 63, structure=rule)\n"
+  },
+  {
+    "name": "rule-evaluator",
+    "family": "rule",
+    "phase": "evaluator",
+    "default_urgency": 63,
+    "description": "Evaluates a proposed rule and probabilistically accepts or rejects it.",
+    "source_file": "rules.ss",
+    "source_line": 461,
+    "execute_body": "# Rule evaluator\nrule = args.get('structure')\nif rule is None:\n    fizzle()\n\nrule.compute_quality(meta)\n\nif not evaluate_structure(rule):\n    fizzle()\n\npost_codelet('rule-builder', 63, structure=rule)\n"
+  },
+  {
+    "name": "rule-builder",
+    "family": "rule",
+    "phase": "builder",
+    "default_urgency": 63,
+    "description": "Builds a rule and posts an answer-finder.",
+    "source_file": "rules.ss",
+    "source_line": 475,
+    "execute_body": "# Rule builder\nrule = args.get('structure')\nif rule is None:\n    fizzle()\n\nbuild_structure(rule)\n\n# Post answer-finder or answer-justifier\nurgency = max(1, round(100 - temperature.value))\nif justify_mode:\n    post_codelet('answer-justifier', urgency)\nelse:\n    post_codelet('answer-finder', urgency)\n"
+  },
+  {
+    "name": "answer-finder",
+    "family": "answer",
+    "phase": "other",
+    "default_urgency": null,
+    "description": "Attempts to produce an answer by translating a top rule across the vertical mapping.",
+    "source_file": "answers.ss",
+    "source_line": 929,
+    "execute_body": "# Answer finder\nfrom server.engine.answers import compute_answer_quality\nfrom server.engine.trace import SNAG, ANSWER_FOUND\n\n# Check mapping strengths are sufficient\ntop_strength = mapping_strength('top')\nvert_strength = mapping_strength('vertical')\nif top_strength < 20 or vert_strength < 20:\n    fizzle()\n\n# Get supported top rules\nsupported = workspace.get_supported_rules(True)\nif not supported:\n    fizzle()\n\n# Choose best rule\nrule_weights = [max(0.1, r.quality) for r in supported]\nchosen_rule = weighted_pick(supported, rule_weights)\n\n# Translate the rule via vertical bridges\ntranslated = translate_rule(chosen_rule)\nif translated is None:\n    # Snag: no vertical bridges to translate through\n    record_event(SNAG, description='No vertical bridges for rule translation')\n    fizzle()\n\n# Apply the translated rule to the target string\nanswer_text = apply_rule(translated)\nif answer_text is None:\n    # Snag: rule application failed (e.g., successor of z)\n    record_event(SNAG, description='Rule application failed (snag)')\n    fizzle()\n\n# Compute answer quality\nquality = compute_answer_quality(chosen_rule.quality, temperature.value, meta)\n\n# Report the answer\nreport_answer(answer_text, quality, top_rule=chosen_rule)\n"
+  },
+  {
+    "name": "answer-justifier",
+    "family": "answer",
+    "phase": "other",
+    "default_urgency": null,
+    "description": "Used in justify mode to validate a given answer.",
+    "source_file": "justify.ss",
+    "source_line": 20,
+    "execute_body": "# Answer justifier\nfrom server.engine.answers import compute_answer_quality\nfrom server.engine.trace import SNAG, ANSWER_FOUND\n\ntop_rules = workspace.get_supported_rules(True)\nbottom_rules = workspace.get_supported_rules(False)\n\nif not top_rules and not bottom_rules:\n    fizzle()\n\n# Try to find compatible rules\n_justified = False\nfor tr in top_rules:\n    if _justified:\n        break\n    for br in bottom_rules:\n        if len(tr.clauses) == len(br.clauses):\n            quality = compute_answer_quality(\n                (tr.quality + br.quality) / 2, temperature.value, meta\n            )\n            record_event(ANSWER_FOUND, description=f'Justified with quality {quality}')\n            _justified = True\n            break\n\nif not _justified:\n    fizzle()\n"
+  },
+  {
+    "name": "thematic-bridge-scout",
+    "family": "bridge",
+    "phase": "scout",
+    "default_urgency": null,
+    "description": "Self-watching codelet that scouts for bridges guided by active Themespace themes.",
+    "source_file": "themes.ss",
+    "source_line": 750,
+    "execute_body": "# Thematic bridge scout\nfrom server.engine.bridges import Bridge, BRIDGE_TOP, BRIDGE_BOTTOM, BRIDGE_VERTICAL\nfrom server.engine.concept_mappings import ConceptMapping\n\nif not self_watching:\n    fizzle()\n\n# Find active bridge type with thematic pressure\npressure = None\nfor bt in ['top', 'vertical', 'bottom']:\n    p = themespace.get_thematic_pressure(bt)\n    if p:\n        pressure = (bt, p)\n        break\n\nif pressure is None:\n    fizzle()\n\nbt_name, theme_pattern = pressure\nbt_map = {'top': BRIDGE_TOP, 'bottom': BRIDGE_BOTTOM, 'vertical': BRIDGE_VERTICAL}\nbt = bt_map[bt_name]\n\n# Choose string pair\nif bt == BRIDGE_TOP:\n    s1, s2 = workspace.initial_string, workspace.modified_string\nelif bt == BRIDGE_VERTICAL:\n    s1, s2 = workspace.initial_string, workspace.target_string\nelse:\n    s1, s2 = workspace.target_string, workspace.answer_string\n    if s2 is None:\n        fizzle()\n\nkey = 'horizontal_inter' if bt != BRIDGE_VERTICAL else 'vertical_inter'\nobj1 = choose_string_object(s1, key)\nobj2 = choose_string_object(s2, key)\nif obj1 is None or obj2 is None:\n    fizzle()\n\ncms = []\nfor d1 in obj1.descriptions:\n    for d2 in obj2.descriptions:\n        if d1.description_type is d2.description_type:\n            label = get_node('plato-identity') if d1.descriptor is d2.descriptor else None\n            if label is None:\n                for lk in d1.descriptor.outgoing_links:\n                    if lk.to_node is d2.descriptor and lk.label_node:\n                        label = lk.label_node\n                        break\n            cms.append(ConceptMapping(d1.description_type, d1.descriptor, d2.description_type, d2.descriptor, label))\n\nif not cms:\n    fizzle()\n\nbridge = Bridge(obj1, obj2, bt, cms)\nbridge.time_stamp = codelet_count\npost_codelet('bridge-evaluator', round(themespace.get_max_positive_theme_activation()), structure=bridge)\n"
+  },
+  {
+    "name": "progress-watcher",
+    "family": "meta",
+    "phase": "other",
+    "default_urgency": 49,
+    "description": "Self-watching codelet that monitors system progress.",
+    "source_file": "jootsing.ss",
+    "source_line": 255,
+    "execute_body": "# Progress watcher\nfrom server.engine.jootsing import check_progress\nfrom server.engine.commentary import emit_clamp_expired\n\nif not self_watching:\n    fizzle()\n\nresult = check_progress(workspace, trace, codelet_count, meta, commentary=commentary)\n\nif result.action == 'undo_clamp':\n    emit_clamp_expired(commentary, 'rule_codelet_clamp', 0.0, codelet_count)\n    trace.within_clamp_period = False\n    trace.last_unclamp_time = codelet_count\n    coderack.unclamp_all()\n    themespace.unclamp_all()\nelif result.action == 'clamp_rule_pattern':\n    pattern = meta.codelet_patterns.get('rule-codelet-pattern', [])\n    if pattern:\n        coderack.clamp_pattern(pattern)\n        trace.record_clamp_start(codelet_count, temperature.value)\nelif result.action == 'post_answer_finder':\n    urgency = max(1, round(100 - temperature.value))\n    if justify_mode:\n        post_codelet('answer-justifier', urgency)\n    else:\n        post_codelet('answer-finder', urgency)\n"
+  },
+  {
+    "name": "jootser",
+    "family": "meta",
+    "phase": "other",
+    "default_urgency": 49,
+    "description": "Self-watching codelet that detects and escapes repetitive failure patterns (Jumping Out Of The System).",
+    "source_file": "jootsing.ss",
+    "source_line": 23,
+    "execute_body": "# Jootser\nfrom server.engine.jootsing import attempt_jootsing\n\nif not self_watching:\n    fizzle()\n\nresult = attempt_jootsing(trace, themespace, meta, commentary=commentary, codelet_count=codelet_count)\n\nif result.give_up:\n    # Give up: too many failed attempts\n    pass\nelif result.pattern_detected and result.negative_pattern:\n    # Clamp negative theme pattern to inhibit stuck interpretation\n    themespace.clamp_negative_pattern(result.negative_pattern)\n    # Clamp bottom-up codelet pattern to force exploration\n    pattern = meta.codelet_patterns.get('bottom-up-codelet-pattern', [])\n    if pattern:\n        coderack.clamp_pattern(pattern)\n    trace.record_clamp_start(codelet_count, temperature.value)\n"
+  },
+  {
+    "name": "breaker",
+    "family": "breaker",
+    "phase": "other",
+    "default_urgency": 7,
+    "description": "Randomly breaks existing structures to allow restructuring. Probabilistically fizzles at low temperature.",
+    "source_file": "breakers.ss",
+    "source_line": 20,
+    "execute_body": "# Breaker codelet\n# Probabilistically fizzle at low temperature (prefer to break at high temp)\nif not prob(temperature.value / 100.0):\n    fizzle()\n\n# Get all built non-rule structures\nstructures = [s for s in workspace.all_structures\n              if hasattr(s, 'is_built') and s.is_built\n              and not hasattr(s, 'is_top_rule')]\nif not structures:\n    fizzle()\n\n# Choose a structure randomly\ntarget = rng.pick(structures)\n\n# Probabilistically break based on weakness (temperature-adjusted)\nweakness = target.weakness() / 100.0\nbreak_prob = temp_adjusted_prob(weakness)\nif prob(break_prob):\n    break_structure(target)\n"
+  }
+]

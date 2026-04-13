@@ -1,0 +1,92 @@
+{
+  "answer_quality_phrases": [
+    {"max_quality": 50, "phrase": "really terrible"},
+    {"max_quality": 60, "phrase": "pretty bad"},
+    {"max_quality": 70, "phrase": "pretty dumb"},
+    {"max_quality": 75, "phrase": "pretty mediocre"},
+    {"max_quality": 80, "phrase": "halfway decent"},
+    {"max_quality": 85, "phrase": "pretty good"},
+    {"max_quality": 90, "phrase": "very good"},
+    {"max_quality": null, "phrase": "great"}
+  ],
+  "coherence_phrases": [
+    {"max_coherence": -50, "phrase": "very incoherent"},
+    {"max_coherence": -10, "phrase": "incoherent"},
+    {"max_coherence": 0, "phrase": "somewhat incoherent"},
+    {"max_coherence": 10, "phrase": "very coherent"},
+    {"max_coherence": null, "phrase": "coherent"}
+  ],
+  "answer_reporting": {
+    "unjustified_slippages": {
+      "eliza": "Okay, I'm stumped.  This answer makes no sense to me.  I see no way to make the necessary {slippage_names} slippage(s) here.",
+      "technical": "Run terminated.  Unable to make the necessary {slippage_names} slippage(s)."
+    },
+    "justify_success": {
+      "eliza_prefix": "Aha!  I see why this answer makes sense",
+      "quality_suffix_bad": ", but it's a {quality_phrase} answer, in my opinion.",
+      "quality_suffix_extreme": ".  I think it's a {quality_phrase} answer!",
+      "quality_suffix_normal": ".  I think it's a {quality_phrase} answer.",
+      "technical": "Successfully justified answer.  Answer quality = {quality}."
+    },
+    "discovery": {
+      "eliza_prefix": "The answer \"{answer}\" {also}occurs to me",
+      "quality_suffix_bad": ", but that's {quality_phrase}{punctuation}",
+      "quality_suffix_good": ".  I think this answer is {quality_phrase}{punctuation}",
+      "technical": "Found the answer \"{answer}\".  Answer quality = {quality}."
+    },
+    "give_up": {
+      "eliza": "Excuse me -- I think I'll go get some more punch.",
+      "technical": "Run terminated."
+    }
+  },
+  "answer_explanation": {
+    "template": "This answer is based {theme_phrases}.",
+    "quality_suffix_eliza": "  Personally, I think this answer is {quality_phrase}.",
+    "quality_suffix_technical": "  Answer quality = {quality}."
+  },
+  "theme_phrase_templates": {
+    "direction_with_group_category": {
+      "identity": "see{ending} {strings} as groups of the same type going in the same direction",
+      "opposite": "see{ending} {strings} as symmetric predecessor and successor groups going in opposite directions",
+      "diff": "see{ending} {strings} as different kinds of groups going in neither the same nor opposite directions"
+    },
+    "direction_without_group_category": {
+      "identity": "see{ending} {strings} as going in the same direction",
+      "opposite": "see{ending} {strings} as going in opposite directions"
+    },
+    "group_category_standalone": {
+      "identity": "see{ending} {strings} as groups of the same type",
+      "opposite": "see{ending} {strings} as symmetric predecessor and successor groups",
+      "diff": "see{ending} {strings} as different kinds of groups"
+    },
+    "bond_facet": "view{ending} one of {strings} in terms of letters and the other in terms of numbers",
+    "alphabetic_position": {
+      "identity": "see{ending} alphabetic-position sameness between {strings}",
+      "opposite": "see{ending} alphabetic-position symmetry between {strings}"
+    }
+  },
+  "caveat_templates": {
+    "unjustified": " (although there is no good reason for doing so)",
+    "snag_justified": " (which avoids a snag that would otherwise arise from the fact that {snag_explanation})"
+  },
+  "comparison_judgment_priority": [
+    "both_incoherent",
+    "one_incoherent_other_not",
+    "fewer_unjustified_themes",
+    "more_abstract_rule",
+    "richer_set_of_ideas",
+    "neither_better"
+  ],
+  "comparison_templates": {
+    "essentially_same": "The answer {answer1} is essentially the same as the answer {answer2}.  Both answers {similarities}.  Furthermore, {rule_comparison}.",
+    "similar_with_rule_diffs": "{rule_explanation}  Both answers {similarities}.",
+    "similar_with_justification_diffs": "The answer {answer1} is similar to the answer {answer2}, since both {similarities}.  However, {justification_explanation}.",
+    "one_incoherent": "All in all, I'd say {coherent_answer} is the better answer, since it is more coherent.",
+    "fewer_unjustified_zero": "All in all, I'd say {answer} is the better answer, since it involves no unjustified ideas.",
+    "fewer_unjustified": "All in all, I'd say {answer} is the better answer, since it involves fewer unjustified ideas.",
+    "more_abstract": "All in all, I'd say {answer} is the better answer, since it involves seeing {change} in a more abstract way.",
+    "richer_ideas": "All in all, I'd say {answer} is the better answer, since it is based on a richer set of ideas.",
+    "same_quality": "All in all, I'd say they're both {quality_phrase} answers.",
+    "different_quality": "All in all, I'd say {answer1} is {quality1} and {answer2} is {quality2}."
+  }
+}

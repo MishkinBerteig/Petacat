@@ -1,0 +1,37 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: petacat-prod-db
+    environment:
+      POSTGRES_DB: petacat
+      POSTGRES_USER: petacat
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - petacat-prod-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U petacat"]
+      interval: 2s
+      retries: 10
+    networks:
+      - petacat-prod-net
+
+  app:
+    build: .
+    container_name: petacat-prod-app
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://petacat:${POSTGRES_PASSWORD}@db:5432/petacat
+      SEED_DATA_DIR: /app/seed_data
+    ports:
+      - "8100:8000"
+    networks:
+      - petacat-prod-net
+
+networks:
+  petacat-prod-net:
+    name: petacat-prod-net
+
+volumes:
+  petacat-prod-pgdata:
