@@ -84,11 +84,16 @@ vacuously.
 Discovered during the first unit-testing pass. Ordered by priority.
 
 ### P1 — Continue bottom-up coverage of low-level structures
-- [ ] `groups.py` — group strength, length, spanning, membership/containment.
-- [ ] `workspace_objects.py` — currently only 3 tests; cover group importance,
-      relative importance, salience, unhappiness.
-- [ ] `workspace.py` — no dedicated unit file; cover unhappiness aggregation
-      and string management (isolate from the full engine).
+- [x] `groups.py` — length, spanning, membership/containment, internal/external
+      strength, flipping, constituent queries (`test_groups.py`).
+- [x] `workspace_objects.py` — geometry, bond bookkeeping, importance,
+      intra-string unhappiness, bridge weakness (`test_workspace_object.py`).
+- [x] `workspace.py` → `WorkspaceString` — bond/group management, counting,
+      equivalence, spanning, relevance (`test_workspace_string.py`).
+- [ ] `workspace.py` → `Workspace` — the outer container's aggregation
+      (average unhappiness, mapping strength, unmapped-object counts). Several
+      of these methods reach across strings/bridges; isolate with fakes or flag
+      for refactoring where the coupling is heavy.
 
 ### P2 — Deepen self-watching (research core)
 - [ ] `trace.py` — pattern detection beyond the basic record/snag paths.

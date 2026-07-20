@@ -70,7 +70,9 @@ class FakeString:
     """Stand-in for a workspace string container.
 
     ``objects``/``letters``/``groups`` are independent lists so a test can
-    populate exactly the collection the unit under test iterates.
+    populate exactly the collection the unit under test iterates. ``length``,
+    ``string_type`` and ``justify_mode`` mirror the fields workspace objects
+    read for spanning / string-type-dependent logic.
     """
 
     def __init__(
@@ -79,10 +81,16 @@ class FakeString:
         objects: list[Any] | None = None,
         letters: list[Any] | None = None,
         groups: list[Any] | None = None,
+        length: int = 0,
+        string_type: str = "initial",
+        justify_mode: bool = False,
     ) -> None:
         self.objects = objects if objects is not None else []
         self.letters = letters if letters is not None else []
         self.groups = groups if groups is not None else []
+        self.length = length
+        self.string_type = string_type
+        self.justify_mode = justify_mode
 
 
 class FakeObject:
