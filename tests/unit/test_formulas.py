@@ -44,13 +44,14 @@ def test_temp_adjusted_probability_one(meta):
     assert temp_adjusted_probability(1.0, 50.0, meta) == 1.0
 
 
-def test_temp_adjusted_probability_high_temp_pushes_toward_half(meta):
-    """At high temperature, probabilities should move toward 0.5."""
-    low_prob = temp_adjusted_probability(0.1, 100.0, meta)
-    assert low_prob > 0.1  # Pushed up toward 0.5
+def test_temp_adjusted_probability_high_temp_pushes_low_prob_up(meta):
+    """At high temperature, a low probability moves up toward 0.5."""
+    assert temp_adjusted_probability(0.1, 100.0, meta) > 0.1
 
-    high_prob = temp_adjusted_probability(0.9, 100.0, meta)
-    assert high_prob < 0.9  # Pushed down toward 0.5
+
+def test_temp_adjusted_probability_high_temp_pushes_high_prob_down(meta):
+    """At high temperature, a high probability moves down toward 0.5."""
+    assert temp_adjusted_probability(0.9, 100.0, meta) < 0.9
 
 
 def test_temp_adjusted_probability_low_temp_preserves(meta):
@@ -92,9 +93,15 @@ def test_update_temperature_with_rule(meta):
     assert temp == 35
 
 
-def test_weighted_average():
+def test_weighted_average_equal_weights():
     assert weighted_average([10, 20], [1, 1]) == 15.0
+
+
+def test_weighted_average_unequal_weights():
     assert weighted_average([10, 20], [3, 1]) == 12.5
+
+
+def test_weighted_average_empty_is_zero():
     assert weighted_average([], []) == 0.0
 
 

@@ -41,11 +41,15 @@ def test_strength_defaults_to_zero():
     assert s.strength == 0.0
 
 
-def test_weakness_inverse_of_strength():
+def test_weakness_is_low_at_full_strength():
     s = WorkspaceStructure()
     s.strength = 100.0
     # weakness = 100 - strength^0.95; at 100 it's about 20.6
     assert s.weakness() < 50.0
+
+
+def test_weakness_is_maximal_at_zero_strength():
+    s = WorkspaceStructure()
     s.strength = 0.0
     assert s.weakness() == 100.0
 
@@ -56,10 +60,12 @@ def test_unique_ids():
     assert s1.id != s2.id
 
 
-def test_repr_contains_level_string():
+def test_repr_contains_proposed_level_string():
     s = WorkspaceStructure()
-    r = repr(s)
-    assert "proposed" in r
+    assert "proposed" in repr(s)
+
+
+def test_repr_contains_built_level_string():
+    s = WorkspaceStructure()
     s.proposal_level = WorkspaceStructure.BUILT
-    r = repr(s)
-    assert "built" in r
+    assert "built" in repr(s)

@@ -26,11 +26,16 @@ def test_get_recent_snags():
     assert len(snags) == 3
 
 
-def test_clamp_tracking():
+def test_clamp_start_enters_clamp_period():
     trace = TemporalTrace()
     trace.record_clamp_start(100, 80.0)
     assert trace.within_clamp_period
     assert trace.clamp_count == 1
+
+
+def test_clamp_end_leaves_clamp_period():
+    trace = TemporalTrace()
+    trace.record_clamp_start(100, 80.0)
     trace.record_clamp_end(200, 70.0)
     assert not trace.within_clamp_period
 

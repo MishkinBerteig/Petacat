@@ -57,11 +57,11 @@ def test_bottom_rule():
     assert not rule.is_identity_rule
 
 
-def test_translate_flips_type():
+def test_translate_top_rule_becomes_bottom():
     rule = Rule(rule_type=RULE_TOP, clauses=[])
-    translated = rule.translate([])
-    assert translated.rule_type == RULE_BOTTOM
+    assert rule.translate([]).rule_type == RULE_BOTTOM
 
-    rule2 = Rule(rule_type=RULE_BOTTOM, clauses=[])
-    translated2 = rule2.translate([])
-    assert translated2.rule_type == RULE_TOP
+
+def test_translate_bottom_rule_becomes_top():
+    rule = Rule(rule_type=RULE_BOTTOM, clauses=[])
+    assert rule.translate([]).rule_type == RULE_TOP

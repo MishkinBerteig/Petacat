@@ -40,14 +40,16 @@ def test_add_and_render_technical():
     assert "Hello there!" not in result
 
 
-def test_switch_modes():
+def test_render_eliza_mode_uses_eliza_voice():
     log = CommentaryLog()
     log.add_comment("Eliza voice", "Technical voice")
-    eliza = log.render(eliza_mode=True)
-    technical = log.render(eliza_mode=False)
-    assert eliza == "Eliza voice"
-    assert technical == "Technical voice"
-    assert eliza != technical
+    assert log.render(eliza_mode=True) == "Eliza voice"
+
+
+def test_render_technical_mode_uses_technical_voice():
+    log = CommentaryLog()
+    log.add_comment("Eliza voice", "Technical voice")
+    assert log.render(eliza_mode=False) == "Technical voice"
 
 
 def test_clear():
@@ -80,11 +82,17 @@ def test_paragraph_dataclass():
     assert p.event_type == "event"
 
 
-def test_render_joins_with_double_newline():
+def test_render_joins_eliza_comments_with_double_newline():
     log = CommentaryLog()
     log.add_comment("A", "X")
     log.add_comment("B", "Y")
     assert log.render(eliza_mode=True) == "A\n\nB"
+
+
+def test_render_joins_technical_comments_with_double_newline():
+    log = CommentaryLog()
+    log.add_comment("A", "X")
+    log.add_comment("B", "Y")
     assert log.render(eliza_mode=False) == "X\n\nY"
 
 

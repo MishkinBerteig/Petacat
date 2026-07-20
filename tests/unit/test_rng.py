@@ -27,9 +27,13 @@ def test_randint_range():
         assert 0 <= val < 10
 
 
-def test_prob_always():
+def test_prob_one_is_always_true():
     rng = RNG(1)
     assert rng.prob(1.0) is True
+
+
+def test_prob_zero_is_always_false():
+    rng = RNG(1)
     assert rng.prob(0.0) is False
 
 

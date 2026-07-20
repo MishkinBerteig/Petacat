@@ -70,13 +70,17 @@ def test_opposite_sliplinks(slipnet):
     assert opp_links[0].label_node.name == "plato-opposite"
 
 
-def test_clamp_and_unclamp(slipnet):
+def test_clamp_freezes_node_at_full_activation(slipnet):
     node = slipnet.get_node("plato-a")
     node.clamp(5)
     assert node.frozen
     assert node.activation == 100.0
     assert node.clamp_cycles_remaining == 5
 
+
+def test_clamp_expires_after_its_cycles(slipnet):
+    node = slipnet.get_node("plato-a")
+    node.clamp(5)
     for _ in range(5):
         node.tick_clamp()
     assert not node.frozen
@@ -102,11 +106,15 @@ def test_clamp_initially_relevant(slipnet, meta):
     assert lc.activation == 100.0
 
 
-def test_reset(slipnet):
+def test_reset_clears_node_activation(slipnet):
     slipnet.get_node("plato-a").activation = 50
-    slipnet.get_node("plato-b").clamp(10)
     slipnet.reset_activations()
     assert slipnet.get_node("plato-a").activation == 0
+
+
+def test_reset_releases_clamped_node(slipnet):
+    slipnet.get_node("plato-b").clamp(10)
+    slipnet.reset_activations()
     assert not slipnet.get_node("plato-b").frozen
 
 
@@ -125,56 +133,59 @@ def test_probabilistic_jump():
     assert node.activation == 100.0
 
 
-def test_intrinsic_degree_of_association():
-    """Intrinsic degree should NOT use shrunk length, even when label is active."""
+def _labeled_lateral_link():
+    """A lateral link whose label is fully active (so dynamic length shrinks)."""
     label = SlipnetNode("label", "label", 50)
     label.intrinsic_link_length = 60
     label.activation = 100.0  # Fully active
-
     n1 = SlipnetNode("n1", "n1", 50)
     n2 = SlipnetNode("n2", "n2", 50)
-    link = SlipnetLink(n1, n2, "lateral", label_node=label)
+    return SlipnetLink(n1, n2, "lateral", label_node=label)
 
-    # Intrinsic: 100 - 60 = 40 (always uses intrinsic length)
+
+def test_intrinsic_degree_ignores_shrunk_length_when_label_active():
+    link = _labeled_lateral_link()
+    # Intrinsic always uses the full intrinsic length: 100 - 60 = 40.
     assert link.intrinsic_degree_of_association() == 40.0
 
-    # Dynamic: should use shrunk (40% of 60 = 24), so 100 - 24 = 76
+
+def test_dynamic_degree_uses_shrunk_length_when_label_active():
+    link = _labeled_lateral_link()
+    # Dynamic uses shrunk length (40% of 60 = 24), so 100 - 24 = 76.
     assert link.degree_of_association() == 76.0
 
-    # They should differ when label is fully active
-    assert link.intrinsic_degree_of_association() != link.degree_of_association()
 
-
-def test_spreading_respects_threshold(slipnet):
-    """Only nodes at or above threshold should spread activation."""
-    # Set up: plato-successor at 50 activation (below 100 threshold)
+def test_partially_active_node_does_not_spread_at_high_threshold(slipnet):
+    """A node at 50 activation must not spread when the threshold is 100."""
     succ = slipnet.get_node("plato-successor")
     succ.activation = 50.0
-
-    # With default threshold=100, a node at 50 should NOT spread
     bc = slipnet.get_node("plato-bond-category")
     bc.activation = 0.0
     slipnet.spread_activation(15, threshold=100)
+    # succ is below threshold, so bond-category receives no spread from it.
+    assert bc.activation == 0.0
 
-    # bond-category should NOT get activation from succ (below threshold)
-    # (it may get small activation from decay buffer effects, but succ shouldn't spread)
-    bc_act_high_threshold = bc.activation
 
-    # Reset and try with threshold=0
-    slipnet.reset_activations()
+def test_partially_active_node_spreads_at_zero_threshold(slipnet):
+    """The same node at 50 activation spreads once the threshold drops to 0."""
+    succ = slipnet.get_node("plato-successor")
     succ.activation = 50.0
+    bc = slipnet.get_node("plato-bond-category")
+    bc.activation = 0.0
     slipnet.spread_activation(15, threshold=0)
-    bc_act_low_threshold = bc.activation
-
-    # With threshold=0, succ at 50 should have spread, giving bond-category more
-    assert bc_act_low_threshold > bc_act_high_threshold
+    assert bc.activation > 0.0
 
 
-def test_fixed_link_intrinsic_degree():
-    """Fixed-length links should return correct intrinsic degree."""
+def test_fixed_link_intrinsic_degree_is_100_minus_length():
     n1 = SlipnetNode("n1", "n1", 50)
     n2 = SlipnetNode("n2", "n2", 50)
     link = SlipnetLink(n1, n2, "lateral", fixed_link_length=30)
     assert link.intrinsic_degree_of_association() == 70.0
-    # Same as dynamic for fixed-length links
+
+
+def test_fixed_link_intrinsic_and_dynamic_degrees_match():
+    n1 = SlipnetNode("n1", "n1", 50)
+    n2 = SlipnetNode("n2", "n2", 50)
+    link = SlipnetLink(n1, n2, "lateral", fixed_link_length=30)
+    # A fixed-length link has no label, so shrinking never applies.
     assert link.intrinsic_degree_of_association() == link.degree_of_association()

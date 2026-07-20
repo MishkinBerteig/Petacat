@@ -48,9 +48,11 @@ def test_choose_empty_returns_none(coderack):
     assert result is None
 
 
-def test_urgency_to_bin(coderack):
-    # Low urgency -> low bin, high urgency -> high bin
+def test_low_urgency_maps_to_lowest_bin(coderack):
     assert coderack._urgency_to_bin(7) == 0
+
+
+def test_high_urgency_maps_to_highest_bin(coderack):
     assert coderack._urgency_to_bin(91) == 6
 
 

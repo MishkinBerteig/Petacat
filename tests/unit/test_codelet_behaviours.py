@@ -35,7 +35,7 @@ from server.engine.memory import EpisodicMemory
 from server.engine.metadata import MetadataProvider
 from server.engine.rng import RNG
 from server.engine.rules import Rule, RuleClause, RuleChange, RULE_TOP, RULE_BOTTOM, CLAUSE_INTRINSIC, CLAUSE_EXTRINSIC
-from server.engine.runner import EngineContext, EngineRunner, StepResult
+from server.engine.runner import EngineContext, EngineRunner
 from server.engine.slipnet import Slipnet
 from server.engine.temperature import Temperature
 from server.engine.themes import Themespace
@@ -781,28 +781,11 @@ class TestStructureFighting:
         assert wins > 70
 
 
-class TestReportAnswer:
-    def test_sets_pending_answer(self, ctx_abc_abd_xyz):
-        """report_answer should set _pending_answer on context."""
-        ctx = ctx_abc_abd_xyz
-        report_answer(ctx, "xyd", 85.0)
-        assert ctx._pending_answer == "xyd"
-        assert len(ctx.memory.answers) == 1
-
-    def test_runner_detects_pending_answer(self, ctx_abc_abd_xyz):
-        """The runner should detect _pending_answer after codelet execution."""
-        ctx = ctx_abc_abd_xyz
-        ctx._pending_answer = "xyd"
-
-        # Simulate what step_mcat does after codelet execution
-        result = StepResult()
-        pending = getattr(ctx, "_pending_answer", None)
-        if pending is not None:
-            result.answer_found = True
-            result.answer = pending
-
-        assert result.answer_found is True
-        assert result.answer == "xyd"
+# NOTE: A second ``class TestReportAnswer`` is defined later in this file and
+# would shadow one defined here (Python binds the name to the last definition,
+# silently dropping the earlier class's tests from collection). The report_answer
+# behaviours are covered by that later class; do not reintroduce a duplicate
+# name here.
 
 
 class TestBottomUpPosting:

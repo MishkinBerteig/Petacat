@@ -25,7 +25,7 @@ license change was authorised by Dr. Marshall directly (see
 > **Status.** Petacat implements all seven of Metacat's core components
 > (Workspace, Slipnet, Coderack, Themespace, Temporal Trace, Episodic Memory,
 > Temperature) and generates answers to letter-string analogy problems
-> end-to-end. It ships with ~390 passing tests covering the engine, the API,
+> end-to-end. It ships with ~500 passing tests covering the engine, the API,
 > and the help/config system. See [Acknowledgements & License](#acknowledgements)
 > below for credits and licensing.
 
@@ -138,7 +138,8 @@ Petacat has two test suites:
   help-topic system, and database persistence. Organised into four layers:
   `unit` (pure functions and data structures), `integration` (seed data and
   codelet compilation), `module` (component assembly), and `e2e` (full HTTP
-  stack against a running database).
+  stack against a running database). See [TESTING.md](TESTING.md) for the
+  unit-test rules, determinism requirements, and test-double conventions.
 - **Frontend** (`client/src/**/*.test.tsx`) — React components with
   [Vitest](https://vitest.dev/) and
   [React Testing Library](https://testing-library.com/docs/react-testing-library/intro/).
