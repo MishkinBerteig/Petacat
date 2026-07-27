@@ -64,9 +64,16 @@ def serialize_coderack_state(ctx: EngineContext) -> dict:
 
 
 def serialize_themespace_state(ctx: EngineContext) -> dict:
-    """Serialize themespace activations."""
+    """Serialize themespace activations, dominance and thematic pressure.
+
+    Dominance is decided server-side (margin of 90 over the runner-up, ranked by
+    absolute activation) so the UI shows the same "locked-in" themes the engine
+    acts on, rather than recomputing it with a different rule.
+    """
+    margin = ctx.meta.get_param("dominant_theme_margin", 90)
     clusters = []
     for cluster in ctx.themespace.clusters:
+        dominant = cluster.get_dominant_theme(margin)
         themes = [
             {
                 "dimension": t.dimension,
@@ -75,6 +82,7 @@ def serialize_themespace_state(ctx: EngineContext) -> dict:
                 "positive_activation": t.positive_activation,
                 "negative_activation": t.negative_activation,
                 "frozen": t.frozen,
+                "dominant": t is dominant,
             }
             for t in cluster.themes
         ]
@@ -82,11 +90,17 @@ def serialize_themespace_state(ctx: EngineContext) -> dict:
             "theme_type": cluster.theme_type,
             "dimension": cluster.dimension,
             "frozen": cluster.frozen,
+            "dominant_relation": dominant.relation if dominant else None,
             "themes": themes,
         })
     return {
         "clusters": clusters,
+        "possible_theme_types": list(ctx.themespace.possible_theme_types),
+        # Theme types currently exerting top-down pressure (empty most of the
+        # time — themes are passive until a pattern is clamped).
         "active_theme_types": list(ctx.themespace.active_theme_types),
+        "thematic_pressure": ctx.themespace.has_thematic_pressure(),
+        "dominant_theme_margin": margin,
     }
 
 
@@ -99,6 +113,7 @@ def serialize_trace_state(ctx: EngineContext) -> dict:
         "last_unclamp_time": ctx.trace.last_unclamp_time,
         "clamp_count": ctx.trace.clamp_count,
         "snag_count": ctx.trace.snag_count,
+        "event_count": len(ctx.trace.events),
     }
 
 
@@ -135,12 +150,21 @@ def _serialize_bridge(bridge: Any) -> dict:
             "from": getattr(cm.descriptor1, "short_name", "?"),
             "to": getattr(cm.descriptor2, "short_name", "?"),
             "label": getattr(cm.label, "short_name", None) if cm.label else None,
+            # A slippage is the interesting half of a bridge's mappings; the
+            # identities are numerous and mostly noise on screen, so the display
+            # needs to be able to tell them apart rather than printing all of
+            # them at equal weight.
+            "is_slippage": bool(cm.is_slippage),
         })
     return {
         "obj1_string": bridge.object1.string.text if hasattr(bridge.object1, "string") and bridge.object1.string else "?",
         "obj1_pos": bridge.object1.left_string_pos,
+        # The right edge as well, so a bridge to a *group* can be drawn to the
+        # middle of that group instead of to its first letter.
+        "obj1_right_pos": bridge.object1.right_string_pos,
         "obj2_string": bridge.object2.string.text if hasattr(bridge.object2, "string") and bridge.object2.string else "?",
         "obj2_pos": bridge.object2.left_string_pos,
+        "obj2_right_pos": bridge.object2.right_string_pos,
         "strength": round(bridge.strength),
         "built": bridge.is_built,
         "concept_mappings": cms,
@@ -156,16 +180,27 @@ def _serialize_group(group: Any) -> dict:
         "direction": getattr(group.direction, "short_name", None) if group.direction else None,
         "strength": round(group.strength),
         "built": group.is_built,
+        # Nesting level so the display can inset enclosed groups instead of
+        # drawing every box at the same offset (group-graphics.ss draws nested
+        # enclosures with padding proportional to depth).
+        "depth": group.get_nesting_level(),
+        "length": group.length,
     }
 
 
 def _serialize_rule(rule: Any) -> dict:
-    """Serialize a rule for workspace display."""
+    """Serialize a rule, including its three quality measures (§3.3.5)."""
     return {
         "type": "top" if rule.is_top_rule else "bottom",
         "quality": round(rule.quality),
+        "uniformity": round(rule.uniformity),
+        "abstractness": round(rule.abstractness),
+        "succinctness": round(rule.succinctness),
+        "clause_count": len(rule.clauses),
+        "verbatim": rule.is_verbatim_rule,
         "english": rule.transcribe_to_english(),
         "built": rule.is_built,
+        "theme_pattern": rule.theme_pattern[1:] if rule.theme_pattern else [],
     }
 
 

@@ -298,32 +298,34 @@ class ConceptMapping:
     def activate_descriptions(self) -> None:
         """Activate the description-type and descriptor nodes in the slipnet.
 
-        Scheme: concept-mappings.ss:161-164.
-        Sets activation to 100 for all four nodes (both description types
-        and both descriptors).
+        Scheme: concept-mappings.ss:161-164 — ``activate-from-workspace`` on both
+        description types and both descriptors, which increments the buffer.
         """
-        self.description_type1.activation = 100.0
-        self.descriptor1.activation = 100.0
-        self.description_type2.activation = 100.0
-        self.descriptor2.activation = 100.0
+        for node in (
+            self.description_type1,
+            self.descriptor1,
+            self.description_type2,
+            self.descriptor2,
+        ):
+            if node is not None and hasattr(node, "activate_from_workspace"):
+                node.activate_from_workspace()
 
     def activate_label(self) -> None:
-        """Activate the label node in the slipnet.
+        """Activate the label node, flushing so it shows up immediately.
 
-        Scheme: concept-mappings.ss:165-171.
-        Activates the label node and flushes its activation buffer so the
-        activation shows up immediately in the trace before the CM event.
+        Scheme: concept-mappings.ss:165-171.  The flush matters because a
+        slippage event is recorded in the Trace right after this, and the Trace
+        stores the concept activations extant at the time of the event.
         """
-        if self.label is not None:
-            # activate-from-workspace: set to full activation
-            self.label.activation = 100.0
-            # flush-activation-buffer: apply any pending buffer, then clear it
-            pending = self.label.activation_buffer
-            if pending != 0.0:
-                self.label.activation = max(
-                    0.0, min(100.0, self.label.activation + pending)
-                )
-                self.label.activation_buffer = 0.0
+        if self.label is None or not hasattr(self.label, "activate_from_workspace"):
+            return
+        self.label.activate_from_workspace()
+        pending = self.label.activation_buffer
+        if pending != 0.0:
+            self.label.activation = max(
+                0.0, min(100.0, self.label.activation + pending)
+            )
+            self.label.activation_buffer = 0.0
 
     def get_concept_pattern(self) -> list[tuple[SlipnetNode, float]]:
         """Return a concept activation pattern suitable for theme computation.

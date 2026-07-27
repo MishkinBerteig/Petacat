@@ -31,6 +31,7 @@ import {
   getTemperature,
   getCommentary,
   getMemory,
+  setSpreadingThreshold as apiSetSpreadingThreshold,
 } from '@/api/client';
 
 // ---------------------------------------------------------------------------
@@ -44,11 +45,20 @@ export type RunStatus =
   | 'paused'
   | 'completed'
   | 'halted'
-  | 'answer_found';
+  | 'answer_found'
+  /** A jootser gave up: looping with no untried alternatives left (§4.5.2). */
+  | 'gave_up';
 
 export interface RunStore {
   // State
   runId: number | null;
+  /**
+   * The problem the loaded run was actually created with. The form inputs can
+   * drift away from this (the user edits a string, or picks a demo), and when
+   * they do the run buttons have to start a *new* run rather than carry on
+   * with the old one.
+   */
+  runParams: RunParams | null;
   status: RunStatus;
   workspace: WorkspaceState | null;
   slipnet: SlipnetState | null;
@@ -66,6 +76,16 @@ export interface RunStore {
   /** Incremented on destructive ops — components watch this to re-fetch. */
   epoch: number;
   pollingInterval: number; // ms between state refreshes during run-to-answer (0 = continuous ~100ms)
+  /**
+   * Spreading activation threshold, 0-100 (100 = the original's behaviour).
+   *
+   * A Run Controls setting, so it belongs to the session rather than to one run:
+   * it is re-applied to each new run as it is created. It used to live only on
+   * the server's in-memory runner, which meant every new run silently reverted
+   * to the default and Reset discarded it — so a chosen value usually never
+   * reached the run that actually executed.
+   */
+  spreadingThreshold: number;
   isProcessing: boolean; // true while run-to-answer is active
 
   // Problem form inputs (shared across ProblemInputPanel and RunControlsPanel)
@@ -103,6 +123,7 @@ export interface RunStore {
   setLiveUpdate: (enabled: boolean) => void;
   setElizaMode: (enabled: boolean) => void;
   setPollingInterval: (ms: number) => void;
+  setSpreadingThreshold: (value: number) => Promise<void>;
   setFormInput: (field: keyof RunStore['formInputs'], value: string) => void;
   setFormInputs: (values: Partial<RunStore['formInputs']>) => void;
 }
@@ -116,6 +137,33 @@ function freshMemory(): MemoryState {
 }
 const INITIAL_MEMORY = freshMemory();
 
+/**
+ * The spreading threshold is a fundamental parameter -- it changes what a run
+ * does -- so the chosen value outlives the page, not just the run. Each run also
+ * records the value it used in the database; this is only the default handed to
+ * the *next* run.
+ */
+const THRESHOLD_KEY = 'petacat.spreadingThreshold';
+
+function loadSpreadingThreshold(): number {
+  try {
+    const raw = window.localStorage.getItem(THRESHOLD_KEY);
+    if (raw === null) return 100;
+    const value = Number.parseInt(raw, 10);
+    return Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 100;
+  } catch {
+    return 100; // storage unavailable (private mode, SSR)
+  }
+}
+
+function saveSpreadingThreshold(value: number): void {
+  try {
+    window.localStorage.setItem(THRESHOLD_KEY, String(value));
+  } catch {
+    // Non-fatal: the setting just will not survive the reload.
+  }
+}
+
 // Mutable flag outside of React state — controls the run loop without
 // depending on store status (which gets overwritten by server responses).
 let _stopRequested = false;
@@ -127,6 +175,7 @@ let _stopRequested = false;
 export const useRunStore = create<RunStore>((set, get) => ({
   // ---- Default state -----------------------------------------------------
   runId: null,
+  runParams: null,
   status: 'idle',
   workspace: null,
   slipnet: null,
@@ -143,6 +192,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
   lastCodeletType: '',
   epoch: 0,
   pollingInterval: 1000,
+  spreadingThreshold: loadSpreadingThreshold(),
   isProcessing: false,
   formInputs: {
     initial: '',
@@ -155,12 +205,28 @@ export const useRunStore = create<RunStore>((set, get) => ({
   // ---- Actions -----------------------------------------------------------
 
   createRun: async (params: RunParams): Promise<void> => {
-    const info = await apiCreateRun(params);
+    // Sent with the create, so the engine is initialised with it and the whole
+    // run uses it — rather than being patched in after the first codelets.
+    const info = await apiCreateRun({
+      spreading_threshold: get().spreadingThreshold,
+      ...params,
+    });
+    // Blank the panels as well as swapping the id. Without this the previous
+    // problem's workspace, trace and commentary stay on screen until every
+    // refresh lands — and stay forever if one of them fails.
     set({
       runId: info.run_id,
+      runParams: params,
       status: info.status as RunStatus,
       codeletCount: info.codelet_count,
       temperature: info.temperature,
+      workspace: null,
+      slipnet: null,
+      coderack: null,
+      themespace: null,
+      trace: [],
+      commentary: '',
+      lastCodeletType: '',
     });
     await get().refreshAll();
   },
@@ -251,6 +317,13 @@ export const useRunStore = create<RunStore>((set, get) => ({
           // Stop if the engine found an answer
           if (r.answer_found) {
             set({ status: 'answer_found' });
+            await get().refreshAll();
+            break;
+          }
+
+          // Or if it gave up — a terminal outcome in its own right, not a stall
+          if (r.gave_up) {
+            set({ status: 'gave_up' });
             await get().refreshAll();
             break;
           }
@@ -415,6 +488,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
     await apiDeleteRun(runId);
     set({
       runId: null,
+      runParams: null,
       status: 'idle',
       workspace: null,
       slipnet: null,
@@ -445,6 +519,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
     // Clear all local state and bump epoch so components re-fetch
     set({
       runId: null,
+      runParams: null,
       status: 'idle',
       workspace: null,
       slipnet: null,
@@ -605,6 +680,21 @@ export const useRunStore = create<RunStore>((set, get) => ({
 
   setPollingInterval: (ms: number): void => {
     set({ pollingInterval: ms === 0 ? 0 : Math.max(100, Math.min(10000, ms)) });
+  },
+
+  setSpreadingThreshold: async (value: number): Promise<void> => {
+    const clamped = Math.max(0, Math.min(100, Math.round(value)));
+    set({ spreadingThreshold: clamped });
+    saveSpreadingThreshold(clamped);
+    // Also push it to the run on screen, so a mid-run change takes effect now.
+    const { runId } = get();
+    if (runId !== null) {
+      try {
+        await apiSetSpreadingThreshold(runId, clamped);
+      } catch {
+        // Run may have gone; the stored value still applies to the next one.
+      }
+    }
   },
 
   setFormInput: (field, value): void => {

@@ -42,18 +42,23 @@ def test_run_status_constants_match_seed(enums_data):
 # ── Event types ──
 
 def test_event_type_constants_match_seed(enums_data):
+    """Every event-type constant must have a row in ``enums.json``.
+
+    ``trace_events.event_type`` is a foreign key onto ``event_types``, so a
+    constant with no enum row makes persisting that event fail at runtime.
+    """
     from server.engine.trace import (
-        BOND_BUILT, BOND_BROKEN, GROUP_BUILT, GROUP_BROKEN,
-        BRIDGE_BUILT, BRIDGE_BROKEN, RULE_BUILT, RULE_BROKEN,
-        DESCRIPTION_BUILT, ANSWER_FOUND, SNAG, CLAMP_START,
-        CLAMP_END, JOOTSING, THEME_ACTIVATED, CONCEPT_MAPPING_BUILT,
+        ANSWER_FOUND, BOND_BROKEN, BOND_BUILT, BRIDGE_BROKEN, BRIDGE_BUILT,
+        CLAMP_END, CLAMP_START, CONCEPT_ACTIVATION, CONCEPT_MAPPING_BUILT,
+        DESCRIPTION_BUILT, GROUP_BROKEN, GROUP_BUILT, JOOTSING, RULE_BROKEN,
+        RULE_BUILT, SNAG, THEME_ACTIVATED,
     )
     expected = _names(enums_data, "event_types")
     constants = {
-        BOND_BUILT, BOND_BROKEN, GROUP_BUILT, GROUP_BROKEN,
-        BRIDGE_BUILT, BRIDGE_BROKEN, RULE_BUILT, RULE_BROKEN,
-        DESCRIPTION_BUILT, ANSWER_FOUND, SNAG, CLAMP_START,
-        CLAMP_END, JOOTSING, THEME_ACTIVATED, CONCEPT_MAPPING_BUILT,
+        ANSWER_FOUND, BOND_BROKEN, BOND_BUILT, BRIDGE_BROKEN, BRIDGE_BUILT,
+        CLAMP_END, CLAMP_START, CONCEPT_ACTIVATION, CONCEPT_MAPPING_BUILT,
+        DESCRIPTION_BUILT, GROUP_BROKEN, GROUP_BUILT, JOOTSING, RULE_BROKEN,
+        RULE_BUILT, SNAG, THEME_ACTIVATED,
     }
     assert constants == expected
 

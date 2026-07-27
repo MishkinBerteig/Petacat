@@ -235,10 +235,12 @@ def test_activate_descriptions_sets_all_four_nodes_to_full():
     d2 = FakeNode("plato-b")
     cm = ConceptMapping(dt1, d1, dt2, d2, label=FakeNode("plato-successor"))
     cm.activate_descriptions()
-    assert dt1.activation == 100.0
-    assert d1.activation == 100.0
-    assert dt2.activation == 100.0
-    assert d2.activation == 100.0
+    # activate-from-workspace increments the buffer by 100; it is clipped when
+    # the Slipnet flushes buffers at the next update cycle.
+    assert dt1.activation_buffer == 100.0
+    assert d1.activation_buffer == 100.0
+    assert dt2.activation_buffer == 100.0
+    assert d2.activation_buffer == 100.0
 
 
 def test_activate_label_flushes_pending_activation_buffer():
@@ -247,7 +249,7 @@ def test_activate_label_flushes_pending_activation_buffer():
     dt = FakeNode("plato-letter-category")
     cm = ConceptMapping(dt, FakeNode("plato-a"), dt, FakeNode("plato-b"), label=label)
     cm.activate_label()
-    # activation set to 100, then buffer (-30) applied and cleared
+    # +100 into the buffer joins the pending -30, then the flush applies 70.
     assert label.activation == 70.0
     assert label.activation_buffer == 0.0
 

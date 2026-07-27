@@ -159,73 +159,85 @@
     "name": "plato-one",
     "short_name": "one",
     "conceptual_depth": 30,
-    "description": "Represents the numeric concept of the length one. Used to describe single-letter groups or strings of length one. Connected to 'two' via a successor link. As an instance of the length category, it participates in analogies where group sizes matter, enabling slippages between letter-category and length dimensions."
+    "description": "Represents the numeric concept of the length one. Used to describe single-letter groups or strings of length one. Connected to 'two' via a successor link. As an instance of the length category, it participates in analogies where group sizes matter, enabling slippages between letter-category and length dimensions.",
+    "descriptor_predicate": "group_length(obj) == 1"
   },
   {
     "name": "plato-two",
     "short_name": "two",
     "conceptual_depth": 30,
-    "description": "Represents the numeric concept of the length two. Used to describe groups or strings containing two elements. Connected to 'one' via a predecessor link and to 'three' via a successor link. Participates in length-based descriptions that can enable abstract analogies between strings with different surface structures."
+    "description": "Represents the numeric concept of the length two. Used to describe groups or strings containing two elements. Connected to 'one' via a predecessor link and to 'three' via a successor link. Participates in length-based descriptions that can enable abstract analogies between strings with different surface structures.",
+    "descriptor_predicate": "group_length(obj) == 2"
   },
   {
     "name": "plato-three",
     "short_name": "three",
     "conceptual_depth": 30,
-    "description": "Represents the numeric concept of the length three. Used to describe groups or strings containing three elements. Connected to 'two' via a predecessor link and to 'four' via a successor link. Central to the classic 'abc -> abd; mrrjjj -> ?' problem where the 1-2-3 length pattern is discovered."
+    "description": "Represents the numeric concept of the length three. Used to describe groups or strings containing three elements. Connected to 'two' via a predecessor link and to 'four' via a successor link. Central to the classic 'abc -> abd; mrrjjj -> ?' problem where the 1-2-3 length pattern is discovered.",
+    "descriptor_predicate": "group_length(obj) == 3"
   },
   {
     "name": "plato-four",
     "short_name": "four",
     "conceptual_depth": 30,
-    "description": "Represents the numeric concept of the length four. Used to describe groups or strings containing four elements. Connected to 'three' via a predecessor link and to 'five' via a successor link. Participates in length-based descriptions that support analogies involving group size patterns."
+    "description": "Represents the numeric concept of the length four. Used to describe groups or strings containing four elements. Connected to 'three' via a predecessor link and to 'five' via a successor link. Participates in length-based descriptions that support analogies involving group size patterns.",
+    "descriptor_predicate": "group_length(obj) == 4"
   },
   {
     "name": "plato-five",
     "short_name": "five",
     "conceptual_depth": 30,
-    "description": "Represents the numeric concept of the length five. Used to describe groups or strings containing five elements. Connected to 'four' via a predecessor link but has no successor, serving as the upper bound of the number chain. Participates in length-based descriptions for larger groups."
+    "description": "Represents the numeric concept of the length five. Used to describe groups or strings containing five elements. Connected to 'four' via a predecessor link but has no successor, serving as the upper bound of the number chain. Participates in length-based descriptions for larger groups.",
+    "descriptor_predicate": "group_length(obj) == 5"
   },
   {
     "name": "plato-leftmost",
     "short_name": "lmost",
     "conceptual_depth": 40,
-    "description": "Represents the string-position concept of being leftmost (first in reading order) within a string. An instance of string-position-category, it is used to describe objects occupying the first position. Connected to rightmost via an opposite sliplink, enabling the crucial leftmost-to-rightmost slippage that underlies many creative analogies. Also linked to the direction concepts left (via identity) and right (via opposite)."
+    "description": "Represents the string-position concept of being leftmost (first in reading order) within a string. An instance of string-position-category, it is used to describe objects occupying the first position. Connected to rightmost via an opposite sliplink, enabling the crucial leftmost-to-rightmost slippage that underlies many creative analogies. Also linked to the direction concepts left (via identity) and right (via opposite).",
+    "descriptor_predicate": "not string_spanning_group(obj) and position_in_string(obj, 'leftmost')"
   },
   {
     "name": "plato-rightmost",
     "short_name": "rmost",
     "conceptual_depth": 40,
-    "description": "Represents the string-position concept of being rightmost (last in reading order) within a string. An instance of string-position-category, it is used to describe objects occupying the final position. Connected to leftmost via an opposite sliplink. Also linked to right (via identity) and left (via opposite). Frequently relevant in rules like 'replace rightmost letter by successor'."
+    "description": "Represents the string-position concept of being rightmost (last in reading order) within a string. An instance of string-position-category, it is used to describe objects occupying the final position. Connected to leftmost via an opposite sliplink. Also linked to right (via identity) and left (via opposite). Frequently relevant in rules like 'replace rightmost letter by successor'.",
+    "descriptor_predicate": "not string_spanning_group(obj) and position_in_string(obj, 'rightmost')"
   },
   {
     "name": "plato-middle",
     "short_name": "middle",
     "conceptual_depth": 40,
-    "description": "Represents the string-position concept of being in the middle of a string. An instance of string-position-category, it applies to objects that are neither leftmost nor rightmost and the string has more than two elements. Less commonly involved in slippages than leftmost or rightmost, but relevant for strings of odd length."
+    "description": "Represents the string-position concept of being in the middle of a string. An instance of string-position-category, it applies to objects that are neither leftmost nor rightmost and the string has more than two elements. Less commonly involved in slippages than leftmost or rightmost, but relevant for strings of odd length.",
+    "descriptor_predicate": "position_in_string(obj, 'middle')"
   },
   {
     "name": "plato-single",
     "short_name": "single",
     "conceptual_depth": 40,
-    "description": "Represents the string-position concept of being the sole element in a string of length one. An instance of string-position-category. Connected to whole via a lateral sliplink, since a single letter in a one-element string is both the single element and the whole string. This slippage enables flexible handling of singleton strings."
+    "description": "Represents the string-position concept of being the sole element in a string of length one. An instance of string-position-category. Connected to whole via a lateral sliplink, since a single letter in a one-element string is both the single element and the whole string. This slippage enables flexible handling of singleton strings.",
+    "descriptor_predicate": "not is_group(obj) and spans_whole_string(obj)"
   },
   {
     "name": "plato-whole",
     "short_name": "whole",
     "conceptual_depth": 40,
-    "description": "Represents the string-position concept of a group that spans an entire string. An instance of string-position-category, it describes spanning groups (groups that encompass all elements of a string). Connected to single via a lateral sliplink. Important for identifying when a string has been fully organized into a single top-level group."
+    "description": "Represents the string-position concept of a group that spans an entire string. An instance of string-position-category, it describes spanning groups (groups that encompass all elements of a string). Connected to single via a lateral sliplink. Important for identifying when a string has been fully organized into a single top-level group.",
+    "descriptor_predicate": "string_spanning_group(obj)"
   },
   {
     "name": "plato-alphabetic-first",
     "short_name": "first",
     "conceptual_depth": 60,
-    "description": "Represents the alphabetic-position concept of being first in the alphabet, i.e., being the letter 'a'. An instance of alphabetic-position-category. Connected to alphabetic-last via an opposite sliplink, enabling the first-to-last slippage. The letter 'a' has a property link to this node. This concept participates in abstract descriptions that strengthen bridges when objects share the property of being alphabetically first."
+    "description": "Represents the alphabetic-position concept of being first in the alphabet, i.e., being the letter 'a'. An instance of alphabetic-position-category. Connected to alphabetic-last via an opposite sliplink, enabling the first-to-last slippage. The letter 'a' has a property link to this node. This concept participates in abstract descriptions that strengthen bridges when objects share the property of being alphabetically first.",
+    "descriptor_predicate": "letter_category_name(obj) == 'plato-a'"
   },
   {
     "name": "plato-alphabetic-last",
     "short_name": "last",
     "conceptual_depth": 60,
-    "description": "Represents the alphabetic-position concept of being last in the alphabet, i.e., being the letter 'z'. An instance of alphabetic-position-category. Connected to alphabetic-first via an opposite sliplink. The letter 'z' has a property link to this node. Critical in 'xyz' problems where recognizing 'z' as alphabetically last enables the creative answer 'wyz' through an alphabetic-first-to-alphabetic-last slippage."
+    "description": "Represents the alphabetic-position concept of being last in the alphabet, i.e., being the letter 'z'. An instance of alphabetic-position-category. Connected to alphabetic-first via an opposite sliplink. The letter 'z' has a property link to this node. Critical in 'xyz' problems where recognizing 'z' as alphabetically last enables the creative answer 'wyz' through an alphabetic-first-to-alphabetic-last slippage.",
+    "descriptor_predicate": "letter_category_name(obj) == 'plato-z'"
   },
   {
     "name": "plato-left",
@@ -291,13 +303,15 @@
     "name": "plato-letter",
     "short_name": "letter",
     "conceptual_depth": 20,
-    "description": "Represents the object-category concept of a single letter. An instance of object-category, it is used to describe workspace objects that are individual letters (as opposed to groups). Has low conceptual depth (20) reflecting its concrete nature. Connected to group via a lateral sliplink, enabling the letter-to-group slippage that allows single letters to be mapped to groups across strings in analogies."
+    "description": "Represents the object-category concept of a single letter. An instance of object-category, it is used to describe workspace objects that are individual letters (as opposed to groups). Has low conceptual depth (20) reflecting its concrete nature. Connected to group via a lateral sliplink, enabling the letter-to-group slippage that allows single letters to be mapped to groups across strings in analogies.",
+    "descriptor_predicate": "not is_group(obj)"
   },
   {
     "name": "plato-group",
     "short_name": "group",
     "conceptual_depth": 80,
-    "description": "Represents the object-category concept of a group. An instance of object-category, it is used to describe workspace objects that are structured collections of letters or sub-groups bonded by a common relation. Has high conceptual depth (80) reflecting the abstract nature of grouping. Connected to letter via a lateral sliplink. Becomes activated when groups are built in the workspace, exerting top-down pressure to find more groups."
+    "description": "Represents the object-category concept of a group. An instance of object-category, it is used to describe workspace objects that are structured collections of letters or sub-groups bonded by a common relation. Has high conceptual depth (80) reflecting the abstract nature of grouping. Connected to letter via a lateral sliplink. Becomes activated when groups are built in the workspace, exerting top-down pressure to find more groups.",
+    "descriptor_predicate": "is_group(obj)"
   },
   {
     "name": "plato-letter-category",

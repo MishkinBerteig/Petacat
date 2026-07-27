@@ -47,12 +47,9 @@ function groupByType(clusters: ClusterState[]): Record<string, ClusterState[]> {
   return groups;
 }
 
-/** Determine if a theme is dominant in its cluster. */
-function isDominant(theme: ThemeState, cluster: ClusterState): boolean {
-  if (cluster.themes.length <= 1) return false;
-  const maxAct = Math.max(...cluster.themes.map(t => Math.abs(t.activation)));
-  if (maxAct < 5) return false;
-  return Math.abs(theme.activation) === maxAct;
+/** Dominance is decided by the engine (margin of 90 over the runner-up), not here. */
+function isDominant(theme: ThemeState, _cluster: ClusterState): boolean {
+  return theme.dominant === true;
 }
 
 /** Activation bar — horizontal bar showing positive (green) / negative (red) */
@@ -193,13 +190,14 @@ export function ThemespaceView() {
   }
 
   const { clusters, active_theme_types } = themespace;
+  const possible = themespace.possible_theme_types ?? active_theme_types;
   const grouped = groupByType(clusters);
 
   const columnOrder = ['top_bridge', 'vertical_bridge', 'bottom_bridge'];
   const activeColumns = columnOrder.filter(
     t =>
       grouped[t]?.length ||
-      active_theme_types.some(at => at.toLowerCase().replace(/[-\s]/g, '_') === t),
+      possible.some(at => at.toLowerCase().replace(/[-\s]/g, '_') === t),
   );
   const displayKeys = activeColumns.length > 0 ? activeColumns : Object.keys(grouped);
 
@@ -212,13 +210,45 @@ export function ThemespaceView() {
   }
 
   return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, height: '100%' }}>
+      {/* Thematic pressure indicator.  Themes are passive representations most of
+          the time; pressure is switched on deliberately, by clamping a pattern. */}
+      <div
+        style={{
+          fontSize: 10,
+          fontFamily: 'var(--font-mono)',
+          padding: '3px 6px',
+          borderRadius: 3,
+          flexShrink: 0,
+          background: themespace.thematic_pressure
+            ? 'rgba(255, 193, 7, 0.15)'
+            : 'rgba(255,255,255,0.03)',
+          border: themespace.thematic_pressure
+            ? '1px solid rgba(255, 193, 7, 0.5)'
+            : '1px solid var(--border)',
+          color: themespace.thematic_pressure ? '#ffc107' : 'var(--text-secondary)',
+        }}
+        title={
+          themespace.thematic_pressure
+            ? 'A clamped pattern is steering structure-building toward these ideas.'
+            : 'Themes are accumulating evidence but exerting no top-down pressure.'
+        }
+      >
+        {themespace.thematic_pressure
+          ? `THEMATIC PRESSURE ON — ${active_theme_types.join(', ')}`
+          : 'thematic pressure off (themes passive)'}
+        <span style={{ float: 'right', opacity: 0.7 }}>
+          dominance margin {themespace.dominant_theme_margin ?? 90}
+        </span>
+      </div>
     <div
       style={{
         display: 'grid',
         gridTemplateColumns: `repeat(${displayKeys.length}, 1fr)`,
         gap: 6,
         overflow: 'auto',
-        height: '100%',
+        flex: 1,
+        minHeight: 0,
       }}
     >
       {displayKeys.map(key => {
@@ -267,6 +297,7 @@ export function ThemespaceView() {
           </div>
         );
       })}
+    </div>
     </div>
   );
 }

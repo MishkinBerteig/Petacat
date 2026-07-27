@@ -78,6 +78,18 @@ def get_quality_phrase(quality: float, meta: MetadataProvider) -> str:
     return "great"
 
 
+# §4.7.1 footnote 18: only these vertical theme categories may appear in an
+# answer description, and Bond-Facet only in its "different" form.  Mirrored in
+# seed_data/theme_dimensions.json as ``answer_description_theme_types``.
+_ANSWER_DESCRIPTION_THEME_TYPES = (
+    "plato-string-position-category",
+    "plato-alphabetic-position-category",
+    "plato-direction-category",
+    "plato-group-category",
+    "plato-bond-facet",
+)
+
+
 def create_answer_description(
     workspace: Workspace,
     top_rule: Rule | None,
@@ -85,9 +97,26 @@ def create_answer_description(
     quality: float,
     temperature: float,
     themes: dict[str, Any],
+    unjustified_slippages: list[Any] | None = None,
+    trace: Any = None,
+    meta: Any = None,
 ) -> AnswerDescription:
-    """Create an AnswerDescription for episodic memory storage."""
+    """Distil an answer description for long-term memory.
+
+    §4.7.1: the description keeps separate **top**, **vertical** and **bottom**
+    theme-patterns, the rules, and an unjustified theme-pattern representing the
+    slippages the program never came to terms with.
+    """
     answer_text = workspace.answer_string.text if workspace.answer_string else ""
+
+    allowed = _ANSWER_DESCRIPTION_THEME_TYPES
+    if meta is not None:
+        allowed = tuple(
+            getattr(meta, "answer_description_theme_types", None) or allowed
+        )
+
+    vertical = _filter_vertical_themes(themes.get("vertical_bridge", {}), allowed)
+
     return AnswerDescription(
         problem=(
             workspace.initial_string.text,
@@ -101,6 +130,39 @@ def create_answer_description(
         bottom_rule_quality=bottom_rule.quality if bottom_rule else 0.0,
         quality=quality,
         temperature=temperature,
-        themes=themes,
-        unjustified_slippages=[],
+        themes=vertical,
+        top_themes=dict(themes.get("top_bridge", {})),
+        vertical_themes=vertical,
+        bottom_themes=dict(themes.get("bottom_bridge", {})),
+        unjustified_themes=_unjustified_themes(unjustified_slippages or []),
+        unjustified_slippages=[str(cm) for cm in (unjustified_slippages or [])],
+        top_rule_abstractness=top_rule.abstractness if top_rule else 0.0,
+        bottom_rule_abstractness=bottom_rule.abstractness if bottom_rule else 0.0,
     )
+
+
+def _filter_vertical_themes(
+    vertical: dict[str, Any], allowed: tuple[str, ...]
+) -> dict[str, Any]:
+    """Apply the §4.7.1 footnote-18 restriction to a vertical theme pattern."""
+    result: dict[str, Any] = {}
+    for dimension, relation in vertical.items():
+        if dimension not in allowed:
+            continue
+        if dimension == "plato-bond-facet" and relation != "diff":
+            continue
+        result[dimension] = relation
+    return result
+
+
+def _unjustified_themes(slippages: list[Any]) -> dict[str, Any]:
+    """The theme-pattern implied by slippages the program failed to justify."""
+    from server.engine.themes import relation_name_for_label
+
+    themes: dict[str, Any] = {}
+    for cm in slippages:
+        dimension = getattr(getattr(cm, "description_type1", None), "name", None)
+        if dimension is None:
+            continue
+        themes[dimension] = relation_name_for_label(getattr(cm, "label", None))
+    return themes

@@ -42,6 +42,19 @@ CLAMP_END = "clamp_end"
 JOOTSING = "jootsing"
 THEME_ACTIVATED = "theme_activated"
 CONCEPT_MAPPING_BUILT = "concept_mapping_built"
+CONCEPT_ACTIVATION = "concept_activation"
+
+# The seven event types the Trace records (§4.4).  Everything else the Workspace
+# does is below the cognitive level and is deliberately filtered out.
+COGNITIVE_EVENT_TYPES = (
+    CONCEPT_ACTIVATION,
+    GROUP_BUILT,
+    CONCEPT_MAPPING_BUILT,  # slippage events
+    RULE_BUILT,
+    ANSWER_FOUND,
+    SNAG,
+    CLAMP_START,
+)
 
 # Default grace period (codelets after unclamping before allowing a new clamp).
 # Matches Scheme constant %grace-period% in jootsing.ss:252.

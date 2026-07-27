@@ -119,6 +119,201 @@ async def test_memory_endpoint(app_client):
 
 
 @pytest.mark.asyncio
+async def test_spreading_threshold_changes_the_run_and_survives_reset(app_client):
+    """The threshold has to actually reach the engine, and outlast a Reset.
+
+    Reset means "this same problem and seed again", so the run's settings belong
+    with it. ``init_mcat`` re-reads the metadata default, which silently threw
+    away whatever the user had chosen — and since a fresh run also starts at the
+    default, a chosen value could easily never reach a run at all.
+    """
+    async def run_with(threshold: int) -> dict:
+        resp = await app_client.post("/api/runs", json={
+            "initial": "abc", "modified": "abd", "target": "xyz", "seed": SEED,
+        })
+        rid = resp.json()["run_id"]
+        await app_client.post(
+            f"/api/runs/{rid}/spreading-threshold", json={"threshold": threshold},
+        )
+        got = (await app_client.get(f"/api/runs/{rid}/spreading-threshold")).json()
+        assert got["spreading_activation_threshold"] == threshold
+        result = (await app_client.post(
+            f"/api/runs/{rid}/run", json={"max_steps": 4000},
+        )).json()
+        return {"run_id": rid, **result}
+
+    # It is not decorative: the same problem and seed run differently.
+    strict = await run_with(100)
+    loose = await run_with(0)
+    assert strict["codelet_count"] != loose["codelet_count"], (
+        "threshold made no difference to the run, so it is not reaching the engine"
+    )
+
+    # And Reset keeps it rather than reverting to the default.
+    await app_client.post(f"/api/runs/{loose['run_id']}/reset")
+    after = (await app_client.get(
+        f"/api/runs/{loose['run_id']}/spreading-threshold",
+    )).json()
+    assert after["spreading_activation_threshold"] == 0
+
+    # The value each run used is recorded on the run itself, so the run list can
+    # say which runs are comparable with the dissertation's (100) and which are
+    # not. Read back from the row rather than from the live engine.
+    listed = {r["run_id"]: r for r in (
+        await app_client.get("/api/runs?limit=50")
+    ).json()["runs"]}
+    assert listed[strict["run_id"]]["spreading_threshold"] == 100
+    assert listed[loose["run_id"]]["spreading_threshold"] == 0
+
+
+@pytest.mark.asyncio
+async def test_spreading_threshold_can_be_set_when_the_run_is_created(app_client):
+    """Supplied at creation, so the engine is initialised with it.
+
+    Applying it afterwards meant the opening codelets had already executed at
+    the default.
+    """
+    resp = await app_client.post("/api/runs", json={
+        "initial": "abc", "modified": "abd", "target": "xyz", "seed": SEED,
+        "spreading_threshold": 30,
+    })
+    assert resp.status_code == 200
+    run_id = resp.json()["run_id"]
+    assert resp.json()["spreading_threshold"] == 30
+
+    # Engine and stored row agree, before a single codelet has run.
+    live = (await app_client.get(f"/api/runs/{run_id}/spreading-threshold")).json()
+    assert live["spreading_activation_threshold"] == 30
+    assert (await app_client.get(f"/api/runs/{run_id}")).json()["spreading_threshold"] == 30
+
+    # Out-of-range input is clamped rather than stored raw.
+    resp = await app_client.post("/api/runs", json={
+        "initial": "abc", "modified": "abd", "target": "xyz", "seed": SEED,
+        "spreading_threshold": 900,
+    })
+    assert resp.json()["spreading_threshold"] == 100
+
+
+@pytest.mark.asyncio
+async def test_run_list_carries_the_answer_and_how_it_was_obtained(app_client):
+    """The run list has to say what a run answered, and whether it found it.
+
+    A justification run is *given* its answer at creation, so ``answer`` alone
+    cannot distinguish "the engine found xyd" from "the engine was asked to
+    justify xyd". ``justify_mode`` travels alongside it so a display can.
+    """
+    # Discovery: no answer supplied.
+    resp = await app_client.post("/api/runs", json={
+        "initial": "abc", "modified": "abd", "target": "xyz", "seed": SEED,
+    })
+    discovered_id = resp.json()["run_id"]
+    assert resp.json()["justify_mode"] is False
+    await app_client.post(f"/api/runs/{discovered_id}/run", json={"max_steps": 4000})
+
+    # Justification: the answer is handed over up front.
+    resp = await app_client.post("/api/runs", json={
+        "initial": "abc", "modified": "abd", "target": "xyz",
+        "answer": "wyz", "seed": SEED,
+    })
+    given_id = resp.json()["run_id"]
+    assert resp.json()["justify_mode"] is True
+
+    listed = (await app_client.get("/api/runs?limit=50")).json()["runs"]
+    by_id = {r["run_id"]: r for r in listed}
+
+    given = by_id[given_id]
+    assert given["answer"] == "wyz"
+    assert given["justify_mode"] is True
+
+    discovered = by_id[discovered_id]
+    assert discovered["justify_mode"] is False
+    # Whatever it settled on, an answer found is reported as not-given.
+    if discovered["answer"] is not None:
+        assert discovered["answer"] != ""
+
+
+@pytest.mark.asyncio
+async def test_run_info_reports_live_progress_while_running(app_client):
+    """Polling a run mid-flight must report where the engine actually is.
+
+    ``run_to_completion`` writes ``codelet_count`` and ``temperature`` back to the
+    row only once the run ends, so mid-run the row still holds its creation
+    values: status ``running`` but 0 codelets and temperature 100. Serving those
+    made the UI's own sampling loop set temperature to 100 on every tick — a
+    visible spike, corrected a moment later by a live read — and pinned the
+    displayed codelet count at 0.
+    """
+    import asyncio
+
+    # A problem that does not resolve, so there is a run to observe.
+    resp = await app_client.post("/api/runs", json={
+        "initial": "abc", "modified": "aabbcc", "target": "ijk", "seed": SEED,
+    })
+    run_id = resp.json()["run_id"]
+
+    runner = asyncio.create_task(
+        app_client.post(f"/api/runs/{run_id}/run", json={"max_steps": 20000})
+    )
+    try:
+        observations = []
+        for _ in range(40):
+            await asyncio.sleep(0.1)
+            info = (await app_client.get(f"/api/runs/{run_id}")).json()
+            if info["status"] == "running" and info["codelet_count"] > 0:
+                observations.append(info)
+                if len(observations) >= 2:
+                    break
+            if info["status"] != "running" and info["status"] != "initialized":
+                break
+
+        assert observations, "never caught the run in flight; cannot judge freshness"
+
+        for info in observations:
+            # The two symptoms, stated directly.
+            assert info["codelet_count"] > 0, f"codelet count pinned at 0: {info}"
+            assert info["temperature"] < 100, f"temperature reported as 100: {info}"
+
+        # And progress is actually visible between samples.
+        if len(observations) >= 2:
+            assert observations[-1]["codelet_count"] >= observations[0]["codelet_count"]
+    finally:
+        await app_client.post(f"/api/runs/{run_id}/stop")
+        await runner
+
+
+@pytest.mark.asyncio
+async def test_clearing_memory_clears_what_the_ui_reads_back(app_client):
+    """DELETE has to empty the same store GET serves.
+
+    Episodic memory lives twice over: as DB rows, and in the process-wide
+    ``_global_memory`` that live runs write to.  ``GET /api/memory`` serves the
+    rows, but DELETE used to clear only the in-process object — so the UI's
+    refresh-after-clear showed every answer still sitting there.
+    """
+    # Produce something worth clearing.
+    resp = await app_client.post("/api/runs", json={
+        "initial": "abc", "modified": "abd", "target": "xyz", "seed": SEED,
+    })
+    run_id = resp.json()["run_id"]
+    await app_client.post(f"/api/runs/{run_id}/run", json={"max_steps": 3000})
+
+    before = (await app_client.get("/api/memory")).json()
+    assert before["answers"] or before["snags"], "nothing stored, test proves nothing"
+
+    resp = await app_client.delete("/api/memory")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["cleared"] is True
+    # It reports what it actually removed, rather than claiming success blindly.
+    assert body["removed"]["answers"] == len(before["answers"])
+    assert body["removed"]["snags"] == len(before["snags"])
+
+    after = (await app_client.get("/api/memory")).json()
+    assert after["answers"] == []
+    assert after["snags"] == []
+
+
+@pytest.mark.asyncio
 async def test_commentary_endpoint(app_client):
     resp = await app_client.post("/api/runs", json={
         "initial": "abc", "modified": "abd", "target": "xyz", "seed": SEED,
@@ -285,10 +480,14 @@ async def test_admin_enum_values_event_types(app_client):
     resp = await app_client.get("/api/admin/enums/event_types")
     assert resp.status_code == 200
     data = resp.json()
-    assert len(data) == 16
+    # 17: the 16 original types plus concept_activation, one of the seven
+    # Temporal Trace event types of §4.4.  trace_events.event_type is a foreign
+    # key onto this table, so every type the engine emits must appear here.
+    assert len(data) == 17
     names = {v["name"] for v in data}
     assert "bond_built" in names
     assert "snag" in names
+    assert "concept_activation" in names
 
 
 @pytest.mark.asyncio

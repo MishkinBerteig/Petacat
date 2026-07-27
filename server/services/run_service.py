@@ -33,6 +33,34 @@ from server.services.snapshot_service import (
 _global_memory = EpisodicMemory()
 
 
+def _live_answer_fields(problem: Any, top_rule_description: str) -> dict:
+    """The parts of an answer description that live only in memory.
+
+    Reminding activation, the per-type theme patterns, the unjustified-theme
+    pattern and the coherence verdict (§4.7.1, §4.7.3, §4.7.5) are computed as
+    answers are found and compared, so they are read from the in-memory Episodic
+    Memory rather than the persisted row.
+
+    Matched on the problem and rule rather than on an id: the database row's
+    ``id`` and ``AnswerDescription.answer_id`` come from independent counters, so
+    comparing them silently never matched and every answer was served with these
+    fields missing.
+    """
+    key = (tuple(problem or ()), top_rule_description or "")
+    for a in _global_memory.answers:
+        if (tuple(a.problem), a.top_rule_description or "") == key:
+            return {
+                "activation": a.activation,
+                "top_themes": a.top_themes,
+                "vertical_themes": a.vertical_themes,
+                "bottom_themes": a.bottom_themes,
+                "unjustified_themes": a.unjustified_themes,
+                "top_rule_abstractness": a.top_rule_abstractness,
+                "is_coherent": a.is_coherent,
+            }
+    return {}
+
+
 @dataclass
 class RunInfo:
     run_id: int
@@ -43,6 +71,14 @@ class RunInfo:
     modified: str
     target: str
     answer: str | None
+    #: True when the answer was *given* at creation for the engine to justify,
+    #: rather than discovered by it. Both arrive in ``answer``, so without this
+    #: a display cannot tell "it found xyd" from "it was asked about xyd".
+    justify_mode: bool = False
+    #: Which Slipnet nodes were allowed to spread (0-100; 100 = the original).
+    #: Part of the run's identity: a run at any other value is not comparable
+    #: with the dissertation's results.
+    spreading_threshold: int = 100
 
 
 class RunService:
@@ -68,8 +104,14 @@ class RunService:
         target: str,
         answer: str | None = None,
         seed: int = 0,
+        spreading_threshold: int | None = None,
     ) -> RunInfo:
         """Create a new run, initialize the engine, save initial snapshot."""
+        threshold = (
+            self.meta.get_param("spreading_activation_threshold", 100)
+            if spreading_threshold is None
+            else max(0, min(100, spreading_threshold))
+        )
         run = Run(
             initial_string=initial,
             modified_string=modified,
@@ -78,6 +120,7 @@ class RunService:
             seed=seed,
             status="initialized",
             justify_mode=answer is not None,
+            spreading_threshold=threshold,
         )
         session.add(run)
         await session.flush()
@@ -85,6 +128,8 @@ class RunService:
         runner = EngineRunner(self.meta)
         runner.init_mcat(initial, modified, target, answer=answer, seed=seed,
                          memory=_global_memory)
+        # Set before the first codelet runs, so the whole run uses it.
+        runner.ctx.spreading_activation_threshold = threshold
         self._runners[run.id] = runner
 
         await save_cycle_snapshot(session, run.id, runner.ctx)
@@ -99,6 +144,8 @@ class RunService:
             modified=modified,
             target=target,
             answer=answer,
+            justify_mode=answer is not None,
+            spreading_threshold=threshold,
         )
 
     async def step(
@@ -133,8 +180,8 @@ class RunService:
             if runner.ctx.codelet_count % ucl == 0:
                 await save_cycle_snapshot(session, run_id, runner.ctx)
 
-            # Stop stepping if an answer was found
-            if step_result.answer_found:
+            # Stop stepping if an answer was found, or if the run gave up
+            if step_result.answer_found or step_result.gave_up:
                 break
 
         # Update run row — include answer_string if found
@@ -155,11 +202,42 @@ class RunService:
         return results
 
     async def get_run_info(self, session: AsyncSession, run_id: int) -> RunInfo | None:
-        """Get current run info."""
+        """Get current run info, live where a runner is loaded.
+
+        ``run_to_completion`` writes ``codelet_count`` and ``temperature`` back to
+        the row only when the run ends, so mid-run the row still holds the values
+        it was created with — status ``running`` but 0 codelets and temperature
+        100.  Serving those made this endpoint actively misleading: a UI polling
+        it during a run saw the temperature jump to 100 on every sample (before a
+        live read corrected it a moment later) and a codelet count stuck at 0.
+
+        A loaded runner is the authority on how far a run has actually got, so
+        prefer it and fall back to the row for runs not currently in memory.
+        """
         result = await session.execute(select(Run).where(Run.id == run_id))
         run = result.scalar_one_or_none()
         if run is None:
             return None
+
+        runner = self._runners.get(run_id)
+        if runner is not None and runner.ctx is not None:
+            answer_string = runner.ctx.workspace.answer_string
+            return RunInfo(
+                run_id=run.id,
+                status=runner.status,
+                codelet_count=runner.ctx.codelet_count,
+                temperature=runner.ctx.temperature.value,
+                initial=run.initial_string,
+                modified=run.modified_string,
+                target=run.target_string,
+                answer=answer_string.text if answer_string is not None else None,
+                justify_mode=bool(run.justify_mode),
+                spreading_threshold=int(
+                    getattr(runner.ctx, "spreading_activation_threshold",
+                            run.spreading_threshold)
+                ),
+            )
+
         return RunInfo(
             run_id=run.id,
             status=run.status,
@@ -169,6 +247,10 @@ class RunService:
             modified=run.modified_string,
             target=run.target_string,
             answer=run.answer_string,
+            justify_mode=bool(run.justify_mode),
+            spreading_threshold=(
+                100 if run.spreading_threshold is None else int(run.spreading_threshold)
+            ),
         )
 
     def get_runner(self, run_id: int) -> EngineRunner | None:
@@ -237,6 +319,12 @@ class RunService:
                 modified=r.modified_string,
                 target=r.target_string,
                 answer=r.answer_string,
+                justify_mode=bool(r.justify_mode),
+                # Explicit None check: 0 is a real, meaningful value here and `or`
+                # would silently turn it into the default.
+                spreading_threshold=(
+                    100 if r.spreading_threshold is None else int(r.spreading_threshold)
+                ),
             )
             for r in rows
         ]
@@ -326,6 +414,10 @@ class RunService:
             answer=runner.ctx.workspace.answer_string.text
             if runner.ctx.workspace.answer_string
             else None,
+            justify_mode=runner.ctx.justify_mode,
+            spreading_threshold=int(
+                getattr(runner.ctx, "spreading_activation_threshold", 100)
+            ),
         )
 
     def stop_run(self, run_id: int) -> None:
@@ -347,6 +439,11 @@ class RunService:
         if run is None:
             raise ValueError(f"Run {run_id} not found in database")
 
+        # Reset means "this same problem and seed again", so the run's settings
+        # should survive it. `init_mcat` re-reads the spreading threshold from the
+        # metadata default, which silently discarded whatever the user had chosen.
+        threshold = getattr(runner.ctx, "spreading_activation_threshold", None)
+
         # Re-init engine
         runner.init_mcat(
             run.initial_string,
@@ -356,6 +453,8 @@ class RunService:
             seed=run.seed,
             memory=_global_memory,
         )
+        if threshold is not None:
+            runner.ctx.spreading_activation_threshold = threshold
 
         # Delete old snapshots and trace events
         await session.execute(
@@ -393,6 +492,10 @@ class RunService:
             modified=run.modified_string,
             target=run.target_string,
             answer=run.answer_string,
+            justify_mode=bool(run.justify_mode),
+            spreading_threshold=(
+                100 if run.spreading_threshold is None else int(run.spreading_threshold)
+            ),
         )
 
     async def delete_run(self, session: AsyncSession, run_id: int) -> None:
@@ -535,6 +638,31 @@ class RunService:
             for r in result.scalars().all()
         ]
 
+    async def clear_memory(self, session: AsyncSession) -> dict[str, int]:
+        """Clear episodic memory in both of the places it lives.
+
+        Answer and snag descriptions exist twice over: as rows in the database,
+        and in the process-wide ``_global_memory`` that live runs read and write.
+        ``get_memory_state_from_db`` serves the *rows*, so clearing only the
+        in-process object left every answer still on screen — which looked like
+        the clear had simply not worked.
+        """
+        answers = (
+            await session.execute(select(func.count()).select_from(AnswerDescriptionRow))
+        ).scalar() or 0
+        snags = (
+            await session.execute(select(func.count()).select_from(SnagDescriptionRow))
+        ).scalar() or 0
+
+        await session.execute(delete(AnswerDescriptionRow))
+        await session.execute(delete(SnagDescriptionRow))
+        await session.commit()
+
+        # Cleared in place, so the runners holding this reference see it too.
+        _global_memory.clear()
+
+        return {"answers": answers, "snags": snags}
+
     async def get_memory_state_from_db(self, session: AsyncSession) -> dict:
         """Read episodic memory from the database."""
         answers_result = await session.execute(
@@ -557,6 +685,7 @@ class RunService:
                     "temperature": a.temperature,
                     "themes": a.themes,
                     "unjustified_slippages": a.unjustified_slippages,
+                    **_live_answer_fields(a.problem, a.top_rule_description),
                 }
                 for a in answers_result.scalars().all()
             ],
@@ -843,17 +972,27 @@ class RunService:
     # Spreading activation threshold
     # ------------------------------------------------------------------
 
-    def set_spreading_threshold(self, run_id: int, threshold: int) -> dict:
+    async def set_spreading_threshold(
+        self, session: AsyncSession, run_id: int, threshold: int,
+    ) -> dict:
         """Set the spreading activation threshold for the given run.
 
         0 = all active nodes spread (permissive).
         100 = only fully-active nodes spread (original Scheme behaviour).
+
+        Written to the run row as well as the live engine: the threshold changes
+        what the run does, so it is part of the record of that run rather than a
+        transient setting that disappears on restart.
         """
         runner = self._runners.get(run_id)
         if runner is None or runner.ctx is None:
             raise ValueError(f"Run {run_id} not found or not loaded")
         threshold = max(0, min(100, threshold))
         runner.ctx.spreading_activation_threshold = threshold
+        await session.execute(
+            update(Run).where(Run.id == run_id).values(spreading_threshold=threshold)
+        )
+        await session.commit()
         return {
             "run_id": run_id,
             "spreading_activation_threshold": threshold,

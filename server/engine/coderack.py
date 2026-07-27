@@ -91,6 +91,9 @@ class Coderack:
         self._total_count = 0
         # Urgency clamping state
         self.clamped_urgencies: dict[str, int] = {}
+        # Set by the runner so ``post`` can enforce ``max_size`` on its own.
+        self.rng: RNG | None = None
+        self.current_time: int = 0
 
     @property
     def total_count(self) -> int:
@@ -105,11 +108,27 @@ class Coderack:
         idx = int(urgency * self.num_bins / 100)
         return max(0, min(self.num_bins - 1, idx))
 
-    def post(self, codelet: Codelet) -> None:
-        """Add a codelet to the appropriate bin."""
+    def post(self, codelet: Codelet, current_time: int | None = None, rng: RNG | None = None) -> None:
+        """Add a codelet, evicting an old one if the rack is at capacity.
+
+        Scheme: the Coderack holds at most ``%max-coderack-size%`` (100)
+        codelets; posting beyond that removes an existing one chosen
+        stochastically by age and low urgency.  Without the cap the rack grows
+        without bound and the codelet mix drifts away from whatever the current
+        Workspace state calls for.
+        """
         # Apply urgency clamping if active
         if codelet.codelet_type in self.clamped_urgencies:
             codelet.urgency = max(codelet.urgency, self.clamped_urgencies[codelet.codelet_type])
+
+        rng = rng if rng is not None else self.rng
+        if current_time is None:
+            current_time = self.current_time
+        if rng is not None and self._total_count >= self.max_size:
+            self.remove_old_codelets(
+                current_time, self._total_count - self.max_size + 1, rng
+            )
+
         bin_idx = self._urgency_to_bin(codelet.urgency)
         self.bins[bin_idx].add(codelet)
         self._total_count += 1

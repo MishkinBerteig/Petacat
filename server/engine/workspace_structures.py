@@ -23,11 +23,9 @@ class WorkspaceStructure:
 
     _next_id = 0
 
-    # Thematic compatibility weight (0-100).  Loaded from the
-    # ``thematic_compatibility_weight`` formula coefficient via
-    # ``configure_thematic_weight()``.  Default 0 preserves backward
-    # compatibility (the thematic term has no effect).
-    _thematic_compatibility_weight: float = 0.0
+    # The Themespace the current run's structures resonate with.  The Scheme uses
+    # a global ``*themespace*``; this mirrors it.  Set by ``init_mcat``.
+    _themespace: object | None = None
 
     def __init__(self) -> None:
         WorkspaceStructure._next_id += 1
@@ -37,11 +35,13 @@ class WorkspaceStructure:
         self.time_stamp: int = 0
 
     @classmethod
-    def configure_thematic_weight(cls, meta: MetadataProvider) -> None:
-        """Set the class-level thematic weight from *meta* coefficients."""
-        cls._thematic_compatibility_weight = meta.get_formula_coeff(
-            "thematic_compatibility_weight"
-        )
+    def set_themespace(cls, themespace: object | None) -> None:
+        """Bind the Themespace structures consult for thematic compatibility."""
+        cls._themespace = themespace
+
+    @classmethod
+    def get_themespace(cls) -> object | None:
+        return cls._themespace
 
     @property
     def is_proposed(self) -> bool:
@@ -58,36 +58,39 @@ class WorkspaceStructure:
     def update_strength(self) -> None:
         """Recompute strength from internal, external, and thematic terms.
 
-        Scheme: workspace-structures.ss:50-63.
+        Scheme: ``update-strength`` (workspace-structures.ss:50-63)::
 
-        1. ``intrinsic_strength`` = weighted-average of internal and external
-           strengths, where internal self-weights (the stronger the internal
-           component, the less external matters).
-        2. ``thematic`` = thematic compatibility of this structure (0 for the
-           base class; subclasses like bridges and descriptions override
-           ``get_thematic_compatibility``).
-        3. Final strength blends thematic and intrinsic via a configurable
-           ``thematic_compatibility_weight`` (from formula_coefficients).
-           When the weight is 0 the formula reduces to just intrinsic_strength.
+            compatibility   = get-thematic-compatibility        ; -1 .. +1
+            thematic-weight = |compatibility|
+            strength = weighted-average([100 if compatibility > 0 else 0,
+                                         intrinsic],
+                                        [thematic-weight, 1 - thematic-weight])
+
+        The thematic weight is *dynamic*, derived per-structure, and pulls
+        strength toward 100 when the structure resonates with the active themes
+        and toward 0 when it clashes with them.  This is the "knobs" mechanism of
+        §4.1.2 / Fig. 4.4 — a small amount of negative theme activation quickly
+        undermines a structure, a small amount of positive activation quickly
+        boosts it, and with no active themes the strength reverts to intrinsic.
         """
         internal = self.calculate_internal_strength()
         external = self.calculate_external_strength()
 
-        # Step 1 – intrinsic strength (unchanged from original)
         intrinsic_strength = weighted_average(
             [internal, external],
             [internal, 100.0 - internal],
         )
 
-        # Step 2 – thematic compatibility
-        thematic = self.get_thematic_compatibility()
-        tw = self._thematic_compatibility_weight
+        compatibility = self.get_thematic_compatibility()
+        thematic_weight = abs(compatibility)
+        if thematic_weight == 0.0:
+            self.strength = round(intrinsic_strength)
+            return
 
-        # Step 3 – blend thematic with intrinsic
         self.strength = round(
             weighted_average(
-                [thematic, intrinsic_strength],
-                [tw, 100.0 - tw],
+                [100.0 if compatibility > 0 else 0.0, intrinsic_strength],
+                [thematic_weight, 1.0 - thematic_weight],
             )
         )
 
@@ -98,12 +101,12 @@ class WorkspaceStructure:
         return 0.0
 
     def get_thematic_compatibility(self) -> float:
-        """Return thematic compatibility for this structure.
+        """How well this structure resonates with the active themes, in -1..+1.
 
-        Base implementation returns 0.  Subclasses (bridges, descriptions)
-        override this to return a value based on theme support.
-
-        Scheme: workspace-structures.ss:66.
+        Base implementation returns 0 — "For structures that lack their own local
+        method" (workspace-structures.ss:66).  Bridges and descriptions override
+        it; §4.1.2 notes that in the current version of Metacat only those two
+        structure types are influenced by themes.
         """
         return 0.0
 

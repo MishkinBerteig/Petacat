@@ -24,15 +24,33 @@ def test_cluster_count(themespace):
     assert len(themespace.clusters) == 27
 
 
-def test_active_types_default(themespace):
-    assert THEME_TOP_BRIDGE in themespace.active_theme_types
-    assert THEME_VERTICAL_BRIDGE in themespace.active_theme_types
-    assert THEME_BOTTOM_BRIDGE not in themespace.active_theme_types
+def test_possible_types_default(themespace):
+    assert THEME_TOP_BRIDGE in themespace.possible_theme_types
+    assert THEME_VERTICAL_BRIDGE in themespace.possible_theme_types
+    assert THEME_BOTTOM_BRIDGE not in themespace.possible_theme_types
 
 
-def test_justify_mode_activates_bottom(themespace):
+def test_thematic_pressure_is_off_by_default(themespace):
+    """§4.1.2: themes are passive most of the time.
+
+    Scheme: ``active-theme-types`` starts as '() (themes.ss:53).
+    """
+    assert themespace.active_theme_types == []
+
+
+def test_justify_mode_makes_bottom_themes_possible(themespace):
     themespace.set_justify_mode(True)
-    assert THEME_BOTTOM_BRIDGE in themespace.active_theme_types
+    assert THEME_BOTTOM_BRIDGE in themespace.possible_theme_types
+
+
+def test_pressure_only_covers_possible_types(themespace):
+    themespace.thematic_pressure_on()
+    assert set(themespace.active_theme_types) == {
+        THEME_TOP_BRIDGE,
+        THEME_VERTICAL_BRIDGE,
+    }
+    themespace.thematic_pressure_off()
+    assert themespace.active_theme_types == []
 
 
 def test_boost_theme(themespace):
@@ -95,7 +113,12 @@ def test_negative_activation_decays_toward_zero(themespace, meta):
 
 
 def test_theme_to_slipnet_spreading(themespace, meta):
-    """Active themes should stochastically activate slipnet nodes."""
+    """Themes spread to the Slipnet only while thematic pressure is on.
+
+    §4.1.2: "whenever thematic pressure is turned on, themes spread activation
+    to their constituent Slipnet concepts".
+    """
+    themespace.thematic_pressure_on()
     from server.engine.slipnet import Slipnet
     from server.engine.rng import RNG
 

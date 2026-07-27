@@ -2,8 +2,9 @@
 // MemoryView -- Cards for episodic memory answer descriptions
 // ---------------------------------------------------------------------------
 
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useRunStore } from '@/store/runStore';
+import type { AnswerComparisonResult } from '@/types';
 
 function qualityColor(quality: number): string {
   if (quality > 70) return 'var(--success)';
@@ -11,9 +12,85 @@ function qualityColor(quality: number): string {
   return 'var(--error)';
 }
 
+/** §4.7.5 renders an answer's activation as a grey-scale fade: weakly-activated
+ *  answers "appear to fade into the background of Metacat's memory". */
+function activationOpacity(activation: number | undefined): number {
+  if (activation === undefined) return 1;
+  return 0.35 + 0.65 * Math.max(0, Math.min(100, activation)) / 100;
+}
+
+const THEME_LABELS: Record<string, string> = {
+  'plato-string-position-category': 'string-position',
+  'plato-alphabetic-position-category': 'alphabetic-position',
+  'plato-direction-category': 'direction',
+  'plato-group-category': 'group-type',
+  'plato-bond-facet': 'bond-facet',
+  'plato-letter-category': 'letter-category',
+  'plato-length': 'length',
+  'plato-object-category': 'object-type',
+  'plato-bond-category': 'bond-type',
+};
+
+function themeChips(
+  themes: Record<string, string> | undefined,
+  tone: string,
+  title: string,
+) {
+  const entries = Object.entries(themes ?? {});
+  if (entries.length === 0) return null;
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginTop: 3 }} title={title}>
+      {entries.map(([dim, rel]) => (
+        <span
+          key={dim}
+          className="mono"
+          style={{
+            fontSize: 9,
+            padding: '1px 4px',
+            borderRadius: 2,
+            border: `1px solid ${tone}`,
+            color: tone,
+          }}
+        >
+          {(THEME_LABELS[dim] ?? dim.replace('plato-', ''))}:{rel}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 export function MemoryView() {
   const memory = useRunStore((s) => s.memory);
   const refreshMemory = useRunStore((s) => s.refreshMemory);
+  const [selected, setSelected] = useState<number[]>([]);
+  const [comparison, setComparison] = useState<AnswerComparisonResult | null>(null);
+  const [comparing, setComparing] = useState(false);
+
+  const toggleSelected = useCallback((answerId: number) => {
+    setComparison(null);
+    setSelected((prev) =>
+      prev.includes(answerId)
+        ? prev.filter((id) => id !== answerId)
+        : [...prev, answerId].slice(-2),
+    );
+  }, []);
+
+  const handleCompare = useCallback(async () => {
+    if (selected.length !== 2) return;
+    setComparing(true);
+    try {
+      const res = await fetch('/api/memory/compare', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ answer_id_1: selected[0], answer_id_2: selected[1] }),
+      });
+      setComparison(res.ok ? await res.json() : null);
+    } catch {
+      setComparison(null);
+    } finally {
+      setComparing(false);
+    }
+  }, [selected]);
 
   const handleClear = useCallback(async () => {
     if (!window.confirm('Clear all episodic memory? This cannot be undone.')) return;
@@ -51,15 +128,51 @@ export function MemoryView() {
           {answers.length} answer{answers.length !== 1 ? 's' : ''}
           {snags.length > 0 && `, ${snags.length} snag${snags.length !== 1 ? 's' : ''}`}
         </span>
-        {!isEmpty && (
-          <button
-            onClick={handleClear}
-            style={{ fontSize: 10, color: 'var(--error)' }}
-          >
-            Clear Memory
-          </button>
-        )}
+        <span style={{ display: 'flex', gap: 8 }}>
+          {answers.length >= 2 && (
+            <button
+              onClick={handleCompare}
+              disabled={selected.length !== 2 || comparing}
+              title="Compare the two selected answers (§4.7.3)"
+              style={{
+                fontSize: 10,
+                color: selected.length === 2 ? 'var(--text-accent)' : 'var(--text-secondary)',
+              }}
+            >
+              {comparing ? 'Comparing...' : `Compare (${selected.length}/2)`}
+            </button>
+          )}
+          {!isEmpty && (
+            <button
+              onClick={handleClear}
+              style={{ fontSize: 10, color: 'var(--error)' }}
+            >
+              Clear Memory
+            </button>
+          )}
+        </span>
       </div>
+
+      {/* Comparison commentary (§4.7.4) */}
+      {comparison && (
+        <div
+          style={{
+            background: 'var(--bg-card)',
+            border: '1px solid var(--text-accent)',
+            borderRadius: 4,
+            padding: 8,
+            marginBottom: 8,
+            fontSize: 11,
+            lineHeight: 1.5,
+          }}
+        >
+          {comparison.commentary.paragraphs.map((para, i) => (
+            <p key={i} style={{ margin: i === 0 ? 0 : '6px 0 0' }}>
+              {para}
+            </p>
+          ))}
+        </div>
+      )}
 
       {/* Empty state */}
       {isEmpty && (
@@ -72,20 +185,36 @@ export function MemoryView() {
       {answers.map((ans) => (
         <div
           key={ans.answer_id}
+          onClick={() => toggleSelected(ans.answer_id)}
+          title={`Reminding activation ${(ans.activation ?? 0).toFixed(0)} — click to select for comparison`}
           style={{
             background: 'var(--bg-card)',
             borderRadius: 4,
             padding: 8,
             marginBottom: 6,
-            border: '1px solid var(--border)',
+            cursor: 'pointer',
+            opacity: activationOpacity(ans.activation),
+            border: selected.includes(ans.answer_id)
+              ? '1px solid var(--text-accent)'
+              : '1px solid var(--border)',
           }}
         >
           {/* Problem string */}
           <div
             className="mono text-xs"
-            style={{ marginBottom: 4, color: 'var(--text-primary)' }}
+            style={{
+              marginBottom: 4,
+              color: 'var(--text-primary)',
+              display: 'flex',
+              justifyContent: 'space-between',
+            }}
           >
-            {ans.problem.join(' -> ')}
+            <span>{ans.problem.join(' -> ')}</span>
+            {ans.activation !== undefined && (
+              <span className="text-muted" style={{ fontSize: 9 }}>
+                act {ans.activation.toFixed(0)}
+              </span>
+            )}
           </div>
 
           {/* Quality bar */}
@@ -139,11 +268,20 @@ export function MemoryView() {
             </div>
           )}
 
+          {/* Theme patterns (§4.7.1) */}
+          {themeChips(ans.vertical_themes ?? ans.themes, 'var(--text-accent)', 'Vertical themes')}
+          {themeChips(ans.top_themes, '#4caf50', 'Top themes')}
+          {themeChips(ans.bottom_themes, '#03a9f4', 'Bottom themes')}
+          {themeChips(ans.unjustified_themes, 'var(--error)', 'Unjustified themes')}
+
           {/* Temperature at discovery */}
           <div
             className="text-xs text-muted"
             style={{ marginTop: 4, textAlign: 'right' }}
           >
+            {ans.is_coherent === false && (
+              <span style={{ color: 'var(--warning)', marginRight: 6 }}>incoherent</span>
+            )}
             T: {ans.temperature.toFixed(0)}
           </div>
         </div>

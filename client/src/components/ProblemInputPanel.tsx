@@ -1,36 +1,60 @@
 // ---------------------------------------------------------------------------
-// ProblemInputPanel — Initial/Modified/Target/Answer inputs + demo dropdown
+// ProblemInputPanel — the problem to run: four strings, seed, demo, Reset
+// ---------------------------------------------------------------------------
+//
+// This panel owns *what* gets run; RunControlsPanel owns *how*. Seed and Reset
+// live here because they belong to the problem's identity rather than to the
+// run mechanics: Reset re-initializes the current run with exactly the strings
+// and seed shown here, which is only legible when they sit together. Changing
+// any field instead means the next Run starts a new run.
 // ---------------------------------------------------------------------------
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRunStore } from '@/store/runStore';
 import type { DemoProblem } from '@/types';
 import { getDemos } from '@/api/client';
 
 export function ProblemInputPanel() {
   const workspace = useRunStore((s) => s.workspace);
+  const runId = useRunStore((s) => s.runId);
+  /** Last run whose problem we copied into the form. */
+  const adoptedRunId = useRef<number | null>(null);
   const formInputs = useRunStore((s) => s.formInputs);
   const setFormInput = useRunStore((s) => s.setFormInput);
   const setFormInputs = useRunStore((s) => s.setFormInputs);
   const status = useRunStore((s) => s.status);
+  const reset = useRunStore((s) => s.reset);
   const isRunning = status === 'running';
+  const hasRun = runId !== null;
 
   const [demos, setDemos] = useState<DemoProblem[]>([]);
   const [selectedDemo, setSelectedDemo] = useState('');
   const [demosLoading, setDemosLoading] = useState(false);
+  const [resetFlash, setResetFlash] = useState(false);
 
-  // Sync from store when a run is loaded (e.g., via URL hash)
+  const handleReset = useCallback(async () => {
+    await reset();
+    setResetFlash(true);
+    setTimeout(() => setResetFlash(false), 1200);
+  }, [reset]);
+
+  // Adopt the problem of a newly-loaded run (e.g. via URL hash or history).
+  //
+  // Keyed on the run id, not on the workspace: this used to re-run on every
+  // workspace refresh, so each poll during a run overwrote whatever the user
+  // had typed with the running problem's strings — which made editing a
+  // problem look like it did nothing at all.
   useEffect(() => {
-    if (workspace) {
-      setFormInputs({
-        initial: workspace.initial,
-        modified: workspace.modified,
-        target: workspace.target,
-        answer: workspace.answer ?? '',
-      });
-    }
+    if (runId === null || runId === adoptedRunId.current || !workspace) return;
+    adoptedRunId.current = runId;
+    setFormInputs({
+      initial: workspace.initial,
+      modified: workspace.modified,
+      target: workspace.target,
+      answer: workspace.answer ?? '',
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workspace]);
+  }, [runId, workspace]);
 
   // Fetch demos on mount
   useEffect(() => {
@@ -74,8 +98,9 @@ export function ProblemInputPanel() {
   return (
     <div className="flex-col" style={{ fontSize: 13 }}>
       <div style={fieldGroupStyle}>
-        <label style={labelStyle}>Initial</label>
+        <label style={labelStyle} htmlFor="problem-initial">Initial</label>
         <input
+          id="problem-initial"
           type="text"
           value={formInputs.initial}
           onChange={(e) => setFormInput('initial', e.target.value)}
@@ -86,8 +111,9 @@ export function ProblemInputPanel() {
       </div>
 
       <div style={fieldGroupStyle}>
-        <label style={labelStyle}>Modified</label>
+        <label style={labelStyle} htmlFor="problem-modified">Modified</label>
         <input
+          id="problem-modified"
           type="text"
           value={formInputs.modified}
           onChange={(e) => setFormInput('modified', e.target.value)}
@@ -98,8 +124,9 @@ export function ProblemInputPanel() {
       </div>
 
       <div style={fieldGroupStyle}>
-        <label style={labelStyle}>Target</label>
+        <label style={labelStyle} htmlFor="problem-target">Target</label>
         <input
+          id="problem-target"
           type="text"
           value={formInputs.target}
           onChange={(e) => setFormInput('target', e.target.value)}
@@ -110,8 +137,9 @@ export function ProblemInputPanel() {
       </div>
 
       <div style={fieldGroupStyle}>
-        <label style={labelStyle}>Answer (optional)</label>
+        <label style={labelStyle} htmlFor="problem-answer">Answer (optional)</label>
         <input
+          id="problem-answer"
           type="text"
           value={formInputs.answer}
           onChange={(e) => setFormInput('answer', e.target.value)}
@@ -122,8 +150,25 @@ export function ProblemInputPanel() {
       </div>
 
       <div style={fieldGroupStyle}>
-        <label style={labelStyle}>Demo Problem</label>
+        <label style={labelStyle} htmlFor="problem-seed">Seed (optional)</label>
+        <input
+          id="problem-seed"
+          type="text"
+          value={formInputs.seed}
+          onChange={(e) => setFormInput('seed', e.target.value)}
+          placeholder="0"
+          style={{ width: '100%' }}
+          disabled={isRunning}
+        />
+        <span className="text-xs text-muted">
+          Same problem and seed reproduces a run exactly. Blank or 0 = seed 0.
+        </span>
+      </div>
+
+      <div style={fieldGroupStyle}>
+        <label style={labelStyle} htmlFor="problem-demo">Demo Problem</label>
         <select
+          id="problem-demo"
           value={selectedDemo}
           onChange={(e) => handleDemoSelect(e.target.value)}
           style={{ width: '100%' }}
@@ -138,6 +183,48 @@ export function ProblemInputPanel() {
             </option>
           ))}
         </select>
+      </div>
+
+      {/* Reset belongs to the problem, not to the run controls: it starts this
+          same problem and seed over from scratch. Editing any field above is
+          the other thing you might mean — that starts a *new* run instead. */}
+      <div
+        style={{
+          borderTop: '1px solid var(--border)',
+          paddingTop: 8,
+          marginTop: 2,
+        }}
+      >
+        <button
+          onClick={handleReset}
+          disabled={!hasRun || isRunning}
+          title="Clear the workspace back to codelet 0, keeping this same problem and seed. Does not start running."
+          style={{ width: '100%' }}
+        >
+          Reset to codelet 0
+        </button>
+        <div className="text-xs text-muted" style={{ marginTop: 4 }}>
+          {hasRun
+            ? `Clears run #${runId} back to bare strings, same problem and seed. Press Run to go again.`
+            : 'Clears the current run back to bare strings, once one exists.'}
+        </div>
+        {resetFlash && (
+          <div
+            style={{
+              background: 'var(--success)',
+              color: '#fff',
+              padding: '4px 8px',
+              borderRadius: 3,
+              fontSize: 11,
+              fontWeight: 600,
+              textAlign: 'center',
+              marginTop: 6,
+              animation: 'fadeOut 1.2s ease-out forwards',
+            }}
+          >
+            Run reset to initial state
+          </div>
+        )}
       </div>
     </div>
   );

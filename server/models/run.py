@@ -35,6 +35,13 @@ class Run(Base):
     self_watching = Column(Boolean, default=True)
     codelet_count = Column(Integer, default=0)
     temperature = Column(Float, default=100.0)
+    #: Which Slipnet nodes were allowed to spread during this run (0-100).
+    #: Recorded per run because it changes what the run does — 100 is the
+    #: original's behaviour, and a run at any other value is not comparable with
+    #: the dissertation's. ``server_default`` so pre-existing rows read as 100.
+    spreading_threshold = Column(
+        Integer, nullable=False, default=100, server_default="100",
+    )
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 

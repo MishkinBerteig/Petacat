@@ -23,7 +23,7 @@ from server.engine.rng import RNG
 from server.engine.slipnet import Slipnet
 from server.engine.temperature import Temperature
 from server.engine.themes import Themespace
-from server.engine.trace import TemporalTrace, TraceEvent
+from server.engine.trace import CONCEPT_ACTIVATION, TemporalTrace, TraceEvent
 from server.engine.workspace import Workspace
 from server.engine.workspace_structures import WorkspaceStructure
 
@@ -45,6 +45,10 @@ class StepResult:
     event: TraceEvent | None = None
     answer_found: bool = False
     answer: str | None = None
+    #: A jootser concluded the program is looping with no alternatives left
+    #: (§4.5.2).  Giving up is a real outcome, distinct from running out of
+    #: codelets, so callers need to be able to tell the two apart.
+    gave_up: bool = False
 
 
 @dataclass
@@ -117,8 +121,9 @@ class EngineRunner:
         """
         rng = RNG(seed)
 
-        # Configure class-level thematic weight from formula coefficients
-        WorkspaceStructure.configure_thematic_weight(self.meta)
+        # Structures consult the Themespace for thematic compatibility; the
+        # Scheme uses a global *themespace*, so bind ours before building any.
+        WorkspaceStructure.set_themespace(None)
 
         # Build slipnet from metadata
         slipnet = Slipnet.from_metadata(self.meta)
@@ -126,11 +131,14 @@ class EngineRunner:
         # Create workspace
         workspace = Workspace(initial, modified, target, answer, slipnet)
 
-        # Create coderack
+        # Create coderack.  It needs the RNG so it can enforce its own capacity
+        # cap when codelets are posted.
         coderack = Coderack(self.meta)
+        coderack.rng = rng
 
-        # Create themespace
+        # Create themespace, and bind it for structure thematic-compatibility
         themespace = Themespace(self.meta)
+        WorkspaceStructure.set_themespace(themespace)
 
         # Create trace
         trace = TemporalTrace()
@@ -265,10 +273,14 @@ class EngineRunner:
 
         for _ in range(num_objects):
             ctx.coderack.post(
-                Codelet("bottom-up-bond-scout", urgency, time_stamp=0)
+                Codelet("bottom-up-bond-scout", urgency, time_stamp=0),
+                ctx.codelet_count,
+                ctx.rng,
             )
             ctx.coderack.post(
-                Codelet("bottom-up-bridge-scout", urgency, time_stamp=0)
+                Codelet("bottom-up-bridge-scout", urgency, time_stamp=0),
+                ctx.codelet_count,
+                ctx.rng,
             )
 
     def step_mcat(self) -> StepResult:
@@ -296,6 +308,7 @@ class EngineRunner:
             return result
 
         ctx.codelet_count += 1
+        ctx.coderack.current_time = ctx.codelet_count
         result.codelet_type = codelet.codelet_type
         result.codelet_count = ctx.codelet_count
 
@@ -306,6 +319,14 @@ class EngineRunner:
             ctx.temperature.value,
         )
         self._execute_codelet(codelet)
+
+        # A jootser may have decided the program is looping and given up
+        # (§4.5.2 — "Metacat simply 'gives up' in a graceful manner and stops").
+        if getattr(ctx, "_gave_up", False):
+            self.status = STATUS_GAVE_UP
+            ctx._gave_up = False  # type: ignore[attr-defined]
+            result.gave_up = True
+            return result
 
         # Check if a codelet reported an answer
         pending = getattr(ctx, "_pending_answer", None)
@@ -425,7 +446,11 @@ class EngineRunner:
         if ctx.self_watching_enabled:
             ctx.themespace.spread_activation_to_slipnet(ctx.slipnet, ctx.rng)
         threshold = getattr(ctx, "spreading_activation_threshold", 100)
+        activations_before = {
+            name: node.activation for name, node in ctx.slipnet.nodes.items()
+        }
         ctx.slipnet.update_activations(ctx.rng, threshold=threshold)
+        self._record_concept_activation_events(activations_before)
 
         # 10. Update temperature
         avg_unhappiness = ctx.workspace.get_average_unhappiness()
@@ -438,25 +463,48 @@ class EngineRunner:
         # 12. Post new top-down codelets
         self._post_top_down_codelets()
 
-    def _spread_activation_to_themespace(self) -> None:
-        """Boost themes from bridge concept-mappings.
+    def _record_concept_activation_events(
+        self, activations_before: dict[str, float]
+    ) -> None:
+        """Note when a deep concept's activation moves substantially.
 
-        Scheme: workspace.ss:495-498 (spread-activation-to-themespace).
-        Each built bridge extracts its theme pattern and boosts the
-        corresponding themes in the Themespace.
+        §4.4: "nodes in the Slipnet monitor their own levels of activation,
+        adding new concept-activation events to the Trace whenever sufficiently
+        large changes occur in the activations of deep concepts.  The importance
+        of this type of event is a function of a node's conceptual depth and of
+        the magnitude of its activation change, with larger changes to deeper
+        concepts being more important."
         """
         ctx = self.ctx
         if ctx is None:
             return
+        threshold = self.meta.get_param("concept_activation_importance_threshold", 85)
+        for name, node in ctx.slipnet.nodes.items():
+            before = activations_before.get(name, 0.0)
+            delta = node.activation - before
+            if delta <= 0:
+                continue
+            importance = (node.conceptual_depth + delta) / 2.0
+            if importance >= threshold:
+                ctx.trace.record_event(
+                    TraceEvent(
+                        event_type=CONCEPT_ACTIVATION,
+                        codelet_count=ctx.codelet_count,
+                        temperature=ctx.temperature.value,
+                        description=f"the concept of {node.short_name} became active",
+                    )
+                )
 
-        from server.engine.bridges import BRIDGE_TOP, BRIDGE_BOTTOM, BRIDGE_VERTICAL
-        from server.engine.themes import THEME_TOP_BRIDGE, THEME_BOTTOM_BRIDGE, THEME_VERTICAL_BRIDGE
+    def _spread_activation_to_themespace(self) -> None:
+        """Boost themes from every built bridge.
 
-        bt_to_tt = {
-            BRIDGE_TOP: THEME_TOP_BRIDGE,
-            BRIDGE_BOTTOM: THEME_BOTTOM_BRIDGE,
-            BRIDGE_VERTICAL: THEME_VERTICAL_BRIDGE,
-        }
+        Scheme: ``boost-themes`` (bridges.ss:296-313), driven from
+        ``spread-activation-to-themespace`` (workspace.ss:495-498).  Spanning
+        bridges boost twice as hard, since they characterise whole strings.
+        """
+        ctx = self.ctx
+        if ctx is None:
+            return
 
         all_bridges = (
             ctx.workspace.top_bridges
@@ -466,13 +514,10 @@ class EngineRunner:
         for bridge in all_bridges:
             if not bridge.is_built:
                 continue
-            theme_type = bt_to_tt.get(bridge.bridge_type)
-            if theme_type is None:
-                continue
-            pattern = bridge.get_theme_pattern()
-            for dimension, relation in pattern.items():
+            factor = bridge.strength * (2 if bridge.is_spanning_bridge else 1)
+            for dimension, relation in bridge.get_associated_thematic_relations():
                 ctx.themespace.boost_theme(
-                    theme_type, dimension, relation, bridge.strength
+                    bridge.theme_type, dimension, relation, factor
                 )
 
     def _post_bottom_up_codelets(self) -> None:

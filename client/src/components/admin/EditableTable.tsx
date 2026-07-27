@@ -160,7 +160,7 @@ export function EditableTable<T extends Record<string, any>>({
                   borderBottom: '1px solid var(--border)',
                   background: isHighlighted
                     ? 'rgba(0,212,255,0.15)'
-                    : flash?.id === id
+                    : flash && flash.id === id
                       ? flash.type === 'success' ? 'rgba(76,175,80,0.1)' : 'rgba(244,67,54,0.1)'
                       : undefined,
                   outline: isHighlighted ? '2px solid var(--text-accent)' : undefined,
@@ -168,7 +168,8 @@ export function EditableTable<T extends Record<string, any>>({
                 }}
               >
                 {columns.map(col => {
-                  const isEditing = editingCell?.id === id && editingCell.key === col.key;
+                  const isEditing =
+                    editingCell !== null && editingCell.id === id && editingCell.key === col.key;
                   const canEdit = col.type !== 'readonly' && onUpdate;
 
                   if (isEditing) {

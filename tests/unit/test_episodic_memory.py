@@ -127,7 +127,7 @@ def test_compare_answers_reports_shared_theme_with_equal_value():
     a = _answer({"position": "rightmost"})
     b = _answer({"position": "rightmost"})
     result = mem.compare_answers(a, b)
-    assert result["shared_themes"] == {"position": "rightmost"}
+    assert result["common_themes"] == {"position": "rightmost"}
 
 
 def test_compare_answers_splits_dimension_with_differing_values():
@@ -135,8 +135,8 @@ def test_compare_answers_splits_dimension_with_differing_values():
     a = _answer({"direction": "opposite"})
     b = _answer({"direction": "same"})
     result = mem.compare_answers(a, b)
-    assert result["a_only_themes"]["direction"] == "opposite"
-    assert result["b_only_themes"]["direction"] == "same"
+    # Same category, different relation -> a *differing* theme, not two uniques.
+    assert result["differing_themes"]["direction"] == ("opposite", "same")
 
 
 def test_compare_answers_reports_dimension_present_only_in_a():
@@ -144,7 +144,7 @@ def test_compare_answers_reports_dimension_present_only_in_a():
     a = _answer({"position": "rightmost", "direction": "opposite"})
     b = _answer({"position": "rightmost"})
     result = mem.compare_answers(a, b)
-    assert result["a_only_themes"] == {"direction": "opposite"}
+    assert result["a_unique_themes"] == {"direction": "opposite"}
 
 
 def test_compare_answers_includes_quality_and_rule_fields():

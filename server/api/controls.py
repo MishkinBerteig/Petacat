@@ -5,10 +5,12 @@ Breakpoints, step size, theme/codelet/temperature/node clamping.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.api.runs import get_run_service
+from server.db import get_session
 
 router = APIRouter(prefix="/api/runs/{run_id}", tags=["controls"])
 
@@ -70,7 +72,11 @@ class SetSpreadingThresholdRequest(BaseModel):
 
 
 @router.post("/spreading-threshold")
-async def set_spreading_threshold(run_id: int, req: SetSpreadingThresholdRequest):
+async def set_spreading_threshold(
+    run_id: int,
+    req: SetSpreadingThresholdRequest,
+    session: AsyncSession = Depends(get_session),
+):
     """Set the spreading activation threshold (0–100).
 
     At 100 (default), only fully-active nodes spread — matching the original
@@ -78,7 +84,7 @@ async def set_spreading_threshold(run_id: int, req: SetSpreadingThresholdRequest
     """
     svc = get_run_service()
     try:
-        result = svc.set_spreading_threshold(run_id, req.threshold)
+        result = await svc.set_spreading_threshold(session, run_id, req.threshold)
     except ValueError as e:
         raise HTTPException(404, str(e))
     return result

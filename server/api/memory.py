@@ -39,12 +39,11 @@ async def list_memory(session: AsyncSession = Depends(get_session)):
 
 
 @router.delete("")
-async def clear_memory():
-    """Clear all episodic memory."""
-    from server.services.run_service import _global_memory
-
-    _global_memory.clear()
-    return {"cleared": True}
+async def clear_memory(session: AsyncSession = Depends(get_session)):
+    """Clear all episodic memory — both the stored rows and the live object."""
+    svc = get_run_service()
+    removed = await svc.clear_memory(session)
+    return {"cleared": True, "removed": removed}
 
 
 @router.post("/compare")
@@ -66,9 +65,12 @@ async def compare_answers(req: CompareRequest):
     if answer_b is None:
         raise HTTPException(404, f"Answer {req.answer_id_2} not found")
 
+    from server.engine.commentary import describe_answer_comparison
+
     comparison = _global_memory.compare_answers(answer_a, answer_b)
     return {
         "answer_id_1": req.answer_id_1,
         "answer_id_2": req.answer_id_2,
         "comparison": comparison,
+        "commentary": describe_answer_comparison(answer_a, answer_b, comparison),
     }

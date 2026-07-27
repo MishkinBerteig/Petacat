@@ -46,9 +46,15 @@ class FakeNode:
         # Link collections consulted by ConceptMapping._find_slipnet_link.
         self.lateral_links: list[FakeLink] = []
         self.lateral_sliplinks: list[FakeLink] = []
+        self.frozen = False
 
     def fully_active(self) -> bool:
         return self._fully_active
+
+    def activate_from_workspace(self) -> None:
+        """Mirror ``SlipnetNode.activate_from_workspace`` (+100 into the buffer)."""
+        if not self.frozen:
+            self.activation_buffer += 100.0
 
     def __repr__(self) -> str:  # pragma: no cover - debugging aid
         return f"FakeNode({self.name})"

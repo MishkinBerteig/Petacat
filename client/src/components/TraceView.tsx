@@ -6,38 +6,36 @@ import { useState, useEffect, useRef } from 'react';
 import { useRunStore } from '@/store/runStore';
 import type { TraceEvent } from '@/types';
 
+/** The seven Trace event types of §4.4, in the order the dissertation lists them.
+ *
+ * The Trace is Metacat's *cognitive* level: a typical run is a few dozen of
+ * these, each a "macroscopic" processing event that may itself comprise the
+ * actions of many codelets.  Bond and description building never appears here.
+ */
+const EVENT_LABELS: Record<string, { icon: string; label: string; color: string }> = {
+  concept_activation: { icon: '[◈]', label: 'concept activated', color: 'var(--text-accent)' },
+  group_built: { icon: '[G]', label: 'group perceived', color: '#4caf50' },
+  concept_mapping_built: { icon: '[⇒]', label: 'slippage', color: '#03a9f4' },
+  rule_built: { icon: '[R]', label: 'rule created', color: '#9c27b0' },
+  answer_found: { icon: '[A]', label: 'answer', color: 'var(--success)' },
+  snag: { icon: '[!]', label: 'snag', color: 'var(--error)' },
+  clamp_start: { icon: '[C]', label: 'pattern clamped', color: 'var(--warning)' },
+};
+
 /** Event type to a short icon prefix for compact display. */
 function eventIcon(eventType: string): string {
-  const t = eventType.toUpperCase();
-  if (t.includes('BOND') && t.includes('BUILT')) return '[B+]';
-  if (t.includes('BOND') && t.includes('BROKEN')) return '[B-]';
-  if (t.includes('BOND')) return '[B]';
-  if (t.includes('GROUP') && t.includes('BUILT')) return '[G+]';
-  if (t.includes('GROUP') && t.includes('BROKEN')) return '[G-]';
-  if (t.includes('GROUP')) return '[G]';
-  if (t.includes('BRIDGE') && t.includes('BUILT')) return '[BR+]';
-  if (t.includes('BRIDGE') && t.includes('BROKEN')) return '[BR-]';
-  if (t.includes('BRIDGE')) return '[BR]';
-  if (t.includes('RULE')) return '[R]';
-  if (t.includes('SNAG')) return '[!]';
-  if (t.includes('CLAMP_START')) return '[C+]';
-  if (t.includes('CLAMP_END')) return '[C-]';
-  if (t.includes('CLAMP')) return '[C]';
-  if (t.includes('ANSWER')) return '[A]';
-  if (t.includes('JOOTSING')) return '[J]';
-  if (t.includes('DESCRIPTION')) return '[D]';
-  if (t.includes('PROGRESS')) return '[P]';
-  return '[.]';
+  return EVENT_LABELS[eventType]?.icon ?? '[.]';
+}
+
+/** Human-readable name for an event type. */
+function eventLabel(eventType: string): string {
+  return EVENT_LABELS[eventType]?.label ?? eventType.replace(/_/g, ' ');
 }
 
 function eventColor(eventType: string): string {
-  const t = eventType.toUpperCase();
-  if (t.includes('SNAG') || t.includes('BROKEN')) return 'var(--error)';
-  if (t.includes('ANSWER')) return 'var(--success)';
-  if (t.includes('CLAMP') || t.includes('JOOTSING')) return 'var(--warning)';
-  if (t.includes('BUILT')) return 'var(--text-accent)';
-  return 'var(--text-secondary)';
+  return EVENT_LABELS[eventType]?.color ?? 'var(--text-secondary)';
 }
+
 
 /** Extract unique event types from a list. */
 function uniqueTypes(events: TraceEvent[]): string[] {
@@ -94,7 +92,7 @@ export function TraceView() {
           <option value="">All events ({trace.length})</option>
           {types.map((t) => (
             <option key={t} value={t}>
-              {t} ({trace.filter((e) => e.event_type === t).length})
+              {eventLabel(t)} ({trace.filter((e) => e.event_type === t).length})
             </option>
           ))}
         </select>

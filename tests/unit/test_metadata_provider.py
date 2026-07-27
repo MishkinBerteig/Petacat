@@ -142,7 +142,9 @@ def test_loads_enum_values(meta):
 def test_enum_values_match_expected_counts(meta):
     """Each enum table should have the expected number of values."""
     assert len(meta.enum_values["run_statuses"]) == 6
-    assert len(meta.enum_values["event_types"]) == 16
+    # 17: the 16 original types plus concept_activation, one of the seven
+    # Temporal Trace event types of §4.4.
+    assert len(meta.enum_values["event_types"]) == 17
     assert len(meta.enum_values["bridge_types"]) == 3
     assert len(meta.enum_values["bridge_orientations"]) == 2
     assert len(meta.enum_values["clause_types"]) == 3

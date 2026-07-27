@@ -46,11 +46,14 @@ services:
     working_dir: /app/client
     volumes:
       - ./client:/app/client
+      # Keep the container's node_modules off the bind mount. Sharing it with
+      # the host means this container's `npm install` (linux, musl) overwrites
+      # the host's platform binaries, which breaks `npm run build` on the host
+      # with a missing @rollup/rollup-<host-platform> module -- and vice versa.
+      - frontend-node-modules:/app/client/node_modules
     ports:
-      - "5175:5173"
+      - "59595:5173"
     command: sh -c "npm install && npm run dev"
-    environment:
-      VITE_API_URL: http://localhost:8100
     networks:
       - petacat-net
 
@@ -60,3 +63,4 @@ networks:
 
 volumes:
   petacat-pgdata:
+  frontend-node-modules:

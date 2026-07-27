@@ -193,10 +193,10 @@ def _themespace():
     return Themespace(meta)
 
 
-def test_justify_mode_activates_all_three_bridge_types():
+def test_justify_mode_makes_all_three_bridge_types_possible():
     ts = _themespace()
     ts.set_justify_mode(True)
-    assert set(ts.active_theme_types) == {
+    assert set(ts.possible_theme_types) == {
         THEME_TOP_BRIDGE,
         THEME_BOTTOM_BRIDGE,
         THEME_VERTICAL_BRIDGE,
@@ -205,6 +205,22 @@ def test_justify_mode_activates_all_three_bridge_types():
 
 def test_default_mode_excludes_bottom_bridge_type():
     ts = _themespace()
+    assert THEME_BOTTOM_BRIDGE not in ts.possible_theme_types
+
+
+def test_thematic_pressure_starts_off():
+    """Scheme: active-theme-types is initialised to '() (themes.ss:53)."""
+    ts = _themespace()
+    assert ts.has_thematic_pressure() is False
+    assert ts.active_theme_types == []
+
+
+def test_leaving_justify_mode_drops_bottom_pressure():
+    ts = _themespace()
+    ts.set_justify_mode(True)
+    ts.thematic_pressure_on()
+    assert THEME_BOTTOM_BRIDGE in ts.active_theme_types
+    ts.set_justify_mode(False)
     assert THEME_BOTTOM_BRIDGE not in ts.active_theme_types
 
 
@@ -219,14 +235,22 @@ def _top_direction_cluster(ts):
 
 def test_thematic_pressure_reports_dominant_relation_for_active_type():
     ts = _themespace()
+    ts.thematic_pressure_on()
     cluster = _top_direction_cluster(ts)
     cluster.get_theme("identity").activation = 95.0  # single dominant positive
     assert ts.get_thematic_pressure("top") == {"direction": "identity"}
 
 
+def test_thematic_pressure_empty_while_pressure_is_off():
+    ts = _themespace()
+    _top_direction_cluster(ts).get_theme("identity").activation = 95.0
+    assert ts.get_thematic_pressure("top") == {}
+
+
 def test_thematic_pressure_empty_for_inactive_bridge_type():
     ts = _themespace()
-    # bottom is not in the default active theme types
+    ts.thematic_pressure_on()
+    # bottom is not among the possible theme types outside justify mode
     assert ts.get_thematic_pressure("bottom") == {}
 
 
@@ -240,14 +264,31 @@ def test_boost_theme_raises_the_matching_theme_activation():
 
 def test_clamp_negative_pattern_inhibits_matching_theme():
     ts = _themespace()
-    ts.clamp_negative_pattern({"direction": "opposite"})
+    ts.clamp_negative_pattern({"direction": "opposite"}, THEME_TOP_BRIDGE)
     theme = _top_direction_cluster(ts).get_theme("opposite")
     assert theme.frozen is True
     assert theme.activation == -100.0
 
 
+def test_clamping_a_pattern_turns_thematic_pressure_on():
+    """§4.2: "the clamping of theme activations ... automatically turns on
+    thematic pressure"."""
+    ts = _themespace()
+    assert ts.has_thematic_pressure() is False
+    ts.clamp_negative_pattern({"direction": "opposite"}, THEME_TOP_BRIDGE)
+    assert ts.has_thematic_pressure([THEME_TOP_BRIDGE]) is True
+
+
+def test_unclamp_all_turns_thematic_pressure_off():
+    ts = _themespace()
+    ts.clamp_negative_pattern({"direction": "opposite"}, THEME_TOP_BRIDGE)
+    ts.unclamp_all()
+    assert ts.has_thematic_pressure() is False
+
+
 def test_max_positive_theme_activation_tracks_largest_active_theme():
     ts = _themespace()
+    ts.thematic_pressure_on()
     _top_direction_cluster(ts).get_theme("identity").activation = 42.0
     assert ts.get_max_positive_theme_activation() == 42.0
 

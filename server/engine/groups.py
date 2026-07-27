@@ -47,6 +47,84 @@ class Group(WorkspaceObject, WorkspaceStructure):
         self.left_object = min(objects, key=lambda o: o.left_string_pos)
         self.right_object = max(objects, key=lambda o: o.right_string_pos)
 
+        self._attach_initial_descriptions()
+
+    def _attach_initial_descriptions(self) -> None:
+        """Describe the group the moment it is created.
+
+        Scheme: ``make-group`` (groups.ss:20-54) plus ``attach-length-description``
+        (groups.ss:831-837).  Without these a group is invisible to the bridge
+        scouts — no descriptions means no concept-mappings — so problems whose
+        answer turns on a whole-string group (``abc -> abcd``, ``abc -> aabbcc``)
+        could never get off the ground.
+        """
+        from server.engine.descriptions import Description
+
+        slipnet = getattr(getattr(self.string, "workspace", None), "slipnet", None)
+        if slipnet is None:
+            slipnet = getattr(self.string, "slipnet", None)
+        if slipnet is None:
+            return
+
+        def node(name: str):
+            return slipnet.nodes.get(name)
+
+        def describe(type_name: str, descriptor, *, bond_description: bool = False) -> None:
+            dt = node(type_name)
+            if dt is None or descriptor is None:
+                return
+            desc = Description(self, dt, descriptor)
+            desc.proposal_level = Description.BUILT
+            if bond_description:
+                self.bond_descriptions.append(desc)
+            else:
+                self.descriptions.append(desc)
+
+        describe("plato-object-category", node("plato-group"))
+        describe("plato-group-category", self.group_category)
+        if self.group_bonds:
+            describe(
+                "plato-bond-category",
+                self.group_bonds[0].bond_category,
+                bond_description=True,
+            )
+        if self.direction is not None:
+            describe("plato-direction-category", self.direction)
+
+        if self.spans_whole_string():
+            describe("plato-string-position-category", node("plato-whole"))
+        else:
+            others = [
+                o
+                for o in getattr(self.string, "objects", [])
+                if o is not self and not self.nested_member(o)
+            ]
+            if others:
+                left = min(o.left_string_pos for o in others + [self])
+                right = max(o.right_string_pos for o in others + [self])
+                if self.left_string_pos == left:
+                    describe("plato-string-position-category", node("plato-leftmost"))
+                elif self.right_string_pos == right:
+                    describe("plato-string-position-category", node("plato-rightmost"))
+
+        describe("plato-bond-facet", self.bond_facet, bond_description=True)
+
+        # Length, when it is one Metacat can name (one..five).
+        length_names = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five"}
+        if self.length in length_names:
+            describe("plato-length", node(f"plato-{length_names[self.length]}"))
+
+        # A letter-category description on a successor/predecessor group is what
+        # makes horizontal bridges like [abc] -> [bcd] possible (groups.ss:44-46).
+        if getattr(self.bond_facet, "name", "") == "plato-letter-category":
+            describe("plato-letter-category", self._initial_letter_category())
+
+    def _initial_letter_category(self):
+        obj = self.left_object
+        while hasattr(obj, "left_object"):
+            obj = obj.left_object
+        return getattr(obj, "letter_category", None)
+
     @property
     def length(self) -> int:
         return len(self.objects)

@@ -20,6 +20,12 @@ class SlipnodeSpec:
     name: str
     short_name: str
     conceptual_depth: int
+    # DSL expression over `obj` deciding whether this node validly describes a
+    # Workspace object.  Scheme: ``define-descriptor-predicate`` (slipnet.ss:508-610),
+    # where the predicate is a lambda attached to the node itself.  Keeping it in
+    # the seed data means a new descriptor needs no code change, the same way a
+    # new codelet type needs only its ``execute_body``.
+    descriptor_predicate: str | None = None
 
 
 @dataclass(frozen=True)
@@ -123,6 +129,7 @@ class MetadataProvider:
                 name=n["name"],
                 short_name=n["short_name"],
                 conceptual_depth=n["conceptual_depth"],
+                descriptor_predicate=n.get("descriptor_predicate"),
             )
             for n in nodes_data
         }

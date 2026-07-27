@@ -135,15 +135,28 @@ class Bridge(WorkspaceStructure):
         return False
 
     def _singleton_factor(self) -> float:
-        """Penalize bridges between mismatched object types involving singletons.
+        """Penalise bridges that pair a *singleton* with a mismatched object type.
 
-        Scheme: bridges.ss:808-815.
+        Scheme: ``singleton-letter-factor`` (bridges.ss:808-822).  The penalty
+        applies only when one side is a singleton letter (a letter wrapped in a
+        length-one group) or a singleton group, and the other side is of the other
+        object type.
+
+        This used to penalise *every* letter-group bridge by 0.1, which made an
+        a-aa bridge unable to compete with a-a — so the whole letter => group
+        slippage family of §3.3.1 and Fig. 3.1 was effectively unreachable, and
+        problems like "abc => aabbcc" could never be described at all.
         """
-        obj1_is_letter = not hasattr(self.object1, "objects")
-        obj2_is_letter = not hasattr(self.object2, "objects")
-        if obj1_is_letter == obj2_is_letter:
-            return 1.0
-        return 0.1
+        o1, o2 = self.object1, self.object2
+        if _is_singleton_letter(o1):
+            return 1.0 if not _is_group(o2) else 0.1
+        if _is_singleton_letter(o2):
+            return 1.0 if not _is_group(o1) else 0.1
+        if _is_singleton_group(o1):
+            return 1.0 if _is_group(o2) else 0.1
+        if _is_singleton_group(o2):
+            return 1.0 if _is_group(o1) else 0.1
+        return 1.0
 
     def calculate_external_strength(self) -> float:
         """External strength from supporting bridges.
@@ -191,19 +204,131 @@ class Bridge(WorkspaceStructure):
                 total += other.strength
         return total
 
-    def get_theme_pattern(self) -> dict[str, Any]:
-        """Extract the theme pattern from this bridge's CMs.
+    @property
+    def theme_type(self) -> str:
+        """The Themespace theme type this bridge feeds."""
+        from server.engine.themes import (
+            THEME_BOTTOM_BRIDGE,
+            THEME_TOP_BRIDGE,
+            THEME_VERTICAL_BRIDGE,
+        )
 
-        Used by Themespace to track dominant perceptual interpretations.
+        return {
+            BRIDGE_TOP: THEME_TOP_BRIDGE,
+            BRIDGE_BOTTOM: THEME_BOTTOM_BRIDGE,
+            BRIDGE_VERTICAL: THEME_VERTICAL_BRIDGE,
+        }[self.bridge_type]
+
+    @property
+    def is_spanning_bridge(self) -> bool:
+        """True when both bridged objects span their whole strings.
+
+        Spanning bridges boost their themes twice as hard (bridges.ss:308-310).
         """
-        pattern: dict[str, Any] = {}
-        for cm in self.concept_mappings:
-            dim = getattr(cm.description_type1, "name", None)
-            if dim and cm.label:
-                rel = getattr(cm.label, "name", None)
-                if rel:
-                    pattern[dim] = rel
-        return pattern
+        return _spans_whole_string(self.object1) and _spans_whole_string(self.object2)
+
+    def get_associated_thematic_relations(self) -> list[tuple[str, str]]:
+        """(dimension, relation) pairs this bridge contributes to the Themespace.
+
+        Scheme: ``get-associated-thematic-relations`` (bridges.ss:314-322) and
+        ``boost-themes`` (bridges.ss:296-313).
+
+        Note this walks the **cross-product of the two objects' descriptions**,
+        not the bridge's concept-mappings.  Deriving relations from CMs (as this
+        used to) silently drops every ``X: different`` theme, because those are
+        exactly the label-less case — and the dissertation needs them: vertical
+        ``Letter-Category: different`` and ``Object-Type: different`` are dominant
+        in Figs. 4.1/4.2, and ``Bond-Facet: different`` carries the whole
+        eqe/abbbc analysis of §4.7.2.
+        """
+        from server.engine.themes import relation_name_for_label
+
+        relations: list[tuple[str, str]] = []
+        for d1 in _all_descriptions(self.object1):
+            for d2 in _all_descriptions(self.object2):
+                if not descriptions_affect_themespace(d1, d2):
+                    continue
+                dimension = getattr(d1.description_type, "name", None)
+                if dimension is None:
+                    continue
+                relation = relation_name_for_label(
+                    _label_node(d1.descriptor, d2.descriptor)
+                )
+                relations.append((dimension, relation))
+        return relations
+
+    def get_theme_pattern(self) -> dict[str, Any]:
+        """Dict view of :meth:`get_associated_thematic_relations`."""
+        return dict(self.get_associated_thematic_relations())
+
+    # ------------------------------------------------------------------
+    # Thematic compatibility  (Scheme: bridges.ss:270-287)
+    # ------------------------------------------------------------------
+
+    def get_thematic_compatibility(self) -> float:
+        """How well this bridge resonates with the active themes, in -1..+1.
+
+        §4.1.2: themes "act like a set of knobs that can be used to smoothly
+        vary the strengths of Workspace structures".  Returns 0 whenever
+        thematic pressure is off, which is the normal case.
+        """
+        return _bridge_theme_compatibility_sigmoid(self.get_average_theme_support())
+
+    def get_average_theme_support(self) -> float:
+        """Weighted mean of per-theme support values, in -1..+1.
+
+        Negative values carry weight ``2 * n`` against positives' weight 1, so
+        "the incompatible themes will tend to drown out the compatible themes,
+        even if the latter outnumber the former" (§4.1.2, p.143).
+        """
+        values = self.get_theme_support_values()
+        if not values:
+            return 0.0
+        neg_weight = 2.0 * len(values)
+        weights = [(neg_weight if v < 0 else 1.0) * abs(v) for v in values]
+        if not any(weights):
+            return 0.0
+        return sum(v * w for v, w in zip(values, weights)) / sum(weights)
+
+    def get_theme_support_values(self) -> list[float]:
+        """Per-theme support in -1..+1: negative if incompatible, positive if supported."""
+        themespace = WorkspaceStructure.get_themespace()
+        if themespace is None:
+            return []
+        values: list[float] = []
+        for theme in themespace.get_active_themes(self.theme_type):
+            if theme.activation == 0:
+                continue
+            if self.incompatible_with_theme(theme):
+                values.append(-theme.activation / 100.0)
+            elif self.supported_by_theme(theme):
+                values.append(theme.activation / 100.0)
+            else:
+                values.append(0.0)
+        return values
+
+    def incompatible_with_theme(self, theme: Any) -> bool:
+        """Scheme: ``incompatible-with-theme?`` (bridges.ss:254-268)."""
+        if _check_descriptions(self.object1, self.object2, _conflicts_with_theme, theme):
+            return True
+        # A theme whose dimension can describe one object but not the other is
+        # itself evidence against the bridge.
+        dim = theme.dimension
+        possible1 = _description_possible(dim, self.object1)
+        possible2 = _description_possible(dim, self.object2)
+        if possible1 != possible2:
+            return True
+        return (
+            dim == "plato-string-position-category"
+            and not possible1
+            and not possible2
+        )
+
+    def supported_by_theme(self, theme: Any) -> bool:
+        """Scheme: ``supported-by-theme?`` (bridges.ss:268-269)."""
+        return _check_descriptions(
+            self.object1, self.object2, _supported_by_theme, theme
+        )
 
     def get_incompatible_bridges(self, workspace: Any = None) -> list[Bridge]:
         """Find bridges that conflict with this one.
@@ -339,6 +464,325 @@ class Bridge(WorkspaceStructure):
 
 
 # ---------------------------------------------------------------------------
+# Object / description helpers
+# ---------------------------------------------------------------------------
+
+
+def _spans_whole_string(obj: Any) -> bool:
+    spans = getattr(obj, "spans_whole_string", None)
+    if callable(spans):
+        return bool(spans())
+    return False
+
+
+def _is_group(obj: Any) -> bool:
+    return hasattr(obj, "objects")
+
+
+def _string_spanning_group(obj: Any) -> bool:
+    """Scheme: ``string-spanning-group?`` (workspace-objects.ss:354)."""
+    return _is_group(obj) and _spans_whole_string(obj)
+
+
+def _is_singleton_group(obj: Any) -> bool:
+    """Scheme: ``singleton-group?`` (groups.ss:269) — a group of exactly one object."""
+    return _is_group(obj) and len(getattr(obj, "objects", [])) == 1
+
+
+def _is_singleton_letter(obj: Any) -> bool:
+    """Scheme: ``singleton-letter?`` (bridges.ss:818-822).
+
+    A letter whose enclosing group wraps it and nothing else.
+    """
+    if _is_group(obj):
+        return False
+    enclosing = getattr(obj, "enclosing_group", None)
+    return enclosing is not None and _is_singleton_group(enclosing)
+
+
+def _all_descriptions(obj: Any) -> list[Any]:
+    """Descriptions of *obj*, including a group's bond descriptions."""
+    getter = getattr(obj, "get_all_descriptions", None)
+    if callable(getter):
+        return list(getter())
+    return list(getattr(obj, "descriptions", []))
+
+
+def _label_node(descriptor1: Any, descriptor2: Any) -> Any:
+    """Scheme: ``get-label`` (slipnet.ss).
+
+    Identical descriptors relate by identity; linked descriptors relate by the
+    link's label; anything else has no relating concept at all.
+    """
+    if descriptor1 is descriptor2:
+        return _IDENTITY_SENTINEL
+    for link in getattr(descriptor1, "outgoing_links", []):
+        if link.to_node is descriptor2:
+            return link.label_node
+    return None
+
+
+class _IdentitySentinel:
+    """Stands in for ``plato-identity`` where no Slipnet handle is available."""
+
+    name = "plato-identity"
+    short_name = "iden"
+
+
+_IDENTITY_SENTINEL = _IdentitySentinel()
+
+
+def _label_relation(descriptor1: Any, descriptor2: Any) -> str:
+    """Bare theme-relation name relating two descriptors."""
+    from server.engine.themes import relation_name_for_label
+
+    return relation_name_for_label(_label_node(descriptor1, descriptor2))
+
+
+def descriptions_affect_themespace(d1: Any, d2: Any) -> bool:
+    """Should this description pair contribute a theme?
+
+    Scheme: ``descriptions-affect-themespace?`` / ``ignore-descriptions?``
+    (themes.ss:1093-1107).
+    """
+    if d1.description_type is not d2.description_type:
+        return False
+    if not d1.is_relevant() or not d2.is_relevant():
+        return False
+
+    dt_name = getattr(d1.description_type, "name", "")
+    o1, o2 = d1.object, d2.object
+
+    if dt_name == "plato-object-category" and (
+        _string_spanning_group(o1) and _string_spanning_group(o2)
+    ):
+        return False
+    if dt_name == "plato-string-position-category" and (
+        _spans_whole_string(o1) and _spans_whole_string(o2)
+    ):
+        return False
+    if (
+        getattr(d1.descriptor, "name", "") == "plato-middle"
+        and getattr(d2.descriptor, "name", "") == "plato-middle"
+    ):
+        return False
+    return True
+
+
+# ---------------------------------------------------------------------------
+# Theme compatibility predicates  (Scheme: themes.ss:1033-1090)
+# ---------------------------------------------------------------------------
+
+
+def _check_descriptions(object1: Any, object2: Any, pred: Any, theme: Any) -> bool:
+    """Scheme: ``check-descriptions`` (themes.ss:1033-1040)."""
+    for d1 in _all_descriptions(object1):
+        for d2 in _all_descriptions(object2):
+            if d1.description_type is d2.description_type and pred(d1, d2, theme):
+                return True
+    return False
+
+
+def _theme_dimension_applies(d1: Any, d2: Any, theme: Any) -> bool:
+    dt_name = getattr(d1.description_type, "name", "")
+    if dt_name == theme.dimension:
+        return True
+    return _special_direction_case(d1, d2, theme)
+
+
+def _special_direction_case(d1: Any, d2: Any, theme: Any) -> bool:
+    """Direction descriptions on two spanning groups speak for string position."""
+    return (
+        getattr(d1.description_type, "name", "") == "plato-direction-category"
+        and _string_spanning_group(d1.object)
+        and _string_spanning_group(d2.object)
+        and theme.dimension == "plato-string-position-category"
+    )
+
+
+def _special_spanning_bridge_case(d1: Any, d2: Any, theme: Any) -> bool:
+    dt_name = getattr(d1.description_type, "name", "")
+    if (
+        dt_name == "plato-object-category"
+        and _string_spanning_group(d1.object)
+        and _string_spanning_group(d2.object)
+        and theme.dimension == "plato-object-category"
+    ):
+        return True
+    return (
+        dt_name == "plato-string-position-category"
+        and _spans_whole_string(d1.object)
+        and _spans_whole_string(d2.object)
+        and theme.dimension == "plato-string-position-category"
+    )
+
+
+def _special_middle_middle_case(d1: Any, d2: Any, theme: Any) -> bool:
+    from server.engine.themes import RELATION_OPPOSITE
+
+    return (
+        getattr(d1.descriptor, "name", "") == "plato-middle"
+        and getattr(d2.descriptor, "name", "") == "plato-middle"
+        and theme.dimension == "plato-string-position-category"
+        and theme.relation == RELATION_OPPOSITE
+    )
+
+
+def _relation_consistent_with_theme(d1: Any, d2: Any, theme: Any) -> bool:
+    from server.engine.themes import RELATION_DIFFERENT, RELATION_IDENTITY
+
+    relation = _label_relation(d1.descriptor, d2.descriptor)
+    if theme.relation == RELATION_DIFFERENT:
+        return relation != RELATION_IDENTITY
+    return relation == theme.relation
+
+
+def _conflicts_with_theme(d1: Any, d2: Any, theme: Any) -> bool:
+    """Scheme: ``conflicts-with-theme?`` (themes.ss:1047-1053)."""
+    return (
+        _theme_dimension_applies(d1, d2, theme)
+        and not _special_spanning_bridge_case(d1, d2, theme)
+        and not _special_middle_middle_case(d1, d2, theme)
+        and not _relation_consistent_with_theme(d1, d2, theme)
+    )
+
+
+def _supported_by_theme(d1: Any, d2: Any, theme: Any) -> bool:
+    """Scheme: ``supported-by-theme?`` (themes.ss:1055-1061)."""
+    return (
+        _theme_dimension_applies(d1, d2, theme)
+        and not _special_spanning_bridge_case(d1, d2, theme)
+        and (
+            _special_middle_middle_case(d1, d2, theme)
+            or _relation_consistent_with_theme(d1, d2, theme)
+        )
+    )
+
+
+def _description_possible(dimension_name: str, obj: Any) -> bool:
+    """Can *obj* be described along *dimension_name*?
+
+    Scheme: ``description-possible?`` on a Slipnet category node.
+    """
+    for d in _all_descriptions(obj):
+        if getattr(d.description_type, "name", "") == dimension_name:
+            return True
+    return False
+
+
+def _bridge_theme_compatibility_sigmoid(x: float) -> float:
+    """Sharpen a raw support value.  Scheme: themes.ss:1115, beta = 4."""
+    import math
+
+    beta = 4.0
+    try:
+        return 2.0 / (1.0 + math.exp(-2.0 * beta * x)) - 1.0
+    except OverflowError:  # pragma: no cover - x is always within -1..+1
+        return -1.0 if x < 0 else 1.0
+
+
+# ---------------------------------------------------------------------------
+# Mappable descriptions  (Scheme: bridges.ss)
+#
+# §3.3.1: "slippages involving length or letter-category, such as one => two or
+# c => d, are only possible for horizontal bridges."  Horizontal concept-mappings
+# ground both similarity and difference — a rule is abstracted from them — while
+# vertical ones ground similarity only.
+# ---------------------------------------------------------------------------
+
+
+def _slip_linked(descriptor1: Any, descriptor2: Any) -> bool:
+    return any(
+        link.to_node is descriptor2
+        for link in getattr(descriptor1, "lateral_sliplinks", [])
+    )
+
+
+def vertical_mappable_descriptions(d1: Any, d2: Any) -> bool:
+    """Scheme: ``vertical-mappable-descriptions?`` (bridges.ss:1620-1630)."""
+    if d1.description_type is not d2.description_type:
+        return False
+    return d1.descriptor is d2.descriptor or _slip_linked(d1.descriptor, d2.descriptor)
+
+
+def horizontal_mappable_descriptions(d1: Any, d2: Any, object1: Any, object2: Any) -> bool:
+    """Scheme: ``horizontal-mappable-descriptions?`` (bridges.ss)."""
+    if d1.description_type is not d2.description_type:
+        return False
+    dt_name = getattr(d1.description_type, "name", "")
+    if dt_name == "plato-letter-category":
+        return _letter_category_mappable_objects(object1, object2)
+    if dt_name in ("plato-string-position-category", "plato-length"):
+        return True
+    return d1.descriptor is d2.descriptor or _slip_linked(d1.descriptor, d2.descriptor)
+
+
+def _letter_category_mappable_objects(object1: Any, object2: Any) -> bool:
+    """Letter-category mappings need a letter-category to speak of on both sides.
+
+    Scheme: ``letter-category-mappable-objects?``.  A group only has one when its
+    bond facet is letter-category (``jjj`` is a "j" group; ``mrrjjj`` is not).
+    """
+    return _has_letter_category(object1) and _has_letter_category(object2)
+
+
+def _has_letter_category(obj: Any) -> bool:
+    if not _is_group(obj):
+        return True
+    facet = getattr(obj, "bond_facet", None)
+    return getattr(facet, "name", "") == "plato-letter-category"
+
+
+def mappable_descriptions(
+    d1: Any, d2: Any, object1: Any, object2: Any, bridge_type: str
+) -> bool:
+    """Dispatch to the horizontal or vertical predicate for *bridge_type*."""
+    if bridge_type == BRIDGE_VERTICAL:
+        return vertical_mappable_descriptions(d1, d2)
+    return horizontal_mappable_descriptions(d1, d2, object1, object2)
+
+
+def make_concept_mappings(
+    object1: Any,
+    object2: Any,
+    bridge_type: str,
+    identity_node: Any = None,
+) -> list[ConceptMapping]:
+    """Build the concept-mappings supporting a bridge of *bridge_type*.
+
+    Applies the §3.3.1 horizontal/vertical asymmetry, so a vertical a-i bridge
+    gets no ``LetterCategory: a => i`` slippage while the horizontal one does.
+    """
+    from server.engine.concept_mappings import ConceptMapping
+
+    cms: list[ConceptMapping] = []
+    seen: set[tuple[int, int, int]] = set()
+    for d1 in _all_descriptions(object1):
+        for d2 in _all_descriptions(object2):
+            if not mappable_descriptions(d1, d2, object1, object2, bridge_type):
+                continue
+            key = (id(d1.description_type), id(d1.descriptor), id(d2.descriptor))
+            if key in seen:
+                continue
+            seen.add(key)
+            label = _label_node(d1.descriptor, d2.descriptor)
+            if label is _IDENTITY_SENTINEL:
+                label = identity_node
+            cms.append(
+                ConceptMapping(
+                    d1.description_type,
+                    d1.descriptor,
+                    d2.description_type,
+                    d2.descriptor,
+                    label,
+                    object1=object1,
+                    object2=object2,
+                )
+            )
+    return cms
+
+
+# ---------------------------------------------------------------------------
 # Module-level helper functions
 # ---------------------------------------------------------------------------
 
@@ -385,10 +829,12 @@ def _incompatible_cms(cm1: ConceptMapping, cm2: ConceptMapping) -> bool:
         return False
 
     # Check that the label relationship between the descriptor pairs differs
-    # (i.e., get-label(cm1-desc1, cm2-desc1) != get-label(cm1-desc2, cm2-desc2))
-    label_1 = _get_label(cm1.descriptor1, cm2.descriptor1)
-    label_2 = _get_label(cm1.descriptor2, cm2.descriptor2)
-    return label_1 is not label_2
+    # (i.e., get-label(cm1-desc1, cm2-desc1) != get-label(cm1-desc2, cm2-desc2)).
+    # This is the §3.5 refinement: incompatibility needs *both* different
+    # relations and differently-linked descriptor pairs.
+    return _label_relation(cm1.descriptor1, cm2.descriptor1) != _label_relation(
+        cm1.descriptor2, cm2.descriptor2
+    )
 
 
 def _nodes_related(node1: Any, node2: Any) -> bool:
@@ -404,20 +850,6 @@ def _nodes_related(node1: Any, node2: Any) -> bool:
             return True
     return False
 
-
-def _get_label(node1: Any, node2: Any) -> Any:
-    """Get the label (relationship) between two slipnet nodes.
-
-    Returns the label node if the two nodes are linked, None otherwise.
-    For identity (same node), returns the identity concept.
-    """
-    if node1 is node2:
-        # Return a sentinel for identity
-        return node1  # identity: same node
-    for link in getattr(node1, "outgoing_links", []):
-        if link.to_node is node2:
-            return getattr(link, "label_node", None)
-    return None
 
 
 def _incompatible_bridges(b1: Bridge, b2: Bridge, orientation: str) -> bool:
@@ -461,16 +893,22 @@ def _supporting_bridges(b1: Bridge, b2: Bridge, orientation: str) -> bool:
 
 
 def _get_bridges_of_type(workspace: Any, bridge_type: str) -> list[Bridge]:
-    """Get all bridges of a given type from the workspace."""
-    # Try different workspace interfaces
-    bridges = getattr(workspace, "bridges", {})
-    if isinstance(bridges, dict):
-        return bridges.get(bridge_type, [])
-    # Fallback: iterate all bridges
-    all_bridges = []
-    for attr in ("top_bridges", "bottom_bridges", "vertical_bridges"):
-        all_bridges.extend(getattr(workspace, attr, []))
-    return [b for b in all_bridges if getattr(b, "bridge_type", "") == bridge_type]
+    """Get all bridges of a given type from the workspace.
+
+    This used to probe a ``workspace.bridges`` dict that does not exist, so
+    ``getattr`` handed back ``{}`` and the function returned an empty list every
+    single time — silently disabling both bridge support (external strength was
+    always 0) and bridge incompatibility (mutually contradictory bridges such as
+    a-a, a-b and a-d all stayed built at once).
+    """
+    attribute = {
+        BRIDGE_TOP: "top_bridges",
+        BRIDGE_BOTTOM: "bottom_bridges",
+        BRIDGE_VERTICAL: "vertical_bridges",
+    }.get(bridge_type)
+    if attribute is None:
+        return []
+    return list(getattr(workspace, attribute, []))
 
 
 def _group_incompatible_bridges(

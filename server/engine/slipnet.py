@@ -11,11 +11,120 @@ Scheme source: slipnet.ss
 from __future__ import annotations
 
 import math
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 if TYPE_CHECKING:
     from server.engine.metadata import MetadataProvider, SlipnodeSpec, SlipnetLinkSpec
     from server.engine.rng import RNG
+
+
+# ---------------------------------------------------------------------------
+# Descriptor predicates
+#
+# Scheme: the ``(tell plato-x 'define-descriptor-predicate ...)`` block at
+# slipnet.ss:508-610, where each predicate is a lambda attached to the node.
+#
+# In Petacat the predicate travels with the node in ``slipnet_nodes.json``, as a
+# small DSL expression over ``obj``, and is compiled once at startup — the same
+# arrangement as a codelet's ``execute_body``.  The helpers below are the
+# vocabulary those expressions are written against; they are mechanism, while
+# *which* predicate belongs to *which* concept is domain knowledge and lives in
+# the seed data.
+# ---------------------------------------------------------------------------
+
+
+def _is_group(obj: Any) -> bool:
+    return hasattr(obj, "objects")
+
+
+def _spans_whole_string(obj: Any) -> bool:
+    spans = getattr(obj, "spans_whole_string", None)
+    return bool(spans()) if callable(spans) else False
+
+
+def _string_spanning_group(obj: Any) -> bool:
+    return _is_group(obj) and _spans_whole_string(obj)
+
+
+def _group_length(obj: Any) -> int | None:
+    return len(getattr(obj, "objects", [])) if _is_group(obj) else None
+
+
+def _letter_category_name(obj: Any) -> str:
+    for d in getattr(obj, "descriptions", []):
+        if getattr(d.description_type, "name", "") == "plato-letter-category":
+            return getattr(d.descriptor, "name", "")
+    return getattr(getattr(obj, "letter_category", None), "name", "")
+
+
+def _position_in_string(obj: Any, which: str) -> bool:
+    string = getattr(obj, "string", None)
+    if string is None:
+        return False
+    objects = [o for o in getattr(string, "objects", []) if not _is_group(o)]
+    if not objects:
+        return False
+    left = min(o.left_string_pos for o in objects)
+    right = max(o.right_string_pos for o in objects)
+    if which == "leftmost":
+        return obj.left_string_pos == left
+    if which == "rightmost":
+        return obj.right_string_pos == right
+    # middle: exactly one object to the left and one to the right
+    return (
+        obj.left_string_pos == left + 1
+        and obj.right_string_pos == right - 1
+        and right - left == 2
+    )
+
+
+# The vocabulary a ``descriptor_predicate`` expression may use.
+DESCRIPTOR_PREDICATE_NAMESPACE: dict[str, Any] = {
+    "is_group": _is_group,
+    "group_length": _group_length,
+    "spans_whole_string": _spans_whole_string,
+    "string_spanning_group": _string_spanning_group,
+    "position_in_string": _position_in_string,
+    "letter_category_name": _letter_category_name,
+}
+
+
+def compile_descriptor_predicate(
+    source: str, node_name: str
+) -> Callable[[Any], bool]:
+    """Compile a seed-data descriptor predicate into a callable.
+
+    Raises ``ValueError`` at startup on a bad expression, rather than failing
+    silently mid-run — the same contract the codelet compiler offers.
+    """
+    try:
+        code = compile(source, f"<descriptor-predicate:{node_name}>", "eval")
+    except SyntaxError as exc:  # pragma: no cover - seed data is checked in
+        raise ValueError(
+            f"descriptor predicate for {node_name} does not compile: {exc}"
+        ) from exc
+
+    def predicate(obj: Any) -> bool:
+        return bool(eval(code, {**DESCRIPTOR_PREDICATE_NAMESPACE, "obj": obj}))  # noqa: S307
+
+    return predicate
+
+
+def _descriptor_read_from_object(descriptor_name: str, obj: Any) -> bool:
+    """Fallback for descriptors that are *read off* an object, not tested.
+
+    Letter-category, direction, bond-category, group-category and bond-facet
+    descriptors are properties the object already carries, so there is nothing to
+    predicate — the node simply describes the object if the object says so.
+    """
+    for d in getattr(obj, "descriptions", []):
+        if getattr(d.descriptor, "name", "") == descriptor_name:
+            return True
+    for attr in ("direction", "group_category", "bond_facet"):
+        node = getattr(obj, attr, None)
+        if node is not None and getattr(node, "name", "") == descriptor_name:
+            return True
+    return _letter_category_name(obj) == descriptor_name
 
 
 class SlipnetNode:
@@ -25,6 +134,7 @@ class SlipnetNode:
         "name",
         "short_name",
         "conceptual_depth",
+        "descriptor_predicate",
         "activation",
         "activation_buffer",
         "frozen",
@@ -37,7 +147,6 @@ class SlipnetNode:
         "incoming_links",
         "intrinsic_link_length",
         "_rate_of_decay",
-        "descriptor_predicate",
     )
 
     def __init__(self, name: str, short_name: str, conceptual_depth: int) -> None:
@@ -66,6 +175,22 @@ class SlipnetNode:
 
     def fully_active(self, threshold: int = 50) -> bool:
         return self.activation >= threshold
+
+    def activate_from_workspace(self) -> None:
+        """Jolt this node from the Workspace.
+
+        Scheme: ``activate-from-workspace`` (slipnet.ss:171-172) —
+        ``increment-activation-buffer %workspace-activation%``, i.e. +100 into
+        the buffer, clipped when the buffer is flushed.
+
+        This is what keeps the Slipnet alive: nodes decay fast (letter-category
+        loses 70% of its activation per update cycle), and it is the constant
+        stream of scouts, evaluators and builders re-activating the concepts
+        they touch that holds the relevant ones up.
+        """
+        if self.frozen:
+            return
+        self.activation_buffer += 100.0
 
     def decay(self) -> None:
         """Reduce activation by rate_of_decay. Frozen nodes don't decay."""
@@ -97,6 +222,37 @@ class SlipnetNode:
             + self.lateral_links
             + self.lateral_sliplinks
         )
+
+    # ------------------------------------------------------------------
+    # Descriptor predicates  (Scheme: slipnet.ss:556-610)
+    # ------------------------------------------------------------------
+
+    def describes(self, obj: Any) -> bool:
+        """Does this node validly describe *obj*?
+
+        Scheme: ``define-descriptor-predicate``.  Answers "which descriptors along
+        this dimension actually apply to this object", so codelets don't propose
+        descriptions that are simply false.  The predicate itself comes from the
+        node's seed data; descriptors that are read off the object rather than
+        tested against it fall back to inspecting the object.
+        """
+        if self.descriptor_predicate is not None:
+            return self.descriptor_predicate(obj)
+        return _descriptor_read_from_object(self.name, obj)
+
+    def get_possible_descriptors(self, obj: Any) -> list[SlipnetNode]:
+        """Descriptors of this *category* node that apply to *obj*.
+
+        Scheme: ``get-possible-descriptors`` / ``description-possible?``.
+        """
+        return [
+            link.to_node
+            for link in self.instance_links
+            if link.to_node.describes(obj)
+        ]
+
+    def description_possible(self, obj: Any) -> bool:
+        return bool(self.get_possible_descriptors(obj))
 
     def shrunk_link_length(self) -> int | None:
         """40% of intrinsic link length. Scheme: slipnet.ss:191."""
@@ -245,14 +401,16 @@ class SlipnetNode:
                     break
 
             if sliplink is not None:
-                # Coattail slippage probability = degree_of_association / 100
+                # §3.4.1: a coattail slippage happens only sometimes, with
+                # probability given by the sliplink's degree of association.
+                # Without an RNG we make no speculative slippage at all —
+                # firing every eligible coattail would mean, for instance, that
+                # a first=>last slippage *always* dragged successor=>predecessor
+                # along, which is precisely the determinism §3.4 rejects.
+                if rng is None:
+                    continue
                 prob = sliplink.degree_of_association() / 100.0
-                if rng is not None and rng.prob(prob):
-                    related = self.get_related_node(label)
-                    if related is not None:
-                        return related
-                elif rng is None:
-                    # Without RNG, always apply coattail (deterministic mode)
+                if rng.prob(prob):
                     related = self.get_related_node(label)
                     if related is not None:
                         return related
@@ -337,6 +495,10 @@ class Slipnet:
         # Create nodes
         for spec in meta.slipnet_node_specs.values():
             node = SlipnetNode(spec.name, spec.short_name, spec.conceptual_depth)
+            if spec.descriptor_predicate:
+                node.descriptor_predicate = compile_descriptor_predicate(
+                    spec.descriptor_predicate, spec.name
+                )
             slipnet.nodes[spec.name] = node
 
         # Set intrinsic link lengths from engine params
@@ -400,9 +562,13 @@ class Slipnet:
                 the original Scheme behaviour (slipnet.ss:383).
                 At 0, all active nodes spread (pre-fix behaviour).
         """
-        # Clear buffers
-        for node in self.nodes.values():
-            node.activation_buffer = 0.0
+        # NB: the buffers are deliberately *not* cleared here.  Between update
+        # cycles, codelets pour Workspace activation into them via
+        # ``activate_from_workspace``, and the Themespace adds its contribution
+        # just before this runs.  Clearing first threw all of that away, which
+        # let the Slipnet decay to zero a few hundred codelets into every run.
+        # Scheme: ``update-slipnet-activations`` (slipnet.ss:377-389) decays,
+        # spreads, then flushes — it never clears up front.
 
         # Decay all nodes
         for node in self.nodes.values():

@@ -1,78 +1,106 @@
 // ---------------------------------------------------------------------------
-// RunControlsPanel — Three grouped sections of run controls
+// RunControlsPanel — Run mode, manual stepping, settings
 // ---------------------------------------------------------------------------
 //
-// Group 1: Run to Answer + polling interval
-// Group 2: Run with Live Updates + Stop + step size + Step + Reset
-// Group 3: Seed, spreading threshold, Eliza toggle, breakpoint, run status
+// "Run to Answer" and "Run with Live Updates" are not two features; they are
+// two mutually exclusive strategies for executing the same run:
+//
+//   fast  — the backend runs flat out via /run, and the UI polls it
+//            (paced by pollingInterval)
+//   live  — the client drives one codelet at a time, refreshing every panel
+//            after each (paced by stepDelay)
+//
+// Presenting them as two side-by-side buttons in separate boxes made that
+// choice invisible and stranded each mode's pacing control in the wrong place:
+// the polling slider sat under one button while stepDelay had no control at
+// all. They are now one selector with the pacing control following the choice.
+//
+// Group 1: Run — mode selector + go/stop + the selected mode's pacing control
+// Group 2: Manual stepping — step size + Step N (orthogonal to run mode)
+// Group 3: Settings — spreading threshold, Eliza toggle, breakpoint, status
+//
+// Reset lives in the Problem Input panel: it re-runs the problem defined there,
+// so it belongs with that definition rather than among the run controls.
 // ---------------------------------------------------------------------------
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRunStore } from '@/store/runStore';
-import { setBreakpoint, clearBreakpoint, setSpreadingThreshold, getSpreadingThreshold } from '@/api/client';
+import { setBreakpoint, clearBreakpoint } from '@/api/client';
+
+/** How a run is executed. Mutually exclusive. */
+type RunMode = 'fast' | 'live';
 
 export function RunControlsPanel() {
   const store = useRunStore();
   const { formInputs } = store;
 
+  const [runMode, setRunMode] = useState<RunMode>('fast');
   const [stepSize, setStepSize] = useState(1);
   const [breakpointValue, setBreakpointValue] = useState('');
-  const [spreadingThresholdLocal, setSpreadingThresholdLocal] = useState(100);
-  const [resetFlash, setResetFlash] = useState(false);
 
-  // Fetch spreading threshold when run loads
-  useEffect(() => {
-    if (store.runId) {
-      getSpreadingThreshold(store.runId)
-        .then((r) => setSpreadingThresholdLocal(r.spreading_activation_threshold))
-        .catch(() => {});
-    }
-  }, [store.runId]);
 
-  const handleRunLiveUpdates = useCallback(async () => {
-    if (!store.runId) {
-      await store.createRun({
-        initial: formInputs.initial,
-        modified: formInputs.modified,
-        target: formInputs.target,
-        answer: formInputs.answer || undefined,
-        seed: formInputs.seed ? parseInt(formInputs.seed, 10) : 0,
-      });
-    }
-    await store.run();
-  }, [store, formInputs]);
+  /**
+   * Start a run for whatever is currently in the form, unless the loaded run
+   * already *is* that problem.
+   *
+   * Previously this only fired when no run existed at all, so editing a string
+   * or picking a different demo and hitting Run silently carried on with the
+   * old problem — and the refresh then stamped the old strings back over the
+   * form.
+   */
+  const pendingParams = useMemo(
+    () => ({
+      initial: formInputs.initial,
+      modified: formInputs.modified,
+      target: formInputs.target,
+      answer: formInputs.answer || undefined,
+      seed: formInputs.seed ? parseInt(formInputs.seed, 10) : 0,
+    }),
+    [formInputs],
+  );
 
-  const handleRunToAnswer = useCallback(async () => {
-    if (!store.runId) {
-      await store.createRun({
-        initial: formInputs.initial,
-        modified: formInputs.modified,
-        target: formInputs.target,
-        answer: formInputs.answer || undefined,
-        seed: formInputs.seed ? parseInt(formInputs.seed, 10) : 0,
-      });
+  /**
+   * Does the loaded run already hold the problem sitting in the form?
+   *
+   * A run loaded from history or a URL hash has no recorded params, so fall
+   * back to the problem its workspace reports (which carries no seed).
+   */
+  const inputsMatchLoadedRun = useMemo(() => {
+    if (store.runId === null) return false;
+    const loaded = store.runParams;
+    const problem = loaded ?? store.workspace;
+    return (
+      problem != null &&
+      problem.initial === pendingParams.initial &&
+      problem.modified === pendingParams.modified &&
+      problem.target === pendingParams.target &&
+      (problem.answer ?? '') === (pendingParams.answer ?? '') &&
+      (loaded === null || loaded.seed === pendingParams.seed)
+    );
+  }, [store.runId, store.runParams, store.workspace, pendingParams]);
+
+  const ensureRunMatchesInputs = useCallback(async () => {
+    if (!inputsMatchLoadedRun) {
+      await store.createRun(pendingParams);
     }
-    await store.runToAnswer();
-  }, [store, formInputs]);
+  }, [store, inputsMatchLoadedRun, pendingParams]);
+
+  const handleRun = useCallback(async () => {
+    await ensureRunMatchesInputs();
+    if (runMode === 'live') {
+      // run() branches on this flag; set it from the mode rather than relying
+      // on the store default so the selector is the single source of truth.
+      store.setLiveUpdate(true);
+      await store.run();
+    } else {
+      await store.runToAnswer();
+    }
+  }, [store, ensureRunMatchesInputs, runMode]);
 
   const handleStep = useCallback(async () => {
-    if (!store.runId) {
-      await store.createRun({
-        initial: formInputs.initial,
-        modified: formInputs.modified,
-        target: formInputs.target,
-        answer: formInputs.answer || undefined,
-        seed: formInputs.seed ? parseInt(formInputs.seed, 10) : 0,
-      });
-    }
+    await ensureRunMatchesInputs();
     await store.step(stepSize);
-  }, [store, formInputs, stepSize]);
-
-  const handleReset = useCallback(async () => {
-    await store.reset();
-    setResetFlash(true);
-    setTimeout(() => setResetFlash(false), 1200);
-  }, [store]);
+  }, [store, ensureRunMatchesInputs, stepSize]);
 
   const handleSetBreakpoint = useCallback(async () => {
     if (!store.runId || !breakpointValue) return;
@@ -93,19 +121,6 @@ export function RunControlsPanel() {
     }
   }, [store.runId]);
 
-  const handleSpreadingThresholdChange = useCallback(
-    async (value: number) => {
-      setSpreadingThresholdLocal(value);
-      if (store.runId) {
-        try {
-          await setSpreadingThreshold(store.runId, value);
-        } catch {
-          // ignore
-        }
-      }
-    },
-    [store.runId],
-  );
 
   const isRunning = store.status === 'running';
   const hasRun = store.runId !== null;
@@ -114,56 +129,43 @@ export function RunControlsPanel() {
   return (
     <div className="flex-col gap-2" style={{ fontSize: 13 }}>
       {/* ------------------------------------------------------------ */}
-      {/* GROUP 1: Run to Answer                                       */}
+      {/* GROUP 1: Run — mode, go/stop, and that mode's pacing control  */}
       {/* ------------------------------------------------------------ */}
       <div style={groupStyle}>
-        <div style={groupLabelStyle}>Run to Answer</div>
+        <div style={groupLabelStyle}>Run</div>
 
-        <button
-          className="primary"
-          onClick={handleRunToAnswer}
-          disabled={isRunning || !hasInputs}
-          title="Run engine at full speed on the backend until an answer is found. The UI refreshes periodically at the polling interval."
-          style={{ width: '100%' }}
-        >
-          Run to Answer
-        </button>
-
-        <div style={{ marginTop: 8 }}>
-          <label style={labelStyle}>
-            Polling interval: {store.pollingInterval === 0
-              ? 'continuous'
-              : `${(store.pollingInterval / 1000).toFixed(1)}s`}
-          </label>
-          <input
-            type="range"
-            min={0}
-            max={5000}
-            step={100}
-            value={store.pollingInterval}
-            onChange={(e) => store.setPollingInterval(parseInt(e.target.value, 10))}
+        <div style={fieldGroupStyle}>
+          <label style={labelStyle} htmlFor="run-mode">How to run</label>
+          <select
+            id="run-mode"
+            value={runMode}
+            onChange={(e) => setRunMode(e.target.value as RunMode)}
             style={{ width: '100%' }}
-          />
-          <div className="text-xs text-muted">
-            How often the UI refreshes during "Run to Answer". 0 = continuous (~100ms).
-          </div>
+            disabled={isRunning}
+          >
+            <option value="fast">Run to answer — full speed</option>
+            <option value="live">Live updates — codelet by codelet</option>
+          </select>
+          <span className="text-xs text-muted">
+            {runMode === 'fast'
+              ? 'The engine runs flat out on the backend; the UI samples it as it goes. Fastest way to an answer.'
+              : 'One codelet at a time, refreshing every panel after each. Much slower, but every structure being built is visible.'}
+          </span>
         </div>
-      </div>
 
-      {/* ------------------------------------------------------------ */}
-      {/* GROUP 2: Live Updates / Step                                 */}
-      {/* ------------------------------------------------------------ */}
-      <div style={groupStyle}>
-        <div style={groupLabelStyle}>Live Updates</div>
-
-        <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
           <button
             className="primary"
-            onClick={handleRunLiveUpdates}
+            onClick={handleRun}
             disabled={isRunning || !hasInputs}
-            title="Run the engine one codelet at a time, refreshing all panels after every step. Slower than Run to Answer but every codelet is visible."
+            title={
+              runMode === 'fast'
+                ? 'Run the engine at full speed on the backend until an answer is found. The UI refreshes at the sampling interval.'
+                : 'Run the engine one codelet at a time, refreshing all panels after every step.'
+            }
+            style={{ flex: 1 }}
           >
-            Run with Live Updates
+            {runMode === 'fast' ? 'Run to Answer' : 'Run with Live Updates'}
           </button>
           <button
             onClick={() => store.stop()}
@@ -174,9 +176,80 @@ export function RunControlsPanel() {
           </button>
         </div>
 
-        <div style={{ marginTop: 8, display: 'flex', gap: 4, alignItems: 'flex-end' }}>
+        {/* What the run button will actually act on. Without this it is not
+            visible whether the workspace on screen belongs to the problem in
+            the form or to a previous one. */}
+        <div className="text-xs text-muted" style={{ marginTop: 6 }}>
+          {store.runId === null ? (
+            hasInputs ? 'Starts a new run.' : 'Enter a problem above to begin.'
+          ) : inputsMatchLoadedRun ? (
+            <>
+              Showing run #{store.runId}: {store.workspace?.initial ?? '?'}&nbsp;&rarr;&nbsp;
+              {store.workspace?.modified ?? '?'}; {store.workspace?.target ?? '?'}
+              &nbsp;&rarr;&nbsp;{store.workspace?.answer ?? '?'}
+            </>
+          ) : (
+            <span style={{ color: 'var(--warning)' }}>
+              Inputs differ from run #{store.runId} — running starts a new run.
+            </span>
+          )}
+        </div>
+
+        {/* Each mode is paced by a different value, so only the relevant one
+            is shown. stepDelay previously had no control at all. */}
+        {runMode === 'fast' ? (
+          <div style={{ marginTop: 8 }}>
+            <label style={labelStyle}>
+              Sampling interval: {store.pollingInterval === 0
+                ? 'continuous'
+                : `${(store.pollingInterval / 1000).toFixed(1)}s`}
+            </label>
+            <input
+              type="range"
+              min={0}
+              max={5000}
+              step={100}
+              value={store.pollingInterval}
+              onChange={(e) => store.setPollingInterval(parseInt(e.target.value, 10))}
+              style={{ width: '100%' }}
+            />
+            <div className="text-xs text-muted">
+              How often the UI reads the running engine. 0 = continuous (~100ms).
+              Does not change how the engine runs.
+            </div>
+          </div>
+        ) : (
+          <div style={{ marginTop: 8 }}>
+            <label style={labelStyle}>
+              Delay per codelet: {store.stepDelay === 0
+                ? 'none (as fast as the UI allows)'
+                : `${store.stepDelay} ms`}
+            </label>
+            <input
+              type="range"
+              min={0}
+              max={1000}
+              step={10}
+              value={store.stepDelay}
+              onChange={(e) => store.setStepDelay(parseInt(e.target.value, 10))}
+              style={{ width: '100%' }}
+            />
+            <div className="text-xs text-muted">
+              Pause after each codelet. Raise it to follow the run by eye.
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ------------------------------------------------------------ */}
+      {/* GROUP 2: Manual stepping — independent of the run mode        */}
+      {/* ------------------------------------------------------------ */}
+      <div style={groupStyle}>
+        <div style={groupLabelStyle}>Manual stepping</div>
+
+        <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            <label style={labelStyle}>Step size</label>
+            <label style={labelStyle}>Codelets</label>
             <input
               type="number"
               min={1}
@@ -185,43 +258,23 @@ export function RunControlsPanel() {
               onChange={(e) =>
                 setStepSize(Math.max(1, parseInt(e.target.value, 10) || 1))
               }
-              style={{ width: 60 }}
+              style={{ width: 70 }}
               disabled={isRunning}
             />
           </div>
           <button
             onClick={handleStep}
             disabled={isRunning || !hasInputs}
-            title={`Execute ${stepSize} codelet(s), refreshing the UI after each.`}
+            title={`Execute ${stepSize} codelet(s), then stop.`}
+            style={{ flex: 1 }}
           >
             Step {stepSize}
           </button>
-          <button
-            onClick={handleReset}
-            disabled={!hasRun || isRunning}
-            title="Re-initialize the current run with the same problem and seed."
-          >
-            Reset
-          </button>
         </div>
-
-        {resetFlash && (
-          <div
-            style={{
-              background: 'var(--success)',
-              color: '#fff',
-              padding: '4px 8px',
-              borderRadius: 3,
-              fontSize: 11,
-              fontWeight: 600,
-              textAlign: 'center',
-              marginTop: 6,
-              animation: 'fadeOut 1.2s ease-out forwards',
-            }}
-          >
-            Run reset to initial state
-          </div>
-        )}
+        <div className="text-xs text-muted" style={{ marginTop: 6 }}>
+          Advance a fixed number of codelets and stop. Useful for inspecting a
+          specific moment.
+        </div>
       </div>
 
       {/* ------------------------------------------------------------ */}
@@ -231,35 +284,23 @@ export function RunControlsPanel() {
         <div style={groupLabelStyle}>Settings</div>
 
         <div style={fieldGroupStyle}>
-          <label style={labelStyle}>Seed (optional)</label>
-          <input
-            type="text"
-            value={formInputs.seed}
-            onChange={(e) => store.setFormInput('seed', e.target.value)}
-            placeholder="0"
-            style={{ width: '100%' }}
-            disabled={isRunning}
-          />
-        </div>
-
-        <div style={fieldGroupStyle}>
-          <label style={labelStyle}>
-            Spreading threshold: {spreadingThresholdLocal}
+          <label style={labelStyle} htmlFor="spreading-threshold">
+            Spreading threshold: {store.spreadingThreshold}
+            {store.spreadingThreshold === 100 ? ' (original)' : ''}
           </label>
           <input
+            id="spreading-threshold"
             type="range"
             min={0}
             max={100}
             step={1}
-            value={spreadingThresholdLocal}
-            onChange={(e) =>
-              handleSpreadingThresholdChange(parseInt(e.target.value, 10))
-            }
+            value={store.spreadingThreshold}
+            onChange={(e) => store.setSpreadingThreshold(parseInt(e.target.value, 10))}
             style={{ width: '100%' }}
-            disabled={!hasRun}
           />
           <span className="text-xs text-muted">
-            0 = all active nodes spread; 100 = only fully-active (original)
+            0 = all active nodes spread; 100 = only fully-active, matching the
+            original. Kept across runs and applied to each new one.
           </span>
         </div>
 

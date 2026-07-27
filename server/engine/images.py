@@ -235,6 +235,11 @@ def change_length_first(
 # Failure sentinel
 # ---------------------------------------------------------------------------
 
+def _is_group(obj: Any) -> bool:
+    """A workspace object with constituent objects of its own."""
+    return bool(getattr(obj, "objects", None))
+
+
 class ImageFailure(Exception):
     """Raised when an image transformation cannot be performed.
 
@@ -327,8 +332,13 @@ class Image:
             self.letter_relation,
             self.length_relation,
             self.direction,
-            self.sub_images,
+            sub_images,
         ) = state
+        # Copy: assigning the saved list directly aliases ``_original_state``,
+        # so a later append would grow the "original" too and every subsequent
+        # reset would restore a longer image than before.  That compounding is
+        # what turned xyz into xxxxyyyyzzzz.
+        self.sub_images = list(sub_images)
 
     def reset(self) -> None:
         """Restore image to its original (pre-rule-application) state."""
@@ -916,23 +926,94 @@ class StringImage:
         enclosed in a group. Each must have a ``get_image()`` method or an
         ``image`` attribute.
         """
-        # Get top-level objects sorted by position
-        all_objs = list(self.string.objects)
-        # Filter to top-level: objects not enclosed in a group
-        top_level = [
-            o for o in all_objs
-            if getattr(o, "enclosing_group", None) is None
-        ]
-        top_level.sort(key=lambda o: o.left_string_pos)
+        # Walk the string left to right and, at each position, take the widest
+        # built object starting there.  This yields a partition that covers every
+        # position exactly once.
+        #
+        # Selecting on ``enclosing_group is None`` alone is not safe: when two
+        # groups claim the same member the later one wins the back-pointer, so the
+        # earlier group *and* its now-orphaned members all look top-level and the
+        # image generates those letters twice — "iijjkk" came out as
+        # "iiijjkdijjkd".  A positional partition cannot double-count whatever
+        # state the ``enclosing_group`` bookkeeping is in.
+        top_level: list[Any] = []
+        position = 0
+        letters_end = max(
+            (o.right_string_pos for o in self.string.objects if not _is_group(o)),
+            default=-1,
+        )
+        while position <= letters_end:
+            candidates = [
+                o
+                for o in self.string.objects
+                if o.left_string_pos == position
+                and o.right_string_pos <= letters_end
+                and (not _is_group(o) or getattr(o, "is_built", True))
+            ]
+            if not candidates:
+                position += 1
+                continue
+            widest = max(candidates, key=lambda o: o.right_string_pos)
+            top_level.append(widest)
+            position = widest.right_string_pos + 1
 
         images: list[Image] = []
         for obj in top_level:
             img = getattr(obj, "image", None)
             if img is None and hasattr(obj, "get_image"):
                 img = obj.get_image()
+            if img is None:
+                # Every object needs an image, not just the ones a rule happens
+                # to transform — otherwise ``generate`` returns only the changed
+                # letters (applying "change rightmost to successor" to abc gave
+                # "d" instead of "abd").
+                img = self._make_image_for(obj)
             if img is not None:
+                obj.image = img
                 images.append(img)
         return images
+
+    def _make_image_for(self, obj: Any) -> Image | None:
+        """Build a fresh image mirroring *obj*'s current appearance.
+
+        Sub-images are cached back onto their objects so the image tree is
+        *shared*: a rule that transforms a letter nested inside a group has to
+        mutate the very image the enclosing group will generate from, otherwise
+        the change is silently lost (applying "change rightmost letter to
+        successor" to iijjkk returned iijjkk).
+        """
+        sub_objects = getattr(obj, "objects", None)
+        if not sub_objects:
+            letter_category = getattr(obj, "letter_category", None)
+            if letter_category is None:
+                return None
+            img = make_letter_image(letter_category, self.slipnet)
+            obj.image = img
+            return img
+
+        sub_images = []
+        for o in sub_objects:
+            sub = self._make_image_for(o)
+            if sub is None:
+                return None
+            o.image = sub
+            sub_images.append(sub)
+        first = sub_images[0]
+        return make_group_image(
+            self.slipnet,
+            first.start_letter,
+            getattr(obj, "bond_facet", None),
+            _bond_relation(obj, "plato-letter-category"),
+            _bond_relation(obj, "plato-length"),
+            # Physical left-to-right order, *not* the group's bonding direction:
+            # ``Group.objects`` is stored left-to-right, so an image seeded with a
+            # left-going group's direction would generate its letters reversed and
+            # an untouched image of "abc" came out as "acb" — making every rule
+            # look broken to ``currently_works``.  A direction-reversal change
+            # flips this to left, which is what produces cba.
+            self.slipnet.nodes.get("plato-right"),
+            sub_images,
+        )
 
     def __repr__(self) -> str:
         dir_name = getattr(self.direction, "short_name", "?")
@@ -943,6 +1024,15 @@ class StringImage:
 # ---------------------------------------------------------------------------
 # Factory functions
 # ---------------------------------------------------------------------------
+
+def _bond_relation(group: Any, facet_name: str) -> SlipnetNode | None:
+    """The group's bond category, if its bonds run along *facet_name*."""
+    facet = getattr(group, "bond_facet", None)
+    if facet is None or getattr(facet, "name", "") != facet_name:
+        return None
+    bonds = getattr(group, "group_bonds", None) or []
+    return bonds[0].bond_category if bonds else None
+
 
 def make_letter_image(letter_category: SlipnetNode, slipnet: Slipnet) -> Image:
     """Scheme: make-letter-image.

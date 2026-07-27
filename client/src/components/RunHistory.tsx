@@ -17,6 +17,9 @@ function statusColor(status: string): string {
     case 'halted':
     case 'stopped':
       return 'var(--error)';
+    // Giving up is a considered outcome, not an error (§4.5.2).
+    case 'gave_up':
+      return 'var(--warning)';
     case 'initialized':
     case 'paused':
       return 'var(--warning)';
@@ -32,6 +35,12 @@ export function RunHistory() {
 
   const currentRunId = useRunStore((s) => s.runId);
   const epoch = useRunStore((s) => s.epoch);
+  // Live figures for the active run, used to keep its row current between
+  // fetches (see liveView below).
+  const liveStatus = useRunStore((s) => s.status);
+  const liveCodeletCount = useRunStore((s) => s.codeletCount);
+  const liveTemperature = useRunStore((s) => s.temperature);
+  const liveAnswer = useRunStore((s) => s.workspace?.answer ?? null);
   const store = useRunStore();
 
   const fetchRuns = useCallback(async () => {
@@ -48,10 +57,41 @@ export function RunHistory() {
     }
   }, []);
 
-  // Fetch on mount, when the current run changes, or after destructive ops
+  // Fetch on mount, when the current run changes, after destructive ops, and
+  // on every status transition.
+  //
+  // `liveStatus` matters: this panel is mounted for the whole session, so
+  // without it the list was fetched once when a run was created and never
+  // again. Finished runs kept showing the values they had a moment after
+  // creation — "initialized, 0 codelets, T 100" — even though the API had the
+  // real outcome all along.
   useEffect(() => {
     fetchRuns();
-  }, [fetchRuns, currentRunId, epoch]);
+  }, [fetchRuns, currentRunId, epoch, liveStatus]);
+
+  /**
+   * Overlay the store's live figures onto the active run's row.
+   *
+   * A row is otherwise only as fresh as the last fetch, so during a run the
+   * current row would sit at a stale codelet count until it terminated. The
+   * store already tracks these for the running engine, so preferring them costs
+   * no extra requests.
+   */
+  const liveView = useCallback(
+    (run: RunInfo): RunInfo =>
+      run.run_id === currentRunId
+        ? {
+            ...run,
+            status: liveStatus === 'idle' ? run.status : liveStatus,
+            codelet_count: Math.max(run.codelet_count, liveCodeletCount),
+            temperature: liveTemperature,
+            // So an answer shows the moment it is found, rather than at the
+            // next fetch.
+            answer: liveAnswer ?? run.answer,
+          }
+        : run,
+    [currentRunId, liveStatus, liveCodeletCount, liveTemperature, liveAnswer],
+  );
 
   const handleRowClick = useCallback(
     async (runId: number) => {
@@ -132,13 +172,24 @@ export function RunHistory() {
         <span style={{ width: 64, flexShrink: 0 }}>Status</span>
         <span style={{ width: 48, flexShrink: 0, textAlign: 'right' }}>Cdlts</span>
         <span style={{ width: 30, flexShrink: 0, textAlign: 'right' }}>T</span>
+        <span
+          style={{ width: 30, flexShrink: 0, textAlign: 'right' }}
+          title="Spreading activation threshold: which Slipnet nodes were allowed to spread. 100 is the original's behaviour."
+        >
+          Spr
+        </span>
         <span style={{ width: 24, flexShrink: 0 }}></span>
       </div>
 
       {/* Rows */}
-      {runs.map((run) => {
+      {runs.map((fetched) => {
+        const run = liveView(fetched);
         const isActive = run.run_id === currentRunId;
         const problem = `${run.initial}->${run.modified}; ${run.target}`;
+        // Show the answer once there is one. A justify-mode run's answer was
+        // *given* rather than found, so it is marked to keep the two apart.
+        const answer = run.answer || null;
+        const answerIsGiven = !!run.justify_mode;
 
         return (
           <div
@@ -179,9 +230,29 @@ export function RunHistory() {
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
               }}
-              title={problem}
+              title={
+                answer
+                  ? `${problem} -> ${answer}${answerIsGiven ? ' (given, to justify)' : ' (found)'}`
+                  : problem
+              }
             >
               {problem}
+              {answer && (
+                <>
+                  <span style={{ color: 'var(--text-secondary)' }}>{' -> '}</span>
+                  <span
+                    style={{
+                      color: answerIsGiven ? 'var(--warning)' : 'var(--success)',
+                      fontWeight: 700,
+                    }}
+                  >
+                    {answer}
+                  </span>
+                  {answerIsGiven && (
+                    <span style={{ color: 'var(--text-secondary)' }}>{' ?'}</span>
+                  )}
+                </>
+              )}
             </span>
             <span
               style={{
@@ -193,7 +264,7 @@ export function RunHistory() {
                 whiteSpace: 'nowrap',
               }}
             >
-              {run.status}
+              {run.status.replace(/_/g, ' ')}
             </span>
             <span
               className="mono"
@@ -216,6 +287,27 @@ export function RunHistory() {
               }}
             >
               {run.temperature.toFixed(0)}
+            </span>
+            {/* A run at anything other than 100 is not comparable with the
+                others, so the value belongs in the record of the run. */}
+            <span
+              className="mono"
+              style={{
+                width: 30,
+                flexShrink: 0,
+                textAlign: 'right',
+                color:
+                  (run.spreading_threshold ?? 100) === 100
+                    ? 'var(--text-secondary)'
+                    : 'var(--warning)',
+              }}
+              title={
+                (run.spreading_threshold ?? 100) === 100
+                  ? 'Spreading threshold 100 — the original behaviour'
+                  : `Spreading threshold ${run.spreading_threshold} — not the original behaviour`
+              }
+            >
+              {run.spreading_threshold ?? 100}
             </span>
             <button
               onClick={(e) => handleDelete(e, run.run_id)}

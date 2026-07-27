@@ -396,3 +396,152 @@ def emit_reminding(
     commentary.add_comment(
         eliza, technical, codelet_count=codelet_count, event_type="reminding"
     )
+
+
+# ---------------------------------------------------------------------------
+# Answer comparison  (§4.7.3 – §4.7.4)
+#
+# "What is interesting is Metacat's deeper capacity to recognize subtle
+# similarities and differences between answers on the basis of the common
+# themes, the differing themes, the unique themes, the unjustified themes, the
+# snag-justified themes, and the rules that constitute answer descriptions."
+#
+# The English is a facade over that classification, assembled from the
+# phrase-templates in seed_data/commentary_templates.json.
+# ---------------------------------------------------------------------------
+
+_THEME_DIMENSION_NAMES = {
+    "plato-string-position-category": "string position",
+    "plato-alphabetic-position-category": "alphabetic position",
+    "plato-direction-category": "direction",
+    "plato-group-category": "group type",
+    "plato-bond-facet": "bond facet",
+    "plato-letter-category": "letter category",
+    "plato-length": "length",
+    "plato-object-category": "object type",
+    "plato-bond-category": "bond type",
+}
+
+_RELATION_NAMES = {
+    "identity": "sameness",
+    "opposite": "symmetry",
+    "successor": "successorship",
+    "predecessor": "predecessorship",
+    "diff": "difference",
+}
+
+
+def _theme_phrase(dimension: str, relation: str) -> str:
+    """Render one theme as an English noun phrase."""
+    dim = _THEME_DIMENSION_NAMES.get(dimension, dimension.replace("plato-", ""))
+    rel = _RELATION_NAMES.get(relation, relation)
+    if dimension == "plato-bond-facet" and relation == "diff":
+        return "seeing the strings as bonded together in different ways"
+    return f"seeing {dim} {rel} between the strings"
+
+
+def _join(phrases: list[str]) -> str:
+    if not phrases:
+        return ""
+    if len(phrases) == 1:
+        return phrases[0]
+    return ", ".join(phrases[:-1]) + " and " + phrases[-1]
+
+
+def describe_answer_comparison(
+    answer_a: Any,
+    answer_b: Any,
+    comparison: dict[str, Any],
+) -> dict[str, Any]:
+    """Explain, in English, how two answers relate and which is preferred."""
+    name_a = answer_a.problem[3]
+    name_b = answer_b.problem[3]
+
+    similarities = [
+        _theme_phrase(dim, rel) for dim, rel in comparison["common_themes"].items()
+    ]
+
+    differences: list[str] = []
+    for dim, (a_rel, b_rel) in comparison["differing_themes"].items():
+        differences.append(
+            f"{name_a} rests on {_theme_phrase(dim, a_rel)}, "
+            f"while {name_b} rests on {_theme_phrase(dim, b_rel)}"
+        )
+
+    uniques: list[str] = []
+    for dim, rel in comparison["a_unique_themes"].items():
+        uniques.append(
+            f"In {name_b}'s case, the idea of {_theme_phrase(dim, rel)} does not arise."
+        )
+    for dim, rel in comparison["b_unique_themes"].items():
+        uniques.append(
+            f"In {name_a}'s case, the idea of {_theme_phrase(dim, rel)} does not arise."
+        )
+
+    caveats: list[str] = []
+    for label, classified in (
+        (name_a, comparison["a_unjustified_themes"]),
+        (name_b, comparison["b_unjustified_themes"]),
+    ):
+        for dim, verdict in classified.items():
+            if verdict == "snag_justified":
+                caveats.append(
+                    f"{label} relies on {_theme_phrase(dim, 'diff')}, which avoids a "
+                    f"snag that would otherwise arise."
+                )
+            else:
+                caveats.append(
+                    f"{label} relies on {_theme_phrase(dim, 'diff')}, although there "
+                    f"is no good reason for doing so."
+                )
+
+    coherence: list[str] = []
+    for label, coherent in ((name_a, comparison["a_coherent"]), (name_b, comparison["b_coherent"])):
+        if not coherent:
+            coherence.append(
+                f"The answer {label}, however, seems incoherent to me, since it "
+                f"involves abstract similarities while at the same time viewing the "
+                f"top change in a more literal way."
+            )
+
+    preferred = comparison["preferred"]
+    judgments = {
+        "fewer_unjustified": "since it involves fewer unjustified ideas",
+        "one_incoherent": "since it is more coherent",
+        "richer_ideas": "since it is based on a richer set of ideas",
+        "different_quality": "since it is the higher-quality answer",
+    }
+    if preferred["answer"] is None:
+        verdict = "All in all, I'd say they're about equally good answers."
+    else:
+        reason = judgments.get(preferred["reason"], "on balance")
+        verdict = (
+            f"All in all, I'd say {preferred['answer']} is the better answer, {reason}."
+        )
+
+    paragraphs: list[str] = []
+    if similarities:
+        paragraphs.append(
+            f"The answers {name_a} and {name_b} are alike in {_join(similarities)}."
+        )
+    if differences:
+        paragraphs.append(_join(differences).capitalize() + ".")
+    paragraphs.extend(uniques)
+    paragraphs.extend(caveats)
+    paragraphs.extend(coherence)
+    if not similarities and not differences and not uniques:
+        paragraphs.append(
+            f"I can't see much to say about how {name_a} and {name_b} relate — "
+            f"neither answer settled on a clear set of ideas."
+        )
+    paragraphs.append(verdict)
+
+    return {
+        "text": "  ".join(paragraphs),
+        "paragraphs": paragraphs,
+        "common": similarities,
+        "differing": differences,
+        "unique": uniques,
+        "caveats": caveats,
+        "verdict": verdict,
+    }

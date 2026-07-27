@@ -406,6 +406,16 @@ def get_unifying_slippages(
 # ============================================================================
 
 
+class _TraversalFailure(Exception):
+    """Structural mismatch while walking two rule clause trees in parallel.
+
+    Module-level on purpose: ``traverse_rule_clauses`` and the ``proc`` callbacks
+    it dispatches to used to define their own local ``_Fail`` classes, so a raise
+    from ``_concept_mapping_proc`` was a *different* exception type and escaped
+    the traversal's ``except`` entirely — crashing the answer-justifier codelet.
+    """
+
+
 def traverse_rule_clauses(
     clauses1: list[RuleClause],
     clauses2: list[RuleClause],
@@ -421,34 +431,31 @@ def traverse_rule_clauses(
     Returns None on structural mismatch ("fail").
     """
 
-    class _Fail(Exception):
-        pass
-
     def walk(
         x1: Any, x2: Any, results: list[dict[str, Any]]
     ) -> list[dict[str, Any]]:
         if x1 is None and x2 is None:
             return results
         if x1 is None or x2 is None:
-            raise _Fail()
+            raise _TraversalFailure()
 
         # Both are lists (e.g., list of changes, list of object-description items)
         if isinstance(x1, (list, tuple)) and isinstance(x2, (list, tuple)):
             if len(x1) != len(x2):
-                raise _Fail()
+                raise _TraversalFailure()
             for a, b in zip(x1, x2):
                 results = walk(a, b, results)
             return results
 
         # One is a list and the other is not -- structural mismatch
         if isinstance(x1, (list, tuple)) or isinstance(x2, (list, tuple)):
-            raise _Fail()
+            raise _TraversalFailure()
 
         # Both are strings (e.g., clause_type, scope)
         if isinstance(x1, str) and isinstance(x2, str):
             if x1 == x2:
                 return results
-            raise _Fail()
+            raise _TraversalFailure()
 
         # SlipnetNode objects: delegate to proc
         if _is_slipnet_node(x1) and _is_slipnet_node(x2):
@@ -457,14 +464,14 @@ def traverse_rule_clauses(
         # Fallback: if they're equal, fine; otherwise fail
         if x1 is x2 or x1 == x2:
             return results
-        raise _Fail()
+        raise _TraversalFailure()
 
     try:
         # Flatten clause structures for parallel walk
         flat1 = _flatten_clauses(clauses1)
         flat2 = _flatten_clauses(clauses2)
         return walk(flat1, flat2, [])
-    except _Fail:
+    except _TraversalFailure:
         return None
 
 
@@ -788,11 +795,8 @@ def _concept_mapping_proc(
     If the node has a category, produce a concept-mapping entry.
     """
 
-    class _Fail(Exception):
-        pass
-
     if n1 is not n2 and not _slip_linked(n1, n2, slipnet):
-        raise _Fail()
+        raise _TraversalFailure()
 
     category = _get_category(n1)
     if category is None:

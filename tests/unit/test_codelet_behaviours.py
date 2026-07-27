@@ -247,9 +247,8 @@ class TestBondBuilder:
         assert bond.is_built
         assert bond in init.bonds
 
-        # Check trace event
-        bond_events = ctx.trace.get_events_by_type(BOND_BUILT)
-        assert len(bond_events) >= 1
+        # Bond building is subcognitive: it must not reach the Trace (§4.4).
+        assert ctx.trace.get_events_by_type(BOND_BUILT) == []
 
     def test_fizzles_if_object_removed(self, ctx_abc_abd_xyz, meta):
         """Builder should fizzle if the object is no longer in a string."""
@@ -491,8 +490,12 @@ class TestTopDownDescriptionScout:
 # ═══════════════════════════════════════════════════════════════════════
 
 class TestRuleScout:
-    def test_fizzles_without_bridges(self, ctx_abc_abd_xyz, meta):
-        """No top bridges → rule scout should fizzle."""
+    def test_falls_back_to_verbatim_without_bridges(self, ctx_abc_abd_xyz, meta):
+        """No bridges → the only available description is a verbatim rule.
+
+        §3.3.3: "if no such relationships exist to begin with, then the only way
+        to describe the situation is with a verbatim rule."
+        """
         ctx = ctx_abc_abd_xyz
         interp = CodeletInterpreter(builtins=_get_test_builtins())
         registry = CodeletRegistry.from_metadata(meta, interp)
@@ -501,12 +504,27 @@ class TestRuleScout:
         coderack_before = sum(b.count for b in ctx.coderack.bins)
         interp.execute(compiled, ctx)
         coderack_after = sum(b.count for b in ctx.coderack.bins)
-        assert coderack_after == coderack_before
+        assert coderack_after == coderack_before + 1
+
+        evaluators = [
+            c
+            for b in ctx.coderack.bins
+            for c in b.codelets
+            if c.codelet_type == "rule-evaluator"
+        ]
+        assert len(evaluators) == 1
+        rule = evaluators[0].arguments["structure"]
+        assert rule.is_verbatim_rule
+        assert [n.short_name for n in rule.get_verbatim_letter_categories()] == list("abd")
 
 
 class TestRuleBuilder:
-    def test_posts_answer_finder(self, ctx_abc_abd_xyz, meta):
-        """Rule builder should build the rule and post answer-finder."""
+    def test_builds_the_rule_and_activates_its_concepts(self, ctx_abc_abd_xyz, meta):
+        """Rule builder builds the rule and activates its constituent concepts.
+
+        It does *not* post an answer-finder: answer-finders come from the
+        bottom-up posting rules and from progress-watchers.
+        """
         ctx = ctx_abc_abd_xyz
         interp = CodeletInterpreter(builtins=_get_test_builtins())
         registry = CodeletRegistry.from_metadata(meta, interp)
@@ -529,12 +547,22 @@ class TestRuleBuilder:
         rule.proposal_level = Rule.EVALUATED
         rule.quality = 80.0
 
-        coderack_before = sum(b.count for b in ctx.coderack.bins)
+        # The initially-relevant description types are clamped at the start of a
+        # run, and clamped nodes ignore Workspace activation; check the ones that
+        # are free to move.
+        for node in (
+            slipnet.nodes["plato-rightmost"],
+            slipnet.nodes["plato-successor"],
+        ):
+            node.frozen = False
+            node.activation = 0.0
+            node.activation_buffer = 0.0
+
         interp.execute(compiled, ctx, structure=rule)
-        coderack_after = sum(b.count for b in ctx.coderack.bins)
 
         assert rule.is_built
-        assert coderack_after > coderack_before  # answer-finder posted
+        assert slipnet.nodes["plato-rightmost"].activation_buffer > 0
+        assert slipnet.nodes["plato-successor"].activation_buffer > 0
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -564,53 +592,44 @@ class TestAnswerFinder:
         assert not hasattr(ctx, "_pending_answer") or ctx._pending_answer is None
 
 
+def _rightmost_successor_rule(slipnet):
+    """"Change letter-category of rightmost letter to successor".
+
+    Object-descriptions are the three-part form of Fig. 3.2:
+    ``(<object-type> <object-attribute> <object-descriptor>)``.
+    """
+    change = RuleChange(
+        dimension=slipnet.nodes["plato-letter-category"],
+        relation=slipnet.nodes["plato-successor"],
+        referent="object",
+    )
+    clause = RuleClause(
+        clause_type=CLAUSE_INTRINSIC,
+        object_description=(
+            slipnet.nodes["plato-letter"],
+            slipnet.nodes["plato-string-position-category"],
+            slipnet.nodes["plato-rightmost"],
+        ),
+        changes=[change],
+    )
+    return Rule(RULE_BOTTOM, [clause])
+
+
 class TestApplyRule:
-    def test_successor_produces_correct_answer(self, ctx_abc_abd_xyz):
-        """Applying 'replace rightmost by successor' to 'xyz' → 'xyy'."""
+    def test_successor_of_z_is_a_snag(self, ctx_abc_abd_xyz):
+        """Applying 'change letter-category of rightmost letter to successor'
+        to 'xyz' hits a snag, because 'z' has no successor."""
         ctx = ctx_abc_abd_xyz
-        slipnet = ctx.slipnet
-
-        change = RuleChange(
-            dimension=slipnet.nodes["plato-letter-category"],
-            relation=slipnet.nodes["plato-successor"],
-        )
-        clause = RuleClause(
-            clause_type=CLAUSE_INTRINSIC,
-            object_description=(
-                slipnet.nodes["plato-string-position-category"],
-                slipnet.nodes["plato-rightmost"],
-            ),
-            changes=[change],
-        )
-        rule = Rule(RULE_BOTTOM, [clause])
-
-        result = apply_rule(ctx, rule)
-        # 'z' has no successor → snag
-        assert result is None
+        rule = _rightmost_successor_rule(ctx.slipnet)
+        assert apply_rule(ctx, rule) is None
 
     def test_successor_on_non_z(self, meta):
-        """Applying 'replace rightmost by successor' to 'abc' → 'abd'."""
+        """The same rule applied to 'abc' yields 'abd'."""
         runner = EngineRunner(meta)
         runner.init_mcat("abc", "abd", "abc", seed=SEED)
         ctx = runner.ctx
-        slipnet = ctx.slipnet
-
-        change = RuleChange(
-            dimension=slipnet.nodes["plato-letter-category"],
-            relation=slipnet.nodes["plato-successor"],
-        )
-        clause = RuleClause(
-            clause_type=CLAUSE_INTRINSIC,
-            object_description=(
-                slipnet.nodes["plato-string-position-category"],
-                slipnet.nodes["plato-rightmost"],
-            ),
-            changes=[change],
-        )
-        rule = Rule(RULE_BOTTOM, [clause])
-
-        result = apply_rule(ctx, rule)
-        assert result == "abd"
+        rule = _rightmost_successor_rule(ctx.slipnet)
+        assert apply_rule(ctx, rule) == "abd"
 
 
 class TestTranslateRule:

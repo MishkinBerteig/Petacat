@@ -106,6 +106,60 @@ class Description(WorkspaceStructure):
             return 100.0
 
     @property
+    def theme_types(self) -> list[str]:
+        """Theme types this description's object participates in.
+
+        Scheme: ``get-theme-types`` (descriptions.ss:52-61) — objects in the
+        initial string speak to both top and vertical themes; modified-string
+        objects to top themes; target-string objects to vertical (and, in
+        justify mode, bottom) themes; answer-string objects to bottom themes.
+        """
+        from server.engine.themes import (
+            THEME_BOTTOM_BRIDGE,
+            THEME_TOP_BRIDGE,
+            THEME_VERTICAL_BRIDGE,
+        )
+
+        role = getattr(getattr(self.object, "string", None), "string_type", None)
+        if role == "initial":
+            return [THEME_TOP_BRIDGE, THEME_VERTICAL_BRIDGE]
+        if role == "modified":
+            return [THEME_TOP_BRIDGE]
+        if role == "target":
+            return [THEME_VERTICAL_BRIDGE, THEME_BOTTOM_BRIDGE]
+        if role == "answer":
+            return [THEME_BOTTOM_BRIDGE]
+        return [THEME_TOP_BRIDGE, THEME_VERTICAL_BRIDGE, THEME_BOTTOM_BRIDGE]
+
+    def get_thematic_compatibility(self) -> float:
+        """Max support from active themes sharing this description's dimension.
+
+        Scheme: ``get-thematic-compatibility`` / ``get-max-theme-support``
+        (descriptions.ss:73-79).  §4.1.2: "In the case of descriptions, thematic
+        compatibility is determined by the presence or absence of themes of the
+        same category as the description."
+        """
+        return self.get_max_theme_support()
+
+    def get_max_theme_support(self) -> float:
+        values = self.get_theme_support_values()
+        return max(values) if values else 0.0
+
+    def get_theme_support_values(self) -> list[float]:
+        themespace = WorkspaceStructure.get_themespace()
+        if themespace is None:
+            return []
+        dt_name = getattr(self.description_type, "name", "")
+        values: list[float] = []
+        for theme_type in self.theme_types:
+            for theme in themespace.get_active_themes(theme_type):
+                if theme.dimension == dt_name:
+                    values.append(abs(theme.activation) / 100.0)
+                else:
+                    values.append(0.0)
+        return values
+
+    @property
     def bond_description(self) -> bool:
         """True if description_type is bond-category or bond-facet.
 

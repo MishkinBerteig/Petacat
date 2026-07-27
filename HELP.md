@@ -88,9 +88,15 @@ The four fields are:
 - Target: The starting string of the bottom row, e.g. 'xyz'. Metacat will try to apply an analogous transformation to this string.
 - Answer (optional): If you supply this, Metacat enters justification mode and tries to explain why this specific answer is (or isn't) a good analogy, rather than discovering an answer from scratch.
 
-The Demo Problem dropdown lets you load pre-configured problems from the dissertation, including well-known examples like the 'abc -> abd; xyz -> ?' problem and many harder variations. Each demo also has a preset random seed for deterministic replay of known-good runs.
+Seed sets the random seed. The same problem and the same seed reproduce a run exactly; blank or 0 means seed 0. It lives here because it is part of the problem's identity -- changing it gives you a different run of the same strings.
 
-Problem Input fields are disabled while a run is in progress. To change the problem, first stop or reset the current run.
+The Demo Problem dropdown lets you load pre-configured problems from the dissertation, including well-known examples like the 'abc -> abd; xyz -> ?' problem and many harder variations. Each demo also carries a preset seed for deterministic replay of known-good runs.
+
+There are two different things you might mean by 'run it again', and they are separate controls:
+- Edit any field (or pick another demo) and press Run in the Run Controls panel: this starts a NEW run on the new problem, leaving the previous one in the run history. The line under the Run button warns you when the inputs have drifted away from the run currently on screen.
+- 'Reset to codelet 0' at the bottom of this panel: this clears the workspace of the CURRENT run back to bare strings, keeping the same problem and seed, so you can replay or retry it. It does not start running -- press Run afterwards.
+
+Problem Input fields are disabled while a run is in progress; press Stop first.
 
 **Related concepts:** `workspace`, `justify_mode`, `deterministic_replay`
 
@@ -99,15 +105,17 @@ Problem Input fields are disabled while a run is in progress. To change the prob
 **Topic key:** `run_controls`  
 **Summary:** Controls for starting, stepping, stopping, and configuring engine runs. Organized into Run to Answer, Live Updates, and Settings groups.
 
-The Run Controls panel has three grouped sections:
+The Run Controls panel decides *how* a run executes; the Problem Input panel above it decides *what* is run. It has three grouped sections:
 
-**Run to Answer**: Runs the engine at full backend speed until an answer is found (or an internal limit is reached). The UI shows a spinner in the Workspace panel header and refreshes all panels periodically at the configured Polling Interval. A polling interval of 0 means continuous updates (~100ms); dragging the slider right produces less frequent updates for lower UI overhead. Use this mode when you want fast time-to-answer and don't need to see every individual codelet.
+**Run**: 'How to run' selects between the two mutually exclusive execution modes; the button and the pacing control below it follow that choice.
+- *Run to answer -- full speed*: the engine runs flat out on the backend until an answer is found (or an internal limit is reached). The Workspace panel header shows a spinner and a STOP button, and the UI samples the running engine at the Sampling Interval. 0 means continuous (~100ms); dragging right samples less often for lower UI overhead. This interval changes only how often the UI reads the engine, never how the engine runs. Use this when you want fast time-to-answer and don't need to see every codelet.
+- *Live updates -- codelet by codelet*: the client drives one codelet at a time and refreshes every panel after each, so you can watch structures being built in real time. Delay Per Codelet inserts a pause after each one -- raise it to follow the run by eye. Much slower than full speed.
+Stop halts whichever mode is running. The line under the button names the run currently on screen, and warns when the problem in the inputs has drifted away from it -- in that case running starts a NEW run rather than continuing the old one.
 
-**Live Updates**: Runs or steps the engine with UI refreshes after every single codelet. 'Run with Live Updates' steps codelet-by-codelet until an answer is found or you press Stop; you can watch every structure being built in real time. 'Step N' executes exactly N codelets (controlled by the Step size field) so you can advance in small, inspectable increments. 'Reset' re-initializes the current run with the same problem and seed, letting you replay or retry.
+**Manual stepping**: Step N executes exactly N codelets and stops, independently of the run mode, so you can advance in small inspectable increments.
 
 **Settings**: Configuration that affects how the engine runs:
-- Seed: Random number seed for deterministic replay. Leave blank for a random seed, or supply a number to reproduce a specific run exactly.
-- Spreading threshold: Controls which Slipnet nodes participate in activation spreading. 100 = only fully-active nodes spread (matches original Scheme); 0 = all active nodes spread proportionally (more exploratory).
+- Spreading threshold: A fundamental parameter -- it changes what a run does. The chosen value is remembered across runs and across page reloads, and is sent with each new run so the engine starts with it; it also survives Reset. The value each run actually used is recorded with that run and shown in the Run History 'Spr' column, so you can tell which runs are comparable with the dissertation's (100) and which are not. Controls which Slipnet nodes participate in activation spreading. Defaults to 100, which reproduces the original exactly: only fully-active nodes spread, matching the Scheme's `fully-active?` test against `%max-activation%` (100). Lowering it lets partially-active nodes spread too, each contributing in proportion to its own activation, which makes the Slipnet more diffuse and exploratory -- useful for experimenting, but no longer Metacat behaviour. Note this is a different cutoff from `%full-activation-threshold%` (50), which decides which nodes count as active for top-down codelet posting; the slider does not affect that.
 - Eliza commentary: Toggles the narration style shown in the Commentary panel. On = friendly natural-language narration; off = technical descriptions.
 - Breakpoint: Pause the run when the codelet count reaches a specific value. Useful for debugging or stepping through a specific point in a known run.
 

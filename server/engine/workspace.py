@@ -24,6 +24,24 @@ if TYPE_CHECKING:
     from server.engine.slipnet import Slipnet
 
 
+def _object_weight(obj: Any, weight_key: str) -> float:
+    """Selection weight for *obj* under *weight_key*.
+
+    Resolves either a numeric attribute (e.g. ``relative_importance``) or a key
+    of the object's ``salience`` dict (``intra``, ``vertical_inter``,
+    ``horizontal_inter``).  Floors at 0.1 so a wholly unsalient object stays
+    reachable — the parallel terraced scan explores in proportion to promise, it
+    does not rule things out.
+    """
+    value = getattr(obj, weight_key, None)
+    if isinstance(value, (int, float)):
+        return max(0.1, float(value))
+    salience = getattr(obj, "salience", None)
+    if isinstance(salience, dict) and weight_key in salience:
+        return max(0.1, float(salience[weight_key]))
+    return 1.0
+
+
 class WorkspaceString:
     """A string of letters in the workspace."""
 
@@ -58,27 +76,23 @@ class WorkspaceString:
 
     def add_bond(self, bond: Bond) -> None:
         self.bonds.append(bond)
-        # Attach to objects
-        left = bond.left_object
-        right = bond.right_object
-        if left.right_string_pos < right.left_string_pos or left is bond.from_object:
-            bond.from_object.right_bond = bond
-            bond.to_object.left_bond = bond
-        else:
-            bond.from_object.left_bond = bond
-            bond.to_object.right_bond = bond
+        # A bond's left/right pointers are *positional*, independent of which
+        # object the bond happens to run from.  Keying off from/to instead meant
+        # a right-to-left bond (say the predecessor bond y->x in "xyz") set
+        # y.right_bond to its own left-hand bond, so walking rightwards from a
+        # letter never advanced — the whole-string group scout then collected
+        # the same letter over and over.
+        bond.left_object.right_bond = bond
+        bond.right_object.left_bond = bond
 
     def remove_bond(self, bond: Bond) -> None:
         if bond in self.bonds:
             self.bonds.remove(bond)
-        if bond.from_object.left_bond is bond:
-            bond.from_object.left_bond = None
-        if bond.from_object.right_bond is bond:
-            bond.from_object.right_bond = None
-        if bond.to_object.left_bond is bond:
-            bond.to_object.left_bond = None
-        if bond.to_object.right_bond is bond:
-            bond.to_object.right_bond = None
+        for obj in (bond.from_object, bond.to_object):
+            if obj.left_bond is bond:
+                obj.left_bond = None
+            if obj.right_bond is bond:
+                obj.right_bond = None
 
     def add_group(self, group: Group) -> None:
         self.groups.append(group)
@@ -228,16 +242,26 @@ class WorkspaceString:
         return round(100.0 * count / (len(non_spanning) - 1))
 
     def choose_object(self, weight_key: str, rng: RNG) -> WorkspaceObject | None:
-        """Choose an object weighted by a salience/importance measure."""
+        """Choose an object weighted by a salience/importance measure.
+
+        *weight_key* names either a numeric attribute (``relative_importance``)
+        or an entry in the object's ``salience`` dict (``intra``,
+        ``vertical_inter``, ``horizontal_inter``).
+
+        The previous version defaulted the ``getattr`` probe to ``1.0``, which is
+        itself a float — so the numeric branch always won and *every object got
+        weight 1.0*.  Object choice was therefore uniformly random and salience,
+        the measure of "how attention-worthy an object is", did nothing at all.
+        With it restored, a group like ``jjj`` (salience 39) properly outcompetes
+        the letters inside it (10-26), which is what lets ``c`` be seen as
+        corresponding to the ``jjj`` group rather than to just the rightmost
+        ``j`` — the difference between the answers mrrkkk and mrrjjk (§1.5).
+        """
         if not self.objects:
             return None
-        weights = [
-            max(0.1, getattr(o, weight_key, 1.0))
-            if isinstance(getattr(o, weight_key, None), (int, float))
-            else o.salience.get(weight_key, 1.0)
-            for o in self.objects
-        ]
-        return rng.weighted_pick(self.objects, weights)
+        return rng.weighted_pick(
+            self.objects, [_object_weight(o, weight_key) for o in self.objects]
+        )
 
     def update_object_values(self) -> None:
         """Recompute importance, unhappiness, salience for all objects.
@@ -298,6 +322,13 @@ class Workspace:
         self.clamped_rules: list[Rule] = []
 
         self.slipnet = slipnet
+
+        # Back-link so structures can reach the Workspace from an object's
+        # string (Bridge._find_workspace).  Without it a bridge could not see
+        # its supporting or incompatible peers, so external strength was always
+        # 0 and mutually contradictory bridges never fought.
+        for ws_string in self.all_strings:
+            ws_string.workspace = self
 
     @property
     def all_strings(self) -> list[WorkspaceString]:
@@ -498,15 +529,9 @@ class Workspace:
         all_objs = self.all_objects
         if not all_objs:
             return None
-        weights = []
-        for o in all_objs:
-            if isinstance(getattr(o, weight_key, None), (int, float)):
-                weights.append(max(0.1, getattr(o, weight_key)))
-            elif isinstance(o.salience, dict) and weight_key in o.salience:
-                weights.append(max(0.1, o.salience[weight_key]))
-            else:
-                weights.append(1.0)
-        return rng.weighted_pick(all_objs, weights)
+        return rng.weighted_pick(
+            all_objs, [_object_weight(o, weight_key) for o in all_objs]
+        )
 
     # ------------------------------------------------------------------
     # Bridge queries

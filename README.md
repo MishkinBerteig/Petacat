@@ -80,29 +80,61 @@ original Scheme `run.ss`):
 docker compose -f docker-compose.dev.yml up -d
 ```
 
-- App: http://localhost:8100
-- Frontend dev server: http://localhost:5175
+- **Frontend (open this): http://localhost:59595**
+- API: http://localhost:8100 — docs at http://localhost:8100/docs
 - Postgres: localhost:5434
+
+In the dev stack the two are separate: Vite serves the UI on 59595 and proxies
+`/api` and `/ws` through to the backend, so 8100 answers API calls but has
+nothing at `/`. The production image is the other way round — `npm run build`
+output is baked into `/app/static` and FastAPI serves the UI and API together on
+one port.
 
 ### 2. Run an analogy problem
 
-Open http://localhost:8100 in your browser. The **Run Dashboard** is the default
-view. Use the **Problem Input** panel (top-left) to enter the four strings of
-the analogy (Initial, Modified, Target, Answer) or pick a demo, then use the
-**Run Controls** panel (below it) to launch a run. Two run modes are available:
+Open http://localhost:59595 in your browser. The **Run Dashboard** is the default
+view. The two left-hand panels split along *what* versus *how*:
 
-- **Run to Answer** — runs the engine at full backend speed until an answer is
-  found. The Workspace header shows a `PROCESSING` spinner and a **STOP**
-  button. All dashboard panels refresh periodically at the polling interval
-  configured in the Run Controls.
-- **Run with Live Updates** — steps the engine one codelet at a time,
-  refreshing every panel after every step. Slower, but every structure-build
-  is visible in real time.
+**Problem Input** (top-left) defines the problem: the four strings (Initial,
+Modified, Target, and optionally Answer — supplying an Answer switches the
+engine into justification mode), the **Seed**, and the demo dropdown.
 
-The dashboard also has **Step N**, **Reset**, and breakpoint controls for
-fine-grained debugging. Every panel has a **`?`** button in its header that
-opens a context-sensitive help popover; the same content is also available
-statically in [`HELP.md`](HELP.md).
+**Run Controls** (below it) decides how that problem executes. **How to run**
+selects between the two mutually exclusive execution modes, and the action
+button and pacing control follow the choice:
+
+- **Run to answer — full speed.** The engine runs flat out on the backend until
+  an answer is found. The Workspace header shows a `PROCESSING` spinner and a
+  **STOP** button. The **Sampling interval** controls how often the UI reads the
+  running engine (0 = continuous, ~100 ms); it does not change how the engine
+  runs.
+- **Live updates — codelet by codelet.** The client drives one codelet at a
+  time, refreshing every panel after each. **Delay per codelet** inserts a pause
+  after each one — raise it to follow the run by eye. Much slower, but every
+  structure-build is visible as it happens.
+
+**Manual stepping** (Step N) is independent of the mode: it advances a fixed
+number of codelets and stops. There are also breakpoint controls for
+fine-grained debugging, and a **Spreading threshold** slider — leave that at its
+default of 100 for faithful Metacat behaviour, see
+[Spreading Activation Threshold](#spreading-activation-threshold).
+
+Every panel has a **`?`** button in its header that opens a context-sensitive
+help popover; the same content is also available statically in
+[`HELP.md`](HELP.md).
+
+### Running the same problem again, vs. running a different one
+
+These are two different intentions, and two separate controls:
+
+- **A different problem.** Edit any field or pick another demo, then press Run.
+  That starts a *new* run, leaving the previous one in the run history. The line
+  under the Run button names the run currently on screen and warns you when your
+  inputs have drifted away from it.
+- **The same problem again.** **Reset to codelet 0**, at the bottom of the
+  Problem Input panel, clears the current run's workspace back to bare strings
+  while keeping the same problem and seed. It does not start running — press Run
+  afterwards.
 
 ### 3. Explore and edit configuration
 
@@ -111,7 +143,7 @@ to `#/config`. This view provides editable tables for all domain knowledge that
 drives the engine:
 
 - **Slipnet Nodes** -- 59 concept nodes with conceptual depths
-- **Slipnet Links** -- 226 links between nodes (category, instance, property, lateral, sliplink)
+- **Slipnet Links** -- 202 links between nodes (category, instance, property, lateral, sliplink)
 - **Slipnet Layout** -- Grid positions for the graph visualization
 - **Codelet Types** -- 27 codelet types with Python `execute_body` source
 - **Engine Params** -- Runtime thresholds and parameters
@@ -213,13 +245,83 @@ Full OpenAPI docs are available at `/docs` when the server is running.
 | POST | `/api/runs/{id}/clamp-codelets` | Clamp codelet urgency |
 | POST/GET | `/api/runs/{id}/spreading-threshold` | Set/get spreading activation threshold |
 
-### Spreading Activation Threshold
+## Spreading Activation Threshold
 
-The spreading activation threshold (0–100) controls which slipnet nodes
-participate in activation spreading. At 100 (default), only nodes at full
-activation (100) spread to their neighbors — matching the original Scheme
-behaviour. At 0, all active nodes spread proportionally. This can be adjusted
-per-run via the API or the UI slider.
+A Petacat-only control, exposed as the **Spreading threshold** slider in the
+Run Controls panel and as `POST /api/runs/{id}/spreading-threshold`.
+
+It is a fundamental parameter — it changes what a run does — so it is treated as
+part of a run's identity rather than a transient preference:
+
+- The **chosen** value is remembered across runs *and across page reloads*, and
+  is sent with each new run so the engine is initialised with it. It survives
+  Reset.
+- The value each run **used** is stored on the run (`runs.spreading_threshold`)
+  and reported by the API, so it outlives a restart and shows in the Run History
+  **Spr** column. A run at anything other than 100 is not comparable with the
+  dissertation's results, and the list says which is which.
+
+`POST /api/runs/{id}/spreading-threshold` still changes it mid-run, and
+`POST /api/runs` accepts `spreading_threshold` at creation.
+
+**The default is 100, which reproduces the original Metacat exactly.** Leave it
+there when comparing against the dissertation.
+
+### What it controls
+
+Each update cycle, the Slipnet decays every node, then lets some nodes spread
+activation to their neighbours. The threshold is the minimum activation a node
+needs to be one of the spreaders (`server/engine/slipnet.py`):
+
+```python
+for node in self.nodes.values():
+    if node.activation >= threshold:
+        node.spread_activation_to_neighbors(update_cycle_length)
+```
+
+The original hard-codes this: `update-slipnet-activations` spreads only from
+nodes passing `fully-active?` (`slipnet.ss:381`), and
+
+```scheme
+(define fully-active?
+  (lambda (node)
+    (= (tell node 'get-activation) %max-activation%)))   ; %max-activation% = 100
+```
+
+Activation is clamped to 100, so a threshold of 100 is exactly `fully-active?`.
+
+### Not to be confused with the *other* activation cutoff
+
+Metacat has two, and they do different jobs:
+
+| Scheme | Value | Governs |
+|--------|-------|---------|
+| `%max-activation%` | 100 | `fully-active?` — **which nodes spread**. This is the slider. |
+| `%full-activation-threshold%` | 50 | `above-threshold?` — which nodes count as "active" for top-down codelet posting, and which are eligible for the stochastic jump to full activation |
+
+The 50 cutoff is a separate parameter (`full_activation_threshold` in
+`engine_params.json`) and the slider does not touch it. Moving the slider
+changes how far activation propagates, not which concepts exert top-down
+pressure.
+
+### What lowering it does
+
+More nodes pass the gate. How much each one contributes is already scaled by
+its own activation —
+
+```
+amount = (update_cycle_length / 15) × (degree_of_association / 100) × activation
+```
+
+— so a node sitting at 60 contributes 60% of what a fully-active node would,
+rather than all-or-nothing. Nodes at zero never spread regardless.
+
+The net effect of a lower threshold is a more diffuse, more exploratory
+Slipnet: more concepts stay warm, more slippages become available, and runs
+wander further from the obvious interpretation. This is a deliberate extension
+beyond what Metacat could do, useful for experimenting with the architecture —
+but it is *not* Metacat behaviour, so results obtained below 100 should not be
+compared against the dissertation's.
 
 ## Seed Data
 
@@ -228,7 +330,7 @@ All domain knowledge lives in `seed_data/*.json`:
 | File | Contents |
 |------|----------|
 | `slipnet_nodes.json` | 59 concept nodes with conceptual depths |
-| `slipnet_links.json` | 226 links (category, instance, property, lateral, sliplink) |
+| `slipnet_links.json` | 202 links (category, instance, property, lateral, sliplink) |
 | `codelet_types.json` | 27 codelet types with Python execute bodies |
 | `engine_params.json` | Runtime parameters and thresholds |
 | `urgency_levels.json` | 7 urgency bin values |
@@ -264,7 +366,9 @@ additional languages without schema changes.
    compiled once, and `exec()`'d in a sandboxed namespace.
 3. **Web-based UI**: React frontend with real-time WebSocket state push.
 4. **Configurable spreading threshold**: The minimum activation level for
-   spreading can be tuned per-run (original is fixed at 100).
+   spreading can be tuned per-run; the original is fixed at full activation.
+   Petacat defaults to 100, which is the original's behaviour — see
+   [Spreading Activation Threshold](#spreading-activation-threshold).
 
 Some additional minor differences include:
 

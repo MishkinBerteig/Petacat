@@ -31,6 +31,9 @@ class CreateRunRequest(BaseModel):
     target: str
     answer: str | None = None
     seed: int = 0
+    #: Set at creation so the whole run uses it, rather than being applied after
+    #: the engine has already been initialised.
+    spreading_threshold: int | None = None
 
 
 class StepRequest(BaseModel):
@@ -50,6 +53,10 @@ class RunResponse(BaseModel):
     modified: str
     target: str
     answer: str | None
+    #: The answer was supplied for the engine to justify, not discovered by it.
+    justify_mode: bool = False
+    #: Which Slipnet nodes were allowed to spread; 100 is the original.
+    spreading_threshold: int = 100
 
 
 class RunListResponse(BaseModel):
@@ -64,6 +71,7 @@ class StepResponse(BaseModel):
     codelet_type: str
     answer_found: bool = False
     answer: str | None = None
+    gave_up: bool = False
 
 
 # ------------------------------------------------------------------
@@ -78,7 +86,8 @@ async def create_run(
 ):
     svc = get_run_service()
     info = await svc.create_run(
-        session, req.initial, req.modified, req.target, req.answer, req.seed
+        session, req.initial, req.modified, req.target, req.answer, req.seed,
+        spreading_threshold=req.spreading_threshold,
     )
     return RunResponse(
         run_id=info.run_id,
@@ -89,6 +98,8 @@ async def create_run(
         modified=info.modified,
         target=info.target,
         answer=info.answer,
+        justify_mode=info.justify_mode,
+        spreading_threshold=info.spreading_threshold,
     )
 
 
@@ -110,6 +121,8 @@ async def get_run(
         modified=info.modified,
         target=info.target,
         answer=info.answer,
+        justify_mode=info.justify_mode,
+        spreading_threshold=info.spreading_threshold,
     )
 
 
@@ -130,6 +143,7 @@ async def step_run(
             codelet_type=r.codelet_type,
             answer_found=r.answer_found,
             answer=r.answer,
+            gave_up=r.gave_up,
         )
         for r in results
     ]
@@ -196,6 +210,8 @@ async def list_runs(
                 modified=r.modified,
                 target=r.target,
                 answer=r.answer,
+                justify_mode=r.justify_mode,
+                spreading_threshold=r.spreading_threshold,
             )
             for r in runs
         ],
@@ -226,6 +242,8 @@ async def run_to_completion(
         modified=info.modified,
         target=info.target,
         answer=info.answer,
+        justify_mode=info.justify_mode,
+        spreading_threshold=info.spreading_threshold,
     )
 
 
@@ -260,6 +278,8 @@ async def reset_run(
         modified=info.modified,
         target=info.target,
         answer=info.answer,
+        justify_mode=info.justify_mode,
+        spreading_threshold=info.spreading_threshold,
     )
 
 

@@ -20,6 +20,201 @@ logger = logging.getLogger("petacat")
 HELP_LOCALE = os.environ.get("HELP_LOCALE", "en")
 
 
+# Seed files whose contents the DB copy of the bulk metadata mirrors.  Help
+# topics are excluded: they are upserted separately on every startup.
+_BULK_SEED_FILES = (
+    "enums.json",
+    "slipnet_nodes.json",
+    "slipnet_links.json",
+    "slipnet_layout.json",
+    "codelet_types.json",
+    "engine_params.json",
+    "urgency_levels.json",
+    "formula_coefficients.json",
+    "theme_dimensions.json",
+    "demo_problems.json",
+    "commentary_templates.json",
+    "posting_rules.json",
+)
+
+# EngineParam row that records which seed data the DB was last loaded from.
+_SEED_FINGERPRINT_PARAM = "__seed_data_fingerprint__"
+
+
+def _seed_data_fingerprint() -> str:
+    """A digest of the checked-in bulk seed files."""
+    import hashlib
+
+    digest = hashlib.sha256()
+    for filename in _BULK_SEED_FILES:
+        path = os.path.join(SEED_DATA_DIR, filename)
+        digest.update(filename.encode())
+        try:
+            with open(path, "rb") as f:
+                digest.update(f.read())
+        except FileNotFoundError:
+            digest.update(b"<missing>")
+    return digest.hexdigest()
+
+
+async def _stored_seed_fingerprint_safe(engine) -> str | None:
+    """The fingerprint the DB was last seeded from, or ``None``.
+
+    Uses raw SQL and swallows failures on purpose: the table may not exist yet,
+    or may predate a column the ORM now expects, and either way the answer we
+    want is "unknown, so re-seed".
+    """
+    from sqlalchemy import text
+
+    try:
+        async with engine.connect() as conn:
+            result = await conn.execute(
+                text("SELECT value FROM engine_params WHERE name = :name"),
+                {"name": _SEED_FINGERPRINT_PARAM},
+            )
+            row = result.first()
+            return row[0] if row else None
+    except Exception:
+        return None
+
+
+# Metadata tables that are *not* derived from the bulk seed files.
+_NON_DERIVED_TABLES = frozenset({"help_topics"})
+
+
+def _derived_metadata_tables() -> list:
+    """Derived metadata tables, in safe deletion order (children first).
+
+    Restricted to classes declared in ``server.models.metadata``: the runtime
+    models in ``server.models.run`` share the same declarative ``Base``, so
+    walking ``Base.metadata`` wholesale would have swept up ``runs``,
+    ``trace_events``, ``cycle_snapshots`` and the episodic-memory tables and
+    deleted a user's saved work.
+
+    Ordering comes from SQLAlchemy's own foreign-key sort rather than a
+    hand-written list — hand-listing meant playing whack-a-mole with dependencies
+    (``posting_rules`` → ``posting_directions``, …) and getting it wrong twice.
+    """
+    import inspect
+
+    from server.models import metadata as metadata_models
+    from server.models.metadata import Base
+
+    derived_names = {
+        cls.__tablename__
+        for _, cls in inspect.getmembers(metadata_models, inspect.isclass)
+        if getattr(cls, "__module__", "") == metadata_models.__name__
+        and hasattr(cls, "__tablename__")
+        and cls.__tablename__ not in _NON_DERIVED_TABLES
+    }
+
+    protected = _tables_referenced_by_runtime(derived_names)
+    ordered = [
+        t
+        for t in Base.metadata.sorted_tables
+        if t.name in derived_names and t.name not in protected
+    ]
+    ordered.reverse()  # children first, so foreign keys stay satisfied
+    return ordered
+
+
+def _tables_referenced_by_runtime(derived_names: set[str]) -> frozenset[str]:
+    """Derived tables that runtime data holds foreign keys into.
+
+    ``runs.status`` points at ``run_statuses`` and ``trace_events.event_type`` at
+    ``event_types``, so clearing those rows while a user's runs exist is refused
+    by the database.  They are stable enum tables, so they get seeded
+    insert-if-missing instead of being cleared.  Computed from the schema rather
+    than hard-coded, so a new runtime foreign key protects itself.
+    """
+    import server.models.run  # noqa: F401 — registers the runtime tables
+
+    from server.models.metadata import Base
+
+    protected: set[str] = set()
+    for table in Base.metadata.sorted_tables:
+        if table.name in derived_names:
+            continue  # only runtime / non-derived tables count as referrers
+        for fk in table.foreign_keys:
+            target = fk.column.table.name
+            if target in derived_names:
+                protected.add(target)
+    return frozenset(protected)
+
+
+def _protected_enum_tables() -> frozenset[str]:
+    """Public wrapper used by the seeding path."""
+    import inspect
+
+    from server.models import metadata as metadata_models
+
+    derived_names = {
+        cls.__tablename__
+        for _, cls in inspect.getmembers(metadata_models, inspect.isclass)
+        if getattr(cls, "__module__", "") == metadata_models.__name__
+        and hasattr(cls, "__tablename__")
+        and cls.__tablename__ not in _NON_DERIVED_TABLES
+    }
+    return _tables_referenced_by_runtime(derived_names)
+
+
+async def _reconcile_metadata_columns(engine) -> None:
+    """Add any columns the models declare that the database is missing.
+
+    ``create_all`` creates missing *tables* but never alters an existing one, so a
+    seed file that grows a new field — ``slipnet_nodes.descriptor_predicate`` —
+    left the old column set in place on any pre-existing volume, and every query
+    naming the new column failed.  Dropping the tables instead is not an option:
+    runtime data holds foreign keys into several of them.
+
+    The models share one ``Base``, so this covers the runtime tables too — which
+    matters for a column like ``runs.spreading_threshold`` that existing rows must
+    acquire a sensible value for rather than NULL.
+    """
+    from sqlalchemy import text
+    from server.models.metadata import Base
+
+    async with engine.begin() as conn:
+        for table in Base.metadata.sorted_tables:
+            result = await conn.execute(
+                text(
+                    "SELECT column_name FROM information_schema.columns "
+                    "WHERE table_name = :table"
+                ),
+                {"table": table.name},
+            )
+            present = {row[0] for row in result}
+            if not present:
+                continue  # table does not exist yet; create_all will make it
+            for column in table.columns:
+                if column.name in present:
+                    continue
+                # Added nullable regardless of the model's constraint: the
+                # derived tables are re-seeded immediately afterwards, and a NOT
+                # NULL column cannot be added to a populated table without a
+                # default.
+                type_sql = column.type.compile(dialect=conn.dialect)
+                # Carry the model's server_default through, so rows that already
+                # exist get the intended value instead of NULL. Without this a
+                # runtime table gaining a column — where the rows are real data
+                # and are not re-seeded — would read back None everywhere.
+                default_sql = ""
+                if column.server_default is not None:
+                    arg = getattr(column.server_default, "arg", None)
+                    if arg is not None:
+                        default_sql = f" DEFAULT {arg}"
+                logger.info(
+                    "Adding missing column %s.%s (%s%s)",
+                    table.name, column.name, type_sql, default_sql,
+                )
+                await conn.execute(
+                    text(
+                        f'ALTER TABLE "{table.name}" '
+                        f'ADD COLUMN "{column.name}" {type_sql}{default_sql}'
+                    )
+                )
+
+
 def _help_topics_filename() -> str:
     """Return the help topics JSON filename for the configured locale.
 
@@ -103,19 +298,44 @@ async def _ensure_db_ready():
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
 
-        # Check if bulk metadata is already seeded (slipnet nodes, codelets, etc.)
-        factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-        async with factory() as session:
-            from server.models.metadata import SlipnetNodeDef
-            result = await session.execute(select(SlipnetNodeDef).limit(1))
-            bulk_seeded = result.scalar_one_or_none() is not None
+        # create_all only creates missing tables; bring existing ones up to date.
+        await _reconcile_metadata_columns(engine)
 
-        if bulk_seeded:
-            # Bulk metadata is already in place — only sync help topics
+        # Decide whether the bulk metadata in the DB is still current.
+        #
+        # Checking merely "are there any rows?" meant a Docker volume left over
+        # from an earlier build kept serving stale metadata to the admin panel
+        # while the engine ran the new seed files from JSON — a silent divergence
+        # between what you can inspect and what is actually executing.  And
+        # ``create_all`` never alters an existing table, so a seed file that grew
+        # a new field (``slipnet_nodes.descriptor_predicate``) left the old column
+        # set in place and every query against it failed.
+        #
+        # So: fingerprint the seed files, and when they differ, drop the derived
+        # metadata tables and let ``create_all`` rebuild them at the current
+        # schema before re-seeding.  Runtime data is never touched.
+        factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+        fingerprint = _seed_data_fingerprint()
+        stored = await _stored_seed_fingerprint_safe(engine)
+
+        if stored == fingerprint:
             async with factory() as session:
                 await _sync_help_topics(session)
+                await session.commit()
             await engine.dispose()
             return
+
+        if stored is not None:
+            logger.info(
+                "Seed data changed (%s -> %s); re-seeding derived metadata",
+                stored[:12], fingerprint[:12],
+            )
+        from sqlalchemy import delete as _delete
+
+        async with factory() as session:
+            for table in _derived_metadata_tables():
+                await session.execute(_delete(table))
+            await session.commit()
 
         # Seed from JSON files (help topics handled separately by _sync_help_topics)
         from server.models.metadata import (
@@ -144,8 +364,17 @@ async def _ensure_db_ready():
                 "param_value_types": ParamValueTypeDef, "demo_modes": DemoModeDef,
             }
             enums_data = _load("enums.json")
+            protected_tables = _protected_enum_tables()
             for table_name, model_cls in _enum_models.items():
-                for row in enums_data.get(table_name, []):
+                rows = enums_data.get(table_name, [])
+                if model_cls.__tablename__ in protected_tables:
+                    # Never cleared, so add only what is missing rather than
+                    # colliding on the primary key.
+                    present = set(
+                        (await session.execute(select(model_cls.name))).scalars().all()
+                    )
+                    rows = [r for r in rows if r["name"] not in present]
+                for row in rows:
                     session.add(model_cls(
                         name=row["name"], display_label=row["display_label"],
                         sort_order=row["sort_order"], description=row.get("description", ""),
@@ -155,7 +384,8 @@ async def _ensure_db_ready():
             for n in _load("slipnet_nodes.json"):
                 session.add(SlipnetNodeDef(name=n["name"], short_name=n["short_name"],
                                             conceptual_depth=n["conceptual_depth"],
-                                            description=n.get("description", "")))
+                                            description=n.get("description", ""),
+                                            descriptor_predicate=n.get("descriptor_predicate")))
             for lk in _load("slipnet_links.json"):
                 session.add(SlipnetLinkDef(
                     from_node=lk["from_node"], to_node=lk["to_node"],
@@ -184,6 +414,9 @@ async def _ensure_db_ready():
                     session.add(EngineParam(name=k, value=str(v), value_type="float"))
                 else:
                     session.add(EngineParam(name=k, value=str(v), value_type="string"))
+            session.add(EngineParam(
+                name=_SEED_FINGERPRINT_PARAM, value=fingerprint, value_type="string",
+            ))
             for k, v in _load("urgency_levels.json").items():
                 session.add(UrgencyLevel(name=k, value=v))
             for k, v in _load("formula_coefficients.json").items():
@@ -299,10 +532,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS for frontend dev server
+# CORS for frontend dev server: the port published by docker-compose.dev.yml,
+# plus Vite's own default for running `npm run dev` on the host.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5175", "http://localhost:5173"],
+    allow_origins=["http://localhost:59595", "http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

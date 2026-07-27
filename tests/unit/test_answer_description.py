@@ -65,8 +65,8 @@ def test_comparison():
         unjustified_slippages=[],
     )
     result = mem.compare_answers(desc1, desc2)
-    assert "position" in result["shared_themes"]
-    assert "direction" in result["b_only_themes"]
+    assert "position" in result["common_themes"]
+    assert "direction" in result["b_unique_themes"]
 
 
 def test_clear():

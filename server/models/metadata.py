@@ -132,6 +132,10 @@ class SlipnetNodeDef(Base):
     short_name = Column(String(16), nullable=False)
     conceptual_depth = Column(Integer, nullable=False)
     description = Column(Text, default="")
+    # DSL expression over `obj` deciding whether this node validly describes a
+    # Workspace object (Scheme: define-descriptor-predicate).  Null for the many
+    # nodes whose descriptors are read off an object rather than tested.
+    descriptor_predicate = Column(Text, nullable=True)
 
 
 class SlipnetLinkDef(Base):

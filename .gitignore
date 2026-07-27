@@ -8,7 +8,8 @@ build/
 .eggs/
 
 # Node
-client/node_modules/
+node_modules/
+.vite/
 
 # IDE
 .vscode/
@@ -24,3 +25,7 @@ client/node_modules/
 .pytest_cache/
 htmlcov/
 .coverage
+
+# TypeScript incremental build cache
+client/tsconfig.tsbuildinfo
+client/dist/
