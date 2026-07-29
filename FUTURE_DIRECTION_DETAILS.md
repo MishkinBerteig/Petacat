@@ -1,14 +1,26 @@
 # Future Direction — Design Details
 
+> ## ⚠ SUPERSEDED — historical record only
+>
+> **This document is stale and is no longer maintained.** It is the origin record of
+> the conversation that produced the phase plans, kept for provenance.
+>
+> **The current plans are `PHASE 0 PLAN.md` through `PHASE 6 PLAN.md`.** They are
+> authoritative wherever the two disagree, and they disagree in many places. Known
+> divergences include the phase scheme itself (§14's table predates the current
+> numbering), the five-rung parallelism ladder and bulk-synchronous waves (removed —
+> free-running is the direct target), the commit journal (removed), deterministic
+> replay and exact reproduction as standards (retired — the oracle is the expected
+> range), the unit Normal mode persists (the Run, not the turn), Audit's write
+> discipline (buffering is permitted), the GPU work (no longer gated behind a
+> go/no-go), and several measurements re-taken against commit `2c5c086`.
+>
+> Nothing here should be cited as a decision. Read the phase plans.
+
 Living design notes for the "self-knowing Petacat" work sketched in
 `FUTURE_DIRECTION.md`. Where that document poses four open questions, this one
 records the concrete decisions, critiques, and mechanisms worked out in
 conversation as we converge on a buildable plan.
-
-This is a working document, not a spec. Sections marked **[decided]** are
-choices we have committed to; **[leading proposal]** are recommendations not yet
-ratified; **[open]** are questions still to resolve before planning. **§14 sorts
-everything below into research phases** — read it as the map.
 
 The through-line: threads 0 (self/other), 1 (generalised workspace), and 3
 (learning by asking) are **not three features** — they are one mechanism seen
@@ -173,9 +185,12 @@ tokenizer: the teacher is *how emergent tokens get their links.*
   good tokens. "Emergent over time" must mean **across runs**, accumulated in
   Episodic Memory. Tokens are a **long-term learned asset**, which ties the
   tokenizer to the learning/evolution loop (§2).
-- **Determinism.** Petacat is deterministic given a seed; the `local-llm` is not
-  (and will be swapped). For a "deterministic harness" to hold, every LLM call
-  must be **journaled and record-replayed** so any run reproduces exactly.
+- **Reproducibility, in its proper place.** Petacat is *stochastic by design*; a
+  different-but-correct run is right behaviour. Seeding makes a run repeatable, which
+  is a testing and debugging convenience rather than a design goal. What the harness
+  genuinely needs is that the *external* inputs be pinned: the `local-llm` is
+  non-deterministic and will be swapped, so every LLM call must be **journaled and
+  record-replayed** or a past run cannot be re-examined at all.
   Parallel execution (§12) threatens determinism from a *second* direction —
   nondeterministic interleaving — and must be designed against just as carefully.
 
@@ -445,7 +460,7 @@ builders may build conflicting structures, a breaker may destroy what a builder 
 mid-way through evaluating. The ladder of relaxation, loosest synchronisation last:
 
 - **(i) Serial semantics, parallel substrate.** Codelets still run one at a time;
-  only the numeric work inside each cycle goes wide. Bit-identical to today, and it
+  only the numeric work inside each cycle goes wide. Cognition unchanged, and it
   already captures the O(n²) win. *Taken regardless* — the floor, not an option.
 - **(ii) Bulk-synchronous waves.** W codelets run **genuinely concurrently**, then a
   barrier resolves conflicts and commits in a **deterministic order** (by slot
@@ -480,17 +495,18 @@ architecture do most of the work for us:
   than it would be in most systems — it makes explicit a structure that is already
   there.
 
-**Reproducibility survives — by replay, not by schedule.** The objection to
-free-running is that §11 corpus training and §2 evolution need reproducible runs.
-But reproducibility does not require the *schedule* to be predictable, only
-**recordable**: journal the actual commit order and a run replays exactly. §6
-already commits to journaling `local-llm` calls for the same reason; the commit log
-is the same mechanism extended to the scheduler. The honest cost is not to validity
-but to **sample efficiency** — a free-running run is one draw from a distribution,
-so evolutionary fitness needs more runs per configuration to see through the
-interleaving noise. Population parallelism (§12a) is exactly what pays for that,
-which is a pleasing closure: the technique that makes free-running affordable to
-evaluate is the same technique that makes the GPU worth using.
+**A free-running run is not recoverable after the fact, and that is accepted.** The
+objection to free-running is that §11 corpus training and §2 evolution want runs they
+can trust. **No journal of commit order is kept** — the thing it would reproduce is one
+arbitrary draw from a distribution we do not privilege, and building a second recording
+mechanism to chase it is not worth it. (§6 journals `local-llm` calls for an unrelated
+reason: pinning an *external* input that would otherwise be unrecoverable.)
+
+The honest cost is not to validity but to **sample efficiency** — a free-running run is
+one draw from a distribution, so evolutionary fitness needs more runs per configuration
+to see through the interleaving noise. Population parallelism (§12a) is exactly what
+pays for that, which is a pleasing closure: the technique that makes free-running
+affordable to evaluate is the same technique that makes the GPU worth using.
 
 **Serial reference mode is retained permanently**, at every phase, for fidelity
 cross-validation against Marshall's semantics: parallel Petacat and serial Petacat
@@ -647,10 +663,10 @@ cross-validation against Marshall's semantics. Building one satisfies both.
 **The limitation to state plainly:** because Audit removes concurrency, it cannot
 reproduce concurrency-dependent behaviour. A defect that only manifests under
 free-running (§12b (v)) will not appear in Audit. So Audit is *not* the debugging
-tool for parallelism, and §12b's **commit journal remains a separate mechanism** —
-Audit answers "what did the system do, tick by tick," while the commit journal
-answers "in what order did concurrent codelets land." Both are needed; neither
-substitutes for the other.
+tool for parallelism, and **nothing else covers that gap** — no journal of concurrent
+commit order is kept (§12b). Audit answers "what did the system do, tick by tick" on a
+serial run; behaviour that only appears under free-running is diagnosed by reasoning and
+targeted instrumentation, not by replaying it.
 
 ### 13b-i. Review UX — a Phase 0 deliverable
 
@@ -707,9 +723,8 @@ Four rules make this hold up:
   from re-execution or from the Audit record — not from a 45 MB blob nothing reads.
 - **Reproducibility is by re-execution.** A turn re-runs to the same end state from
   **(RNG state at turn start, config-hash, memory-hash)**. No journal is required
-  for Normal; §12b's commit journal is a separate mechanism serving concurrency, not
-  this.
-- **Metadata gets a config-hash.** Re-execution is only valid against identical
+  for Normal, and none is kept for concurrency either (§12b).
+- **Metadata gets a config-hash.** Re-execution is only meaningful against the same
   configuration, and §2's evolution deliberately varies it. Every run records the
   hash of the `MetadataProvider` it ran under.
 - **Episodic memory becomes a named, versioned input** — an explicit argument at run
@@ -759,7 +774,7 @@ engine-imports-no-SQLAlchemy invariant test; and the retirement of write-only
 snapshots.
 
 *Proves:* that one engine can serve three persistence regimes without three code
-paths. *Exit:* identical cognition across all three modes from the same seed; Fast
+paths. *Exit:* cognition unaffected by persistence mode; Fast
 Run demonstrably opening **no database connection at all**; Normal turns
 re-executing to their recorded end state; Audit reconstructing a run tick by tick in
 its inspector. Purely technical, no new cognition, and **permanent**: every later
@@ -845,7 +860,7 @@ must resolve it.
    Also how much of the live client can be reused for recorded-state review (§13b-i).
 2. **Runtime and framework choices** *(Phase 1)* — free-threaded CPython vs. a
    native core (§12b); MLX vs. hand-written Metal kernels (§12a); per-codelet RNG
-   stream derivation; the commit-journal format.
+   stream derivation.
 3. **Projection/ingestion triggers** *(seeded Phase 1, load-bearing Phase 5)* — what
    fires them, and whether me/not-me labels are `Description`s participating in
    salience and strength.
@@ -894,6 +909,5 @@ must resolve it.
 | **`RunSink`** | The port the engine emits events to; mode is which implementation is attached, and the engine never knows which |
 | **Config-hash** | Hash of the `MetadataProvider` a run executed under; replay is only valid against a matching hash |
 | **Conflict → fizzle** | A codelet that loses a race fizzles — reusing an outcome the architecture already has |
-| **Replay-determinism** | Reproducibility from a journaled commit order rather than a predictable schedule |
 | **Serial reference mode** | Permanently retained one-codelet-at-a-time execution, for fidelity cross-validation |
 | **Population parallelism** | Batching K independent runs so the GPU sees fat batched kernels — the near-term GPU win |

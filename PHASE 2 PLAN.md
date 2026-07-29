@@ -26,9 +26,6 @@ text form. That loop does not change afterwards; later phases vary only the phys
 means of acting and sensing. Getting the small case right therefore matters out of
 proportion to how small it is.
 
-**Source.** Partitioned from `FUTURE_DIRECTION_DETAILS.md` §1, §2, §3, §8, §10, and
-§11 (completion, harness, valence A and B, homeostasis).
-
 **Depends on.** Phase 0 (turn-level persistence is exactly what Normal mode records;
 valence events are a `RunSink` event). Phase 1 (the backward pass creates concepts —
 Phase 1 must already know *how* to create and wire them; Phase 2 supplies a new
@@ -154,9 +151,11 @@ any percept can enter the same workspace (Phase 5).
 At first the harness only orchestrates send/receive between Petacat and its `not-me`.
 Its second job is to deliver the fitness signal.
 
-**Determinism.** Petacat is deterministic given a seed; the `local-llm` is not (and
-will be swapped). Every LLM call must be **journaled and record-replayed** so any run
-reproduces exactly.
+**Pinning the external input.** Petacat is stochastic by design, and a
+different-but-correct run is right behaviour — so this is not about making runs
+repeat. It is that the `local-llm` is non-deterministic and will be swapped, so unless
+every LLM call is **journaled and record-replayed**, a past dialogue cannot be
+re-examined at all.
 
 ## 7. love / not-love — a separate, independent perceptual channel
 

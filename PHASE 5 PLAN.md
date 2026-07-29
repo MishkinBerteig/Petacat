@@ -3,13 +3,6 @@
 **Goal.** Extend perception beyond text to **audio** and **proprioception** —
 embodied AI — building directly on the `love`/`not-love` system from Phase 2.
 
-**Source.** Two commitments in `FUTURE_DIRECTION_DETAILS.md` §11: that completion is
-*pure rule-application over percepts*, so the architecture is inherently
-**multi-modal-ready**; and that `love`/`not-love` is a **separate perceptual
-mechanism** rather than a workspace percept. The design detail below is largely new
-and should be read as a sketch to be argued with, but the *architecture* is not new —
-see §0.
-
 **Depends on.** Phase 2 above all. Phase 3 (the workspace already accepts non-letter
 atoms and chunks them hierarchically — audio and proprioception are the severe test of
 whether that generalisation was real). Phase 0 (sensor streams make the numeric
@@ -191,8 +184,8 @@ active, given that they compete for the attention of one coderack.
   unchanged `(1):(2)::(3):(4)` machinery — audio in → audio out, position in → position
   out — with no modality-specific analogy path.
 - They are instantiated as **independent channels** with **no coupling to the valence
-  channel** — verifiable by the fact that `love`/`not-love` behaves identically whether
-  or not a body is attached.
+  channel** — verifiable by the fact that `love`/`not-love` is unaffected by whether a
+  body is attached.
 - **The act → sense → value loop closes in each new modality**, exactly as it does for
   text in Phase 2: a proprioceptive percept arising from an act Petacat took is bridged
   to the act that produced it, and the value term remains the valence channel.
@@ -206,10 +199,9 @@ active, given that they compete for the attention of one coderack.
 4. **Arbitration between simultaneously-active independent channels** (§5) — they
    share one coderack and one Slipnet but must not collapse into one another.
 5. **Evaluation criteria** — what "perceiving well" means, defined in advance.
-6. **Real-time feasibility** — whether the rung of the parallelism ladder that Phase 0
-   settled on delivers the required rate. If it does not, that is a constraint
-   discovered here and resolved by re-opening Phase 0, not by scheduling work inside
-   this phase.
+6. **Real-time feasibility** — whether the free-running engine Phase 0 delivers reaches
+   the required rate. If it does not, that is a constraint discovered here and resolved
+   by re-opening Phase 0, not by scheduling work inside this phase.
 
 ## Glossary
 

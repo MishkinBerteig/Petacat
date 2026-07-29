@@ -5,9 +5,6 @@ Phase 1's concept-and-link creation from the controlled capital-letter case to
 open-ended chunk discovery — leveraging the existing episodic memory as the
 vocabulary store, with byte-pair encoding as the guiding analogy.
 
-**Source.** Partitioned from `FUTURE_DIRECTION_DETAILS.md` §4, §4a, the scale and
-cold-start constraints of §6, and the vocabulary-persistence part of §5.
-
 **Depends on.** Phase 1 heavily — that phase establishes both the concept/link
 creation mechanism *and* the BPE-style frequency accumulator, in a domain where the
 right answer is known. This phase generalises both rather than inventing anything.

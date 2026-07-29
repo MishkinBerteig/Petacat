@@ -4,13 +4,10 @@
 text training corpus**, and introduce **self-constructed codelets** via a new
 **meta-codelet system** — the first time the system grows *code* rather than *data*.
 
-**Source.** Partitioned from `FUTURE_DIRECTION_DETAILS.md` §9 (consolidation and
-self-construction) and the corpus-mode part of §11.
-
 **Depends on.** Phase 3 (a byte-capable workspace and a growing vocabulary). Phase 2
 (valence is what corpus mode drives deterministically). Phase 0 (Fast Run is what
-makes corpus training affordable at all — this phase is where the ~2.8× and the
-population batching actually get spent).
+makes corpus training affordable at all — this phase is where Fast Run and population
+batching actually get spent).
 
 ---
 

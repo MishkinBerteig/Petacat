@@ -4,9 +4,6 @@
 Slipnet, staying entirely within letter-string analogies but introducing **capital
 letters**, which the system does not currently know.
 
-**Source.** Partitioned from `FUTURE_DIRECTION_DETAILS.md` §4a (relational structure),
-the (a)/(b) staging of §11, and the frequency-accumulation idea that opens §4.
-
 **Scope — purely internal.** The mechanism must be **self-contained**: no teacher, no
 external inquiry, no dependence on anything Phases 2–5 introduce. It builds on what
 the system already has — the **existing episodic memory**, **new codelets**, and a

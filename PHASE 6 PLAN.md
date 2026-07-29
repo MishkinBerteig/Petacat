@@ -1,13 +1,8 @@
 # Phase 6 Plan — Remainder
 
-**Goal.** The bucket phase. Everything in `FUTURE_DIRECTION_DETAILS.md` that does not
-belong to Phases 0–5 lands here: the most ambitious items, the deliberately deferred
-ones, and the synthesis that ties the programme together.
-
-**Source.** Partitioned from `FUTURE_DIRECTION_DETAILS.md` §5 (wiring by asking), §7
-(how the threads unify), the stage-(c) goal of §11, the recall-is-future-work note of
-§2, threads §2 (self-tuning by evolution) and §3 (learning by asking) of
-`FUTURE_DIRECTION.md`, and the framing material of the source document's introduction.
+**Goal.** The bucket phase. Everything that does not belong to Phases 0–5 lands here:
+the most ambitious items, the deliberately deferred ones, and the synthesis that ties
+the programme together.
 
 **Depends on.** Everything. Nothing here is startable early, and most of it is only
 meaningful once Phases 0–5 have produced something to tune, prune, or explain.
@@ -112,10 +107,9 @@ than earlier:
   workload that genuinely saturates the hardware.
 - **Reproducibility** — Phase 0's config-hash and re-execution guarantees.
 
-**The sample-efficiency caveat.** If the parallelism ladder has reached free-running
-by this point, each run is one draw from a distribution rather than a deterministic
-outcome, so fitness needs more runs per configuration to see through interleaving
-noise. Population batching is what pays for that — the technique that makes
+**The sample-efficiency caveat.** Under free-running each run is one draw from a
+distribution rather than a deterministic outcome, so fitness needs more runs per
+configuration to see through interleaving noise. Population batching is what pays for that — the technique that makes
 free-running affordable to evaluate is the same one that makes the GPU worth using.
 
 **The interesting questions are empirical, not engineering:** what *kinds* of change do
@@ -183,16 +177,19 @@ would either become self-sufficient or be shown not to.
 
 ## 7. Also parked here
 
-- **Justification mode at scale.** The existing mode that validates a *given* answer
-  rather than discovering one. It is untouched by Phases 0–5 and may need
-  reinterpretation once the workspace is a transcript rather than four strings.
+- **Justification mode — retirement, not extension.** The existing mode that validates a
+  *given* answer rather than discovering one. **It is not carried forward past Phase 0**
+  and is deliberately excluded from the expected-range baseline, so nothing in Phases
+  1–5 depends on it. What remains open is only whether the *capacity* it represents —
+  evaluating a supplied answer rather than producing one — is worth reconstructing once
+  the workspace is a transcript, which is a different question from keeping the mode.
 - **Other "others."** Phase 2 fixes `not-me` as a single `local-llm`. Multiple
   simultaneous others — several LLMs, other Petacat instances — is the natural
   extension and is where theory of mind gets genuinely interesting, because the system
   must model *different* minds rather than *an* other.
 - **Re-opening Phase 0**, if Phase 5's real-time deadline turns out not to be met by
-  the rung of the parallelism ladder Phase 0 settled on. All scheduling work belongs
-  there, not here — this entry exists only to name where the trigger would come from.
+  the free-running engine Phase 0 delivers. All scheduling work belongs there, not here
+  — this entry exists only to name where the trigger would come from.
 
 ## 8. Open questions
 

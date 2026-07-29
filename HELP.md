@@ -90,7 +90,7 @@ The four fields are:
 
 Seed sets the random seed. The same problem and the same seed reproduce a run exactly; blank or 0 means seed 0. It lives here because it is part of the problem's identity -- changing it gives you a different run of the same strings.
 
-The Demo Problem dropdown lets you load pre-configured problems from the dissertation, including well-known examples like the 'abc -> abd; xyz -> ?' problem and many harder variations. Each demo also carries a preset seed for deterministic replay of known-good runs.
+The Demo Problem dropdown lets you load pre-configured problems from the dissertation, including well-known examples like the 'abc -> abd; xyz -> ?' problem and many harder variations. Each demo also carries a preset seed, which pins the run while the configuration is unchanged -- handy for following a known-good run.
 
 There are two different things you might mean by 'run it again', and they are separate controls:
 - Edit any field (or pick another demo) and press Run in the Run Controls panel: this starts a NEW run on the new problem, leaving the previous one in the run history. The line under the Run button warns you when the inputs have drifted away from the run currently on screen.
@@ -363,12 +363,16 @@ Conceptual depth is a fixed numeric property (0-100) of each Slipnet node that m
 
 A description is a semantic label attached to a Workspace object (letter or group) that identifies one of its properties. Each description pairs a description type (such as letter-category, string-position, or object-category) with a descriptor (the actual Slipnet concept, such as 'a', 'leftmost', or 'letter'). For example, the letter 'a' at the start of string 'abc' would have descriptions including (letter-category: a), (string-position: leftmost), and (object-category: letter). Descriptions are the basis for concept-mappings in bridges -- when a bridge connects two objects, it maps their descriptions to each other. A description is considered relevant when its type is fully active in the Slipnet.
 
-### Deterministic Replay
+### Seeds and Stochastic Behaviour
 
 **Topic key:** `deterministic_replay`  
-**Summary:** The ability to reproduce an exact run by reusing the same random number seed, enabling debugging and analysis.
+**Summary:** Petacat is stochastic by design: a different-but-correct run is right behaviour. A seed narrows that variation for development, and only while nothing the system has learned has changed.
 
-Deterministic replay is the ability to reproduce an exact sequence of processing steps by supplying the same random number seed that was used in a previous run. Because all of Metacat's stochastic decisions (codelet selection, structure-building fights, probabilistic choices) are driven by a pseudorandom number generator, providing the same seed guarantees identical behavior. This is invaluable for debugging, analysis, and demonstration -- the dissertation's sample runs all include their random seeds in an appendix so they can be reproduced exactly. In Petacat, deterministic replay support ensures that any run can be saved and re-examined step by step.
+Petacat is a stochastic system by design. Codelet selection, structure-building fights, and probabilistic choices are all driven by a pseudorandom number generator, and that randomness is the mechanism -- the parallel terraced scan explores many possible interpretations in proportion to how promising they look. Two runs of the same problem that reach the same answer by different routes are both correct, and so are two runs that reach different valid answers. Variation is not a defect to be engineered away.
+
+Supplying the same random seed narrows that variation, which is useful while developing and debugging, and the dissertation's sample runs publish their seeds for that reason. But it is a development aid rather than a property of the architecture, and it is narrower than it looks: a seed only pins a run against an unchanged configuration -- the same slipnet, the same codelet definitions, the same parameters. Change any of them and the same seed produces a different run, correctly.
+
+That limit matters because Petacat is built to grow beyond Metacat. Once the system learns -- adding concepts and connections to its own slipnet and carrying them forward -- its configuration is no longer fixed between runs, so reproducing an earlier run becomes progressively less possible and less meaningful. A learning system that repeated itself exactly would not be learning. What is worth preserving instead is the ability to inspect what a run did: saved run state and recorded processing history let a run be re-examined step by step whether or not it could ever be reproduced.
 
 ### Direction
 
