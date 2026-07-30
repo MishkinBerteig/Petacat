@@ -105,6 +105,24 @@ class MetadataProvider:
     def get_param(self, name: str, default: Any = None) -> Any:
         return self.params.get(name, default)
 
+    def with_overrides(self, overrides: dict[str, Any] | None) -> MetadataProvider:
+        """A view of this metadata with some parameters replaced, for one Run.
+
+        Returns ``self`` unchanged when there is nothing to override, so the ordinary
+        case allocates nothing and every Run keeps sharing one provider.
+
+        A shallow copy otherwise: only ``params`` is rebuilt, and the slipnet, codelet
+        and posting-rule specs are shared by reference.  That is safe because they are
+        read-only for the lifetime of a run, and it matters because those are the bulk —
+        copying them per Run would put the 59 nodes, 202 links and 27 compiled codelet
+        bodies behind every parameter change.
+        """
+        if not overrides:
+            return self
+        from dataclasses import replace
+
+        return replace(self, params={**self.params, **overrides})
+
     def get_urgency(self, name: str) -> int:
         return self.urgency_levels[name]
 

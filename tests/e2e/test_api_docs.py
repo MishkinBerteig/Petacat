@@ -1,7 +1,7 @@
 """E2E tests for documentation endpoints.
 
 Tests context-sensitive help, glossary, and search.
-Requires: docker compose -f docker-compose.dev.yml up -d
+Requires: a local Postgres — start it with `scripts/dev.sh db`.
 """
 
 import pytest

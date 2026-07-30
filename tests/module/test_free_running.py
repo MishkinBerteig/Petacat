@@ -1,0 +1,223 @@
+"""Free-running execution across worker threads (WP4.4).
+
+The scaling numbers live in ``scripts/bench_free_running.py`` and need the free-threaded
+interpreter to mean anything.  What is worth pinning here is *correctness*, which does not:
+the GIL prevents simultaneous execution but not interleaving, so threads still switch
+between bytecodes and the logical races are all reachable under either build.
+
+The properties below are the ones whose absence would make the throughput numbers
+worthless — a run that loses codelets, double-counts an answer, or lets two workers
+allocate the same identifier is not a faster engine.
+"""
+
+from __future__ import annotations
+
+import os
+
+import pytest
+
+from server.engine.coderack_shards import WorkerShardedCoderack
+from server.engine.free_running import FreeRunningEngine, run_free
+from server.engine.metadata import MetadataProvider
+from server.engine.runner import EngineRunner
+
+SEED_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    "seed_data",
+)
+
+PROBLEM = ("abc", "abd", "mrrjjj")
+
+
+@pytest.fixture(scope="module")
+def meta() -> MetadataProvider:
+    return MetadataProvider.from_seed_data(SEED_DIR)
+
+
+def _prepared(meta, seed: int = 42) -> EngineRunner:
+    runner = EngineRunner(meta)
+    runner.init_mcat(*PROBLEM, seed=seed)
+    return runner
+
+
+# --- it runs, and finishes --------------------------------------------------
+
+
+@pytest.mark.parametrize("workers", [1, 2, 4, 8])
+def test_a_free_run_completes_at_every_worker_count(meta, workers):
+    result = run_free(_prepared(meta), workers=workers, max_steps=900)
+    assert result.codelet_count > 0
+    assert result.status in {"answer_found", "halted", "gave_up"}
+    assert result.workers == workers
+
+
+def test_every_worker_does_some_work(meta):
+    """A configuration where one worker does everything is not parallel.
+
+    That is the failure mode of thread-affine sharding done wrong: posts pile into one
+    shard, the others start empty, and stealing never gets going.
+
+    Measured on a problem that runs to the step cap rather than one that answers early.
+    On a short run an idle worker is not evidence of anything — the last thread started
+    can legitimately never be scheduled before the stop flag is set, and this test
+    initially failed with ``[248, 129, 76, 0]`` for exactly that reason. A run long
+    enough for every worker to be scheduled is what actually tests the distribution.
+    """
+    runner = EngineRunner(meta)
+    runner.init_mcat("eeqee", "qeeq", "xxixx", seed=42)
+    result = run_free(runner, workers=4, max_steps=4000)
+
+    assert result.codelet_count > 2000, "the run was too short to test distribution"
+    assert len(result.per_worker) == 4
+    assert all(count > 0 for count in result.per_worker), result.per_worker
+    # And no single worker monopolised it.
+    assert max(result.per_worker) < 0.9 * result.codelet_count, result.per_worker
+
+
+def test_the_codelet_count_is_the_sum_of_what_workers_did(meta):
+    """No codelet lost and none counted twice.
+
+    ``codelet_count`` is incremented under a lock and is what the trace, the sink and
+    every capture are stamped with, so a lost increment would corrupt the record rather
+    than merely miscount.
+    """
+    result = run_free(_prepared(meta), workers=4, max_steps=900)
+    assert sum(result.per_worker) == result.codelet_count
+
+
+def test_an_answer_is_reported_exactly_once(meta):
+    """Several workers can notice the same pending answer.
+
+    Without the guarded hand-off the run would append it once per worker, and Episodic
+    Memory would accumulate duplicates of a single discovery.
+    """
+    for seed in (7, 42, 12345):
+        runner = _prepared(meta, seed=seed)
+        result = run_free(runner, workers=8, max_steps=3000)
+        if result.status == "answer_found":
+            assert len(result.answers) == 1, result.answers
+            assert result.answers == runner._answers
+
+
+def test_a_free_run_produces_a_valid_workspace(meta):
+    """Structures must be as internally consistent as the serial engine leaves them.
+
+    The commit lock exists because ``build_structure``'s duplicate check and fights are
+    read-modify-write sequences over shared lists; if it were not held, this is where the
+    corruption would show.
+
+    **The invariants below were chosen by measuring the serial engine, not by intuition.**
+    The obvious assertion — that every bond's objects are in their string's ``objects``
+    list — is *not* one Petacat has ever satisfied: breaking a group removes it from the
+    string while bonds attached to it survive, and a serial run with the numeric substrate
+    off produces 86 such bonds out of 1,283 across 200 runs. An earlier version of this
+    test asserted it and failed intermittently under free-running, which read as a
+    concurrency defect and was not one. What free-running must not do is make the
+    Workspace *worse* than serial leaves it, so these are the properties a serial run does
+    hold, verified over 200 runs before being asserted here.
+    """
+    runner = _prepared(meta)
+    run_free(runner, workers=8, max_steps=1500)
+    ws = runner.ctx.workspace
+
+    for string in ws.all_strings:
+        for bond in string.bonds:
+            # A bond belongs to the string whose objects it relates, even when one of
+            # those objects has since been broken out of the string.
+            assert bond.from_object.string is string
+            assert bond.to_object.string is string
+        for group in string.groups:
+            # A group that is still listed as a group is still an object of the string;
+            # ``remove_group`` takes it out of both together or neither.
+            assert group in string.objects
+            assert group.string is string
+            for member in group.objects:
+                assert member.string is string
+        for obj in string.objects:
+            assert obj.string is string
+
+    for bridge in ws.top_bridges + ws.bottom_bridges + ws.vertical_bridges:
+        assert bridge.object1.string in ws.all_strings
+        assert bridge.object2.string in ws.all_strings
+
+
+def test_identifiers_are_unique_across_workers(meta):
+    """Every worker binds the run's allocator for itself.
+
+    The binding is a ``ContextVar``, so a thread that failed to set it would fall back to
+    the process-wide allocator and issue identifiers colliding with another worker's —
+    the defect WP0.3 removed, reintroduced by threading.
+    """
+    runner = _prepared(meta)
+    run_free(runner, workers=8, max_steps=1500)
+    ctx = runner.ctx
+
+    object_ids = [o.id for o in ctx.workspace.all_objects]
+    assert len(object_ids) == len(set(object_ids))
+
+    event_numbers = [e.event_number for e in ctx.trace.events]
+    assert len(event_numbers) == len(set(event_numbers))
+    assert event_numbers == sorted(event_numbers)
+
+
+def test_the_sharded_rack_is_installed_and_drains(meta):
+    runner = _prepared(meta)
+    engine = FreeRunningEngine(runner, workers=4)
+    engine.prepare()
+    assert isinstance(runner.ctx.coderack, WorkerShardedCoderack)
+    # The opening codelets were carried over rather than discarded.
+    assert runner.ctx.coderack.total_count > 0
+
+
+def test_conflicts_are_reported_as_telemetry(meta):
+    """The conflict rate is what says how much staleness a configuration produces.
+
+    It is deliberately *telemetry* rather than a rollback: a codelet's writes land as it
+    makes them, so validation reports what happened rather than preventing it. Asserted
+    as a bounded rate rather than zero, because a nonzero rate under concurrency is the
+    expected and correct observation.
+    """
+    result = run_free(_prepared(meta), workers=8, max_steps=1500)
+    assert 0.0 <= result.conflict_rate <= 1.0
+    assert result.conflicts <= result.codelet_count
+
+
+def test_update_cycles_run_without_stopping_the_workers(meta):
+    """Roughly one per fifteen codelets, and not a barrier.
+
+    Whichever worker crosses the boundary runs it while the others continue, which is the
+    staleness WP0.5 bounded at five codelets.
+    """
+    result = run_free(_prepared(meta), workers=4, max_steps=900)
+    expected = result.codelet_count // 15
+    assert result.update_cycles > 0
+    # Within a wide band: workers cross boundaries concurrently, so the count is
+    # approximate by construction rather than exact.
+    assert 0.5 * expected <= result.update_cycles <= 1.5 * expected + 2
+
+
+def test_one_worker_still_uses_the_parallel_path(meta):
+    """A one-worker free run is not the serial loop, and should not be mistaken for it.
+
+    It exercises the same sharded rack, the same commit lock and the same per-codelet
+    streams, which is what makes it the right control for the multi-worker numbers.
+    """
+    runner = _prepared(meta)
+    result = run_free(runner, workers=1, max_steps=600)
+    assert result.workers == 1
+    assert isinstance(runner.ctx.coderack, WorkerShardedCoderack)
+    assert runner.ctx.commit_lock is not None
+    assert result.codelet_count > 0
+
+
+def test_the_serial_loop_is_untouched_by_free_running(meta):
+    """Serial execution is the permanent reference mode.
+
+    It must take no commit lock and use no sharded rack — the free-running machinery is a
+    wrapper, not a mode the serial loop grew.
+    """
+    runner = _prepared(meta)
+    runner.run_mcat(max_steps=300)
+    assert runner.ctx.commit_lock is None
+    assert not isinstance(runner.ctx.coderack, WorkerShardedCoderack)
+    assert runner.ctx.access is None

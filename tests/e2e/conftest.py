@@ -1,10 +1,13 @@
 """E2E test fixtures — requires Postgres accessible via TEST_DATABASE_URL.
 
-When running inside the dev container:
-  docker compose -f docker-compose.dev.yml exec app pytest tests/e2e/ -v
+Petacat runs natively on macOS (WP2.1), so these reach a local Postgres:
 
-The test DB URL is provided by the TEST_DATABASE_URL env var, which
-points to a separate database on the same Postgres instance.
+  brew services start postgresql@17
+  .venv/bin/python -m pytest tests/e2e/ -v
+
+TEST_DATABASE_URL overrides the default below.  It names a separate database on the
+same instance as the development one, so a test run cannot touch the Training
+Session accumulated in `petacat`.
 
 ALL e2e tests are deterministic: they use fixed seeds and produce
 identical results on every run.
@@ -20,7 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 TEST_DB_URL = os.environ.get(
     "TEST_DATABASE_URL",
-    "postgresql+asyncpg://petacat:dev@db:5432/petacat_test",
+    "postgresql+asyncpg://petacat:dev@localhost:5432/petacat_test",
 )
 
 # Fixed seed for deterministic e2e tests
@@ -50,8 +53,8 @@ def _db_available() -> bool:
 # Skip all e2e tests if DB isn't reachable
 pytestmark = pytest.mark.skipif(
     not _db_available(),
-    reason="Test Postgres not reachable. Run inside dev container: "
-           "docker compose -f docker-compose.dev.yml exec app pytest tests/e2e/ -v",
+    reason=f"Test Postgres not reachable at {TEST_DB_URL.rsplit('@', 1)[-1]}. "
+           "Start it with: scripts/dev.sh db",
 )
 
 
@@ -83,8 +86,42 @@ async def test_engine():
     await engine.dispose()
 
 
+# Identifies the advisory lock below.  Any constant works as long as every e2e
+# session agrees on it; this one is arbitrary and simply unlikely to collide with a
+# lock taken by something else on the same instance.
+_SCHEMA_LOCK_KEY = 0x7E7ACA7
+
+
 @pytest.fixture(scope="session")
-async def setup_db(test_engine):
+async def schema_lock(test_engine):
+    """Serialise e2e sessions that share ``petacat_test``.
+
+    ``setup_db`` drops and recreates every table.  Two pytest sessions against the
+    same database therefore destroy each other's schema mid-run, and the symptom —
+    ``relation "runs" does not exist``, raised from whichever tests happened to be
+    executing — looks nothing like its cause.  It cost a misdiagnosis: the failure
+    first appeared during a free-threaded run that happened to overlap another suite,
+    and read as a free-threading defect until two concurrent runs on the *standard*
+    build reproduced it exactly.
+
+    A Postgres advisory lock makes the second session wait rather than interleave.
+    It is held on a dedicated connection for the whole session because the engine
+    uses ``NullPool``: advisory locks belong to a connection, and one taken on a
+    connection that is immediately returned would be released at once.
+    """
+    connection = await test_engine.connect()
+    await connection.execute(text("SELECT pg_advisory_lock(:key)"),
+                             {"key": _SCHEMA_LOCK_KEY})
+    try:
+        yield
+    finally:
+        await connection.execute(text("SELECT pg_advisory_unlock(:key)"),
+                                 {"key": _SCHEMA_LOCK_KEY})
+        await connection.close()
+
+
+@pytest.fixture(scope="session")
+async def setup_db(test_engine, schema_lock):
     """Create all tables and seed metadata once per session."""
     # Import all models so Base.metadata knows about them
     from server.models.metadata import Base  # noqa

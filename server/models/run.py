@@ -15,6 +15,85 @@ from sqlalchemy.dialects.postgresql import JSONB
 from server.models.metadata import Base
 
 
+class TrainingSession(Base):
+    """A sequence of Runs sharing one Episodic Memory (WP3.0).
+
+    The concept already existed and already worked — Episodic Memory is carried across
+    Run boundaries by injection, and a memory clear is already the boundary between one
+    session and the next. What was missing was any way to *say so*: Runs could not be
+    grouped, and there was no row to hang a session's identity on. This adds the
+    representation and changes no behaviour; in particular it does not touch
+    ``init_mcat``.
+
+    ``ended_at`` is set when the memory is cleared, which is what ends a session.
+    """
+
+    __tablename__ = "training_sessions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    started_at = Column(DateTime, default=_utcnow)
+    #: Set by ``POST /api/memory/clear`` — the action that ends a session by
+    #: discarding the one thing that crosses Run boundaries.
+    ended_at = Column(DateTime, nullable=True)
+    note = Column(Text, default="")
+
+
+class RunStateCapture(Base):
+    """A complete Petacat state, captured at a Run boundary (WP3.4/WP3.7).
+
+    Normal mode writes exactly two of these per Run: one before the first codelet and
+    one after the last. That is the whole of what Normal persists, and it is enough to
+    re-execute the Run — reload the start state, run, and the end state must follow.
+
+    Replaces ``cycle_snapshots``, which wrote a ~43 KB blob every fifteenth codelet
+    that no code path could read back. The difference is not the cadence but the
+    content: this is the id-based object graph from ``server/engine/state_graph.py``,
+    complete enough to restore, where the old blob was assembled for display.
+    """
+
+    __tablename__ = "run_state_captures"
+    __table_args__ = (
+        Index("ix_run_state_captures_run_boundary", "run_id", "boundary"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    run_id = Column(Integer, nullable=False, index=True)
+    #: ``start`` or ``end``.
+    boundary = Column(String(8), nullable=False)
+    codelet_count = Column(Integer, nullable=False, default=0)
+    #: The ``state_graph`` capture. Versioned by its own ``format_version`` field.
+    state = Column(JSONB, nullable=False)
+    created_at = Column(DateTime, default=_utcnow)
+
+
+class AuditAction(Base):
+    """One state-changing action during an Audit Run (WP3.8).
+
+    Audit records every action rather than the two boundary states, so that any
+    intermediate state can be reconstructed by replaying forward from the Run-start
+    capture. ``sequence`` is the replay order and is dense within a Run.
+
+    ``before`` carries enough of the prior state to invert the action later. Phase 0
+    ships forward stepping only, but backwards scrubbing constrains the *format* rather
+    than only the UI, so the format admits it now and the machinery is deferred.
+    """
+
+    __tablename__ = "audit_actions"
+    __table_args__ = (
+        Index("ix_audit_actions_run_sequence", "run_id", "sequence"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    run_id = Column(Integer, nullable=False, index=True)
+    sequence = Column(Integer, nullable=False)
+    codelet_count = Column(Integer, nullable=False)
+    action_type = Column(String(32), nullable=False)
+    temperature = Column(Float, nullable=False, default=0.0)
+    payload = Column(JSONB, nullable=True)
+    #: State prior to the action, sufficient to invert it. Not read in Phase 0.
+    before = Column(JSONB, nullable=True)
+
+
 class Run(Base):
     """A single Metacat run."""
 
@@ -42,6 +121,25 @@ class Run(Base):
     spreading_threshold = Column(
         Integer, nullable=False, default=100, server_default="100",
     )
+    #: Which Training Session this Run belongs to (WP3.0). Nullable so Runs recorded
+    #: before sessions existed still read back.
+    session_id = Column(Integer, nullable=True, index=True)
+    #: Persistence mode — a property of the Run, chosen at creation, never a global
+    #: setting: later phases want a Fast corpus-training population and a Normal live
+    #: dialogue in the same process.
+    mode = Column(String(8), nullable=False, default="normal", server_default="normal")
+    #: Hash of the MetadataProvider this Run executed under (WP3.5).
+    config_hash = Column(String(64), nullable=True)
+    #: Identifies the Episodic Memory state the Run executed against (WP3.5). Two runs
+    #: with the same seed and different memory hashes are distinguishable in the record,
+    #: which matters once Phase 1 puts the concept vocabulary in episodic memory.
+    memory_hash = Column(String(64), nullable=True)
+    #: Every run parameter's *resolved* value for this Run — the whole set, not just the
+    #: overrides. Stored whole because the global defaults can change afterwards, and a
+    #: record of overrides alone would have to be read against whatever the defaults are
+    #: at the time of reading, so the Run's meaning would quietly drift. Written for
+    #: Normal and Audit; a Fast Run has no row, by design.
+    parameters = Column(JSONB, nullable=True)
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 

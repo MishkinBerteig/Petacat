@@ -5,6 +5,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRunStore } from '@/store/runStore';
 import { listRuns, deleteRun, getRun } from '@/api/client';
+import { ModeBadge } from '@/components/ModeBadge';
 import type { RunInfo } from '@/types';
 
 function statusColor(status: string): string {
@@ -34,6 +35,7 @@ export function RunHistory() {
   const [error, setError] = useState<string | null>(null);
 
   const currentRunId = useRunStore((s) => s.runId);
+  const currentRunMode = useRunStore((s) => s.runMode);
   const epoch = useRunStore((s) => s.epoch);
   // Live figures for the active run, used to keep its row current between
   // fetches (see liveView below).
@@ -101,6 +103,9 @@ export function RunHistory() {
         // then refresh all sub-states from the server.
         useRunStore.setState({
           runId: info.run_id,
+          // Carried over so the run controls know whether pressing Run would
+          // continue this run or start a new one under a different mode.
+          runMode: info.mode ?? null,
           status: info.status as any,
           codeletCount: info.codelet_count,
           temperature: info.temperature,
@@ -112,6 +117,20 @@ export function RunHistory() {
     },
     [store],
   );
+
+  /**
+   * Open this run in the Review browser.
+   *
+   * The record was reachable only by browsing Training Sessions, which is the right
+   * way round when the reader is exploring and the wrong way round when they have
+   * just watched a run finish: the session is precisely the thing they do not know,
+   * and the run they want is one of however many in it. The hash carries the run id
+   * so the link survives a reload and can be shared.
+   */
+  const handleReview = useCallback((e: React.MouseEvent, runId: number) => {
+    e.stopPropagation();
+    window.location.hash = `/review/runs/${runId}`;
+  }, []);
 
   const handleDelete = useCallback(
     async (e: React.MouseEvent, runId: number) => {
@@ -143,16 +162,44 @@ export function RunHistory() {
     );
   }
 
+  /**
+   * Why the run on screen is not in the list below.
+   *
+   * A Fast Run writes nothing, including the `runs` row this list is built from, so
+   * it is not merely missing from the table — it cannot be in it. Without saying so,
+   * the most visible consequence of choosing Fast looks exactly like the list having
+   * failed to refresh, which is a bug this panel has actually had before.
+   */
+  const fastRunNote = currentRunMode === 'fast' && currentRunId !== null && (
+    <div
+      className="text-xs"
+      style={{
+        padding: '5px 6px',
+        borderBottom: '1px solid var(--border)',
+        color: 'var(--warning)',
+      }}
+    >
+      Run #{currentRunId} is a <strong>Fast</strong> run and is not listed: Fast
+      writes nothing, including the row this list reads. Choose Normal or Audit
+      under Recording for a run that appears here.
+    </div>
+  );
+
   if (runs.length === 0) {
     return (
-      <div className="text-muted text-sm" style={{ padding: 16, textAlign: 'center' }}>
-        No runs yet.
+      <div style={{ fontSize: 11 }}>
+        {fastRunNote}
+        <div className="text-muted text-sm" style={{ padding: 16, textAlign: 'center' }}>
+          No runs yet.
+        </div>
       </div>
     );
   }
 
   return (
     <div style={{ fontSize: 11 }}>
+      {fastRunNote}
+
       {/* Table header */}
       <div
         style={{
@@ -169,6 +216,14 @@ export function RunHistory() {
       >
         <span style={{ width: 36, flexShrink: 0 }}>ID</span>
         <span style={{ flex: 1 }}>Problem</span>
+        {/* What the run wrote down, which decides what the Review browser can show
+            of it. Only Normal and Audit can appear at all — see fastRunNote. */}
+        <span
+          style={{ width: 54, flexShrink: 0 }}
+          title="Persistence mode: what the run recorded. Fast runs write no row and so are never listed."
+        >
+          Mode
+        </span>
         <span style={{ width: 64, flexShrink: 0 }}>Status</span>
         <span style={{ width: 48, flexShrink: 0, textAlign: 'right' }}>Cdlts</span>
         <span style={{ width: 30, flexShrink: 0, textAlign: 'right' }}>T</span>
@@ -178,6 +233,7 @@ export function RunHistory() {
         >
           Spr
         </span>
+        <span style={{ width: 46, flexShrink: 0 }}></span>
         <span style={{ width: 24, flexShrink: 0 }}></span>
       </div>
 
@@ -254,6 +310,9 @@ export function RunHistory() {
                 </>
               )}
             </span>
+            <span style={{ width: 54, flexShrink: 0 }}>
+              <ModeBadge mode={run.mode ?? 'normal'} />
+            </span>
             <span
               style={{
                 width: 64,
@@ -309,6 +368,28 @@ export function RunHistory() {
             >
               {run.spreading_threshold ?? 100}
             </span>
+            {/* Every row here has a database row behind it — a Fast run cannot be
+                listed — so every one of them has something to review. */}
+            <button
+              onClick={(e) => handleReview(e, run.run_id)}
+              style={{
+                width: 46,
+                flexShrink: 0,
+                fontSize: 10,
+                padding: '1px 4px',
+                color: 'var(--text-accent)',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+              }}
+              title={
+                run.mode === 'audit'
+                  ? `Step through run #${run.run_id} tick by tick in the Review browser.`
+                  : `Open run #${run.run_id} in the Review browser: its start and end states, and what changed between them.`
+              }
+            >
+              review
+            </button>
             <button
               onClick={(e) => handleDelete(e, run.run_id)}
               style={{

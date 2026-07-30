@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from server.engine.ids import KIND_OBJECT, next_id
+
 if TYPE_CHECKING:
     from server.engine.descriptions import Description
     from server.engine.rng import RNG
@@ -28,16 +30,13 @@ _NON_DISTINGUISHING_NAMES: set[str] = {
 class WorkspaceObject:
     """Base class for letters and groups in the workspace."""
 
-    _next_id = 0
-
     def __init__(
         self,
         string: Any,  # WorkspaceString
         left_pos: int,
         right_pos: int,
     ) -> None:
-        WorkspaceObject._next_id += 1
-        self.id = WorkspaceObject._next_id
+        self.id = next_id(KIND_OBJECT)
         self.string = string
         self.left_string_pos = left_pos
         self.right_string_pos = right_pos

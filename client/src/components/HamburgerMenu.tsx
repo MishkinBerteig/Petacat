@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 
-export type AppView = 'dashboard' | 'config' | 'admin'
+export type AppView = 'dashboard' | 'review' | 'config' | 'admin'
 
 interface Props {
   activeView: AppView
@@ -72,6 +72,11 @@ export function HamburgerMenu({ activeView, onSelect, disabled }: Props) {
             label="Run Dashboard"
             active={activeView === 'dashboard'}
             onClick={() => select('dashboard')}
+          />
+          <MenuItem
+            label="Review"
+            active={activeView === 'review'}
+            onClick={() => select('review')}
           />
           <MenuItem
             label="Configuration"

@@ -968,7 +968,7 @@ def test_every_answer_is_a_letter_string(meta, problem):
 
 
 class TestUiSurface:
-    """The API layer needs sqlalchemy/fastapi, which only the Docker image has.
+    """The API layer needs sqlalchemy/fastapi, which the venv provides.
 
     These tests therefore check the *engine-side* shape the serializers read, so a
     change that silently drops a field the UI depends on fails here rather than in

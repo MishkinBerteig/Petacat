@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import { useRunStore } from '@/store/runStore';
-import type { ClusterState, ThemeState } from '@/types';
+import type { ClusterState, ThemespaceState, ThemeState } from '@/types';
 
 /** Human-readable short names for dimensions. */
 const DIM_LABELS: Record<string, string> = {
@@ -178,9 +178,14 @@ function DimensionPanel({ cluster }: { cluster: ClusterState }) {
   );
 }
 
-export function ThemespaceView() {
-  const themespace = useRunStore((s) => s.themespace);
-
+/**
+ * The three-column grid, given its data.
+ *
+ * Split from `ThemespaceView` so the review surfaces can show the Themespace of a
+ * *recorded* state (WP3.9). The grid was already a pure function of the themespace
+ * state; only the store read tied it to a live run.
+ */
+export function ThemespaceGrid({ themespace }: { themespace: ThemespaceState | null }) {
   if (!themespace) {
     return (
       <div className="text-muted text-sm" style={{ padding: 16, textAlign: 'center' }}>
@@ -300,4 +305,10 @@ export function ThemespaceView() {
     </div>
     </div>
   );
+}
+
+/** The live Themespace: `ThemespaceGrid` fed from the run store. */
+export function ThemespaceView() {
+  const themespace = useRunStore((s) => s.themespace);
+  return <ThemespaceGrid themespace={themespace} />;
 }

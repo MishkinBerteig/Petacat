@@ -28,6 +28,10 @@ const createRun = vi.fn().mockResolvedValue({
   answer: null,
 })
 
+const getRunMemory = vi
+  .fn()
+  .mockResolvedValue({ answers: [], snags: [], scope: 'run', mode: 'fast' })
+
 vi.mock('@/api/client', () => ({
   createRun: (...args: unknown[]) => createRun(...args),
   getRun: vi.fn(),
@@ -44,6 +48,7 @@ vi.mock('@/api/client', () => ({
   getTemperature: vi.fn().mockResolvedValue({ temperature: 100 }),
   getCommentary: vi.fn().mockResolvedValue({ commentary: '' }),
   getMemory: vi.fn().mockResolvedValue({ answers: [], snags: [] }),
+  getRunMemory: (...args: unknown[]) => getRunMemory(...args),
   setSpreadingThreshold: vi.fn().mockResolvedValue({}),
 }))
 
@@ -78,6 +83,7 @@ async function freshStore() {
 
 beforeEach(() => {
   createRun.mockClear()
+  getRunMemory.mockClear()
   installStorage()
 })
 
@@ -141,5 +147,164 @@ describe('runStore — spreading threshold persistence', () => {
     expect(createRun).toHaveBeenCalledWith(
       expect.objectContaining({ spreading_threshold: 0 }),
     )
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Persistence mode (Phase 0 §A2) -- what a run writes down
+// ---------------------------------------------------------------------------
+//
+// Mode selects the sink before the first codelet runs, so it has to travel with
+// the create request. A selector that only set a local value would look identical
+// on screen and produce Normal runs forever, which nobody would notice, because
+// Normal is also what they would have got without choosing.
+//
+// It is deliberately *not* persisted, unlike the threshold above: the threshold is
+// remembered because forgetting it would silently change results, while this only
+// changes what is kept, and a remembered value fails in the directions that hurt --
+// a day's work recorded nothing, or every run paid Audit's 1.8x for a record
+// nobody wanted.
+
+describe('runStore — persistence mode', () => {
+  it('defaults to normal', async () => {
+    const useRunStore = await freshStore()
+    expect(useRunStore.getState().persistenceMode).toBe('normal')
+  })
+
+  it('sends the chosen mode with the create, since it selects the sink', async () => {
+    const useRunStore = await freshStore()
+    useRunStore.getState().setPersistenceMode('audit')
+
+    await useRunStore.getState().createRun({
+      initial: 'abc', modified: 'abd', target: 'xyz', seed: 7,
+    })
+
+    expect(createRun).toHaveBeenCalledWith(
+      expect.objectContaining({ mode: 'audit' }),
+    )
+  })
+
+  it('records the mode the server reports, which is what the run actually is', async () => {
+    const useRunStore = await freshStore()
+    createRun.mockResolvedValueOnce({
+      run_id: -1,
+      mode: 'fast',
+      status: 'initialized',
+      codelet_count: 0,
+      temperature: 100,
+      initial: 'abc', modified: 'abd', target: 'xyz', answer: null,
+    })
+    useRunStore.getState().setPersistenceMode('fast')
+
+    await useRunStore.getState().createRun({
+      initial: 'abc', modified: 'abd', target: 'xyz', seed: 7,
+    })
+
+    expect(useRunStore.getState().runMode).toBe('fast')
+    // Negative, because there is no row to take an identifier from.
+    expect(useRunStore.getState().runId).toBe(-1)
+  })
+
+  it('does not survive a reload — it starts at normal every time', async () => {
+    let useRunStore = await freshStore()
+    useRunStore.getState().setPersistenceMode('fast')
+    expect(useRunStore.getState().persistenceMode).toBe('fast')
+
+    useRunStore = await freshStore()
+    expect(useRunStore.getState().persistenceMode).toBe('normal')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Run parameters and worker count
+// ---------------------------------------------------------------------------
+//
+// Both are read by the engine before the first codelet, so both have to be sent
+// with the create rather than applied afterwards — exactly as the persistence mode
+// is. The wrong version pushes them to a running engine, which has no endpoint for
+// them and should not have one.
+
+describe('runStore — fixed run parameters', () => {
+  it('sends nothing at all when no parameter was changed', async () => {
+    const store = await freshStore()
+    await store.getState().createRun({ initial: 'abc', modified: 'abd', target: 'xyz', seed: 0 })
+
+    expect(createRun).toHaveBeenCalledWith(
+      expect.not.objectContaining({ parameters: expect.anything() }),
+    )
+  })
+
+  it('sends only the overrides, so the run tracks the server\'s defaults for the rest', async () => {
+    const store = await freshStore()
+    store.getState().setParameterOverride('update_cycle_length', 40)
+    await store.getState().createRun({ initial: 'abc', modified: 'abd', target: 'xyz', seed: 0 })
+
+    expect(createRun).toHaveBeenCalledWith(
+      expect.objectContaining({ parameters: { update_cycle_length: 40 } }),
+    )
+  })
+
+  it('removes an override rather than pinning it to the default of the moment', async () => {
+    const store = await freshStore()
+    store.getState().setParameterOverride('update_cycle_length', 40)
+    store.getState().clearParameterOverride('update_cycle_length')
+
+    expect(store.getState().parameterOverrides).toEqual({})
+  })
+
+  it('resets every override at once', async () => {
+    const store = await freshStore()
+    store.getState().setParameterOverride('update_cycle_length', 40)
+    store.getState().setParameterOverride('theme_boost_amount', 55)
+    store.getState().clearAllParameterOverrides()
+
+    expect(store.getState().parameterOverrides).toEqual({})
+  })
+
+  it('records what the created run was fixed with, so a later change starts a new run', async () => {
+    const store = await freshStore()
+    store.getState().setParameterOverride('update_cycle_length', 40)
+    await store.getState().createRun({ initial: 'abc', modified: 'abd', target: 'xyz', seed: 0 })
+
+    expect(store.getState().runParameterOverrides).toEqual({ update_cycle_length: 40 })
+  })
+})
+
+describe('runStore — worker count', () => {
+  it('defaults to the serial loop', async () => {
+    const store = await freshStore()
+    expect(store.getState().workers).toBe(1)
+  })
+
+  it('sends the chosen count with the create', async () => {
+    const store = await freshStore()
+    store.getState().setWorkers(4)
+    await store.getState().createRun({ initial: 'abc', modified: 'abd', target: 'xyz', seed: 0 })
+
+    expect(createRun).toHaveBeenCalledWith(expect.objectContaining({ workers: 4 }))
+  })
+
+  it('sends 1 under Audit, which refuses anything more with a 400', async () => {
+    // The control shows 1 and says why; sending the other number would turn a mode
+    // change into a rejected request the reader did not ask for.
+    const store = await freshStore()
+    store.getState().setWorkers(4)
+    store.getState().setPersistenceMode('audit')
+    await store.getState().createRun({ initial: 'abc', modified: 'abd', target: 'xyz', seed: 0 })
+
+    expect(createRun).toHaveBeenCalledWith(expect.objectContaining({ workers: 1 }))
+  })
+})
+
+describe('runStore — which Episodic Memory the panel reads', () => {
+  it('asks the run, not the shared store, once a run is loaded', async () => {
+    // A Fast Run thinks against an ephemeral memory of its own. Reading the shared
+    // one regardless showed it answers it could not be reminded of.
+    const store = await freshStore()
+    store.setState({ runId: 7 })
+    await store.getState().refreshMemory()
+
+    expect(getRunMemory).toHaveBeenCalledWith(7)
+    expect(store.getState().memory.scope).toBe('run')
   })
 })

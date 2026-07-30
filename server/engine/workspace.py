@@ -11,6 +11,12 @@ from __future__ import annotations
 import math
 from typing import TYPE_CHECKING, Any
 
+from server.engine.numeric.backend import select_backend
+from server.engine.numeric.layout import (
+    gather_object_values,
+    relative_importances,
+    scatter_object_values,
+)
 from server.engine.workspace_objects import Letter, WorkspaceObject
 
 if TYPE_CHECKING:
@@ -40,6 +46,23 @@ def _object_weight(obj: Any, weight_key: str) -> float:
     if isinstance(salience, dict) and weight_key in salience:
         return max(0.1, float(salience[weight_key]))
     return 1.0
+
+
+# ``select_backend`` is imported at module level and the backend *classes* are
+# not: ``numeric.backend`` costs nothing to import — it reaches for NumPy and MLX
+# only when a backend is actually constructed — so the engine can consult the
+# selection policy on the update-cycle path without dragging either package into
+# a process that will never use one.  That matters for the expected-range oracle,
+# which starts one interpreter per core.
+#
+# The workspace's batches are small: a string holds a handful of objects, and a
+# run builds tens of structures.  Under the default size policy ``select_backend``
+# therefore returns ``None`` here and the reference loops run.  This is the part
+# of the substrate least likely ever to engage automatically, because it grows
+# with string length and structure count rather than with the Slipnet; it is
+# implemented because the profile names object values and structure strengths as
+# 18% of runtime between them, and because a substrate covering five of the seven
+# numeric phases would be an odd thing to leave half-built.
 
 
 class WorkspaceString:
@@ -277,19 +300,45 @@ class WorkspaceString:
           7. update_inter_string_salience
           8. update_average_salience
           9. update_description_strengths
+
+        Steps 3-9 run per object in the reference.  When the numeric substrate is
+        engaged they are regrouped into three passes — traversals (3-4), the
+        arithmetic combination (5-8), and description strengths (9) — because only
+        the middle one vectorises.  The regrouping is sound because no step
+        reads another object's unhappiness or salience: intra-string unhappiness
+        reads bond and group *strengths*, which the previous phase fixed, and
+        ``Description.calculate_local_support`` counts neighbouring description
+        *types* rather than their strengths.  ``tests/module/test_numeric_engine.py``
+        asserts the two groupings agree on a real mid-run workspace.
         """
         # 1. Raw importances
         for obj in self.objects:
             obj.update_importance()
 
-        # 2. Relative importances
-        total_raw = sum(o.raw_importance for o in self.objects) or 1.0
-        for obj in self.objects:
-            obj.relative_importance = round(100.0 * obj.raw_importance / total_raw)
+        # 2. Relative importances.  On the host in float64 on both paths: it is a
+        # ratio of sums of decayed activations, which can legitimately be around
+        # 1e-48, and float32 cannot represent the operands of a ratio that small
+        # even though the ratio itself is an ordinary number between 0 and 100.
+        for obj, relative in zip(self.objects, relative_importances(self.objects)):
+            obj.relative_importance = relative
 
-        # 3-9. Full per-object update cycle
+        backend = select_backend(len(self.objects))
+        if backend is None:
+            # 3-9. Full per-object update cycle
+            for obj in self.objects:
+                obj.update_object_values()
+            return
+
         for obj in self.objects:
-            obj.update_object_values()
+            obj.update_intra_string_unhappiness()
+            obj.update_inter_string_unhappiness()
+
+        batch = gather_object_values(self.objects)
+        backend.combine_object_values(batch)
+        scatter_object_values(batch, self.objects)
+
+        for obj in self.objects:
+            obj.update_description_strengths()
 
     def __repr__(self) -> str:
         return f"WorkspaceString('{self.text}', {len(self.bonds)} bonds, {len(self.groups)} groups)"
@@ -322,6 +371,9 @@ class Workspace:
         self.clamped_rules: list[Rule] = []
 
         self.slipnet = slipnet
+        #: Cached workspace-level average unhappiness, dropped by
+        #: ``update_all_object_values``.  See ``get_average_unhappiness``.
+        self._average_unhappiness: float | None = None
 
         # Back-link so structures can reach the Workspace from an object's
         # string (Bridge._find_workspace).  Without it a bridge could not see
@@ -415,19 +467,43 @@ class Workspace:
         When all importances are 0 (early in a run, before descriptions are
         activated), falls back to an unweighted average so temperature
         correctly reflects the lack of structure.
+
+        **Cached until the next object-value update.**  The runner asks for this from
+        two places inside one update cycle — the temperature update, and the posting
+        probability of the description scouts — and neither can change it, because
+        nothing between them touches an object's unhappiness.  Measured at 3.76 calls
+        per cycle, 557 in a ``mrrjjj`` run.
+
+        That was free while the sum happened in Python and is not now the numeric
+        substrate runs on the GPU: each call ends in a host sync to read one scalar
+        back, and after fusing the three syncs this used to make into one, these were
+        the *only* remaining syncs in a whole run. The cache turns 557 of them into 148.
         """
         objects = self.all_objects
         if not objects:
             return 100.0
-        total_weight = sum(o.relative_importance for o in objects)
-        if total_weight > 0:
-            weighted_sum = sum(
-                o.intra_string_unhappiness * o.relative_importance for o in objects
+        if self._average_unhappiness is not None:
+            return self._average_unhappiness
+        backend = select_backend(len(objects))
+        if backend is not None:
+            value = backend.average_unhappiness(
+                [o.intra_string_unhappiness for o in objects],
+                [o.relative_importance for o in objects],
             )
-            return round(weighted_sum / total_weight)
         else:
-            # No importance assigned yet — use unweighted average
-            return round(sum(o.intra_string_unhappiness for o in objects) / len(objects))
+            total_weight = sum(o.relative_importance for o in objects)
+            if total_weight > 0:
+                weighted_sum = sum(
+                    o.intra_string_unhappiness * o.relative_importance for o in objects
+                )
+                value = round(weighted_sum / total_weight)
+            else:
+                # No importance assigned yet — use unweighted average
+                value = round(
+                    sum(o.intra_string_unhappiness for o in objects) / len(objects)
+                )
+        self._average_unhappiness = value
+        return value
 
     def get_mapping_strength(self, bridge_type_name: str) -> float:
         """Mapping strength for bridges of a given type.
@@ -518,11 +594,58 @@ class Workspace:
     def update_all_object_values(self) -> None:
         for s in self.all_strings:
             s.update_object_values()
+        # The one place object unhappiness changes, so the one place the cache above
+        # has to be dropped.
+        self._average_unhappiness = None
 
     def update_all_structure_strengths(self) -> None:
-        for structure in self.all_structures:
+        """Recompute every structure's strength, in the reference's own order.
+
+        Order is load-bearing and the substrate has to respect it.  ``Group.
+        calculate_internal_strength`` averages its constituent bonds' strengths,
+        and ``all_structures`` lists a string's bonds before its groups precisely
+        so those are already fresh; ``Bridge._get_supporting_bridge_strength``
+        sums *other bridges'* strengths, so bridges form a chain in which each one
+        reads the result of the one before it.
+
+        Bonds and groups carry no such chain — their external strength is a
+        function of counts, categories and positions, never of a peer's strength —
+        and their thematic compatibility is the base 0, since only bridges and
+        descriptions override it (§4.1.2).  Those two kinds are therefore batched
+        per string; bridges and rules stay sequential, because batching them would
+        be a change to the model rather than to its implementation.
+        """
+        backend = select_backend(len(self.all_structures))
+        if backend is None:
+            for structure in self.all_structures:
+                if hasattr(structure, "update_strength"):
+                    structure.update_strength()
+            return
+
+        for s in self.all_strings:
+            self._update_strengths_batched(backend, s.bonds)
+            self._update_strengths_batched(backend, s.groups)
+        for structure in (
+            self.top_bridges
+            + self.bottom_bridges
+            + self.vertical_bridges
+            + self.top_rules
+            + self.bottom_rules
+        ):
             if hasattr(structure, "update_strength"):
                 structure.update_strength()
+
+    @staticmethod
+    def _update_strengths_batched(backend: Any, structures: list[Any]) -> None:
+        if not structures:
+            return
+        internal = [s.calculate_internal_strength() for s in structures]
+        external = [s.calculate_external_strength() for s in structures]
+        compatibility = [s.get_thematic_compatibility() for s in structures]
+        for structure, strength in zip(
+            structures, backend.structure_strengths(internal, external, compatibility)
+        ):
+            structure.strength = strength
 
     def choose_object(self, weight_key: str, rng: RNG) -> WorkspaceObject | None:
         """Choose an object from any string, weighted by salience."""

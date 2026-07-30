@@ -15,18 +15,24 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from server.engine.memory import AnswerDescription, EpisodicMemory, SnagDescription
 from server.engine.metadata import MetadataProvider
 from server.engine.runner import EngineContext, EngineRunner, STATUS_ANSWER_FOUND, STATUS_HALTED, STATUS_PAUSED, STATUS_RUNNING, StepResult
+from server.engine.serialization import serialize_themespace_state, serialize_workspace_state
 from server.engine.trace import SNAG
 from server.models.run import (
+    _utcnow,
     AnswerDescriptionRow,
+    AuditAction,
     CycleSnapshot,
     Run,
+    RunStateCapture,
     SnagDescriptionRow,
     TraceEventRow,
+    TrainingSession,
 )
-from server.services.snapshot_service import (
-    save_cycle_snapshot,
-    serialize_themespace_state,
-)
+from server.engine.commentary import CommentaryLog, DiscardingCommentaryLog
+from server.engine.free_running import FreeRunningEngine
+from server.engine.hashing import config_hash, memory_hash
+from server.engine.parameters import resolved_parameters, validate_overrides
+from server.services.sinks import MODE_AUDIT, MODE_FAST, MODE_NORMAL, sink_for_mode
 
 
 # Shared cross-run episodic memory (per-process)
@@ -79,6 +85,8 @@ class RunInfo:
     #: Part of the run's identity: a run at any other value is not comparable
     #: with the dissertation's results.
     spreading_threshold: int = 100
+    #: The persistence mode this run was created with.
+    mode: str = "normal"
 
 
 class RunService:
@@ -87,6 +95,21 @@ class RunService:
     def __init__(self, meta: MetadataProvider) -> None:
         self.meta = meta
         self._runners: dict[int, EngineRunner] = {}
+        #: The sink attached to each live run.  Persistence mode is a property of a
+        #: run, not a global setting, so this is per-run rather than per-service.
+        self._sinks: dict[int, Any] = {}
+        #: Mode per live run, so the service knows which runs must not be written to.
+        self._modes: dict[int, str] = {}
+        #: Worker count per live run.  1 is the serial loop — the permanent reference
+        #: mode — and is the default, so nothing changes unless a run asks for it.
+        self._workers: dict[int, int] = {}
+        #: Last free-running telemetry per run — worker count, conflict rate, throughput.
+        self._free_run_telemetry: dict[int, dict] = {}
+        #: Identifiers for Fast Runs.  A Fast Run has no database row to take an id
+        #: from — that is the whole point — so it needs one from somewhere, and it must
+        #: not collide with a real ``runs.id``.  Negative numbers cannot: the column is
+        #: a positive autoincrement.
+        self._next_fast_id: int = -1
         # Per-runner control state
         self._breakpoints: dict[int, int | None] = {}
         self._step_sizes: dict[int, int] = {}
@@ -105,13 +128,53 @@ class RunService:
         answer: str | None = None,
         seed: int = 0,
         spreading_threshold: int | None = None,
+        mode: str = MODE_NORMAL,
+        workers: int = 1,
+        parameters: dict[str, Any] | None = None,
     ) -> RunInfo:
-        """Create a new run, initialize the engine, save initial snapshot."""
+        """Create a new run and initialise the engine.
+
+        ``mode`` is a property of *this run*, not a global setting, because later
+        phases want a Fast corpus-training population and a Normal live dialogue in the
+        same process.  It selects a sink and nothing else: the engine is handed the
+        same problem, the same seed and the same memory whichever mode is chosen, which
+        is what makes a mode-mixed Training Session comparable with an all-Fast one.
+
+        ``workers`` above 1 runs the Run free-running (WP4.4): codelets across CPU
+        cores with no global barrier.  It defaults to 1 — the serial loop — because
+        serial execution is the permanent reference mode every later phase validates
+        against, and because free-running is a *different draw*: the expected range is
+        unchanged, but a given seed no longer reproduces a given run, since execution
+        order is not determined.  Audit refuses it outright, for the same reason it
+        exists: a record of actions with no record of commit order reconstructs nothing.
+        """
+        # Validated before anything is created, so a bad override cannot leave a
+        # half-built Run behind. Raises ValueError, which the API turns into a 400.
+        overrides = validate_overrides(parameters)
+        run_meta = self.meta.with_overrides(overrides)
+
+        workers = max(1, int(workers))
+        if workers > 1 and mode == MODE_AUDIT:
+            raise ValueError(
+                "Audit mode is serial by definition and cannot run free-running: it "
+                "reconstructs intermediate states by replaying its action log forward, "
+                "and under free-running the order that log records is not the order "
+                "things happened in. Use Normal or Fast for a parallel run."
+            )
         threshold = (
-            self.meta.get_param("spreading_activation_threshold", 100)
+            run_meta.get_param("spreading_activation_threshold", 100)
             if spreading_threshold is None
             else max(0, min(100, spreading_threshold))
         )
+        # The explicit argument and the parameter are the same setting reached two ways,
+        # so the stored parameter set has to agree with what the Run actually used.
+        overrides["spreading_activation_threshold"] = threshold
+        run_meta = self.meta.with_overrides(overrides)
+        if mode == MODE_FAST:
+            return self._create_fast_run(
+                initial, modified, target, answer, seed, threshold, workers, overrides,
+            )
+
         run = Run(
             initial_string=initial,
             modified_string=modified,
@@ -121,18 +184,40 @@ class RunService:
             status="initialized",
             justify_mode=answer is not None,
             spreading_threshold=threshold,
+            mode=mode,
+            session_id=await self._current_session_id(session),
+            # Hashed over the Run's *own* metadata, so two Runs that differ only in a
+            # parameter override are distinguishable by their config hash alone.
+            config_hash=config_hash(run_meta),
+            parameters=resolved_parameters(run_meta),
+            # Hashed *before* the run executes: it identifies the memory the run
+            # inherited, not the one it leaves behind.
+            memory_hash=memory_hash(
+                EpisodicMemory() if mode == MODE_FAST else _global_memory
+            ),
         )
         session.add(run)
         await session.flush()
 
+        sink = sink_for_mode(mode)
+        # A Fast Run gets an ephemeral memory of its own rather than the shared one:
+        # its whole point is that it leaves nothing behind, and contributing answers to
+        # the Training Session's memory would be leaving something behind.  It also
+        # discards commentary, which no part of cognition reads back.
+        memory = EpisodicMemory() if mode == MODE_FAST else _global_memory
+        commentary = DiscardingCommentaryLog() if mode == MODE_FAST else CommentaryLog()
+
         runner = EngineRunner(self.meta)
         runner.init_mcat(initial, modified, target, answer=answer, seed=seed,
-                         memory=_global_memory)
+                         memory=memory, sink=sink, commentary=commentary,
+                         parameters=overrides)
+        self._sinks[run.id] = sink
         # Set before the first codelet runs, so the whole run uses it.
         runner.ctx.spreading_activation_threshold = threshold
         self._runners[run.id] = runner
+        self._modes[run.id] = mode
+        self._workers[run.id] = workers
 
-        await save_cycle_snapshot(session, run.id, runner.ctx)
         await session.commit()
 
         return RunInfo(
@@ -146,7 +231,84 @@ class RunService:
             answer=answer,
             justify_mode=answer is not None,
             spreading_threshold=threshold,
+            mode=mode,
         )
+
+    def _create_fast_run(
+        self,
+        initial: str,
+        modified: str,
+        target: str,
+        answer: str | None,
+        seed: int,
+        threshold: int,
+        workers: int = 1,
+        parameters: dict[str, Any] | None = None,
+    ) -> RunInfo:
+        """A Fast Run, created without touching the database.
+
+        Not "created and then not written to" — the session is never used, no row is
+        inserted, and no identifier is taken from one.  Fast Run's requirement is zero
+        database activity *during the run and at its end*, and creation is part of that:
+        a run that inserted a row and then wrote nothing more would still fail with the
+        database stopped, which is the condition the mode is verified under.
+
+        The memory is ephemeral and the commentary is discarded, so the run leaves
+        nothing behind in the process either.
+        """
+        run_id = self._next_fast_id
+        self._next_fast_id -= 1
+
+        sink = sink_for_mode(MODE_FAST)
+        runner = EngineRunner(self.meta)
+        runner.init_mcat(
+            initial, modified, target, answer=answer, seed=seed,
+            memory=EpisodicMemory(), sink=sink,
+            commentary=DiscardingCommentaryLog(), parameters=parameters,
+        )
+        runner.ctx.spreading_activation_threshold = threshold
+
+        self._runners[run_id] = runner
+        self._sinks[run_id] = sink
+        self._modes[run_id] = MODE_FAST
+        self._workers[run_id] = workers
+
+        return RunInfo(
+            run_id=run_id,
+            status="initialized",
+            codelet_count=0,
+            temperature=runner.ctx.temperature.value,
+            initial=initial,
+            modified=modified,
+            target=target,
+            answer=answer,
+            justify_mode=answer is not None,
+            spreading_threshold=threshold,
+            mode=MODE_FAST,
+        )
+
+    def _is_fast(self, run_id: int) -> bool:
+        return self._modes.get(run_id) == MODE_FAST
+
+    async def _current_session_id(self, session: AsyncSession) -> int:
+        """The open Training Session, opening one if none is.
+
+        Sessions are not created by the user; they are the span between memory clears,
+        which is already how the concept worked.  This gives that span a row so Runs can
+        be grouped and reviewed (WP3.0), and changes no behaviour.
+        """
+        result = await session.execute(
+            select(TrainingSession)
+            .where(TrainingSession.ended_at.is_(None))
+            .order_by(TrainingSession.id.desc())
+            .limit(1)
+        )
+        current = result.scalars().first()
+        if current is None:
+            current = TrainingSession()
+            session.add(current)
+            await session.flush()
+        return current.id
 
     async def step(
         self,
@@ -160,29 +322,26 @@ class RunService:
             raise ValueError(f"Run {run_id} not found or not loaded")
 
         results = []
-        ucl = self.meta.get_param("update_cycle_length", 15)
 
+        # The loop is pure engine work now.  Persistence is the attached sink's
+        # business: it buffers as the engine emits and is written once, below.  What
+        # used to be here was an ``await`` per codelet whose trace slice was empty
+        # about 99.2% of the time, and a full ~43 KB snapshot every fifteenth codelet
+        # that nothing could read back (defect D1).
         for _ in range(n):
-            trace_before = len(runner.ctx.trace.events)
             step_result = runner.step_mcat()
             results.append(step_result)
-
-            # Persist new trace events to DB
-            await self._persist_new_trace_events(
-                session, run_id, runner.ctx, trace_before,
-            )
-
-            # Persist answer/snag if found
-            if step_result.answer_found:
-                await self._persist_answer(session, run_id, runner.ctx)
-
-            # Save snapshot at cycle boundaries
-            if runner.ctx.codelet_count % ucl == 0:
-                await save_cycle_snapshot(session, run_id, runner.ctx)
 
             # Stop stepping if an answer was found, or if the run gave up
             if step_result.answer_found or step_result.gave_up:
                 break
+
+        if self._is_fast(run_id):
+            # No flush, no row update, no commit.  A Fast Run must complete with the
+            # database stopped, so the session is not touched even to say the run moved.
+            return results
+
+        await self._flush_sink(session, run_id)
 
         # Update run row — include answer_string if found
         update_values: dict = {
@@ -214,12 +373,34 @@ class RunService:
         A loaded runner is the authority on how far a run has actually got, so
         prefer it and fall back to the row for runs not currently in memory.
         """
+        runner = self._runners.get(run_id)
+
+        if self._is_fast(run_id):
+            # A Fast Run has no row to read.  It is still fully observable — "Fast"
+            # means not written down, not unobservable — so it is served entirely from
+            # the live runner.
+            if runner is None or runner.ctx is None:
+                return None
+            ws = runner.ctx.workspace
+            return RunInfo(
+                run_id=run_id,
+                status=runner.status,
+                codelet_count=runner.ctx.codelet_count,
+                temperature=runner.ctx.temperature.value,
+                initial=ws.initial_string.text,
+                modified=ws.modified_string.text,
+                target=ws.target_string.text,
+                answer=ws.answer_string.text if ws.answer_string else None,
+                justify_mode=runner.ctx.justify_mode,
+                spreading_threshold=runner.ctx.spreading_activation_threshold,
+                mode=MODE_FAST,
+            )
+
         result = await session.execute(select(Run).where(Run.id == run_id))
         run = result.scalar_one_or_none()
         if run is None:
             return None
 
-        runner = self._runners.get(run_id)
         if runner is not None and runner.ctx is not None:
             answer_string = runner.ctx.workspace.answer_string
             return RunInfo(
@@ -236,6 +417,7 @@ class RunService:
                     getattr(runner.ctx, "spreading_activation_threshold",
                             run.spreading_threshold)
                 ),
+                mode=run.mode or MODE_NORMAL,
             )
 
         return RunInfo(
@@ -261,7 +443,6 @@ class RunService:
         runner = self._runners.get(run_id)
         if runner is None or runner.ctx is None:
             return None
-        from server.services.snapshot_service import serialize_workspace_state
         return serialize_workspace_state(runner.ctx)
 
     def get_slipnet_state(self, run_id: int) -> dict | None:
@@ -330,6 +511,71 @@ class RunService:
         ]
         return runs, total
 
+    async def _run_free(
+        self,
+        session: AsyncSession,
+        run_id: int,
+        runner: EngineRunner,
+        workers: int,
+        max_steps: int,
+    ) -> RunInfo:
+        """Drive a Run free-running, then persist it exactly as a serial Run.
+
+        The engine work happens in worker *threads* and is handed to a thread executor so
+        the event loop stays free — otherwise a run would block every other request for
+        its whole duration, including the stop control.
+
+        Persistence is unchanged: the sink has been collecting throughout, and it is
+        flushed here once, as for a serial Run. That is the point of the ``RunSink`` port
+        — the engine emits the same events in the same order whether one worker or eight
+        produced them, so no mode needed teaching about concurrency.
+        """
+        import asyncio
+
+        fast = self._is_fast(run_id)
+        if not fast:
+            await session.execute(
+                update(Run).where(Run.id == run_id).values(status="running")
+            )
+            await session.commit()
+
+        engine = FreeRunningEngine(runner, workers=workers)
+        result = await asyncio.to_thread(engine.run, max_steps)
+        self._free_run_telemetry[run_id] = result.summary()
+
+        status_str = runner.status
+        if not fast:
+            await self._flush_sink(session, run_id)
+            await session.execute(
+                update(Run)
+                .where(Run.id == run_id)
+                .values(
+                    codelet_count=runner.ctx.codelet_count,
+                    temperature=runner.ctx.temperature.value,
+                    status=status_str,
+                    answer_string=runner.ctx.workspace.answer_string.text
+                    if runner.ctx.workspace.answer_string
+                    else None,
+                )
+            )
+            await session.commit()
+        self._stop_flags.pop(run_id, None)
+
+        ws = runner.ctx.workspace
+        return RunInfo(
+            run_id=run_id,
+            mode=self._modes.get(run_id, MODE_NORMAL),
+            status=status_str,
+            codelet_count=runner.ctx.codelet_count,
+            temperature=runner.ctx.temperature.value,
+            initial=ws.initial_string.text,
+            modified=ws.modified_string.text,
+            target=ws.target_string.text,
+            answer=ws.answer_string.text if ws.answer_string else None,
+            justify_mode=runner.ctx.justify_mode,
+            spreading_threshold=runner.ctx.spreading_activation_threshold,
+        )
+
     async def run_to_completion(
         self, session: AsyncSession, run_id: int, max_steps: int = 0
     ) -> RunInfo:
@@ -341,12 +587,26 @@ class RunService:
         self._stop_flags[run_id] = False
         runner.status = STATUS_RUNNING
 
-        # Update DB status to running
-        await session.execute(
-            update(Run).where(Run.id == run_id).values(status="running")
-        )
-        await session.commit()
+        workers = self._workers.get(run_id, 1)
+        if workers > 1:
+            return await self._run_free(session, run_id, runner, workers, max_steps)
 
+        fast = self._is_fast(run_id)
+        if not fast:
+            # Update DB status to running
+            await session.execute(
+                update(Run).where(Run.id == run_id).values(status="running")
+            )
+            await session.commit()
+
+        # How often to hand control back to the event loop.  The plan asks for the
+        # per-codelet ``await asyncio.sleep(0)`` to go, and it should: it cost about
+        # 16 µs per codelet, which at this engine's rate is a fifth of the budget for
+        # a codelet.  Removing it outright is not an option, though, because the stop
+        # flag and the breakpoint are set by *other* HTTP requests, and a loop that
+        # never yields never lets them be served — the run would become uninterruptible.
+        # Yielding once per update cycle keeps the pause and stop controls responsive
+        # to within about a millisecond while removing fourteen fifteenths of the cost.
         ucl = self.meta.get_param("update_cycle_length", 15)
         step = 0
 
@@ -365,29 +625,41 @@ class RunService:
                 runner.status = STATUS_PAUSED
                 break
 
-            trace_before = len(runner.ctx.trace.events)
             step_result = runner.step_mcat()
-
-            # Persist new trace events
-            await self._persist_new_trace_events(
-                session, run_id, runner.ctx, trace_before,
-            )
-
             if step_result.answer_found:
                 runner.status = STATUS_ANSWER_FOUND
-                await self._persist_answer(session, run_id, runner.ctx)
-
-            # Save snapshot at cycle boundaries
-            if runner.ctx.codelet_count % ucl == 0:
-                await save_cycle_snapshot(session, run_id, runner.ctx)
 
             step += 1
 
-            # Yield event loop so concurrent requests (polling, stop) get served
-            await asyncio.sleep(0)
+            if runner.ctx.codelet_count % ucl == 0:
+                await asyncio.sleep(0)
+
+        # The Run has stopped, so the engine emits its closing event and the sink is
+        # written once for the whole run.
+        runner.finish()
+
+        status_str = runner.status
+        if fast:
+            self._stop_flags.pop(run_id, None)
+            return RunInfo(
+                run_id=run_id,
+                status=status_str,
+                codelet_count=runner.ctx.codelet_count,
+                temperature=runner.ctx.temperature.value,
+                initial=runner.ctx.workspace.initial_string.text,
+                modified=runner.ctx.workspace.modified_string.text,
+                target=runner.ctx.workspace.target_string.text,
+                answer=runner.ctx.workspace.answer_string.text
+                if runner.ctx.workspace.answer_string
+                else None,
+                justify_mode=runner.ctx.justify_mode,
+                spreading_threshold=runner.ctx.spreading_activation_threshold,
+                mode=MODE_FAST,
+            )
+
+        await self._flush_sink(session, run_id)
 
         # Final update
-        status_str = runner.status
         await session.execute(
             update(Run)
             .where(Run.id == run_id)
@@ -405,6 +677,7 @@ class RunService:
 
         return RunInfo(
             run_id=run_id,
+            mode=self._modes.get(run_id, MODE_NORMAL),
             status=status_str,
             codelet_count=runner.ctx.codelet_count,
             temperature=runner.ctx.temperature.value,
@@ -460,6 +733,15 @@ class RunService:
         await session.execute(
             delete(CycleSnapshot).where(CycleSnapshot.run_id == run_id)
         )
+        # The tables Phase 0 added. Without these a deleted run left its boundary
+        # captures and its audit log behind — rows keyed to a run id that no longer
+        # exists, which nothing would ever read and nothing would ever clean up.
+        await session.execute(
+            delete(RunStateCapture).where(RunStateCapture.run_id == run_id)
+        )
+        await session.execute(
+            delete(AuditAction).where(AuditAction.run_id == run_id)
+        )
         await session.execute(
             delete(TraceEventRow).where(TraceEventRow.run_id == run_id)
         )
@@ -475,8 +757,13 @@ class RunService:
             )
         )
 
-        await save_cycle_snapshot(session, run_id, runner.ctx)
         await session.commit()
+
+        # A reset run gets a fresh sink of its own mode: the old one may hold records
+        # buffered from before the reset, and those describe a run that no longer
+        # exists.  The mode is a property of the Run and survives a reset.
+        self._sinks[run_id] = sink_for_mode(self._modes.get(run_id, MODE_NORMAL))
+        runner.ctx.sink = self._sinks[run_id]
 
         # Clear control state
         self._breakpoints.pop(run_id, None)
@@ -510,6 +797,15 @@ class RunService:
         await session.execute(
             delete(CycleSnapshot).where(CycleSnapshot.run_id == run_id)
         )
+        # The tables Phase 0 added. Without these a deleted run left its boundary
+        # captures and its audit log behind — rows keyed to a run id that no longer
+        # exists, which nothing would ever read and nothing would ever clean up.
+        await session.execute(
+            delete(RunStateCapture).where(RunStateCapture.run_id == run_id)
+        )
+        await session.execute(
+            delete(AuditAction).where(AuditAction.run_id == run_id)
+        )
         await session.execute(
             delete(TraceEventRow).where(TraceEventRow.run_id == run_id)
         )
@@ -526,6 +822,10 @@ class RunService:
 
         # Delete all DB rows
         await session.execute(delete(CycleSnapshot))
+        await session.execute(delete(RunStateCapture))
+        await session.execute(delete(AuditAction))
+        # Sessions group runs; with every run gone there is nothing left to group.
+        await session.execute(delete(TrainingSession))
         await session.execute(delete(TraceEventRow))
         await session.execute(delete(AnswerDescriptionRow))
         await session.execute(delete(SnagDescriptionRow))
@@ -545,68 +845,22 @@ class RunService:
     # Trace & memory persistence helpers
     # ------------------------------------------------------------------
 
-    async def _persist_new_trace_events(
-        self,
-        session: AsyncSession,
-        run_id: int,
-        ctx: EngineContext,
-        trace_start: int,
-    ) -> None:
-        """Persist any new trace events added since trace_start index."""
-        new_events = ctx.trace.events[trace_start:]
-        for event in new_events:
-            row = TraceEventRow(
-                run_id=run_id,
-                event_number=event.event_number,
-                event_type=event.event_type,
-                codelet_count=event.codelet_count,
-                temperature=event.temperature,
-                description=event.description,
-                structures=None,  # Structures are complex objects; not serialized here
-                theme_pattern=event.theme_pattern,
-            )
-            session.add(row)
+    async def _flush_sink(self, session: AsyncSession, run_id: int) -> None:
+        """Write whatever the run's sink has buffered.
 
-            # If this is a snag event, also persist a SnagDescriptionRow
-            if event.event_type == SNAG:
-                snag_row = SnagDescriptionRow(
-                    run_id=run_id,
-                    problem=[
-                        ctx.workspace.initial_string.text,
-                        ctx.workspace.modified_string.text,
-                        ctx.workspace.target_string.text,
-                    ],
-                    codelet_count=event.codelet_count,
-                    temperature=event.temperature,
-                    theme_pattern=event.theme_pattern,
-                    description=event.description,
-                )
-                session.add(snag_row)
+        Replaces ``_persist_new_trace_events`` and ``_persist_answer``, which the step
+        loop used to call inline once per codelet.  The engine no longer knows that
+        persistence exists: it emits events, the sink accumulates, and this is the one
+        place a record reaches the session.
 
-    async def _persist_answer(
-        self,
-        session: AsyncSession,
-        run_id: int,
-        ctx: EngineContext,
-    ) -> None:
-        """Persist the most recent answer from episodic memory to DB."""
-        if not ctx.memory.answers:
+        A missing sink is not an error.  A run reloaded into a fresh process has a
+        runner but no sink until one is attached, and a Fast Run's sink buffers
+        nothing, so both correctly write nothing here.
+        """
+        sink = self._sinks.get(run_id)
+        if sink is None:
             return
-        latest = ctx.memory.answers[-1]
-        latest.run_id = run_id
-        row = AnswerDescriptionRow(
-            run_id=run_id,
-            problem=list(latest.problem),
-            top_rule_description=latest.top_rule_description,
-            bottom_rule_description=latest.bottom_rule_description,
-            top_rule_quality=latest.top_rule_quality,
-            bottom_rule_quality=latest.bottom_rule_quality,
-            quality=latest.quality,
-            temperature=latest.temperature,
-            themes=latest.themes,
-            unjustified_slippages=latest.unjustified_slippages,
-        )
-        session.add(row)
+        await sink.flush(session, run_id)
 
     # ------------------------------------------------------------------
     # DB-backed trace & memory reads
@@ -656,12 +910,27 @@ class RunService:
 
         await session.execute(delete(AnswerDescriptionRow))
         await session.execute(delete(SnagDescriptionRow))
+
+        # Clearing the memory *is* the end of the Training Session — it discards the one
+        # thing that crosses Run boundaries, so the Runs before and after it did not
+        # share anything and do not belong together.  WP3.0 says as much and the review
+        # UI tells the user so, but nothing was closing the row: every Run in the
+        # database therefore belonged to one session that had been open since the first
+        # one, which makes the grouping useless precisely when it would start to matter.
+        now = _utcnow()
+        closed = (
+            await session.execute(
+                update(TrainingSession)
+                .where(TrainingSession.ended_at.is_(None))
+                .values(ended_at=now)
+            )
+        ).rowcount or 0
         await session.commit()
 
         # Cleared in place, so the runners holding this reference see it too.
         _global_memory.clear()
 
-        return {"answers": answers, "snags": snags}
+        return {"answers": answers, "snags": snags, "sessions_closed": closed}
 
     async def get_memory_state_from_db(self, session: AsyncSession) -> dict:
         """Read episodic memory from the database."""
@@ -721,7 +990,10 @@ class RunService:
                 unjustified_slippages=a.unjustified_slippages or [],
                 run_id=a.run_id,
             )
-            _global_memory.answers.append(desc)
+            # Stored rather than appended, so the rehydrated answers take
+            # ``answer_id`` from the memory's own counter.  ``/api/memory/compare``
+            # looks answers up by that id.
+            _global_memory.store_answer(desc)
 
         snags_result = await session.execute(
             select(SnagDescriptionRow).order_by(SnagDescriptionRow.id)
@@ -735,7 +1007,7 @@ class RunService:
                 description=s.description or "",
                 run_id=s.run_id,
             )
-            _global_memory.snags.append(desc)
+            _global_memory.store_snag(desc)
 
     def get_themespace_state(self, run_id: int) -> dict | None:
         """Serialize the current themespace state for the given run."""

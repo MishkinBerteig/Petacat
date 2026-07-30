@@ -21,6 +21,10 @@ node_modules/
 .env
 .env.local
 
+# Native macOS development (WP2.1 — replaces the container stack)
+.venv/
+.venv-*/
+
 # pytest
 .pytest_cache/
 htmlcov/

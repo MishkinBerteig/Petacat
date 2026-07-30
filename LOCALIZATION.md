@@ -46,6 +46,12 @@ They differ only in how the frontend renders them.
    text shown in the HelpPopover, with paragraph breaks rendered verbatim
    (`\n\n` in the JSON becomes a blank line in the popover).
 
+   A component topic does not *have* to be reachable from a `?` button. `admin`
+   and `review` describe whole views rather than dashboard panels and are read
+   from `HELP.md` and the API. The guardrail runs one way only — every
+   `componentName` in the frontend must name a real topic, but a topic with no
+   caller is allowed, which is what lets the text be written before the button.
+
 2. **Admin action topics** (`topic_type: "component"`, with
    `metadata.kind: "admin_action"`) describe each button in the Admin view.
    Instead of a single `full_desc` blob, they carry two parallel string
@@ -85,7 +91,7 @@ seed_data/help_topics.en.json         ← single source of truth (edit here)
          │   The sync runs automatically on:
          │     • every backend startup     (server/main.py lifespan)
          │     • admin button click        (POST /api/admin/help/regenerate)
-         │     • CLI invocation            (python scripts/generate_help_docs.py)
+         │     • CLI invocation            (.venv/bin/python scripts/generate_help_docs.py)
          │   All three paths call server/services/help_docs.regenerate_all.
          │
          ├──▶ server/main.py::_sync_help_topics
@@ -122,11 +128,14 @@ The fastest path is to edit the JSON and click a button:
 
 Alternative triggers, all equivalent in effect:
 
-- **Backend restart** —
-  `docker compose -f docker-compose.dev.yml restart app`.
+- **Backend restart** — stop the API and start it again (ctrl-c the
+  `scripts/dev.sh` process and re-run it, or `scripts/dev.sh stop` followed by
+  `scripts/dev.sh api` if you are running the halves in separate terminals).
   The lifespan hook runs the same sync and regeneration on every startup.
+  Note that the API's `--reload` watcher only watches Python sources, so
+  editing the JSON does not restart the backend by itself.
 
-- **CLI** — `python scripts/generate_help_docs.py`. Useful when the backend
+- **CLI** — `.venv/bin/python scripts/generate_help_docs.py`. Useful when the backend
   is not running and you need the derived files on disk (for a build, a
   static import, or to inspect drift from a cold checkout).
 
@@ -149,7 +158,7 @@ for additional languages without any schema changes.
    `help_topics.{HELP_LOCALE}.json`, falling back to
    `help_topics.en.json` only if the locale file is missing.
 5. Regenerate derived artifacts for the target locale:
-   `python scripts/generate_help_docs.py --locale fr`.
+   `.venv/bin/python scripts/generate_help_docs.py --locale fr`.
 
 Translators contributing a new language file should open a pull request with
 only the new `help_topics.{locale}.json` added. The maintainer will
@@ -193,7 +202,7 @@ same topic).
 
 ### CI drift detection
 
-Run `python scripts/generate_help_docs.py --check` in CI. It re-renders
+Run `.venv/bin/python scripts/generate_help_docs.py --check` in CI. It re-renders
 `HELP.md` and `helpTopics.ts` in memory, compares them to the files on disk,
 and exits non-zero if they differ. Fails fast when someone edits the JSON
 but forgets to regenerate.

@@ -8,6 +8,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from server.engine.formulas import weighted_average
+from server.engine.ids import KIND_STRUCTURE, next_id
 
 if TYPE_CHECKING:
     from server.engine.metadata import MetadataProvider
@@ -21,15 +22,12 @@ class WorkspaceStructure:
     EVALUATED = "evaluated"
     BUILT = "built"
 
-    _next_id = 0
-
     # The Themespace the current run's structures resonate with.  The Scheme uses
     # a global ``*themespace*``; this mirrors it.  Set by ``init_mcat``.
     _themespace: object | None = None
 
     def __init__(self) -> None:
-        WorkspaceStructure._next_id += 1
-        self.id = WorkspaceStructure._next_id
+        self.id = next_id(KIND_STRUCTURE)
         self.proposal_level = self.PROPOSED
         self.strength: float = 0.0
         self.time_stamp: int = 0

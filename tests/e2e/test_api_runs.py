@@ -3,7 +3,7 @@
 ALL tests are deterministic: same seed → same codelet sequence → same state.
 Tests exercise the full stack: HTTP API → RunService → EngineRunner → DB.
 
-Requires: docker compose -f docker-compose.test.yml up -d
+Requires: a local Postgres — start it with `scripts/dev.sh db`.
 """
 
 import pytest
@@ -283,20 +283,213 @@ async def test_answer_appears_in_workspace(app_client):
 
 
 @pytest.mark.asyncio
-async def test_snapshot_persists(app_client, db_session):
-    """Cycle snapshots should be created at initialization and cycle boundaries."""
+async def test_no_mid_run_snapshots_are_written(app_client, db_session):
+    """Mid-run snapshots are retired (WP3.3, defect D1).
+
+    This test previously asserted the opposite — that stepping past a cycle boundary
+    produced at least two ``cycle_snapshots`` rows. That behaviour is what WP3.3
+    removes, so the assertion is inverted rather than deleted: it now pins the absence,
+    which is the thing that could silently come back.
+
+    The snapshots were written every fifteenth codelet, cost 18–27% of engine time, and
+    **no code path could read them back** — the four ``restore_*`` functions were called
+    from nowhere, ``prune_old_snapshots`` was never called either, and there was no
+    coderack or workspace restore at all. A production database held 230 MB of them for
+    ten runs. Complete, genuinely restorable state capture arrives with WP3.4 and is
+    written at the two Run boundaries instead.
+    """
     resp = await app_client.post("/api/runs", json={
         "initial": "abc", "modified": "abd", "target": "xyz", "seed": SEED,
     })
     run_id = resp.json()["run_id"]
 
-    # Step past a cycle boundary (15 codelets)
-    await app_client.post(f"/api/runs/{run_id}/step", json={"n": 15})
+    # Step well past a cycle boundary (15 codelets).
+    await app_client.post(f"/api/runs/{run_id}/step", json={"n": 30})
 
     from sqlalchemy import select, func
     from server.models.run import CycleSnapshot
     result = await db_session.execute(
         select(func.count()).select_from(CycleSnapshot).where(CycleSnapshot.run_id == run_id)
     )
-    count = result.scalar()
-    assert count >= 2  # Initial snapshot + at least one cycle snapshot
+    assert result.scalar() == 0
+
+
+# ---------------------------------------------------------------------------
+# Run identity — which configuration and which memory a run executed against
+#
+# The Review browser shows these, but a run that is still executing has no entry
+# there yet, and by the time it does the reader has stopped watching. The identity
+# endpoint answers for a live run, and — the case worth testing — answers for a Fast
+# Run too, where the honest answer is "nothing was written down".
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_run_identity_carries_the_hashes_and_the_session(app_client):
+    resp = await app_client.post("/api/runs", json={
+        "initial": "abc", "modified": "abd", "target": "xyz", "seed": SEED,
+    })
+    run_id = resp.json()["run_id"]
+
+    data = (await app_client.get(f"/api/runs/{run_id}/identity")).json()
+    assert data["run_id"] == run_id
+    assert data["mode"] == "normal"
+    assert data["recorded"] is True
+    assert data["seed"] == SEED
+    assert data["config_hash"]
+    assert data["memory_hash"]
+    assert data["session_id"] is not None
+
+
+@pytest.mark.asyncio
+async def test_identity_hashes_match_the_row_the_review_browser_reads(app_client, db_session):
+    """One source, so the live view and the recorded view cannot disagree.
+
+    Two displays of the same run showing different config hashes would be worse than
+    either display being absent, because both look authoritative.
+    """
+    from sqlalchemy import select
+    from server.models.run import Run
+
+    resp = await app_client.post("/api/runs", json={
+        "initial": "abc", "modified": "abd", "target": "xyz", "seed": SEED,
+    })
+    run_id = resp.json()["run_id"]
+
+    data = (await app_client.get(f"/api/runs/{run_id}/identity")).json()
+    row = (await db_session.execute(select(Run).where(Run.id == run_id))).scalar_one()
+    assert data["config_hash"] == row.config_hash
+    assert data["memory_hash"] == row.memory_hash
+    assert data["session_id"] == row.session_id
+
+
+@pytest.mark.asyncio
+async def test_a_fast_run_reports_no_recorded_identity_rather_than_404(app_client):
+    """"Nothing was written down" is a fact about the run, not a missing run.
+
+    A 404 here would be indistinguishable from a mistyped id, and the Fast Run is the
+    case a reader most needs told apart from a fault.
+    """
+    resp = await app_client.post("/api/runs", json={
+        "initial": "abc", "modified": "abd", "target": "xyz", "seed": SEED,
+        "mode": "fast",
+    })
+    run_id = resp.json()["run_id"]
+    assert run_id < 0
+
+    resp = await app_client.get(f"/api/runs/{run_id}/identity")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["mode"] == "fast"
+    assert data["recorded"] is False
+    assert data["config_hash"] is None
+    assert data["memory_hash"] is None
+    assert data["session_id"] is None
+
+
+@pytest.mark.asyncio
+async def test_identity_of_a_run_that_does_not_exist_is_a_404(app_client):
+    resp = await app_client.get("/api/runs/999999/identity")
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_the_run_list_carries_each_run_s_mode(app_client):
+    """The list is what Run History renders, and mode decides what a run can be
+    reviewed with. Without it every row read as Normal, including the Audit runs."""
+    for mode in ("normal", "audit"):
+        await app_client.post("/api/runs", json={
+            "initial": "abc", "modified": "abd", "target": "xyz", "seed": SEED,
+            "mode": mode,
+        })
+
+    listing = (await app_client.get("/api/runs?limit=50")).json()
+    modes = {r["mode"] for r in listing["runs"]}
+    assert {"normal", "audit"} <= modes
+    for row in listing["runs"]:
+        assert row["config_hash"]
+
+
+@pytest.mark.asyncio
+async def test_a_fast_run_is_absent_from_the_list_by_construction(app_client):
+    """It has no row, so nothing can list it. The client explains the absence."""
+    resp = await app_client.post("/api/runs", json={
+        "initial": "abc", "modified": "abd", "target": "xyz", "seed": SEED,
+        "mode": "fast",
+    })
+    fast_id = resp.json()["run_id"]
+
+    listing = (await app_client.get("/api/runs?limit=50")).json()
+    assert fast_id not in [r["run_id"] for r in listing["runs"]]
+
+
+# ---------------------------------------------------------------------------
+# Which Episodic Memory a run is thinking against
+#
+# A Fast Run is handed an ephemeral ``EpisodicMemory`` of its own so that it can
+# contribute nothing to the Training Session — that is the whole of what Fast
+# promises. The run-scoped memory endpoint served the shared database memory to it
+# regardless, which made the panel a straightforward lie about the run: the answers
+# it listed were ones the run could not be reminded of.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_a_normal_run_reads_the_shared_memory(app_client):
+    created = await app_client.post("/api/runs", json={
+        "initial": "abc", "modified": "abd", "target": "xyz", "seed": SEED,
+        "mode": "normal",
+    })
+    run_id = created.json()["run_id"]
+
+    body = (await app_client.get(f"/api/runs/{run_id}/memory")).json()
+    assert body["scope"] == "shared"
+    assert body["mode"] == "normal"
+
+    # The same content as the un-scoped endpoint, which is only ever the shared one.
+    shared = (await app_client.get("/api/memory")).json()
+    assert len(body["answers"]) == len(shared["answers"])
+    assert len(body["snags"]) == len(shared["snags"])
+
+
+@pytest.mark.asyncio
+async def test_a_fast_run_reads_its_own_ephemeral_memory(app_client):
+    created = await app_client.post("/api/runs", json={
+        "initial": "abc", "modified": "abd", "target": "xyz", "seed": SEED,
+        "mode": "fast",
+    })
+    run_id = created.json()["run_id"]
+
+    body = (await app_client.get(f"/api/runs/{run_id}/memory")).json()
+    assert body["scope"] == "run"
+    assert body["mode"] == "fast"
+    # Ephemeral means it starts empty, whatever the shared memory holds.
+    assert body["answers"] == []
+    assert body["snags"] == []
+
+
+@pytest.mark.asyncio
+async def test_a_fast_run_s_answer_stays_in_its_own_memory(app_client):
+    """The assertion that matters: the two memories do not leak into each other.
+
+    A Fast Run that found an answer must show it in *its* memory and must not have
+    added it to the shared one, or the mode has not kept its promise.
+    """
+    shared_before = len((await app_client.get("/api/memory")).json()["answers"])
+
+    created = await app_client.post("/api/runs", json={
+        "initial": "abc", "modified": "abd", "target": "xyz", "seed": SEED,
+        "mode": "fast",
+    })
+    run_id = created.json()["run_id"]
+    finished = await app_client.post(
+        f"/api/runs/{run_id}/run", json={"max_steps": 4000}
+    )
+    assert finished.json()["answer"] is not None
+
+    own = (await app_client.get(f"/api/runs/{run_id}/memory")).json()
+    assert own["scope"] == "run"
+    assert len(own["answers"]) == 1
+
+    shared_after = (await app_client.get("/api/memory")).json()
+    assert len(shared_after["answers"]) == shared_before

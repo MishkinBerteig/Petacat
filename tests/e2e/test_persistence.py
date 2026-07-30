@@ -2,7 +2,7 @@
 
 ALL tests are deterministic: same seed → same results.
 
-Requires: docker compose -f docker-compose.test.yml up -d
+Requires: a local Postgres — start it with `scripts/dev.sh db`.
 """
 
 import pytest
@@ -78,55 +78,50 @@ async def test_codelet_execute_body_round_trip(db_session):
 
 
 @pytest.mark.asyncio
-async def test_snapshot_round_trip(app_client, db_session):
-    """Snapshot data should faithfully capture engine state.
+async def test_trace_events_persist_without_mid_run_snapshots(app_client, db_session):
+    """The record of a stepped run is its Trace, written in one batch (WP3.3).
 
-    Create a run, step it, verify the snapshot contains expected data.
+    This replaces a test that asserted a ``cycle_snapshots`` row existed after fifteen
+    codelets and inspected its seven JSONB columns. Those snapshots are retired: they
+    were write-only — nothing ever called the ``restore_*`` functions — and cost
+    18-27% of engine time to produce 1-6 MB per run that no code path could read.
+
+    What replaces the assertion is the property that actually matters now: stepping a
+    run persists its trace events, and it does so without writing snapshots. The events
+    are buffered by the run's sink during the step loop and staged once per API call
+    rather than awaited per codelet.
     """
-    from sqlalchemy import select
-    from server.models.run import CycleSnapshot
+    from sqlalchemy import func, select
+    from server.models.run import CycleSnapshot, TraceEventRow
 
     resp = await app_client.post("/api/runs", json={
         "initial": "abc", "modified": "abd", "target": "xyz", "seed": SEED,
     })
     run_id = resp.json()["run_id"]
 
-    # Step to generate a snapshot
-    await app_client.post(f"/api/runs/{run_id}/step", json={"n": 15})
+    # Far enough for the run to record trace events of its own.
+    await app_client.post(f"/api/runs/{run_id}/run", json={"max_steps": 1200})
 
-    result = await db_session.execute(
-        select(CycleSnapshot)
-        .where(CycleSnapshot.run_id == run_id)
-        .order_by(CycleSnapshot.id.desc())
+    snapshots = await db_session.execute(
+        select(func.count()).select_from(CycleSnapshot).where(CycleSnapshot.run_id == run_id)
     )
-    snapshot = result.scalars().first()
-    assert snapshot is not None
+    assert snapshots.scalar() == 0
 
-    # Verify snapshot contains all required state
-    assert snapshot.codelet_count == 15
-    assert snapshot.rng_state is not None
-    assert "seed" in snapshot.rng_state
-    assert "internal_state" in snapshot.rng_state
+    events = await db_session.execute(
+        select(TraceEventRow)
+        .where(TraceEventRow.run_id == run_id)
+        .order_by(TraceEventRow.event_number)
+    )
+    rows = list(events.scalars().all())
+    assert rows, "a run of this length must record trace events"
 
-    assert snapshot.slipnet_state is not None
-    assert "plato-a" in snapshot.slipnet_state
-
-    assert snapshot.coderack_state is not None
-    assert "bins" in snapshot.coderack_state
-
-    assert snapshot.themespace_state is not None
-    assert "clusters" in snapshot.themespace_state
-
-    assert snapshot.trace_state is not None
-    assert "within_clamp_period" in snapshot.trace_state
-
-    assert snapshot.runner_state is not None
-    assert "codelet_count" in snapshot.runner_state
-    assert snapshot.runner_state["codelet_count"] == 15
-
-    assert snapshot.workspace_state is not None
-    assert snapshot.workspace_state["initial"] == "abc"
-
+    # Event numbers are per-run and dense (WP0.3), which is what makes them usable as
+    # the ordering key they are indexed as.
+    assert [r.event_number for r in rows] == list(range(1, len(rows) + 1))
+    for row in rows:
+        assert row.event_type
+        assert row.codelet_count >= 0
+        assert 0.0 <= row.temperature <= 100.0
 
 @pytest.mark.asyncio
 async def test_deterministic_state_at_checkpoint(app_client):

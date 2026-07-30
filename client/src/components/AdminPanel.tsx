@@ -127,10 +127,18 @@ export function AdminPanel() {
   // --- Clear episodic memory ---
   const handleClearMemory = useCallback(async () => {
     if (
+      // Named as what it is: Episodic Memory is the one thing that crosses a Run
+      // boundary, so clearing it is what ends a Training Session. Saying only
+      // "removes stored descriptions" understated that — the boundary in the Review
+      // browser is drawn by this button and nothing said so at the point of pressing.
       window.confirm(
         'Clear episodic memory?\n\n'
-          + 'This removes all stored answer and snag descriptions from past runs. '
-          + 'It does NOT reset the current run or delete run history.\n\n'
+          + 'This ends the current Training Session and starts a new one: episodic '
+          + 'memory is the only thing carried from one run to the next, so the runs '
+          + 'after this point start from an empty memory.\n\n'
+          + 'It removes all stored answer and snag descriptions from past runs. '
+          + 'It does NOT reset the current run or delete run history — past runs stay '
+          + 'in the Review browser, grouped under the session that is being closed.\n\n'
           + 'This cannot be undone.'
       )
     ) {

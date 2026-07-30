@@ -13,6 +13,9 @@ from __future__ import annotations
 import math
 from typing import TYPE_CHECKING, Any, Callable
 
+from server.engine.numeric.backend import select_backend
+from server.engine.numeric.layout import SlipnetState, SlipnetTopology
+
 if TYPE_CHECKING:
     from server.engine.metadata import MetadataProvider, SlipnodeSpec, SlipnetLinkSpec
     from server.engine.rng import RNG
@@ -481,11 +484,21 @@ class SlipnetLink:
         return f"SlipnetLink({self.from_node.short_name}->{self.to_node.short_name}, {self.link_type}{label})"
 
 
+#: Sentinel distinguishing "the substrate has not been resolved yet" from "the
+#: substrate resolved to *no backend*, run the reference loops".  Both are common
+#: and ``None`` cannot mean both.
+_UNRESOLVED = object()
+
+
 class Slipnet:
     """The full semantic network."""
 
     def __init__(self) -> None:
         self.nodes: dict[str, SlipnetNode] = {}
+        # Resolved on first use rather than here, because ``from_metadata``
+        # computes the decay rates *after* constructing the Slipnet and the
+        # numeric layout needs them.
+        self._numeric: Any = _UNRESOLVED
 
     @classmethod
     def from_metadata(cls, meta: MetadataProvider) -> Slipnet:
@@ -584,18 +597,71 @@ class Slipnet:
             node.activation = max(0.0, min(100.0, node.activation + node.activation_buffer))
             node.activation_buffer = 0.0
 
+    # ------------------------------------------------------------------
+    # The numeric substrate  (WP4.5)
+    # ------------------------------------------------------------------
+
+    def _numeric_session(self) -> Any:
+        """A prepared ``SlipnetSession``, or ``None`` to run the loops above.
+
+        The topology is flattened once and the session holds it for the life of
+        the Slipnet, which is what makes the substrate worth having at scale: the
+        sparse matrix is entirely static (``intrinsic_degree_of_association``
+        never consults an activation), so there is no rebuild to amortise.
+
+        ``None`` is the answer for a 59-node Slipnet under the default policy, and
+        deliberately so — see ``numeric/backend.py``.
+        """
+        if self._numeric is not _UNRESOLVED:
+            return self._numeric
+        backend = select_backend(len(self.nodes))
+        if backend is None:
+            self._numeric = None
+        else:
+            self._numeric = backend.open_slipnet(SlipnetTopology.from_slipnet(self))
+        return self._numeric
+
+    def invalidate_numeric_layout(self) -> None:
+        """Discard the flattened topology, forcing a rebuild on next use.
+
+        Needed only if the graph is edited after construction — the admin surface
+        can rewrite link lengths — because the layout caches the association
+        weights that such an edit changes.
+        """
+        self._numeric = _UNRESOLVED
+
     def update_activations(self, rng: RNG, threshold: int = 100) -> None:
         """Spread activation and do probabilistic jumps.
 
         Scheme: slipnet.ss:377-389.
         Note: theme→slipnet spreading should be called BEFORE this method;
         the activation_buffer may already contain contributions from themes.
+
+        The RNG is consumed identically on both paths, and that is the constraint
+        the substrate's interface is shaped around.  ``RNG.prob`` returns without
+        touching the stream when the probability is 0 or 1, so a node at exactly
+        full activation costs no draw and a node at zero is never asked; the
+        substrate therefore hands back only the nodes that *would* consume a draw,
+        in index order, and the loop below draws for exactly those.  Same draws,
+        same order, same count as the reference — which is what keeps a seeded run
+        comparable across the change.
         """
         ucl = 15  # Will be parameterized later
-        self.spread_activation(ucl, threshold=threshold)
-        # Probabilistic jump for partially-active nodes (50-99)
-        for node in self.nodes.values():
-            node.probabilistic_jump_to_full(rng)
+        session = self._numeric_session()
+        if session is None:
+            self.spread_activation(ucl, threshold=threshold)
+            # Probabilistic jump for partially-active nodes (50-99)
+            for node in self.nodes.values():
+                node.probabilistic_jump_to_full(rng)
+            return
+
+        session.load(SlipnetState.from_slipnet(self))
+        session.update(float(threshold), ucl / 15.0)
+        indices, probabilities = session.jump_candidates()
+        session.apply_jumps(
+            [i for i, p in zip(indices, probabilities) if rng.prob(p)]
+        )
+        session.store().apply_to_slipnet(self)
 
     def clamp_initially_relevant(self, meta: MetadataProvider) -> None:
         """Clamp initially-relevant slipnet nodes.

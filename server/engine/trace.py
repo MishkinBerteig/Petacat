@@ -16,6 +16,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from server.engine.formulas import weighted_average
+from server.engine.ids import KIND_TRACE_EVENT, next_id
 
 if TYPE_CHECKING:
     from server.engine.slipnet import Slipnet
@@ -72,8 +73,6 @@ MAX_CLAMP_PERIOD_DEFAULT = 750
 class TraceEvent:
     """A single recorded event in the temporal trace."""
 
-    _next_id = 0
-
     def __init__(
         self,
         event_type: str,
@@ -83,8 +82,7 @@ class TraceEvent:
         description: str = "",
         theme_pattern: Any = None,
     ) -> None:
-        TraceEvent._next_id += 1
-        self.event_number = TraceEvent._next_id
+        self.event_number = next_id(KIND_TRACE_EVENT)
         self.event_type = event_type
         self.codelet_count = codelet_count
         self.temperature = temperature

@@ -44,8 +44,14 @@ function uniqueTypes(events: TraceEvent[]): string[] {
   return Array.from(seen).sort();
 }
 
-export function TraceView() {
-  const trace = useRunStore((s) => s.trace);
+/**
+ * The event list, given its events.
+ *
+ * Split from `TraceView` so a review surface can show the Trace a recorded state
+ * carried (WP3.9). The filtering, the search and the auto-scroll are all functions
+ * of the event list, so nothing had to change to make them work on a recorded one.
+ */
+export function TraceList({ trace }: { trace: TraceEvent[] }) {
   const [filter, setFilter] = useState<string>('');
   const [search, setSearch] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -188,4 +194,10 @@ export function TraceView() {
       </div>
     </div>
   );
+}
+
+/** The live Trace: `TraceList` fed from the run store. */
+export function TraceView() {
+  const trace = useRunStore((s) => s.trace);
+  return <TraceList trace={trace} />;
 }

@@ -5,10 +5,24 @@
 // A modal search palette that queries /api/docs/search and displays categorized
 // results.  Clicking a result triggers the help system (useHelp) to show details
 // in the HelpPopover.
+//
+// Two things about the search endpoint have to be respected here, and neither was.
+//
+// It answers `{query, results, total}`, not a bare array — the `.map` on the response
+// threw on every search, and the catch turned that into "No results found" for every
+// query anybody ever typed.
+//
+// And it labels its hits by *table*: `slipnet_node`, `codelet_type`, `component`,
+// `glossary`. The help endpoints are addressed differently — a concept by node name,
+// a codelet by type name, and a component or glossary term by `topic_key`, which is
+// not the title the search returns. Coercing everything unrecognised to `component`
+// and looking it up by title meant every glossary hit 404'd. `HITS` below is the one
+// place that translation happens.
 // ---------------------------------------------------------------------------
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { searchDocs } from '@/api/client';
+import type { DocSearchHit } from '@/api/client';
 import { useHelp } from '@/hooks/useHelp';
 import type { HelpType } from '@/hooks/useHelp';
 
@@ -17,8 +31,12 @@ import type { HelpType } from '@/hooks/useHelp';
 // ---------------------------------------------------------------------------
 
 interface SearchResult {
-  type: string;       // e.g. "concept", "codelet", "component", "glossary"
+  /** The search endpoint's own label: what table the hit came from. */
+  type: string;
+  /** What to show. */
   name: string;
+  /** What to ask the help endpoint for, which is not always the name. */
+  key: string;
   description: string;
 }
 
@@ -28,14 +46,14 @@ export interface SearchPaletteProps {
 }
 
 // ---------------------------------------------------------------------------
-// Category labels for display
+// The search endpoint's hit types, mapped to how help is addressed
 // ---------------------------------------------------------------------------
 
-const CATEGORY_LABELS: Record<string, string> = {
-  concept: 'Slipnet Nodes',
-  codelet: 'Codelet Types',
-  component: 'Components',
-  glossary: 'Glossary',
+const HITS: Record<string, { label: string; help: HelpType }> = {
+  slipnet_node: { label: 'Slipnet Nodes', help: 'concept' },
+  codelet_type: { label: 'Codelet Types', help: 'codelet' },
+  component: { label: 'Components', help: 'component' },
+  glossary: { label: 'Glossary', help: 'glossary' },
 };
 
 // ---------------------------------------------------------------------------
@@ -75,12 +93,14 @@ export function SearchPalette({ open, onClose }: SearchPaletteProps) {
     setIsLoading(true);
     debounceRef.current = setTimeout(async () => {
       try {
-        const data = await searchDocs(q.trim());
-        // The API may return items with { type, name, description }
+        const hits = await searchDocs(q.trim());
         setResults(
-          (data ?? []).map((item: any) => ({
+          hits.map((item: DocSearchHit) => ({
             type: item.type ?? 'unknown',
             name: item.name ?? '',
+            // Components and glossary terms are keyed by `topic_key`; nodes and
+            // codelets are keyed by the name that is also displayed.
+            key: item.topic_key ?? item.name ?? '',
             description: item.description ?? '',
           })),
         );
@@ -109,11 +129,12 @@ export function SearchPalette({ open, onClose }: SearchPaletteProps) {
   // Open help for a result
   const selectResult = useCallback(
     (result: SearchResult) => {
-      const helpType: HelpType =
-        result.type === 'concept' || result.type === 'codelet' || result.type === 'component'
-          ? result.type
-          : 'component'; // fallback for glossary or unknown types
-      showHelp(helpType, result.name);
+      const hit = HITS[result.type];
+      // An unrecognised hit type is left alone rather than guessed at. Guessing is
+      // what produced the bug this replaces: every glossary term was looked up as a
+      // component, by title, against a table keyed by topic_key.
+      if (hit === undefined) return;
+      showHelp(hit.help, result.key);
       onClose();
     },
     [showHelp, onClose],
@@ -245,7 +266,7 @@ export function SearchPalette({ open, onClose }: SearchPaletteProps) {
                   color: 'var(--text-muted, #666)',
                 }}
               >
-                {CATEGORY_LABELS[category] ?? category}
+                {HITS[category]?.label ?? category}
               </div>
 
               {/* Items */}
@@ -254,7 +275,7 @@ export function SearchPalette({ open, onClose }: SearchPaletteProps) {
                 const isSelected = globalIdx === selectedIndex;
                 return (
                   <div
-                    key={`${item.type}-${item.name}`}
+                    key={`${item.type}-${item.key}`}
                     onClick={() => selectResult(item)}
                     onMouseEnter={() => setSelectedIndex(globalIdx)}
                     style={{

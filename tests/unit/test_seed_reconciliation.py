@@ -1,7 +1,7 @@
 """The DB copy of the metadata must track the seed files without eating runtime data.
 
 These guard the startup reconciliation in ``server.main``.  They need SQLAlchemy,
-which only the Docker image has, so they skip locally and run in the container.
+which the venv provides via `pip install -e ".[dev]"`.
 """
 
 import pytest

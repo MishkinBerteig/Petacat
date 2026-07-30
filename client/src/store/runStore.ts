@@ -5,6 +5,8 @@
 import { create } from 'zustand';
 
 import type {
+  PersistenceMode,
+  RunParameterValue,
   RunParams,
   StepResult,
   WorkspaceState,
@@ -31,6 +33,7 @@ import {
   getTemperature,
   getCommentary,
   getMemory,
+  getRunMemory,
   setSpreadingThreshold as apiSetSpreadingThreshold,
 } from '@/api/client';
 
@@ -59,6 +62,16 @@ export interface RunStore {
    * with the old one.
    */
   runParams: RunParams | null;
+  /**
+   * The persistence mode the *loaded* run was created with, as the server reports
+   * it. Distinct from `persistenceMode` below, which is the choice for the next
+   * run: mode is fixed at creation, so the two differ exactly when running would
+   * start a new run rather than continue this one.
+   *
+   * `null` while no run is loaded, or when a run was loaded from somewhere that
+   * did not report it.
+   */
+  runMode: string | null;
   status: RunStatus;
   workspace: WorkspaceState | null;
   slipnet: SlipnetState | null;
@@ -86,6 +99,43 @@ export interface RunStore {
    * reached the run that actually executed.
    */
   spreadingThreshold: number;
+  /**
+   * What the *next* run will write down: `fast`, `normal` or `audit`.
+   *
+   * Deliberately not persisted across reloads, unlike `spreadingThreshold`. The
+   * threshold is remembered because it changes what a run does and a forgotten
+   * value would silently change results; this changes only what is kept, and the
+   * failure modes of a remembered value are the bad ones — coming back the next
+   * day to find that a session's worth of work recorded nothing (fast), or ran at
+   * 1.8x cost for a record nobody wanted (audit). It starts at `normal` every
+   * time, which is the mode whose promise is hardest to be disappointed by.
+   */
+  persistenceMode: PersistenceMode;
+  /**
+   * Per-run overrides for the engine's fixed parameters, for the *next* run.
+   *
+   * Only what differs from the catalogue's default is held here, so an empty object
+   * means "whatever the server's defaults are" rather than a frozen snapshot of them.
+   * That matters because the defaults are editable in the Admin panel: a client that
+   * sent all twenty-five values every time would silently pin a run to the defaults
+   * that happened to be loaded when the page opened.
+   */
+  parameterOverrides: Record<string, RunParameterValue>;
+  /**
+   * The overrides the *loaded* run was created with, as the client sent them.
+   *
+   * The same relationship as `runMode` to `persistenceMode`: a Run's parameters are
+   * fixed before its first codelet, so the two differ exactly when pressing Run has
+   * to start a new run rather than continue this one.
+   */
+  runParameterOverrides: Record<string, RunParameterValue>;
+  /**
+   * Worker threads for the *next* run. 1 is the serial loop and the reference mode;
+   * above 1 the run executes free-running and a seed no longer reproduces it.
+   */
+  workers: number;
+  /** Worker count the loaded run was created with — fixed, like the mode. */
+  runWorkers: number;
   isProcessing: boolean; // true while run-to-answer is active
 
   // Problem form inputs (shared across ProblemInputPanel and RunControlsPanel)
@@ -124,6 +174,11 @@ export interface RunStore {
   setElizaMode: (enabled: boolean) => void;
   setPollingInterval: (ms: number) => void;
   setSpreadingThreshold: (value: number) => Promise<void>;
+  setPersistenceMode: (mode: PersistenceMode) => void;
+  setParameterOverride: (name: string, value: RunParameterValue) => void;
+  clearParameterOverride: (name: string) => void;
+  clearAllParameterOverrides: () => void;
+  setWorkers: (workers: number) => void;
   setFormInput: (field: keyof RunStore['formInputs'], value: string) => void;
   setFormInputs: (values: Partial<RunStore['formInputs']>) => void;
 }
@@ -176,6 +231,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
   // ---- Default state -----------------------------------------------------
   runId: null,
   runParams: null,
+  runMode: null,
   status: 'idle',
   workspace: null,
   slipnet: null,
@@ -193,6 +249,11 @@ export const useRunStore = create<RunStore>((set, get) => ({
   epoch: 0,
   pollingInterval: 1000,
   spreadingThreshold: loadSpreadingThreshold(),
+  persistenceMode: 'normal',
+  parameterOverrides: {},
+  runParameterOverrides: {},
+  workers: 1,
+  runWorkers: 1,
   isProcessing: false,
   formInputs: {
     initial: '',
@@ -205,10 +266,25 @@ export const useRunStore = create<RunStore>((set, get) => ({
   // ---- Actions -----------------------------------------------------------
 
   createRun: async (params: RunParams): Promise<void> => {
-    // Sent with the create, so the engine is initialised with it and the whole
-    // run uses it — rather than being patched in after the first codelets.
+    // All four of these are sent with the create rather than applied afterwards. The
+    // threshold has to be, so the engine is initialised with it; the mode has to
+    // be, because it selects the sink and a Run's mode cannot change once it has
+    // begun writing (or not writing); the parameters and the worker count have to be
+    // for the same reason as the mode — they are read before the first codelet.
+    const overrides = get().parameterOverrides;
+    // Audit refuses anything above 1 — its forward log would not describe the order
+    // things actually happened in — so the request is built with what Audit will
+    // accept rather than with what the selector last held. The control shows 1 and
+    // says why, so this agrees with what is on screen; sending the other number
+    // instead would turn a mode change into a 400 the reader did not ask for.
+    const workers = get().persistenceMode === 'audit' ? 1 : get().workers;
     const info = await apiCreateRun({
       spreading_threshold: get().spreadingThreshold,
+      mode: get().persistenceMode,
+      workers,
+      // Omitted entirely when empty, so a run with no overrides sends the same
+      // request it always did.
+      ...(Object.keys(overrides).length > 0 ? { parameters: overrides } : {}),
       ...params,
     });
     // Blank the panels as well as swapping the id. Without this the previous
@@ -217,6 +293,11 @@ export const useRunStore = create<RunStore>((set, get) => ({
     set({
       runId: info.run_id,
       runParams: params,
+      runMode: info.mode ?? get().persistenceMode,
+      // Recorded as sent, not as echoed: the response carries neither, and these are
+      // what decide whether the next press of Run continues this run or starts one.
+      runParameterOverrides: { ...overrides },
+      runWorkers: workers,
       status: info.status as RunStatus,
       codeletCount: info.codelet_count,
       temperature: info.temperature,
@@ -489,6 +570,9 @@ export const useRunStore = create<RunStore>((set, get) => ({
     set({
       runId: null,
       runParams: null,
+      runMode: null,
+      runParameterOverrides: {},
+      runWorkers: 1,
       status: 'idle',
       workspace: null,
       slipnet: null,
@@ -520,6 +604,9 @@ export const useRunStore = create<RunStore>((set, get) => ({
     set({
       runId: null,
       runParams: null,
+      runMode: null,
+      runParameterOverrides: {},
+      runWorkers: 1,
       status: 'idle',
       workspace: null,
       slipnet: null,
@@ -625,8 +712,14 @@ export const useRunStore = create<RunStore>((set, get) => ({
   },
 
   refreshMemory: async (): Promise<void> => {
+    // Asked *of the run* whenever there is one, because which memory a run thinks
+    // against is a property of the run: a Fast Run gets an ephemeral one of its own
+    // and contributes nothing to the shared one. Reading the shared memory regardless
+    // showed a Fast Run answers it could not be reminded of, and went on showing them
+    // after it had found one that never appeared.
+    const { runId } = get();
     try {
-      const memory = await getMemory();
+      const memory = runId === null ? await getMemory() : await getRunMemory(runId);
       set({ memory });
     } catch {
       // Memory endpoint may not be available
@@ -695,6 +788,37 @@ export const useRunStore = create<RunStore>((set, get) => ({
         // Run may have gone; the stored value still applies to the next one.
       }
     }
+  },
+
+  setPersistenceMode: (mode: PersistenceMode): void => {
+    // Nothing is pushed to the server: a Run's mode is fixed at creation, so this
+    // can only ever apply to the *next* run. Trying to change a running run's mode
+    // would be a request the backend is right to have no endpoint for.
+    set({ persistenceMode: mode });
+  },
+
+  // Nothing below is pushed to the server either, and for the same reason: every one
+  // of these is read by the engine before the first codelet, so the only run they can
+  // apply to is the next one.
+
+  setParameterOverride: (name, value): void => {
+    set({ parameterOverrides: { ...get().parameterOverrides, [name]: value } });
+  },
+
+  clearParameterOverride: (name): void => {
+    // Removed rather than set back to the default's current value. The two look the
+    // same today and differ the moment the default is edited in the Admin panel: a
+    // parameter left pinned to yesterday's default is an override nobody chose.
+    const { [name]: _removed, ...rest } = get().parameterOverrides;
+    set({ parameterOverrides: rest });
+  },
+
+  clearAllParameterOverrides: (): void => {
+    set({ parameterOverrides: {} });
+  },
+
+  setWorkers: (workers): void => {
+    set({ workers: Math.max(1, Math.min(64, Math.round(workers))) });
   },
 
   setFormInput: (field, value): void => {

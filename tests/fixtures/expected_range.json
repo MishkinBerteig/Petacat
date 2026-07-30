@@ -10,7 +10,7 @@
     "max_steps_per_run": 6000
   },
   "scope": "Every unique (initial, modified, target) triple across all demo problems, run in discovery mode. Demos catalogued as justification contribute their triple with the supplied answer dropped: justification MODE is not carried forward past Phase 0, but the underlying analogy problems are.",
-  "note": "Regression oracle: compare SET MEMBERSHIP, never frequencies. A stopping state outside expected_range is a strong signal to investigate, not an automatic failure \u2014 see f1_over_n for the per-problem false-alarm rate. Absence is only evidence for the states listed in absence_check.",
+  "note": "Regression oracle: compare SET MEMBERSHIP, never frequencies. A stopping state outside expected_range is a strong signal to investigate, not an automatic failure -- see f1_over_n for the per-problem false-alarm rate. Absence is only evidence for the states listed in absence_check. expected_range is the union of the serially-saturated sample and any states in admitted_states, which were observed under a different execution mode and accepted by human review. The counts, f1 and f1_over_n fields describe the serial saturation sample ONLY and are deliberately not adjusted when a state is admitted: they measure how completely that sample explored, which admitting a state from elsewhere does not change.",
   "totals": {
     "problems": 13,
     "runs": 410000,
@@ -226,12 +226,13 @@
       "modified": "aabbcc",
       "target": "kkjjii",
       "runs": 10000,
-      "distinct_states": 2,
+      "distinct_states": 3,
       "f1": 0,
       "f1_over_n": 0.0,
       "stop_reason": "no_singletons",
       "saturated": true,
       "expected_range": [
+        "answer_found:kkjjii",
         "gave_up:",
         "halted:"
       ],
@@ -252,7 +253,12 @@
           "halted:": 0.0
         }
       },
-      "seconds": 1685.4
+      "seconds": 1685.4,
+      "admitted_states": {
+        "answer_found:kkjjii": {
+          "source": "free-running at 4 workers (WP4.4); admitted by human review as valid stopping states rather than defects"
+        }
+      }
     },
     {
       "name": "misc5",
@@ -266,13 +272,14 @@
       "modified": "abd",
       "target": "glz",
       "runs": 10000,
-      "distinct_states": 7,
+      "distinct_states": 8,
       "f1": 0,
       "f1_over_n": 0.0,
       "stop_reason": "no_singletons",
       "saturated": true,
       "expected_range": [
         "answer_found:dlz",
+        "answer_found:fky",
         "answer_found:flz",
         "answer_found:gld",
         "answer_found:gly",
@@ -307,7 +314,12 @@
           "answer_found:gld": 0.0
         }
       },
-      "seconds": 254.2
+      "seconds": 254.2,
+      "admitted_states": {
+        "answer_found:fky": {
+          "source": "free-running at 4 workers (WP4.4); admitted by human review as valid stopping states rather than defects"
+        }
+      }
     },
     {
       "name": "misc2",
@@ -533,7 +545,7 @@
       "modified": "abd",
       "target": "xyz",
       "runs": 25000,
-      "distinct_states": 35,
+      "distinct_states": 36,
       "f1": 2,
       "f1_over_n": 8e-05,
       "stop_reason": "in_band",
@@ -554,6 +566,7 @@
         "answer_found:xxy",
         "answer_found:xxz",
         "answer_found:xyd",
+        "answer_found:xye",
         "answer_found:xyx",
         "answer_found:xyy",
         "answer_found:xyz",
@@ -658,7 +671,12 @@
           "answer_found:xyd": 0.0
         }
       },
-      "seconds": 553.4
+      "seconds": 553.4,
+      "admitted_states": {
+        "answer_found:xye": {
+          "source": "free-running at 4 workers (WP4.4); admitted by human review as valid stopping states rather than defects"
+        }
+      }
     },
     {
       "name": "misc1",
@@ -735,13 +753,16 @@
       "modified": "qeeq",
       "target": "xxixx",
       "runs": 10000,
-      "distinct_states": 3,
+      "distinct_states": 6,
       "f1": 1,
       "f1_over_n": 0.0001,
       "stop_reason": "in_band",
       "saturated": true,
       "expected_range": [
         "answer_found:qexx",
+        "answer_found:qiq",
+        "answer_found:xix",
+        "answer_found:xxixx",
         "gave_up:",
         "halted:"
       ],
@@ -764,7 +785,18 @@
           "halted:": 0.0
         }
       },
-      "seconds": 1877.6
+      "seconds": 1877.6,
+      "admitted_states": {
+        "answer_found:qiq": {
+          "source": "free-running at 4 workers (WP4.4); admitted by human review as valid stopping states rather than defects"
+        },
+        "answer_found:xix": {
+          "source": "free-running at 4 workers (WP4.4); admitted by human review as valid stopping states rather than defects"
+        },
+        "answer_found:xxixx": {
+          "source": "free-running at 4 workers (WP4.4); admitted by human review as valid stopping states rather than defects"
+        }
+      }
     },
     {
       "name": "eqe-baaab",
@@ -779,7 +811,7 @@
       "modified": "qeq",
       "target": "abbba",
       "runs": 10000,
-      "distinct_states": 9,
+      "distinct_states": 11,
       "f1": 0,
       "f1_over_n": 0.0,
       "stop_reason": "no_singletons",
@@ -788,7 +820,9 @@
         "answer_found:abbba",
         "answer_found:abeba",
         "answer_found:abebq",
+        "answer_found:bqebq",
         "answer_found:ebbbq",
+        "answer_found:qbbba",
         "answer_found:qbeba",
         "answer_found:qbebq",
         "answer_found:qpebq",
@@ -828,7 +862,15 @@
           "answer_found:qbebq": 0.0
         }
       },
-      "seconds": 765.9
+      "seconds": 765.9,
+      "admitted_states": {
+        "answer_found:bqebq": {
+          "source": "free-running at 4 workers (WP4.4); admitted by human review as valid stopping states rather than defects"
+        },
+        "answer_found:qbbba": {
+          "source": "free-running at 4 workers (WP4.4); admitted by human review as valid stopping states rather than defects"
+        }
+      }
     },
     {
       "name": "run6",
@@ -846,7 +888,7 @@
       "modified": "qeq",
       "target": "abbbc",
       "runs": 94000,
-      "distinct_states": 30,
+      "distinct_states": 31,
       "f1": 9,
       "f1_over_n": 9.574e-05,
       "stop_reason": "in_band",
@@ -869,6 +911,7 @@
         "answer_found:ebbbc",
         "answer_found:ebbbq",
         "answer_found:qbbbe",
+        "answer_found:qbbbq",
         "answer_found:qbeba",
         "answer_found:qbebc",
         "answer_found:qbebq",
@@ -958,7 +1001,12 @@
           "answer_found:qbebq": 0.0
         }
       },
-      "seconds": 6884.6
+      "seconds": 6884.6,
+      "admitted_states": {
+        "answer_found:qbbbq": {
+          "source": "free-running at 4 workers (WP4.4); admitted by human review as valid stopping states rather than defects"
+        }
+      }
     },
     {
       "name": "run3",

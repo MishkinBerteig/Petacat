@@ -198,11 +198,24 @@ async def _reconcile_metadata_columns(engine) -> None:
                 # exist get the intended value instead of NULL. Without this a
                 # runtime table gaining a column — where the rows are real data
                 # and are not re-seeded — would read back None everywhere.
+                # Interpolated defaults have to be quoted when they are strings.
+                # Postgres reads an unquoted ``DEFAULT normal`` as a *column
+                # reference* and rejects it — "cannot use column reference in DEFAULT
+                # expression" — which went unnoticed while the only column with a
+                # server_default was ``spreading_threshold``, whose ``"100"`` happens
+                # to be valid unquoted. The first string-valued default (``runs.mode``)
+                # broke it. Numeric literals are still emitted bare so existing
+                # behaviour is unchanged.
                 default_sql = ""
                 if column.server_default is not None:
                     arg = getattr(column.server_default, "arg", None)
                     if arg is not None:
-                        default_sql = f" DEFAULT {arg}"
+                        literal = str(getattr(arg, "text", arg))
+                        try:
+                            float(literal)
+                        except ValueError:
+                            literal = "'" + literal.replace("'", "''") + "'"
+                        default_sql = f" DEFAULT {literal}"
                 logger.info(
                     "Adding missing column %s.%s (%s%s)",
                     table.name, column.name, type_sql, default_sql,
@@ -303,7 +316,7 @@ async def _ensure_db_ready():
 
         # Decide whether the bulk metadata in the DB is still current.
         #
-        # Checking merely "are there any rows?" meant a Docker volume left over
+        # Checking merely "are there any rows?" meant a database left over
         # from an earlier build kept serving stale metadata to the admin panel
         # while the engine ran the new seed files from JSON — a silent divergence
         # between what you can inspect and what is actually executing.  And
@@ -500,6 +513,13 @@ async def lifespan(app: FastAPI):
     run_service = RunService(meta)
     runs_module._run_service = run_service
 
+    # The review surfaces read the record rather than a live runner, so they get their
+    # own service with the metadata and nothing else (WP3.9).
+    from server.services.review_service import ReviewService
+    from server.api import review as review_module
+
+    review_module._review_service = ReviewService(meta)
+
     # Rehydrate episodic memory from DB (if DB is available)
     try:
         from server.db import async_session_factory
@@ -532,7 +552,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS for frontend dev server: the port published by docker-compose.dev.yml,
+# CORS for frontend dev server: the port `scripts/dev.sh` starts Vite on,
 # plus Vite's own default for running `npm run dev` on the host.
 app.add_middleware(
     CORSMiddleware,
@@ -549,6 +569,8 @@ from server.api.memory import router as memory_router
 from server.api.admin import router as admin_router
 from server.api.docs import router as docs_router
 from server.api.ws import router as ws_router
+from server.api.review import router as review_router
+from server.api.system import router as system_router
 
 app.include_router(runs_router)
 app.include_router(controls_router)
@@ -556,6 +578,8 @@ app.include_router(memory_router)
 app.include_router(admin_router)
 app.include_router(docs_router)
 app.include_router(ws_router)
+app.include_router(review_router)
+app.include_router(system_router)
 
 
 @app.get("/healthz")

@@ -18,6 +18,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 
 import { RunControlsPanel } from './RunControlsPanel'
 import { useRunStore } from '@/store/runStore'
+import { getRunIdentity } from '@/api/client'
 import type { WorkspaceState } from '@/types'
 
 vi.mock('@/api/client', () => ({
@@ -27,6 +28,51 @@ vi.mock('@/api/client', () => ({
   getSpreadingThreshold: vi
     .fn()
     .mockResolvedValue({ run_id: 1, spreading_activation_threshold: 100 }),
+  getRunIdentity: vi.fn().mockResolvedValue({
+    run_id: 12,
+    mode: 'normal',
+    recorded: true,
+    seed: 7,
+    spreading_threshold: 100,
+    config_hash: 'c0ffee1234567890',
+    memory_hash: 'deadbeef12345678',
+    session_id: 3,
+    created_at: null,
+  }),
+  // The panel now mounts the parameter form and the derived read-out, both of which
+  // fetch on mount. Stubbed rather than left out so a fetch failure in an unrelated
+  // test reads as a failure of the thing under test.
+  getParameterCatalogue: vi.fn().mockResolvedValue([
+    {
+      name: 'update_cycle_length',
+      kind: 'int',
+      group: 'Temperature and pacing',
+      label: 'Update cycle length',
+      description: 'How many codelets run between full recomputations.',
+      minimum: 1,
+      maximum: 1000,
+      departs_from_original: true,
+      default: 15,
+    },
+    {
+      name: 'self_watching_enabled_default',
+      kind: 'bool',
+      group: 'Self-watching',
+      label: 'Self-watching enabled',
+      description: 'Whether the Themespace, progress-watchers and jootsers run.',
+      minimum: null,
+      maximum: null,
+      departs_from_original: true,
+      default: true,
+    },
+  ]),
+  getRunParameters: vi.fn().mockResolvedValue({
+    run_id: 12,
+    fixed: { update_cycle_length: 15 },
+    overridden: [],
+    defaults: { update_cycle_length: 15 },
+    derived: { mode: 'normal', workers: 1 },
+  }),
 }))
 
 /** Minimal workspace standing in for a loaded run's problem. */
@@ -220,16 +266,21 @@ describe('RunControlsPanel — which problem a run button acts on', () => {
 })
 
 // ---------------------------------------------------------------------------
-// Run mode is a single mutually-exclusive choice
+// The execution strategy is a single mutually-exclusive choice
 // ---------------------------------------------------------------------------
 //
 // "Run to Answer" and "Run with Live Updates" used to be two primary buttons in
 // two separate boxes, which read as two unrelated features rather than two
-// strategies for the same run. They are now one selector, and each mode shows
+// strategies for the same run. They are now one selector, and each strategy shows
 // only its own pacing control -- `stepDelay` previously had no control at all,
 // while the polling slider sat visible in both modes despite applying to one.
+//
+// The strategy's `fast` value was renamed `batch` when Phase 0 introduced a
+// persistence mode also called Fast. They are unrelated, and two things in one
+// panel answering to one name is how a reader ends up believing that watching a
+// run more slowly changes what it records.
 
-describe('RunControlsPanel — run mode selector', () => {
+describe('RunControlsPanel — execution strategy selector', () => {
   let createRun: ReturnType<typeof vi.fn>
   let run: ReturnType<typeof vi.fn>
   let runToAnswer: ReturnType<typeof vi.fn>
@@ -252,13 +303,13 @@ describe('RunControlsPanel — run mode selector', () => {
     })
   }
 
-  it('defaults to fast mode and uses the backend run path', async () => {
+  it('defaults to batch execution and uses the backend run path', async () => {
     setupWithRun()
     render(<RunControlsPanel />)
 
     expect(
       (screen.getByLabelText(/how to run/i) as HTMLSelectElement).value,
-    ).toBe('fast')
+    ).toBe('batch')
     fireEvent.click(screen.getByRole('button', { name: /run to answer/i }))
 
     await waitFor(() => expect(runToAnswer).toHaveBeenCalled())
@@ -282,11 +333,11 @@ describe('RunControlsPanel — run mode selector', () => {
     expect(setLiveUpdate).toHaveBeenCalledWith(true)
   })
 
-  it('shows only the pacing control that applies to the chosen mode', () => {
+  it('shows only the pacing control that applies to the chosen strategy', () => {
     setupWithRun()
     render(<RunControlsPanel />)
 
-    // Fast mode is paced by how often the UI samples the engine.
+    // Batch execution is paced by how often the UI samples the engine.
     expect(screen.getByText(/sampling interval/i)).toBeTruthy()
     expect(screen.queryByText(/delay per codelet/i)).toBeNull()
 
@@ -299,7 +350,7 @@ describe('RunControlsPanel — run mode selector', () => {
     expect(screen.queryByText(/sampling interval/i)).toBeNull()
   })
 
-  it('keeps manual stepping available regardless of mode', () => {
+  it('keeps manual stepping available regardless of strategy', () => {
     setupWithRun()
     render(<RunControlsPanel />)
     expect(screen.getByRole('button', { name: /step 1/i })).toBeTruthy()
@@ -356,5 +407,373 @@ describe('RunControlsPanel — spreading threshold persists across runs', () => 
     setup({ runId: null, spreadingThreshold: 100 })
     render(<RunControlsPanel />)
     expect(screen.getByText(/Spreading threshold: 100 \(original\)/)).toBeTruthy()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Persistence mode -- what the run writes down (Phase 0 §A2)
+// ---------------------------------------------------------------------------
+//
+// Three claims, each with a plausible wrong version:
+//
+//   1. The mode reaches the run. The wrong version renders a selector that changes
+//      a local value the create request never sees, so every run is Normal and the
+//      user cannot tell because Normal is also what they would have got.
+//   2. Changing the mode starts a NEW run. Mode is fixed at creation, so the wrong
+//      version silently carries on with the run that is already loaded -- and the
+//      audit record the reader switched modes for does not exist afterwards.
+//   3. Fast's consequences are stated before the run, not discovered after it.
+//      Its absence from Run History is the mode working, and looks like a bug.
+
+describe('RunControlsPanel — persistence mode', () => {
+  function setupFor(
+    persistenceMode: 'fast' | 'normal' | 'audit',
+    overrides: Partial<ReturnType<typeof useRunStore.getState>> = {},
+  ) {
+    const createRun = vi.fn().mockResolvedValue(undefined)
+    const runToAnswer = vi.fn().mockResolvedValue(undefined)
+    const setPersistenceMode = vi.fn()
+    setup({
+      persistenceMode,
+      formInputs: { initial: 'abc', modified: 'abd', target: 'xyz', answer: '', seed: '7' },
+      createRun,
+      runToAnswer,
+      setPersistenceMode,
+      ...overrides,
+    })
+    return { createRun, runToAnswer, setPersistenceMode }
+  }
+
+  it('defaults to normal — the mode whose promise is hardest to be disappointed by', () => {
+    setupFor('normal', { runId: null })
+    render(<RunControlsPanel />)
+    expect(
+      (screen.getByLabelText(/what the run writes down/i) as HTMLSelectElement).value,
+    ).toBe('normal')
+  })
+
+  it('is selectable before any run exists', () => {
+    const { setPersistenceMode } = setupFor('normal', { runId: null })
+    render(<RunControlsPanel />)
+
+    fireEvent.change(screen.getByLabelText(/what the run writes down/i), {
+      target: { value: 'audit' },
+    })
+    expect(setPersistenceMode).toHaveBeenCalledWith('audit')
+  })
+
+  it('sends the chosen mode with the create, since it selects the sink', async () => {
+    const { createRun, runToAnswer } = setupFor('audit', { runId: null })
+    render(<RunControlsPanel />)
+
+    fireEvent.click(screen.getByRole('button', { name: /run to answer/i }))
+    await waitFor(() => expect(runToAnswer).toHaveBeenCalled())
+    // The store's createRun attaches the mode; the panel's job is to have asked
+    // for a new run at all, which is claim 2 below.
+    expect(createRun).toHaveBeenCalled()
+  })
+
+  it('starts a NEW run when only the mode was changed', async () => {
+    // Same problem, same seed, loaded run is Normal, the selector now says Audit.
+    const { createRun, runToAnswer } = setupFor('audit', {
+      runId: 12,
+      runMode: 'normal',
+      runParams: { initial: 'abc', modified: 'abd', target: 'xyz', seed: 7 },
+      workspace: workspaceFor('abc', 'abd', 'xyz'),
+    })
+
+    render(<RunControlsPanel />)
+    fireEvent.click(screen.getByRole('button', { name: /run to answer/i }))
+
+    await waitFor(() => expect(runToAnswer).toHaveBeenCalled())
+    expect(createRun).toHaveBeenCalledWith(
+      expect.objectContaining({ initial: 'abc', target: 'xyz', seed: 7 }),
+    )
+  })
+
+  it('says on screen that a mode change will start a new run', () => {
+    setupFor('audit', {
+      runId: 12,
+      runMode: 'normal',
+      runParams: { initial: 'abc', modified: 'abd', target: 'xyz', seed: 7 },
+      workspace: workspaceFor('abc', 'abd', 'xyz'),
+    })
+
+    render(<RunControlsPanel />)
+    expect(screen.getByText(/Recording mode differs from run #12/)).toBeTruthy()
+  })
+
+  it('reuses the loaded run when the mode matches it', async () => {
+    const { createRun, runToAnswer } = setupFor('normal', {
+      runId: 12,
+      runMode: 'normal',
+      runParams: { initial: 'abc', modified: 'abd', target: 'xyz', seed: 7 },
+      workspace: workspaceFor('abc', 'abd', 'xyz'),
+    })
+
+    render(<RunControlsPanel />)
+    fireEvent.click(screen.getByRole('button', { name: /run to answer/i }))
+
+    await waitFor(() => expect(runToAnswer).toHaveBeenCalled())
+    expect(createRun).not.toHaveBeenCalled()
+  })
+
+  it('reuses a run whose mode the store never learned', async () => {
+    // Adopted from a URL hash before modes were reported. Refusing to reuse it on
+    // the strength of a value we do not have would be worse than the odd wrong guess.
+    const { createRun, runToAnswer } = setupFor('audit', {
+      runId: 12,
+      runMode: null,
+      runParams: { initial: 'abc', modified: 'abd', target: 'xyz', seed: 7 },
+      workspace: workspaceFor('abc', 'abd', 'xyz'),
+    })
+
+    render(<RunControlsPanel />)
+    fireEvent.click(screen.getByRole('button', { name: /run to answer/i }))
+
+    await waitFor(() => expect(runToAnswer).toHaveBeenCalled())
+    expect(createRun).not.toHaveBeenCalled()
+  })
+
+  it('warns what Fast costs before the run rather than after it', () => {
+    setupFor('fast', { runId: null })
+    render(<RunControlsPanel />)
+    expect(screen.getByText(/no row in Run History/i)).toBeTruthy()
+  })
+
+  it('does not warn about Fast when Fast is not selected', () => {
+    setupFor('normal', { runId: null })
+    render(<RunControlsPanel />)
+    expect(screen.queryByText(/no row in Run History/i)).toBeNull()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// A live run's identity -- which config and which memory it ran against
+// ---------------------------------------------------------------------------
+//
+// The Review browser shows these, but by the time a reader is in the Review
+// browser the run they were watching is over. A Fast Run has no row and so no
+// hashes, and that has to read as the mode keeping its promise rather than as a
+// failed lookup.
+
+describe('RunControlsPanel — run identity', () => {
+  it('shows the config and memory hashes of the loaded run', async () => {
+    setup({
+      runId: 12,
+      runMode: 'normal',
+      runParams: { initial: 'abc', modified: 'abd', target: 'xyz', seed: 7 },
+      workspace: workspaceFor('abc', 'abd', 'xyz'),
+      formInputs: { initial: 'abc', modified: 'abd', target: 'xyz', answer: '', seed: '7' },
+    })
+
+    render(<RunControlsPanel />)
+    await waitFor(() => expect(screen.getByText(/cfg c0ffee12/)).toBeTruthy())
+    expect(screen.getByText(/mem deadbeef/)).toBeTruthy()
+    expect(screen.getByText(/Training Session 3/)).toBeTruthy()
+  })
+
+  it('explains, rather than blanks, a Fast Run that has no recorded identity', async () => {
+    vi.mocked(getRunIdentity).mockResolvedValueOnce({
+      run_id: -1,
+      mode: 'fast',
+      recorded: false,
+      seed: null,
+      spreading_threshold: 100,
+      config_hash: null,
+      memory_hash: null,
+      session_id: null,
+      created_at: null,
+    })
+
+    setup({
+      runId: -1,
+      runMode: 'fast',
+      runParams: { initial: 'abc', modified: 'abd', target: 'xyz', seed: 7 },
+      workspace: workspaceFor('abc', 'abd', 'xyz'),
+      formInputs: { initial: 'abc', modified: 'abd', target: 'xyz', answer: '', seed: '7' },
+      persistenceMode: 'fast',
+    })
+
+    render(<RunControlsPanel />)
+    await waitFor(() =>
+      expect(screen.getByText(/Not recorded — a Fast Run has no database row/)).toBeTruthy(),
+    )
+  })
+
+  it('still explains a Fast Run when the identity lookup itself is unreachable', async () => {
+    // Not hypothetical: the identity endpoint needs a database session, and a Fast
+    // Run is required to complete with Postgres stopped. The mode is already known
+    // from the creation response, so the explanation does not depend on the lookup.
+    vi.mocked(getRunIdentity).mockRejectedValueOnce(new Error('API 500'))
+
+    setup({
+      runId: -1,
+      runMode: 'fast',
+      runParams: { initial: 'abc', modified: 'abd', target: 'xyz', seed: 7 },
+      workspace: workspaceFor('abc', 'abd', 'xyz'),
+      formInputs: { initial: 'abc', modified: 'abd', target: 'xyz', answer: '', seed: '7' },
+      persistenceMode: 'fast',
+    })
+
+    render(<RunControlsPanel />)
+    await waitFor(() =>
+      expect(screen.getByText(/Not recorded — a Fast Run has no database row/)).toBeTruthy(),
+    )
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Worker count and engine parameters — the other two things fixed at creation
+// ---------------------------------------------------------------------------
+//
+// Both behave exactly as the persistence mode does, and for the same reason: the
+// engine reads them before the first codelet, so changing one cannot apply to a run
+// that has already begun. The wrong version carries on with the old run and the
+// reader gets a run that is not the experiment they set up.
+
+describe('RunControlsPanel — worker count', () => {
+  let createRun: ReturnType<typeof vi.fn>
+  let runToAnswer: ReturnType<typeof vi.fn>
+
+  beforeEach(() => {
+    createRun = vi.fn().mockResolvedValue(undefined)
+    runToAnswer = vi.fn().mockResolvedValue(undefined)
+  })
+
+  const LOADED = {
+    runId: 12,
+    runParams: { initial: 'abc', modified: 'abd', target: 'xyz', seed: 7 },
+    workspace: workspaceFor('abc', 'abd', 'xyz'),
+    formInputs: { initial: 'abc', modified: 'abd', target: 'xyz', answer: '', seed: '7' },
+  }
+
+  it('defaults to the serial loop and says that is the reference mode', () => {
+    setup({ ...LOADED, createRun, runToAnswer })
+
+    render(<RunControlsPanel />)
+    expect(screen.getByLabelText(/Workers/)).toHaveValue(1)
+    expect(
+      screen.getByText(/The same problem and seed reproduce the run exactly/),
+    ).toBeTruthy()
+  })
+
+  it('starts a NEW run when the worker count was changed', async () => {
+    setup({ ...LOADED, runWorkers: 1, workers: 4, createRun, runToAnswer })
+
+    render(<RunControlsPanel />)
+    expect(screen.getByText(/Worker count differs from run #12/)).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: /run to answer/i }))
+    await waitFor(() => expect(createRun).toHaveBeenCalled())
+  })
+
+  it('reuses the loaded run when the worker count matches it', async () => {
+    setup({ ...LOADED, runWorkers: 4, workers: 4, createRun, runToAnswer })
+
+    render(<RunControlsPanel />)
+    fireEvent.click(screen.getByRole('button', { name: /run to answer/i }))
+
+    await waitFor(() => expect(runToAnswer).toHaveBeenCalled())
+    expect(createRun).not.toHaveBeenCalled()
+  })
+
+  it('refuses free-running under Audit rather than letting the request 400', () => {
+    // Audit reconstructs states by replaying its log forward, and under free-running
+    // that log does not record the order things happened in — so the backend rejects
+    // anything above 1. The control has to say so, not discover it.
+    setup({ ...LOADED, workers: 4, persistenceMode: 'audit', createRun, runToAnswer })
+
+    render(<RunControlsPanel />)
+    const input = screen.getByLabelText(/Workers/)
+    expect(input).toBeDisabled()
+    expect(input).toHaveValue(1)
+    expect(screen.getByText(/Audit is serial by definition/)).toBeTruthy()
+  })
+})
+
+describe('RunControlsPanel — engine parameters', () => {
+  let createRun: ReturnType<typeof vi.fn>
+  let runToAnswer: ReturnType<typeof vi.fn>
+
+  beforeEach(() => {
+    createRun = vi.fn().mockResolvedValue(undefined)
+    runToAnswer = vi.fn().mockResolvedValue(undefined)
+  })
+
+  const LOADED = {
+    runId: 12,
+    runParams: { initial: 'abc', modified: 'abd', target: 'xyz', seed: 7 },
+    workspace: workspaceFor('abc', 'abd', 'xyz'),
+    formInputs: { initial: 'abc', modified: 'abd', target: 'xyz', answer: '', seed: '7' },
+  }
+
+  it('starts a NEW run when a parameter was changed', async () => {
+    setup({
+      ...LOADED,
+      runParameterOverrides: {},
+      parameterOverrides: { update_cycle_length: 40 },
+      createRun,
+      runToAnswer,
+    })
+
+    render(<RunControlsPanel />)
+    expect(screen.getByText(/Engine parameters differ from run #12/)).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: /run to answer/i }))
+    await waitFor(() => expect(createRun).toHaveBeenCalled())
+  })
+
+  it('reuses the loaded run when the parameters match it', async () => {
+    setup({
+      ...LOADED,
+      runParameterOverrides: { update_cycle_length: 40 },
+      parameterOverrides: { update_cycle_length: 40 },
+      createRun,
+      runToAnswer,
+    })
+
+    render(<RunControlsPanel />)
+    fireEvent.click(screen.getByRole('button', { name: /run to answer/i }))
+
+    await waitFor(() => expect(runToAnswer).toHaveBeenCalled())
+    expect(createRun).not.toHaveBeenCalled()
+  })
+
+  it('refuses to run at all while a parameter is outside the server\'s range', async () => {
+    setup({
+      ...LOADED,
+      parameterOverrides: { update_cycle_length: 5000 },
+      createRun,
+      runToAnswer,
+    })
+
+    render(<RunControlsPanel />)
+    // The catalogue arrives asynchronously; until it does there are no bounds to
+    // check against, so the refusal appears with it.
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /run to answer/i })).toBeDisabled(),
+    )
+    expect(screen.getByText(/must be at most 1000/)).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: /run to answer/i }))
+    expect(createRun).not.toHaveBeenCalled()
+    expect(runToAnswer).not.toHaveBeenCalled()
+  })
+})
+
+describe('RunControlsPanel — reaching the record of the run on screen', () => {
+  it('offers a route from the dashboard into the Review browser', async () => {
+    setup({
+      runId: 12,
+      runParams: { initial: 'abc', modified: 'abd', target: 'xyz', seed: 7 },
+      workspace: workspaceFor('abc', 'abd', 'xyz'),
+      formInputs: { initial: 'abc', modified: 'abd', target: 'xyz', answer: '', seed: '7' },
+    })
+
+    render(<RunControlsPanel />)
+    const link = await screen.findByRole('button', { name: /Review this run/i })
+    fireEvent.click(link)
+    expect(window.location.hash).toBe('#/review/runs/12')
   })
 })

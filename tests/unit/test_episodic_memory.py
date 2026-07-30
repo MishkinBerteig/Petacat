@@ -48,16 +48,44 @@ def test_store_snag_appends_to_snags_list():
     assert len(mem.snags) == 1
 
 
-def test_answer_description_assigns_incrementing_ids():
-    first = _answer({"a": "1"})
-    second = _answer({"a": "1"})
+def test_storing_answers_assigns_incrementing_ids():
+    mem = EpisodicMemory()
+    first, second = _answer({"a": "1"}), _answer({"a": "1"})
+    mem.store_answer(first)
+    mem.store_answer(second)
     assert second.answer_id == first.answer_id + 1
 
 
-def test_snag_description_assigns_incrementing_ids():
-    first = _snag({"a": "1"})
-    second = _snag({"a": "1"})
+def test_storing_snags_assigns_incrementing_ids():
+    mem = EpisodicMemory()
+    first, second = _snag({"a": "1"}), _snag({"a": "1"})
+    mem.store_snag(first)
+    mem.store_snag(second)
     assert second.snag_id == first.snag_id + 1
+
+
+def test_answer_ids_are_scoped_to_the_memory_not_the_process():
+    """A fresh memory numbers from 1 again.
+
+    Episodic Memory outlives a run — within a Training Session it accumulates
+    answers across many of them — so ``answer_id`` has to be unique within the
+    memory: ``/api/memory/compare`` identifies answers by it.  What it must *not*
+    depend on is how many answers some earlier, unrelated memory happened to hold,
+    which is what the class-level counter it replaced did (WP0.3 / defect D3).
+    """
+    first_session = EpisodicMemory()
+    for _ in range(3):
+        first_session.store_answer(_answer({"a": "1"}))
+
+    second_session = EpisodicMemory()
+    answer = _answer({"a": "1"})
+    second_session.store_answer(answer)
+    assert answer.answer_id == 1
+
+
+def test_unstored_answer_has_no_id():
+    """An answer description that was never stored has no place in a memory."""
+    assert _answer({"a": "1"}).answer_id == 0
 
 
 # --- theme distance --------------------------------------------------------

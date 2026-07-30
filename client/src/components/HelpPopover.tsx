@@ -25,20 +25,27 @@ export interface HelpPopoverProps {
 }
 
 export function HelpPopover(props: HelpPopoverProps) {
-  const { helpContent, isLoading, hideHelp } = useHelp();
+  const { helpContent, isLoading, error, hideHelp } = useHelp();
   const popoverRef = useRef<HTMLDivElement>(null);
 
   // Determine what to show: external props take priority over hook content
   const hasExternalContent = props.title !== undefined || props.description !== undefined;
-  const isOpen = hasExternalContent ? (props.open ?? false) : (helpContent !== null || isLoading);
+  // A failed lookup keeps the popover open to say so. It used to close silently the
+  // instant the request 404'd, which is indistinguishable from a button that does
+  // nothing — and that is exactly how the unreachable glossary entries presented.
+  const isOpen = hasExternalContent
+    ? (props.open ?? false)
+    : (helpContent !== null || isLoading || error !== null);
   const closeHandler = hasExternalContent ? (props.onClose ?? hideHelp) : hideHelp;
 
   // Derived display values
   const title = hasExternalContent
     ? (props.title ?? '')
-    : (helpContent?.name ?? 'Help');
+    : (helpContent?.name ?? (error !== null ? 'Not found' : 'Help'));
 
   let description = '';
+  /** The one-line definition, where the content type has one. */
+  let summary = '';
   let metadata: Record<string, string | number> = {};
 
   if (hasExternalContent) {
@@ -61,10 +68,20 @@ export function HelpPopover(props: HelpPopoverProps) {
         metadata['Source'] = `${helpContent.source_file}:${helpContent.source_line}`;
       }
     } else if (helpContent.type === 'component') {
+      summary = helpContent.short_desc ?? '';
       // Related glossary concepts from help_topics.{locale}.json metadata
       const related = helpContent.metadata?.key_concepts;
       if (Array.isArray(related) && related.length > 0) {
         metadata = { 'Related concepts': (related as string[]).join(', ') };
+      }
+    } else if (helpContent.type === 'glossary') {
+      // A glossary term's definition is the point of it, so it leads rather than
+      // being folded into the long form.
+      summary = helpContent.short_desc ?? '';
+      metadata = { Term: helpContent.term };
+      const related = helpContent.metadata?.see_also;
+      if (Array.isArray(related) && related.length > 0) {
+        metadata['See also'] = (related as string[]).join(', ');
       }
     }
   }
@@ -169,8 +186,23 @@ export function HelpPopover(props: HelpPopoverProps) {
         >
           {isLoading ? (
             <div className="text-muted">Loading...</div>
+          ) : !hasExternalContent && error !== null && helpContent === null ? (
+            <div style={{ color: 'var(--error)', lineHeight: 1.6 }}>{error}</div>
           ) : (
             <>
+              {/* The one-line definition, ahead of the long form. */}
+              {summary && (
+                <div
+                  style={{
+                    lineHeight: 1.5,
+                    color: 'var(--text-accent)',
+                    marginBottom: description ? 10 : 0,
+                  }}
+                >
+                  {summary}
+                </div>
+              )}
+
               {/* Description — preserve paragraph breaks from JSON */}
               {description && (
                 <div

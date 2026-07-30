@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import { useRunStore } from '@/store/runStore';
+import type { CoderackState } from '@/types';
 
 /** Map urgency level to a display color. */
 function urgencyColor(urgency: string): string {
@@ -27,9 +28,11 @@ function guessUrgency(typeName: string): string {
   return 'medium';
 }
 
-export function CoderackView() {
-  const coderack = useRunStore((s) => s.coderack);
-
+/**
+ * The bar chart, given its data — so a *recorded* coderack draws the same way a
+ * live one does (WP3.9).
+ */
+export function CoderackBars({ coderack }: { coderack: CoderackState | null }) {
   if (!coderack) {
     return (
       <div className="text-muted text-sm" style={{ padding: 16, textAlign: 'center' }}>
@@ -111,4 +114,10 @@ export function CoderackView() {
       })}
     </div>
   );
+}
+
+/** The live coderack: `CoderackBars` fed from the run store. */
+export function CoderackView() {
+  const coderack = useRunStore((s) => s.coderack);
+  return <CoderackBars coderack={coderack} />;
 }

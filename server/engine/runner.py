@@ -8,19 +8,24 @@ Scheme source: run.ss
 from __future__ import annotations
 
 import logging
+from collections import deque
 from dataclasses import dataclass, field
 from typing import Any
 
 logger = logging.getLogger("petacat.engine")
 
 from server.engine.codelet_dsl.builtins import get_builtins
-from server.engine.commentary import CommentaryLog, emit_new_problem
+from server.engine.commentary import CommentaryLog, CommentaryWriter, emit_new_problem
 from server.engine.codelet_dsl.interpreter import CodeletInterpreter, CodeletRegistry
+from server.engine.access import AccessRecorder
 from server.engine.coderack import Codelet, Coderack
+from server.engine.ids import IdAllocator, use_allocator
 from server.engine.memory import EpisodicMemory
 from server.engine.metadata import MetadataProvider
 from server.engine.rng import RNG
+from server.engine.sink import STRUCTURE_BUILT, NullSink, RunSink
 from server.engine.slipnet import Slipnet
+from server.engine.staleness import StaleView
 from server.engine.temperature import Temperature
 from server.engine.themes import Themespace
 from server.engine.trace import CONCEPT_ACTIVATION, TemporalTrace, TraceEvent
@@ -49,6 +54,10 @@ class StepResult:
     #: (§4.5.2).  Giving up is a real outcome, distinct from running out of
     #: codelets, so callers need to be able to tell the two apart.
     gave_up: bool = False
+    #: Did the state this codelet read still hold when it committed (WP4.2)?  Always
+    #: True serially, and only meaningful when access tracking is on.  Under
+    #: free-running, False is the conflict that becomes a fizzle.
+    premises_held: bool = True
 
 
 @dataclass
@@ -73,10 +82,16 @@ class EngineContext:
         trace: TemporalTrace,
         memory: EpisodicMemory,
         temperature: Temperature,
-        commentary: CommentaryLog,
+        commentary: CommentaryWriter,
         rng: RNG,
         meta: MetadataProvider,
+        ids: IdAllocator | None = None,
+        sink: RunSink | None = None,
     ) -> None:
+        #: This run's identifier counters.  Held here rather than on the classes that
+        #: allocate from it so that a run's identifiers depend on the run and not on
+        #: what the process happened to execute before it (``server/engine/ids.py``).
+        self.ids = ids if ids is not None else IdAllocator()
         self.workspace = workspace
         self.slipnet = slipnet
         self.coderack = coderack
@@ -87,10 +102,65 @@ class EngineContext:
         self.commentary = commentary
         self.rng = rng
         self.meta = meta
+        #: Where this run's record goes.  ``NullSink`` rather than ``None`` so every
+        #: emission site can call unconditionally; the engine never learns which mode
+        #: is attached (``server/engine/sink.py``).
+        self.sink: RunSink = sink if sink is not None else NullSink()
         self.codelet_count: int = 0
         self.justify_mode: bool = False
         self.self_watching_enabled: bool = True
         self.spreading_activation_threshold: int = 100
+
+        #: How many codelets behind the live Workspace each codelet reads (WP0.5).
+        #: 0 — the default — is ordinary live execution; nothing in
+        #: ``server/engine/staleness.py`` runs.  See that module for what a
+        #: non-zero value delays and what it deliberately does not.
+        self.staleness_delay: int = 0
+        self.view_history: deque[StaleView] = deque(maxlen=1)
+
+        #: Read/write-set tracking (WP4.2).  Absent rather than idle when off, so
+        #: serial execution — the permanent reference mode — pays one boolean check
+        #: rather than the recorder's cost.
+        self.track_access: bool = False
+        self.access: AccessRecorder | None = None
+
+        #: Held while a codelet mutates the Workspace, under free-running (WP4.4).
+        #: ``None`` when serial, so the serial loop takes no lock at all rather than an
+        #: uncontended one — the reference mode must not pay for machinery it cannot use.
+        #: A codelet is a long read-and-decide followed by a short mutation, so
+        #: serialising only the mutation leaves the expensive part parallel.
+        self.commit_lock: Any = None
+
+    def enable_access_tracking(self, enabled: bool = True) -> None:
+        """Turn read/write-set recording on or off.
+
+        Serially the recorder only observes; its validation always passes, because
+        nothing runs between a codelet's reads and its commit.  That is what makes
+        turning it on a no-op for behaviour and a source of telemetry for WP4.4.
+        """
+        self.track_access = bool(enabled)
+        if enabled and self.access is None:
+            self.access = AccessRecorder()
+        elif not enabled:
+            self.access = None
+
+    def set_staleness_delay(self, delay: int) -> None:
+        """Set the read lag, in codelets, and resize the history that serves it.
+
+        The history holds exactly ``delay`` views.  A view is captured at the top of
+        each step, *before* ``codelet_count`` is incremented, so the view taken at
+        the start of codelet *k* is labelled *k-1*; keeping ``delay`` of them leaves
+        the oldest at *k - delay* while codelet *k* runs, which is the lag asked for.
+        """
+        self.staleness_delay = max(0, int(delay))
+        self.view_history = deque(
+            self.view_history, maxlen=max(1, self.staleness_delay)
+        )
+
+    def capture_view(self) -> None:
+        """Record the current Workspace for codelets to read ``delay`` codelets hence."""
+        if self.staleness_delay:
+            self.view_history.append(StaleView(self))
 
 
 class EngineRunner:
@@ -101,10 +171,28 @@ class EngineRunner:
         self.ctx: EngineContext | None = None
         self.status: str = STATUS_INITIALIZED
         self._answers: list[str] = []
+        #: Guards ``on_turn_end`` against being emitted more than once per Run.
+        self._turn_ended: bool = False
+        #: How many Trace events have been handed to the sink so far.
+        self._trace_emitted: int = 0
 
         # Build the codelet interpreter and registry
         self._interpreter = CodeletInterpreter(builtins=get_builtins())
         self._registry = CodeletRegistry.from_metadata(meta, self._interpreter)
+
+    # -- Identifier scoping ------------------------------------------------
+    #
+    # Codelets, workspace objects, workspace structures and trace events take their
+    # identifiers from the run's ``IdAllocator``.  They reach it through the binding
+    # in ``server/engine/ids.py`` rather than through their constructors, because the
+    # DSL bodies in ``seed_data/codelet_types.json`` construct structures directly and
+    # threading an allocator argument through them would make adding a codelet type a
+    # code change again.
+    #
+    # The binding is re-established at each entry point rather than once per run.
+    # That is not belt-and-braces: the service layer runs one API request per step,
+    # each in its own asyncio task with its own context, so an allocator bound during
+    # ``init_mcat`` would not be visible to the request that steps the run next.
 
     def init_mcat(
         self,
@@ -114,11 +202,36 @@ class EngineRunner:
         answer: str | None = None,
         seed: int = 0,
         memory: EpisodicMemory | None = None,
+        commentary: CommentaryWriter | None = None,
+        sink: RunSink | None = None,
+        parameters: dict[str, Any] | None = None,
     ) -> None:
         """Initialize Metacat for a new run.
 
         Scheme: run.ss init-mcat.
         """
+        with use_allocator(IdAllocator()) as ids:
+            # Parameter overrides apply for this Run only, so the metadata is
+            # replaced on the runner rather than mutated: two Runs in one process must
+            # be able to disagree about the update cycle without disturbing each other.
+            if parameters:
+                self.meta = self.meta.with_overrides(parameters)
+            self._init_mcat(
+                initial, modified, target, answer, seed, memory, ids, commentary, sink,
+            )
+
+    def _init_mcat(
+        self,
+        initial: str,
+        modified: str,
+        target: str,
+        answer: str | None,
+        seed: int,
+        memory: EpisodicMemory | None,
+        ids: IdAllocator,
+        commentary: CommentaryWriter | None = None,
+        sink: RunSink | None = None,
+    ) -> None:
         rng = RNG(seed)
 
         # Structures consult the Themespace for thematic compatibility; the
@@ -152,8 +265,11 @@ class EngineRunner:
             initial=float(self.meta.get_param("initial_temperature", 100))
         )
 
-        # Create commentary log
-        commentary = CommentaryLog()
+        # Commentary is injected rather than constructed, so a mode that keeps no
+        # record can supply a writer that discards (WP3.10).  The default preserves
+        # the accumulating log, so nothing changes for a caller that does not care.
+        if commentary is None:
+            commentary = CommentaryLog()
 
         # Bundle context
         self.ctx = EngineContext(
@@ -167,6 +283,8 @@ class EngineRunner:
             commentary=commentary,
             rng=rng,
             meta=self.meta,
+            ids=ids,
+            sink=sink,
         )
 
         # Set modes
@@ -195,6 +313,13 @@ class EngineRunner:
 
         self.status = STATUS_INITIALIZED
         self._answers = []
+        self._turn_ended = False
+        self._trace_emitted = 0
+
+        # Normal mode's first complete-state capture.  Emitted last, so the state the
+        # sink sees is the one the first codelet will actually run against: initial
+        # descriptions attached, slipnodes clamped, opening codelets posted.
+        self.ctx.sink.on_run_created(self.ctx)
 
     def _add_initial_descriptions(self, workspace: Workspace, slipnet: Slipnet) -> None:
         """Add initial descriptions to all letters.
@@ -291,8 +416,17 @@ class EngineRunner:
         ctx = self.ctx
         if ctx is None:
             return StepResult()
+        with use_allocator(ctx.ids):
+            return self._step_mcat(ctx)
 
+    def _step_mcat(self, ctx: EngineContext) -> StepResult:
         result = StepResult()
+
+        # Record the Workspace before this codelet touches it, so that with a
+        # staleness delay configured the codelet reads the state of ``delay``
+        # codelets ago rather than the state it is about to change (WP0.5).  A
+        # no-op at the default delay of 0.
+        ctx.capture_view()
 
         # If coderack is empty, repost initial codelets and re-clamp
         # initial slipnodes (Scheme: run.ss:155-157)
@@ -318,7 +452,25 @@ class EngineRunner:
             codelet.codelet_type,
             ctx.temperature.value,
         )
-        self._execute_codelet(codelet)
+        if ctx.track_access and ctx.access is not None:
+            ctx.access.begin()
+            try:
+                self._execute_codelet(codelet)
+            finally:
+                # Validated here, at the codelet's own commit point, and nowhere else.
+                # A read-set means "these were the premises when I decided" and only
+                # answers a question asked at the moment of committing; checked later it
+                # is guaranteed to fail, because subsequent codelets have legitimately
+                # moved on.  Serially this always passes — nothing runs in between —
+                # which is exactly why tracking changes no serial behaviour.  Under
+                # free-running a False here is the signal to fizzle.
+                result.premises_held = ctx.access.validate()
+                ctx.access.end()
+        else:
+            self._execute_codelet(codelet)
+
+        self._emit_new_trace_events(ctx)
+        ctx.sink.on_codelet(ctx, codelet, result)
 
         # A jootser may have decided the program is looping and given up
         # (§4.5.2 — "Metacat simply 'gives up' in a graceful manner and stops").
@@ -326,6 +478,7 @@ class EngineRunner:
             self.status = STATUS_GAVE_UP
             ctx._gave_up = False  # type: ignore[attr-defined]
             result.gave_up = True
+            self.finish()
             return result
 
         # Check if a codelet reported an answer
@@ -338,13 +491,59 @@ class EngineRunner:
             ctx._pending_answer = None  # type: ignore[attr-defined]
             logger.info(">>> ANSWER FOUND: '%s' (quality=%.0f)", pending,
                         getattr(ctx, "_pending_answer_quality", 0))
+            ctx.sink.on_answer(
+                ctx, pending, float(getattr(ctx, "_pending_answer_quality", 0) or 0)
+            )
+            self.finish()
 
         # Check for update cycle
         ucl = self.meta.get_param("update_cycle_length", 15)
         if ctx.codelet_count % ucl == 0:
             self.update_everything()
+            # ``update_everything`` records concept-activation events of its own, and
+            # they arrive after the codelet has been reported.  Draining only once per
+            # step, before this call, silently dropped every one of them.
+            self._emit_new_trace_events(ctx)
 
         return result
+
+    def _emit_new_trace_events(self, ctx: EngineContext) -> None:
+        """Hand the sink every Trace event it has not seen yet.
+
+        Driven from a watermark rather than a per-call diff so that calling it more
+        often than necessary is free and calling it twice cannot double-report.  That
+        matters because Trace events are recorded from several places — codelets, the
+        Trace's own clamp and snag lifecycle, and the update cycle — and the emission
+        points have to cover all of them without coordinating with each other.
+        """
+        events = ctx.trace.events
+        if len(events) == self._trace_emitted:
+            return
+        for event in events[self._trace_emitted:]:
+            ctx.sink.on_trace_event(ctx, event)
+        self._trace_emitted = len(events)
+
+    def finish(self) -> None:
+        """Mark the Run stopped and emit ``on_turn_end`` exactly once.
+
+        Normal mode's second complete-state capture, and where a buffering Audit sink
+        flushes — so emitting it twice would double a Run's record, and not emitting it
+        would lose the end of one.
+
+        It is a method rather than a line at the bottom of ``run_mcat`` because a Run
+        can stop in three different places: a codelet reports an answer, a jootser
+        gives up, or the step budget runs out.  The service layer also drives runs one
+        codelet per API request and never calls ``run_mcat`` at all, so it needs a way
+        to say "this Run is over" itself.  The idempotence is what makes calling it
+        from all of those safe.
+        """
+        if self._turn_ended or self.ctx is None:
+            return
+        # Anything recorded since the last drain — a final snag, an answer event —
+        # must reach the sink before the Run's closing capture.
+        self._emit_new_trace_events(self.ctx)
+        self._turn_ended = True
+        self.ctx.sink.on_turn_end(self.ctx)
 
     def _execute_codelet(self, codelet: Codelet) -> None:
         """Execute a single codelet via the CodeletInterpreter.
@@ -381,6 +580,7 @@ class EngineRunner:
 
             step += 1
 
+        self.finish()
         result.status = self.status
         result.answers = list(self._answers)
         result.codelet_count = self.ctx.codelet_count if self.ctx else 0
@@ -405,7 +605,12 @@ class EngineRunner:
         ctx = self.ctx
         if ctx is None:
             return
+        # Bound here as well as in ``step_mcat`` because tests and the service layer
+        # both call this directly.
+        with use_allocator(ctx.ids):
+            self._update_everything(ctx)
 
+    def _update_everything(self, ctx: EngineContext) -> None:
         # 1. Check if rules are possible (Scheme: run.ss:297)
         ctx.workspace.check_if_rules_possible()
 

@@ -1,20 +1,35 @@
-"""SnapshotService — serializes/deserializes full engine state to/from DB.
+"""Pure serializers — engine state to plain JSON-compatible data.
 
-Handles cycle_snapshot round-trip: save current EngineContext state as a
-JSONB row, and restore it back to a live EngineContext.
+Every function here reads a live :class:`EngineContext` and returns dicts and
+lists of primitives. Nothing is written, nothing is queried, and no database
+name is imported: the module depends on the standard library and on
+``server.engine`` alone, so reading engine state costs nothing more than having
+the engine itself.
+
+That independence is the point of the module. These functions used to live in
+``server/services/snapshot_service.py`` alongside ``sqlalchemy`` and
+``server.models.run`` imports (defect D2 in the Phase 0 plan), which meant that
+anything wanting to look at engine state — a benchmark, a fuzzer, a test on a
+checkout with no database layer installed — had to drag in the ORM to get at
+functions that never touch it. The benchmark harness worked around this by
+stubbing out SQLAlchemy; the split removes the need.
+
+Persisting what these functions produce is the other half of the story, and it
+lives in ``server/services/snapshot_repository.py``.
+
+``pickle`` and ``base64`` appear below, and both are fine here: they are
+standard library, and the RNG's internal state is an opaque tuple that only
+``random`` itself can interpret, so round-tripping it through pickle is the only
+way to store it faithfully.
 """
 
 from __future__ import annotations
 
-import pickle
 import base64
+import pickle
 from typing import Any
 
-from sqlalchemy import select, delete
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from server.engine.runner import EngineContext
-from server.models.run import CycleSnapshot
 
 
 def serialize_rng_state(ctx: EngineContext) -> dict:
@@ -243,85 +258,3 @@ def serialize_workspace_state(ctx: EngineContext) -> dict:
         "top_rules": [_serialize_rule(r) for r in ws.top_rules if r.is_built],
         "bottom_rules": [_serialize_rule(r) for r in ws.bottom_rules if r.is_built],
     }
-
-
-async def save_cycle_snapshot(
-    session: AsyncSession,
-    run_id: int,
-    ctx: EngineContext,
-) -> int:
-    """Serialize full engine state to a cycle_snapshot row. Returns snapshot ID."""
-    snapshot = CycleSnapshot(
-        run_id=run_id,
-        codelet_count=ctx.codelet_count,
-        temperature=ctx.temperature.value,
-        rng_state=serialize_rng_state(ctx),
-        workspace_state=serialize_workspace_state(ctx),
-        slipnet_state=serialize_slipnet_state(ctx),
-        coderack_state=serialize_coderack_state(ctx),
-        themespace_state=serialize_themespace_state(ctx),
-        trace_state=serialize_trace_state(ctx),
-        runner_state=serialize_runner_state(ctx),
-    )
-    session.add(snapshot)
-    await session.flush()
-    return snapshot.id
-
-
-def restore_slipnet_state(ctx: EngineContext, state: dict) -> None:
-    """Restore slipnet activations from a snapshot."""
-    for name, node_state in state.items():
-        node = ctx.slipnet.nodes.get(name)
-        if node:
-            node.activation = node_state["activation"]
-            node.activation_buffer = node_state["activation_buffer"]
-            node.frozen = node_state["frozen"]
-            node.clamp_cycles_remaining = node_state["clamp_cycles_remaining"]
-
-
-def restore_trace_state(ctx: EngineContext, state: dict) -> None:
-    """Restore trace clamp/snag state from a snapshot."""
-    ctx.trace.within_clamp_period = state["within_clamp_period"]
-    ctx.trace.within_snag_period = state["within_snag_period"]
-    ctx.trace.last_clamp_time = state["last_clamp_time"]
-    ctx.trace.last_unclamp_time = state["last_unclamp_time"]
-    ctx.trace.clamp_count = state["clamp_count"]
-    ctx.trace.snag_count = state["snag_count"]
-
-
-def restore_runner_state(ctx: EngineContext, state: dict) -> None:
-    """Restore runner control state from a snapshot."""
-    ctx.codelet_count = state["codelet_count"]
-    ctx.temperature.value = state["temperature"]
-    ctx.temperature.clamped = state["temperature_clamped"]
-    ctx.temperature.clamp_value = state["temperature_clamp_value"]
-    ctx.temperature.clamp_cycles_remaining = state["temperature_clamp_cycles"]
-    ctx.justify_mode = state["justify_mode"]
-    ctx.self_watching_enabled = state["self_watching_enabled"]
-
-
-def restore_rng_state(ctx: EngineContext, state: dict) -> None:
-    """Restore RNG state from a snapshot."""
-    internal_state = pickle.loads(base64.b64decode(state["internal_state"]))
-    ctx.rng.set_state((state["seed"], state["call_count"], internal_state))
-
-
-async def prune_old_snapshots(
-    session: AsyncSession,
-    run_id: int,
-    keep_n: int = 10,
-) -> int:
-    """Remove all but the latest N cycle_snapshots for a run. Returns count removed."""
-    result = await session.execute(
-        select(CycleSnapshot.id)
-        .where(CycleSnapshot.run_id == run_id)
-        .order_by(CycleSnapshot.id.desc())
-    )
-    all_ids = [row[0] for row in result.all()]
-    if len(all_ids) <= keep_n:
-        return 0
-    ids_to_delete = all_ids[keep_n:]
-    await session.execute(
-        delete(CycleSnapshot).where(CycleSnapshot.id.in_(ids_to_delete))
-    )
-    return len(ids_to_delete)

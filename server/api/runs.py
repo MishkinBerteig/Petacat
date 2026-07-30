@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.db import get_session
+from server.models.run import Run
 
 router = APIRouter(prefix="/api/runs", tags=["runs"])
 
@@ -34,6 +39,23 @@ class CreateRunRequest(BaseModel):
     #: Set at creation so the whole run uses it, rather than being applied after
     #: the engine has already been initialised.
     spreading_threshold: int | None = None
+    #: Persistence mode — ``fast``, ``normal`` or ``audit``.  A property of this run
+    #: rather than a global setting, so a Fast corpus-training population and a Normal
+    #: live dialogue can coexist in one process.  ``fast`` touches the database at no
+    #: point, including creation, so a Fast Run works with Postgres stopped.
+    mode: str = "normal"
+    #: Worker threads for free-running execution (WP4.4).  1 — the default — is the
+    #: serial loop, which stays the reference mode.  Above 1 the run's codelets execute
+    #: across CPU cores with no global barrier; the expected range is unchanged, but a
+    #: seed no longer reproduces a run, because execution order is not determined.
+    #: Audit refuses anything above 1, since its forward log would not describe the
+    #: order things actually happened in.
+    workers: int = 1
+    #: Per-run overrides for the engine's fixed run parameters, by name.  Omitted
+    #: parameters keep the global default.  An unknown name is rejected rather than
+    #: ignored: ignoring it would produce a Run at the default while the record claimed
+    #: the override was applied.
+    parameters: dict[str, Any] | None = None
 
 
 class StepRequest(BaseModel):
@@ -46,6 +68,7 @@ class RunToCompletionRequest(BaseModel):
 
 class RunResponse(BaseModel):
     run_id: int
+    mode: str = "normal"
     status: str
     codelet_count: int
     temperature: float
@@ -59,11 +82,51 @@ class RunResponse(BaseModel):
     spreading_threshold: int = 100
 
 
+class RunListItem(RunResponse):
+    """A listed run, plus the identity fields only the row carries.
+
+    Separate from ``RunResponse`` rather than folded into it because the two are
+    populated from different places: ``RunResponse`` is built from a ``RunInfo``,
+    which is assembled from the live runner and knows nothing about hashes, whereas a
+    listing reads rows and has them to hand.  Widening ``RunResponse`` would mean
+    every single-run endpoint answering ``config_hash: null`` for runs that plainly
+    have one, which reads as "no config hash" rather than "not looked up".
+    """
+
+    config_hash: str | None = None
+    memory_hash: str | None = None
+
+
 class RunListResponse(BaseModel):
-    runs: list[RunResponse]
+    runs: list[RunListItem]
     total: int
     limit: int
     offset: int
+
+
+class RunIdentityResponse(BaseModel):
+    """What identifies a Run as an experiment, rather than what it is doing.
+
+    Seed and problem say what was asked; ``config_hash`` and ``memory_hash`` say what
+    it was asked *of*.  Two Runs with one seed and different hashes are not the same
+    experiment, which is why the Review browser shows them — and why a live run needs
+    somewhere to show them too, since by the time a reader is in the Review browser
+    the run they were watching is over.
+    """
+
+    run_id: int
+    mode: str
+    #: False for a Fast Run.  There is no ``runs`` row, so there is nothing to read
+    #: the hashes from and nothing to link a Training Session to.  This is the mode
+    #: keeping its promise, not a lookup failure, and the client says so.
+    recorded: bool
+    seed: int | None = None
+    spreading_threshold: int = 100
+    config_hash: str | None = None
+    memory_hash: str | None = None
+    #: The Training Session this Run belongs to — the span between memory clears.
+    session_id: int | None = None
+    created_at: datetime | None = None
 
 
 class StepResponse(BaseModel):
@@ -85,10 +148,17 @@ async def create_run(
     session: AsyncSession = Depends(get_session),
 ):
     svc = get_run_service()
-    info = await svc.create_run(
-        session, req.initial, req.modified, req.target, req.answer, req.seed,
-        spreading_threshold=req.spreading_threshold,
-    )
+    try:
+        info = await svc.create_run(
+            session, req.initial, req.modified, req.target, req.answer, req.seed,
+            spreading_threshold=req.spreading_threshold, mode=req.mode,
+            workers=req.workers, parameters=req.parameters,
+        )
+    except ValueError as exc:
+        # An unknown mode name. Rejected rather than defaulted: silently giving a Fast
+        # Run to someone who asked for Audit would only show up when the record they
+        # expected turned out not to exist.
+        raise HTTPException(400, str(exc)) from None
     return RunResponse(
         run_id=info.run_id,
         status=info.status,
@@ -100,6 +170,7 @@ async def create_run(
         answer=info.answer,
         justify_mode=info.justify_mode,
         spreading_threshold=info.spreading_threshold,
+        mode=info.mode,
     )
 
 
@@ -123,6 +194,7 @@ async def get_run(
         answer=info.answer,
         justify_mode=info.justify_mode,
         spreading_threshold=info.spreading_threshold,
+        mode=info.mode,
     )
 
 
@@ -196,12 +268,36 @@ async def list_runs(
     offset: int = 0,
     session: AsyncSession = Depends(get_session),
 ):
-    """List all runs (paginated)."""
+    """List all runs (paginated).
+
+    Fast Runs are structurally absent: they have no row, so nothing can list them.
+    The client explains that where the absence would otherwise look like a bug.
+    """
     svc = get_run_service()
     runs, total = await svc.list_runs(session, limit=limit, offset=offset)
-    return RunListResponse(
-        runs=[
-            RunResponse(
+
+    # Mode and the two hashes come from a second query rather than from ``RunInfo``,
+    # which does not carry them.  One statement over the ids just returned, so the
+    # cost is a single round trip regardless of the page size.
+    identity: dict[int, tuple[str, str | None, str | None]] = {}
+    if runs:
+        rows = await session.execute(
+            select(Run.id, Run.mode, Run.config_hash, Run.memory_hash).where(
+                Run.id.in_([r.run_id for r in runs])
+            )
+        )
+        identity = {
+            row.id: (row.mode or "normal", row.config_hash, row.memory_hash)
+            for row in rows
+        }
+
+    items = []
+    for r in runs:
+        # A run listed but absent from the identity query predates the mode column,
+        # and "normal" is what it was: the column's server default backfills it.
+        mode, config, memory = identity.get(r.run_id, ("normal", None, None))
+        items.append(
+            RunListItem(
                 run_id=r.run_id,
                 status=r.status,
                 codelet_count=r.codelet_count,
@@ -212,13 +308,180 @@ async def list_runs(
                 answer=r.answer,
                 justify_mode=r.justify_mode,
                 spreading_threshold=r.spreading_threshold,
+                mode=mode,
+                config_hash=config,
+                memory_hash=memory,
             )
-            for r in runs
-        ],
-        total=total,
-        limit=limit,
-        offset=offset,
+        )
+
+    return RunListResponse(runs=items, total=total, limit=limit, offset=offset)
+
+
+@router.get("/{run_id}/identity", response_model=RunIdentityResponse)
+async def get_run_identity(
+    run_id: int,
+    session: AsyncSession = Depends(get_session),
+):
+    """The recorded identity of a run: mode, seed, config hash, memory hash, session.
+
+    Served here rather than from ``/api/review`` because this one is about a run that
+    may still be executing.  The review router's contract is that its 404 means
+    "nothing was recorded"; this endpoint answers for a Fast Run too, and answers
+    ``recorded: false`` rather than 404, because "this run wrote nothing" is a fact
+    about it and not an absence of one.
+    """
+    svc = get_run_service()
+    info = await svc.get_run_info(session, run_id)
+    if info is None:
+        raise HTTPException(404, f"Run {run_id} not found")
+
+    result = await session.execute(select(Run).where(Run.id == run_id))
+    row = result.scalar_one_or_none()
+    if row is None:
+        # A Fast Run: live, observable, and with no row behind it by design.
+        return RunIdentityResponse(
+            run_id=run_id,
+            mode=info.mode,
+            recorded=False,
+            spreading_threshold=info.spreading_threshold,
+        )
+
+    return RunIdentityResponse(
+        run_id=row.id,
+        mode=row.mode or "normal",
+        recorded=True,
+        seed=row.seed,
+        spreading_threshold=(
+            100 if row.spreading_threshold is None else int(row.spreading_threshold)
+        ),
+        config_hash=row.config_hash,
+        memory_hash=row.memory_hash,
+        session_id=row.session_id,
+        created_at=row.created_at,
     )
+
+
+@router.get("/parameters/catalogue")
+async def get_parameter_catalogue():
+    """Every settable run parameter: kind, bounds, current default, and what it does.
+
+    Served rather than duplicated in the client, because the bounds are the same ones
+    the API validates against and two copies would drift — a control that lets you set a
+    value the server rejects is worse than no control.
+
+    Placed above ``/{run_id}/...`` so ``parameters`` is not parsed as a run id.
+    """
+    from server.engine.parameters import describe_parameters
+
+    svc = get_run_service()
+    return {"parameters": describe_parameters(svc.meta)}
+
+
+@router.get("/{run_id}/parameters")
+async def get_run_parameters(
+    run_id: int, session: AsyncSession = Depends(get_session),
+):
+    """What this Run was: the fixed parameters it ran under, and what they produced.
+
+    Both halves in one response because reading a Run needs both, and separating them
+    invites the mistake of showing derived values as though they were settings. The
+    ``fixed`` half is the *resolved* set — every parameter, not only the overridden ones
+    — so it is self-contained even if the global defaults change afterwards.
+    """
+    from server.engine.parameters import RUN_PARAMETERS, resolved_parameters
+
+    svc = get_run_service()
+    runner = svc._runners.get(run_id)
+
+    stored: dict | None = None
+    row = None
+    if run_id > 0:
+        result = await session.execute(select(Run).where(Run.id == run_id))
+        row = result.scalar_one_or_none()
+        if row is not None:
+            stored = row.parameters
+
+    if stored is None and runner is not None and runner.ctx is not None:
+        # A Fast Run has no row, and a Run created before this column existed has a null
+        # one; the live runner is then the only account of what it is executing under.
+        stored = resolved_parameters(runner.ctx.meta)
+    if stored is None:
+        raise HTTPException(404, f"No parameter record for run {run_id}")
+
+    defaults = {p.name: svc.meta.get_param(p.name) for p in RUN_PARAMETERS}
+    overridden = sorted(n for n, v in stored.items() if defaults.get(n) != v)
+
+    derived: dict = {
+        "mode": (row.mode if row is not None else svc._modes.get(run_id, "fast")),
+        "workers": svc._workers.get(run_id, 1),
+        "config_hash": row.config_hash if row is not None else None,
+        "memory_hash": row.memory_hash if row is not None else None,
+        "session_id": row.session_id if row is not None else None,
+        "seed": row.seed if row is not None else None,
+        "recorded": row is not None,
+    }
+
+    if runner is not None and runner.ctx is not None:
+        ctx = runner.ctx
+        coderack = ctx.coderack
+        shards = getattr(coderack, "num_shards", 1)
+        derived.update(
+            {
+                "codelet_count": ctx.codelet_count,
+                "temperature": round(ctx.temperature.value, 2),
+                "status": runner.status,
+                "justify_mode": ctx.justify_mode,
+                "slipnet_nodes": len(ctx.slipnet.nodes),
+                "coderack_shards": shards,
+                # Sharding divides the rack's capacity rather than replicating it, and
+                # a shard below the floor is too small for the jootsing sequence to
+                # complete — so the per-shard figure is the one worth seeing.
+                "coderack_capacity_per_shard": (
+                    coderack._racks[0].max_size if shards > 1 else coderack.max_size
+                ),
+                "staleness_delay": ctx.staleness_delay,
+            }
+        )
+        telemetry = svc._free_run_telemetry.get(run_id)
+        if telemetry is not None:
+            derived["free_running"] = telemetry
+
+    try:
+        from server.engine.numeric.backend import select_backend
+
+        backend = select_backend(
+            len(runner.ctx.slipnet.nodes) if runner and runner.ctx else 59
+        )
+        derived["numeric_backend"] = getattr(backend, "name", None) if backend else None
+        derived["numeric_device"] = (
+            str(getattr(backend, "device", "")) if backend else None
+        )
+    except Exception:  # pragma: no cover - the substrate is optional
+        derived["numeric_backend"] = None
+
+    return {
+        "run_id": run_id,
+        "fixed": stored,
+        "overridden": overridden,
+        "defaults": defaults,
+        "derived": derived,
+    }
+
+
+@router.get("/{run_id}/telemetry")
+async def get_run_telemetry(run_id: int):
+    """Free-running telemetry for a run, if it ran free-running.
+
+    Reported rather than inferred, because the interesting figures — the conflict rate
+    and how the work actually divided between workers — cannot be reconstructed from
+    the run's record afterwards. A free-running run is one draw, and this is the only
+    account of how it was taken.
+    """
+    svc = get_run_service()
+    telemetry = svc._free_run_telemetry.get(run_id)
+    if telemetry is None:
+        return {"run_id": run_id, "free_running": False}
+    return {"run_id": run_id, "free_running": True, **telemetry}
 
 
 @router.post("/{run_id}/run", response_model=RunResponse)
@@ -244,6 +507,7 @@ async def run_to_completion(
         answer=info.answer,
         justify_mode=info.justify_mode,
         spreading_threshold=info.spreading_threshold,
+        mode=info.mode,
     )
 
 
@@ -280,6 +544,7 @@ async def reset_run(
         answer=info.answer,
         justify_mode=info.justify_mode,
         spreading_threshold=info.spreading_threshold,
+        mode=info.mode,
     )
 
 
@@ -341,11 +606,85 @@ async def get_trace(
     return {"run_id": run_id, "events": events, "limit": limit, "offset": offset}
 
 
+def _project_memory(memory) -> dict:
+    """An in-process ``EpisodicMemory`` in the shape the Memory panel reads.
+
+    A near-twin of ``RunService.get_memory_state``, which projects the *shared* memory
+    and only that one; this projects whichever memory it is handed.  The duplication is
+    small and the alternative — a parameter on the service method — would have to be
+    added in ``server/services``, which this change does not touch.
+    """
+    return {
+        "answers": [
+            {
+                "answer_id": a.answer_id,
+                "run_id": a.run_id,
+                "problem": list(a.problem),
+                "top_rule_description": a.top_rule_description,
+                "bottom_rule_description": a.bottom_rule_description,
+                "top_rule_quality": a.top_rule_quality,
+                "bottom_rule_quality": a.bottom_rule_quality,
+                "quality": a.quality,
+                "temperature": a.temperature,
+                "themes": a.themes,
+                "unjustified_slippages": a.unjustified_slippages,
+                "activation": a.activation,
+                "top_themes": a.top_themes,
+                "vertical_themes": a.vertical_themes,
+                "bottom_themes": a.bottom_themes,
+                "unjustified_themes": a.unjustified_themes,
+                "top_rule_abstractness": a.top_rule_abstractness,
+                "is_coherent": a.is_coherent,
+            }
+            for a in memory.answers
+        ],
+        "snags": [
+            {
+                "snag_id": s.snag_id,
+                "run_id": s.run_id,
+                "problem": list(s.problem),
+                "codelet_count": s.codelet_count,
+                "temperature": s.temperature,
+                "theme_pattern": s.theme_pattern,
+                "description": s.description,
+            }
+            for s in memory.snags
+        ],
+    }
+
+
 @router.get("/{run_id}/memory")
 async def get_memory(run_id: int, session: AsyncSession = Depends(get_session)):
-    """Episodic memory contents (cross-run, from DB)."""
+    """The Episodic Memory *this run* is actually thinking against.
+
+    For a Normal or Audit Run that is the shared memory, read from the database, and
+    nothing here changes.  For a Fast Run it is not: a Fast Run is given an ephemeral
+    ``EpisodicMemory`` of its own precisely so that it contributes nothing to the
+    Training Session, and serving it the shared one made the panel a straightforward
+    lie — it showed answers the run could not be reminded of, and would go on showing
+    them after the run found an answer that never appeared.
+
+    ``scope`` says which of the two was served, because the difference is invisible
+    otherwise and the two are most easily confused when the ephemeral one is empty.
+    """
+    from server.services.sinks import MODE_FAST, MODE_NORMAL
+
     svc = get_run_service()
-    return await svc.get_memory_state_from_db(session)
+    runner = svc._runners.get(run_id)
+    mode = svc._modes.get(run_id, MODE_NORMAL)
+    if mode == MODE_FAST and runner is not None and runner.ctx is not None:
+        return {
+            **_project_memory(runner.ctx.memory),
+            "scope": "run",
+            "run_id": run_id,
+            "mode": mode,
+        }
+    return {
+        **await svc.get_memory_state_from_db(session),
+        "scope": "shared",
+        "run_id": run_id,
+        "mode": mode,
+    }
 
 
 @router.get("/{run_id}/commentary")

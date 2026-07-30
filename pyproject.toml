@@ -2,7 +2,10 @@
 name = "petacat"
 version = "0.9.0"
 description = "Python/React port of Metacat cognitive architecture for analogy-making"
-requires-python = ">=3.12"
+# Native macOS execution on a single Python version (WP2.1).  The container stack
+# this replaced pinned 3.12 while local test runs used whatever `python3` resolved
+# to, so the engine was routinely exercised on two interpreters and measured on one.
+requires-python = ">=3.14"
 dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.32",
@@ -20,13 +23,46 @@ dev = [
     "httpx>=0.28",
 ]
 
+# The numeric substrate (WP4.5).  Optional to *install*, but used whenever present:
+# Phase 0 B1 requires the numeric work to execute on the GPU cores, so the selection
+# policy takes MLX at every Slipnet size rather than above a threshold.  Install
+# `.[gpu]` to get that.  They remain optional because `server/engine/numeric/` ships a
+# pure-Python reference backend that is always available and the whole suite is verified
+# with NumPy and MLX made unimportable — the engine must not require a GPU to run at all.
+numeric = ["numpy>=2.0"]
+gpu = [
+    "numpy>=2.0",
+    # MLX is Apple-silicon only, which is also Petacat's only target (B1).
+    "mlx>=0.29; sys_platform == 'darwin' and platform_machine == 'arm64'",
+]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+# The repository is not a src layout — `server/` sits at the root beside `client/`,
+# `tests/` and `seed_data/` — so hatchling cannot infer what belongs in the wheel and
+# refuses to build.  It never came up before because the container installed the
+# dependency list directly and bind-mounted the source; `pip install -e .` was never
+# exercised.  Naming the package is what makes an editable install work, and with one
+# the test suite and the API find `server` without a PYTHONPATH.
+[tool.hatch.build.targets.wheel]
+packages = ["server"]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = [
+    # The expected-range check (tests/module/test_expected_range.py) runs ~1,300
+    # engine runs across a process pool. It is on by default because it is the
+    # standard regression oracle, but it is marked so a tight edit-test loop can
+    # deselect it with -m "not slow".
+    "slow: takes seconds to minutes; deselect with -m 'not slow'",
+]
 
-[tool.pytest.ini_options.env]
-TEST_DATABASE_URL = "postgresql+asyncpg://petacat:test@localhost:5433/petacat_test"
+# The e2e database URL is not set here.  A `[tool.pytest.ini_options.env]` table used
+# to sit at this spot naming port 5433 and password `test`, which matched neither the
+# container stack (5434, `dev`) nor anything else; pytest reported it as an unknown
+# option and ignored it, so the value had never been correct and never mattered.  The
+# default now lives in `tests/e2e/conftest.py`, next to the code that reads it, and
+# `TEST_DATABASE_URL` still overrides it.

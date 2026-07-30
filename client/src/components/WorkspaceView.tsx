@@ -4,6 +4,7 @@
 // ---------------------------------------------------------------------------
 
 import { useRunStore } from '@/store/runStore';
+import type { WorkspaceState } from '@/types';
 
 // Layout is organised into reserved horizontal bands so that nothing has to
 // share a y with something else. Previously every bridge label was placed at the
@@ -532,9 +533,16 @@ function BridgeKey({
   );
 }
 
-export function WorkspaceView() {
-  const workspace = useRunStore((s) => s.workspace);
-
+/**
+ * The diagram itself, given its data.
+ *
+ * Split from `WorkspaceView` so the review surfaces can draw a *recorded*
+ * workspace with the same code that draws the live one (WP3.9). Everything below
+ * this line was already a pure function of the workspace state; the only thing
+ * that tied it to a live run was the store read, which now happens in the thin
+ * wrapper underneath.
+ */
+export function WorkspaceDiagram({ workspace }: { workspace: WorkspaceState | null }) {
   if (!workspace) {
     return (
       <div className="text-muted text-sm" style={{ padding: 16, textAlign: 'center' }}>
@@ -818,4 +826,10 @@ export function WorkspaceView() {
       </defs>
     </svg>
   );
+}
+
+/** The live workspace: `WorkspaceDiagram` fed from the run store. */
+export function WorkspaceView() {
+  const workspace = useRunStore((s) => s.workspace);
+  return <WorkspaceDiagram workspace={workspace} />;
 }

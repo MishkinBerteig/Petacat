@@ -6,6 +6,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRunStore } from '@/store/runStore';
 import { api } from '@/api/client';
 import { SlipnetGraphView } from './SlipnetGraphView';
+import type { SlipnetState } from '@/types';
 
 interface LinkDef {
   id: number;
@@ -33,12 +34,23 @@ function activationColor(activation: number): string {
   return `rgb(${r},${g},${b})`;
 }
 
-export function SlipnetView() {
+interface SlipnetViewProps {
+  /**
+   * Activations to draw. Omit for the live run; pass a recorded state to review one
+   * (WP3.9). The node-focus panel is a live-run affordance — it offers an Edit button
+   * that jumps into the Slipnet configuration editor — so a review passes `readOnly`
+   * and stays on the graph.
+   */
+  slipnet?: SlipnetState | null;
+  readOnly?: boolean;
+}
+
+export function SlipnetView({ slipnet, readOnly = false }: SlipnetViewProps = {}) {
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [focusedNode, setFocusedNode] = useState<string | null>(null);
 
   // Node focus view (replaces the graph when a node is double-clicked)
-  if (focusedNode) {
+  if (focusedNode && !readOnly) {
     return (
       <SlipnetNodeFocus
         nodeName={focusedNode}
@@ -55,6 +67,8 @@ export function SlipnetView() {
           selectedNode={selectedNode}
           onSelectNode={setSelectedNode}
           onDoubleClickNode={setFocusedNode}
+          slipnet={slipnet}
+          readOnly={readOnly}
         />
       </div>
     </div>

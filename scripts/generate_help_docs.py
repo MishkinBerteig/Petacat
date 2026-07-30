@@ -25,9 +25,10 @@ import argparse
 import sys
 from pathlib import Path
 
-# Allow running this script directly from a repo checkout, outside the Docker
-# container (which sets PYTHONPATH=/app). Add the repo root to sys.path so we
-# can import server.services.help_docs.
+# Allow running this script directly from a repo checkout with any interpreter and
+# from any working directory. The project venv has `server` on its path already
+# (`pip install -e .`), but this script is often reached by an interpreter that does
+# not, so add the repo root to sys.path before importing server.services.help_docs.
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 

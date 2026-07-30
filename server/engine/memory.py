@@ -11,6 +11,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from server.engine.ids import KIND_ANSWER, KIND_SNAG, IdAllocator
+
 
 @dataclass
 class AnswerDescription:
@@ -43,11 +45,10 @@ class AnswerDescription:
     # answer reflects how strongly the program is reminded of it."
     activation: float = 0.0
 
-    _next_id: int = 0
-
     def __post_init__(self) -> None:
-        AnswerDescription._next_id += 1
-        self.answer_id = AnswerDescription._next_id
+        # ``answer_id`` is stamped by :meth:`EpisodicMemory.store_answer`, not here.
+        # It numbers an answer's place in a memory, and a description that has not
+        # been stored has no place in one yet.  See ``server/engine/ids.py``.
         if not self.vertical_themes:
             self.vertical_themes = dict(self.themes)
 
@@ -82,31 +83,35 @@ class SnagDescription:
     run_id: int | None = None
     snag_id: int = 0
 
-    _next_id: int = 0
-
-    def __post_init__(self) -> None:
-        SnagDescription._next_id += 1
-        self.snag_id = SnagDescription._next_id
-
 
 class EpisodicMemory:
     """Cross-run episodic memory.
 
     Memory is scoped to the user/session, not to individual runs.
     A manual "Clear Memory" action resets it (matching clearmem in Scheme).
+
+    Because it outlives a run, it is also the right owner of answer and snag
+    numbering.  ``POST /api/memory/compare`` identifies answers by ``answer_id``
+    across every run in a Training Session, so those identifiers have to be unique
+    within the *memory*; per-run numbering would give two answers found in two runs
+    of one session the same id.  A fresh ``EpisodicMemory`` starts again at 1, which
+    is what removes the process-history dependence WP0.3 is about.
     """
 
     def __init__(self) -> None:
         self.answers: list[AnswerDescription] = []
         self.snags: list[SnagDescription] = []
+        self.ids = IdAllocator()
 
     def store(self, desc: AnswerDescription) -> None:
-        self.answers.append(desc)
+        self.store_answer(desc)
 
     def store_answer(self, desc: AnswerDescription) -> None:
+        desc.answer_id = self.ids.next(KIND_ANSWER)
         self.answers.append(desc)
 
     def store_snag(self, desc: SnagDescription) -> None:
+        desc.snag_id = self.ids.next(KIND_SNAG)
         self.snags.append(desc)
 
     def find_remindings(

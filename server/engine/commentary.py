@@ -11,7 +11,7 @@ Scheme source: commentary-graphics.ss, answers.ss, trace.ss, jootsing.ss
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Protocol, runtime_checkable
 
 
 @dataclass
@@ -22,6 +22,44 @@ class CommentaryParagraph:
     technical_text: str
     codelet_count: int = 0
     event_type: str = ""
+
+
+@runtime_checkable
+class CommentaryWriter(Protocol):
+    """Where commentary goes — an injected dependency rather than a fixed log.
+
+    Commentary is output and nothing else: the engine calls ``emit_*``, which calls
+    ``add_comment``, and no part of cognition ever reads a paragraph back.  ``render``,
+    ``get_paragraphs`` and ``count`` are used only by the API.
+
+    That asymmetry is what makes commentary a *sink* concern.  Fast Run must construct
+    nothing storable, and a log of formatted prose that no one will read is exactly the
+    kind of thing that requirement is about.  Rather than teach the engine to ask
+    whether it is in Fast Run — which would put a mode flag inside
+    ``server/engine/`` and undermine the whole point of the ``RunSink`` port — the
+    engine emits unconditionally and Fast Run supplies a writer that discards.
+
+    ``render`` and ``count`` are part of the protocol because the API calls them
+    regardless of mode.  Fast means *not written down*, not *not observable*: a Fast
+    Run must still answer ``GET /commentary``, and answer it with nothing.
+    """
+
+    def add_comment(
+        self,
+        eliza_text: str,
+        technical_text: str,
+        codelet_count: int = 0,
+        event_type: str = "",
+    ) -> None: ...
+
+    def render(self, eliza_mode: bool = False) -> str: ...
+
+    def get_paragraphs(self) -> list[CommentaryParagraph]: ...
+
+    def clear(self) -> None: ...
+
+    @property
+    def count(self) -> int: ...
 
 
 class CommentaryLog:
@@ -61,6 +99,48 @@ class CommentaryLog:
     @property
     def count(self) -> int:
         return len(self._paragraphs)
+
+
+class DiscardingCommentaryLog:
+    """A commentary writer that keeps nothing — Fast Run's (WP3.6, §A2 requirement 2).
+
+    Deliberately a discarder rather than a collector nobody drains.  A buffering
+    implementation would satisfy "nothing is written to the database" while still
+    formatting every paragraph and holding the result, which is the requirement's
+    failure mode, not its satisfaction.  ``__slots__`` is empty so there is nowhere to
+    accumulate even by accident, and the allocation probe in WP3.6 can assert that a
+    Fast Run allocates no paragraphs at all.
+    """
+
+    __slots__ = ()
+
+    def add_comment(
+        self,
+        eliza_text: str,
+        technical_text: str,
+        codelet_count: int = 0,
+        event_type: str = "",
+    ) -> None:
+        """Accept and forget.  The arguments are already-built strings, which is the
+        one cost this cannot avoid: the f-strings in the ``emit_*`` helpers are
+        evaluated at the call site.  They are transient and never retained, so nothing
+        accumulates; removing even that would mean the engine knowing its mode."""
+
+    def render(self, eliza_mode: bool = False) -> str:
+        return ""
+
+    def get_paragraphs(self) -> list[CommentaryParagraph]:
+        return []
+
+    def clear(self) -> None:
+        pass
+
+    @property
+    def count(self) -> int:
+        return 0
+
+    def __repr__(self) -> str:
+        return "DiscardingCommentaryLog()"
 
 
 # ---- Commentary generation helpers ----------------------------------------

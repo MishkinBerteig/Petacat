@@ -5,7 +5,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useRunStore } from '@/store/runStore';
 import { api } from '@/api/client';
-import type { SlipnetNodeDef } from '@/types';
+import type { SlipnetNodeDef, SlipnetState } from '@/types';
 
 interface LinkDef {
   id: number;
@@ -55,11 +55,36 @@ interface Props {
   onSelectNode?: (name: string) => void;
   onDoubleClickNode?: (name: string) => void;
   selectedNode?: string | null;
+  /**
+   * Activations to draw. Omit for the live run; pass a recorded state to review one
+   * (WP3.9).
+   *
+   * This component takes an override rather than being split into a pure part and a
+   * store-reading wrapper, as `WorkspaceView` and the others were. The layout and the
+   * drawing here really are pure, but the graph is also an *interactive* surface —
+   * right-clicking a node clamps it in the live run — and clamping is meaningless on
+   * a recording. Rather than tear the interaction out to a container, the review
+   * caller passes `readOnly` and gets the same picture without the actions that only
+   * a live engine can honour.
+   */
+  slipnet?: SlipnetState | null;
+  /** Suppress the clamp menu: a recorded Slipnet cannot be clamped. */
+  readOnly?: boolean;
 }
 
-export function SlipnetGraphView({ onSelectNode, onDoubleClickNode, selectedNode }: Props) {
-  const slipnet = useRunStore((s) => s.slipnet);
-  const runId = useRunStore((s) => s.runId);
+export function SlipnetGraphView({
+  onSelectNode,
+  onDoubleClickNode,
+  selectedNode,
+  slipnet: slipnetOverride,
+  readOnly = false,
+}: Props) {
+  const liveSlipnet = useRunStore((s) => s.slipnet);
+  const liveRunId = useRunStore((s) => s.runId);
+  // `undefined` means "not supplied"; `null` is a supplied-but-empty recorded state,
+  // which must not fall back to the live run's activations.
+  const slipnet = slipnetOverride !== undefined ? slipnetOverride : liveSlipnet;
+  const runId = readOnly ? null : liveRunId;
 
   const [nodeDefs, setNodeDefs] = useState<SlipnetNodeDef[]>([]);
   const [links, setLinks] = useState<LinkDef[]>([]);
@@ -413,8 +438,8 @@ export function SlipnetGraphView({ onSelectNode, onDoubleClickNode, selectedNode
         })}
       </svg>
 
-      {/* Context menu */}
-      {contextMenu && (
+      {/* Context menu — clamping is a live-run action, so a review never offers it */}
+      {contextMenu && !readOnly && (
         <div
           style={{
             position: 'fixed', left: contextMenu.x, top: contextMenu.y,

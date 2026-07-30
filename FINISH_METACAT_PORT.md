@@ -1,5 +1,12 @@
 # Finish the Metacat Port
 
+> **Note (July 2026).** This is a record of completed work and is kept as written.
+> One thing in it has since changed: Phase 0 WP2.1 removed the container stack, so
+> `Dockerfile`, `Dockerfile.dev` and both compose files no longer exist and Petacat
+> runs natively — `scripts/dev.sh` is the dev runner that replaced
+> `docker compose up`, and [README.md](README.md) has the current setup. The Docker
+> section below, and the test counts throughout, describe the state at the time.
+
 **Goal:** bring Petacat to functional parity with Marshall's Metacat (PhD dissertation,
 Indiana University, 1999) and the reference Scheme implementation in `../Metacat/`.
 

@@ -1,12 +1,20 @@
 // ---------------------------------------------------------------------------
 // CommentaryPanel -- Scrollable text area showing run commentary
 // ---------------------------------------------------------------------------
+//
+// One wrinkle from Phase 0's WP3.10: commentary became a sink concern, and a Fast
+// Run is handed a discarding writer. The engine still calls `emit_*` for every
+// paragraph; nothing keeps them. So a Fast Run that has answered returns an empty
+// commentary, and the panel's ordinary empty message ("start a run to see
+// commentary") is then a lie about a run that has already finished.
+// ---------------------------------------------------------------------------
 
 import { useRef, useEffect } from 'react';
 import { useRunStore } from '@/store/runStore';
 
 export function CommentaryPanel() {
   const commentary = useRunStore((s) => s.commentary);
+  const runMode = useRunStore((s) => s.runMode);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const prevText = useRef('');
@@ -50,6 +58,12 @@ export function CommentaryPanel() {
           >
             {displayText}
           </pre>
+        ) : runMode === 'fast' ? (
+          <div className="text-muted text-sm" style={{ padding: 8 }}>
+            A Fast run discards commentary as it is produced, so there is none to
+            show — the engine writes the same paragraphs, and nothing keeps them.
+            Choose Normal or Audit under Recording to read the narration.
+          </div>
         ) : (
           <div className="text-muted text-sm" style={{ padding: 8 }}>
             No commentary yet. Start a run to see commentary.

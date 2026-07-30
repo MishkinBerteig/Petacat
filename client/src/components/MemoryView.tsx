@@ -112,9 +112,36 @@ export function MemoryView() {
 
   const { answers, snags } = memory;
   const isEmpty = answers.length === 0 && snags.length === 0;
+  /**
+   * A Fast Run is handed an ephemeral Episodic Memory of its own, so that it can
+   * contribute nothing to the Training Session — which is the whole of what Fast
+   * promises. This panel used to show the shared database memory regardless, which
+   * made it a straightforward lie about the run on screen: the answers listed were
+   * ones the run could not possibly be reminded of, and the answer it went on to find
+   * never appeared among them.
+   */
+  const isEphemeral = memory.scope === 'run';
 
   return (
     <div style={{ fontSize: 12 }}>
+      {isEphemeral && (
+        <div
+          className="text-xs"
+          style={{
+            marginBottom: 6,
+            padding: '4px 6px',
+            borderRadius: 3,
+            border: '1px solid var(--warning)',
+            color: 'var(--warning)',
+          }}
+        >
+          This run's own memory, not the shared one. A <strong>Fast</strong> run gets
+          an ephemeral Episodic Memory that starts empty, is not read from the
+          database, and is discarded when the run is — so nothing here reaches the
+          Training Session and nothing from it reaches here.
+        </div>
+      )}
+
       {/* Header with counts and clear button */}
       <div
         style={{
@@ -128,8 +155,13 @@ export function MemoryView() {
           {answers.length} answer{answers.length !== 1 ? 's' : ''}
           {snags.length > 0 && `, ${snags.length} snag${snags.length !== 1 ? 's' : ''}`}
         </span>
+        {/* Both actions address the *shared* memory — comparison by answer id
+            against `_global_memory`, clearing by deleting the stored rows — so
+            neither is offered while an ephemeral one is on screen. Offering them
+            would act on answers other than the ones being looked at, and the ids
+            of the two memories are independent counters that collide. */}
         <span style={{ display: 'flex', gap: 8 }}>
-          {answers.length >= 2 && (
+          {answers.length >= 2 && !isEphemeral && (
             <button
               onClick={handleCompare}
               disabled={selected.length !== 2 || comparing}
@@ -142,7 +174,7 @@ export function MemoryView() {
               {comparing ? 'Comparing...' : `Compare (${selected.length}/2)`}
             </button>
           )}
-          {!isEmpty && (
+          {!isEmpty && !isEphemeral && (
             <button
               onClick={handleClear}
               style={{ fontSize: 10, color: 'var(--error)' }}

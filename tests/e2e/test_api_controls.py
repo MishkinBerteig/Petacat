@@ -1,7 +1,7 @@
 """E2E tests for interactive control endpoints.
 
 ALL tests are deterministic: same seed → same results.
-Requires: docker compose -f docker-compose.dev.yml up -d
+Requires: a local Postgres — start it with `scripts/dev.sh db`.
 """
 
 import pytest

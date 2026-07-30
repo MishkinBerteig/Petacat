@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from server.engine.runner import EngineContext
 
+from server.engine.access import AccessSet
 from server.engine.bonds import Bond
 from server.engine.bridges import Bridge
 from server.engine.coderack import Codelet
@@ -29,6 +30,8 @@ from server.engine.descriptions import Description
 from server.engine.formulas import temp_adjusted_probability, temp_adjusted_values
 from server.engine.groups import Group
 from server.engine.rules import Rule
+from server.engine.sink import STRUCTURE_BROKEN, STRUCTURE_BUILT
+from server.engine.staleness import current_view
 from server.engine.trace import (
     ANSWER_FOUND,
     BOND_BROKEN,
@@ -99,16 +102,94 @@ def get_builtins() -> dict[str, Any]:
     }
 
 
+# ── Read/write-set tracking (WP4.2) ──
+#
+# Two one-line helpers rather than tracking calls scattered inline, because the sites
+# are numerous and the guard has to be identical at every one of them.  Both are no-ops
+# unless tracking is on, which is what keeps serial execution — the permanent reference
+# mode — free of the cost.
+
+
+class _committing:
+    """Hold the commit lock, if there is one.
+
+    A null context manager when serial, which is the common case and must stay free.
+    Used by the builtins that mutate shared containers — building and breaking
+    structures, recording trace events, storing to memory — because those are
+    read-modify-write sequences over shared lists: running two concurrently corrupts the
+    list rather than producing a conflict the model could interpret as a fizzle.
+    """
+
+    __slots__ = ("_lock",)
+
+    def __init__(self, ctx: EngineContext) -> None:
+        self._lock = getattr(ctx, "commit_lock", None)
+
+    def __enter__(self):
+        if self._lock is not None:
+            self._lock.acquire()
+        return self
+
+    def __exit__(self, *exc) -> None:
+        if self._lock is not None:
+            self._lock.release()
+
+
+def _read(ctx: EngineContext, *entities: Any) -> None:
+    if ctx.track_access and ctx.access is not None:
+        ctx.access.read(*entities)
+
+
+def _wrote(ctx: EngineContext, *entities: Any) -> None:
+    if ctx.track_access and ctx.access is not None:
+        ctx.access.write(*entities)
+
+
+def _wrote_component(ctx: EngineContext, name: str) -> None:
+    if ctx.track_access and ctx.access is not None:
+        ctx.access.write_component(name)
+
+
 # ── Object selection ──
 
 def choose_object(ctx: EngineContext, weight_key: str = "intra") -> Any:
     """Choose a workspace object weighted by salience/importance."""
-    return ctx.workspace.choose_object(weight_key, ctx.rng)
+    view = current_view(ctx)
+    chosen = (
+        _choose_from_view(ctx, view, view.all_objects, weight_key)
+        if view is not None
+        else ctx.workspace.choose_object(weight_key, ctx.rng)
+    )
+    _read(ctx, chosen)
+    return chosen
 
 
 def choose_string_object(ctx: EngineContext, string: Any, weight_key: str = "intra") -> Any:
     """Choose an object from a specific string."""
-    return string.choose_object(weight_key, ctx.rng)
+    view = current_view(ctx)
+    chosen = (
+        _choose_from_view(ctx, view, view.string_objects(string), weight_key)
+        if view is not None
+        else string.choose_object(weight_key, ctx.rng)
+    )
+    _read(ctx, chosen)
+    return chosen
+
+
+def _choose_from_view(
+    ctx: EngineContext, view: Any, objects: Any, weight_key: str
+) -> Any:
+    """Salience-weighted choice over a stale view (WP0.5).
+
+    Deliberately one ``weighted_pick`` call over one weight list, matching the live
+    path, so that switching staleness on shifts *which* object is chosen without
+    changing how many random numbers the choice consumes.
+    """
+    if not objects:
+        return None
+    return ctx.rng.weighted_pick(
+        objects, [view.object_weight(o, weight_key) for o in objects]
+    )
 
 
 def choose_neighbor(ctx: EngineContext, obj: Any) -> Any:
@@ -142,7 +223,12 @@ def choose_neighbor(ctx: EngineContext, obj: Any) -> Any:
     if not neighbors:
         return None
     weights = [max(0.1, n.salience.get("intra", 1.0)) for n in neighbors]
-    return ctx.rng.weighted_pick(neighbors, weights)
+    chosen = ctx.rng.weighted_pick(neighbors, weights)
+    # The object *and* the one it neighbours: a bond scout's decision depends on both,
+    # so a change to either invalidates it. This is the locality the plan relies on to
+    # bound the blast radius — two adjacent objects, not the string.
+    _read(ctx, obj, chosen)
+    return chosen
 
 
 def choose_string(ctx: EngineContext, weight_fn: str = "unhappiness") -> Any:
@@ -173,6 +259,8 @@ def propose_bond(
     bond = Bond(from_obj, to_obj, bond_category, bond_facet,
                 from_descriptor, to_descriptor, direction)
     bond.time_stamp = ctx.codelet_count
+    # The proposal rests on both objects; the bond itself is new and so cannot conflict.
+    _read(ctx, from_obj, to_obj)
     urgency = round(bond_category.activation) if hasattr(bond_category, 'activation') else 35
     post_codelet(ctx, "bond-evaluator", urgency, structure=bond)
     return bond
@@ -219,8 +307,10 @@ def evaluate_structure(ctx: EngineContext, structure: Any) -> bool:
         ctx.temperature.value,
         ctx.meta,
     )
+    _read(ctx, structure)
     if ctx.rng.prob(accept_prob):
         structure.proposal_level = structure.EVALUATED
+        _wrote(ctx, structure)
         return True
     return False
 
@@ -234,16 +324,61 @@ def build_structure(ctx: EngineContext, structure: Any) -> bool:
 
     Scheme: bonds.ss:354-407, groups.ss:622-771, bridges.ss:1183-1298.
     """
+    with _committing(ctx):
+        return _build_structure_locked(ctx, structure)
+
+
+def _premises_still_hold(ctx: EngineContext, structure: Any) -> bool:
+    """Are the objects this structure relates still in the Workspace?
+
+    Conflict -> fizzle, applied at the one place it has to be: a codelet decides outside
+    the commit lock and commits inside it, so between the two another worker may have
+    broken a group the decision rested on.  Committing anyway leaves a bond pointing at
+    an object no string contains — observed under free-running as
+    ``Bond(Group -> Group)`` where the second group had been removed.
+
+    Checked here rather than relying on WP4.2's read-set validation because that
+    validation runs *after* the codelet has finished and reports rather than prevents.
+    This is the cheap, targeted version: re-read the premises while holding the lock that
+    makes the answer stable, and decline if they have moved.  Returning ``False`` makes
+    the builder fizzle, which is an outcome the architecture already has.
+
+    Costs a handful of identity comparisons on the commit path and nothing at all when
+    serial, where the answer is always yes.
+    """
+    for obj in _structure_objects(structure):
+        if obj is None:
+            continue
+        string = getattr(obj, "string", None)
+        if string is None:
+            continue
+        if obj not in string.objects:
+            return False
+    return True
+
+
+def _build_structure_locked(ctx: EngineContext, structure: Any) -> bool:
+    """The body of ``build_structure``, run with the commit lock held.
+
+    Split out rather than indented in place so the lock's extent is unmistakable: it
+    covers the duplicate check and the fights as well as the mutation, because those read
+    the same lists the mutation writes.
+    """
+    if not _premises_still_hold(ctx, structure):
+        return False
     # Descriptions and rules don't fight
     if isinstance(structure, Description):
         structure.proposal_level = structure.BUILT
         if structure not in structure.object.descriptions:
             structure.object.descriptions.append(structure)
+        ctx.sink.on_structure_change(ctx, structure, STRUCTURE_BUILT)
+        _wrote(ctx, structure, structure.object)
         return True
     elif isinstance(structure, Rule):
         structure.proposal_level = structure.BUILT
         ctx.workspace.add_rule(structure)
         _record_rule_event(ctx, structure)
+        ctx.sink.on_structure_change(ctx, structure, STRUCTURE_BUILT)
         return True
 
     # Don't build a structure the Workspace already has.  Scheme: the builders
@@ -266,16 +401,21 @@ def build_structure(ctx: EngineContext, structure: Any) -> bool:
     structure.proposal_level = structure.BUILT
     if isinstance(structure, Bond):
         structure.string.add_bond(structure)
-        return True
     elif isinstance(structure, Group):
         structure.string.add_group(structure)
         _record_group_event(ctx, structure)
-        return True
     elif isinstance(structure, Bridge):
         ctx.workspace.add_bridge(structure)
         _record_slippage_events(ctx, structure)
-        return True
-    return False
+    else:
+        return False
+    # Emitted after the structure is in the Workspace, so a sink that reads the
+    # context sees the state the change produced rather than the one before it.
+    ctx.sink.on_structure_change(ctx, structure, STRUCTURE_BUILT)
+    # The structure and every object it now relates: building a bond changes what its
+    # two objects are, which is what another codelet reading them must notice.
+    _wrote(ctx, structure, *_structure_objects(structure))
+    return True
 
 
 # ── Trace: which events are important enough to record ──
@@ -490,6 +630,11 @@ def break_structure(ctx: EngineContext, structure: Any) -> None:
     structure still satisfies ``is_built`` and can be counted as support or as
     an existing duplicate long after it has left the Workspace.
     """
+    with _committing(ctx):
+        return _break_structure_locked(ctx, structure)
+
+
+def _break_structure_locked(ctx: EngineContext, structure: Any) -> None:
     structure.proposal_level = structure.PROPOSED
     # Breaking a structure is subcognitive: none of the seven Trace event types
     # of §4.4 covers it, and recording them drowned the Trace in noise.
@@ -501,9 +646,27 @@ def break_structure(ctx: EngineContext, structure: Any) -> None:
         ctx.workspace.remove_bridge(structure)
     elif isinstance(structure, Rule):
         ctx.workspace.remove_rule(structure)
+    _wrote(ctx, structure, *_structure_objects(structure))
+    # Subcognitive for the Trace, but not for Audit: reconstructing an intermediate
+    # Workspace in forward order needs removals as much as additions.
+    ctx.sink.on_structure_change(ctx, structure, STRUCTURE_BROKEN)
 
 
 # ── Stochastic helpers ──
+
+def _structure_objects(structure: Any) -> tuple:
+    """The workspace objects a structure relates, for write-set purposes.
+
+    Building or breaking a structure changes the objects at both ends as much as the
+    structure itself — a letter that has just acquired a bond is not the letter a
+    concurrent scout read a moment ago.
+    """
+    for names in (("from_object", "to_object"), ("object1", "object2"), ("object",)):
+        values = tuple(getattr(structure, n) for n in names if hasattr(structure, n))
+        if values:
+            return values
+    return tuple(getattr(structure, "objects", ()) or ())
+
 
 def prob(ctx: EngineContext, p: float) -> bool:
     """Return True with probability p."""
@@ -636,21 +799,33 @@ def single_letter_group_probability(ctx: EngineContext, group: Any) -> float:
 
 def get_objects(ctx: EngineContext) -> list:
     """Get all workspace objects."""
+    view = current_view(ctx)
+    if view is not None:
+        return list(view.all_objects)
     return ctx.workspace.all_objects
 
 
 def get_string_objects(ctx: EngineContext, string: Any) -> list:
     """Get objects from a specific string."""
+    view = current_view(ctx)
+    if view is not None:
+        return list(view.string_objects(string))
     return string.objects
 
 
 def get_built_bonds(ctx: EngineContext, string: Any) -> list:
     """Get built bonds from a string."""
+    view = current_view(ctx)
+    if view is not None:
+        return list(view.string_bonds(string))
     return [b for b in string.bonds if b.is_built]
 
 
 def get_built_bridges(ctx: EngineContext, bridge_type: str = "top") -> list:
     """Get built bridges of a given type."""
+    view = current_view(ctx)
+    if view is not None:
+        return list(view.bridges(bridge_type))
     type_map = {
         "top": ctx.workspace.top_bridges,
         "bottom": ctx.workspace.bottom_bridges,
@@ -682,6 +857,9 @@ def post_codelet(
     ctx.coderack.post(
         Codelet(codelet_type, urgency, arguments=arguments, time_stamp=ctx.codelet_count)
     )
+    # The coderack has no useful sub-identity and is contended by every post and every
+    # selection, which is why WP4.3 shards it rather than versioning it finely.
+    _wrote_component(ctx, "coderack")
 
 
 # ── Trace ──
@@ -703,7 +881,8 @@ def record_event(
         structures=structures,
         description=description,
     )
-    ctx.trace.record_event(event)
+    with _committing(ctx):
+        ctx.trace.record_event(event)
 
     # Emit commentary for snag events (Scheme: answers.ss:1164-1172)
     if event_type == SNAG:
@@ -832,6 +1011,18 @@ def report_answer(
     bottom_rule: Any = None,
     unjustified_slippages: Any = None,
 ) -> None:
+    with _committing(ctx):
+        return _report_answer_locked(ctx, answer_string, quality, top_rule, bottom_rule, unjustified_slippages)
+
+
+def _report_answer_locked(
+    ctx: EngineContext,
+    answer_string: str,
+    quality: float,
+    top_rule: Any = None,
+    bottom_rule: Any = None,
+    unjustified_slippages: Any = None,
+) -> None:
     """Report a found answer — stores in episodic memory and signals runner.
 
     Creates the answer WorkspaceString on the workspace (so the UI can display
@@ -933,6 +1124,11 @@ def report_answer(
 # ── Rule operations ──
 
 def translate_rule(ctx: EngineContext, rule: Any) -> Any:
+    with _committing(ctx):
+        return _translate_rule_locked(ctx, rule)
+
+
+def _translate_rule_locked(ctx: EngineContext, rule: Any) -> Any:
     """Translate a rule through the vertical mapping.
 
     Scheme: ``apply-slippages`` (slipnet.ss:257-277).  A slippage whose
@@ -971,6 +1167,11 @@ def translate_rule(ctx: EngineContext, rule: Any) -> Any:
 
 
 def apply_rule(ctx: EngineContext, rule: Any, string: Any = None) -> str | None:
+    with _committing(ctx):
+        return _apply_rule_locked(ctx, rule, string)
+
+
+def _apply_rule_locked(ctx: EngineContext, rule: Any, string: Any = None) -> str | None:
     """Apply a rule to *string* (the target string by default) and read off the result.
 
     Delegates to the image-based ``rules.apply_rule`` (rules.ss:1260-1318), which

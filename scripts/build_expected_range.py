@@ -158,6 +158,12 @@ def saturate(
     """
     counts: Counter = Counter(prior["counts"]) if prior else Counter()
     total = prior["runs"] if prior else 0
+    # States admitted by human review after being observed under a different execution
+    # mode -- free-running, a different numeric backend -- rather than by this sampler.
+    # Carried forward explicitly because ``expected_range`` is rebuilt from ``counts``
+    # below, so anything not in ``counts`` would be silently dropped by a resume, and the
+    # state would then present as a fresh regression the next time it appeared.
+    admitted: dict = dict(prior.get("admitted_states", {})) if prior else {}
     first_seen: dict[str, int] = dict(prior["first_seen_at_run"]) if prior else {}
     started = time.perf_counter()
     prior_seconds = prior.get("seconds", 0.0) if prior else 0.0
@@ -206,12 +212,14 @@ def saturate(
         "modified": problem["modified"],
         "target": problem["target"],
         "runs": total,
-        "distinct_states": len(counts),
+        # The union of what this sampler found and what review has admitted.
+        "distinct_states": len(set(counts) | set(admitted)),
         "f1": f1,
         "f1_over_n": round(ratio, 8),
         "stop_reason": reason,
         "saturated": reason != "max_runs",
-        "expected_range": sorted(counts),
+        "expected_range": sorted(set(counts) | set(admitted)),
+        "admitted_states": admitted,
         "counts": dict(counts.most_common()),
         "first_seen_at_run": {s: first_seen[s] for s, _ in counts.most_common()},
         "absence_check": _absence_check_states(counts, total),
@@ -259,7 +267,13 @@ def _write(path: str, results: list[dict], seconds: float) -> None:
             "Regression oracle: compare SET MEMBERSHIP, never frequencies. A stopping "
             "state outside expected_range is a strong signal to investigate, not an "
             "automatic failure — see f1_over_n for the per-problem false-alarm rate. "
-            "Absence is only evidence for the states listed in absence_check."
+            "Absence is only evidence for the states listed in absence_check. "
+            "expected_range is the union of the serially-saturated sample and any states "
+            "in admitted_states, which were observed under a different execution mode "
+            "and accepted by human review. The counts, f1 and f1_over_n fields describe "
+            "the serial saturation sample ONLY and are deliberately not adjusted when a "
+            "state is admitted: they measure how completely that sample explored, which "
+            "admitting a state from elsewhere does not change."
         ),
         "totals": {
             "problems": len(results),

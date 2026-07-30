@@ -23,6 +23,8 @@ import { getRun } from '@/api/client';
 import type { RunStatus } from '@/store/runStore';
 
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { ModeBadge } from '@/components/ModeBadge';
+import { SubstrateBadge } from '@/components/SubstrateBadge';
 import { SearchPalette } from '@/components/SearchPalette';
 import { HelpPopover } from '@/components/HelpPopover';
 import { HamburgerMenu } from '@/components/HamburgerMenu';
@@ -40,6 +42,7 @@ import { MemoryView } from '@/components/MemoryView';
 import { TemperatureGauge } from '@/components/TemperatureGauge';
 import { CommentaryPanel } from '@/components/CommentaryPanel';
 import { RunHistory } from '@/components/RunHistory';
+import { ReviewPanel } from '@/components/review/ReviewPanel';
 import type { ComponentHelpKey } from '@/constants/helpTopics';
 
 // ---------------------------------------------------------------------------
@@ -92,9 +95,22 @@ function parseRunIdFromHash(): number | null {
   return match ? parseInt(match[1], 10) : null;
 }
 
+/**
+ * Can this run be reached again by its URL?
+ *
+ * Only if it has a database row, and a Fast Run does not — it takes a negative id
+ * from an in-process counter instead. A `#/runs/-1` link would survive the reload
+ * that the run itself does not, and would then quietly fail to load anything, so no
+ * link is written for one at all.
+ */
+function isDeepLinkable(runId: number | null): boolean {
+  return runId !== null && runId > 0;
+}
+
 function parseViewFromHash(): AppView {
   if (window.location.hash.startsWith('#/config')) return 'config';
   if (window.location.hash.startsWith('#/admin')) return 'admin';
+  if (window.location.hash.startsWith('#/review')) return 'review';
   return 'dashboard';
 }
 
@@ -104,15 +120,30 @@ function parseConfigNodeFromHash(): string | null {
   return match ? decodeURIComponent(match[1]) : null;
 }
 
+/**
+ * A run to open in the Review browser: `#/review/runs/42`.
+ *
+ * The review surfaces were reachable only by browsing Training Sessions, which is
+ * the wrong way round for a reader who has just watched a run finish — they know the
+ * run and not the session. Putting the id in the hash also makes the link survive a
+ * reload and be worth sending to somebody.
+ */
+function parseReviewRunFromHash(): number | null {
+  const match = window.location.hash.match(/^#\/review\/runs\/(\d+)$/);
+  return match ? parseInt(match[1], 10) : null;
+}
+
 // ---------------------------------------------------------------------------
 // App
 // ---------------------------------------------------------------------------
 
 export default function App() {
-  const { status, codeletCount, temperature, runId, refreshAll, isProcessing } = useRunStore();
+  const { status, codeletCount, temperature, runId, runMode, refreshAll, isProcessing } =
+    useRunStore();
   const [searchOpen, setSearchOpen] = useState(false);
   const [view, setView] = useState<AppView>(parseViewFromHash);
   const [configEditNode, setConfigEditNode] = useState<string | null>(parseConfigNodeFromHash);
+  const [reviewRunId, setReviewRunId] = useState<number | null>(parseReviewRunFromHash);
 
   // Register global keyboard shortcuts
   const openSearch = useCallback(() => setSearchOpen(true), []);
@@ -124,6 +155,7 @@ export default function App() {
       const newView = parseViewFromHash();
       setView(newView);
       setConfigEditNode(parseConfigNodeFromHash());
+      setReviewRunId(parseReviewRunFromHash());
     };
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
@@ -133,11 +165,16 @@ export default function App() {
   const handleViewChange = useCallback((newView: AppView) => {
     setView(newView);
     setConfigEditNode(null);
+    // Choosing Review from the menu means "browse", not "reopen whatever run was
+    // last deep-linked", so the pinned run is dropped along with the pinned node.
+    setReviewRunId(null);
     if (newView === 'config') {
       window.location.hash = '/config';
     } else if (newView === 'admin') {
       window.location.hash = '/admin';
-    } else if (runId !== null) {
+    } else if (newView === 'review') {
+      window.location.hash = '/review';
+    } else if (isDeepLinkable(runId)) {
       window.location.hash = `/runs/${runId}`;
     } else {
       history.replaceState(null, '', window.location.pathname + window.location.search);
@@ -154,6 +191,7 @@ export default function App() {
         const info = await getRun(deepLinkId);
         useRunStore.setState({
           runId: info.run_id,
+          runMode: info.mode ?? null,
           status: info.status as RunStatus,
           codeletCount: info.codelet_count,
           temperature: info.temperature,
@@ -171,7 +209,7 @@ export default function App() {
   // Keep the URL hash in sync when runId changes (dashboard view only)
   useEffect(() => {
     if (view !== 'dashboard') return;
-    if (runId !== null) {
+    if (isDeepLinkable(runId)) {
       window.location.hash = `/runs/${runId}`;
     } else {
       if (window.location.hash) {
@@ -195,9 +233,20 @@ export default function App() {
             'Configuration'
           ) : view === 'admin' ? (
             'Admin'
+          ) : view === 'review' ? (
+            'Review — recorded Training Sessions'
           ) : (
             <>
               {runId ? `Run #${runId}` : 'No run'}
+              {/* The mode belongs beside the run number rather than only in the
+                  controls: it is the difference between a run that can be reopened
+                  later and one that vanishes when the page does. */}
+              {runId !== null && runMode && (
+                <>
+                  {' '}
+                  <ModeBadge mode={runMode} />
+                </>
+              )}
               {' | '}
               Status: <span className="text-accent">{status}</span>
               {' | '}
@@ -206,6 +255,8 @@ export default function App() {
               T: {temperature.toFixed(1)}
             </>
           )}
+          {' | '}
+          <SubstrateBadge />
           {' | '}
           <button
             onClick={openSearch}
@@ -231,6 +282,19 @@ export default function App() {
         <div className="panel" style={{ gridColumn: '1 / -1', minHeight: 500 }}>
           <div className="panel-content" style={{ height: '100%' }}>
             <AdminLayout editNodeName={configEditNode} onClearEditNode={() => setConfigEditNode(null)} />
+          </div>
+        </div>
+      )}
+
+      {/* ---- Review view (WP3.9) ----
+          Reads the record rather than a live run, so it does not touch the run
+          store at all and is unaffected by whatever is loaded on the dashboard. */}
+      {view === 'review' && (
+        <div className="panel" style={{ gridColumn: '1 / -1', gridRow: '2 / -1', minHeight: 600 }}>
+          <div className="panel-content" style={{ height: '100%' }}>
+            <ErrorBoundary fallback="Review">
+              <ReviewPanel initialRunId={reviewRunId} />
+            </ErrorBoundary>
           </div>
         </div>
       )}

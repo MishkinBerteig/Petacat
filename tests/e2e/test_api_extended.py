@@ -1,7 +1,7 @@
 """E2E tests for extended runs, memory, docs, and admin endpoints.
 
 ALL tests are deterministic.
-Requires: docker compose -f docker-compose.dev.yml up -d
+Requires: a local Postgres — start it with `scripts/dev.sh db`.
 """
 
 import pytest

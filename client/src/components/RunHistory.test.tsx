@@ -11,12 +11,12 @@
 // ---------------------------------------------------------------------------
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor, act } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 
 import { RunHistory } from './RunHistory'
 import { useRunStore } from '@/store/runStore'
 import type { RunInfo } from '@/types'
-import { listRuns } from '@/api/client'
+import { listRuns, getRun } from '@/api/client'
 
 vi.mock('@/api/client', () => ({
   listRuns: vi.fn(),
@@ -234,5 +234,118 @@ describe('RunHistory — spreading threshold per run', () => {
     await waitFor(() =>
       expect(screen.getByTitle(/Spreading threshold 100 — the original/)).toBeTruthy(),
     )
+  })
+})
+
+// ---------------------------------------------------------------------------
+// A Fast Run is absent by construction, and the absence has to be explained
+// ---------------------------------------------------------------------------
+//
+// This list is built from the `runs` table, and a Fast Run writes no row -- so it
+// is not missing from the list, it cannot be in it. Unexplained, that is
+// indistinguishable from the bug this panel has actually had: a list that was
+// fetched once and never refreshed.
+
+describe('RunHistory — Fast runs cannot appear', () => {
+  it('says why the run on screen is not in the list', async () => {
+    mockedListRuns.mockResolvedValue({ runs: [], total: 0 })
+    useRunStore.setState({ runId: -1, runMode: 'fast' })
+
+    render(<RunHistory />)
+    await waitFor(() => expect(screen.getByText(/is not listed/)).toBeTruthy())
+    expect(screen.getByText(/writes nothing, including the row this list reads/)).toBeTruthy()
+  })
+
+  it('still says so when other, recorded runs are listed', async () => {
+    mockedListRuns.mockResolvedValue({
+      runs: [runInfo({ run_id: 4, mode: 'normal', status: 'answer_found' })],
+      total: 1,
+    })
+    useRunStore.setState({ runId: -2, runMode: 'fast' })
+
+    render(<RunHistory />)
+    await waitFor(() => expect(screen.getByText(/is not listed/)).toBeTruthy())
+    expect(screen.getByText('#4')).toBeTruthy()
+  })
+
+  it('says nothing when the loaded run is one that was recorded', async () => {
+    mockedListRuns.mockResolvedValue({
+      runs: [runInfo({ run_id: 4, mode: 'normal' })],
+      total: 1,
+    })
+    useRunStore.setState({ runId: 4, runMode: 'normal' })
+
+    render(<RunHistory />)
+    await waitFor(() => expect(screen.getByText('#4')).toBeTruthy())
+    expect(screen.queryByText(/is not listed/)).toBeNull()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Each listed run shows what it recorded
+// ---------------------------------------------------------------------------
+//
+// The mode decides what the Review browser can show of a run, so choosing a row to
+// review without knowing its mode is guessing. Runs recorded before modes existed
+// read as Normal, which is what they were.
+
+describe('RunHistory — persistence mode per run', () => {
+  it('shows each run its mode', async () => {
+    mockedListRuns.mockResolvedValue({
+      runs: [
+        runInfo({ run_id: 9, mode: 'audit' }),
+        runInfo({ run_id: 8, mode: 'normal' }),
+      ],
+      total: 2,
+    })
+
+    render(<RunHistory />)
+    await waitFor(() => expect(screen.getByText('audit')).toBeTruthy())
+    expect(screen.getByText('normal')).toBeTruthy()
+  })
+
+  it('treats a run with no recorded mode as normal', async () => {
+    mockedListRuns.mockResolvedValue({ runs: [runInfo({ run_id: 7 })], total: 1 })
+
+    render(<RunHistory />)
+    await waitFor(() => expect(screen.getByText('normal')).toBeTruthy())
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Reaching the record from the dashboard
+// ---------------------------------------------------------------------------
+//
+// The review surfaces were reachable only by opening the Review view and browsing
+// Training Sessions — which is the right way round for a reader who is exploring,
+// and the wrong way round for one who has just watched a run finish: they know the
+// run and not the session it landed in.
+
+describe('RunHistory — opening a run in the Review browser', () => {
+  it('offers a review route on every listed run', async () => {
+    mockedListRuns.mockResolvedValue({
+      runs: [runInfo({ run_id: 7, mode: 'normal', status: 'answer_found' })],
+      total: 1,
+    })
+
+    render(<RunHistory />)
+    const review = await screen.findByRole('button', { name: /^review$/i })
+    fireEvent.click(review)
+
+    expect(window.location.hash).toBe('#/review/runs/7')
+  })
+
+  it('does not also load the run onto the dashboard when review is clicked', async () => {
+    // The row itself loads the run; the review button is a different action and must
+    // not do both, or a click on it would replace the workspace being looked at.
+    mockedListRuns.mockResolvedValue({
+      runs: [runInfo({ run_id: 8, mode: 'audit' })],
+      total: 1,
+    })
+
+    render(<RunHistory />)
+    fireEvent.click(await screen.findByRole('button', { name: /^review$/i }))
+
+    expect(vi.mocked(getRun)).not.toHaveBeenCalled()
   })
 })

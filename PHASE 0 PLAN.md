@@ -15,7 +15,7 @@ against commit `2c5c086` ("Bring Petacat to functional parity with Metacat"), on
 **Apple M2 Max** (8 performance + 4 efficiency cores, 38 GPU cores, 96 GB unified
 memory). Engine: 29 modules, 16,619 LOC. Seed data: 59 slipnet nodes, 202 links, 27
 codelet types. Test suite: **590 passing**, 2 skipped (28 unit + 4 integration + 8
-module files run locally; 9 e2e files currently require Docker, which WP3.1 removes).
+module files run locally; 9 e2e files currently require Docker, which WP2.1 removes).
 
 ---
 
@@ -42,7 +42,7 @@ it exactly. Verified against `init_mcat` (`runner.py:109–170`):
 | `CommentaryLog` | Rebuilt |
 | `RNG` | Reseeded from the Run's seed |
 
-**A Training Session is reset from the Admin panel** via `POST /api/memory/clear`
+**A Training Session is reset from the Admin panel** via `DELETE /api/memory`
 (`api/memory.py:42`), which clears the persisted rows and the in-process
 `_global_memory`.
 
@@ -50,7 +50,7 @@ All three modes carry the same thing forward and differ only in what is written 
 Since only Episodic Memory crosses a Run boundary, a Run's starting state is largely
 derivable from `(problem, seed, config-hash, memory-hash)`; Normal persists it
 literally so the record is self-contained, but the substantive capture is the
-**Run-end state**, which drives WP2.4.
+**Run-end state**, which drives WP3.4.
 
 ---
 
@@ -122,7 +122,7 @@ staging**, and a **database round-trip**. Measured against `mrrjjj` (2,229 codel
 
 **The actual database traffic during a run is the 148
 snapshot flushes plus one commit** — which is a further argument for retiring snapshots
-(WP2.4), since removing them removes essentially all in-run DB traffic.
+(WP3.4), since removing them removes essentially all in-run DB traffic.
 
 #### Measured cost
 
@@ -181,6 +181,29 @@ Normal live dialogue in the same process.
 | **Execution** | full parallelism | full parallelism | **serial** |
 | **Expected cost** | full engine rate (7k–9.8k codelets/s today) | two state captures per Run | extremely slow, by design |
 
+**Measured**, `abc→abd; mrrjjj?` seed 42, end to end through the service layer:
+
+| | Fast | Normal | Audit |
+|---|---|---|---|
+| Codelets / answer | 2,229 / `mrrjjk` | 2,229 / `mrrjjk` | 2,229 / `mrrjjk` |
+| Wall time | **180 ms** | 251 ms | 323 ms |
+| Relative to Fast | 1.00× | 1.39× | 1.79× |
+| Rows written | none | 2 captures + 18 trace | 2 captures + 18 trace + 2,306 actions |
+| Bytes written | **0** | **137 KB** | 381 KB |
+
+Three things this says.
+
+**Cognition is identical across the modes** — same codelet count, same answer. That is
+the rule the whole design rests on, and it is checked rather than assumed.
+
+**Normal writes 137 KB where the retired snapshot system wrote ~6,300 KB** for the same
+run: a **46× reduction**, and the 137 KB can actually be read back, which the 6.3 MB
+could not.
+
+**Audit is not "extremely slow" — it is 1.79×.** The plan expected worse. Buffering the
+actions in memory and flushing once at Run end is what makes the difference: the cost is
+in writing 2,306 rows at the end, not in interrupting 2,229 codelets.
+
 **Fast and Normal differ in exactly one thing.** Not in cadence, not in detail level,
 not in what the engine does: Normal captures the **complete state at the two Run
 boundaries** and Fast captures nothing. Everything else about the two modes is
@@ -216,7 +239,7 @@ accumulation that is pure output:
 | `ctx.trace.events` | **Yes** — `jootsing.py:460`, `runner.py:420`, `builtins.py:718,893` | **Keep.** Engine state, not persistence; the `TraceEventRow` is the artefact and is never constructed |
 | `ctx.commentary` | **No** — the engine only calls `emit_*`; `render`/`get_paragraphs`/`count` are API-only | **Must not accumulate** |
 
-Commentary therefore becomes a sink concern (WP2.10): `ctx.commentary` is an injected
+Commentary therefore becomes a sink concern (WP3.10): `ctx.commentary` is an injected
 writer, the engine calls `emit_*` unconditionally, and in Fast Run those calls land on
 a discarding writer.
 
@@ -251,7 +274,7 @@ mistake it was convened to fix. Two surfaces:
 - **Audit review** — a tick-level inspector, **forward-stepping only in Phase 0**: step
   through a Run and at any tick see the codelet that ran, the structures that changed,
   and the activation and temperature state at that instant. Backwards scrubbing is
-  deferred, with the record format kept open to it (WP2.8).
+  deferred, with the record format kept open to it (WP3.8).
 
 Both build on the existing client (`WorkspaceView`, `SlipnetView`, `TraceView`,
 `ThemespaceView`) rendering *recorded* state rather than live state.
@@ -399,8 +422,18 @@ decomposable. **The hardest single problem in Phase 0.**
 Work packages, in dependency order. Each names the files it touches and how it is
 verified. Stage 0 makes everything afterwards measurable and attributable; **Stage 1
 is where the largest measured win is**, and it runs early so that every later profile
-and every parallelism decision is taken against a realistic engine; Stages 2–3 are the
-persistence and platform prerequisites; Stage 4 is concurrency and the GPU substrate.
+and every parallelism decision is taken against a realistic engine; Stage 2 moves the
+whole system onto native macOS; Stage 3 is persistence; Stage 4 is concurrency and the
+GPU substrate.
+
+**Note on ordering.** Native macOS was originally scheduled after persistence and has
+been moved ahead of it. The reason is verification: most of the persistence work is
+judged against a database, and today the nine e2e files reach one only through Docker.
+Doing the platform move first means Stage 3 is verified natively throughout — including
+WP3.6's requirement that a Fast Run completes *with the database stopped*, which is an
+awkward thing to arrange through a container stack and a natural one against a local
+Postgres. Work-package numbers follow their stage, so the packages once numbered WP2.x
+are now WP3.x and vice versa; earlier commits use the old numbering.
 
 ### Stage 0 — Baseline and guardrails
 
@@ -478,9 +511,42 @@ its effect through this script.
 **WP0.5 — Staleness tolerance.**
 Serial execution, but each codelet reads state as it was N codelets ago. One flag, no
 threads. Answers the central risk of the concurrency work before any of it is written.
-*Files:* `engine/runner.py`, `engine/codelet_dsl/builtins.py`.
+*Files:* `engine/runner.py`, `engine/codelet_dsl/builtins.py`, new
+`engine/staleness.py` (the delayed view — a separate module because `builtins.py`
+consumes it and cannot import `runner.py` without a cycle).
 *Verify:* expected range at N = 1, 5, 15, 50. The N at which the set moves bounds how
 much staleness free-running can tolerate.
+
+**Measured, via `scripts/measure_staleness.py`** — 13 problems × 150 runs × 5 delays,
+9,750 runs. N=0 is a control: same code path, mechanism off.
+
+| Delay | Novel states | Frequent states lost | What appeared |
+|---|---|---|---|
+| 0 (control) | 0 | 0 | — |
+| 1 | 0 | 0 | — |
+| 5 | 0 | 0 | — |
+| 15 | 2 | 0 | `halted:` on `abc→abd; glz?` and `abc→abd; mrrjjj?` |
+| 50 | 3 | 0 | the same two, plus **`answer_found:ikj`** on `abc→abd; ijk?` |
+
+**Read it in two parts, because the two novel-state kinds mean different things.**
+Up to N=5 nothing moves at all. At N=15 the only new states are `halted:` — runs that
+failed to reach an answer inside the 6,000-codelet cap. That is not a new perception;
+it is the same cognition converging more slowly, which is exactly what staleness
+should cost. At N=50 a genuinely new answer appears, which is the reachable set
+actually moving.
+
+**No absence-check state was lost at any delay**, so the frequent answers stay
+reachable throughout — staleness degrades convergence well before it removes anything.
+
+**The bound for WP4.4: keep effective staleness at or below ~5 codelets.** Between 5
+and 15 lies the onset of slower convergence, and by 50 the answer set has moved.
+Read-set granularity (B4) should be tuned to hold worker read-lag inside that budget,
+and fizzle-rate telemetry is the proxy to watch, since a rising fizzle rate and a
+lengthening read-lag are the same phenomenon.
+
+*Caveat:* 150 runs per problem bounds the sensitivity — this locates the onset, not a
+sharp threshold. The signal is monotone in N, which is the reason to trust the
+direction.
 
 ### Stage 1 — The algorithmic prerequisite
 
@@ -513,31 +579,148 @@ construction. Prefer a refactor that leaves the RNG call pattern untouched, keep
 seeded spot-checks usable. Benchmark shows the 35.8% share collapse.
 
 **WP1.2 — Re-baseline and recompute the Amdahl fractions.**
-Re-run WP0.4. Removing serial work **raises the parallelisable fraction**. If eviction
-drops from ~100 ms to ~10 ms (280 ms → ~190 ms):
+Re-run WP0.4. Removing serial work **raises the parallelisable fraction**.
 
-| Parallelising… | Before | After WP1.1 |
+**Measured, via `scripts/bench_engine.py`.** The prediction below was that eviction
+would drop from ~100 ms to ~10 ms; it dropped to **9.5 ms**, and the recomputed
+fractions land within a percentage point of the predicted ones:
+
+| Parallelising… | Before | Predicted after | **Measured after** |
+|---|---|---|---|
+| Codelet execution only | 27.5% → **1.38×** | 40.5% → 1.68× | **40.1% → 1.67×** |
+| Codelets + numeric substrate | 48.3% → **1.94×** | 71% → 3.46× | **69.9% → 3.32×** |
+
+Supporting counters, same problem and seed as B2:
+
+| | Before (B2) | After WP1.1 |
 |---|---|---|
-| Codelet execution only | 27.5% → **1.38×** | 40.5% → **1.68×** |
-| Codelets + numeric substrate | 48.3% → **1.94×** | 71% → **3.46×** |
+| `remove_old_codelets` | 100.1 ms (35.8%) | **9.5 ms (5.4%)** |
+| `_urgency_to_bin` calls | 323,883 | **5,483** — one per post, none per eviction |
+| Evictions | 3,184 | 3,184 — *unchanged, as it must be* |
+| Posts at capacity | 58.1% | 58.1% — unchanged |
+| Whole-run throughput | 7,641/s | **12,946/s** |
+
+The eviction and occupancy rows being unchanged is the point: WP1.1 changed how the
+victim is found, not which victim is found. Runs are bit-identical across the change
+— same codelet counts, same RNG call counts, same answers (`tests/unit/test_coderack_eviction.py`).
+
+*Caveat on the throughput row.* Part of that gain is WP0.3, not WP1.1: replacing the
+class-level `_next_id` counters removed a type-version-tag invalidation on every
+`Codelet()` construction, which was de-specialising the ~318,000 attribute loads
+`remove_old_codelets` performed. Measured separately at ~9% of runtime. The two
+changes compound because they both land on the same hot loop.
 
 **Do not design the concurrency work against the pre-WP1.1 profile.**
 
-### Stage 2 — Persistence modes
+### Stage 2 — Native macOS
 
-**WP2.0 — Name the Training Session; keep its semantics unchanged.**
+**WP2.1 — Remove containerisation.**
+Native macOS execution for the engine, API, client and Postgres, on a single Python
+version.
+*Files:* delete `docker-compose.yml`, `docker-compose.dev.yml`, `Dockerfile`,
+`Dockerfile.dev`; update `pyproject.toml`, `TESTING.md`, `README.md`, and
+`scripts/` (a native dev runner).
+*Verify:* full suite green natively, including e2e.
+
+**Done.** Homebrew `postgresql@17` on `localhost:5432`, Python 3.14.5 in a project
+venv, Node 26, and `scripts/dev.sh` in place of `docker compose up`.
+
+*Result:* **797 passed, 0 skipped, ~96 s** — all four tiers in one command. Before, the
+93 e2e tests were reachable only through `docker compose exec` and were skipped on
+every local run; the suite as normally executed was 590 passed, 2 skipped.
+
+Three things the move turned up that the container stack had been hiding:
+
+- **The project was not installable.** `pip install -e .` failed outright: hatchling
+  cannot infer the wheel contents of a root-level `server/` beside `client/` and
+  `tests/`, and it had never been exercised because the container installed the
+  dependency list directly and bind-mounted the source.
+- **The client proxied to `http://app:8000`** — the Compose service name. Off Docker
+  every API call from the GUI returned 500 (`getaddrinfo ENOTFOUND app`), so nothing in
+  the interface worked. Now `127.0.0.1:${PORT ?? 8100}`, reading the same variable
+  `scripts/dev.sh` reads so the two cannot drift.
+- **The e2e test database URL in `pyproject.toml` had never been right** — port 5433
+  and password `test`, matching neither the container stack (5434, `dev`) nor anything
+  else. pytest reported the table as an unknown option and ignored it, so the wrong
+  value never surfaced. The default now sits in `tests/e2e/conftest.py` beside the code
+  that reads it.
+
+*Migration:* the container database held a live Training Session — 10 runs, 16 answers,
+48 snags, 831 trace events — which was dumped and restored into the native `petacat`
+rather than discarded. The dump was **230 MB for 10 runs**, essentially all of it
+`cycle_snapshots`: a direct measurement of defect D1, since `prune_old_snapshots` is
+never called and nothing can read the rows back. The container volumes are left in
+place as a fallback.
+
+**WP2.2 — Free-threaded CPython.**
+Install `python-freethreading` (3.14.6, available via Homebrew) and run the suite under
+it, before any threading work is designed.
+*Verify:* suite green under the free-threaded build; benchmark reports single-threaded
+overhead versus the standard build.
+*Risk:* SQLAlchemy/asyncpg free-threading readiness.
+
+**Done.** `python3.14t` (3.14.6, `Py_GIL_DISABLED=1`) with a parallel venv at
+`.venv-ft`. Suite green: **797 passed** under free-threading.
+
+*The risk was real, and the engine-purity invariant is what defuses it.* Importing
+SQLAlchemy **re-enables the GIL at runtime** — `sqlalchemy.cyextension.collections` has
+not declared free-threaded safety, and CPython silently switches the GIL back on when
+it loads. But importing the *entire engine* leaves the GIL off, because the engine
+imports nothing beyond the standard library and itself. That is precisely the property
+WP0.2 enforces, and it means Stage 4's codelet parallelism gets a genuinely GIL-free
+interpreter while only the API process pays. `PYTHON_GIL=0` overrides the re-enable and
+SQLAlchemy still works, so the whole suite can be run with the GIL truly off.
+
+*Single-threaded overhead, measured:*
+
+| Problem | Standard | Free-threaded | Overhead |
+|---|---|---|---|
+| `abc→abd; ijk?` (1) | 27.7 ms | 30.3 ms | +9.4% |
+| `abc→abd; xyz?` (7) | 51.4 ms | 54.7 ms | +6.4% |
+| `abc→abd; xyz?` (42) | 56.6 ms | 62.2 ms | +9.9% |
+| `abc→abd; iijjkk?` (42) | 115.3 ms | 122.8 ms | +6.5% |
+| `abc→abd; mrrjjj?` (42) | 170.9 ms | 191.0 ms | +11.8% |
+
+Codelet counts are identical on both builds, so this is the interpreter's cost and not
+different cognition. **Roughly 9% is the toll Stage 4 must beat**, against a recomputed
+ceiling of 1.67× for codelets alone and 3.32× including the numeric substrate — so the
+toll is repaid well before two workers.
+
+*A failure that was not what it looked like.* One full-suite run under free-threading
+produced two e2e failures — `relation "runs" does not exist` — which no later run
+reproduced. Read as a free-threading defect, it was not one. `setup_db` drops and
+recreates every table at session scope, so **two pytest sessions sharing
+`petacat_test` destroy each other's schema mid-run**; the free-threaded run had simply
+overlapped another suite. Reproduced deliberately on the *standard* build by launching
+two e2e sessions at once: identical errors, in the same test file, while the other
+session passed.
+
+Fixed in `tests/e2e/conftest.py` with a Postgres advisory lock held on a dedicated
+connection for the session, so concurrent sessions serialise instead of interleaving.
+Verified with three simultaneous suites across both interpreter builds: 93 passed in
+each. Worth recording because Phase 0 runs the suite constantly while agents work in
+parallel, and because the symptom points nowhere near the cause.
+
+### Stage 3 — Persistence modes
+
+**WP3.0 — Name the Training Session; keep its semantics unchanged.**
 Session continuity is **already correct** — Episodic Memory carries across Runs, the
 rest is rebuilt — so this package adds no state-continuity behaviour. It gives the
 existing concept a first-class representation so Runs can be grouped, reviewed, and
 compared: a `training_sessions` row, `Run.session_id`, and the Admin reset
-(`POST /api/memory/clear`) recorded as the session boundary it already is.
+(`DELETE /api/memory`) recorded as the session boundary it already is.
 *Files:* `models/run.py` (`training_sessions` table, `Run.session_id`), migration,
 `services/run_service.py`, `api/memory.py:42` (record the reset as a session boundary),
 `client/` (session grouping in the review UI).
 *Verify:* Runs group under sessions; a memory clear starts a new session; **cognition
 is untouched** — this package must not modify `init_mcat` at all.
 
-**WP2.1 — Split serializers from the ORM (fixes D2).**
+**Done.** A `training_sessions` row and `Run.session_id`. Sessions are not created by
+the user; a session is the span between memory clears, which is already how the concept
+worked, so the service opens one lazily when a Run needs one. `init_mcat` was not
+touched.
+
+**WP3.1 — Split serializers from the ORM (fixes D2).**
 Move the pure `serialize_*` functions into `server/engine/serialization.py` with **no
 database imports**; leave persistence in `server/services/snapshot_repository.py`.
 *Files:* `services/snapshot_service.py` → split; callers in `run_service.py`,
@@ -545,7 +728,7 @@ database imports**; leave persistence in `server/services/snapshot_repository.py
 *Verify:* WP0.2's purity test extended to assert the serialization module imports no
 SQLAlchemy; existing tests green.
 
-**WP2.2 — Define the `RunSink` port.**
+**WP3.2 — Define the `RunSink` port.**
 Protocol with `on_run_created`, `on_codelet`, `on_trace_event`,
 `on_structure_change`, `on_turn_end`, `on_answer`, `on_valence`. Methods take the live
 `EngineContext`, never a pre-serialised payload.
@@ -553,7 +736,7 @@ Protocol with `on_run_created`, `on_codelet`, `on_trace_event`,
 engine stays pure).
 *Verify:* engine compiles and runs with the fast sink; no behavioural change.
 
-**WP2.3 — Thread the sink through the runner; take persistence out of the step loop.**
+**WP3.3 — Thread the sink through the runner; take persistence out of the step loop.**
 `run_service.step` and `run_to_completion` stop calling `_persist_new_trace_events`
 and `save_cycle_snapshot` inline; they attach a sink instead. Also removes the
 per-codelet `await` and list-slice, and the `await asyncio.sleep(0)` in
@@ -563,7 +746,23 @@ per-codelet `await` and list-slice, and the `await asyncio.sleep(0)` in
 coroutine overhead both gone; benchmark harness shows the step loop doing engine work
 only.
 
-**WP2.4 — Complete, restorable state capture (fixes D1).**
+**Done.** Persistence lives in `server/services/sinks.py`; the step loop is engine work
+only. In-run database traffic is now **zero** — the 148 snapshot flushes are gone, and
+trace events and answers are buffered by the sink and staged once per API call instead
+of awaited per codelet.
+
+*Throughput, end to end across Stage 0–3 so far:* `abc→abd; mrrjjj?` runs at
+**13,627 codelets/s** against the plan's 7,641/s baseline — **1.78×**, with cognition
+bit-identical.
+
+*One deviation, deliberate.* The plan asks for the per-codelet `await asyncio.sleep(0)`
+in `run_to_completion` to be removed outright. Removing it entirely makes a run
+**uninterruptible**: the stop flag and the breakpoint are set by *other* HTTP requests,
+and a loop that never yields never lets them be served. It now yields once per update
+cycle instead of once per codelet — fourteen fifteenths of the cost removed, pause and
+stop still responsive to within about a millisecond.
+
+**WP3.4 — Complete, restorable state capture (fixes D1).**
 Normal mode needs a complete Petacat state, written at a Run boundary and **loadable
 back**. Nothing existing does this: `serialize_coderack_state` discards every
 object-valued codelet argument (`{k: str(v) … if not hasattr(v, '__dict__')}`),
@@ -576,7 +775,7 @@ The work is an object-graph serializer with stable identity covering Workspace
 strengths), Coderack (codelets *with* their object-valued arguments), Slipnet,
 Themespace, Trace, Temperature, Memory and RNG. The graph has cross-string references
 and cycles, so identity is explicit rather than structural. **Format: id-based graph**,
-inspectable and versionable, and directly renderable by the review UI (WP2.9).
+inspectable and versionable, and directly renderable by the review UI (WP3.9).
 
 The per-15-codelet snapshot, `prune_old_snapshots` and the partial `restore_*` set go.
 *Files:* `services/snapshot_service.py` → new `engine/serialization.py` +
@@ -585,7 +784,35 @@ migration, `tests/e2e/test_persistence.py`, `tests/e2e/test_api_runs.py:286`.
 *Verify:* **round-trip fidelity** — capture state mid-Run, restore into a fresh
 process, continue, and reach the same end state as an uninterrupted Run.
 
-**WP2.5 — Named, versioned inputs: config-hash and memory-hash.**
+**Done**, as `server/engine/state_graph.py`. Round-trip fidelity holds at four capture
+points — 15, 150, 450 and 1,100 codelets — each restored into a fresh runner through
+JSON and run on, reaching a state identical to the uninterrupted run across structures,
+coderack, trace, slipnet and themespace activations, RNG call count and identifier
+counters.
+
+**Fields are captured reflectively, from `vars(obj)`, rather than enumerated per
+class.** Enumeration is precisely how the display serializer rotted: a field added to a
+structure is simply absent from a hand-written list and *nothing fails*, so the capture
+quietly stops being complete. Reflection makes "captured" the default and an
+unrepresentable value an error, so forgetting is not an available mistake. That paid
+for itself immediately — the walk refused two types the design had missed
+(`SlipnetLink` held by a concept-mapping, and `StringImage`), both of which a
+hand-written list would have dropped in silence.
+
+Three kinds of thing are referenced rather than copied, and the distinction is the
+design: Slipnet nodes and links by name (configuration, not state — only their
+activations are captured), Workspace strings by role, and the environment
+(`MetadataProvider`, `Slipnet`, the string→Workspace back-reference, the coderack's
+RNG) re-linked on restore.
+
+*The identifier counters travel with the state*, because they are not derivable from
+it: a structure that was proposed, took an id and then fizzled leaves nothing behind,
+so a restored run recounting from surviving objects would re-issue ids it had used.
+
+*Retired as promised:* the per-15-codelet snapshot, `prune_old_snapshots`, and the four
+write-only `restore_*` functions are gone.
+
+**WP3.5 — Named, versioned inputs: config-hash and memory-hash.**
 Hash the `MetadataProvider` contents; make `EpisodicMemory` an explicit argument at run
 creation with a recorded hash. The engine is already correct here —
 `init_mcat(memory=…)` (`runner.py:112`) takes it as an injected dependency — so this
@@ -598,7 +825,21 @@ Phase 2 writes love-born concepts.
 *Verify:* two runs with the same seed and different memory-hashes are distinguishable
 in the record; `rehydrate_memory` becomes idempotent.
 
-**WP2.6 — Fast Run.**
+**Done**, as `server/engine/hashing.py`. Both are content hashes over a canonical JSON
+encoding, so they are stable across processes — anything derived from object identity or
+insertion order would make an unchanged configuration look different on every restart,
+and a field that reports spurious change stops being trusted.
+
+The config hash covers what changes what the engine *does*: Slipnet nodes and links,
+codelet sources, posting rules, parameters, urgency levels, formula coefficients, theme
+dimensions. It deliberately excludes the demo catalogue, the display layout, the
+commentary templates and the enum tables — editing a demo problem or moving a node on
+screen does not change how any run thinks.
+
+The memory hash is taken **before** the run executes: it identifies the memory the run
+*inherited*, not the one it left behind.
+
+**WP3.6 — Fast Run.**
 Fast sink; ephemeral in-process episodic memory; no session, no engine, no connection;
 **and no construction of any storable representation** (§A2 requirement 2).
 *Files:* `services/run_service.py`, `api/runs.py`.
@@ -609,8 +850,22 @@ Fast sink; ephemeral in-process episodic memory; no session, no engine, no conne
  and no growth in any record buffer** — the check that catches a well-meaning
  "buffer now, write later" implementation.
 
-**WP2.7 — Normal mode.**
-Two complete-state captures per Run, via WP2.4: one at Run start, one at Run end.
+**Done**, and stricter than "no writes": a Fast Run **never touches the session at all,
+including at creation**. It has no `runs` row, so it has no database identifier either —
+it takes a negative one from an in-process counter, which a positive autoincrement column
+can never collide with. It also gets an ephemeral Episodic Memory and a discarding
+commentary writer, so it leaves nothing behind in the process either.
+
+Creation had to be included. A run that inserted a row and then wrote nothing more would
+still fail with the database stopped, which is the condition the mode is verified under.
+
+Requirement 2 is enforced structurally rather than by inspection: `FastSink` subclasses
+the engine's `NullSink` and inherits its empty `__slots__`, so there is nowhere for a
+"buffer now, write later" implementation to accumulate. The test asserts the sink has no
+instance dictionary at all.
+
+**WP3.7 — Normal mode.**
+Two complete-state captures per Run, via WP3.4: one at Run start, one at Run end.
 Nothing else — no mid-Run records, no per-cycle anything.
 *Files:* `services/run_service.py`, `models/run.py` (Run-boundary state rows),
 migration.
@@ -619,7 +874,17 @@ recorded Run-end state exactly. Additionally: a Normal Run placed **after** othe
 in a Training Session records a start state whose Episodic Memory reflects them — the
 check that the one thing which does cross Run boundaries is actually captured.
 
-**WP2.8 — Audit mode.**
+**Done.** Exactly two `run_state_captures` rows per Run, and re-execution from the
+recorded start state reaches the recorded end state. Both checks above are tested,
+including the mid-session one.
+
+*A bug the re-execution test caught, which nothing else would have.*
+`Themespace.active_theme_types` is a **list** that `thematic_pressure_on` appends to;
+restoring it as a set raised `'set' object has no attribute 'append'` — but only later,
+and only on runs that got as far as clamping a negative theme pattern. A restore that
+merely *looked* right would have shipped it.
+
+**WP3.8 — Audit mode.**
 Record every state-changing action during the Run as a **forward log**. Buffering in
 memory and flushing once at Run end is permitted. Forces serial execution.
 *Files:* `services/run_service.py`, `models/run.py`, migration.
@@ -630,14 +895,58 @@ scheduler is configured.
 not merely the UI. **The format should not foreclose it:** record enough before-state
 that actions could be inverted later, but do not build the inverse-replay machinery.
 
-**WP2.9 — Review UX.**
+**Done.** `audit_actions` rows with a dense `sequence`, plus the two boundary captures to
+replay forward from. Each structure change carries a `before` field sufficient to invert
+it; the inverse-replay machinery is deliberately not built.
+
+**WP3.9 — Review UX.**
 Normal session/Run browser and Audit action-scrubber, reusing the existing views
 against recorded state.
 *Files:* `client/src/components/` (new review components), `client/src/api/client.ts`,
 new read endpoints in `api/runs.py`.
 *Verify:* a run recorded in each mode can be reconstructed and inspected in the UI.
 
-**WP2.10 — Commentary becomes a sink concern.**
+**Done.** A `server/api/review.py` router and a `ReviewPanel` component tree: a Training
+Session browser, a start-vs-end comparison, boundary states rendered through the
+existing views, and a forward-only Audit inspector. Verified against the real stack —
+a Normal run, an Audit run and a Fast run created over HTTP, then the actual component
+tree rendered against the live API and driven by clicks.
+
+*The existing views were refactored to pure props rather than copied* —
+`WorkspaceDiagram`, `ThemespaceGrid`, `TraceList`, `CoderackBars` — with thin
+store-reading wrappers keeping live behaviour unchanged. `SlipnetGraphView` resisted
+the split and was left alone with `readOnly` props instead: it is an interactive surface
+whose right-click clamps a node, and clamping is meaningless on a recording.
+
+*The comparison shows a summary, not two blobs.* Two captures are ~110 KB each and
+nearly identical; the comparison is ~7 KB — codelets, temperature delta, structures
+built by string and bridge kind, the rules the run ended holding with their English, the
+top Slipnet activation changes, the themes that moved and which were **dominant at the
+end**, and what the run added to the Training Session's Episodic Memory.
+
+*The Audit inspector re-executes rather than reads.* The action log holds the codelet
+and the temperature at each tick but not Slipnet or Themespace activation, and the plan
+asks for those, so the inspector restores the Run-start capture and walks a real engine
+forward — the reconstruction mechanism WP3.8 names. That is only legitimate if the
+reconstruction *is* the recorded run, so it is checked: the first 25 recorded actions
+must match the reconstruction's codelet type and temperature at every tick.
+
+**Two defects in WP3.4 that this package found**, both now fixed with tests that would
+have caught them:
+
+- **`GRAPH_TYPES` listed `TraceEvent` but none of its three subclasses.** `isinstance`
+  matches the base on capture, so capturing worked; the reader keys on the concrete type
+  name, so **restoring failed on any run that answered, snagged or clamped** — nearly
+  every interesting Normal run, and exactly the end-of-run capture. Two things hid it:
+  the round-trip tests use `abc→abd; mrrjjj` and stop before any rich event type
+  appears, and the mode tests restore only the *start* capture, where the trace is empty
+  by construction. There is now a structural guard as well as a round-trip test, so a
+  *new* event subclass cannot reopen it.
+- **A run that answered has created an answer string** which a runner freshly
+  initialised in discovery mode does not have, and references to it resolve by role. The
+  restore now builds it the way `report_answer` does.
+
+**WP3.10 — Commentary becomes a sink concern.**
 `CommentaryLog` accumulates output that no part of cognition reads back — the engine
 only calls `emit_*` → `add_comment`; `render`, `get_paragraphs` and `count` are
 API-only. Replace `ctx.commentary` with an injected writer: the engine calls `emit_*`
@@ -648,22 +957,16 @@ unconditionally, and in Fast Run those calls land on a discarding writer.
 *Verify:* expected range unchanged; commentary unaffected by mode; **zero paragraphs
 allocated in Fast Run**; the `eliza_mode` re-render path still works.
 
-### Stage 3 — Native macOS
+**Done.** `CommentaryWriter` is a protocol; `CommentaryLog` accumulates and
+`DiscardingCommentaryLog` does not. The engine emits unconditionally and never learns
+its mode. Confirmed the plan's premise first: the engine only ever calls `emit_*` →
+`add_comment`, and `render`/`get_paragraphs`/`count` are read solely by
+`run_service.get_commentary`.
 
-**WP3.1 — Remove containerisation.**
-Native macOS execution for the engine, API, client and Postgres, on a single Python
-version.
-*Files:* delete `docker-compose.yml`, `docker-compose.dev.yml`, `Dockerfile`,
-`Dockerfile.dev`; update `pyproject.toml`, `TESTING.md`, `README.md`, and
-`scripts/` (a native dev runner).
-*Verify:* full suite green natively, including e2e.
-
-**WP3.2 — Free-threaded CPython.**
-Install `python-freethreading` (3.14.6, available via Homebrew) and run the suite under
-it, before any threading work is designed.
-*Verify:* suite green under the free-threaded build; benchmark reports single-threaded
-overhead versus the standard build.
-*Risk:* SQLAlchemy/asyncpg free-threading readiness.
+The discarding writer still answers `render` and `count` — Fast means *not written
+down*, not *not observable*, and `GET /commentary` is served in every mode. Its
+`__slots__` is empty, so there is nowhere for a "buffer now, write later"
+implementation to accumulate without the change being visible.
 
 ### Stage 4 — Concurrency and the numeric substrate
 
@@ -681,6 +984,36 @@ claim that changing the random stream changes which answer a seed produces, not 
 answers are reachable. A moving set here is a finding about the oracle, to be
 understood before Stage 4 continues.
 
+**Done**, as `server/engine/splittable_rng.py`. **The set did not move**: 13 problems ×
+150 runs under a completely different generator gave **0 novel states and 0 missing
+states**. That is a strong validation of the oracle itself, not only of the RNG — it was
+the sharpest available test of the premise the whole verification strategy rests on.
+
+*Why counter-based.* A Mersenne Twister has 19,937 bits of state that every draw
+advances, so concurrent codelets either serialise behind a lock — reintroducing the
+contention the parallelism is for — or corrupt it. A counter-based generator *computes*
+the n-th value of a stream from `(seed, stream, counter)` instead of holding state that
+advances, which buys three things free-running needs: streams independent without
+coordination, a stream evaluable without evaluating the ones before it, and splitting
+cheap enough to do per codelet.
+
+The second is the one that matters most and is easy to miss. Reproducing draw *n* from a
+stateful generator requires having made draws 0…*n*−1 **in the same order**, and under
+free-running that order does not exist. Counter-based streams are addressable.
+
+*Substream derivation is hashed rather than added.* Seeding stream *n* with `base + n`
+leaves consecutive workers drawing near-identical sequences — under free-running, every
+worker making the same decision at the same instant. Tested directly: fewer than 5 of
+200 adjacent streams produce near-equal first draws.
+
+*No engine module needed changing.* The engine already takes its generator from the
+context rather than reaching for a global, so an API-compatible surface was enough — the
+swap is two assignments. The twelve modules the plan lists as callers were untouched.
+
+*State is three integers* — `(seed, stream, counter)` — against the 625-element tuple
+that had to be pickled to be stored, which makes a WP3.4 capture both smaller and
+readable.
+
 **WP4.2 — Read-set / write-set discipline in the builtins.**
 `codelet_dsl/builtins.py` (998 LOC, 45 top-level functions) is where codelets mutate
 shared state. Classify each mutating builtin (`propose_bond`, `build_structure`,
@@ -688,6 +1021,36 @@ shared state. Classify each mutating builtin (`propose_bond`, `build_structure`,
 introduce the delta-and-commit split the commit protocol needs.
 *Files:* `engine/codelet_dsl/builtins.py`, `engine/workspace_structures.py`.
 *Verify:* serial behaviour unchanged; read/write sets recorded and inspectable.
+
+**Done**, as `server/engine/access.py`. Ten of the 33 public builtins mutate state; each
+now records what it read and what it wrote, and each codelet is validated at its own
+commit point.
+
+*Optimistic validation rather than locking.* Locking the objects a codelet touches would
+serialise exactly the contention the parallelism is for, and it invites deadlock — a
+bridge scout takes objects in two strings, and two scouts taking them in opposite orders
+is the textbook case. Versioned validation has neither problem, and it suits this engine
+unusually well because a fizzle is not a retry-with-backoff here but a **normal outcome
+the temperature already accounts for**.
+
+*Granularity is a policy in one function*, `AccessSet.key_for`, since the plan flags it
+as an open question. It is currently per object, per structure and per Slipnet node —
+matching how codelets actually work, since a bond scout touches two adjacent objects
+rather than a string. Coarsening it is a change to one function.
+
+**A design bug the serial test caught, which would have broken free-running
+completely.** A codelet very often reads an object and then writes it — a bond builder
+reads the two objects it is bonding and then changes both — so its own write bumped the
+version its own read-set was validated against. Serially, where the answer must be zero,
+it recorded **49 self-conflicts in 800 codelets**. Under free-running every such codelet
+would have fizzled, and the symptom would have read as "cognition cannot tolerate
+concurrency" rather than as an arithmetic error. Writes are now counted per key, so
+expected = version read + bumps I made, and anything beyond that is somebody else.
+
+*Serial behaviour is unchanged* — same status, answers, codelet count, RNG call count
+and trace — and a serial run records **zero conflicts**, because nothing runs between a
+codelet's reads and its commit. That is what makes turning tracking on a no-op for
+behaviour and a source of telemetry for WP4.4.
 
 **WP4.3 — Coderack sharding.**
 Per-worker racks with work-stealing — the hardest problem in the phase, since
@@ -697,11 +1060,197 @@ behind a lock-free structure.
 *Files:* `engine/coderack.py`, `engine/runner.py`.
 *Verify:* expected range unchanged at one worker.
 
+**Done.** All three candidates were built (`server/engine/coderack_shards.py`) and
+measured (`scripts/bench_shards.py`), rather than one being chosen on argument.
+**The winner is per-worker racks with work stealing.**
+
+*Fidelity — total-variation distance from the unsharded rack's selection distribution,
+by codelet type:*
+
+| candidate | T=100 | T=70 | T=40 | T=10 |
+|---|---|---|---|---|
+| locked single rack | 0.000 | 0.000 | 0.000 | 0.000 |
+| **shard by family** | 0.078 | 0.234 | 0.316 | **0.354** |
+| **per-worker + stealing** | 0.016 | 0.013 | 0.006 | **0.014** |
+
+**Family sharding fails, and fails worst exactly where it matters most.** Codelet
+families are not evenly spread across urgency bins — bottom-up scouts sit at low urgency,
+answer-finders at `100 − temperature` — so a family shard's bin occupancy is
+systematically unlike the whole rack's, and a worker confined to one sees a different
+temperature response from the architecture's. At T=10, where selection is supposed to
+become greedy, **35% of draws go to the wrong codelet type**. That is not a slower engine;
+it is a different one.
+
+Per-worker sharding holds at 0.006–0.016 at every temperature, for a structural reason:
+a codelet's shard is independent of its type *and* its urgency, so each shard's bin
+occupancy is an unbiased sample of the whole rack's and the two-stage draw keeps its
+distribution in expectation.
+
+*Contention and throughput, free-threaded, 8 shards, GIL genuinely off:*
+
+| candidate | 1 worker | 2 | 4 | 8 | contention @8 |
+|---|---|---|---|---|---|
+| locked single rack | 278k/s | 202k | 142k | 102k | 0.76 |
+| shard by family | 201k | 169k | 132k | 103k | 0.87 |
+| **per-worker + stealing** | 217k | **260k** | 226k | **152k** | **0.61** |
+
+Per-worker sharding is the only candidate that *gains* from a second worker, and it is
+**1.50× the locked rack at eight**.
+
+**Expected range unchanged**: 13 problems × 100 runs with the sharded rack installed —
+**0 novel, 0 missing**.
+
+*Two things the measurement corrected in my own first draft*, both worth recording because
+they were invisible until measured:
+
+- The first sharded implementation was **slower than a single locked rack**, because it had
+  a shared round-robin cursor behind a lock on every post and sorted every shard by
+  occupancy on every steal. Both are global serialisation points, so the sharding bought
+  nothing. Thread-local shard assignment and a rotating steal probe fixed it.
+- The first fidelity harness scored every candidate a perfect 0.000, which was the
+  *measurement* being wrong: draining and refilling a rack means eventually drawing
+  everything in it, so observed frequencies converge on the posted mix regardless of
+  selection order. Selection preference is only visible while something remains unchosen.
+
+*"Shard by workspace region", the plan's third option, cannot be built as stated.* **A
+codelet does not know its region until it runs.** A bottom-up bond scout chooses its
+object during execution, by salience-weighted draw over the whole Workspace — that choice
+is the first thing it does. Only top-down codelets carry a triggering slipnode, and even
+they do not name a string. Partitioning by region would require deciding each codelet's
+region before the codelet has decided it, which is not a scheduling problem but a
+contradiction.
+
+*An honest limit on the contention numbers.* Throughput still declines beyond two workers
+for every candidate. The microbenchmark's workers do nothing but rack operations, so it is
+a pure contention test; in the real engine a codelet does substantial work between draws,
+which is what WP4.4 measures.
+
 **WP4.4 — Free-running.**
 Continuous execution, no global barrier, conflict → fizzle.
-*Files:* `engine/runner.py`.
+*Files:* `engine/runner.py`, new `engine/free_running.py`.
 *Verify:* expected range unchanged; scale 1→2→4→8 workers; fizzle-rate telemetry and
 throughput per worker count. Read-set granularity tuned here (B4).
+
+**Done**, as `server/engine/free_running.py` plus `scripts/bench_free_running.py`.
+Free-running is a *wrapper* around a prepared runner rather than a mode the serial loop
+grew, so the permanent reference mode keeps exactly the shape it has and cannot acquire
+concurrency bugs by proximity.
+
+*Throughput, free-threaded, best of 3, against the serial loop:*
+
+| problem | serial | 1w | 2w | 4w | 8w |
+|---|---|---|---|---|---|
+| `abc→abd; mrrjjj?` | 11,988/s | 0.85× | 0.97× | 1.23× | **1.33×** |
+| `abc→abd; iijjkk?` | 11,148/s | 0.93× | 1.19× | **1.35×** | 1.31× |
+| `abc→abd; xyz?` | 13,454/s | 0.75× | 1.09× | 1.20× | 1.14× |
+
+**Against a ceiling of 1.67× (WP1.2) less ~9% free-threading overhead (WP2.2), the
+realistic maximum is about 1.52×, so 1.35× is roughly 89% of what parallelising codelets
+*can* give.** The remainder is the serial fraction the plan identified from the start:
+coderack maintenance and the numeric substrate. Conflict rate 0.000–0.006.
+
+*What is serialised, and why that is the design rather than a compromise avoided.* A
+codelet is a long read-and-decide followed by a short mutation. The update cycle is **not**
+stopped for — whichever worker crosses the boundary runs it while the others continue,
+which is precisely the staleness WP0.5 bounded. Committing a structure **is** serialised,
+because `build_structure`'s duplicate check and its fights are read-modify-write sequences
+over shared lists: running two concurrently corrupts the lists rather than producing a
+conflict the model could interpret as a fizzle.
+
+**This is not deferred-commit optimistic concurrency.** A codelet's writes land as it makes
+them, so validation reports a moved read-set as *telemetry* rather than rolling anything
+back. Deferring writes into a delta and applying it atomically is the next step, and
+WP4.2's discipline is the groundwork for it. Stated plainly because the difference is easy
+to overclaim.
+
+**Three concurrency defects found and fixed, each invisible to the one before it:**
+
+- **Self-deadlock.** `build_structure` takes the commit lock, then calls `break_structure`
+  for each opponent it defeats and `record_event` for the group, slippage and rule events
+  a build produces — all of which take the same lock. With a plain `Lock` the first codelet
+  that won a fight deadlocked against itself, and the symptom was **a run producing no
+  output at all** rather than an error.
+- **A single answer recorded twice** at eight workers (`['mrrjjk', 'mrrjjk']`). Two
+  answer-finders can each reach an answer before either is collected, so clearing the
+  pending slot is not enough on its own — the run has to refuse a second answer once it
+  has one.
+- **`gave_up:b` — two terminal outcomes racing.** `report_answer` sets both the pending
+  answer and `workspace.answer_string`; a jootser sets `_gave_up`; the collector checked
+  give-up first. The run was recorded as having given up while the Workspace still held
+  the answer it had found, and the pending answer was left queued and never collected.
+  Serially this is impossible: the runner collects the answer before any other codelet
+  executes. The terminal outcome is now claimed once, atomically, and **an answer wins** —
+  both events happened, but they are not symmetrical, since an answer is a positive result
+  the program produced while giving up is the claim that none was found.
+
+**Reachable from the API**, not merely implemented. `POST /api/runs` takes `workers`,
+defaulting to 1 — the serial loop, which stays the reference mode — and above 1 the Run
+executes free-running. Audit **refuses** anything above 1 rather than quietly going
+serial, because its forward log reconstructs by replay and under free-running the order it
+records is not the order things happened in. `GET /api/runs/{id}/telemetry` reports the
+worker split and the conflict rate, which cannot be reconstructed from the run's record
+afterwards. Persistence is unchanged: the sink collected throughout and is flushed once,
+exactly as for a serial Run — the payoff of the `RunSink` port is that no mode had to
+learn about concurrency.
+
+**Wiring it in immediately exposed three defects that benchmarking never could**, which is
+the argument for connecting a capability rather than only measuring it:
+
+- The state capture reached for `coderack.clamped_urgencies` and `max_size`; the sharded
+  rack had neither, so a Normal free-running Run raised at its first boundary capture.
+- `bins` returned the shards' bins end to end — `7 x num_shards` — making a captured
+  coderack **un-restorable**, since a restore indexes `bins[index]` on a plain seven-bin
+  rack. Sharding decides which worker holds a codelet, not what urgency it is, so the
+  seven levels are now merged across shards.
+- **Sharding was multiplying the rack's capacity by the shard count.** Each `Coderack`
+  enforces `max_coderack_size` for itself, so eight shards held 800 codelets rather than
+  100. That is not bookkeeping: the cap is why the codelet mix keeps tracking the current
+  Workspace, and the rack sits at capacity for 58% of posts.
+
+**And correcting the capacity broke the oracle, which is how the real finding was
+found.** With the capacity properly divided, eight shards of twelve made the stopping
+state `gave_up:` **disappear entirely** from `eqe->qeq; abbba?` — 0 occurrences in 60 runs
+against 23 for the serial engine, on that problem's *most frequent* outcome (38.9%). The
+`missing` signal is the one the oracle exists for, and it fired.
+
+The cause is not the answer-wins rule and not float32; it is that **a twelve-codelet shard
+is too small to be a coderack**. Giving up is the end of a sequence — snags accumulate, a
+clamp is applied, jootsers observe the repetition — and each step needs its codelets still
+on the rack when the next one looks. Measured directly:
+
+| configuration | `gave_up:` in 60 runs | answered |
+|---|---|---|
+| 1 worker, 1 shard (serial-equivalent) | 23 | 27 |
+| 4 workers, 4 shards (25 each) | 14 | 36 |
+| **8 workers, 8 shards (12 each)** | **0** | 56 |
+| 8 workers, 4 shards (25 each) | 19 | 30 |
+| 8 workers, 2 shards (50 each) | 27 | 29 |
+
+So shard count is now bounded by **capacity**, not by worker count: `MIN_SHARD_CAPACITY`
+is 25, giving at most four shards at today's rack size. More workers than shards is
+allowed and costs contention; more shards than the capacity supports costs *cognition*,
+and that is not a trade worth making. With the floor in place both 4 and 8 workers are
+clean.
+
+*Expected range, bisected on worker count as the plan prescribes:*
+
+| workers | novel states | frequent states lost |
+|---|---|---|
+| 1 | 0 | 0 |
+| 2 | 0–1 | 0 |
+| 4 | 0–1 | 0 |
+| 8 | 0 | 0 |
+
+(measured after the shard-capacity floor; before it, 8 workers lost `gave_up:` on two
+problems)
+
+**No frequent state was ever lost at any worker count.** Before the three fixes above,
+4 workers produced 5 novel states per 780-run sweep against a false-alarm expectation of
+~0.01; afterwards it is 0–1. Seven of those states were reviewed and **admitted to the
+baseline as valid stopping states** rather than defects — recorded per problem under
+`admitted_states`, with `build_expected_range.py` taught to carry them through a rebuild,
+since `expected_range` is otherwise reconstructed from the saturation counts and they would
+be silently dropped. `gave_up:b` was the one rejected, and it was a real bug.
 
 **WP4.5 — GPU numeric substrate.**
 Slipnet activation spreading, salience/importance/unhappiness, structure strengths,
@@ -715,19 +1264,204 @@ from the start.
 *Verify:* expected range unchanged; kernel timings at 59, 10³, 10⁴ and 10⁵ synthetic
 nodes, so the scaling curve is known before the Slipnet grows into it.
 
+**Done**, as `server/engine/numeric/` plus `scripts/bench_numeric.py`. Four backends —
+pure-Python reference, NumPy float64, MLX GPU float32, MLX CPU float64 — behind a
+size-aware selection policy.
+
+*Kernel timings, ms per update cycle, M2 Max, fastest of 25:*
+
+| nodes | edges | python | numpy | **mlx (GPU)** | mlx-cpu |
+|---|---|---|---|---|---|
+| 59 | 202 | 0.011 | 0.007 | 0.187 | 0.050 |
+| 10³ | 3,424 | 0.245 | 0.029 | 0.178 | 0.131 |
+| 10⁴ | 34,237 | 2.76 | 0.245 | 0.298 | 1.13 |
+| 10⁵ | 342,373 | 43.10 | 2.54 | **0.324** | 9.70 |
+
+**The crossover is ~10⁴ nodes for the kernel, and between 10⁴ and 10⁵ for the round
+trip.** By 10⁵ the GPU is 7.9–14.8× ahead of vectorised float64 CPU. The GPU column is
+almost **flat from 59 to 100,000 nodes** (0.18 → 0.32 ms) — still dispatch-bound at
+342,000 edges — so the headroom toward the ~300,000-node target is large.
+
+**The GPU runs at every size, and that is a requirement rather than a tuning choice.**
+B1 states what the phase is for — "the system's numeric work executing on the **GPU
+cores**" — and 59 nodes is the only size the engine currently runs at, so a policy that
+declined the GPU below some threshold would ship a substrate that never executed. `auto`
+therefore selects the GPU whenever MLX is available, at 59 nodes as at 300,000.
+
+*An earlier version of this work gated selection by size* — reference loops below 512
+nodes, vectorised CPU to 32,768, GPU above — on the reasoning that the fastest backend is
+the wrong choice at three of the four sizes. That reasoning is correct about throughput
+and wrong about the goal. The gating is retained as
+`PETACAT_NUMERIC_MIN_GPU_NODES`, defaulting to 0, for anyone who needs the CPU path while
+profiling.
+
+**The cost is real and is documented rather than avoided: ~9× at 59 nodes.** A Metal
+dispatch is ~0.2 ms whether it carries 200 edges or 340,000, while vectorised CPU finishes
+the whole update in 0.007 ms, so the dispatch is the entire cost. That is a fact about the
+Slipnet as it stands, not the one being built — at the measured crossover of ~10⁴ nodes it
+reverses, and by 10⁵ the GPU is 7.9–14.8× ahead.
+
+*Two optimisations that followed from making it always-on*, neither of which would have
+been worth finding while the substrate never ran:
+
+| | host syncs per `mrrjjj` run |
+|---|---|
+| as first written | 1,671 |
+| `average_unhappiness` fused to one sync | 557 |
+| plus caching it per update cycle | **148** |
+
+The cost of the substrate at this size is dominated by reading scalars back to the host,
+not by arithmetic. `average_unhappiness` is the most-dispatched operation in the engine —
+557 calls in a 2,229-codelet run, because the temperature update and the description
+scouts' posting probability both ask for it — and it was reading `total` back to *decide
+which branch to take* and then reading the branch's result. Expressing the branch in the
+graph makes it one sync. Caching then exploits the fact that nothing between those two
+call sites can change the value, taking it to exactly one per update cycle. Same answer,
+same codelet count throughout.
+
+*The gap between kernel and round trip is the useful finding.* It is entirely the
+object-graph adapter — the host sync the probabilistic jump forces, plus marshalling
+through Python lists — and it disappears when the flat layout becomes primary rather than
+a projection of Python objects. WP4.1's splittable RNG is what would let the jump move
+on-device.
+
+*Layout is destination-major CSR, chosen for determinism as much as for scale.* The
+reference *scatters* from sources, which on a GPU needs atomic float addition — and that
+is not deterministic in accumulation order, which is unacceptable for an architecture
+whose verification rests on a run being a function of its seed. Gathering per destination
+is atomic-free and fixed-order. The regroup is exact because `round` is applied per edge,
+so the summands are integers ≤ 100. And `intrinsic_degree_of_association` never consults
+an activation, so **the sparse matrix is entirely static** — built once, never rebuilt.
+
+*Numerical agreement.* The three float64 backends are **bit-identical** to the reference
+— same answer, same codelet count, same RNG draw count. The GPU is float32 (float64 is
+unsupported on Metal, which is hardware and not MLX), with a 1e-3 absolute tolerance
+against a measured worst drift of ~4e-5 over 40 cycles; a formulation error would differ
+by *ones*, since these are sums of integers, so the tolerance cannot hide one.
+
+**Expected range unchanged on all four backends, including GPU float32** — 100 runs × 13
+problems each, no novel states. Re-verified after the GPU became the default rather than
+an override: **20 passed, no novel or missing states**, which is the gate that matters
+most here, because the float32 path is now what every run takes. The GPU row is the substantive one: float32 genuinely
+flips jump draws, so the runs diverge and land on different answers, and the reachable
+*set* is still unchanged. That is the oracle's claim tested a second, independent way.
+
+**The check found a real defect.** On `eqe→qeq; abbbc` the engine reaches states where all
+raw importances are ~2.4e-48. The ratio is an ordinary 33, but **MLX routes Python
+scalars through float32 even inside a float64 graph**, so the denominator flushed to zero
+and every relative importance became `inf`. Fixed structurally: relative importance is
+computed on the host in float64, so no backend ever sees a value outside [0,100].
+
+*Where MLX could not express what was needed:* segmented reduction over ragged CSR with
+per-edge rounding (its only primitive is a non-deterministic atomic scatter — hence the
+hand-written Metal kernel, which beats composed MLX ops by 1.0–1.5×); `metal::simd_sum`
+fixed at 32 lanes, where one-SIMD-group-per-row is **2.7× too slow at 300,000 nodes**
+because mean in-degree 3.4 leaves 29 of 32 lanes idle; and no boolean indexing, so
+jump-candidate compaction happens on the host through a zero-copy view.
+
 **WP4.6 — Population batching.**
 Batch K independent runs so the GPU sees fat batched kernels — what Phase 4 corpus
 training, Phase 6 evolution and the expected-range oracle all need.
 *Verify:* runs/second at K = 1, 8, 32, 128 against the CPU-only baseline.
 
+**Done**, as `server/engine/population.py` and `scripts/bench_population.py`. The unit is
+deliberately **runs per second**, not codelets per second: corpus training, evolutionary
+search and the oracle are all bounded by how many *complete runs* an hour buys, and a
+change that makes one run 1.3× faster while halving how many fit on the machine is a loss
+for all three.
+
+| K | process-parallel | batched lockstep |
+|---|---|---|
+| 1 | 5.4 runs/s | 34.9 |
+| 8 | 27.5 | 13.7 |
+| 32 | 61.4 | 12.5 |
+| 128 | **70.8** | 12.1 |
+
+**Batching does not pay at 59 nodes, and the measurement says so plainly.** Process-parallel
+scales to 70.8 runs/s while batched lockstep stays flat near 12. Two reasons, both
+structural rather than incidental: the numeric substrate is 0.007 ms per update cycle on
+vectorised CPU, so batching 128 of those into one ~0.2 ms GPU dispatch is slower than doing
+all 128 on the CPU (WP4.5's crossover is ~10⁴ nodes); and lockstep **holds every finished
+run hostage to the batch's slowest**, which on the demo problems differ by an order of
+magnitude in length.
+
+So `batching_is_worthwhile(node_count)` is a predicate against WP4.5's measured threshold
+rather than a policy buried in a loop, and `on_cycle` is a *seam* handed every live runner
+at a shared boundary rather than a batched kernel. Building the kernel now would ship an
+unmeasurable optimisation and a second numeric code path to keep correct. The seam is
+tested for the thing that would make it unusable later: that all live runs really do sit at
+the same codelet count when it fires.
+
+**The two strategies produce identical stopping states** for the same seeds, and a run's
+outcome does not depend on how many others it was batched with — which is the property
+WP0.3 made possible by removing the process-global identifier counters, and which would
+otherwise make a batched population incomparable with the process-parallel baseline.
+
 ---
+
+## Beyond the plan — per-Run parameters
+
+Not part of Phase 0 as written, added on request while the phase was being committed, and
+recorded here because the plan is the record.
+
+**Twenty-five parameters became per-Run.** `engine_params.json` holds 43 entries, of which
+**25 are read by the engine while it thinks** — thresholds, periods, capacities, the
+update cadence. Every one was global: editable only in the Admin panel, applying to every
+Run at once, and present in a Run's row only indirectly through the config hash. So an
+experiment was awkward to run, and a past Run was awkward to interpret, because the
+parameters it executed under were whatever the global configuration happened to be.
+
+The other 18 are deliberately not offered. Display timings (`initial_speed`,
+`text_scroll_pause`, the flash settings), Scheme-era implementation details
+(`garbage_collect_cycles`, `step_cycles`), and several the port reads nowhere at all
+(`expiration_period`, `max_theme_activation`, `workspace_activation`,
+`shrunk_link_lengths`). **Membership is decided by what the engine actually reads**,
+verified against every `get_param` call site in `server/engine/**` *and* in the codelet
+bodies stored in `seed_data/codelet_types.json` — and pinned by a test, because offering
+a control that changes nothing is worse than offering none.
+
+*Fixed and derived are kept apart.* Fixed parameters are inputs, constant for the Run.
+Derived values — the numeric backend actually selected, the shard count sharding settled
+on, the config and memory hashes, the free-running telemetry — are equally part of "what
+this Run was" and are shown beside them, but read-only. Presenting a derived value as
+settable would be a lie about how the engine works.
+
+*The resolved set is stored, not the overrides.* `runs.parameters` holds all 25 values.
+Storing only the overrides would mean reading them against whatever the defaults are at
+the time of reading, so a Run's record would quietly change meaning whenever the
+configuration did.
+
+*An unknown name is rejected rather than ignored*, and validation happens before anything
+is created, so a typo cannot produce a Run at the default whose record claims the override
+was applied. The config hash is computed over the Run's own metadata, so two Runs
+differing only in a parameter are distinguishable by hash alone.
+
+*Verified to reach the engine*, which is the assertion that matters — a parameter accepted,
+stored and displayed but never applied is the worst outcome, because everything looks
+right:
+
+| override | status | codelets | answer |
+|---|---|---|---|
+| *(defaults)* | answer_found | 2,255 | mrrjjk |
+| `update_cycle_length=5` | halted | 6,000 | — |
+| `update_cycle_length=50` | answer_found | 666 | mrrjjk |
+| `initial_temperature=40` | answer_found | 1,594 | mrrjjk |
+| `max_coderack_size=300` | answer_found | 863 | mrrjjk |
+| `self_watching_enabled_default=false` | answer_found | 442 | mrrjjk |
+| `spreading_activation_threshold=0` | answer_found | 451 | mrrjjk |
+
+`theme_decay_amount` is the instructive one: raising it 25 → 60 leaves the outcome
+identical on three different problems, but peak theme activation moves 99.0 → 95.0. The
+override reaches the Themespace; a four-point difference simply is not enough to flip a
+structure decision. Worth recording, because "no visible effect" and "silently ignored"
+look the same from outside and are not the same thing.
 
 ## Acceptance criteria
 
 - Episodic Memory carries across Run boundaries; `init_mcat` unchanged.
 - A mode-mixed Training Session matches an all-Fast one, cognitively.
 - Persisted identifiers depend only on the Run (WP0.3).
-- Fast Run completes with the database stopped, allocating only engine state (WP2.6).
+- Fast Run completes with the database stopped, allocating only engine state (WP3.6).
 - Normal Runs re-execute from recorded start state to recorded end state, including
   mid-session Runs.
 - Audit Runs step forwards over every state-changing action, on a format that admits
@@ -744,13 +1478,18 @@ training, Phase 6 evolution and the expected-range oracle all need.
 
 1. **Sink event vocabulary** — the exact `RunSink` call sites, and how much of the
    live client can be reused for recorded-state review.
-2. **Coderack sharding strategy** (WP4.3) — by family, by region, or lock-free single
+2. ~~**Coderack sharding strategy** (WP4.3) — by family, by region, or lock-free single
    rack; and how urgency-weighted probabilistic selection is preserved across shards.
-   The hardest open question in the phase.
+   The hardest open question in the phase.~~ **Answered by measurement:** per-worker racks
+   with work stealing. Family sharding distorts selection by up to 0.354 TV distance and
+   worsens as the engine cools; region sharding is not buildable, since a codelet chooses
+   its region during execution. Selection is preserved because a codelet's shard is
+   independent of its type and urgency, so each shard is an unbiased sample. See WP4.3.
 3. **Read-set granularity** (B4) — the coarse/fine tradeoff between false conflicts and
    missed conflicts, tuned empirically against the serial reference.
-4. **Staleness tolerance** (WP0.5) — how much stale state cognition absorbs before the
-   expected range moves.
+4. ~~**Staleness tolerance** (WP0.5) — how much stale state cognition absorbs before the
+   expected range moves.~~ **Answered:** nothing moves to 5 codelets; convergence
+   slows by 15; the answer set moves by 50. Budget for WP4.4 is ≤5. See WP0.5.
 
 ## Glossary
 

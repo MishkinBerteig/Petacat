@@ -935,10 +935,10 @@ class TestReportAnswer:
 
     def test_workspace_serialization_includes_answer(self, ctx_abc_abd_xyz):
         """After report_answer, serialize_workspace_state must include the answer."""
-        try:
-            from server.services.snapshot_service import serialize_workspace_state
-        except ImportError:
-            pytest.skip("sqlalchemy not available locally")
+        # Imported unconditionally: since WP3.1 the serializers live in the
+        # engine and pull in no database layer, so there is no longer an
+        # environment in which this import can fail and a skip would be honest.
+        from server.engine.serialization import serialize_workspace_state
         ctx = ctx_abc_abd_xyz
 
         report_answer(ctx, "xye", 75.0)

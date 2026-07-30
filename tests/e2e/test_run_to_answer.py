@@ -7,7 +7,7 @@ Tests cover:
   - Run-to-completion with no step limit finds an answer or halts gracefully
 
 ALL tests are deterministic: same seed -> same results.
-Requires: docker compose -f docker-compose.dev.yml exec app pytest tests/e2e/ -v
+Requires: a local Postgres — start it with `scripts/dev.sh db`.
 """
 
 import asyncio

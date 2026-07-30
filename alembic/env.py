@@ -10,7 +10,10 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Allow DATABASE_URL env var to override alembic.ini (for Docker)
+# Allow the DATABASE_URL env var to override alembic.ini.  The .ini names the local
+# development database, which is what `scripts/dev.sh` exports and what a migration
+# is normally run against; the override is how you point the same migration at
+# another database on the same instance (petacat_test) or at another host.
 _db_url = os.environ.get("DATABASE_URL")
 if _db_url:
     config.set_main_option("sqlalchemy.url", _db_url)

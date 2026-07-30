@@ -26,13 +26,25 @@ import {
   getConceptHelp,
   getCodeletHelp,
   getComponentHelp,
+  getGlossaryHelp,
 } from '@/api/client';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-export type HelpType = 'concept' | 'codelet' | 'component';
+/**
+ * The four kinds of thing the help system can be asked about.
+ *
+ * `glossary` was missing, and its absence was not a gap in coverage — the glossary is
+ * over half the help content, twenty-nine terms to sixteen components — but a gap in
+ * *reachability*: nothing could ask for one. The search palette coerced glossary hits
+ * to `component` and looked them up by title, which 404s against a table keyed by
+ * topic_key and typed by topic_type, so every glossary result in search silently
+ * failed. Components and glossary terms are different rows with different shapes and
+ * different endpoints, and the type has to say which.
+ */
+export type HelpType = 'concept' | 'codelet' | 'component' | 'glossary';
 
 export interface ConceptHelpContent {
   type: 'concept';
@@ -63,10 +75,24 @@ export interface ComponentHelpContent {
   metadata: Record<string, unknown>;
 }
 
+export interface GlossaryHelpContent {
+  type: 'glossary';
+  /** The topic_key, which is what the endpoint is addressed by. */
+  term: string;
+  /** The human title, shown as the popover's heading. */
+  name: string;
+  /** The one-line definition. */
+  short_desc: string;
+  /** The long form, which for a glossary term is `full_desc`. */
+  description: string;
+  metadata: Record<string, unknown>;
+}
+
 export type HelpContent =
   | ConceptHelpContent
   | CodeletHelpContent
-  | ComponentHelpContent;
+  | ComponentHelpContent
+  | GlossaryHelpContent;
 
 export interface UseHelpReturn {
   helpContent: HelpContent | null;
@@ -139,6 +165,23 @@ export const useHelpStore = create<HelpStoreState>((set) => ({
               topic_key: data.topic_key,
               short_desc: data.short_desc,
               description: data.description,
+              metadata: data.metadata ?? {},
+            },
+            isLoading: false,
+            error: null,
+          });
+        } else if (type === 'glossary') {
+          const data = await getGlossaryHelp(name);
+          set({
+            helpContent: {
+              type: 'glossary',
+              term: data.term,
+              // The endpoint calls these `definition` and `details`; the popover
+              // reads `short_desc` and `description` from every content type, so the
+              // renaming happens here rather than as a special case in the view.
+              name: data.title,
+              short_desc: data.definition,
+              description: data.details,
               metadata: data.metadata ?? {},
             },
             isLoading: false,

@@ -11,6 +11,9 @@ from __future__ import annotations
 import math
 from typing import TYPE_CHECKING, Any
 
+from server.engine.numeric.backend import select_backend
+from server.engine.numeric.layout import ThemeLayout, ThemeParams, ThemeState
+
 if TYPE_CHECKING:
     from server.engine.metadata import MetadataProvider
     from server.engine.slipnet import SlipnetNode
@@ -49,6 +52,9 @@ _RELATION_NODES: dict[str, str] = {
 }
 
 _NODE_RELATIONS: dict[str, str] = {v: k for k, v in _RELATION_NODES.items()}
+
+#: See ``slipnet._UNRESOLVED`` — "not yet decided" is not "decided against".
+_UNRESOLVED = object()
 
 # Bridge-type aliases accepted by the lookup helpers below.
 _BRIDGE_TYPE_TO_THEME_TYPE: dict[str, str] = {
@@ -299,6 +305,12 @@ class Themespace:
         # Scheme: ``active-theme-types`` (themes.ss:53), initialised to '().
         self.active_theme_types: list[str] = []
 
+        # Numeric substrate (WP4.5), resolved on first spread.  ``_UNRESOLVED``
+        # rather than ``None`` because "no backend" is itself a resolved answer.
+        self._numeric: Any = _UNRESOLVED
+        self._numeric_layout: Any = None
+        self._numeric_params: Any = None
+
     def set_justify_mode(self, enabled: bool) -> None:
         if enabled:
             self.possible_theme_types = list(ALL_THEME_TYPES)
@@ -359,10 +371,37 @@ class Themespace:
         tt = _BRIDGE_TYPE_TO_THEME_TYPE.get(bridge_type, bridge_type)
         return [t for t in self.get_active_themes(tt) if t.activation > 0]
 
+    def _numeric_backend(self) -> Any:
+        """The substrate for intra-cluster dynamics, or ``None`` for the loops.
+
+        Sized on the theme count rather than the cluster count, because that is
+        the quantity the arithmetic is proportional to.  With 27 clusters of at
+        most four themes it is 81 today, far below any threshold at which
+        vectorising pays, so under the default policy this returns ``None`` — the
+        substrate is here because the theme vocabulary grows with the conceptual
+        dimensions the architecture tracks, and later phases grow it a long way.
+        """
+        if self._numeric is not _UNRESOLVED:
+            return self._numeric
+        backend = select_backend(sum(len(c.themes) for c in self.clusters))
+        self._numeric = backend
+        if backend is not None:
+            self._numeric_layout = ThemeLayout.from_themespace(self)
+            self._numeric_params = ThemeParams.from_metadata(self.meta)
+        return backend
+
     def spread_activation(self) -> None:
         """Spread activation within all clusters."""
-        for cluster in self.clusters:
-            cluster.spread_activation(self.meta)
+        backend = self._numeric_backend()
+        if backend is None:
+            for cluster in self.clusters:
+                cluster.spread_activation(self.meta)
+            return
+
+        layout = self._numeric_layout
+        state = ThemeState.from_themespace(self, layout)
+        backend.spread_themes(layout, state, self._numeric_params)
+        state.apply_to_themespace(self, layout)
 
     def get_thematic_pressure(self, bridge_type: str) -> dict[str, Any]:
         """Get dominant themes for a bridge type."""
