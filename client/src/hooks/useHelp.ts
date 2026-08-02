@@ -1,3 +1,4 @@
+import { describeApiError } from '@/api/client';
 // ---------------------------------------------------------------------------
 // Petacat — Context-sensitive help hook (shared-state)
 // ---------------------------------------------------------------------------
@@ -189,8 +190,10 @@ export const useHelpStore = create<HelpStoreState>((set) => ({
           });
         }
       } catch (err: unknown) {
+        // Somebody clicked "?" and is owed an answer about it, so the popover stays
+        // open and shows what came back.
         const message =
-          err instanceof Error ? err.message : `Failed to load ${type} help`;
+          describeApiError(err, `load the ${type} help`);
         set({ error: message, helpContent: null, isLoading: false });
       }
     };

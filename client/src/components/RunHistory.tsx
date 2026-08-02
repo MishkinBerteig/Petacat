@@ -4,9 +4,13 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRunStore } from '@/store/runStore';
-import { listRuns, deleteRun, getRun } from '@/api/client';
+import { listRuns, deleteRun, getRun, describeApiError } from '@/api/client';
 import { ModeBadge } from '@/components/ModeBadge';
+import { Pager } from '@/components/Pager';
 import type { RunInfo } from '@/types';
+
+/** How many runs one window of the list holds. */
+const PAGE_SIZE = 50;
 
 function statusColor(status: string): string {
   switch (status.toLowerCase()) {
@@ -33,6 +37,12 @@ export function RunHistory() {
   const [runs, setRuns] = useState<RunInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  /** Why the last row acted on is still as it was. */
+  const [actionError, setActionError] = useState<string | null>(null);
+  // Which window of the list is on screen, and how many runs exist behind it.
+  // The server pages this endpoint, so the offset is what reaches run 51 and later.
+  const [offset, setOffset] = useState(0);
+  const [total, setTotal] = useState(0);
 
   const currentRunId = useRunStore((s) => s.runId);
   const currentRunMode = useRunStore((s) => s.runMode);
@@ -43,21 +53,32 @@ export function RunHistory() {
   const liveCodeletCount = useRunStore((s) => s.codeletCount);
   const liveTemperature = useRunStore((s) => s.temperature);
   const liveAnswer = useRunStore((s) => s.workspace?.answer ?? null);
+  const liveWorkspace = useRunStore((s) => s.workspace);
+  const liveParams = useRunStore((s) => s.runParams);
+  const liveThreshold = useRunStore((s) => s.spreadingThreshold);
   const store = useRunStore();
 
   const fetchRuns = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await listRuns(50, 0);
+      const data = await listRuns(PAGE_SIZE, offset);
       setRuns(data.runs);
-    } catch (e: any) {
-      setError(e.message ?? 'Failed to load runs');
+      setTotal(data.total);
+      // Deleting the last run on a window leaves the reader on a window that no
+      // longer exists, so step back to one that does.
+      if (data.runs.length === 0 && offset > 0) {
+        setOffset(Math.max(0, offset - PAGE_SIZE));
+      }
+    } catch (e) {
+      // The reason takes the table's place, which leaves an empty table with one
+      // meaning: the database holds no runs.
+      setError(describeApiError(e, 'load the run history'));
       setRuns([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [offset]);
 
   // Fetch on mount, when the current run changes, after destructive ops, and
   // on every status transition.
@@ -99,20 +120,16 @@ export function RunHistory() {
     async (runId: number) => {
       try {
         const info = await getRun(runId);
-        // Directly set store state to point at this existing run,
-        // then refresh all sub-states from the server.
-        useRunStore.setState({
-          runId: info.run_id,
-          // Carried over so the run controls know whether pressing Run would
-          // continue this run or start a new one under a different mode.
-          runMode: info.mode ?? null,
-          status: info.status as any,
-          codeletCount: info.codelet_count,
-          temperature: info.temperature,
-        });
+        // Point the store at this existing run — which takes on the values that
+        // belong to it, the spreading threshold among them — then refresh all
+        // sub-states from the server.
+        useRunStore.getState().adoptRun(info);
+        setActionError(null);
         await store.refreshAll();
-      } catch {
-        // ignore
+      } catch (err) {
+        // The dashboard is still showing whatever it was showing, so the row that
+        // was clicked says what became of the click.
+        setActionError(describeApiError(err, `load run #${runId}`));
       }
     },
     [store],
@@ -138,10 +155,13 @@ export function RunHistory() {
       if (!window.confirm(`Delete run #${runId}?`)) return;
       try {
         await deleteRun(runId);
-        await fetchRuns();
-      } catch {
-        // ignore
+        setActionError(null);
+      } catch (err) {
+        // The row is still there, so the reason for its still being there is too.
+        setActionError(describeApiError(err, `delete run #${runId}`));
+        return;
       }
+      await fetchRuns();
     },
     [fetchRuns],
   );
@@ -156,7 +176,11 @@ export function RunHistory() {
 
   if (error) {
     return (
-      <div className="text-sm" style={{ padding: 16, textAlign: 'center', color: 'var(--error)' }}>
+      <div
+        role="alert"
+        className="text-sm"
+        style={{ padding: 16, textAlign: 'center', color: 'var(--error)' }}
+      >
         {error}
       </div>
     );
@@ -170,7 +194,32 @@ export function RunHistory() {
    * the most visible consequence of choosing Fast looks exactly like the list having
    * failed to refresh, which is a bug this panel has actually had before.
    */
-  const fastRunNote = currentRunMode === 'fast' && currentRunId !== null && (
+  /**
+   * The run in memory, listed from what the engine holds.
+   *
+   * A Fast run writes no row, so the listing this panel reads cannot carry it. Its
+   * state is known all the same — the store follows the running engine — so the run
+   * appears here from memory, with its status, codelet count, temperature and answer
+   * as they stand. It is marked as unrecorded, because that is what decides whether
+   * Review can show it afterwards.
+   */
+  const inMemoryRun: RunInfo | null =
+    currentRunId !== null && !runs.some((r) => r.run_id === currentRunId)
+      ? {
+          run_id: currentRunId,
+          status: liveStatus === 'idle' ? 'initialized' : liveStatus,
+          codelet_count: liveCodeletCount,
+          temperature: liveTemperature,
+          initial: liveWorkspace?.initial ?? liveParams?.initial ?? '',
+          modified: liveWorkspace?.modified ?? liveParams?.modified ?? '',
+          target: liveWorkspace?.target ?? liveParams?.target ?? '',
+          answer: liveAnswer,
+          mode: currentRunMode ?? undefined,
+          spreading_threshold: liveThreshold,
+        }
+      : null;
+
+  const fastRunNote = inMemoryRun !== null && (
     <div
       className="text-xs"
       style={{
@@ -179,19 +228,56 @@ export function RunHistory() {
         color: 'var(--warning)',
       }}
     >
-      Run #{currentRunId} is a <strong>Fast</strong> run and is not listed: Fast
-      writes nothing, including the row this list reads. Choose Normal or Audit
-      under Recording for a run that appears here.
+      Run #{currentRunId} is shown from memory. A <strong>Fast</strong> run writes
+      nothing, including the row this list reads, so it is here while it is loaded
+      and is not available in Review. Choose Normal or Audit under Recording for a
+      run that is recorded.
     </div>
   );
 
-  if (runs.length === 0) {
+  /** What became of the last row acted on, above the rows it is about. */
+  const actionNote = actionError !== null && (
+    <div
+      role="alert"
+      className="text-xs"
+      style={{
+        padding: '5px 6px',
+        borderBottom: '1px solid var(--border)',
+        color: 'var(--error)',
+      }}
+    >
+      {actionError}
+    </div>
+  );
+
+  /**
+   * The window on screen, and how many runs exist behind it.
+   *
+   * `GET /api/runs` serves one window of the list at a time and reports the total,
+   * so this is what reaches the runs past the first fifty.
+   */
+  const pager = total > 0 && (
+    <Pager
+      offset={offset}
+      limit={PAGE_SIZE}
+      total={total}
+      count={runs.length}
+      onChange={setOffset}
+      label="runs"
+    />
+  );
+
+  // The in-memory run is a row like any other, so a list holding only that one is
+  // not an empty list.
+  if (runs.length === 0 && inMemoryRun === null) {
     return (
       <div style={{ fontSize: 11 }}>
         {fastRunNote}
+        {actionNote}
         <div className="text-muted text-sm" style={{ padding: 16, textAlign: 'center' }}>
           No runs yet.
         </div>
+        {pager}
       </div>
     );
   }
@@ -199,6 +285,7 @@ export function RunHistory() {
   return (
     <div style={{ fontSize: 11 }}>
       {fastRunNote}
+      {actionNote}
 
       {/* Table header */}
       <div
@@ -237,8 +324,8 @@ export function RunHistory() {
         <span style={{ width: 24, flexShrink: 0 }}></span>
       </div>
 
-      {/* Rows */}
-      {runs.map((fetched) => {
+      {/* Rows. The in-memory run leads, because it is the one on screen. */}
+      {(inMemoryRun ? [inMemoryRun, ...runs] : runs).map((fetched) => {
         const run = liveView(fetched);
         const isActive = run.run_id === currentRunId;
         const problem = `${run.initial}->${run.modified}; ${run.target}`;
@@ -410,6 +497,8 @@ export function RunHistory() {
           </div>
         );
       })}
+
+      {pager}
     </div>
   );
 }

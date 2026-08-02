@@ -96,6 +96,7 @@ def get_builtins() -> dict[str, Any]:
         "give_up": give_up,
         # Answer reporting
         "report_answer": report_answer,
+        "answer_present": answer_present,
         # Rule operations
         "translate_rule": translate_rule,
         "apply_rule": apply_rule,
@@ -349,12 +350,30 @@ def _premises_still_hold(ctx: EngineContext, structure: Any) -> bool:
     for obj in _structure_objects(structure):
         if obj is None:
             continue
+        # A bridge proposed against a reversed reading of a spanning group points
+        # at a group that was never in the string — the premise is the *original*
+        # it replaces (bridges.ss:1085-1105).
+        obj = _flip_original(structure, obj) or obj
         string = getattr(obj, "string", None)
         if string is None:
             continue
         if obj not in string.objects:
             return False
     return True
+
+
+def _flip_original(structure: Any, obj: Any) -> Any:
+    """The group *obj* is a flipped reading of, if it is one.
+
+    Scheme: ``get-original-group1`` / ``get-original-group2`` (bridges.ss:183-192).
+    """
+    if not isinstance(structure, Bridge):
+        return None
+    if obj is structure.object1:
+        return structure.flipped_group1
+    if obj is structure.object2:
+        return structure.flipped_group2
+    return None
 
 
 def _build_structure_locked(ctx: EngineContext, structure: Any) -> bool:
@@ -398,6 +417,9 @@ def _build_structure_locked(ctx: EngineContext, structure: Any) -> bool:
     for opponent, _, _ in incompatibles:
         break_structure(ctx, opponent)
 
+    if isinstance(structure, Bridge):
+        _apply_group_flips(ctx, structure)
+
     structure.proposal_level = structure.BUILT
     if isinstance(structure, Bond):
         structure.string.add_bond(structure)
@@ -418,6 +440,37 @@ def _build_structure_locked(ctx: EngineContext, structure: Any) -> bool:
     return True
 
 
+def _apply_group_flips(ctx: EngineContext, bridge: Bridge) -> None:
+    """Put the reversed reading of a spanning group into the Workspace.
+
+    Scheme: the two flip branches of ``build-bridge`` (bridges.ss:1322-1345).  The
+    original group has already lost its fight and been broken along with the rest
+    of the incompatibles; what is left is to break the bonds that held it together
+    and build the reversed ones in their place, so that the Workspace holds the
+    reading the bridge is about rather than the one it displaced.
+
+    Reading ``>abc>`` as ``<cba<`` is not a different parse of the string — the
+    same letters, the same span — so it is a *replacement*, not a competitor.
+    """
+    for new_group, original in (
+        (bridge.object1, bridge.flipped_group1),
+        (bridge.object2, bridge.flipped_group2),
+    ):
+        if original is None:
+            continue
+        for bond in list(getattr(original, "group_bonds", ())):
+            break_structure(ctx, bond)
+        for bond in getattr(new_group, "group_bonds", ()):
+            bond.proposal_level = bond.BUILT
+            new_group.string.add_bond(bond)
+            ctx.sink.on_structure_change(ctx, bond, STRUCTURE_BUILT)
+        new_group.proposal_level = new_group.BUILT
+        new_group.string.add_group(new_group)
+        _record_group_event(ctx, new_group, flipped=True)
+        ctx.sink.on_structure_change(ctx, new_group, STRUCTURE_BUILT)
+        _wrote(ctx, new_group, *getattr(new_group, "objects", ()))
+
+
 # ── Trace: which events are important enough to record ──
 #
 # §4.4: "each event ... has an importance value associated with it, and only
@@ -429,20 +482,99 @@ def _build_structure_locked(ctx: EngineContext, structure: Any) -> bool:
 # but only when they clear their threshold.
 
 
-def _record_group_event(ctx: EngineContext, group: Group) -> None:
-    """Record an important group.  §4.4: importance is a function of a group's
-    strength and size, "with single-letter groups and whole-string groups being
-    particularly important"."""
+def _has_length_description(ctx: EngineContext, group: Group) -> bool:
+    """Does this group carry a Length description?
+
+    ``trace.ss:1355`` — a *singleton* group only counts as important when it has been
+    described by its length, because that is what makes "a group of one" an idea rather
+    than a bare letter.
+    """
+    node = ctx.slipnet.get_node("plato-length")
+    present = getattr(group, "description_type_present", None)
+    return bool(present(node)) if present is not None else False
+
+
+def _record_group_event(
+    ctx: EngineContext, group: Group, flipped: bool = False
+) -> None:
+    """Record an important group.
+
+    Scheme: ``group-importance`` (``trace.ss:1350-1357``)::
+
+        (if (or flipped?
+                (tell group 'spans-whole-string?)
+                (and (tell group 'singleton-group?)
+                     (tell group 'description-type-present? plato-length)))
+          100
+          (tell group 'get-strength))
+
+    §4.4: importance is a function of a group's strength and size, "with single-letter
+    groups and whole-string groups being particularly important" — and a **flip** is
+    maximally important whatever its strength, because re-perceiving a string in the
+    opposite direction is one of the twelve milestones Figure 4.12 records.
+    """
     threshold = ctx.meta.get_param("group_importance_threshold", 100)
-    size_bonus = 100.0 if (group.spans_whole_string() or group.length == 1) else 50.0
-    importance = (group.strength + size_bonus) / 2.0 * 2.0
+    singleton_with_length = group.length == 1 and _has_length_description(ctx, group)
+    if flipped or group.spans_whole_string() or singleton_with_length:
+        importance = 100.0
+    else:
+        importance = float(group.strength)
     if importance >= threshold:
         record_event(
             ctx,
             GROUP_BUILT,
             structures=[group],
-            description=f"perceived {group.string.text} group",
+            description=(
+                # ``trace.ss:904-907`` titles a flipped group event differently: the
+                # event records a *re-perception*, not a first perception.
+                f"flipped {group.string.text} group"
+                if flipped
+                else f"perceived {group.string.text} group"
+            ),
+            # ``trace.ss:880`` — a group event's strength is the group's own.
+            strength=float(group.strength),
         )
+
+
+def _slippage_importance(ctx: EngineContext, bridge: Bridge, cm: Any) -> float:
+    """Scheme: ``concept-mapping-importance`` (``trace.ss:1365-1385``).
+
+    A weighted average over four terms — the mapping's own dimension, whether the
+    bridge spans a whole string, the depth of the two descriptors, and the depth of
+    the label (50 when unlabelled) — at weights 4, 2, 2, 3.
+
+    Bond-category slippages score **0** outright: they say something about how two
+    strings are bonded, not about how their objects correspond, and §4.4 is about the
+    latter.  The previous form (depth + 10x span) had no spanning term, no label term,
+    no bond-category exclusion, and was unbounded above 100.
+    """
+    cm_type = getattr(cm, "description_type1", None)
+    cm_type_name = getattr(cm_type, "name", "")
+    if cm_type_name == "plato-bond-category":
+        return 0.0
+
+    def depth(node: Any) -> float:
+        return float(getattr(node, "conceptual_depth", 0) or 0)
+
+    label = getattr(cm, "label", None)
+    spanning = 100.0 if _bridge_is_spanning(bridge) else 0.0
+    values = [
+        depth(cm_type),
+        spanning,
+        (depth(getattr(cm, "descriptor1", None)) + depth(getattr(cm, "descriptor2", None))) / 2.0,
+        depth(label) if label is not None else 50.0,
+    ]
+    weights = [4.0, 2.0, 2.0, 3.0]
+    return round(sum(v * w for v, w in zip(values, weights)) / sum(weights))
+
+
+def _bridge_is_spanning(bridge: Bridge) -> bool:
+    """Does this bridge join two objects that each span their whole string?"""
+    for obj in (bridge.object1, bridge.object2):
+        spans = getattr(obj, "spans_whole_string", None)
+        if spans is None or not spans():
+            return False
+    return True
 
 
 def _record_slippage_events(ctx: EngineContext, bridge: Bridge) -> None:
@@ -463,9 +595,7 @@ def _record_slippage_events(ctx: EngineContext, bridge: Bridge) -> None:
     for cm in bridge.concept_mappings:
         if cm.is_identity:
             continue
-        importance = cm.conceptual_depth + 10.0 * (
-            bridge.object1.span + bridge.object2.span
-        )
+        importance = _slippage_importance(ctx, bridge, cm)
         if under_pressure and _slippage_matches_active_theme(ctx, bridge, cm):
             importance = 100.0
         if importance >= threshold:
@@ -474,19 +604,35 @@ def _record_slippage_events(ctx: EngineContext, bridge: Bridge) -> None:
                 CONCEPT_MAPPING_BUILT,
                 structures=[bridge],
                 description=f"slippage {cm}",
+                # ``trace.ss:796`` — a concept-mapping event's strength is the
+                # concept-mapping's own.  ``strength`` is a method here, not a property.
+                strength=float(cm.strength()),
             )
 
 
 def _slippage_matches_active_theme(
     ctx: EngineContext, bridge: Bridge, cm: ConceptMapping
 ) -> bool:
+    """Whether a slippage is supported by an active theme.
+
+    Scheme: ``supported-by-active-theme?`` (``themes.ss:166-173``).  Three conjuncts:
+    the theme exists, its type is under thematic pressure, and the theme is *dominant*
+    in its cluster.  Dominance is the operative one — a theme carrying some activation
+    confers no support; only the theme its cluster has settled on does.
+    """
     from server.engine.themes import relation_name_for_label
 
     dimension = getattr(cm.description_type1, "name", "")
     relation = relation_name_for_label(cm.label)
-    for theme in ctx.themespace.get_active_themes(bridge.theme_type):
-        if theme.dimension == dimension and theme.relation == relation:
-            return theme.activation > 0
+    themespace = ctx.themespace
+    if bridge.theme_type not in themespace.active_theme_types:
+        return False
+    margin = themespace.meta.get_param("dominant_theme_margin", 90)
+    for cluster in themespace.clusters:
+        if cluster.theme_type != bridge.theme_type or cluster.dimension != dimension:
+            continue
+        dominant = cluster.get_dominant_theme(margin)
+        return dominant is not None and dominant.relation == relation
     return False
 
 
@@ -494,12 +640,19 @@ def _record_rule_event(ctx: EngineContext, rule: Rule) -> None:
     """Record an important rule.  §4.4: importance is "a function of the relative
     quality of a rule with respect to all other rules that already exist"."""
     threshold = ctx.meta.get_param("rule_importance_threshold", 67)
-    if rule.get_relative_quality(ctx.workspace) >= threshold:
+    relative_quality = rule.get_relative_quality(ctx.workspace)
+    # ``trace.ss:1359-1363``: a perfectly uniform rule is maximally important whatever
+    # its relative quality — uniformity is what makes a rule say one thing about the
+    # whole string rather than several things about its parts.
+    importance = 100.0 if rule.uniformity == 100 else float(relative_quality)
+    if importance >= threshold:
         record_event(
             ctx,
             RULE_BUILT,
             structures=[rule],
             description=rule.transcribe_to_english(),
+            # ``trace.ss:965`` — a rule event's strength is its relative quality.
+            strength=float(relative_quality),
         )
 
 
@@ -601,6 +754,13 @@ def _get_incompatible_structures(
             incompatibles.append(
                 (bridge, float(structure.object1.span), float(bridge.object1.span))
             )
+
+        # A bridge proposed against a reversed reading of a spanning group has to
+        # beat the group it would replace, at even odds (bridges.ss:1295-1312).
+        # The group is doing no wrong: the bridge is asking to reinterpret it.
+        for original in (structure.flipped_group1, structure.flipped_group2):
+            if original is not None and original.is_built:
+                incompatibles.append((original, 1.0, 1.0))
 
     return incompatibles
 
@@ -869,10 +1029,12 @@ def record_event(
     event_type: str,
     structures: list | None = None,
     description: str = "",
+    strength: float = 0.0,
 ) -> None:
     """Record an event to the temporal trace.
 
-    Also emits commentary for snag and clamp events.
+    ``strength`` is what a clamp's progress-evaluator reads (§4.5.1); group, rule and
+    slippage events supply it.  Also emits commentary for snag and clamp events.
     """
     event = TraceEvent(
         event_type=event_type,
@@ -880,6 +1042,7 @@ def record_event(
         temperature=ctx.temperature.value,
         structures=structures,
         description=description,
+        strength=strength,
     )
     with _committing(ctx):
         ctx.trace.record_event(event)
@@ -1003,6 +1166,34 @@ def give_up(ctx: EngineContext) -> None:
 
 # ── Answer reporting ──
 
+def answer_present(
+    ctx: EngineContext,
+    answer_string: str,
+    top_rule: Any = None,
+    bottom_rule: Any = None,
+) -> bool:
+    """Is this answer, reached by these rules, already in Episodic Memory?
+
+    Scheme: ``answers.ss:982`` consults ``memory.ss:90`` *before* reporting and fizzles
+    on a hit — "Already found this answer" — so the search carries on toward a different
+    answer instead of rediscovering one already stored.
+
+    This is the single point at which Episodic Memory influences cognition rather than
+    merely recording it: every other memory read (reminding, snag comparison) only
+    produces commentary.  The author documents the observable consequence in
+    ``Metacat/help.txt:29`` — rerunning with the same seed after an answer will not
+    produce that answer again, because it already exists in memory.
+    """
+    ws = ctx.workspace
+    problem = (
+        ws.initial_string.text,
+        ws.modified_string.text,
+        ws.target_string.text,
+        answer_string,
+    )
+    return ctx.memory.answer_present(problem, top_rule, bottom_rule)
+
+
 def report_answer(
     ctx: EngineContext,
     answer_string: str,
@@ -1037,12 +1228,44 @@ def _report_answer_locked(
     from server.engine.memory import AnswerDescription
     from server.engine.workspace import WorkspaceString
 
+    # Free-running lets two workers reach ``report_answer`` before either result has
+    # been collected (WP4.4).  ``FreeRunningEngine._collect_outcome`` de-duplicates the
+    # run's *status*, but by then each worker has already written its own
+    # ``AnswerDescription`` — and under a Training Session that memory is shared with
+    # every later Run, so the pollution outlives the run that caused it.  Measured at 8
+    # workers before this guard: 22 of 40 runs stored 2–5 answers where the serial loop
+    # stores exactly 1.
+    #
+    # A queued-but-uncollected answer, or an ending already claimed, means the run is
+    # over and this result is an artefact of parallelism rather than a second cognitive
+    # result.  Both checks are needed: two workers can report before either is collected
+    # (``_pending_answer`` still set), and a worker can report after the ending has been
+    # collected and the queue cleared (``run_ended``).  Serially ``_pending_answer`` is
+    # always collected before the next codelet runs and ``run_ended`` is cleared at every
+    # start and resume, so neither fires and the reference mode is unchanged.
+    if getattr(ctx, "_pending_answer", None) is not None or ctx.run_ended:
+        return
+
     # Create the answer string on the workspace so it is visible to
     # serialization and the UI.
     if ctx.workspace.answer_string is None or not ctx.justify_mode:
-        ctx.workspace.answer_string = WorkspaceString(
-            answer_string, ctx.slipnet, string_type="answer"
-        )
+        # Built with the structure the translated rule implies, not as bare letters:
+        # ``make-translated-string`` (``answers.ss:991``) carries the target's
+        # perceptual reading across to the answer, so ``mrrjjj`` seen as three sameness
+        # groups yields ``mrrkkk`` seen as three sameness groups.  A row of unconnected
+        # letters would say the program had no reading of its own answer.
+        translated_string = None
+        if bottom_rule is not None:
+            from server.engine.answers import make_translated_string
+
+            translated_string = make_translated_string(
+                bottom_rule, ctx.workspace.target_string, ctx.slipnet, ctx.workspace
+            )
+        if translated_string is None:
+            translated_string = WorkspaceString(
+                answer_string, ctx.slipnet, string_type="answer"
+            )
+        ctx.workspace.answer_string = translated_string
         ctx.workspace.answer_string.workspace = ctx.workspace
 
     # Store in episodic memory
@@ -1105,9 +1328,11 @@ def _report_answer_locked(
             f"{past_answer.problem[0]} -> {past_answer.problem[1]}; "
             f"{past_answer.problem[2]} -> ?"
         )
-        # Approximate reminding strength from theme distance
-        dist = ctx.memory._theme_distance(answer_desc.themes, past_answer.themes)
-        strength = max(0.0, 100.0 - dist * 20.0)
+        # The reminding strength *is* the activation ``find_remindings`` just stored
+        # (``memory.ss:210-217`` computes one number and reports that same number).
+        # Recomputing a second figure from a different distance made the Memory panel,
+        # which renders activation, disagree with the commentary, which quoted this.
+        strength = past_answer.activation
         emit_reminding(
             ctx.commentary,
             past_answer.problem[3],

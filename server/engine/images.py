@@ -682,13 +682,21 @@ class Image:
         # Group direction: None for same-groups
         group_direction = None if group_category is samegrp else self.direction
 
+        # The bonds a group of adjacent objects *is*.  An instantiated group with no
+        # internal bonds is a claim the program cannot support: it says these objects
+        # form a same-group without saying that consecutive members are the same.  It
+        # also leaves the answer string drawn as unconnected letters, which is what the
+        # Workspace display then honestly reports.
+        group_bonds = _bonds_between(
+            ordered_objects, bond_category, self.bond_facet, group_direction, self.slipnet
+        )
         group = Group(
             string=string,
             group_category=group_category,
             bond_facet=self.bond_facet,
             direction=group_direction,
             objects=ordered_objects,
-            bonds=[],  # bonds are not created by the image system
+            bonds=group_bonds,
         )
         self.instantiated_object = group
         string.groups.append(group)
@@ -1075,3 +1083,49 @@ def make_string_image(
 ) -> StringImage:
     """Scheme: make-string-image."""
     return StringImage(string=string, direction=direction, slipnet=slipnet)
+
+
+def _bonds_between(
+    objects: list, bond_category: Any, bond_facet: Any, direction: Any, slipnet: Any
+) -> list:
+    """Bonds joining each consecutive pair of *objects*, all of one kind.
+
+    Used when a group is instantiated from an image (``instantiate-as-group``): the
+    group's reading already fixes the category, facet and direction, so the bonds it
+    implies are determined rather than discovered.
+    """
+    from server.engine.bonds import Bond
+
+    if bond_category is None or bond_facet is None or len(objects) < 2:
+        return []
+
+    bonds = []
+    for left, right in zip(objects, objects[1:]):
+        from_descriptor = _descriptor_of(left, bond_facet)
+        to_descriptor = _descriptor_of(right, bond_facet)
+        if from_descriptor is None or to_descriptor is None:
+            return []
+        bond = Bond(
+            from_object=left,
+            to_object=right,
+            bond_category=bond_category,
+            bond_facet=bond_facet,
+            from_descriptor=from_descriptor,
+            to_descriptor=to_descriptor,
+            direction=direction,
+        )
+        bonds.append(bond)
+    return bonds
+
+
+def _descriptor_of(obj: Any, facet: Any) -> Any:
+    """The descriptor *obj* carries along *facet*, or ``None``.
+
+    A bond relates two objects along one facet, so it needs each side's descriptor for
+    that facet — the letter-category for a letter-category bond, the length for a
+    length bond.
+    """
+    for description in obj.get_all_descriptions():
+        if getattr(description, "description_type", None) is facet:
+            return getattr(description, "descriptor", None)
+    return None

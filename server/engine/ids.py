@@ -95,6 +95,19 @@ class IdAllocator:
         with self._lock:
             return self._counters.get(kind, 0)
 
+    def reserve(self, kind: str, value: int) -> None:
+        """Guarantee that no future ``next(kind)`` returns ``value`` or below.
+
+        Used when identifiers arrive from outside the allocator — restoring an Episodic
+        Memory from its stored rows, where each answer keeps the identifier it was given
+        in the session that found it.  Without this the counter would start again at 1
+        and re-issue an identifier already in use, and the two answers sharing it would
+        be indistinguishable to every API that names one.
+        """
+        with self._lock:
+            if value > self._counters.get(kind, 0):
+                self._counters[kind] = value
+
     def snapshot(self) -> dict[str, int]:
         """The counters, for state capture.
 

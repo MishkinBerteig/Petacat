@@ -12,7 +12,7 @@ The float32 constraint
 is accepted, but any operation on it raises ``float64 is not supported on the
 GPU``.  The GPU backend is therefore float32 throughout, against a reference that
 is float64 throughout, and the two cannot agree bit for bit.  What they agree to
-is measured rather than assumed: see ``tests/unit/test_numeric_backends.py``,
+is measured rather than assumed: see ``tests/seed_unit/test_numeric_backends.py``,
 which compares them element-wise over the real Slipnet across many update cycles.
 
 This is the single largest constraint on the work package, and it is a property of
@@ -290,21 +290,20 @@ class MlxBackend(Backend):
     ) -> None:
         """Composed MLX, slots sequential and clusters vectorised.
 
-        There is no custom kernel here and there should not be: the Gauss-Seidel
-        dependency between slots means the traversal is four dependent steps over
-        a 27-element vector, which is dispatch-bound on any device and would be
-        dispatch-bound on a hand-written kernel too.  The reason it is implemented
-        at all is that the theme vocabulary grows with the *conceptual* dimensions
-        the architecture tracks, not with the letter strings, and the Phase 1-6
-        plans grow it substantially.
+        ``themes.ss:520-527`` is Jacobi — three passes over a cluster — so the slot
+        loop reads a snapshot taken before any write and the writes are deferred.  There
+        is no custom kernel here and there should not be: the traversal is a handful of
+        steps over a 27-element vector, which is dispatch-bound on any device and would
+        be dispatch-bound on a hand-written kernel too.  The reason it is implemented at
+        all is that the theme vocabulary grows with the *conceptual* dimensions the
+        architecture tracks, not with the letter strings, and the Phase 1-6 plans grow
+        it substantially.
         """
         c, s = layout.n_clusters, layout.n_slots
         if c == 0 or s == 0:
             return
         dt = self.dtype
         with mx.stream(self.device):
-            pos = mx.array(state.positive, dtype=dt).reshape(c, s)
-            neg = mx.array(state.negative, dtype=dt).reshape(c, s)
             act = mx.array(state.activation, dtype=dt).reshape(c, s)
             valid = mx.array(
                 [1 if v else 0 for v in layout.valid], dtype=mx.uint8
@@ -328,9 +327,18 @@ class MlxBackend(Backend):
             w_pp = params.pos_to_pos / 100.0
             zeros = mx.zeros((c,), dtype=dt)
 
+            # Passes one and two: read ``snapshot``, never ``act``.  A genuine copy —
+            # ``snapshot = act`` would alias, and the third pass's column writes would
+            # then be visible to reads that must not see them, quietly restoring the
+            # Gauss-Seidel behaviour this replaces.
+            snapshot = mx.array(act)
+            effects = []
+            lives = []
+
             for t in range(s):
                 live = (cluster_live != 0) & (valid[:, t] != 0) & (frozen[:, t] == 0)
-                target = act[:, t]
+                lives.append(live)
+                target = snapshot[:, t]
                 target_neg = target < 0.0
 
                 net = mx.full((c,), -params.decay, dtype=dt)
@@ -339,7 +347,7 @@ class MlxBackend(Backend):
                 for source in range(s):
                     if source == t:
                         continue
-                    a = act[:, source]
+                    a = snapshot[:, source]
                     src_neg = a < 0.0
                     weight = mx.where(
                         src_neg,
@@ -349,17 +357,26 @@ class MlxBackend(Backend):
                     applies = (valid[:, source] != 0) & (a != 0.0)
                     net = net + mx.where(applies, mx.abs(a) * weight, zeros)
 
-                effect = mx.round(params.spread_amount * mx.tanh(alpha * net))
+                effects.append(mx.round(params.spread_amount * mx.tanh(alpha * net)))
 
-                new_pos = mx.clip(pos[:, t] + effect, 0.0, 100.0)
-                new_neg = mx.clip(neg[:, t] - effect, -100.0, 0.0)
-                pos[:, t] = mx.where(live & ~target_neg, new_pos, pos[:, t])
-                neg[:, t] = mx.where(live & target_neg, new_neg, neg[:, t])
-                act[:, t] = mx.where(live, pos[:, t] + neg[:, t], act[:, t])
+            # Pass three: apply.  ``act`` is rebuilt column by column, so the reads
+            # above cannot see any of these writes.
+            new_act = mx.array(act)
+            for t in range(s):
+                live = lives[t]
+                effect = effects[t]
+                # ``activation-function`` (``themes.ss:456-459``) branches on the
+                # theme's own sign and clips to its own half of the range.
+                target_neg = snapshot[:, t] < 0.0
+                updated = mx.where(
+                    target_neg,
+                    mx.clip(act[:, t] - effect, -100.0, 0.0),
+                    mx.clip(act[:, t] + effect, 0.0, 100.0),
+                )
+                new_act[:, t] = mx.where(live, updated, snapshot[:, t])
+            act = new_act
 
-            mx.eval(pos, neg, act)
-            state.positive = [float(x) for x in np.array(pos, copy=False).reshape(-1)]
-            state.negative = [float(x) for x in np.array(neg, copy=False).reshape(-1)]
+            mx.eval(act)
             state.activation = [
                 float(x) for x in np.array(act, copy=False).reshape(-1)
             ]

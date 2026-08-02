@@ -44,6 +44,11 @@ class ClampCodeletsRequest(BaseModel):
     urgency: int
 
 
+class ClampCodeletPatternRequest(BaseModel):
+    #: One of the five names ``GET /codelet-patterns`` lists.
+    pattern: str
+
+
 class UnclampCodeletsRequest(BaseModel):
     codelet_type: str
 
@@ -191,6 +196,79 @@ async def unclamp_codelets(run_id: int, req: UnclampCodeletsRequest):
     svc = get_run_service()
     try:
         result = svc.unclamp_codelets(run_id, req.codelet_type)
+    except ValueError as e:
+        raise HTTPException(404, str(e))
+    return result
+
+
+@router.get("/codelet-patterns")
+async def list_codelet_patterns(run_id: int):
+    """The named codelet patterns that can be clamped as a unit.
+
+    Scheme: ``gui.ss:597-603`` puts these five on the Options menu, and
+    ``trace.ss:1597-1668`` says what each one contains.
+    """
+    from server.engine.codelet_patterns import (
+        CODELET_PATTERNS,
+        PATTERN_LABELS,
+        pattern_names,
+    )
+
+    return {
+        "run_id": run_id,
+        "patterns": [
+            {
+                "name": name,
+                "label": PATTERN_LABELS[name],
+                "entries": [
+                    {"codelet_type": codelet_type, "urgency_level": level}
+                    for codelet_type, level in CODELET_PATTERNS[name]
+                ],
+            }
+            for name in pattern_names()
+        ],
+    }
+
+
+@router.post("/clamp-codelet-pattern")
+async def clamp_codelet_pattern(run_id: int, req: ClampCodeletPatternRequest):
+    """Clamp a whole codelet pattern, as the Options menu does.
+
+    Scheme: ``clamp-codelet-pattern`` (``trace.ss:1583-1588``) clamps every
+    ``(codelet type, urgency)`` entry in the pattern, so a scout and the evaluator and
+    builder that finish its work are pinned together.
+    """
+    svc = get_run_service()
+    try:
+        result = svc.clamp_codelet_pattern(run_id, req.pattern)
+    except KeyError:
+        from server.engine.codelet_patterns import pattern_names
+
+        raise HTTPException(
+            400,
+            f"Unknown codelet pattern '{req.pattern}'. "
+            f"Available: {', '.join(pattern_names())}",
+        ) from None
+    except ValueError as e:
+        raise HTTPException(404, str(e))
+    return result
+
+
+@router.delete("/clamp-codelet-pattern")
+async def unclamp_codelet_pattern(run_id: int, req: ClampCodeletPatternRequest):
+    """Release a codelet pattern.  Scheme: ``unclamp-codelet-pattern``
+    (``trace.ss:1590-1593``)."""
+    svc = get_run_service()
+    try:
+        result = svc.unclamp_codelet_pattern(run_id, req.pattern)
+    except KeyError:
+        from server.engine.codelet_patterns import pattern_names
+
+        raise HTTPException(
+            400,
+            f"Unknown codelet pattern '{req.pattern}'. "
+            f"Available: {', '.join(pattern_names())}",
+        ) from None
     except ValueError as e:
         raise HTTPException(404, str(e))
     return result

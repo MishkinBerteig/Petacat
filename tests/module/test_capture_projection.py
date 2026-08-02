@@ -58,6 +58,10 @@ from server.services.capture_projection import (
     project_workspace,
 )
 
+# Every test here executes arithmetic the numeric substrate owns, so each one runs
+# once per backend in the matrix. See tests/conftest.py.
+pytestmark = pytest.mark.numeric_matrix
+
 SEED_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
     "seed_data",
@@ -86,13 +90,16 @@ def _run_to(meta: MetadataProvider, codelets: int) -> EngineRunner:
     return runner
 
 
-@pytest.fixture(scope="module")
+# The two capture fixtures run the engine, so they are function-scoped: the numeric
+# backend of a matrix case is in force for the test, and a capture built once per
+# module would carry one backend's numbers into both cases.
+@pytest.fixture
 def mid_run_capture(meta: MetadataProvider) -> dict:
     """A capture round-tripped through JSON, as a stored one has been."""
     return json.loads(json.dumps(capture_run_state(_run_to(meta, RESTORABLE_POINT).ctx)))
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def end_of_run_capture(meta: MetadataProvider) -> dict:
     runner = EngineRunner(meta)
     runner.init_mcat(*PROBLEM, seed=SEED)

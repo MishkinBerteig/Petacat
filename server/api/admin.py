@@ -108,6 +108,9 @@ class CodeletTypeResponse(BaseModel):
 
 class ParamUpdateRequest(BaseModel):
     value: str
+    #: How the value is read back — ``int``, ``float``, ``bool``, ``json`` or ``string``.
+    #: Sent when the type is being changed alongside the value.
+    value_type: str | None = None
 
 
 class ParamResponse(BaseModel):
@@ -368,6 +371,30 @@ async def list_codelet_types(session: AsyncSession = Depends(get_session)):
     ]
 
 
+async def _check_codelet_family_and_phase(
+    session: AsyncSession, family: str, phase: str
+) -> None:
+    """Answer a bad family or phase with the list of the ones that exist.
+
+    Both are foreign keys into their own tables, and the Configuration screen lets a
+    codelet type be typed in, so the reply names the choices.
+    """
+    if await session.get(CodeletFamilyDef, family) is None:
+        families = (
+            await session.execute(select(CodeletFamilyDef.name).order_by(CodeletFamilyDef.name))
+        ).scalars().all()
+        raise HTTPException(
+            400, f"Unknown codelet family '{family}'. Available: {', '.join(families)}"
+        )
+    if await session.get(CodeletPhaseDef, phase) is None:
+        phases = (
+            await session.execute(select(CodeletPhaseDef.name).order_by(CodeletPhaseDef.name))
+        ).scalars().all()
+        raise HTTPException(
+            400, f"Unknown codelet phase '{phase}'. Available: {', '.join(phases)}"
+        )
+
+
 @router.post("/codelets", response_model=CodeletTypeResponse, status_code=201)
 async def create_codelet_type(
     req: CodeletTypeRequest,
@@ -377,6 +404,8 @@ async def create_codelet_type(
     existing = await session.get(CodeletTypeDef, req.name)
     if existing is not None:
         raise HTTPException(409, f"Codelet type '{req.name}' already exists")
+
+    await _check_codelet_family_and_phase(session, req.family, req.phase)
 
     codelet = CodeletTypeDef(
         name=req.name,
@@ -490,6 +519,8 @@ async def update_param(
     if param is None:
         raise HTTPException(404, f"Parameter '{name}' not found")
     param.value = req.value
+    if req.value_type is not None:
+        param.value_type = req.value_type
     await session.commit()
     return ParamResponse(
         name=param.name,
@@ -1134,21 +1165,137 @@ async def reload_metadata(session: AsyncSession = Depends(get_session)):
     return {"reloaded": True}
 
 
+@router.post("/export-to-seed-data")
+async def export_to_seed_data(session: AsyncSession = Depends(get_session)):
+    """Write the database's configuration back out to `seed_data/*.json`.
+
+    The seed files are what a fresh database is built from and what the repository
+    carries, so this is how a configuration arrived at through the Configuration screen
+    becomes the project's own starting point.
+
+    Each file keeps the shape it has on disk: the four flat collections are lists, the
+    three name/value tables become objects keyed by name, and the commentary templates
+    become an object keyed by template. `written` names the files this replaced and
+    `skipped` names the collections whose seed files carry structure the database
+    flattens, so a reader can see the whole picture in the response.
+    """
+    import json
+    import os
+
+    from server.config import SEED_DATA_DIR
+
+    exported = await export_metadata(session)
+
+    # The database this server is connected to is what gets written. Naming it in the
+    # response lets a caller confirm the source before the files are used.
+    from server.config import DATABASE_URL
+
+    def _drop_ids(rows: list[dict]) -> list[dict]:
+        return [{k: v for k, v in row.items() if k != "id"} for row in rows]
+
+    def _scalar(row: dict) -> Any:
+        """The value in the type the seed file carries it in.
+
+        The engine-params table stores every value as text beside a `value_type`, and
+        `_parse_param` is what the loader uses to turn the pair back into an int, float,
+        bool or JSON structure. Reusing it keeps the file a database export writes and
+        the file the loader reads as one format.
+        """
+        from server.services.metadata_service import _parse_param
+
+        value = row["value"]
+        value_type = row.get("value_type")
+        if value_type and isinstance(value, str):
+            return _parse_param(value, value_type)
+        if isinstance(value, float) and value.is_integer():
+            return int(value)
+        return value
+
+    def _by_name(rows: list[dict]) -> dict:
+        return {row["name"]: _scalar(row) for row in rows}
+
+    files: dict[str, Any] = {
+        "slipnet_nodes.json": _drop_ids(exported["slipnet_nodes"]),
+        "slipnet_links.json": _drop_ids(exported["slipnet_links"]),
+        "codelet_types.json": _drop_ids(exported["codelet_types"]),
+        "demo_problems.json": _drop_ids(exported["demo_problems"]),
+        "engine_params.json": _by_name(exported["engine_params"]),
+        "urgency_levels.json": _by_name(exported["urgency_levels"]),
+        "formula_coefficients.json": _by_name(exported["formula_coefficients"]),
+        # The templates live in one row keyed `all`, and the seed file is that row's
+        # payload. A single-row table is unwrapped; several rows are written as a map.
+        "commentary_templates.json": (
+            exported["commentary_templates"][0]["template_data"]
+            if len(exported["commentary_templates"]) == 1
+            and exported["commentary_templates"][0]["template_key"] == "all"
+            else {
+                row["template_key"]: row["template_data"]
+                for row in exported["commentary_templates"]
+            }
+        ),
+        "help_topics.en.json": _drop_ids(exported["help_topics"]),
+    }
+
+    # Every file this replaces is copied first, under a timestamp, so a configuration
+    # that was on disk and not in the database survives the write and can be put back.
+    import shutil
+    from datetime import datetime, timezone
+
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    backup_dir = os.path.join(SEED_DATA_DIR, ".backups", stamp)
+    os.makedirs(backup_dir, exist_ok=True)
+
+    written = []
+    for filename, payload in files.items():
+        path = os.path.join(SEED_DATA_DIR, filename)
+        if os.path.exists(path):
+            shutil.copy2(path, os.path.join(backup_dir, filename))
+        with open(path, "w") as handle:
+            json.dump(payload, handle, indent=2, ensure_ascii=True)
+            handle.write("\n")
+        written.append(filename)
+
+    return {
+        "written": written,
+        "skipped": {
+            "theme_dimensions.json": "grouped by cluster type on disk",
+            "posting_rules.json": "grouped into rules, initial codelets and patterns",
+            "slipnet_layout.json": "carries grid dimensions alongside node positions",
+            "enums.json": "lookup tables, edited through their own screen",
+        },
+        "directory": SEED_DATA_DIR,
+        "backup": backup_dir,
+        "source_database": DATABASE_URL.rsplit("/", 1)[-1],
+    }
+
+
 @router.get("/export")
 async def export_metadata(session: AsyncSession = Depends(get_session)):
     """Export all metadata as a single JSON object."""
-    nodes_result = await session.execute(select(SlipnetNodeDef))
-    links_result = await session.execute(select(SlipnetLinkDef))
-    codelets_result = await session.execute(select(CodeletTypeDef))
-    params_result = await session.execute(select(EngineParam))
-    urgency_result = await session.execute(select(UrgencyLevel))
-    formula_result = await session.execute(select(FormulaCoefficient))
-    demos_result = await session.execute(select(DemoProblem))
-    theme_dims_result = await session.execute(select(ThemeDimensionDef))
-    posting_result = await session.execute(select(PostingRule))
-    commentary_result = await session.execute(select(CommentaryTemplate))
-    layout_result = await session.execute(select(SlipnetLayoutPos))
-    help_result = await session.execute(select(HelpTopic))
+    # Ordered by primary key throughout, so two exports of the same configuration are
+    # the same bytes and a backup can be diffed against the file it came from.
+    nodes_result = await session.execute(select(SlipnetNodeDef).order_by(SlipnetNodeDef.name))
+    links_result = await session.execute(select(SlipnetLinkDef).order_by(SlipnetLinkDef.id))
+    codelets_result = await session.execute(
+        select(CodeletTypeDef).order_by(CodeletTypeDef.name)
+    )
+    params_result = await session.execute(select(EngineParam).order_by(EngineParam.name))
+    urgency_result = await session.execute(select(UrgencyLevel).order_by(UrgencyLevel.name))
+    formula_result = await session.execute(
+        select(FormulaCoefficient).order_by(FormulaCoefficient.name)
+    )
+    demos_result = await session.execute(select(DemoProblem).order_by(DemoProblem.id))
+    theme_dims_result = await session.execute(
+        select(ThemeDimensionDef).order_by(ThemeDimensionDef.id)
+    )
+    posting_result = await session.execute(select(PostingRule).order_by(PostingRule.id))
+    commentary_result = await session.execute(
+        select(CommentaryTemplate).order_by(CommentaryTemplate.id)
+    )
+    layout_result = await session.execute(
+        select(SlipnetLayoutPos).order_by(SlipnetLayoutPos.node_name)
+    )
+    help_result = await session.execute(select(HelpTopic).order_by(HelpTopic.id))
 
     return {
         "slipnet_nodes": [
@@ -1251,59 +1398,115 @@ async def export_metadata(session: AsyncSession = Depends(get_session)):
     }
 
 
+#: Every collection ``GET /export`` writes, and where it lands on the way back in:
+#: the model, the primary key a row is matched on, and any payload key whose name
+#: differs from the ORM attribute.  Export and import read this one list, so the two
+#: cover the same twelve collections.
+_IMPORTABLE: tuple[tuple[str, type, str, dict[str, str]], ...] = (
+    ("slipnet_nodes", SlipnetNodeDef, "name", {}),
+    ("slipnet_links", SlipnetLinkDef, "id", {}),
+    ("codelet_types", CodeletTypeDef, "name", {}),
+    ("engine_params", EngineParam, "name", {}),
+    ("urgency_levels", UrgencyLevel, "name", {}),
+    ("formula_coefficients", FormulaCoefficient, "name", {}),
+    ("demo_problems", DemoProblem, "id", {}),
+    ("theme_dimensions", ThemeDimensionDef, "id", {}),
+    ("posting_rules", PostingRule, "id", {}),
+    ("commentary_templates", CommentaryTemplate, "id", {}),
+    ("slipnet_layout", SlipnetLayoutPos, "node_name", {}),
+    # ``metadata`` is reserved on a declarative class, so the column is reached
+    # through ``metadata_json``.
+    ("help_topics", HelpTopic, "id", {"metadata": "metadata_json"}),
+)
+
+
+def _model_attributes(model: type) -> set[str]:
+    """The ORM attribute names a row may set."""
+    from sqlalchemy import inspect as sa_inspect
+
+    return {attr.key for attr in sa_inspect(model).mapper.column_attrs}
+
+
+async def _import_collection(
+    session: AsyncSession,
+    model: type,
+    key_field: str,
+    rows: list[dict],
+    aliases: dict[str, str],
+) -> int:
+    """Write one collection's rows, matching each on *key_field*.
+
+    A row already present is updated in place; a row that is not is added. Payload keys
+    the model does not carry are left alone, so a payload from a newer export loads into
+    an older schema for the columns the two share.
+    """
+    attributes = _model_attributes(model)
+    for raw in rows:
+        row = {aliases.get(key, key): value for key, value in raw.items()}
+        row = {key: value for key, value in row.items() if key in attributes}
+        if key_field not in row:
+            raise ValueError(
+                f"{model.__tablename__}: a row arrived without its {key_field}"
+            )
+        existing = await session.get(model, row[key_field])
+        if existing is None:
+            session.add(model(**row))
+        else:
+            for field, value in row.items():
+                if field != key_field:
+                    setattr(existing, field, value)
+    return len(rows)
+
+
+async def _resync_identity_sequence(session: AsyncSession, model: type) -> None:
+    """Put an integer primary key's sequence past the largest id now present.
+
+    Rows arrive carrying their own ids, and the sequence a later ``POST`` draws from
+    counts independently of them, so it is advanced to match.
+    """
+    from sqlalchemy import func as sa_func, text
+
+    table = model.__tablename__
+    column = next(iter(model.__table__.primary_key)).name
+    highest = (
+        await session.execute(sa_func.max(getattr(model, column)))
+    ).scalar()
+    if highest is None:
+        return
+    await session.execute(
+        text(
+            "SELECT setval(pg_get_serial_sequence(:table, :column), :value, true)"
+        ),
+        {"table": table, "column": column, "value": int(highest)},
+    )
+
+
 @router.post("/import")
 async def import_metadata(
     data: dict,
     session: AsyncSession = Depends(get_session),
 ):
-    """Import metadata from a JSON object (same format as export).
+    """Import metadata from a JSON object — the same twelve collections ``/export`` writes.
 
-    Replaces matching rows in each table. Uses a transaction so the
-    entire import succeeds or rolls back.
+    Every collection present in the payload is applied; the response names each one and
+    how many rows it carried, so what was written is legible from the reply. Rows are
+    matched on their primary key, and the whole import is one transaction.
     """
     imported: dict[str, int] = {}
     try:
-        # Slipnet nodes
-        if "slipnet_nodes" in data:
-            for n in data["slipnet_nodes"]:
-                existing = await session.get(SlipnetNodeDef, n["name"])
-                if existing:
-                    existing.short_name = n["short_name"]
-                    existing.conceptual_depth = n["conceptual_depth"]
-                    existing.description = n.get("description", "")
-                else:
-                    session.add(SlipnetNodeDef(**n))
-            imported["slipnet_nodes"] = len(data["slipnet_nodes"])
+        for name, model, key_field, aliases in _IMPORTABLE:
+            rows = data.get(name)
+            if rows is None:
+                continue
+            imported[name] = await _import_collection(
+                session, model, key_field, rows, aliases
+            )
 
-        # Engine params
-        if "engine_params" in data:
-            for p in data["engine_params"]:
-                existing = await session.get(EngineParam, p["name"])
-                if existing:
-                    existing.value = p["value"]
-                else:
-                    session.add(EngineParam(**p))
-            imported["engine_params"] = len(data["engine_params"])
+        await session.flush()
 
-        # Urgency levels
-        if "urgency_levels" in data:
-            for u in data["urgency_levels"]:
-                existing = await session.get(UrgencyLevel, u["name"])
-                if existing:
-                    existing.value = u["value"]
-                else:
-                    session.add(UrgencyLevel(**u))
-            imported["urgency_levels"] = len(data["urgency_levels"])
-
-        # Formula coefficients
-        if "formula_coefficients" in data:
-            for f in data["formula_coefficients"]:
-                existing = await session.get(FormulaCoefficient, f["name"])
-                if existing:
-                    existing.value = f["value"]
-                else:
-                    session.add(FormulaCoefficient(**f))
-            imported["formula_coefficients"] = len(data["formula_coefficients"])
+        for name, model, key_field, _aliases in _IMPORTABLE:
+            if name in imported and key_field == "id":
+                await _resync_identity_sequence(session, model)
 
         await session.commit()
 
@@ -1478,12 +1681,12 @@ async def delete_enum_value(
 async def regenerate_help_docs(
     session: AsyncSession = Depends(get_session),
 ):
-    """Re-sync help topics from the locale JSON and regenerate derived docs.
+    """Re-sync help topics from the topics JSON and regenerate derived docs.
 
     Triggered by the Admin panel's "Regenerate Help Documentation" button.
     Performs two steps:
 
-    1. Upsert every row from `seed_data/help_topics.{locale}.json` into the
+    1. Upsert every row from `seed_data/help_topics.en.json` into the
        `help_topics` table (same idempotent sync that runs on startup). After
        this, every `?` popover in the UI reflects the latest JSON content on
        the very next fetch.
@@ -1500,7 +1703,6 @@ async def regenerate_help_docs(
     from server.services.help_docs import regenerate_all
     from server.main import _sync_help_topics
 
-    locale = os.environ.get("HELP_LOCALE", "en")
 
     # Step 1: upsert DB rows from JSON
     try:
@@ -1510,7 +1712,7 @@ async def regenerate_help_docs(
 
     # Step 2: regenerate derived files (HELP.md, helpTopics.ts)
     try:
-        result = regenerate_all(locale)
+        result = regenerate_all()
     except FileNotFoundError as e:
         raise HTTPException(404, f"Help topics file not found: {e}") from e
     except Exception as e:

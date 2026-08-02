@@ -23,7 +23,7 @@ limitation: the substrate exists so that the layout, the kernels and the seam ar
 in place *before* the Slipnet grows, not so that today's Slipnet runs faster.
 
 **Purity.**  Nothing here imports ``sqlalchemy``, ``server.models``, ``server.db``
-or ``server.services``, and ``tests/unit/test_engine_purity.py`` enforces that
+or ``server.services``, and ``tests/architecture/test_engine_purity.py`` enforces that
 automatically for every module in this package.  NumPy and MLX are third-party
 imports, which that policy permits and which this package uses only behind
 ``try: import`` guards, so the engine remains runnable on a checkout with neither.

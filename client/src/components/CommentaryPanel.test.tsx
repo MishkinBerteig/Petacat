@@ -28,11 +28,15 @@ describe('CommentaryPanel', () => {
     expect(screen.getByText(/I noticed a successor group/)).toBeTruthy()
   })
 
-  it('tells a Fast run that its commentary was discarded, not missing', () => {
-    useRunStore.setState({ commentary: '', runMode: 'fast', runId: -1, codeletCount: 2229 })
+  it('shows a Fast run its commentary, which it narrates like any other run', () => {
+    useRunStore.setState({
+      commentary: 'I noticed a successor group.',
+      runMode: 'fast',
+      runId: -1,
+      codeletCount: 2229,
+    })
     render(<CommentaryPanel />)
-    expect(screen.getByText(/discards commentary as it is produced/)).toBeTruthy()
-    expect(screen.queryByText(/Start a run to see commentary/)).toBeNull()
+    expect(screen.getByText(/I noticed a successor group/)).toBeTruthy()
   })
 
   it('keeps the ordinary invitation when no run has been started', () => {

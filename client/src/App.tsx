@@ -20,7 +20,6 @@ import { useRunStore } from '@/store/runStore';
 import { useHelp } from '@/hooks/useHelp';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { getRun } from '@/api/client';
-import type { RunStatus } from '@/store/runStore';
 
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ModeBadge } from '@/components/ModeBadge';
@@ -28,12 +27,14 @@ import { SubstrateBadge } from '@/components/SubstrateBadge';
 import { SearchPalette } from '@/components/SearchPalette';
 import { HelpPopover } from '@/components/HelpPopover';
 import { HamburgerMenu } from '@/components/HamburgerMenu';
+import { LastErrorBanner } from '@/components/LastErrorBanner';
 import type { AppView } from '@/components/HamburgerMenu';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { AdminPanel } from '@/components/AdminPanel';
 import { ProblemInputPanel } from '@/components/ProblemInputPanel';
 import { RunControlsPanel } from '@/components/RunControlsPanel';
 import { WorkspaceView } from '@/components/WorkspaceView';
+import { useWebSocket } from '@/hooks/useWebSocket';
 import { SlipnetView } from '@/components/SlipnetView';
 import { CoderackView } from '@/components/CoderackView';
 import { ThemespaceView } from '@/components/ThemespaceView';
@@ -145,6 +146,11 @@ export default function App() {
   const [configEditNode, setConfigEditNode] = useState<string | null>(parseConfigNodeFromHash);
   const [reviewRunId, setReviewRunId] = useState<number | null>(parseReviewRunFromHash);
 
+  // The engine's own account of the run, pushed as it moves rather than polled for.
+  // A snag response clamping the temperature, or a run reaching an answer, reaches the
+  // display without the client asking.
+  useWebSocket(runId);
+
   // Register global keyboard shortcuts
   const openSearch = useCallback(() => setSearchOpen(true), []);
   useKeyboardShortcuts({ onOpenSearch: openSearch });
@@ -189,13 +195,9 @@ export default function App() {
     const loadRun = async () => {
       try {
         const info = await getRun(deepLinkId);
-        useRunStore.setState({
-          runId: info.run_id,
-          runMode: info.mode ?? null,
-          status: info.status as RunStatus,
-          codeletCount: info.codelet_count,
-          temperature: info.temperature,
-        });
+        // The same route into an existing run that Run History takes, so a deep
+        // link shows the run's own settings, its spreading threshold included.
+        useRunStore.getState().adoptRun(info);
         await refreshAll();
       } catch (err) {
         console.error(`Failed to load run #${deepLinkId} from URL hash:`, err);
@@ -275,11 +277,22 @@ export default function App() {
             Cmd+K
           </button>
         </span>
+
+        {/* Why the last thing asked for did not happen, wherever it was asked from. */}
+        <LastErrorBanner />
       </div>
 
-      {/* ---- Config view ---- */}
+      {/* ---- Config view ----
+          Spans every content row, as Review and Admin do. Without the row span it
+          occupied only the first (2fr) band at a fixed 500px, so the page stopped
+          partway down the window whatever the window's height. minHeight 0 lets the
+          grid shrink it, which is what allows the inner table to scroll rather than
+          push the panel past the viewport. */}
       {view === 'config' && (
-        <div className="panel" style={{ gridColumn: '1 / -1', minHeight: 500 }}>
+        <div
+          className="panel"
+          style={{ gridColumn: '1 / -1', gridRow: '2 / -1', minHeight: 0 }}
+        >
           <div className="panel-content" style={{ height: '100%' }}>
             <AdminLayout editNodeName={configEditNode} onClearEditNode={() => setConfigEditNode(null)} />
           </div>
@@ -290,7 +303,10 @@ export default function App() {
           Reads the record rather than a live run, so it does not touch the run
           store at all and is unaffected by whatever is loaded on the dashboard. */}
       {view === 'review' && (
-        <div className="panel" style={{ gridColumn: '1 / -1', gridRow: '2 / -1', minHeight: 600 }}>
+        <div
+          className="panel"
+          style={{ gridColumn: '1 / -1', gridRow: '2 / -1', minHeight: 0 }}
+        >
           <div className="panel-content" style={{ height: '100%' }}>
             <ErrorBoundary fallback="Review">
               <ReviewPanel initialRunId={reviewRunId} />
@@ -301,7 +317,10 @@ export default function App() {
 
       {/* ---- Admin view ---- */}
       {view === 'admin' && (
-        <div className="panel" style={{ gridColumn: '1 / -1', gridRow: '2 / -1' }}>
+        <div
+          className="panel"
+          style={{ gridColumn: '1 / -1', gridRow: '2 / -1', minHeight: 0 }}
+        >
           <div className="panel-content" style={{ height: '100%' }}>
             <ErrorBoundary fallback="Admin">
               <AdminPanel />

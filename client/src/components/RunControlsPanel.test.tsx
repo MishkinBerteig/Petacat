@@ -18,10 +18,13 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 
 import { RunControlsPanel } from './RunControlsPanel'
 import { useRunStore } from '@/store/runStore'
-import { getRunIdentity } from '@/api/client'
+import { ApiError, getRunIdentity, setBreakpoint } from '@/api/client'
 import type { WorkspaceState } from '@/types'
 
-vi.mock('@/api/client', () => ({
+// `ApiError` and `describeApiError` come through as themselves: the panel's failure
+// messages are the shared ones, and asserting on a stand-in would prove nothing.
+vi.mock('@/api/client', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/api/client')>()),
   setBreakpoint: vi.fn().mockResolvedValue({}),
   clearBreakpoint: vi.fn().mockResolvedValue({}),
   setSpreadingThreshold: vi.fn().mockResolvedValue({}),
@@ -363,16 +366,15 @@ describe('RunControlsPanel — execution strategy selector', () => {
 })
 
 // ---------------------------------------------------------------------------
-// The spreading threshold is a session setting, not per-run state
+// The spreading threshold slider reports the run on screen
 // ---------------------------------------------------------------------------
 //
-// It used to live only on the server's in-memory runner. Every new run reverted
-// to the default and Reset discarded it, while the slider was disabled until a
-// run existed -- so a chosen value usually never reached the run that actually
-// executed, and the slider snapping back to 100 was telling the truth about the
-// run rather than misreporting it.
+// The threshold decides which Slipnet nodes spread activation, so the slider shows
+// the value the loaded run is executing with, and moving it changes that run. With
+// no run loaded it shows the value the next run will be created with, so the
+// setting is adjustable from the moment the page opens.
 
-describe('RunControlsPanel — spreading threshold persists across runs', () => {
+describe('RunControlsPanel — spreading threshold reflects the loaded run', () => {
   it('is adjustable before any run exists', () => {
     const setSpreadingThreshold = vi.fn()
     setup({
@@ -389,7 +391,7 @@ describe('RunControlsPanel — spreading threshold persists across runs', () => 
     expect(setSpreadingThreshold).toHaveBeenCalledWith(40)
   })
 
-  it('shows the session value, not a per-run reset', () => {
+  it('shows the value the loaded run is executing with', () => {
     setup({
       runId: 12,
       runParams: { initial: 'abc', modified: 'abd', target: 'xyz', seed: 7 },
@@ -407,6 +409,25 @@ describe('RunControlsPanel — spreading threshold persists across runs', () => 
     setup({ runId: null, spreadingThreshold: 100 })
     render(<RunControlsPanel />)
     expect(screen.getByText(/Spreading threshold: 100 \(original\)/)).toBeTruthy()
+  })
+
+  it('sends the moved-to value, so the run on screen changes', () => {
+    const setSpreadingThreshold = vi.fn()
+    setup({
+      runId: 12,
+      runParams: { initial: 'abc', modified: 'abd', target: 'xyz', seed: 7 },
+      workspace: workspaceFor('abc', 'abd', 'xyz'),
+      formInputs: { initial: 'abc', modified: 'abd', target: 'xyz', answer: '', seed: '7' },
+      spreadingThreshold: 30,
+      setSpreadingThreshold,
+    })
+
+    render(<RunControlsPanel />)
+    fireEvent.change(screen.getByLabelText(/spreading threshold/i), {
+      target: { value: '45' },
+    })
+
+    expect(setSpreadingThreshold).toHaveBeenCalledWith(45)
   })
 })
 
@@ -759,6 +780,70 @@ describe('RunControlsPanel — engine parameters', () => {
     fireEvent.click(screen.getByRole('button', { name: /run to answer/i }))
     expect(createRun).not.toHaveBeenCalled()
     expect(runToAnswer).not.toHaveBeenCalled()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Failures the run controls cause are reported, not swallowed
+// ---------------------------------------------------------------------------
+//
+// Every button here starts something on the server, and each one used to drop its
+// failure on the floor: a run that could not be created looked exactly like a run
+// that was created and had not moved yet, and a breakpoint the server refused looked
+// exactly like a breakpoint that was set and never reached.
+
+describe('RunControlsPanel — a refused request reaches the error channel', () => {
+  const LOADED = {
+    runId: 12,
+    runParams: { initial: 'abc', modified: 'abd', target: 'xyz', seed: 7 },
+    workspace: workspaceFor('abc', 'abd', 'xyz'),
+    formInputs: { initial: 'abc', modified: 'abd', target: 'xyz', answer: '', seed: '7' },
+  }
+
+  it('does not start running when the run could not be created', async () => {
+    // The store reports the failure and raises; the panel stops rather than asking a
+    // run that does not exist to execute.
+    const createRun = vi.fn().mockRejectedValue(new ApiError(422, 'Unprocessable Entity', ''))
+    const runToAnswer = vi.fn().mockResolvedValue(undefined)
+    setup({
+      runId: null,
+      formInputs: { initial: 'abc', modified: 'abd', target: 'xyz', answer: '', seed: '7' },
+      createRun,
+      runToAnswer,
+    })
+
+    render(<RunControlsPanel />)
+    fireEvent.click(screen.getByRole('button', { name: /run to answer/i }))
+
+    await waitFor(() => expect(createRun).toHaveBeenCalled())
+    expect(runToAnswer).not.toHaveBeenCalled()
+  })
+
+  it('says why a breakpoint was refused, since it will not stop the run', async () => {
+    vi.mocked(setBreakpoint).mockRejectedValueOnce(
+      new ApiError(404, 'Not Found', '{"detail":"Run 12 not found"}'),
+    )
+    setup(LOADED)
+
+    render(<RunControlsPanel />)
+    fireEvent.change(screen.getByLabelText(/breakpoint/i), { target: { value: '250' } })
+    fireEvent.click(screen.getByRole('button', { name: /^set$/i }))
+
+    await waitFor(() => {
+      const message = useRunStore.getState().lastError ?? ''
+      expect(message).toContain('set the breakpoint')
+      expect(message).toContain('Run 12 not found')
+    })
+  })
+
+  it('clears the channel once a breakpoint is accepted', async () => {
+    setup({ ...LOADED, lastError: 'Could not set the breakpoint: it no longer exists.' })
+
+    render(<RunControlsPanel />)
+    fireEvent.change(screen.getByLabelText(/breakpoint/i), { target: { value: '250' } })
+    fireEvent.click(screen.getByRole('button', { name: /^set$/i }))
+
+    await waitFor(() => expect(useRunStore.getState().lastError).toBeNull())
   })
 })
 

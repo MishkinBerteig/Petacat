@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """Measure free-running execution across worker counts (WP4.4).
 
-Reports what the plan asks for: throughput and conflict-rate telemetry at 1, 2, 4 and 8
-workers, against the serial loop.
+Reports what the plan asks for: throughput and conflict-rate telemetry across a ladder
+of worker counts, against the serial loop.  The ladder is powers of two up to the
+machine's own worker count — its performance cores — so the measurement covers the
+range this machine can actually run and stops there.  ``--workers`` names a ladder
+explicitly.
 
 **Run this under the free-threaded interpreter.** Under the standard build the GIL
 serialises the codelet bodies, so every worker count measures the same thing plus
@@ -28,6 +31,7 @@ import time
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, REPO)
 
+from server.engine import hardware  # noqa: E402
 from server.engine.free_running import FreeRunningEngine  # noqa: E402
 from server.engine.metadata import MetadataProvider  # noqa: E402
 from server.engine.runner import EngineRunner  # noqa: E402
@@ -76,19 +80,33 @@ def free_running(meta, problem, workers: int, max_steps: int, repeats: int) -> d
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--workers", default="1,2,4,8")
+    ap.add_argument(
+        "--workers",
+        default=None,
+        help="Comma-separated worker counts. Default: powers of two up to this "
+             "machine's performance core count.",
+    )
     ap.add_argument("--max-steps", type=int, default=2000)
     ap.add_argument("--repeats", type=int, default=3)
     ap.add_argument("--json", dest="json_path", default=None)
     args = ap.parse_args()
 
     gil = getattr(sys, "_is_gil_enabled", lambda: True)()
-    worker_counts = [int(w) for w in args.workers.split(",")]
+    machine = hardware.detect()
+    worker_counts = (
+        [int(w) for w in args.workers.split(",")]
+        if args.workers
+        else hardware.worker_ladder()
+    )
     meta = MetadataProvider.from_seed_data(SEED_DIR)
 
     print(
         f"Free-running — {args.max_steps} codelet cap, best of {args.repeats}, "
         f"GIL {'ENABLED (not a parallelism measurement)' if gil else 'disabled'}\n"
+        f"  {machine.cpu.chip or machine.platform}: "
+        f"{machine.cpu.performance_cores} performance + "
+        f"{machine.cpu.efficiency_cores} efficiency cores, "
+        f"workers {worker_counts}\n"
     )
     if gil:
         print(
@@ -96,7 +114,13 @@ def main() -> None:
             "   Re-run as: PYTHON_GIL=0 .venv-ft/bin/python scripts/bench_free_running.py\n"
         )
 
-    records: dict = {"gil_enabled": gil, "max_steps": args.max_steps, "problems": {}}
+    records: dict = {
+        "gil_enabled": gil,
+        "max_steps": args.max_steps,
+        "machine": machine.as_dict(),
+        "worker_counts": worker_counts,
+        "problems": {},
+    }
 
     for problem in PROBLEMS:
         label = f"{problem[0]}->{problem[1]}; {problem[2]}? (seed {problem[3]})"

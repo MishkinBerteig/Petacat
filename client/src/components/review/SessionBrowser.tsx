@@ -10,16 +10,21 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import {
+  describeApiError,
   listTrainingSessions,
   getTrainingSession,
   setSessionNote,
 } from '@/api/client';
 import { ModeBadge, MODE_NOTES } from '@/components/ModeBadge';
+import { Pager } from '@/components/Pager';
 import type {
   RecordedRun,
   TrainingSessionDetail,
   TrainingSessionSummary,
 } from '@/types';
+
+/** How many Training Sessions one window of the browser holds. */
+const PAGE_SIZE = 50;
 
 function formatTime(iso: string | null): string {
   if (!iso) return '—';
@@ -44,33 +49,53 @@ export function SessionBrowser({ selectedRunId, onSelectRun, focusSessionId = nu
   const [sessions, setSessions] = useState<TrainingSessionSummary[]>([]);
   const [openSessionId, setOpenSessionId] = useState<number | null>(null);
   const [detail, setDetail] = useState<TrainingSessionDetail | null>(null);
+  /** Why there is no list of sessions. */
   const [error, setError] = useState<string | null>(null);
+  /** Why an opened session shows no Runs. */
+  const [detailError, setDetailError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  // Which window of sessions is on screen, and how many exist behind it. The
+  // server pages this endpoint, so the offset is what reaches session 51 and later.
+  const [offset, setOffset] = useState(0);
+  const [total, setTotal] = useState(0);
 
   useEffect(() => {
-    listTrainingSessions(50, 0)
+    listTrainingSessions(PAGE_SIZE, offset)
       .then((r) => {
         setSessions(r.sessions);
-        // Open the newest session straight away: a browser that opens on an empty
-        // pane makes the reader do a click to find out there is anything at all.
+        setTotal(r.total);
+        // Open the newest session on the window straight away: a browser that opens
+        // on an empty pane makes the reader do a click to find out there is anything
+        // at all.
         if (r.sessions.length > 0) setOpenSessionId(r.sessions[0].session_id);
       })
-      .catch((e) => setError(String(e)))
+      .catch((e) => setError(describeApiError(e, 'load the Training Sessions')))
       .finally(() => setLoading(false));
-  }, []);
+  }, [offset]);
 
   useEffect(() => {
     if (focusSessionId !== null) setOpenSessionId(focusSessionId);
   }, [focusSessionId]);
 
+  // One session's Runs. A failure here is about that session, so it is reported
+  // inside the expanded row and the rest of the list stays usable.
   useEffect(() => {
     if (openSessionId === null) {
       setDetail(null);
+      setDetailError(null);
       return;
     }
     getTrainingSession(openSessionId)
-      .then(setDetail)
-      .catch((e) => setError(String(e)));
+      .then((d) => {
+        setDetail(d);
+        setDetailError(null);
+      })
+      .catch((e) => {
+        setDetail(null);
+        setDetailError(
+          describeApiError(e, `load the Runs in Training Session ${openSessionId}`),
+        );
+      });
   }, [openSessionId]);
 
   /**
@@ -93,9 +118,13 @@ export function SessionBrowser({ selectedRunId, onSelectRun, focusSessionId = nu
     return <div className="text-muted text-sm" style={{ padding: 12 }}>Loading sessions…</div>;
   }
   if (error) {
-    return <div style={{ padding: 12, color: 'var(--error)', fontSize: 12 }}>{error}</div>;
+    return (
+      <div role="alert" style={{ padding: 12, color: 'var(--error)', fontSize: 12 }}>
+        {error}
+      </div>
+    );
   }
-  if (sessions.length === 0) {
+  if (sessions.length === 0 && offset === 0) {
     return (
       <div className="text-muted text-sm" style={{ padding: 12 }}>
         No Training Sessions recorded yet. A session begins with the first Run and
@@ -188,6 +217,20 @@ export function SessionBrowser({ selectedRunId, onSelectRun, focusSessionId = nu
               <span className="text-muted">{isOpen ? '▾' : '▸'}</span>
             </button>
 
+            {isOpen && detailError !== null && (
+              <div
+                role="alert"
+                className="text-xs"
+                style={{
+                  padding: '6px 8px',
+                  borderTop: '1px solid var(--border)',
+                  color: 'var(--error)',
+                }}
+              >
+                {detailError}
+              </div>
+            )}
+
             {isOpen && detail && detail.session_id === s.session_id && (
               <>
                 <SessionNoteEditor
@@ -219,6 +262,18 @@ export function SessionBrowser({ selectedRunId, onSelectRun, focusSessionId = nu
           </div>
         );
       })}
+
+      {/* The window on screen, and how many sessions exist behind it. The list is
+          one page of a paged endpoint, so this is what reaches the sessions past
+          the first window. */}
+      <Pager
+        offset={offset}
+        limit={PAGE_SIZE}
+        total={total}
+        count={sessions.length}
+        onChange={setOffset}
+        label="Training Sessions"
+      />
     </div>
   );
 }
@@ -247,25 +302,26 @@ function SessionNoteEditor({
 }) {
   const [draft, setDraft] = useState(note);
   const [saving, setSaving] = useState(false);
-  const [failed, setFailed] = useState(false);
+  /** Why the note in the field is still only in the field. */
+  const [failure, setFailure] = useState<string | null>(null);
 
   // A different session is a different note; without this, expanding a second
   // session shows the first one's text sitting in the field.
   useEffect(() => {
     setDraft(note);
-    setFailed(false);
+    setFailure(null);
   }, [sessionId, note]);
 
   const dirty = draft !== note;
 
   const save = async () => {
     setSaving(true);
-    setFailed(false);
+    setFailure(null);
     try {
       await setSessionNote(sessionId, draft);
       onSaved(sessionId, draft);
-    } catch {
-      setFailed(true);
+    } catch (err) {
+      setFailure(describeApiError(err, 'save the session note'));
     } finally {
       setSaving(false);
     }
@@ -275,33 +331,40 @@ function SessionNoteEditor({
     <div
       style={{
         display: 'flex',
-        gap: 4,
-        alignItems: 'center',
+        flexDirection: 'column',
+        gap: 2,
         padding: '4px 8px',
         borderTop: '1px solid var(--border)',
       }}
     >
-      <label
-        htmlFor={`session-note-${sessionId}`}
-        className="text-muted text-xs"
-        style={{ flexShrink: 0 }}
-      >
-        Note
-      </label>
-      <input
-        id={`session-note-${sessionId}`}
-        type="text"
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        placeholder="What was this session for?"
-        style={{ flex: 1, fontSize: 11 }}
-      />
-      <button onClick={save} disabled={!dirty || saving} style={{ fontSize: 10 }}>
-        {saving ? 'Saving…' : 'Save'}
-      </button>
-      {failed && (
-        <span className="text-xs" style={{ color: 'var(--error)' }}>
-          not saved
+      <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+        <label
+          htmlFor={`session-note-${sessionId}`}
+          className="text-muted text-xs"
+          style={{ flexShrink: 0 }}
+        >
+          Note
+        </label>
+        <input
+          id={`session-note-${sessionId}`}
+          type="text"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder="What was this session for?"
+          style={{ flex: 1, fontSize: 11 }}
+        />
+        <button onClick={save} disabled={!dirty || saving} style={{ fontSize: 10 }}>
+          {saving ? 'Saving…' : 'Save'}
+        </button>
+        {failure !== null && (
+          <span className="text-xs" style={{ color: 'var(--error)' }}>
+            not saved
+          </span>
+        )}
+      </div>
+      {failure !== null && (
+        <span role="alert" className="text-xs" style={{ color: 'var(--error)' }}>
+          {failure}
         </span>
       )}
     </div>

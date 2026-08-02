@@ -263,6 +263,29 @@ class SlipnetNode:
             return None
         return round(0.4 * self.intrinsic_link_length)
 
+    def degree_of_assoc(self) -> float:
+        """How strongly this *label* concept associates the things it labels.
+
+        Scheme: ``get-degree-of-assoc`` on a slipnode (slipnet.ss:90-91) —
+        ``100 - (fully-active? ? shrunk-link-length : intrinsic-link-length)``.
+        Distinct from ``SlipnetLink.degree_of_association``, which asks the same
+        question of a particular link; this asks it of the relating concept
+        itself, and is what sets the probability of an auxiliary slippage in
+        ``look-for-auxiliary-slippages`` (themes.ss:920-924).
+        """
+        if self.intrinsic_link_length is None:
+            return 0.0
+        if self.fully_active():
+            shrunk = self.shrunk_link_length()
+            if shrunk is not None:
+                return max(0.0, 100.0 - shrunk)
+        return max(0.0, 100.0 - self.intrinsic_link_length)
+
+    @property
+    def is_instance(self) -> bool:
+        """Is this node an instance of some category?  Scheme: slipnet.ss:94."""
+        return bool(self.category_links)
+
     def clamp(self, cycles: int) -> None:
         self.frozen = True
         self.clamp_cycles_remaining = cycles
@@ -300,7 +323,7 @@ class SlipnetNode:
             return self.category_links[0].to_node
         return None
 
-    def get_related_node(self, relation: SlipnetNode) -> SlipnetNode | None:
+    def get_related_node(self, relation: SlipnetNode | str) -> SlipnetNode | None:
         """Find the neighbor node connected via a link labeled with *relation*.
 
         Scheme: slipnet.ss:114-129.
@@ -309,14 +332,24 @@ class SlipnetNode:
         - If exactly one match, return it.
         - If multiple matches, prefer the one sharing self's category.
         - If none, return None.
+
+        *relation* may be given as a node **or** as a node name.  Callers deep in
+        the Workspace — group and bond flipping — hold no Slipnet handle to reach
+        ``plato-opposite`` with, and passing the name used to raise
+        ``AttributeError`` into a bare ``except`` at both call sites, so a
+        "flipped" group silently kept its original direction and category.
+        Matching by name is exact: node names are unique within a Slipnet.
         """
+        relation_name = (
+            relation if isinstance(relation, str) else getattr(relation, "name", "")
+        )
         # Identity relation -> return self
-        if relation.name == "plato-identity":
+        if relation_name == "plato-identity":
             return self
 
         related_nodes: list[SlipnetNode] = []
         for link in self.outgoing_links:
-            if link.label_node is relation:
+            if link.label_node is not None and link.label_node.name == relation_name:
                 related_nodes.append(link.to_node)
 
         if not related_nodes:
@@ -423,6 +456,28 @@ class SlipnetNode:
 
     def __repr__(self) -> str:
         return f"SlipnetNode({self.short_name}, act={self.activation:.0f}, depth={self.conceptual_depth})"
+
+
+def opposite_node(node: Any) -> Any:
+    """The concept *node* relates to by ``plato-opposite``, or *node* itself.
+
+    Scheme: ``(tell node 'get-related-node plato-opposite)`` as used by
+    ``make-flipped-version`` (bonds.ss:125, groups.ss:334-338).  A concept with no
+    opposite — sameness, or a group with no direction — is its own reflection, so
+    returning it unchanged is what "flipping" means for it.
+
+    Resolved through ``getattr`` because flipping is also exercised against
+    stand-in descriptor objects that carry a name and nothing else; a stand-in
+    with no Slipnet links has no opposite to offer, which is the same answer as a
+    real concept without one.
+    """
+    if node is None:
+        return None
+    get_related_node = getattr(node, "get_related_node", None)
+    if get_related_node is None:
+        return node
+    related = get_related_node("plato-opposite")
+    return related if related is not None else node
 
 
 class SlipnetLink:

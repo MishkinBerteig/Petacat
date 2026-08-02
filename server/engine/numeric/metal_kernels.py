@@ -45,9 +45,11 @@ Two effects pull in opposite directions, and the table is the two of them
 crossing.
 
 *Below about 10,000 rows the kernel is latency-bound*: there are not enough rows
-to fill 38 GPU cores, so splitting each row across more lanes buys parallelism
+to fill the GPU's cores, so splitting each row across more lanes buys parallelism
 that would otherwise go unused.  A full SIMD group per row — the obvious choice,
-and the one ``metal::simd_sum`` makes natural — is right here.
+and the one ``metal::simd_sum`` makes natural — is right here.  How many rows
+count as "not enough" scales with the GPU, which is why the thread target below
+is read from the machine rather than fixed.
 
 *Above it the kernel is occupancy-bound*: with a mean in-degree of 3.4, giving a
 row 32 lanes leaves 29 of them with no edge to fetch, and the wasted launches
@@ -67,6 +69,8 @@ from __future__ import annotations
 
 from typing import Any, Sequence
 
+from server.engine import hardware
+
 #: Lanes per SIMD group on Apple silicon.  Not configurable — it is a property of
 #: the hardware, and it caps how many lanes can cooperate on one row, because a
 #: shuffle cannot cross a SIMD group.
@@ -74,15 +78,6 @@ SIMD_WIDTH = 32
 
 #: Threads per threadgroup.
 THREADGROUP_SIZE = 256
-
-#: Threads the dispatch aims for before it stops splitting rows further.  An M2
-#: Max has 38 GPU cores; 65,536 threads is enough to fill them several times over
-#: and is where the measured table stops rewarding extra lanes.  Tuned to that
-#: table rather than derived: at 2²⁰ the rule picks 32 lanes at 10,000 nodes,
-#: which the table says is 25% off the best, and at 2¹⁴ it picks 4 lanes at 1,000
-#: nodes, which is 47% off.  At 2¹⁶ it is within 9% of the best row at every
-#: measured size and exactly on it at two of the four.
-TARGET_THREADS = 1 << 16
 
 #: How many edges one lane may serialise before the row is split further.  This is
 #: what keeps a hub node from stalling its whole group: today's longest row is 29
@@ -99,7 +94,24 @@ def _next_power_of_two(value: float) -> int:
     return n
 
 
-def lanes_per_row(n_rows: int, n_edges: int, max_in_degree: int) -> int:
+def target_threads() -> int:
+    """Threads the dispatch aims for before it stops splitting rows further.
+
+    ``hardware.gpu_target_threads`` computes it from the detected GPU core count,
+    at 1,024 threads per core rounded up to a power of two.  A 38-core GPU asks
+    for 65,536 threads, which is the target the lane table above was measured at;
+    a GPU with twice the cores asks for twice as many and splits rows twice as
+    widely in the latency-bound regime.
+    """
+    return hardware.gpu_target_threads()
+
+
+def lanes_per_row(
+    n_rows: int,
+    n_edges: int,
+    max_in_degree: int,
+    threads: int | None = None,
+) -> int:
     """How many lanes cooperate on one destination node.  See the module docstring.
 
     Three demands, and the largest wins: enough total threads to fill the GPU,
@@ -108,13 +120,17 @@ def lanes_per_row(n_rows: int, n_edges: int, max_in_degree: int) -> int:
     group.  Rounded up to a power of two because the shuffle-down sweep halves its
     offset each step, and capped at the SIMD width because a shuffle cannot cross
     a SIMD group.
+
+    ``threads`` is the total thread target the first demand is measured against,
+    and defaults to :func:`target_threads` — this machine's GPU.  Passing it
+    explicitly asks what the rule would produce for a GPU of a stated size.
     """
     if n_rows <= 0:
         return 1
     mean_degree = n_edges / n_rows
     demand = max(
         mean_degree,
-        TARGET_THREADS / n_rows,
+        (target_threads() if threads is None else threads) / n_rows,
         max_in_degree / MAX_EDGES_PER_LANE,
     )
     return max(1, min(SIMD_WIDTH, _next_power_of_two(demand)))

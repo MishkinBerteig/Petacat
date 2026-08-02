@@ -38,7 +38,11 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, REPO)
 
 from server.engine.coderack import Codelet, Coderack  # noqa: E402
-from server.engine.coderack_shards import build_candidate  # noqa: E402
+from server.engine import hardware  # noqa: E402
+from server.engine.coderack_shards import (  # noqa: E402
+    MIN_SHARD_CAPACITY,
+    build_candidate,
+)
 from server.engine.metadata import MetadataProvider  # noqa: E402
 from server.engine.rng import RNG  # noqa: E402
 
@@ -266,29 +270,61 @@ def measure_contention(meta, name: str, shards: int, workers: int, draws: int) -
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--shards", type=int, default=4)
-    ap.add_argument("--workers", default="1,2,4,8")
+    ap.add_argument(
+        "--shards", type=int, default=None,
+        help="Shards per candidate. Default: this machine's shard count, one per "
+             "performance core.",
+    )
+    ap.add_argument(
+        "--workers", default=None,
+        help="Comma-separated worker counts. Default: powers of two up to this "
+             "machine's performance core count.",
+    )
     ap.add_argument("--draws", type=int, default=20000)
     ap.add_argument("--json", dest="json_path", default=None)
     args = ap.parse_args()
 
-    worker_counts = [int(w) for w in args.workers.split(",")]
+    machine = hardware.detect()
+    worker_counts = (
+        [int(w) for w in args.workers.split(",")]
+        if args.workers
+        else hardware.worker_ladder()
+    )
     meta = MetadataProvider.from_seed_data(SEED_DIR)
     names = ["locked", "family", "worker"]
 
+    # The rack's capacity is divided across shards rather than replicated, so the
+    # machine's shard count is bounded by how many shards that capacity supports at
+    # ``MIN_SHARD_CAPACITY`` each. Applied here so the header states the shard count
+    # the candidates are actually built with.
+    requested = args.shards if args.shards else hardware.shard_count()
+    supported = max(
+        1, meta.get_param("max_coderack_size", 100) // MIN_SHARD_CAPACITY
+    )
+    shards = max(1, min(requested, supported))
+
     print(
-        f"Coderack sharding comparison — {args.shards} shards, "
+        f"Coderack sharding comparison — {shards} shards "
+        f"(machine asks for {requested}, capacity supports {supported}), "
         f"{args.draws:,} draws, workers {worker_counts}\n"
+        f"  {machine.cpu.chip or machine.platform}: "
+        f"{machine.cpu.performance_cores} performance + "
+        f"{machine.cpu.efficiency_cores} efficiency cores\n"
     )
 
-    results: dict = {"shards": args.shards, "draws": args.draws, "candidates": {}}
+    results: dict = {
+        "shards": shards,
+        "draws": args.draws,
+        "machine": machine.as_dict(),
+        "candidates": {},
+    }
 
     print("1. Selection fidelity — total-variation distance from the unsharded rack")
     print("   (0.000 = identical distribution; by codelet type / by urgency bin)\n")
     header = "   candidate    " + "".join(f"{f'T={t:g}':>18}" for t in TEMPERATURES)
     print(header)
     for name in names:
-        fidelity = measure_fidelity(meta, name, args.shards, min(args.draws, 20000))
+        fidelity = measure_fidelity(meta, name, shards, min(args.draws, 20000))
         results["candidates"].setdefault(name, {})["fidelity"] = {
             str(k): v for k, v in fidelity.items()
         }
@@ -303,7 +339,7 @@ def main() -> None:
     for name in names:
         results["candidates"][name]["contention"] = []
         for workers in worker_counts:
-            row = measure_contention(meta, name, args.shards, workers, args.draws)
+            row = measure_contention(meta, name, shards, workers, args.draws)
             results["candidates"][name]["contention"].append(row)
             print(
                 f"   {name:<13}{row['workers']:>7}{row['draws_per_second']:>11,}"

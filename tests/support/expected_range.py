@@ -24,26 +24,47 @@ The set test is one-sided by nature: sampling 100 runs can show a state is
 *reachable*, but not that it is *unreachable*.  So the check treats the two
 directions differently, and the baseline records what is needed for each.
 
-* A state outside ``expected_range`` is **novel**, not a failure.  The baseline is
-  saturated but not exhaustive, and ``f1_over_n`` quantifies exactly how often an
-  always-reachable state should first appear here: at ``f1/N = 0.0001`` a 100-run
-  check surfaces one roughly 1% of the time, per problem.  Failing on that would
-  make the check cry wolf about once every ten cycles.  The plan's instruction is
-  to investigate — re-sample that problem deeply and, if the state proves
-  old-but-rare, add it to the baseline.
+* A **missing p50 state is a regression** and fails the check.  The p50 set is the
+  smallest group of most-frequent states whose combined frequency in the baseline
+  sample reaches 50% — ``p50_states`` reads it from ``absence_check.states``, and
+  computes it from the recorded ``counts`` distribution by the same rule where that
+  key is absent.  Those states are frequent enough that their absence is decisive
+  rather than suggestive: the rarest one across the 13 problems sits at 20%
+  frequency, whose absence from 100 runs has probability 1e-10.  Everything rarer is
+  ignored in this direction, because at n=100 its absence carries no information.
 
-* A state listed in ``absence_check`` that does *not* appear **is** a failure.
-  Those are the most-frequent states summing to at least 50% of the baseline
-  sample, and they are frequent enough that their absence is decisive rather than
-  suggestive: the rarest one across the 13 problems sits at 20% frequency, whose
-  absence from 100 runs has probability 1e-10.  Everything rarer is ignored in this
-  direction, because at n=100 its absence carries no information.
+* A state outside the baseline's accepted range is **novel**, and is reported for
+  the user to adjudicate.  They decide whether it belongs in the set or is a defect;
+  nothing here widens the fixture.  ``f1_over_n`` quantifies how often an
+  always-reachable state should first appear in a sample this size: at
+  ``f1/N = 0.0001`` a 100-run check surfaces one roughly 1% of the time, per
+  problem.  That number goes into the report as context for the decision, and the
+  report also names the numeric backend the sample ran on, because a difference
+  belongs to a configuration as much as to a problem.
+
+Every difference is reported the same way whatever produced it — CPU or GPU,
+float64 or float32, serial or free-running.  A backend's arithmetic explains *how*
+a run diverged; whether the state it reached belongs in the reachable set is a
+separate question and is the user's to answer.
+
+The numeric backend the workers run on
+--------------------------------------
+Each pool worker pins a backend before its first engine object exists, from a
+candidate list taken in order — ``DEFAULT_WORKER_BACKENDS`` is vectorised float64
+where NumPy is installed and the reference loops where it is not, so the routine
+check computes in the reference's precision under either interpreter the suite runs
+on.  ``worker_pool(backends=("mlx",))`` puts the sample on Metal instead, which is
+where the engine's default policy puts a Petacat run, and
+``resolved_worker_backend`` names the result so every ``CheckResult`` says which
+configuration produced it.
 """
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
+import time
 from collections import Counter
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -205,14 +226,131 @@ def default_workers() -> int:
     return max(1, (os.cpu_count() or 4) - 1)
 
 
-def _init_worker(seed_dir: str, run_one: RunOne) -> None:
+#: Set to ``1`` to let pool workers resolve the numeric backend from the ambient
+#: policy, which puts them on the GPU at every Slipnet size.
+ENV_ALLOW_GPU = "PETACAT_ORACLE_ALLOW_GPU"
+
+#: Comma-separated candidate backends for the pool's workers, most-preferred first.
+ENV_WORKER_BACKENDS = "PETACAT_NUMERIC_BACKEND_WORKERS"
+
+#: What the pool's workers run on by default: vectorised CPU where NumPy is
+#: installed, the reference loops where it is not.
+#:
+#: A *list* rather than a name, because the suite runs under two interpreters with
+#: different packages installed — ``.venv`` has NumPy and MLX, ``.venv-ft`` has
+#: neither — and the check wants the reference's float64 arithmetic under both.
+#: Taking the first candidate that is present keeps the rule the rest of the suite
+#: follows: a test that wants a specific backend skips when it is absent, and a test
+#: that wants *a* backend takes what is there.
+DEFAULT_WORKER_BACKENDS: tuple[str, ...] = ("numpy", "python")
+
+#: The module each backend needs before ``get_backend`` will hand it over.
+#: ``python`` is the reference implementation and needs nothing.
+_BACKEND_REQUIREMENT: dict[str, str | None] = {
+    "python": None,
+    "numpy": "numpy",
+    "mlx": "mlx.core",
+    "mlx-cpu": "mlx.core",
+}
+
+
+def first_available_backend(candidates: Sequence[str]) -> str:
+    """The first candidate whose dependency is importable.
+
+    ``importlib.util.find_spec`` rather than an import, because this runs in a pool
+    worker before the first engine object exists and the answer must not itself
+    load MLX: locating a module is a filesystem question, importing one initialises
+    whatever the module initialises.  Falls back to ``python``, which is
+    unconditional.
+    """
+    for name in candidates:
+        requirement = _BACKEND_REQUIREMENT.get(name, name)
+        if requirement is None or importlib.util.find_spec(requirement) is not None:
+            return name
+    return "python"
+
+
+def worker_backends(requested: Sequence[str] | None = None) -> tuple[str, ...] | None:
+    """Candidate backends for a pool worker, most-preferred first.
+
+    ``None`` — from ``PETACAT_ORACLE_ALLOW_GPU=1`` — means the worker resolves the
+    backend from the ambient policy like any other process, GPU included.
+    """
+    if requested is not None:
+        return tuple(requested)
+    if os.environ.get(ENV_ALLOW_GPU) == "1":
+        return None
+    raw = os.environ.get(ENV_WORKER_BACKENDS)
+    if raw:
+        return tuple(name.strip() for name in raw.split(",") if name.strip())
+    return DEFAULT_WORKER_BACKENDS
+
+
+#: What the GPU check pins its workers to.  A one-element candidate list, because
+#: the point of that check is Metal: falling back to a CPU backend would answer a
+#: different question under the same test name.
+GPU_BACKENDS: tuple[str, ...] = ("mlx",)
+
+_GPU_AVAILABLE: bool | None = None
+
+
+def _probe_gpu() -> bool:
+    """Run in a throwaway subprocess by ``gpu_is_available``."""
+    from server.engine.numeric.backend import available_backends
+
+    return GPU_BACKENDS[0] in available_backends()
+
+
+def gpu_is_available() -> bool:
+    """Whether the Metal backend can be built and used in a worker.
+
+    Answered in a throwaway subprocess, for two reasons.  MLX being importable is
+    not the same as Metal being usable, and the registry settles that by evaluating
+    one small kernel on the GPU stream — which initialises Metal in whatever process
+    asks.  Keeping that out of the process that goes on to start the sampling pool
+    means the parent stays a plain Python interpreter for the whole check.
+    """
+    global _GPU_AVAILABLE
+    if _GPU_AVAILABLE is None:
+        if importlib.util.find_spec("mlx.core") is None:
+            _GPU_AVAILABLE = False
+        else:
+            with Pool(1) as probe:
+                _GPU_AVAILABLE = bool(probe.apply(_probe_gpu))
+    return _GPU_AVAILABLE
+
+
+def resolved_worker_backend(backends: Sequence[str] | None = None) -> str:
+    """The backend name a pool worker will pin, for the record.
+
+    Answered in the parent, which is exact because ``spawn`` starts each worker from
+    ``sys.executable`` and therefore from the same installed packages.  A sample
+    carries this name so that a difference from the baseline names the configuration
+    that produced it.  ``ambient policy`` is what an unpinned worker follows:
+    ``select_backend`` chooses per Slipnet size, which is the GPU wherever MLX runs.
+    """
+    candidates = worker_backends(backends)
+    if candidates is None:
+        return "ambient policy"
+    return first_available_backend(candidates)
+
+
+def _init_worker(
+    seed_dir: str, run_one: RunOne, backends: tuple[str, ...] | None
+) -> None:
     """Load the metadata once per worker rather than once per run.
 
     ``MetadataProvider.from_seed_data`` costs a couple of milliseconds against a
     ~130 ms run, which is small but not free at 1,300 runs, and it would otherwise
     be paid on every task.
+
+    The backend is pinned here, before the first engine object exists, so that every
+    run in the worker resolves the same way.  ``backends=None`` leaves the ambient
+    policy alone.
     """
     global _META, _RUN_ONE
+    if backends:
+        os.environ["PETACAT_NUMERIC_BACKEND"] = first_available_backend(backends)
     _META = MetadataProvider.from_seed_data(seed_dir)
     _RUN_ONE = run_one
 
@@ -228,6 +366,7 @@ def worker_pool(
     workers: int | None = None,
     run_one: RunOne | None = None,
     seed_dir: str | None = None,
+    backends: Sequence[str] | None = None,
 ) -> Iterator[ProcessPool]:
     """A process pool with the metadata already loaded in every worker.
 
@@ -235,9 +374,16 @@ def worker_pool(
     one session: starting a pool spawns N interpreters, and paying that once for
     thirteen problems rather than thirteen times is most of the difference between
     the routine check being seconds and being a minute.
+
+    ``backends`` names the candidate numeric backends for the workers, most
+    preferred first; the default comes from ``worker_backends()``.
     """
     workers = default_workers() if workers is None else workers
-    initargs = (seed_dir or SEED_DIR, run_one or default_run_one)
+    initargs = (
+        seed_dir or SEED_DIR,
+        run_one or default_run_one,
+        worker_backends(backends),
+    )
     with Pool(workers, initializer=_init_worker, initargs=initargs) as pool:
         yield pool
 
@@ -256,6 +402,122 @@ def sample_seeds(n_runs: int, seed_offset: int = CHECK_SEED_OFFSET) -> range:
     return range(seed_offset, seed_offset + n_runs)
 
 
+#: Seconds a single problem's sample may take before it is declared stalled, as a
+#: multiple of the run count.  Measured: the slowest problem in the baseline,
+#: ``fig5.4-top``, takes 10 s per 100 runs on vectorised CPU across 11 workers and
+#: 72 s per 100 runs on Metal, because its runs mostly exhaust the 6,000-codelet cap.
+#: Six seconds per run is eight times the slowest of those, which leaves room for a
+#: loaded machine and still turns a stall into a failure the same afternoon.
+SECONDS_PER_RUN_CEILING = 6.0
+
+#: Floor under the derived budget, so a small sample still gets a usable allowance.
+MIN_SAMPLE_TIMEOUT = 600.0
+
+#: Seconds per problem sample, overriding the derived budget. ``0`` waits forever.
+ENV_SAMPLE_TIMEOUT = "PETACAT_RANGE_TIMEOUT"
+
+#: ``sample_problem(timeout=...)`` default: derive the budget from the run count.
+#: A distinct value rather than ``None``, because ``None`` means "wait forever" and
+#: both need to be askable for.
+DERIVE_TIMEOUT = -1.0
+
+
+#: How often the wait on the pool looks up to check that its workers are all still
+#: the ones it started with.  A second is far below any real sample's duration and
+#: far above the cost of reading a list of process handles.
+WORKER_POLL_SECONDS = 1.0
+
+
+class SampleStalled(RuntimeError):
+    """A problem's sample did not finish inside its budget.
+
+    Distinct from a comparison failure, because it says nothing about the reachable
+    set: it says the sampling itself stopped making progress.  Raising it is what
+    keeps a stalled check from being indistinguishable from a slow one.
+    """
+
+
+class SampleWorkerLost(SampleStalled):
+    """A pool worker holding a run disappeared, so its result can never arrive.
+
+    ``multiprocessing.Pool`` replaces a worker that exits and does not re-send the
+    task that worker was executing, so ``map`` waits on a result that no process is
+    going to produce.  The signature is precise and worth naming, because it is what
+    a hung oracle looks like from the outside: every worker at 0% CPU parked on the
+    task queue, ``_handle_tasks`` with nothing left to send, ``_handle_results``
+    parked in ``recv``, and the calling thread waiting on a result event — for as
+    long as the machine stays up.
+
+    Watching the worker identities turns that into an immediate, named failure.  A
+    changed set of process ids is unambiguous: a Pool creates its workers once and
+    replaces one only when it has lost one.
+    """
+
+
+def sample_timeout(n_runs: int) -> float | None:
+    """The budget for one problem's sample, in seconds. ``None`` waits forever.
+
+    Derived from the run count so that raising ``PETACAT_RANGE_RUNS`` raises the
+    allowance with it, and floored so that a short sample is not held to a budget
+    smaller than pool startup.
+    """
+    raw = os.environ.get(ENV_SAMPLE_TIMEOUT)
+    if raw:
+        seconds = float(raw)
+        return seconds if seconds > 0 else None
+    return max(MIN_SAMPLE_TIMEOUT, SECONDS_PER_RUN_CEILING * n_runs)
+
+
+def _worker_pids(pool: ProcessPool) -> list[int]:
+    """The pool's current worker process ids, in a stable order."""
+    return sorted(proc.pid for proc in getattr(pool, "_pool", []))
+
+
+def _map_within_budget(
+    pool: ProcessPool,
+    tasks: list[tuple[dict, int, int]],
+    chunksize: int,
+    timeout: float | None,
+    label: str,
+) -> Counter:
+    """``pool.map`` that answers, whatever happens to the pool.
+
+    Two ways a sample stops being a sample, and both end here rather than in silence:
+    a worker disappears with a run in hand, or the whole thing simply stops
+    progressing.  The worker check is the sharp one — it fires within a second of the
+    loss and names the process — and the deadline is the backstop for everything
+    else.
+    """
+    started_pids = _worker_pids(pool)
+    pending = pool.map_async(_worker_task, tasks, chunksize=chunksize)
+    deadline = None if timeout is None else time.monotonic() + timeout
+
+    while True:
+        pending.wait(WORKER_POLL_SECONDS)
+        if pending.ready():
+            return Counter(pending.get())
+
+        current_pids = _worker_pids(pool)
+        if current_pids != started_pids:
+            lost = sorted(set(started_pids) - set(current_pids))
+            raise SampleWorkerLost(
+                f"sampling {label} lost worker process(es) {lost}: the pool started "
+                f"with {started_pids} and now holds {current_pids}. The run those "
+                f"workers were executing is gone and its result will never arrive. "
+                f"Re-run the same problem with workers=1 to execute it in this "
+                f"process, where the failure that killed the worker is visible."
+            )
+
+        if deadline is not None and time.monotonic() >= deadline:
+            raise SampleStalled(
+                f"sampling {label} stalled: {len(tasks)} runs did not finish within "
+                f"{timeout:.0f}s, with every worker process still present "
+                f"({current_pids}). Sample the same problem with workers=1 to run it "
+                f"in this process, and raise or remove the budget with "
+                f"{ENV_SAMPLE_TIMEOUT}."
+            )
+
+
 def sample_problem(
     problem: dict,
     n_runs: int,
@@ -265,6 +527,7 @@ def sample_problem(
     run_one: RunOne | None = None,
     pool: ProcessPool | None = None,
     seed_dir: str | None = None,
+    timeout: float | None = DERIVE_TIMEOUT,
 ) -> Counter:
     """Run ``problem`` ``n_runs`` times in discovery mode; count stopping states.
 
@@ -276,6 +539,12 @@ def sample_problem(
     when that pool is created, so passing both is a contradiction and is rejected
     rather than silently resolved.  ``workers=1`` runs in-process, which is the right
     choice for a handful of runs and the only choice for a non-picklable ``run_one``.
+
+    ``timeout`` bounds the wait on the pool: the default derives a budget from
+    ``sample_timeout``, ``None`` waits indefinitely, and a number sets the seconds
+    directly.  The bounded wait is what makes a stalled sample announce itself, and
+    this check is the gate every cognition change is measured against, so it says so
+    within the minute rather than holding the suite open.
     """
     if pool is not None and run_one is not None:
         raise ValueError(
@@ -295,11 +564,13 @@ def sample_problem(
     # leave most of the pool idle.
     n_workers = workers or default_workers()
     chunksize = max(1, n_runs // (n_workers * 4))
+    budget = sample_timeout(n_runs) if timeout == DERIVE_TIMEOUT else timeout
+    label = f"{problem.get('name', problem_label(problem))}"
 
     if pool is not None:
-        return Counter(pool.map(_worker_task, tasks, chunksize=chunksize))
+        return _map_within_budget(pool, tasks, chunksize, budget, label)
     with worker_pool(n_workers, run_one, seed_dir) as own_pool:
-        return Counter(own_pool.map(_worker_task, tasks, chunksize=chunksize))
+        return _map_within_budget(own_pool, tasks, chunksize, budget, label)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -307,26 +578,83 @@ def sample_problem(
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+def p50_states(record: dict) -> list[str]:
+    """The **p50 set**: the smallest group of most-frequent states whose combined
+    frequency in the baseline sample reaches 50%.
+
+    These are the states a healthy run reaches routinely, and their absence from a
+    sample is a regression rather than sampling noise: the rarest p50 state across
+    the 13 problems sits at 20% frequency, whose absence from 100 runs has
+    probability 1e-10.
+
+    Read from ``absence_check.states`` where the baseline records it, and otherwise
+    computed from the recorded distribution in ``counts`` by the identical rule, so
+    a record written by any version of the build script yields the same set.  Ties
+    are broken by state name, which makes the derived set deterministic.
+    """
+    recorded = record.get("absence_check", {}).get("states")
+    if recorded is not None:
+        return list(recorded)
+    counts: dict[str, int] = record.get("counts", {})
+    total = sum(counts.values())
+    if not total:
+        return []
+    chosen: list[str] = []
+    cumulative = 0
+    for state, count in sorted(counts.items(), key=lambda item: (-item[1], item[0])):
+        chosen.append(state)
+        cumulative += count
+        if cumulative / total >= 0.5:
+            break
+    return chosen
+
+
+def admitted_range(record: dict) -> set[str]:
+    """Every state the baseline accepts: the saturated sample plus admitted states.
+
+    ``expected_range`` is the union of the two as of the last rebuild, and
+    ``admitted_states`` is where a state goes when the user adjudicates one that a
+    sample surfaced.  Reading both means an adjudication takes effect the moment it
+    is written into the fixture.
+    """
+    return set(record["expected_range"]) | set(record.get("admitted_states", {}))
+
+
 @dataclass(frozen=True)
 class CheckResult:
-    """One problem's sample, compared against its baseline record."""
+    """One problem's sample, compared against its baseline record.
+
+    Two outcomes, and they are different kinds of thing:
+
+    * ``missing`` — a p50 state the sample never reached.  A **regression**, and
+      ``ok`` is False.
+    * ``novel`` — a state outside the baseline's accepted range.  A question **for
+      the user to adjudicate**: admit it to the fixture, or treat it as a defect.
+      ``ok`` stays True, and ``adjudication`` carries what the decision needs.
+    """
 
     name: str
     label: str
     runs: int
     observed: Counter = field(repr=False)
-    #: Observed states absent from ``expected_range``, with their sample counts.
+    #: Observed states outside the baseline's accepted range, with their sample counts.
     novel: dict[str, int]
-    #: ``absence_check`` states that the sample failed to produce. Failures.
+    #: p50 states the sample failed to produce. Regressions.
     missing: list[str]
-    #: ``absence_check`` states the sample did produce, with their counts.
+    #: p50 states the sample did produce, with their counts.
     present: dict[str, int]
     #: The baseline's f1/N, i.e. the per-check probability of a spurious novel state.
     f1_over_n: float
+    #: The numeric backend the sample ran on, as reported by the caller.
+    backend: str = "unspecified"
+    #: How many states the baseline accepts for this problem.
+    baseline_states: int = 0
+    #: How many runs the baseline's own sample took.
+    baseline_runs: int = 0
 
     @property
     def ok(self) -> bool:
-        """Only absence fails a check. Novelty is a prompt to investigate."""
+        """False only for a missing p50 state. Novelty is for the user to decide."""
         return not self.missing
 
     @property
@@ -336,48 +664,89 @@ class CheckResult:
         Reported alongside a novel state so it can be read as noise or as signal."""
         return 1.0 - (1.0 - self.f1_over_n) ** self.runs
 
+    def regression(self) -> str:
+        """The missing p50 states, as the failure message names them."""
+        lines = [
+            f"REGRESSION — {self.name} ({self.label}) on the {self.backend} backend "
+            f"failed to reach {len(self.missing)} p50 state(s) in {self.runs} runs.",
+            "  A p50 state accounts for part of the top half of the baseline's "
+            f"distribution over {self.baseline_runs} runs; a healthy engine reaches "
+            "it routinely.",
+        ]
+        lines.extend(f"    NOT REACHED  {state}" for state in self.missing)
+        if self.present:
+            lines.append("  p50 states that were reached:")
+            lines.extend(
+                f"    {state}  x{count}" for state, count in sorted(self.present.items())
+            )
+        return "\n".join(lines)
+
+    def adjudication(self) -> str:
+        """The novel states, with everything the user's decision needs.
+
+        Which problem, which state, which backend, how many samples, and how likely
+        the baseline's own saturation says such a state is by chance.
+        """
+        lines = [
+            f"ADJUDICATE — {self.name} ({self.label}) on the {self.backend} backend "
+            f"reached {len(self.novel)} state(s) that "
+            f"tests/fixtures/expected_range.json does not list.",
+            f"  Sample: {self.runs} runs, {len(self.observed)} distinct states. "
+            f"Baseline: {self.baseline_runs} runs, {self.baseline_states} states.",
+            f"  A state the baseline had never seen appears by chance in "
+            f"~{self.novel_alarm_rate:.1%} of samples of this problem at this size.",
+        ]
+        lines.extend(
+            f"    NOVEL  {state}  x{count} of {self.runs}"
+            for state, count in sorted(self.novel.items())
+        )
+        lines.append(
+            "  Decide: admit it under this problem's admitted_states in the fixture, "
+            "or treat it as a defect. Re-sample deeply first with "
+            f"scripts/build_expected_range.py --problem {self.name} --force."
+        )
+        return "\n".join(lines)
+
     def describe(self) -> str:
         lines = [
-            f"{self.name}  ({self.label})  {self.runs} runs, "
+            f"{self.name}  ({self.label})  backend={self.backend}  {self.runs} runs, "
             f"{len(self.observed)} distinct stopping states"
         ]
         if self.missing:
-            lines.append(
-                "  MISSING — states the baseline says should be common, but which "
-                "did not occur:"
-            )
-            lines.extend(f"    {state}" for state in self.missing)
-        if self.present:
-            lines.append("  absence-check states present:")
+            lines.append(self.regression())
+        elif self.present:
+            lines.append("  p50 states present:")
             lines.extend(
                 f"    {state}  x{count}" for state, count in sorted(self.present.items())
             )
         if self.novel:
-            lines.append(
-                f"  NOVEL — outside the baseline's expected range (expected in "
-                f"~{self.novel_alarm_rate:.1%} of checks by chance alone):"
-            )
-            lines.extend(
-                f"    {state}  x{count}" for state, count in sorted(self.novel.items())
-            )
+            lines.append(self.adjudication())
         return "\n".join(lines)
 
 
-def check_problem(record: dict, observed: Counter) -> CheckResult:
+def check_problem(
+    record: dict, observed: Counter, backend: str = "unspecified"
+) -> CheckResult:
     """Compare a sample against one baseline record.
 
     Set membership only: the baseline's own frequencies are never compared against
     the sample's, because reordering codelets moves frequencies around freely without
     changing which states are reachable, and a frequency test would fire on every
-    such change while telling us nothing about correctness.
+    such change while telling us nothing about correctness.  The one place frequency
+    enters is the choice of p50 set, and that is the *baseline's* distribution
+    deciding which states are common enough for their absence to mean something.
+
+    ``backend`` is carried through so a difference names the configuration that
+    produced it.  Every difference, on every backend, is reported; a state is added
+    to the fixture only by the user's decision.
     """
-    expected = set(record["expected_range"])
-    absence_states = record.get("absence_check", {}).get("states", [])
+    expected = admitted_range(record)
+    common = p50_states(record)
     runs = sum(observed.values())
 
     novel = {state: count for state, count in observed.items() if state not in expected}
-    missing = [state for state in absence_states if state not in observed]
-    present = {state: observed[state] for state in absence_states if state in observed}
+    missing = [state for state in common if state not in observed]
+    present = {state: observed[state] for state in common if state in observed}
 
     return CheckResult(
         name=record["name"],
@@ -388,6 +757,9 @@ def check_problem(record: dict, observed: Counter) -> CheckResult:
         missing=missing,
         present=present,
         f1_over_n=record.get("f1_over_n", 0.0),
+        backend=backend,
+        baseline_states=len(expected),
+        baseline_runs=record.get("runs", 0),
     )
 
 
@@ -398,6 +770,7 @@ def check_all(
     run_one: RunOne | None = None,
     names: Sequence[str] | None = None,
     progress: Callable[[CheckResult], None] | None = None,
+    backends: Sequence[str] | None = None,
 ) -> list[CheckResult]:
     """Check every problem in the baseline over a single shared pool.
 
@@ -407,10 +780,11 @@ def check_all(
     """
     records = [baseline.by_name(n) for n in names] if names else list(baseline)
     results: list[CheckResult] = []
-    with worker_pool(workers, run_one) as pool:
+    backend = resolved_worker_backend(backends)
+    with worker_pool(workers, run_one, backends=backends) as pool:
         for record in records:
             observed = sample_problem(record, n_runs, pool=pool)
-            result = check_problem(record, observed)
+            result = check_problem(record, observed, backend=backend)
             results.append(result)
             if progress is not None:
                 progress(result)

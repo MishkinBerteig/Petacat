@@ -370,6 +370,14 @@ def capture_run_state(ctx: Any) -> dict:
             "spreading_activation_threshold": ctx.spreading_activation_threshold,
             "staleness_delay": ctx.staleness_delay,
         },
+        # The run parameters this Run actually resolved.  A capture that omitted them
+        # could only be re-executed against whatever the *global* configuration happened
+        # to be at review time, so an inspector showed a Themespace the recorded Run
+        # never had — a dominance margin edited since the Run would silently rewrite its
+        # history.  The **resolved** set rather than the overrides, for the reason
+        # migration 010 gives: overrides alone would be read against today's defaults,
+        # so the record would change meaning whenever the configuration did.
+        "parameters": dict(getattr(ctx.meta, "params", None) or {}),
         "ids": ctx.ids.snapshot(),
         "rng": _capture_rng(ctx.rng),
         "temperature": {
@@ -395,8 +403,7 @@ def capture_run_state(ctx: Any) -> dict:
                     "dimension": c.dimension,
                     "frozen": c.frozen,
                     "themes": [
-                        [t.relation, t.activation, t.positive_activation,
-                         t.negative_activation, t.frozen, t._net_input_buffer]
+                        [t.relation, t.activation, t.frozen, t._net_input_buffer]
                         for t in c.themes
                     ],
                 }
@@ -535,13 +542,11 @@ def restore_run_state(runner: Any, state: dict) -> None:
             continue
         cluster.frozen = c_state["frozen"]
         themes = {t.relation: t for t in cluster.themes}
-        for relation, act, pos, neg, frozen, buffered in c_state["themes"]:
+        for relation, act, frozen, buffered in c_state["themes"]:
             theme = themes.get(relation)
             if theme is None:
                 continue
             theme.activation = act
-            theme.positive_activation = pos
-            theme.negative_activation = neg
             theme.frozen = frozen
             theme._net_input_buffer = buffered
 

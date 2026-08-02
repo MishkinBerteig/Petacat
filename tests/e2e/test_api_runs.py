@@ -453,7 +453,23 @@ async def test_a_normal_run_reads_the_shared_memory(app_client):
 
 
 @pytest.mark.asyncio
-async def test_a_fast_run_reads_its_own_ephemeral_memory(app_client):
+async def test_a_fast_run_reads_the_shared_session_memory(app_client):
+    """A Fast Run is in the Training Session like any other.
+
+    Mode chooses where a run is *recorded*, not what it is, so a Fast Run thinks
+    against the shared Episodic Memory: it can be reminded of earlier answers, and
+    ``answer_present`` will stop it rediscovering one.  It is served from the live
+    object rather than the rows only because it has no rows.
+    """
+    seeded = await app_client.post("/api/runs", json={
+        "initial": "abc", "modified": "abd", "target": "ijk", "seed": SEED,
+    })
+    await app_client.post(
+        f"/api/runs/{seeded.json()['run_id']}/run", json={"max_steps": 3000}
+    )
+    shared = (await app_client.get("/api/memory")).json()["answers"]
+    assert shared, "nothing in the session, test proves nothing"
+
     created = await app_client.post("/api/runs", json={
         "initial": "abc", "modified": "abd", "target": "xyz", "seed": SEED,
         "mode": "fast",
@@ -461,19 +477,21 @@ async def test_a_fast_run_reads_its_own_ephemeral_memory(app_client):
     run_id = created.json()["run_id"]
 
     body = (await app_client.get(f"/api/runs/{run_id}/memory")).json()
-    assert body["scope"] == "run"
+    assert body["scope"] == "live"
     assert body["mode"] == "fast"
-    # Ephemeral means it starts empty, whatever the shared memory holds.
-    assert body["answers"] == []
-    assert body["snags"] == []
+    assert [a["answer_id"] for a in body["answers"]] == [
+        a["answer_id"] for a in shared
+    ]
 
 
 @pytest.mark.asyncio
-async def test_a_fast_run_s_answer_stays_in_its_own_memory(app_client):
-    """The assertion that matters: the two memories do not leak into each other.
+async def test_a_fast_run_contributes_its_answer_to_the_session(app_client):
+    """A Fast Run leaves nothing in the *database* and everything in the *session*.
 
-    A Fast Run that found an answer must show it in *its* memory and must not have
-    added it to the shared one, or the mode has not kept its promise.
+    Those are different promises and only the first belongs to the mode.  A Fast Run
+    whose answer vanished from Episodic Memory would be a different program from a
+    Normal one rather than the same program recorded differently, and a Fast training
+    population would then teach the session nothing.
     """
     shared_before = len((await app_client.get("/api/memory")).json()["answers"])
 
@@ -487,9 +505,8 @@ async def test_a_fast_run_s_answer_stays_in_its_own_memory(app_client):
     )
     assert finished.json()["answer"] is not None
 
-    own = (await app_client.get(f"/api/runs/{run_id}/memory")).json()
-    assert own["scope"] == "run"
-    assert len(own["answers"]) == 1
+    shared_after = (await app_client.get("/api/memory")).json()["answers"]
+    assert len(shared_after) == shared_before + 1
 
-    shared_after = (await app_client.get("/api/memory")).json()
-    assert len(shared_after["answers"]) == shared_before
+    # ...and nothing written down: a Fast Run has no ``runs`` row at all, which is
+    # what ``test_a_fast_run_writes_nothing`` in test_persistence_modes.py asserts.

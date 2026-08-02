@@ -152,18 +152,17 @@ class NumpyBackend(Backend):
     ) -> None:
         """Slots sequentially, clusters in parallel.
 
-        The reference's Gauss-Seidel update within a cluster is a genuine
-        sequential dependency and is preserved by walking slots in the outer loop;
-        clusters are independent and become the vector dimension.  With nine
-        dimensions and three bridge types that is 27 lanes today — small, but it
-        grows with the theme vocabulary rather than with the string length, which
-        is the axis this is sized for.
+        ``themes.ss:520-527`` is Jacobi — three passes over a cluster, so every net
+        input is computed from the activations as they stood at the start of the step.
+        The slot loop therefore reads a snapshot taken before any write, and the writes
+        are deferred to a second loop.  Clusters are independent and become the vector
+        dimension: with nine dimensions and three bridge types that is 27 lanes today —
+        small, but it grows with the theme vocabulary rather than with the string
+        length, which is the axis this is sized for.
         """
         c, s = layout.n_clusters, layout.n_slots
         if c == 0 or s == 0:
             return
-        pos = np.asarray(state.positive, dtype=np.float64).reshape(c, s)
-        neg = np.asarray(state.negative, dtype=np.float64).reshape(c, s)
         act = np.asarray(state.activation, dtype=np.float64).reshape(c, s)
         valid = np.asarray(layout.valid, dtype=bool).reshape(c, s)
         frozen = np.asarray(state.frozen, dtype=bool).reshape(c, s)
@@ -180,11 +179,18 @@ class NumpyBackend(Backend):
         w_pn = params.pos_to_neg / 100.0
         w_pp = params.pos_to_pos / 100.0
 
+        # Passes one and two: every read below is of ``snapshot``, never of ``act``,
+        # which the third pass is about to overwrite.
+        snapshot = act.copy()
+        effects = np.zeros((c, s), dtype=np.float64)
+        live_slots = np.zeros((c, s), dtype=bool)
+
         for t in range(s):
             live = cluster_live & valid[:, t] & ~frozen[:, t]
+            live_slots[:, t] = live
             if not live.any():
                 continue
-            target = act[:, t]
+            target = snapshot[:, t]
             target_neg = target < 0.0
 
             net = np.full(c, -params.decay, dtype=np.float64)
@@ -193,7 +199,7 @@ class NumpyBackend(Backend):
             for source in range(s):
                 if source == t:
                     continue
-                a = act[:, source]
+                a = snapshot[:, source]
                 src_neg = a < 0.0
                 weight = np.where(
                     src_neg,
@@ -205,16 +211,24 @@ class NumpyBackend(Backend):
                 )
                 net += contribution
 
-            effect = np.rint(params.spread_amount * np.tanh(alpha * net))
+            effects[:, t] = np.rint(params.spread_amount * np.tanh(alpha * net))
 
-            new_pos = np.clip(pos[:, t] + effect, 0.0, 100.0)
-            new_neg = np.clip(neg[:, t] - effect, -100.0, 0.0)
-            pos[:, t] = np.where(live & ~target_neg, new_pos, pos[:, t])
-            neg[:, t] = np.where(live & target_neg, new_neg, neg[:, t])
-            act[:, t] = np.where(live, pos[:, t] + neg[:, t], act[:, t])
+        # Pass three: apply.
+        for t in range(s):
+            live = live_slots[:, t]
+            if not live.any():
+                continue
+            effect = effects[:, t]
+            # ``activation-function`` (``themes.ss:456-459``) branches on the theme's
+            # own sign and clips to its own half of the range.
+            target_neg = snapshot[:, t] < 0.0
+            updated = np.where(
+                target_neg,
+                np.clip(act[:, t] - effect, -100.0, 0.0),
+                np.clip(act[:, t] + effect, 0.0, 100.0),
+            )
+            act[:, t] = np.where(live, updated, act[:, t])
 
-        state.positive = pos.reshape(-1).tolist()
-        state.negative = neg.reshape(-1).tolist()
         state.activation = act.reshape(-1).tolist()
 
     # -- Workspace object values -------------------------------------------

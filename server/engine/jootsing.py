@@ -104,6 +104,7 @@ def check_progress(
     rng: RNG | None = None,
     themespace: Themespace | None = None,
     slipnet: Slipnet | None = None,
+    coderack: Any = None,
 ) -> ProgressWatcherResult:
     """Progress-watcher logic.
 
@@ -131,8 +132,14 @@ def check_progress(
 
         # Enough time has elapsed -- undo the clamp
         last_clamp = trace.get_last_event(CLAMP_START)
+        # ``coderack`` is threaded through so that ``deactivate`` lifts the clamped
+        # codelet pattern here too (``trace.ss:656-664``).  The progress-watcher DSL
+        # body's own ``coderack.unclamp_all()`` sits behind ``if
+        # trace.within_clamp_period``, which this call has already set False, so without
+        # this a rule-codelet clamp pinned rule-scout/evaluator/builder urgencies for
+        # the rest of the run.
         progress = trace.undo_last_clamp(
-            themespace, slipnet, codelet_count
+            themespace, slipnet, codelet_count, coderack
         ) if themespace is not None and slipnet is not None else 0.0
 
         # Stochastically post answer-finder/justifier based on progress
@@ -392,10 +399,10 @@ def attempt_jootsing(
         "entries": negative_entries,
     }
 
-    # Also build a bottom-up codelet pattern for the clamp
-    bottom_up_pattern: dict[str, Any] = {
-        "type": "bottom_up_codelet_pattern"
-    }
+    # Also build a bottom-up codelet pattern for the clamp (``%bottom-up-codelet-
+    # pattern%``, ``jootsing.ss:117``).  The real urgency list, not a placeholder
+    # naming it, so that the event can actually apply and lift it.
+    bottom_up_pattern = meta.codelet_patterns.get("bottom-up-codelet-pattern", [])
 
     # Create and activate the snag-response clamp
     temperature = 50.0
@@ -406,9 +413,15 @@ def attempt_jootsing(
         codelet_count=codelet_count,
         temperature=temperature,
         clamp_type="snag_response_clamp",
-        clamped_theme_patterns=[negative_theme_pattern, bottom_up_pattern],
+        # ``jootsing.ss:113-118`` passes both patterns to one clamp event and
+        # ``make-clamp-event`` (``trace.ss:523-532``) sorts them BY TYPE.  The codelet
+        # pattern belongs in the codelet slot: left among the theme patterns it was
+        # handed to ``clamp_theme_pattern``, which found no cluster named
+        # "bottom_up_codelet_pattern" and silently did nothing, so the event's record of
+        # what it clamped disagreed with what was actually clamped.
+        clamped_theme_patterns=[negative_theme_pattern],
         clamped_concept_patterns=[],
-        clamped_codelet_patterns=[],
+        clamped_codelet_patterns=[bottom_up_pattern],
         rules=[],
         progress_focus="workspace",
     )
@@ -718,21 +731,66 @@ def _partition_events(
 def _events_equivalent(e1: TraceEvent, e2: TraceEvent) -> bool:
     """Check if two events are equivalent for jootsing purposes.
 
-    Scheme: (tell ev1 'equal? ev2)
-    For ClampEvents: same clamp type.
-    For SnagEvents: same snag type.
-    Otherwise: same event type.
+    Scheme: ``(tell ev1 'equal? ev2)``.
+
+    Snag events (``trace.ss:1150-1154``) are the same snag when the **translated rule**
+    matches structurally *and* the **snag objects** are the same set::
+
+        (and (tell event 'type? 'snag)
+             (tell translated-rule 'equal? (tell event 'get-rule 'bottom))
+             (sets-equal-pred? equivalent-workspace-objects?
+                               snag-objects (tell event 'get-snag-objects)))
+
+    This used to compare ``snag_type``, which is never assigned and so is always
+    ``"change"`` — every snag was equivalent to every other.  §4.5.2 asks jootsers to
+    find "snag events that share the same set of snag structures", so an equivalence
+    that lumps all snags together makes the program joots on a repetition it has not
+    established: three *unrelated* snags reached the threshold of three.
+
+    Clamp events also compare their progress focus and rule pair (``trace.ss:586-590``);
+    §4.5.2 (line 5147) is explicit that justify clamps must agree on the rules.
     """
+    from server.engine.rules import rule_signature
+
     if e1.event_type != e2.event_type:
         return False
 
     if isinstance(e1, ClampEvent) and isinstance(e2, ClampEvent):
-        return e1.clamp_type == e2.clamp_type
+        if e1.clamp_type != e2.clamp_type:
+            return False
+        if e1.progress_focus != e2.progress_focus:
+            return False
+        return [rule_signature(r) for r in (e1.rules or [])] == [
+            rule_signature(r) for r in (e2.rules or [])
+        ]
 
     if isinstance(e1, SnagEvent) and isinstance(e2, SnagEvent):
-        return e1.snag_type == e2.snag_type
+        if rule_signature(e1.translated_rule) != rule_signature(e2.translated_rule):
+            return False
+        return _same_object_set(e1.snag_objects, e2.snag_objects)
 
     return True
+
+
+def _same_object_set(objects1: list[Any], objects2: list[Any]) -> bool:
+    """Do two lists denote the same Workspace objects?
+
+    Scheme: ``sets-equal-pred?`` with ``equivalent-workspace-objects?``.  Compared by
+    the string they sit in and the span they cover rather than by identity, because two
+    snags separated by a rebuild refer to equivalent objects, not the same ones.
+    """
+
+    def key(obj: Any) -> tuple:
+        string = getattr(obj, "string", None)
+        return (
+            getattr(string, "text", None),
+            getattr(obj, "left_index", getattr(obj, "position", None)),
+            getattr(obj, "right_index", getattr(obj, "position", None)),
+        )
+
+    return sorted(key(o) for o in (objects1 or [])) == sorted(
+        key(o) for o in (objects2 or [])
+    )
 
 
 def _collect_all_theme_entries(

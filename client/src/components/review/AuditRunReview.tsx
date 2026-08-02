@@ -21,17 +21,23 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import {
+  ApiError,
   advanceInspector,
   closeInspector,
+  describeApiError,
   getAuditSummary,
   listAuditActions,
   openInspector,
 } from '@/api/client';
 import type { AuditAction, AuditActionSummary, InspectorState, RecordedRun } from '@/types';
+import { Pager } from '@/components/Pager';
 import { RecordedStatePanels } from './RecordedStateViews';
 
 /** Jump sizes offered beside single-stepping. All forward. */
 const STEPS = [1, 5, 15, 100];
+
+/** How many recorded actions one window of the log holds. */
+const LOG_PAGE_SIZE = 60;
 
 const ACTION_COLORS: Record<string, string> = {
   codelet: 'var(--text-secondary)',
@@ -48,11 +54,18 @@ export function AuditRunReview({ run }: { run: RecordedRun }) {
   // The log is fetched in its own effect, so it lands a tick after the state does.
   // It carries the tick it was fetched for rather than being labelled from the
   // current position, which would caption a stale page with a tick it is not from.
-  const [log, setLog] = useState<{ from: number; actions: AuditAction[] }>({
+  const [log, setLog] = useState<{ from: number; actions: AuditAction[]; total: number }>({
     from: 0,
     actions: [],
+    total: 0,
   });
+  // Where in the log the window starts. The server reports how many actions the
+  // log holds from `from` onwards, and this is what reaches the ones past the
+  // first window.
+  const [logOffset, setLogOffset] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  /** Why the recorded log below is empty. */
+  const [logError, setLogError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   // Open on mount, and release on unmount: an open inspection holds a whole engine
@@ -68,6 +81,7 @@ export function AuditRunReview({ run }: { run: RecordedRun }) {
     setState(null);
     setError(null);
     setBusy(true);
+    setLogOffset(0);
 
     Promise.all([openInspector(run.run_id), getAuditSummary(run.run_id)])
       .then(([opened, s]) => {
@@ -75,11 +89,17 @@ export function AuditRunReview({ run }: { run: RecordedRun }) {
         setState(opened);
         setSummary(s);
       })
-      .catch((e) => !cancelled && setError(String(e)))
+      .catch(
+        (e) =>
+          !cancelled &&
+          setError(describeApiError(e, `open the inspector for run #${run.run_id}`)),
+      )
       .finally(() => !cancelled && setBusy(false));
 
     return () => {
       cancelled = true;
+      // The release is sent as this component goes away, and let go of: the
+      // surface that carries a reason is going with it.
       void closeInspector(run.run_id).catch(() => {});
     };
   }, [run.run_id]);
@@ -89,20 +109,43 @@ export function AuditRunReview({ run }: { run: RecordedRun }) {
   useEffect(() => {
     if (!state) return;
     const from = Math.max(0, state.codelet_count - 2);
-    listAuditActions(run.run_id, { from_codelet: from, limit: 60 })
-      .then((page) => setLog({ from, actions: page.actions }))
-      .catch(() => setLog({ from, actions: [] }));
-  }, [run.run_id, state?.codelet_count]);
+    listAuditActions(run.run_id, {
+      from_codelet: from,
+      limit: LOG_PAGE_SIZE,
+      offset: logOffset,
+    })
+      .then((page) => {
+        setLog({ from, actions: page.actions, total: page.total });
+        setLogError(null);
+      })
+      .catch((e) => {
+        // A window with no actions in it is a claim about the record, so a window
+        // that could not be fetched says which of the two this is.
+        setLog({ from, actions: [], total: 0 });
+        setLogError(describeApiError(e, 'load the recorded action log'));
+      });
+  }, [run.run_id, state?.codelet_count, logOffset]);
 
+  // Stepping moves the tick the log window is anchored on, so the window starts
+  // again at the beginning of the new anchor.
   const step = useCallback(
     async (by: number) => {
       if (!state || busy) return;
       setBusy(true);
       setError(null);
       try {
-        setState(await advanceInspector(run.run_id, state.codelet_count + by));
+        const next = await advanceInspector(run.run_id, state.codelet_count + by);
+        setLogOffset(0);
+        setState(next);
       } catch (e) {
-        setError(String(e));
+        // A 409 is the one refusal with a meaning of its own: the destination is
+        // behind the position the reconstruction has reached, and Phase 0 walks the
+        // record forward.
+        setError(
+          e instanceof ApiError && e.status === 409
+            ? 'The inspector steps forward only.'
+            : describeApiError(e, 'step the inspection forward'),
+        );
       } finally {
         setBusy(false);
       }
@@ -114,9 +157,11 @@ export function AuditRunReview({ run }: { run: RecordedRun }) {
     setBusy(true);
     setError(null);
     try {
-      setState(await openInspector(run.run_id));
+      const opened = await openInspector(run.run_id);
+      setLogOffset(0);
+      setState(opened);
     } catch (e) {
-      setError(String(e));
+      setError(describeApiError(e, 'start the inspection again'));
     } finally {
       setBusy(false);
     }
@@ -134,7 +179,7 @@ export function AuditRunReview({ run }: { run: RecordedRun }) {
     return (
       <div style={{ padding: 12, fontSize: 12 }}>
         {error ? (
-          <span style={{ color: 'var(--error)' }}>{error}</span>
+          <span role="alert" style={{ color: 'var(--error)' }}>{error}</span>
         ) : (
           <span className="text-muted">Restoring the Run-start capture…</span>
         )}
@@ -219,8 +264,8 @@ export function AuditRunReview({ run }: { run: RecordedRun }) {
           </div>
         )}
         {error && (
-          <div style={{ fontSize: 11, color: 'var(--error)' }}>
-            {error.includes('409') ? 'The inspector steps forward only.' : error}
+          <div role="alert" style={{ fontSize: 11, color: 'var(--error)' }}>
+            {error}
           </div>
         )}
       </div>
@@ -287,6 +332,11 @@ export function AuditRunReview({ run }: { run: RecordedRun }) {
           Recorded action log from tick {log.from}
           {summary && <> · {summary.total} actions in this Run</>}
         </div>
+        {logError !== null && (
+          <div role="alert" className="text-xs" style={{ marginBottom: 3, color: 'var(--error)' }}>
+            {logError}
+          </div>
+        )}
         <div
           style={{
             maxHeight: 180,
@@ -325,6 +375,16 @@ export function AuditRunReview({ run }: { run: RecordedRun }) {
             </div>
           ))}
         </div>
+        {/* The log runs to thousands of actions in an Audit Run, so the window has
+            to move: this is what reaches the actions past the first sixty. */}
+        <Pager
+          offset={logOffset}
+          limit={LOG_PAGE_SIZE}
+          total={log.total}
+          count={log.actions.length}
+          onChange={setLogOffset}
+          label={`actions from tick ${log.from}`}
+        />
       </div>
     </div>
   );

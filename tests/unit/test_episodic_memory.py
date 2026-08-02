@@ -2,12 +2,14 @@
 
 EpisodicMemory is part of MetaCat's self-watching machinery: it decides when
 a new answer is similar enough to a past one to trigger a reminding, and how
-two answers compare. These tests drive one path each through the reminding /
-theme-distance / comparison logic. The module is pure (no RNG, no I/O), so
+two answers compare. These tests drive one path each through the identifier,
+theme-distance and ``answer_present`` logic, over answers built in the test, so
 determinism is automatic.
 
-Basic store/remind/compare/clear happy paths live in test_answer_description.py;
-this file targets the branch structure and the previously-untested snag path.
+Reminding and comparison resolve the seeded commentary templates, and are
+covered in ``tests/seed_unit/test_episodic_memory.py`` alongside the
+store/remind/compare/clear happy paths in
+``tests/seed_unit/test_answer_description.py``.
 """
 
 from server.engine.memory import (
@@ -113,74 +115,92 @@ def test_theme_distance_counts_dimension_present_on_only_one_side():
     assert mem._theme_distance({"direction": "opposite"}, {}) == 1.0
 
 
-# --- find_remindings -------------------------------------------------------
+# --- answer_present: the one place memory reaches back into cognition -------
 
-def test_find_remindings_excludes_the_query_answer_itself():
+
+def _stored(problem, top_sig, bottom_sig=None):
+    return AnswerDescription(
+        problem=problem,
+        top_rule_description="",
+        bottom_rule_description="",
+        top_rule_quality=0.0,
+        bottom_rule_quality=0.0,
+        quality=0.0,
+        temperature=0.0,
+        themes={},
+        unjustified_slippages=[],
+        top_rule_signature=top_sig,
+        bottom_rule_signature=bottom_sig,
+    )
+
+
+class _FakeRule:
+    """Stands in for a Rule with a known signature.
+
+    ``answer_present`` calls ``rule_signature``, which reads ``clauses``; an empty
+    clause list gives the empty signature, so the fakes carry explicit ones through a
+    module-level patch instead.
+    """
+
+    def __init__(self, signature):
+        self.signature = signature
+        self.clauses = []
+
+
+def _patched_signature(monkeypatch):
+    import server.engine.rules as rules_module
+
+    monkeypatch.setattr(
+        rules_module,
+        "rule_signature",
+        lambda rule: getattr(rule, "signature", None) if rule is not None else None,
+    )
+
+
+def test_answer_present_is_true_for_the_same_answer_by_the_same_rules(monkeypatch):
+    """``answers.ss:982`` fizzles on a hit so the search moves to a *different* answer."""
+    _patched_signature(monkeypatch)
     mem = EpisodicMemory()
-    desc = _answer({"direction": "opposite"})
-    mem.store_answer(desc)
-    # Querying with the very answer that is stored must not remind of itself.
-    assert mem.find_remindings(desc, distance_threshold=5.0) == []
+    mem.store_answer(_stored(("abc", "abd", "xyz", "xyd"), [["intrinsic"]], None))
+
+    assert mem.answer_present(
+        ("abc", "abd", "xyz", "xyd"), _FakeRule([["intrinsic"]]), None
+    )
 
 
-def test_find_remindings_returns_past_answer_within_threshold():
+def test_answer_present_is_false_for_the_same_answer_by_a_different_rule(monkeypatch):
+    """``memory.ss:190-196`` compares the rules too.
+
+    The same answer string reached a different way is a different idea, and MetaCat
+    stores it as a separate episode rather than suppressing it.
+    """
+    _patched_signature(monkeypatch)
     mem = EpisodicMemory()
-    past = _answer({"direction": "opposite", "position": "rightmost"})
-    mem.store_answer(past)
-    query = _answer({"direction": "opposite", "position": "leftmost"})  # distance 1
-    remindings = mem.find_remindings(query, distance_threshold=2.0)
-    assert remindings == [past]
+    mem.store_answer(_stored(("abc", "abd", "xyz", "xyd"), [["intrinsic"]], None))
+
+    assert not mem.answer_present(
+        ("abc", "abd", "xyz", "xyd"), _FakeRule([["verbatim"]]), None
+    )
 
 
-def test_find_remindings_excludes_past_answer_beyond_threshold():
+def test_answer_present_is_false_for_a_different_problem(monkeypatch):
+    _patched_signature(monkeypatch)
     mem = EpisodicMemory()
-    past = _answer({"direction": "same", "position": "leftmost"})
-    mem.store_answer(past)
-    query = _answer({"direction": "opposite", "position": "rightmost"})  # distance 2
-    assert mem.find_remindings(query, distance_threshold=1.0) == []
+    mem.store_answer(_stored(("abc", "abd", "xyz", "xyd"), [["intrinsic"]], None))
+
+    assert not mem.answer_present(
+        ("abc", "abd", "ijk", "ijl"), _FakeRule([["intrinsic"]]), None
+    )
 
 
-def test_find_remindings_includes_past_answer_at_exact_threshold():
+def test_clearing_memory_resets_the_identifier_counter():
+    """Otherwise ids drift out of step with the rows they were written from, and
+    ``/api/memory/compare`` resolves an id to the wrong answer."""
     mem = EpisodicMemory()
-    past = _answer({"direction": "opposite"})
-    mem.store_answer(past)
-    query = _answer({"direction": "same"})  # distance exactly 1
-    assert mem.find_remindings(query, distance_threshold=1.0) == [past]
+    mem.store_answer(_stored(("abc", "abd", "xyz", "xyd"), None))
+    mem.store_answer(_stored(("abc", "abd", "xyz", "wyz"), None))
+    assert [a.answer_id for a in mem.answers] == [1, 2]
 
-
-# --- compare_answers -------------------------------------------------------
-
-def test_compare_answers_reports_shared_theme_with_equal_value():
-    mem = EpisodicMemory()
-    a = _answer({"position": "rightmost"})
-    b = _answer({"position": "rightmost"})
-    result = mem.compare_answers(a, b)
-    assert result["common_themes"] == {"position": "rightmost"}
-
-
-def test_compare_answers_splits_dimension_with_differing_values():
-    mem = EpisodicMemory()
-    a = _answer({"direction": "opposite"})
-    b = _answer({"direction": "same"})
-    result = mem.compare_answers(a, b)
-    # Same category, different relation -> a *differing* theme, not two uniques.
-    assert result["differing_themes"]["direction"] == ("opposite", "same")
-
-
-def test_compare_answers_reports_dimension_present_only_in_a():
-    mem = EpisodicMemory()
-    a = _answer({"position": "rightmost", "direction": "opposite"})
-    b = _answer({"position": "rightmost"})
-    result = mem.compare_answers(a, b)
-    assert result["a_unique_themes"] == {"direction": "opposite"}
-
-
-def test_compare_answers_includes_quality_and_rule_fields():
-    mem = EpisodicMemory()
-    a = _answer({"position": "rightmost"}, quality=80.0, top_rule="rule-a")
-    b = _answer({"position": "rightmost"}, quality=55.0, top_rule="rule-b")
-    result = mem.compare_answers(a, b)
-    assert result["a_quality"] == 80.0
-    assert result["b_quality"] == 55.0
-    assert result["a_rule"] == "rule-a"
-    assert result["b_rule"] == "rule-b"
+    mem.clear()
+    mem.store_answer(_stored(("abc", "abd", "xyz", "xyd"), None))
+    assert [a.answer_id for a in mem.answers] == [1]

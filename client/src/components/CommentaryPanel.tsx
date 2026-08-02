@@ -14,7 +14,6 @@ import { useRunStore } from '@/store/runStore';
 
 export function CommentaryPanel() {
   const commentary = useRunStore((s) => s.commentary);
-  const runMode = useRunStore((s) => s.runMode);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const prevText = useRef('');
@@ -58,12 +57,6 @@ export function CommentaryPanel() {
           >
             {displayText}
           </pre>
-        ) : runMode === 'fast' ? (
-          <div className="text-muted text-sm" style={{ padding: 8 }}>
-            A Fast run discards commentary as it is produced, so there is none to
-            show — the engine writes the same paragraphs, and nothing keeps them.
-            Choose Normal or Audit under Recording to read the narration.
-          </div>
         ) : (
           <div className="text-muted text-sm" style={{ padding: 8 }}>
             No commentary yet. Start a run to see commentary.

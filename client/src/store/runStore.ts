@@ -6,6 +6,7 @@ import { create } from 'zustand';
 
 import type {
   PersistenceMode,
+  RunInfo,
   RunParameterValue,
   RunParams,
   StepResult,
@@ -35,6 +36,9 @@ import {
   getMemory,
   getRunMemory,
   setSpreadingThreshold as apiSetSpreadingThreshold,
+  deleteAllRuns as apiDeleteAllRuns,
+  clearMemory as apiClearMemory,
+  describeApiError,
 } from '@/api/client';
 
 // ---------------------------------------------------------------------------
@@ -80,6 +84,14 @@ export interface RunStore {
   trace: TraceEvent[];
   memory: MemoryState;
   temperature: number;
+  /**
+   * The engine is holding the temperature at its clamp value.
+   *
+   * Server state, read from `GET /runs/{id}/temperature` and refreshed by each
+   * WebSocket snapshot, so the gauge's clamped indicator reports the engine and
+   * outlives any one mounting of the gauge.
+   */
+  temperatureClamped: boolean;
   commentary: string;
   elizaMode: boolean;
   codeletCount: number;
@@ -90,19 +102,28 @@ export interface RunStore {
   epoch: number;
   pollingInterval: number; // ms between state refreshes during run-to-answer (0 = continuous ~100ms)
   /**
-   * Spreading activation threshold, 0-100 (100 = the original's behaviour).
+   * Spreading activation threshold of the run on screen, 0-100 (100 = the
+   * original's behaviour).
    *
-   * A Run Controls setting, so it belongs to the session rather than to one run:
-   * it is re-applied to each new run as it is created. It used to live only on
-   * the server's in-memory runner, which meant every new run silently reverted
-   * to the default and Reset discarded it — so a chosen value usually never
-   * reached the run that actually executed.
+   * A property of the run: it decides which Slipnet nodes spread activation, so the
+   * value shown is the one the loaded run is executing with. Loading a run adopts
+   * that run's value, and moving the slider applies the new value to that same run.
+   * With no run loaded it shows `defaultSpreadingThreshold`, which is what the next
+   * run will be created with.
    */
   spreadingThreshold: number;
   /**
+   * The threshold a *newly created* run is given, remembered across page loads.
+   *
+   * This is the standing preference: it travels with each create request, and the
+   * slider records the chosen value here and in local storage.
+   */
+  defaultSpreadingThreshold: number;
+  /**
    * What the *next* run will write down: `fast`, `normal` or `audit`.
    *
-   * Deliberately not persisted across reloads, unlike `spreadingThreshold`. The
+   * Deliberately not persisted across reloads, unlike
+   * `defaultSpreadingThreshold`. The
    * threshold is remembered because it changes what a run does and a forgotten
    * value would silently change results; this changes only what is kept, and the
    * failure modes of a remembered value are the bad ones — coming back the next
@@ -137,6 +158,19 @@ export interface RunStore {
   /** Worker count the loaded run was created with — fixed, like the mode. */
   runWorkers: number;
   isProcessing: boolean; // true while run-to-answer is active
+  /**
+   * The one error channel: why the last thing the user asked for did not happen.
+   *
+   * One actionable sentence from `describeApiError`, rendered once in the header.
+   * It carries failures of *user-initiated* actions — create, step, run, stop,
+   * delete, clear, threshold — because each of those is a request somebody made and
+   * is entitled to an answer about. Polling and refresh failures are recovered by
+   * the tick that follows them, and keep to the console.
+   *
+   * Every user-initiated action clears the channel as it begins, so the message on
+   * screen belongs to the most recent thing asked for.
+   */
+  lastError: string | null;
 
   // Problem form inputs (shared across ProblemInputPanel and RunControlsPanel)
   formInputs: {
@@ -149,6 +183,14 @@ export interface RunStore {
 
   // Actions
   createRun: (params: RunParams) => Promise<void>;
+  /**
+   * Point the store at an existing run, taking on the values that belong to it.
+   *
+   * Every route into a run that already exists goes through here — a Run History
+   * row, a deep link — so the panels describe the run on screen: its mode, its
+   * position, and the spreading threshold it is executing with.
+   */
+  adoptRun: (info: RunInfo) => void;
   step: (n?: number) => Promise<void>;
   run: (maxSteps?: number) => Promise<void>;
   runToAnswer: (maxSteps?: number) => Promise<void>;
@@ -181,6 +223,12 @@ export interface RunStore {
   setWorkers: (workers: number) => void;
   setFormInput: (field: keyof RunStore['formInputs'], value: string) => void;
   setFormInputs: (values: Partial<RunStore['formInputs']>) => void;
+
+  // The error channel
+  /** Put a message on the channel — for user-initiated work outside the store. */
+  setLastError: (message: string) => void;
+  /** Dismiss whatever is on the channel. */
+  clearLastError: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -193,10 +241,11 @@ function freshMemory(): MemoryState {
 const INITIAL_MEMORY = freshMemory();
 
 /**
- * The spreading threshold is a fundamental parameter -- it changes what a run
- * does -- so the chosen value outlives the page, not just the run. Each run also
- * records the value it used in the database; this is only the default handed to
- * the *next* run.
+ * Where the standing preference for the spreading threshold is kept.
+ *
+ * Storage holds one thing: the value a *newly created* run is given, so a chosen
+ * preference survives a reload. The value a run is executing with comes from the
+ * run itself, and each run records it in the database.
  */
 const THRESHOLD_KEY = 'petacat.spreadingThreshold';
 
@@ -219,6 +268,9 @@ function saveSpreadingThreshold(value: number): void {
   }
 }
 
+/** Read once at load, so the display and the default start from one value. */
+const REMEMBERED_THRESHOLD = loadSpreadingThreshold();
+
 // Mutable flag outside of React state — controls the run loop without
 // depending on store status (which gets overwritten by server responses).
 let _stopRequested = false;
@@ -226,6 +278,24 @@ let _stopRequested = false;
 // ---------------------------------------------------------------------------
 // Store
 // ---------------------------------------------------------------------------
+
+/**
+ * Take the error channel for the action about to run, so the message on screen
+ * always belongs to the most recent thing the user asked for.
+ */
+function beginAction(): void {
+  useRunStore.setState({ lastError: null });
+}
+
+/**
+ * Say why a user-initiated action did not happen, in one sentence the reader can
+ * act on. `action` names the attempt in the reader's own terms: it completes
+ * "Could not ...".
+ */
+function reportFailure(err: unknown, action: string): void {
+  console.error(`${action} failed:`, err);
+  useRunStore.setState({ lastError: describeApiError(err, action) });
+}
 
 export const useRunStore = create<RunStore>((set, get) => ({
   // ---- Default state -----------------------------------------------------
@@ -240,6 +310,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
   trace: [],
   memory: INITIAL_MEMORY,
   temperature: 100,
+  temperatureClamped: false,
   commentary: '',
   elizaMode: true,
   codeletCount: 0,
@@ -248,13 +319,15 @@ export const useRunStore = create<RunStore>((set, get) => ({
   lastCodeletType: '',
   epoch: 0,
   pollingInterval: 1000,
-  spreadingThreshold: loadSpreadingThreshold(),
+  spreadingThreshold: REMEMBERED_THRESHOLD,
+  defaultSpreadingThreshold: REMEMBERED_THRESHOLD,
   persistenceMode: 'normal',
   parameterOverrides: {},
   runParameterOverrides: {},
   workers: 1,
   runWorkers: 1,
   isProcessing: false,
+  lastError: null,
   formInputs: {
     initial: '',
     modified: '',
@@ -278,15 +351,26 @@ export const useRunStore = create<RunStore>((set, get) => ({
     // says why, so this agrees with what is on screen; sending the other number
     // instead would turn a mode change into a 400 the reader did not ask for.
     const workers = get().persistenceMode === 'audit' ? 1 : get().workers;
-    const info = await apiCreateRun({
-      spreading_threshold: get().spreadingThreshold,
-      mode: get().persistenceMode,
-      workers,
-      // Omitted entirely when empty, so a run with no overrides sends the same
-      // request it always did.
-      ...(Object.keys(overrides).length > 0 ? { parameters: overrides } : {}),
-      ...params,
-    });
+    beginAction();
+    let info: RunInfo;
+    try {
+      info = await apiCreateRun({
+        // The standing preference, so a new run starts at the value the user chose
+        // and a run loaded in between hands on nothing of its own.
+        spreading_threshold: get().defaultSpreadingThreshold,
+        mode: get().persistenceMode,
+        workers,
+        // Omitted entirely when empty, so a run with no overrides sends the same
+        // request it always did.
+        ...(Object.keys(overrides).length > 0 ? { parameters: overrides } : {}),
+        ...params,
+      });
+    } catch (err) {
+      // Reported on the channel and raised: the caller asked for a run and there is
+      // none, so whatever it meant to do with the new run stops here.
+      reportFailure(err, 'start a new run');
+      throw err;
+    }
     // Blank the panels as well as swapping the id. Without this the previous
     // problem's workspace, trace and commentary stay on screen until every
     // refresh lands — and stay forever if one of them fails.
@@ -301,6 +385,10 @@ export const useRunStore = create<RunStore>((set, get) => ({
       status: info.status as RunStatus,
       codeletCount: info.codelet_count,
       temperature: info.temperature,
+      temperatureClamped: false,
+      // Taken from the response, which reports the threshold the engine was
+      // initialised with — including when the caller asked for one of its own.
+      spreadingThreshold: info.spreading_threshold ?? get().defaultSpreadingThreshold,
       workspace: null,
       slipnet: null,
       coderack: null,
@@ -312,55 +400,78 @@ export const useRunStore = create<RunStore>((set, get) => ({
     await get().refreshAll();
   },
 
+  adoptRun: (info: RunInfo): void => {
+    set({
+      runId: info.run_id,
+      // Carried over so the run controls know whether pressing Run would continue
+      // this run or start a new one under a different mode.
+      runMode: info.mode ?? null,
+      status: info.status as RunStatus,
+      codeletCount: info.codelet_count,
+      temperature: info.temperature,
+      // The threshold belongs to the run, so the slider shows what this run is
+      // executing with. A record that carries no threshold reads as 100, which is
+      // the value such a run used and the original's behaviour.
+      spreadingThreshold: info.spreading_threshold ?? 100,
+    });
+  },
+
   step: async (n?: number): Promise<void> => {
     const { runId, liveUpdate } = get();
     if (runId === null) return;
 
     const count = n ?? 1;
+    beginAction();
 
-    if (liveUpdate && count > 1) {
-      // Step one at a time, refreshing UI after each
-      for (let i = 0; i < count; i++) {
-        const state = get();
-        if (state.status === 'idle' || state.runId === null) break;
+    // A step the engine refuses is a request that produced nothing, so it is said
+    // out loud and the remaining steps are abandoned: the run stands where it was.
+    try {
+      if (liveUpdate && count > 1) {
+        // Step one at a time, refreshing UI after each
+        for (let i = 0; i < count; i++) {
+          const state = get();
+          if (state.status === 'idle' || state.runId === null) break;
 
-        const results = await apiStepRun(runId, 1);
+          const results = await apiStepRun(runId, 1);
+          if (results.length > 0) {
+            set({
+              codeletCount: results[0].codelet_count,
+              lastCodeletType: results[0].codelet_type,
+            });
+          }
+          await get().refreshAll();
+
+          if (state.stepDelay > 0) {
+            await new Promise(resolve => setTimeout(resolve, state.stepDelay));
+          }
+        }
+        // Final status sync
+        const info = await apiGetRun(runId);
+        set({
+          status: info.status as RunStatus,
+          codeletCount: info.codelet_count,
+          temperature: info.temperature,
+        });
+      } else {
+        // Batch mode: step all at once, refresh once at the end
+        const results = await apiStepRun(runId, count);
         if (results.length > 0) {
+          const last = results[results.length - 1];
           set({
-            codeletCount: results[0].codelet_count,
-            lastCodeletType: results[0].codelet_type,
+            codeletCount: last.codelet_count,
+            lastCodeletType: last.codelet_type,
           });
         }
-        await get().refreshAll();
-
-        if (state.stepDelay > 0) {
-          await new Promise(resolve => setTimeout(resolve, state.stepDelay));
-        }
-      }
-      // Final status sync
-      const info = await apiGetRun(runId);
-      set({
-        status: info.status as RunStatus,
-        codeletCount: info.codelet_count,
-        temperature: info.temperature,
-      });
-    } else {
-      // Batch mode: step all at once, refresh once at the end
-      const results = await apiStepRun(runId, count);
-      if (results.length > 0) {
-        const last = results[results.length - 1];
+        const info = await apiGetRun(runId);
         set({
-          codeletCount: last.codelet_count,
-          lastCodeletType: last.codelet_type,
+          status: info.status as RunStatus,
+          codeletCount: info.codelet_count,
+          temperature: info.temperature,
         });
+        await get().refreshAll();
       }
-      const info = await apiGetRun(runId);
-      set({
-        status: info.status as RunStatus,
-        codeletCount: info.codelet_count,
-        temperature: info.temperature,
-      });
-      await get().refreshAll();
+    } catch (err) {
+      reportFailure(err, 'step the run');
     }
   },
 
@@ -369,6 +480,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
     if (runId === null) return;
 
     _stopRequested = false;
+    beginAction();
     set({ status: 'running' });
 
     if (liveUpdate) {
@@ -383,7 +495,9 @@ export const useRunStore = create<RunStore>((set, get) => ({
         try {
           results = await apiStepRun(runId, 1);
         } catch (err) {
-          console.error('Step failed:', err);
+          // The run stops here, so the reason it stopped is put on the channel: a
+          // halt with no explanation looks like the engine giving up.
+          reportFailure(err, 'run the engine');
           set({ status: 'halted' });
           break;
         }
@@ -413,7 +527,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
         try {
           await get().refreshAll();
         } catch {
-          // Refresh failed — continue stepping
+          // A poll: the next tick reads the same panels again, so stepping carries on.
         }
 
         // Check for stop between refresh and next tick
@@ -435,6 +549,8 @@ export const useRunStore = create<RunStore>((set, get) => ({
           temperature: info.temperature,
         });
       } catch {
+        // A poll for the status the loop has already finished with: the status shown
+        // is halted either way, and the next action reads the run again.
         set({ status: 'halted' });
       }
     } else {
@@ -448,10 +564,14 @@ export const useRunStore = create<RunStore>((set, get) => ({
         });
         await get().refreshAll();
       } catch (err) {
-        console.error('Run to completion failed:', err);
+        reportFailure(err, 'run the engine');
         set({ status: 'halted' });
-        // Try to refresh whatever state we can
-        try { await get().refreshAll(); } catch { /* ignore */ }
+        // Whatever state is still readable, so the panels show where the run got to.
+        try {
+          await get().refreshAll();
+        } catch {
+          // A poll: the panels keep what they last had, and the next action re-reads.
+        }
       }
     }
   },
@@ -461,13 +581,16 @@ export const useRunStore = create<RunStore>((set, get) => ({
     if (runId === null) return;
 
     _stopRequested = false;
+    beginAction();
     set({ status: 'running', isProcessing: true });
 
     try {
       // Fire the backend /run request (returns when the run finishes).
       // We don't await it here — instead we poll the server-side status.
       const runPromise = apiRunToCompletion(runId, maxSteps ?? 0).catch((err) => {
-        console.error('Run to completion failed:', err);
+        // The request that does the work: if it is refused, the polling below sees a
+        // run that never moves, and this is the only account of why.
+        reportFailure(err, 'run the engine');
       });
 
       // Poll server status + refresh panels at the configured interval
@@ -490,7 +613,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
 
           await get().refreshAll();
         } catch {
-          // Refresh failed — continue polling
+          // A poll: the loop comes back at the sampling interval and reads again.
         }
       }
 
@@ -501,7 +624,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
       try {
         await get().refreshAll();
       } catch {
-        /* ignore */
+        // A poll: the panels hold what the last successful sample gave them.
       }
 
       // Sync final status from server
@@ -513,7 +636,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
           temperature: info.temperature,
         });
       } catch {
-        /* ignore */
+        // A poll: the status shown is the last one the run reported.
       }
     } finally {
       set({ isProcessing: false });
@@ -523,6 +646,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
   stop: async (): Promise<void> => {
     // Signal the live-update loop / run-to-answer polling to stop
     _stopRequested = true;
+    beginAction();
     set({ status: 'paused', isProcessing: false });
 
     const { runId } = get();
@@ -536,8 +660,10 @@ export const useRunStore = create<RunStore>((set, get) => ({
         codeletCount: info.codelet_count,
         temperature: info.temperature,
       });
-    } catch {
-      // ignore — we already set paused
+    } catch (err) {
+      // The client loop has stopped and the panel says paused; a refused stop means
+      // the engine on the server is still going, which is worth saying.
+      reportFailure(err, 'stop the run');
     }
   },
 
@@ -545,13 +671,26 @@ export const useRunStore = create<RunStore>((set, get) => ({
     const { runId } = get();
     if (runId === null) return;
 
-    const info = await apiResetRun(runId);
+    beginAction();
+    let info;
+    try {
+      info = await apiResetRun(runId);
+    } catch (err) {
+      // Raised to the caller, which is where this one is reported: the Reset button
+      // renders the failure beside itself, next to the problem it was to re-run.
+      console.error('Reset failed:', err);
+      throw err;
+    }
     // Clear all state first so panels visibly reset, then refresh
     set({
       runId: info.run_id,
       status: info.status as RunStatus,
       codeletCount: info.codelet_count,
       temperature: info.temperature,
+      temperatureClamped: false,
+      // A reset is the same run again, threshold included, so the display keeps
+      // reporting what the engine is executing with.
+      spreadingThreshold: info.spreading_threshold ?? get().spreadingThreshold,
       workspace: null,
       slipnet: null,
       coderack: null,
@@ -566,7 +705,15 @@ export const useRunStore = create<RunStore>((set, get) => ({
     const { runId } = get();
     if (runId === null) return;
 
-    await apiDeleteRun(runId);
+    beginAction();
+    try {
+      await apiDeleteRun(runId);
+    } catch (err) {
+      // Said out loud and raised: the run is still on the server, so the store keeps
+      // showing it rather than presenting it as gone.
+      reportFailure(err, 'delete the run');
+      throw err;
+    }
     set({
       runId: null,
       runParams: null,
@@ -581,23 +728,31 @@ export const useRunStore = create<RunStore>((set, get) => ({
       trace: [],
       memory: freshMemory(),
       temperature: 100,
+      temperatureClamped: false,
       commentary: '',
       codeletCount: 0,
       lastCodeletType: '',
       epoch: get().epoch + 1,
+      // With no run on screen the slider shows what the next one will be created
+      // with.
+      spreadingThreshold: get().defaultSpreadingThreshold,
     });
   },
 
   fullReset: async (): Promise<void> => {
     // Stop any running loop
     _stopRequested = true;
+    beginAction();
 
-    // Delete ALL runs, snapshots, trace events, and episodic memory on server
+    // Delete ALL runs, snapshots, trace events, and episodic memory on server.
+    // Clearing the memory is also what closes the Training Session.
     try {
-      await fetch('/api/runs', { method: 'DELETE' });
-      await fetch('/api/memory', { method: 'DELETE' });
-    } catch {
-      // ignore
+      await apiDeleteAllRuns();
+      await apiClearMemory();
+    } catch (err) {
+      // The local state is cleared below regardless, so the message is what tells a
+      // reader that the server still holds what the panels have stopped showing.
+      reportFailure(err, 'clear every run and the episodic memory');
     }
 
     // Clear all local state and bump epoch so components re-fetch
@@ -615,14 +770,22 @@ export const useRunStore = create<RunStore>((set, get) => ({
       trace: [],
       memory: freshMemory(),
       temperature: 100,
+      temperatureClamped: false,
       commentary: '',
       codeletCount: 0,
       lastCodeletType: '',
       epoch: get().epoch + 1,
+      // As above: nothing is loaded, so the display returns to the default.
+      spreadingThreshold: get().defaultSpreadingThreshold,
     });
   },
 
   // ---- State refresh -----------------------------------------------------
+  //
+  // Every refresh below is a poll: it runs on a timer or after each codelet, and the
+  // tick that follows reads the same endpoint again. A failed read therefore leaves
+  // the panel showing its last good value and stays out of the error channel, which
+  // is reserved for the things a user asked for by name.
 
   refreshAll: async (): Promise<void> => {
     const {
@@ -655,7 +818,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
       const workspace = await getWorkspace(runId);
       set({ workspace });
     } catch {
-      // Run may have been deleted or not ready
+      // A poll: the panel keeps what it has, and the next refresh reads it again.
     }
   },
 
@@ -666,7 +829,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
       const slipnet = await getSlipnet(runId);
       set({ slipnet });
     } catch {
-      // Run may have been deleted or not ready
+      // A poll: the panel keeps what it has, and the next refresh reads it again.
     }
   },
 
@@ -677,7 +840,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
       const coderack = await getCoderack(runId);
       set({ coderack });
     } catch {
-      // Run may have been deleted or not ready
+      // A poll: the panel keeps what it has, and the next refresh reads it again.
     }
   },
 
@@ -688,7 +851,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
       const themespace = await getThemespace(runId);
       set({ themespace });
     } catch {
-      // Run may have been deleted or not ready
+      // A poll: the panel keeps what it has, and the next refresh reads it again.
     }
   },
 
@@ -699,30 +862,26 @@ export const useRunStore = create<RunStore>((set, get) => ({
       // Only fetch events newer than what we already have.
       // Use offset = existing.length to get incremental updates.
       const offset = existing.length;
-      const response = await getTrace(runId, { limit: 500, offset });
-      const raw = Array.isArray(response)
-        ? response
-        : (response as unknown as { events: TraceEvent[] }).events;
+      const raw = await getTrace(runId, { limit: 500, offset });
       if (raw.length > 0) {
         set({ trace: [...existing, ...raw] });
       }
     } catch {
-      // Run may have been deleted or not ready
+      // A poll: the panel keeps what it has, and the next refresh reads it again.
     }
   },
 
   refreshMemory: async (): Promise<void> => {
-    // Asked *of the run* whenever there is one, because which memory a run thinks
-    // against is a property of the run: a Fast Run gets an ephemeral one of its own
-    // and contributes nothing to the shared one. Reading the shared memory regardless
-    // showed a Fast Run answers it could not be reminded of, and went on showing them
-    // after it had found one that never appeared.
+    // Asked *of the run* whenever there is one. Every run shares the Training
+    // Session's memory, and the run-scoped read is the one that reaches it by the
+    // right route in every mode: a Fast Run has no database rows, so its memory is
+    // served from the live object rather than from storage.
     const { runId } = get();
     try {
       const memory = runId === null ? await getMemory() : await getRunMemory(runId);
       set({ memory });
     } catch {
-      // Memory endpoint may not be available
+      // A poll: the panel keeps what it has, and the next refresh reads it again.
     }
   },
 
@@ -730,14 +889,12 @@ export const useRunStore = create<RunStore>((set, get) => ({
     const { runId } = get();
     if (runId === null) return;
     try {
-      const result = await getTemperature(runId);
-      // Server returns { temperature: number }
-      const temp = typeof result === 'number'
-        ? result
-        : (result as unknown as { temperature: number }).temperature;
-      set({ temperature: temp });
+      // The clamp state travels with the value: both are the engine's, and the
+      // gauge shows both.
+      const state = await getTemperature(runId);
+      set({ temperature: state.temperature, temperatureClamped: state.clamped });
     } catch {
-      // Run may have been deleted or not ready
+      // A poll: the panel keeps what it has, and the next refresh reads it again.
     }
   },
 
@@ -745,14 +902,9 @@ export const useRunStore = create<RunStore>((set, get) => ({
     const { runId, elizaMode } = get();
     if (runId === null) return;
     try {
-      const result = await getCommentary(runId, elizaMode);
-      // Server returns { run_id, commentary, eliza_mode }
-      const text = typeof result === 'string'
-        ? result
-        : (result as unknown as { commentary: string }).commentary;
-      set({ commentary: text });
+      set({ commentary: await getCommentary(runId, elizaMode) });
     } catch {
-      // Run may have been deleted or not ready
+      // A poll: the panel keeps what it has, and the next refresh reads it again.
     }
   },
 
@@ -777,15 +929,22 @@ export const useRunStore = create<RunStore>((set, get) => ({
 
   setSpreadingThreshold: async (value: number): Promise<void> => {
     const clamped = Math.max(0, Math.min(100, Math.round(value)));
-    set({ spreadingThreshold: clamped });
+    // Moving the slider states a preference as well as changing the run in front of
+    // the user, so it sets both: what this run is executing with, and what the next
+    // one will be created with.
+    beginAction();
+    set({ spreadingThreshold: clamped, defaultSpreadingThreshold: clamped });
     saveSpreadingThreshold(clamped);
-    // Also push it to the run on screen, so a mid-run change takes effect now.
+    // Pushed to the run on screen, so the change takes effect on it now.
     const { runId } = get();
     if (runId !== null) {
       try {
         await apiSetSpreadingThreshold(runId, clamped);
-      } catch {
-        // Run may have gone; the stored value still applies to the next one.
+      } catch (err) {
+        // The slider has moved and the stored value applies to the next run, so a
+        // refusal here means the run on screen is spreading by the old rule — which
+        // changes what it computes, and is exactly what a reader needs told.
+        reportFailure(err, 'apply the spreading threshold to this run');
       }
     }
   },
@@ -827,5 +986,17 @@ export const useRunStore = create<RunStore>((set, get) => ({
 
   setFormInputs: (values): void => {
     set({ formInputs: { ...get().formInputs, ...values } });
+  },
+
+  // ---- The error channel -------------------------------------------------
+
+  setLastError: (message: string): void => {
+    // For user-initiated work that runs outside the store — a breakpoint, a clamp —
+    // so every failure a user asked for arrives in the same place, in the same voice.
+    set({ lastError: message });
+  },
+
+  clearLastError: (): void => {
+    set({ lastError: null });
   },
 }));

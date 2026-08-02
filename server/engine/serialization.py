@@ -94,8 +94,6 @@ def serialize_themespace_state(ctx: EngineContext) -> dict:
                 "dimension": t.dimension,
                 "relation": t.relation,
                 "activation": t.activation,
-                "positive_activation": t.positive_activation,
-                "negative_activation": t.negative_activation,
                 "frozen": t.frozen,
                 "dominant": t is dominant,
             }
@@ -257,4 +255,24 @@ def serialize_workspace_state(ctx: EngineContext) -> dict:
         "bottom_bridges": [_serialize_bridge(b) for b in ws.bottom_bridges if b.is_built],
         "top_rules": [_serialize_rule(r) for r in ws.top_rules if r.is_built],
         "bottom_rules": [_serialize_rule(r) for r in ws.bottom_rules if r.is_built],
+    }
+
+
+def describe_structure(structure: Any) -> dict:
+    """A Workspace structure named well enough to be pointed at in the UI.
+
+    §4.4: an event records "the Workspace structures ... that exist at the time of the
+    event", and MetaCat's Trace display highlights exactly those (``trace.ss:311-327``).
+    Descriptive rather than a reference: the structure may since have been broken and
+    rebuilt, and a persisted event outlives the objects entirely, so what a reader needs
+    is to see *which* structure it was, not to hold it.
+    """
+    string = getattr(structure, "string", None)
+    return {
+        "kind": type(structure).__name__,
+        "label": str(structure),
+        "string": getattr(string, "text", None),
+        "left_index": getattr(structure, "left_index", None),
+        "right_index": getattr(structure, "right_index", None),
+        "strength": getattr(structure, "strength", None),
     }

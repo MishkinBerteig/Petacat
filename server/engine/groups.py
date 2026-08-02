@@ -312,54 +312,35 @@ class Group(WorkspaceObject, WorkspaceStructure):
     def make_flipped_version(self) -> Group:
         """Create a direction-reversed copy of this group.
 
-        Scheme: groups.ss:328-346.
-        For same-groups (no direction), returns self.
-        Otherwise flips the direction and group category to their opposites.
+        Scheme: ``make-flipped-version`` (groups.ss:328-346).  A same-group has no
+        direction to reverse and is returned unchanged, exactly as the Scheme
+        returns ``self`` for ``plato-samegrp``.
+
+        Reading ``>abc>`` as ``<cba<`` is what lets a thematic scout satisfy a
+        Direction: opposite theme without abandoning the group it already has
+        (themes.ss:996-1010), and it is how the crosswise mapping of §2.4.5 is
+        reached at all.
         """
-        from server.engine.bonds import Bond
+        from server.engine.slipnet import opposite_node
 
         # sameness groups have no direction; return self
         if self.direction is None:
             return self
 
-        # Try to get opposite group_category and direction
-        new_category = self.group_category
-        new_direction = self.direction
-
-        opposite_method = getattr(self.group_category, "get_related_node", None)
-        if opposite_method is not None:
-            try:
-                opp = opposite_method("plato-opposite")
-                if opp is not None:
-                    new_category = opp
-            except Exception:
-                pass
-
-        opposite_dir_method = getattr(self.direction, "get_related_node", None)
-        if opposite_dir_method is not None:
-            try:
-                opp = opposite_dir_method("plato-opposite")
-                if opp is not None:
-                    new_direction = opp
-            except Exception:
-                pass
-
-        # Flip constituent bonds
-        flipped_bonds = []
-        for bond in self.group_bonds:
-            if hasattr(bond, "flipped"):
-                flipped_bonds.append(bond.flipped())
-            else:
-                flipped_bonds.append(bond)
-
         flipped = Group(
             string=self.string,
-            group_category=new_category,
+            group_category=opposite_node(self.group_category),
             bond_facet=self.bond_facet,
-            direction=new_direction,
+            direction=opposite_node(self.direction),
             objects=self.objects,
-            bonds=flipped_bonds,
+            bonds=[bond.flipped() for bond in self.group_bonds],
         )
+        # The Scheme keeps the flipped group's id equal to the original's
+        # (groups.ss:343) so that bridges to either version land in the same slot
+        # of the proposed-bridge table.  Petacat keeps it for the same reason the
+        # comment gives — the two are the same group seen two ways — and because
+        # the builder has to recognise which existing group a flip replaces.
+        flipped.id = self.id
         return flipped
 
     def add_descriptions_for_group(self, slipnet: Any) -> None:

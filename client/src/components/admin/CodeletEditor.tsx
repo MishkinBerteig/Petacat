@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 
+import { request, describeApiError } from '@/api/client'
+import { LoadFailure } from './EditableTable'
+
 interface CodeletDef {
   name: string
   family: string
@@ -9,58 +12,88 @@ interface CodeletDef {
   execute_body: string
 }
 
+/** A blank definition for "+ New": a new type is created by saving this. */
+const EMPTY: CodeletDef = {
+  name: '', family: '', phase: '', default_urgency: null, description: '', execute_body: '',
+}
+
 export function CodeletEditor() {
   const [codelets, setCodelets] = useState<CodeletDef[]>([])
   const [selected, setSelected] = useState<CodeletDef | null>(null)
   const [editing, setEditing] = useState<CodeletDef | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [flash, setFlash] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
   const [filter, setFilter] = useState('')
+  //: True while `editing` holds a type that does not exist yet, so Save posts it.
+  const [creating, setCreating] = useState(false)
 
+  // A refresh leaves the list on screen, so the flash reporting what just happened
+  // survives the reload it triggered.
   const load = useCallback(() => {
-    fetch('/api/admin/codelets').then(r => r.json()).then(data => {
-      setCodelets(data)
-      setLoading(false)
-    })
+    request<CodeletDef[]>('/admin/codelets')
+      .then(data => { setCodelets(data); setLoadError(null) })
+      .catch(e => setLoadError(describeApiError(e, 'load the codelet types')))
+      .finally(() => setLoading(false))
   }, [])
 
   useEffect(() => { load() }, [load])
-  useEffect(() => { if (flash) { const t = setTimeout(() => setFlash(null), 2500); return () => clearTimeout(t) } }, [flash])
+  // A success announces itself and gets out of the way; a failure stays until the next
+  // operation replaces it.
+  useEffect(() => {
+    if (flash && flash.type === 'success') {
+      const t = setTimeout(() => setFlash(null), 2500)
+      return () => clearTimeout(t)
+    }
+  }, [flash])
 
-  const startEdit = (c: CodeletDef) => setEditing({ ...c })
-  const cancelEdit = () => setEditing(null)
+  const startEdit = (c: CodeletDef) => { setCreating(false); setEditing({ ...c }) }
+  const startCreate = () => { setCreating(true); setSelected(null); setEditing({ ...EMPTY }) }
+  const cancelEdit = () => { setEditing(null); setCreating(false) }
 
   const saveEdit = async () => {
     if (!editing) return
     try {
-      const res = await fetch(`/api/admin/codelets/${encodeURIComponent(editing.name)}`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editing),
-      })
-      if (!res.ok) throw new Error(await res.text())
-      setFlash({ type: 'success', msg: 'Saved' })
+      const saved = await request<CodeletDef>(
+        creating
+          ? '/admin/codelets'
+          : `/admin/codelets/${encodeURIComponent(editing.name)}`,
+        {
+          method: creating ? 'POST' : 'PUT',
+          body: JSON.stringify(editing),
+        },
+      )
+      setFlash({ type: 'success', msg: creating ? 'Created' : 'Saved' })
       setEditing(null)
+      setCreating(false)
+      setSelected(saved)
       load()
-    } catch (e: any) {
-      setFlash({ type: 'error', msg: e.message ?? 'Error' })
+    } catch (e) {
+      // The edited definition stays open with the message, so a rejected body is
+      // corrected rather than retyped.
+      setFlash({
+        type: 'error',
+        msg: describeApiError(e, creating ? 'add the codelet type' : 'save the codelet type'),
+      })
     }
   }
 
   const handleDelete = async (name: string) => {
     if (!confirm(`Delete codelet type "${name}"?`)) return
     try {
-      const res = await fetch(`/api/admin/codelets/${encodeURIComponent(name)}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error(await res.text())
+      await request<void>(`/admin/codelets/${encodeURIComponent(name)}`, { method: 'DELETE' })
       setFlash({ type: 'success', msg: 'Deleted' })
       if (selected?.name === name) setSelected(null)
       if (editing?.name === name) setEditing(null)
       load()
-    } catch (e: any) {
-      setFlash({ type: 'error', msg: e.message ?? 'Cannot delete' })
+    } catch (e) {
+      // The type survives a refused delete, and goes on being listed and selectable.
+      setFlash({ type: 'error', msg: describeApiError(e, 'delete the codelet type') })
     }
   }
 
   if (loading) return <div className="text-muted">Loading codelet types...</div>
+  if (loadError) return <LoadFailure message={loadError} onRetry={load} />
 
   const filtered = filter
     ? codelets.filter(c => c.name.includes(filter) || c.family.includes(filter) || c.phase.includes(filter))
@@ -77,6 +110,9 @@ export function CodeletEditor() {
           placeholder="Filter..." style={{ width: '100%', fontSize: 11, padding: '2px 6px', marginBottom: 4 }}
         />
         <div className="text-xs text-muted mb-2">{filtered.length} codelet types</div>
+        <button onClick={startCreate} style={{ fontSize: 10, marginBottom: 6 }}>
+          + New codelet type
+        </button>
         {filtered.map(c => (
           <div
             key={c.name}
@@ -96,7 +132,7 @@ export function CodeletEditor() {
       {/* Right: detail/edit */}
       <div style={{ flex: 1, overflow: 'auto' }}>
         {flash && (
-          <div style={{
+          <div role={flash.type === 'error' ? 'alert' : 'status'} style={{
             padding: '4px 8px', marginBottom: 4, fontSize: 11, borderRadius: 3,
             background: flash.type === 'success' ? 'rgba(76,175,80,0.2)' : 'rgba(244,67,54,0.2)',
             color: flash.type === 'success' ? 'var(--success)' : 'var(--error)',
@@ -106,7 +142,18 @@ export function CodeletEditor() {
         {detail ? (
           <div>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8 }}>
-              <h3 className="mono" style={{ margin: 0, fontSize: 14 }}>{detail.name}</h3>
+              {creating ? (
+                <input
+                  value={editing?.name ?? ''}
+                  onChange={e => setEditing(ed => ed ? { ...ed, name: e.target.value } : ed)}
+                  placeholder="codelet type name"
+                  aria-label="Name"
+                  className="mono"
+                  style={{ fontSize: 13, width: 260 }}
+                />
+              ) : (
+                <h3 className="mono" style={{ margin: 0, fontSize: 14 }}>{detail.name}</h3>
+              )}
               {!editing && <button onClick={() => startEdit(detail)} style={{ fontSize: 10 }}>Edit</button>}
               {!editing && <button onClick={() => handleDelete(detail.name)} style={{ fontSize: 10, color: 'var(--error)' }}>Delete</button>}
               {editing && <button onClick={saveEdit} style={{ fontSize: 10 }} className="primary">Save</button>}

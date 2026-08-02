@@ -17,6 +17,7 @@ needs none, which is the subject of the last test in this file.
 
 import pytest
 
+from server.engine import hardware
 from server.engine.numeric import available_backends, select_backend
 
 
@@ -81,6 +82,65 @@ async def test_the_gpu_threshold_is_zero_so_the_substrate_actually_runs(app_clie
     data = (await app_client.get("/api/system/numeric")).json()
     assert data["gpu_threshold"] == 0
     assert data["vectorise_threshold"] > 0
+
+
+@pytest.mark.asyncio
+async def test_it_reports_the_machine_the_thresholds_are_answers_for(app_client):
+    """A figure measured on one machine is only legible beside the machine.
+
+    Worker counts, shard counts and the numeric crossovers are all answers for a
+    particular CPU and GPU, so the endpoint states which one this process detected
+    rather than leaving a reader to infer it from a hostname.
+    """
+    data = (await app_client.get("/api/system/numeric")).json()
+    machine = data["hardware"]
+
+    assert machine["platform"]
+    assert machine["logical_cores"] >= 1
+    assert 1 <= machine["performance_cores"] <= machine["logical_cores"]
+    assert machine["efficiency_cores"] >= 0
+    # Every probe says where it got its answer, including when it got none.
+    assert machine["cpu_probe"]
+    assert machine["gpu_probe"]
+    assert isinstance(machine["metal_available"], bool)
+
+
+@pytest.mark.asyncio
+async def test_the_derived_sizes_agree_with_the_engine_that_uses_them(app_client):
+    """Reported and used are the same numbers, not two statements of one intent."""
+    data = (await app_client.get("/api/system/numeric")).json()
+    derived = data["derived"]
+
+    assert derived["workers"] == hardware.worker_count()
+    assert derived["coderack_shards"] == hardware.shard_count(derived["workers"])
+    assert derived["population_workers"] == hardware.population_worker_count()
+    assert derived["gpu_target_threads"] == hardware.gpu_target_threads()
+    assert derived["overrides"] == hardware.overrides_in_force()
+    assert data["summary"]
+
+
+@pytest.mark.asyncio
+async def test_a_run_can_ask_for_the_machines_own_worker_count(app_client):
+    """``workers: 0`` means "the cores you have", and the Run records the number."""
+    data = (await app_client.get("/api/system/numeric")).json()
+    expected = data["derived"]["workers"]
+
+    created = await app_client.post(
+        "/api/runs",
+        json={
+            "initial": "abc",
+            "modified": "abd",
+            "target": "ijk",
+            "seed": 11,
+            "mode": "fast",
+            "workers": 0,
+        },
+    )
+    assert created.status_code == 200
+    run_id = created.json()["run_id"]
+
+    parameters = (await app_client.get(f"/api/runs/{run_id}/parameters")).json()
+    assert parameters["derived"]["workers"] == expected
 
 
 @pytest.mark.asyncio

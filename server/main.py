@@ -7,7 +7,7 @@ import os
 import signal
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -17,7 +17,6 @@ from server.engine.metadata import MetadataProvider
 logger = logging.getLogger("petacat")
 
 
-HELP_LOCALE = os.environ.get("HELP_LOCALE", "en")
 
 
 # Seed files whose contents the DB copy of the bulk metadata mirrors.  Help
@@ -228,19 +227,12 @@ async def _reconcile_metadata_columns(engine) -> None:
                 )
 
 
-def _help_topics_filename() -> str:
-    """Return the help topics JSON filename for the configured locale.
-
-    Prefers `help_topics.{locale}.json`, falls back to legacy `help_topics.json`.
-    """
-    localized = f"help_topics.{HELP_LOCALE}.json"
-    if os.path.exists(os.path.join(SEED_DATA_DIR, localized)):
-        return localized
-    return "help_topics.json"
+#: The help topics ship in one file, which the `en` suffix names.
+HELP_TOPICS_FILENAME = "help_topics.en.json"
 
 
 async def _sync_help_topics(session) -> None:
-    """Upsert all help topics from the locale JSON into the `help_topics` table.
+    """Upsert all help topics from the topics JSON into the `help_topics` table.
 
     Unlike the bulk seeding, this is idempotent — it runs on every startup and
     keeps the DB in sync with the JSON source of truth. Existing rows are
@@ -250,7 +242,7 @@ async def _sync_help_topics(session) -> None:
     from sqlalchemy import select
     from server.models.metadata import HelpTopic
 
-    help_file = os.path.join(SEED_DATA_DIR, _help_topics_filename())
+    help_file = os.path.join(SEED_DATA_DIR, HELP_TOPICS_FILENAME)
     if not os.path.exists(help_file):
         logger.warning("Help topics file not found: %s", help_file)
         return
@@ -285,8 +277,8 @@ async def _sync_help_topics(session) -> None:
 
     await session.commit()
     logger.info(
-        "Help topics synced (locale=%s): %d in file, %d pre-existing",
-        HELP_LOCALE, len(topics), len(existing),
+        "Help topics synced: %d in file, %d pre-existing",
+        len(topics), len(existing),
     )
 
 
@@ -456,7 +448,7 @@ async def _ensure_db_ready():
             await session.commit()
             logger.info("Database tables created and seeded")
 
-            # Sync help topics from the locale JSON (idempotent upsert)
+            # Sync help topics from the topics JSON (idempotent upsert)
             await _sync_help_topics(session)
 
         await engine.dispose()
@@ -465,10 +457,10 @@ async def _ensure_db_ready():
 
 
 async def _regenerate_derived_help_docs() -> None:
-    """Regenerate HELP.md and helpTopics.ts from the locale JSON.
+    """Regenerate HELP.md and helpTopics.ts from the topics JSON.
 
     This runs on every backend startup so that the derived artifacts stay in
-    sync with `seed_data/help_topics.{locale}.json` without requiring a manual
+    sync with `seed_data/help_topics.en.json` without requiring a manual
     invocation of `scripts/generate_help_docs.py`. It is idempotent -- if the
     generated output already matches what's on disk, no files are written.
 
@@ -477,18 +469,17 @@ async def _regenerate_derived_help_docs() -> None:
     """
     try:
         from server.services.help_docs import regenerate_all
-        result = regenerate_all(HELP_LOCALE)
+        result = regenerate_all()
         if result.help_md_changed or result.ts_constants_changed:
             logger.info(
-                "Help docs regenerated (locale=%s): HELP.md=%s, helpTopics.ts=%s",
-                result.locale,
+                "Help docs regenerated: HELP.md=%s, helpTopics.ts=%s",
                 "updated" if result.help_md_changed else "unchanged",
                 "updated" if result.ts_constants_changed else "unchanged",
             )
         else:
             logger.debug(
-                "Help docs already in sync (locale=%s, %d topics)",
-                result.locale, result.topics_loaded,
+                "Help docs already in sync (%d topics)",
+                result.topics_loaded,
             )
     except Exception as e:
         logger.warning("Help doc regeneration skipped: %s", e)
@@ -571,6 +562,34 @@ from server.api.docs import router as docs_router
 from server.api.ws import router as ws_router
 from server.api.review import router as review_router
 from server.api.system import router as system_router
+
+_CONFIG_WRITE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+
+
+@app.middleware("http")
+async def adopt_configuration_edits(request: Request, call_next):
+    """Carry an admin edit through to the Runs created after it.
+
+    A write under ``/api/admin`` changes the configuration in the database. The
+    ``RunService`` holds a ``MetadataProvider`` built from that configuration, and this
+    marks it stale so ``create_run`` rebuilds it from the database for the next Run.
+
+    Marking rather than reloading here keeps a Run's metadata fixed for its whole life:
+    an edit made while something is running takes effect on the Run after it, and the
+    reload happens once however many cells were edited.
+    """
+    response = await call_next(request)
+    if (
+        request.method in _CONFIG_WRITE_METHODS
+        and request.url.path.startswith("/api/admin")
+        and 200 <= response.status_code < 300
+    ):
+        from server.api.runs import _run_service
+
+        if _run_service is not None:
+            _run_service.mark_metadata_stale()
+    return response
+
 
 app.include_router(runs_router)
 app.include_router(controls_router)

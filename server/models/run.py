@@ -197,6 +197,13 @@ class AnswerDescriptionRow(Base):
     )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
+    # The Episodic Memory's own identifier for this answer, and the one every API that
+    # names an answer uses (compare, display, forget).  Recorded here rather than
+    # letting the row's primary key stand in for it: a Fast Run contributes answers to
+    # the session but writes no rows, so a row-derived identifier would collide with a
+    # Fast answer's and resolve a comparison to the wrong pair.  One id space, owned by
+    # the memory, of which this column is a record.
+    answer_id = Column(Integer, nullable=True)
     run_id = Column(Integer, nullable=True)  # Which run produced this
     problem = Column(JSONB, nullable=False)  # [initial, modified, target, answer]
     top_rule_description = Column(Text, default="")
@@ -207,6 +214,21 @@ class AnswerDescriptionRow(Base):
     temperature = Column(Float, default=0)
     themes = Column(JSONB, default=dict)
     unjustified_slippages = Column(JSONB, default=list)
+    # §4.7.1 keeps the top, bottom and unjustified theme-patterns separately from the
+    # vertical one, and §4.7.3's comparison reads the rules' abstractness and the
+    # answer's activation.  Without these columns a restart silently zeroed them, which
+    # switched off ``is_coherent``, two of the five distance components, the
+    # snag-justified distinction and two of the preference criteria.
+    top_themes = Column(JSONB, default=dict)
+    bottom_themes = Column(JSONB, default=dict)
+    unjustified_themes = Column(JSONB, default=dict)
+    top_rule_abstractness = Column(Float, default=0)
+    bottom_rule_abstractness = Column(Float, default=0)
+    theme_abstractness = Column(Float, default=0)
+    activation = Column(Float, default=0)
+    # The structural clause keys ``answer_present`` compares (``memory.ss:117``).
+    top_rule_signature = Column(JSONB, nullable=True)
+    bottom_rule_signature = Column(JSONB, nullable=True)
     created_at = Column(DateTime, default=_utcnow)
 
 
@@ -219,6 +241,12 @@ class SnagDescriptionRow(Base):
     )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
+    # The Episodic Memory's own identifier for this snag, recorded the way
+    # ``answer_descriptions.answer_id`` records an answer's.  One id space, owned by the
+    # memory: a Fast Run contributes snags to the session and writes no rows, so the
+    # memory's counter is the only identifier that covers every snag, and every
+    # projection of a snag — live object or row — reports that one.
+    snag_id = Column(Integer, nullable=True)
     run_id = Column(Integer, nullable=True)
     problem = Column(JSONB, nullable=False)  # [initial, modified, target]
     codelet_count = Column(Integer, default=0)

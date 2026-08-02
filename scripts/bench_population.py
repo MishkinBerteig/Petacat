@@ -23,10 +23,11 @@ import sys
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, REPO)
 
+from server.engine import hardware  # noqa: E402
 from server.engine.metadata import MetadataProvider  # noqa: E402
 from server.engine.population import (  # noqa: E402
-    BATCHING_MIN_NODES,
     batching_is_worthwhile,
+    batching_min_nodes,
     run_population,
     run_population_batched,
 )
@@ -44,10 +45,14 @@ def main() -> None:
     counts = [int(k) for k in args.k.split(",")]
     meta = MetadataProvider.from_seed_data(os.path.join(REPO, "seed_data"))
     nodes = len(meta.slipnet_node_specs)
+    machine = hardware.detect()
+    pool = hardware.population_worker_count()
 
     print(
         f"Population throughput — {PROBLEM[0]}->{PROBLEM[1]}; {PROBLEM[2]}?, "
         f"{nodes}-node Slipnet\n"
+        f"  {machine.cpu.chip or machine.platform}: "
+        f"{machine.cpu.logical_cores} logical cores, process pool of {pool}\n"
     )
     print("      K   strategy     seconds   runs/s   distinct states")
     records = []
@@ -71,7 +76,9 @@ def main() -> None:
 
     print(
         f"   Batching worthwhile at {nodes} nodes: {batching_is_worthwhile(nodes)}\n"
-        f"   (threshold {BATCHING_MIN_NODES:,} nodes, from WP4.5's measured crossover).\n"
+        f"   (threshold {batching_min_nodes():,} nodes, from the measured crossover;\n"
+        f"    re-measure it with scripts/bench_numeric.py and set\n"
+        f"    PETACAT_BATCHING_MIN_NODES on a machine with a different CPU).\n"
         f"   Below it, process-parallel wins: nothing is shared, it scales with cores,\n"
         f"   and lockstep would hold every finished run hostage to the batch's slowest."
     )
@@ -79,7 +86,17 @@ def main() -> None:
     if args.json_path:
         os.makedirs(os.path.dirname(os.path.abspath(args.json_path)), exist_ok=True)
         with open(args.json_path, "w") as fh:
-            json.dump({"nodes": nodes, "results": records}, fh, indent=2)
+            json.dump(
+                {
+                    "nodes": nodes,
+                    "machine": machine.as_dict(),
+                    "population_workers": pool,
+                    "batching_min_nodes": batching_min_nodes(),
+                    "results": records,
+                },
+                fh,
+                indent=2,
+            )
             fh.write("\n")
         print(f"\n   Wrote {args.json_path}")
 

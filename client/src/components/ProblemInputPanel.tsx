@@ -12,7 +12,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRunStore } from '@/store/runStore';
 import type { DemoProblem } from '@/types';
-import { getDemos } from '@/api/client';
+import { getDemos, describeApiError } from '@/api/client';
 
 export function ProblemInputPanel() {
   const workspace = useRunStore((s) => s.workspace);
@@ -31,9 +31,19 @@ export function ProblemInputPanel() {
   const [selectedDemo, setSelectedDemo] = useState('');
   const [demosLoading, setDemosLoading] = useState(false);
   const [resetFlash, setResetFlash] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
 
   const handleReset = useCallback(async () => {
-    await reset();
+    try {
+      await reset();
+    } catch (err) {
+      // Reported beside the button that asked for it, in the same words the rest of
+      // the app uses: `describeApiError` turns the status into a next move — the run
+      // is gone, the values are wrong, the server is unreachable.
+      setResetError(describeApiError(err, 'reset the run'));
+      return;
+    }
+    setResetError(null);
     setResetFlash(true);
     setTimeout(() => setResetFlash(false), 1200);
   }, [reset]);
@@ -208,6 +218,15 @@ export function ProblemInputPanel() {
             ? `Clears run #${runId} back to bare strings, same problem and seed. Press Run to go again.`
             : 'Clears the current run back to bare strings, once one exists.'}
         </div>
+        {resetError && (
+          <div
+            className="text-xs"
+            style={{ marginTop: 4, color: 'var(--error)' }}
+            role="alert"
+          >
+            {resetError}
+          </div>
+        )}
         {resetFlash && (
           <div
             style={{

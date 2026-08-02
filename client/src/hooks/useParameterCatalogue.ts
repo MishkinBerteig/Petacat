@@ -17,7 +17,7 @@
 // ---------------------------------------------------------------------------
 
 import { create } from 'zustand';
-import { getParameterCatalogue } from '@/api/client';
+import { getParameterCatalogue, describeApiError } from '@/api/client';
 import type { RunParameterSpec, RunParameterValue } from '@/types';
 
 interface CatalogueState {
@@ -43,7 +43,9 @@ export const useParameterCatalogueStore = create<CatalogueState>((set, get) => (
         set({
           specs: [],
           isLoading: false,
-          error: e instanceof Error ? e.message : 'Failed to load run parameters',
+          // The form has no bounds to offer without this, so the panel says what
+          // happened in the same words the rest of the app uses.
+          error: describeApiError(e, 'load the run parameters'),
         }),
       );
   },

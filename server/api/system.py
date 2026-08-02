@@ -22,10 +22,13 @@ Read-only by construction: no route here has a side effect, and none takes a bod
 
 from __future__ import annotations
 
+import asyncio
+
 from fastapi import APIRouter
 from pydantic import BaseModel
 
 from server.api.runs import get_run_service
+from server.engine import hardware
 from server.engine.numeric import (
     BackendUnavailable,
     available_backends,
@@ -60,6 +63,57 @@ _PRECISION_BY_BACKEND = {
 }
 
 
+class DetectedMachine(BaseModel):
+    """The machine this process is running on, as its own probes report it.
+
+    Reported so that a figure recorded on one machine can be read on another and
+    still be interpretable: a throughput number, a worker count and a crossover
+    threshold all mean something different on a 12-core laptop and a 32-core desktop,
+    and this is the part of the answer that says which one produced them.
+    """
+
+    platform: str
+    #: Marketing name of the processor, when the machine reports one.
+    chip: str | None
+    logical_cores: int
+    #: Cores on the fastest performance level.  Equal to ``logical_cores`` on a
+    #: machine that reports a single level.
+    performance_cores: int
+    efficiency_cores: int
+    memory_bytes: int | None
+    gpu_name: str | None
+    #: GPU cores, when a probe reports them.
+    gpu_cores: int | None
+    #: True when ``mlx.core`` is importable, which is what puts the Metal backend
+    #: within reach.
+    metal_available: bool
+    #: Which probe answered for the CPU and the GPU, or why it did not.
+    cpu_probe: str
+    gpu_probe: str
+
+
+class DerivedSizes(BaseModel):
+    """The sizes computed from the detected machine.
+
+    Every one of these follows from :class:`DetectedMachine` by a rule stated in
+    ``server/engine/hardware.py``, and every one is overridable by an environment
+    variable.  ``overrides`` names the variables actually set in this process.
+    """
+
+    #: Free-running worker threads: one per performance core.
+    workers: int
+    #: Coderack shards: one per worker, floor of two, bounded further by the
+    #: capacity a shard needs.
+    coderack_shards: int
+    #: Processes in a population pool: every logical core but one.
+    population_workers: int
+    #: GPU cores the Metal dispatch is sized for.
+    gpu_cores: int
+    #: Threads a Metal dispatch aims for: GPU cores x 1,024, to a power of two.
+    gpu_target_threads: int
+    overrides: dict[str, str]
+
+
 class NumericSubstrateResponse(BaseModel):
     """Which implementation of the engine's arithmetic this process is running."""
 
@@ -81,6 +135,10 @@ class NumericSubstrateResponse(BaseModel):
     #: why the GPU is selected at today's 59 nodes.
     vectorise_threshold: int
     gpu_threshold: int
+    #: The machine the thresholds and the derived sizes are answers for.
+    hardware: DetectedMachine
+    #: What was computed from it.
+    derived: DerivedSizes
     #: One sentence for a tooltip, so the client does not have to reassemble the
     #: above into prose and drift from it.
     summary: str
@@ -93,9 +151,19 @@ async def numeric_substrate() -> NumericSubstrateResponse:
     The three together, because none of them means much alone: "mlx" without the node
     count hides that the GPU is being used at a size where it is slower than NumPy,
     and the node count without the backend says nothing about where the work lands.
+
+    The detected machine and the sizes derived from it come with them, so the whole
+    answer is self-contained: what the machine is, what was computed from it, and
+    which implementation of the arithmetic that produced.
     """
     meta = get_run_service().meta
     n_nodes = len(meta.slipnet_node_specs)
+
+    # The GPU probe shells out to ``system_profiler`` the first time it is asked, so
+    # it goes to a thread and leaves the event loop free.  Subsequent calls are cached
+    # and return immediately.
+    machine = await asyncio.to_thread(hardware.detect)
+    derived = await asyncio.to_thread(hardware.derived_sizes)
 
     try:
         backend = select_backend(n_nodes)
@@ -110,16 +178,21 @@ async def numeric_substrate() -> NumericSubstrateResponse:
     precision = _PRECISION_BY_BACKEND.get(name or "", "float64")
     exact = backend.exact if backend is not None else True
 
+    machine_phrase = (
+        f"{machine.cpu.chip or machine.platform}, "
+        f"{machine.cpu.performance_cores}P+{machine.cpu.efficiency_cores}E cores"
+        + (f", {machine.gpu.cores}-core GPU" if machine.gpu.cores else "")
+    )
     if name is None:
         summary = (
             "No numeric substrate: the engine runs its own loops over "
-            f"{n_nodes} Slipnet nodes."
+            f"{n_nodes} Slipnet nodes on {machine_phrase}."
         )
     else:
         where = "the GPU (Metal via MLX)" if device == "gpu" else "the CPU"
         summary = (
             f"Numeric substrate {name!r} on {where}, {precision}, over "
-            f"{n_nodes} Slipnet nodes."
+            f"{n_nodes} Slipnet nodes on {machine_phrase}."
         )
 
     return NumericSubstrateResponse(
@@ -133,5 +206,21 @@ async def numeric_substrate() -> NumericSubstrateResponse:
         slipnet_links=len(meta.slipnet_link_specs),
         vectorise_threshold=vectorise_threshold(),
         gpu_threshold=gpu_threshold(),
+        hardware=DetectedMachine(
+            platform=machine.platform,
+            chip=machine.cpu.chip,
+            logical_cores=machine.cpu.logical_cores,
+            performance_cores=machine.cpu.performance_cores,
+            efficiency_cores=machine.cpu.efficiency_cores,
+            memory_bytes=machine.cpu.memory_bytes,
+            gpu_name=machine.gpu.name,
+            gpu_cores=machine.gpu.cores,
+            metal_available=machine.gpu.metal_available,
+            cpu_probe=machine.cpu.probe,
+            gpu_probe=machine.gpu.probe,
+        ),
+        derived=DerivedSizes(
+            **derived, overrides=hardware.overrides_in_force()
+        ),
         summary=summary,
     )

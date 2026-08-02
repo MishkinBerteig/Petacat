@@ -201,6 +201,31 @@ rethinking before being built on top.
    where that pinches.
 6. **Merge/dedup.** What happens when the same concept is discovered twice.
 
+### Carried forward: parallelism beyond sharding
+
+Free-running splits the Coderack into shards, one per worker, with stealing. The shard
+count is bounded by `max_coderack_size // MIN_SHARD_CAPACITY` — 100 // 25 = 4 today. The
+floor of 25 is a cognition measurement: at smaller shards each worker draws from a thin
+population, and the `gave_up:` stopping state leaves the reachable range for
+`eqe→qeq; abbba?`.
+
+A machine with more cores than shards therefore runs several workers against one shard.
+Raising the shard count means raising `max_coderack_size`, which changes how long codelets
+survive and what the urgency-weighted selection draws from, so it changes what the engine
+computes.
+
+**The measurement this needs:** run the expected range at 100, 200, 400 and 600 codelets
+and record where the reachable set moves. The result decides whether more shards are
+available within the cognition the model specifies.
+
+**Sharding is one approach among several.** Parallelism that scales past the shard bound
+may come from somewhere other than partitioning the Coderack — running whole independent
+runs in parallel (`population.py` already does this), parallelism inside the update cycle,
+or parallelism inside the numeric substrate, which grows in importance as the Slipnet
+grows toward the sizes this phase begins to reach. This phase's Slipnet growth changes the
+balance: the numeric work rises with node and link count, so the arithmetic becomes the
+part worth parallelising.
+
 ## Glossary
 
 | Term | Meaning |

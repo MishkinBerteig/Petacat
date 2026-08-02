@@ -5,6 +5,10 @@ import pytest
 from server.engine.metadata import MetadataProvider
 from server.engine.themes import Themespace, THEME_TOP_BRIDGE, THEME_BOTTOM_BRIDGE, THEME_VERTICAL_BRIDGE
 
+# Every test here executes arithmetic the numeric substrate owns, so each one runs
+# once per backend in the matrix. See tests/conftest.py.
+pytestmark = pytest.mark.numeric_matrix
+
 
 SEED_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
 
@@ -90,26 +94,24 @@ def test_current_pattern(themespace):
     assert "vertical_bridge" in pattern
 
 
-def test_negative_activation_decays_toward_zero(themespace, meta):
-    """Negative themes should decay toward 0 over time (become less negative).
+def test_a_negative_theme_decays_toward_zero(themespace, meta):
+    """A negative theme becomes less negative over time.
 
-    The negative_activation update uses `- net_effect` so that the decay
-    term (which produces a negative net_effect) pushes negative activation
-    toward 0 rather than further from it.
+    ``activation-function`` (``themes.ss:456-459``) subtracts the net effect for a
+    negatively-activated theme, so the decay term — which makes the net effect
+    negative — moves the activation toward zero, which is where a theme that nothing
+    is reinforcing ends up whichever pole it sits on.
     """
     cluster = themespace.clusters[0]
     theme = cluster.themes[0]
     theme.clamp(-80.0)
     theme.unclamp()  # Frozen=False but activation stays at -80
 
-    initial_neg = theme.negative_activation
-    assert initial_neg == -80.0
+    assert theme.activation == -80.0
 
-    # After spreading, decay should push negative activation toward 0
     cluster.spread_activation(meta)
 
-    # Should become less negative (closer to 0)
-    assert theme.negative_activation > initial_neg
+    assert -80.0 < theme.activation <= 0.0
 
 
 def test_theme_to_slipnet_spreading(themespace, meta):
@@ -160,3 +162,49 @@ def test_theme_to_slipnet_spreading(themespace, meta):
         total_buffer += dir_node.activation_buffer
 
     assert total_buffer > 0, "Theme→slipnet spreading should activate dimension nodes"
+
+
+# --- displaying a past episode over the live Themespace ---------------------
+#
+# Every MetaCat event and every stored answer answers `display`: it saves the live
+# Themespace, clears it, and imposes that episode's own theme-pattern
+# (trace.ss:415-420, trace.ss:809, memory.ss:275-277).  Clicking again restores what
+# the program was actually thinking.  Without the save/restore half, inspecting the
+# past would silently overwrite the present.
+
+
+def _clusters_of(themespace, theme_type):
+    return [c for c in themespace.clusters if c.theme_type == theme_type]
+
+
+def test_saving_and_restoring_returns_every_theme_to_where_it_was(meta):
+    from server.engine.themes import Themespace
+
+    themespace = Themespace(meta)
+    cluster = _clusters_of(themespace, "vertical_bridge")[0]
+    live = cluster.themes[0]
+    live.activation = 64.0
+    cluster.frozen = True
+    themespace.thematic_pressure_on(["vertical_bridge"])
+
+    themespace.save_current_state()
+    assert themespace.displaying_past_state
+
+    # Whatever the display does to the Themespace...
+    for theme in cluster.themes:
+        theme.activation = 0.0
+    cluster.frozen = False
+    themespace.thematic_pressure_off(["vertical_bridge"])
+
+    assert themespace.restore_current_state()
+    assert live.activation == 64.0
+    assert cluster.frozen is True
+    assert "vertical_bridge" in themespace.active_theme_types
+    assert not themespace.displaying_past_state
+
+
+def test_restoring_without_a_saved_state_reports_that_it_did_nothing(meta):
+    """So a caller cannot mistake "nothing to restore" for a successful restore."""
+    from server.engine.themes import Themespace
+
+    assert Themespace(meta).restore_current_state() is False

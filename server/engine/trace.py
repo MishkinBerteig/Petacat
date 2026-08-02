@@ -81,6 +81,7 @@ class TraceEvent:
         structures: list[Any] | None = None,
         description: str = "",
         theme_pattern: Any = None,
+        strength: float = 0.0,
     ) -> None:
         self.event_number = next_id(KIND_TRACE_EVENT)
         self.event_type = event_type
@@ -89,11 +90,20 @@ class TraceEvent:
         self.structures = structures or []
         self.description = description
         self.theme_pattern = theme_pattern
+        #: How strong the thing this event records was, at the moment it happened.
+        #: §4.5.1 measures a clamp by "the strengths of the most important Workspace
+        #: structures that get built in the aftermath of the clamp ... recorded in the
+        #: Temporal Trace, in the form of group events, slippage events, and rule
+        #: events", so these three carry a real value: relative rule quality
+        #: (``trace.ss:965``), group strength (``trace.ss:880``) and concept-mapping
+        #: strength (``trace.ss:796``).  It was previously hard-zero for every event,
+        #: which made every clamp record ``progress_achieved = 0.0``.
+        self.strength = strength
 
     # Convenience used by progress evaluators
     def get_strength(self) -> float:
         """Return a generic strength metric for progress evaluation."""
-        return 0.0
+        return self.strength
 
     def __repr__(self) -> str:
         return (
@@ -264,6 +274,12 @@ class ClampEvent(TraceEvent):
             "rule": (RULE_BUILT,),
             "answer": (ANSWER_FOUND,),
             "group": (GROUP_BUILT,),
+            # ``'workspace'`` is the Scheme's pseudo-type: group events, rule events
+            # and concept-mapping events all answer ``(type? 'workspace)``
+            # (``trace.ss:780, 860, 958``).  Both the snag-response clamp and the
+            # justify clamp use this focus, so without it neither could ever measure
+            # any progress at all.
+            "workspace": (GROUP_BUILT, RULE_BUILT, CONCEPT_MAPPING_BUILT),
         }
         matching_types = focus_to_types.get(self.progress_focus, ())
         if event.event_type in matching_types:
@@ -283,12 +299,17 @@ class ClampEvent(TraceEvent):
         trace: TemporalTrace,
         themespace: Themespace,
         slipnet: Slipnet,
+        coderack: Any = None,
     ) -> None:
         """Activate all clamped patterns.
 
-        Scheme: ``activate`` message on clamp-event.
+        Scheme: ``activate`` message on clamp-event (``trace.ss:620-635``).
         Undoes any current snag condition, then clamps theme patterns,
         concept patterns, and codelet patterns.
+
+        ``coderack`` is optional because a caller that has no coderack to hand simply
+        cannot apply a codelet pattern; when it is supplied the third kind of pattern is
+        applied here rather than being stored and forgotten.
         """
         trace.undo_snag_condition(themespace, slipnet)
 
@@ -300,15 +321,22 @@ class ClampEvent(TraceEvent):
         for pattern in self.clamped_concept_patterns:
             clamp_concept_pattern(pattern, slipnet)
 
+        # Clamp codelet patterns (``trace.ss:632-635``).
+        if coderack is not None:
+            for pattern in self.clamped_codelet_patterns:
+                if pattern:
+                    coderack.clamp_pattern(pattern)
+
     def deactivate(
         self,
         trace: TemporalTrace,
         themespace: Themespace,
         slipnet: Slipnet,
+        coderack: Any = None,
     ) -> None:
         """Deactivate all clamped patterns.
 
-        Scheme: ``deactivate`` message on clamp-event.
+        Scheme: ``deactivate`` message on clamp-event (``trace.ss:645-665``).
         """
         # Unclamp theme patterns
         for pattern in self.clamped_theme_patterns:
@@ -317,6 +345,11 @@ class ClampEvent(TraceEvent):
         # Unclamp concept patterns
         for pattern in self.clamped_concept_patterns:
             unclamp_concept_pattern(slipnet)
+
+        # Unclamp codelet patterns (``trace.ss:656-664``).  Without this a rule-codelet
+        # clamp pinned rule-scout/evaluator/builder urgencies for the rest of the run.
+        if coderack is not None and self.clamped_codelet_patterns:
+            coderack.unclamp_all()
 
     def __repr__(self) -> str:
         return (
@@ -495,9 +528,22 @@ def _rule_relative_quality(rule: Any) -> float:
 def clamp_theme_pattern(pattern: Any, themespace: Themespace) -> None:
     """Clamp a theme pattern in the Themespace.
 
-    Scheme: trace.ss ``clamp-theme-pattern`` (line 1530).
-    Clears the theme type, imposes the pattern, freezes the type, and
-    enables thematic pressure for that type.
+    Scheme: trace.ss ``clamp-theme-pattern`` (line 1530), which is four steps:
+
+        (tell *themespace* 'delete-theme-type theme-type)
+        (impose-theme-pattern theme-pattern)
+        (tell *themespace* 'freeze-theme-type theme-type)
+        (tell *themespace* 'thematic-pressure-on theme-type)
+
+    The fourth was missing, and it is the one that makes the other three matter.
+    §4.2: "the clamping of theme activations in the Themespace automatically turns on
+    thematic pressure."  Without it ``get_active_themes`` returns ``[]``
+    (thematic pressure is off by default — §4.1.2, "most of the time themes behave as
+    passive representational structures"), so all three of §4.1.2's top-down channels
+    stay inert however hard the program clamps: theme→Slipnet spreading, the theme
+    contribution to bridge and description strength, and Thematic-bridge-scout posting.
+    Measured before this fix: 57 clamp activations, ``active_theme_types`` empty after
+    every one.
     """
     if pattern is None:
         return
@@ -514,8 +560,6 @@ def clamp_theme_pattern(pattern: Any, themespace: Themespace) -> None:
                     cluster.frozen = False
                     for theme in cluster.themes:
                         theme.activation = 0.0
-                        theme.positive_activation = 0.0
-                        theme.negative_activation = 0.0
 
             # Impose the pattern entries
             for entry in entries:
@@ -546,6 +590,13 @@ def clamp_theme_pattern(pattern: Any, themespace: Themespace) -> None:
                     for theme in cluster.themes:
                         if theme.activation != 0:
                             theme.frozen = True
+
+        # Step four of ``clamp-theme-pattern``: a clamped pattern turns thematic
+        # pressure on for its own theme type.  Guarded on the type actually naming a
+        # cluster, so a pattern of some other kind that reaches here cannot switch
+        # pressure on for a theme type that does not exist.
+        if theme_type and any(c.theme_type == theme_type for c in themespace.clusters):
+            themespace.thematic_pressure_on([theme_type])
 
 
 def unclamp_theme_pattern(themespace: Themespace) -> None:
@@ -624,13 +675,7 @@ def _set_theme_activation(
         if cluster.theme_type == theme_type and cluster.dimension == dimension:
             theme = cluster.get_theme(relation)
             if theme:
-                if activation >= 0:
-                    theme.positive_activation = activation
-                    theme.negative_activation = 0.0
-                else:
-                    theme.positive_activation = 0.0
-                    theme.negative_activation = activation
-                theme.activation = theme.positive_activation + theme.negative_activation
+                theme.activation = activation
             return
 
 
@@ -689,8 +734,15 @@ class TemporalTrace:
     def record_event(self, event: TraceEvent) -> None:
         """Record a new event."""
         self.events.append(event)
-        if event.event_type not in (CLAMP_START, CLAMP_END):
-            self._last_significant_event_time = event.codelet_count
+        # Every event counts, clamp events included.  §4.5.1: the progress-watcher
+        # "examines the most recent event in the Trace (which may or may not be the most
+        # recent clamp event) in order to determine how much time has elapsed since the
+        # event occurred" — the parenthesis is explicit that a clamp qualifies, and
+        # ``jootsing.ss:262`` asks for ``(get-elapsed-time 'any)``.  Excluding clamps
+        # meant a clamp made long after the last structure event was born already older
+        # than the 250-codelet settling period, so the next progress-watcher tore it
+        # down immediately.
+        self._last_significant_event_time = event.codelet_count
 
     def record_clamp_start(self, codelet_count: int, temperature: float) -> None:
         self.within_clamp_period = True
@@ -861,6 +913,7 @@ class TemporalTrace:
         themespace: Themespace,
         slipnet: Slipnet,
         codelet_count: int = 0,
+        coderack: Any = None,
     ) -> float:
         """Deactivate the last clamp event and return progress achieved.
 
@@ -880,7 +933,7 @@ class TemporalTrace:
         last_clamp = self.get_last_event(CLAMP_START)
         if last_clamp is not None and isinstance(last_clamp, ClampEvent):
             last_clamp.progress_achieved = progress
-            last_clamp.deactivate(self, themespace, slipnet)
+            last_clamp.deactivate(self, themespace, slipnet, coderack)
 
         return progress
 

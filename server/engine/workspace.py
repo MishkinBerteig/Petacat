@@ -776,6 +776,38 @@ class Workspace:
             objects.extend(string2.objects)
         return objects
 
+    def get_other_string(
+        self, string: WorkspaceString, orientation: str
+    ) -> WorkspaceString | None:
+        """The string *string* is bridged to along *orientation*.
+
+        Scheme: ``get-other-string`` (workspace.ss:161-172).  The initial and
+        target strings each sit at a corner of the two-by-two arrangement and so
+        have a different partner horizontally than vertically; the modified and
+        answer strings have only one partner each.
+
+        A thematic-bridge-scout picks one object from either side and then has to
+        know which string to look for its counterpart in (themes.ss:831-833) —
+        the scout chooses from *both* strings of a bridge type, so it cannot
+        assume the object came from the left-hand one.
+        """
+        stype = string.string_type
+        if stype == "initial":
+            return (
+                self.modified_string if orientation == "horizontal"
+                else self.target_string
+            )
+        if stype == "modified":
+            return self.initial_string
+        if stype == "target":
+            return (
+                self.answer_string if orientation == "horizontal"
+                else self.initial_string
+            )
+        if stype == "answer":
+            return self.target_string
+        return None
+
     def maximal_mapping(self, bridge_type: str) -> bool:
         """Check if bridges of this type cover all letters in both strings.
 

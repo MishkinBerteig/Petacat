@@ -1,5 +1,20 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { request, describeApiError } from '@/api/client'
 import { EditableTable, type ColumnDef } from './EditableTable'
+
+/**
+ * Send one write, and describe a refusal in terms of what was being attempted.
+ *
+ * The table shows the thrown message beside the row that was edited, so the sentence it
+ * throws is the sentence the reader gets.
+ */
+async function submit<T>(action: string, path: string, options: RequestInit): Promise<T> {
+  try {
+    return await request<T>(path, options)
+  } catch (err) {
+    throw new Error(describeApiError(err, action))
+  }
+}
 
 interface NodeDef {
   name: string
@@ -23,11 +38,16 @@ interface Props {
 export function SlipnetEditor({ editNodeName, onClearEditNode }: Props) {
   const [nodes, setNodes] = useState<NodeDef[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [highlightNode, setHighlightNode] = useState<string | null>(null)
   const highlightRef = useRef<HTMLTableRowElement>(null)
 
   const load = useCallback(() => {
-    fetch('/api/admin/slipnet/nodes').then(r => r.json()).then(setNodes).finally(() => setLoading(false))
+    setLoading(true)
+    request<NodeDef[]>('/admin/slipnet/nodes')
+      .then(data => { setNodes(data); setError(null) })
+      .catch(err => setError(describeApiError(err, 'load the slipnet nodes')))
+      .finally(() => setLoading(false))
   }, [])
 
   useEffect(() => { load() }, [load])
@@ -51,6 +71,15 @@ export function SlipnetEditor({ editNodeName, onClearEditNode }: Props) {
 
   if (loading) return <div className="text-muted">Loading nodes...</div>
 
+  if (error) {
+    return (
+      <div role="alert" className="text-xs" style={{ color: 'var(--error)' }}>
+        {error}{' '}
+        <button onClick={load} style={{ fontSize: 10, padding: '1px 6px' }}>Retry</button>
+      </div>
+    )
+  }
+
   return (
     <div>
       <div className="text-xs text-muted mb-2">{nodes.length} slipnet nodes (double-click to edit)</div>
@@ -60,27 +89,26 @@ export function SlipnetEditor({ editNodeName, onClearEditNode }: Props) {
         idKey="name"
         highlightId={highlightNode}
         highlightRef={highlightRef}
-        onCreate={async (row) => {
-          const res = await fetch('/api/admin/slipnet/nodes', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(row),
-          })
-          if (!res.ok) throw new Error(await res.text())
-          return res.json()
-        }}
+        onCreate={async (row) => submit<NodeDef>(
+          'create the slipnet node',
+          '/admin/slipnet/nodes',
+          { method: 'POST', body: JSON.stringify(row) },
+        )}
         onUpdate={async (name, row) => {
           const current = nodes.find(n => n.name === name)
           const merged = { ...current, ...row }
-          const res = await fetch(`/api/admin/slipnet/nodes/${encodeURIComponent(name)}`, {
-            method: 'PUT', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(merged),
-          })
-          if (!res.ok) throw new Error(await res.text())
-          return res.json()
+          return submit<NodeDef>(
+            `save the slipnet node "${name}"`,
+            `/admin/slipnet/nodes/${encodeURIComponent(name)}`,
+            { method: 'PUT', body: JSON.stringify(merged) },
+          )
         }}
         onDelete={async (name) => {
-          const res = await fetch(`/api/admin/slipnet/nodes/${encodeURIComponent(name)}`, { method: 'DELETE' })
-          if (!res.ok) throw new Error(await res.text())
+          await submit<unknown>(
+            `delete the slipnet node "${name}"`,
+            `/admin/slipnet/nodes/${encodeURIComponent(name)}`,
+            { method: 'DELETE' },
+          )
           return true
         }}
         onRefresh={load}

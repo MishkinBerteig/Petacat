@@ -26,7 +26,7 @@ and reported on in Chapter 5.
 Phases A–L are implemented. `python3 -m pytest tests/unit tests/integration tests/module`
 is green: **589 passed, 1 skipped** (the skip needs `sqlalchemy`, which only the Docker image
 has), including ~90 new tests that encode the dissertation's claims rather than the code's
-habits (`tests/module/test_dissertation_parity.py`, `tests/unit/test_slipnet_link_lengths.py`).
+habits (`tests/module/test_dissertation_parity.py`, `tests/seed_unit/test_slipnet_link_lengths.py`).
 
 Documented answers, measured over 20 seeds per problem at a 4000-codelet cap. "Before" is the
 same measurement taken before any of this work:

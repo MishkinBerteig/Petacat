@@ -75,35 +75,48 @@ def test_theme_is_negative_when_activation_below_zero():
 
 # --- Theme: boost ----------------------------------------------------------
 
-def test_boost_positive_factor_raises_positive_activation():
+def test_boost_raises_activation():
     t = Theme(THEME_TOP_BRIDGE, "direction", "identity")
-    t.boost(factor=100.0, boost_amount=7.0)  # amount = round(1.0 * 7) = 7
+    t.boost(factor=100.0, boost_amount=7.0)  # round(0 + 1.0 * 7) = 7
     assert t.activation == 7.0
 
 
-def test_boost_negative_factor_lowers_negative_activation():
+def test_boost_caps_activation_at_100():
     t = Theme(THEME_TOP_BRIDGE, "direction", "identity")
-    t.boost(factor=-100.0, boost_amount=7.0)  # amount = -7
-    assert t.activation == -7.0
-
-
-def test_boost_caps_positive_activation_at_100():
-    t = Theme(THEME_TOP_BRIDGE, "direction", "identity")
-    t.positive_activation = 98.0
+    t.activation = 98.0
     t.boost(factor=100.0, boost_amount=7.0)  # 98 + 7 -> capped 100
     assert t.activation == 100.0
 
 
+def test_boost_clips_at_zero_rather_than_going_negative():
+    """``themes.ss:674-679`` applies ``clip-positive`` to the whole boost.
+
+    A boost carries the Workspace's push toward a theme's positive pole, so it can
+    take a theme up to +100 and can take a negative theme up to zero, and stops there.
+    """
+    t = Theme(THEME_TOP_BRIDGE, "direction", "identity")
+    t.boost(factor=-100.0, boost_amount=7.0)
+    assert t.activation == 0.0
+
+
+def test_boost_moves_a_negative_theme_toward_zero():
+    """One signed activation: boosting a theme at -50 gives ``clip_positive(-43)``."""
+    t = Theme(THEME_TOP_BRIDGE, "direction", "identity")
+    t.activation = -50.0
+    t.boost(factor=100.0, boost_amount=7.0)
+    assert t.activation == 0.0
+
+
 # --- Theme: clamp ----------------------------------------------------------
 
-def test_clamp_negative_value_freezes_and_sets_negative_activation():
+def test_clamp_negative_value_freezes_and_sets_a_negative_activation():
     t = Theme(THEME_TOP_BRIDGE, "direction", "identity")
     t.clamp(-100.0)
     assert t.frozen is True
     assert t.activation == -100.0
 
 
-def test_clamp_positive_value_sets_positive_activation():
+def test_clamp_positive_value_sets_a_positive_activation():
     t = Theme(THEME_TOP_BRIDGE, "direction", "identity")
     t.clamp(60.0)
     assert t.activation == 60.0
@@ -167,7 +180,6 @@ def test_get_theme_returns_none_for_unknown_relation():
 
 def test_spread_activation_skips_frozen_cluster():
     cluster = ThemeCluster(THEME_TOP_BRIDGE, "direction", ["identity"])
-    cluster.themes[0].positive_activation = 40.0
     cluster.themes[0].activation = 40.0
     cluster.frozen = True
     cluster.spread_activation(_FakeMeta([], _SPREAD_PARAMS, _SPREAD_COEFFS))
@@ -176,7 +188,6 @@ def test_spread_activation_skips_frozen_cluster():
 
 def test_spread_activation_applies_decay_and_self_excitation():
     cluster = ThemeCluster(THEME_TOP_BRIDGE, "direction", ["identity"])
-    cluster.themes[0].positive_activation = 40.0
     cluster.themes[0].activation = 40.0
     cluster.spread_activation(_FakeMeta([], _SPREAD_PARAMS, _SPREAD_COEFFS))
     # net_input = -25 (decay) + 40*0.5 (self) = -5

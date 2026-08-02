@@ -323,6 +323,27 @@ class WorkspaceObject:
             return False
         return self.span == getattr(string, "length", 0)
 
+    def string_spanning_group(self) -> bool:
+        """Scheme: ``string-spanning-group?`` (workspace-objects.ss:353-354)."""
+        return hasattr(self, "objects") and self.spans_whole_string()
+
+    def get_num_of_spanning_bridges(self) -> int:
+        """How many spanning bridges already rest on this object.
+
+        Scheme: ``get-num-of-spanning-bridges`` (workspace-objects.ss:356-359).
+        Only a whole-string object can carry one.  ``conditions-for-bridge``
+        (themes.ss:986-992) uses this to decide which of two spanning groups to
+        try flipping first: the one already committed to more bridges is the more
+        expensive one to reinterpret, so it is tried second.
+        """
+        if not self.spans_whole_string():
+            return 0
+        return sum(
+            1
+            for bridge in (self.horizontal_bridge, self.vertical_bridge)
+            if bridge is not None
+        )
+
     def leftmost_in_string(self) -> bool:
         """Scheme: workspace-objects.ss:361-362."""
         return self.left_string_pos == 0
@@ -620,6 +641,30 @@ class WorkspaceObject:
 # ======================================================================
 #  Module-level helpers
 # ======================================================================
+
+# ----------------------------------------------------------------------
+#  Spanning predicates  (Scheme: workspace-objects.ss:653-672)
+#
+#  Free functions rather than methods because they are relations *between*
+#  two objects, and because the Scheme names them at module level and the
+#  thematic scout reads like the Scheme when it can call them by name.
+# ----------------------------------------------------------------------
+
+
+def lone_spanning_object(object1: Any, object2: Any) -> bool:
+    """One object covers its whole string and the other does not.
+
+    Scheme: ``lone-spanning-object?`` (workspace-objects.ss:653-659).  Such a
+    pair is not a correspondence worth pursuing: a whole string and a fragment
+    of another are not playing the same role.
+    """
+    return object1.spans_whole_string() != object2.spans_whole_string()
+
+
+def both_spanning_groups(object1: Any, object2: Any) -> bool:
+    """Scheme: ``both-spanning-groups?`` (workspace-objects.ss:662-665)."""
+    return object1.string_spanning_group() and object2.string_spanning_group()
+
 
 def _average(*values: float) -> float:
     """Simple average of the given values."""

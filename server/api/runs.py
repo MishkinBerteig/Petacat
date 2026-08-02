@@ -50,6 +50,10 @@ class CreateRunRequest(BaseModel):
     #: seed no longer reproduces a run, because execution order is not determined.
     #: Audit refuses anything above 1, since its forward log would not describe the
     #: order things actually happened in.
+    #:
+    #: 0 asks for this machine's own count — one worker per performance core, which
+    #: ``GET /api/system/numeric`` reports under ``derived.workers``.  It is how a
+    #: caller says "use the cores you have" without first learning how many there are.
     workers: int = 1
     #: Per-run overrides for the engine's fixed run parameters, by name.  Omitted
     #: parameters keep the global default.  An unknown name is rejected rather than
@@ -135,6 +139,12 @@ class StepResponse(BaseModel):
     answer_found: bool = False
     answer: str | None = None
     gave_up: bool = False
+    #: The run paused at its breakpoint after this codelet, so this is the last entry
+    #: of the batch and fewer codelets ran than were asked for.  The breakpoint stays
+    #: set and the run's status is ``paused``; a step made while the run is already at
+    #: the breakpoint runs no codelets and returns an empty list, and the run's status
+    #: reports that pause.
+    breakpoint_hit: bool = False
 
 
 # ------------------------------------------------------------------
@@ -206,9 +216,12 @@ async def step_run(
 ):
     svc = get_run_service()
     try:
-        results = await svc.step(session, run_id, req.n)
+        batch = await svc.step(session, run_id, req.n)
     except ValueError as e:
         raise HTTPException(404, str(e))
+    # The breakpoint stopped the batch after its final codelet, so that entry carries
+    # the flag: it is the codelet the run is paused at.
+    last = len(batch.results) - 1
     return [
         StepResponse(
             codelet_count=r.codelet_count,
@@ -216,8 +229,9 @@ async def step_run(
             answer_found=r.answer_found,
             answer=r.answer,
             gave_up=r.gave_up,
+            breakpoint_hit=batch.breakpoint_hit and i == last,
         )
-        for r in results
+        for i, r in enumerate(batch.results)
     ]
 
 
@@ -250,11 +264,16 @@ async def get_coderack(run_id: int):
 
 @router.get("/{run_id}/temperature")
 async def get_temperature(run_id: int):
+    """The temperature and its clamp state, as the engine holds them.
+
+    ``clamped`` is what the gauge's clamped indicator follows, so the indicator
+    reports the engine and survives a remount of the display.
+    """
     svc = get_run_service()
-    temp = svc.get_temperature(run_id)
-    if temp is None:
+    state = svc.get_temperature_state(run_id)
+    if state is None:
         raise HTTPException(404, f"Run {run_id} not found")
-    return {"temperature": temp}
+    return {"run_id": run_id, **state}
 
 
 # ------------------------------------------------------------------
@@ -606,6 +625,66 @@ async def get_trace(
     return {"run_id": run_id, "events": events, "limit": limit, "offset": offset}
 
 
+@router.get("/{run_id}/trace/export")
+async def export_trace(run_id: int, session: AsyncSession = Depends(get_session)):
+    """Export full trace as downloadable JSON."""
+    from fastapi.responses import JSONResponse
+
+    svc = get_run_service()
+    events = await svc.get_trace_events_from_db(session, run_id, limit=100000)
+    if not events:
+        # Fall back to in-memory
+        mem_events = svc.get_trace_events(run_id, limit=100000)
+        if mem_events is not None:
+            events = mem_events
+    return JSONResponse(
+        content={"run_id": run_id, "events": events or []},
+        headers={"Content-Disposition": f"attachment; filename=trace_run_{run_id}.json"},
+    )
+
+
+# ``export`` is registered above ``/{event_number}``: FastAPI matches routes in
+# registration order, so the literal path has to be declared before the parameterised
+# one that would otherwise swallow it.
+@router.get("/{run_id}/trace/{event_number}")
+async def get_trace_event(run_id: int, event_number: int):
+    """One Trace event in full — its structures, theme-pattern and strength.
+
+    §2.4.3: Trace events are "themselves subject to examination by codelets"; MetaCat's
+    Trace window makes them examinable by the user too, and a log with no addressable
+    events is the one thing the Trace display exists not to be.
+    """
+    svc = get_run_service()
+    detail = svc.describe_trace_event(run_id, event_number)
+    if detail is None:
+        raise HTTPException(404, f"Event {event_number} not found in run {run_id}")
+    return detail
+
+
+@router.post("/{run_id}/trace/{event_number}/display")
+async def display_trace_event(run_id: int, event_number: int):
+    """Impose that event's theme-pattern over the live Themespace, or restore it.
+
+    The ``display`` message every MetaCat event answers, which saves the live state and
+    imposes the episode's own pattern; calling it again puts the live state back.
+    """
+    svc = get_run_service()
+    try:
+        return svc.impose_trace_event(run_id, event_number)
+    except ValueError as exc:
+        raise HTTPException(404, str(exc)) from None
+
+
+@router.post("/{run_id}/themespace/restore")
+async def restore_themespace(run_id: int):
+    """Stop displaying a past episode (Scheme: ``restore-current-state``)."""
+    svc = get_run_service()
+    try:
+        return svc.restore_themespace(run_id)
+    except ValueError as exc:
+        raise HTTPException(404, str(exc)) from None
+
+
 def _project_memory(memory) -> dict:
     """An in-process ``EpisodicMemory`` in the shape the Memory panel reads.
 
@@ -634,6 +713,8 @@ def _project_memory(memory) -> dict:
                 "bottom_themes": a.bottom_themes,
                 "unjustified_themes": a.unjustified_themes,
                 "top_rule_abstractness": a.top_rule_abstractness,
+                "bottom_rule_abstractness": a.bottom_rule_abstractness,
+                "theme_abstractness": a.theme_abstractness,
                 "is_coherent": a.is_coherent,
             }
             for a in memory.answers
@@ -657,15 +738,15 @@ def _project_memory(memory) -> dict:
 async def get_memory(run_id: int, session: AsyncSession = Depends(get_session)):
     """The Episodic Memory *this run* is actually thinking against.
 
-    For a Normal or Audit Run that is the shared memory, read from the database, and
-    nothing here changes.  For a Fast Run it is not: a Fast Run is given an ephemeral
-    ``EpisodicMemory`` of its own precisely so that it contributes nothing to the
-    Training Session, and serving it the shared one made the panel a straightforward
-    lie — it showed answers the run could not be reminded of, and would go on showing
-    them after the run found an answer that never appeared.
+    That is the shared Training Session memory in **every** mode.  Mode chooses where a
+    run is recorded, not what it is: a Fast Run takes part in the session exactly as a
+    Normal or Audit Run does, so it is reminded of earlier answers and its own answers
+    are there for the runs that follow.
 
-    ``scope`` says which of the two was served, because the difference is invisible
-    otherwise and the two are most easily confused when the ephemeral one is empty.
+    A Fast Run is served from the live object rather than the database — it has no rows,
+    which is the whole point — but the object is the same one.  ``scope`` says which
+    read was taken, so a panel showing a Fast Run cannot be mistaken for one showing
+    stale rows.
     """
     from server.services.sinks import MODE_FAST, MODE_NORMAL
 
@@ -675,7 +756,7 @@ async def get_memory(run_id: int, session: AsyncSession = Depends(get_session)):
     if mode == MODE_FAST and runner is not None and runner.ctx is not None:
         return {
             **_project_memory(runner.ctx.memory),
-            "scope": "run",
+            "scope": "live",
             "run_id": run_id,
             "mode": mode,
         }
@@ -699,20 +780,3 @@ async def get_commentary(
         raise HTTPException(404, f"Run {run_id} not found")
     return result
 
-
-@router.get("/{run_id}/trace/export")
-async def export_trace(run_id: int, session: AsyncSession = Depends(get_session)):
-    """Export full trace as downloadable JSON."""
-    from fastapi.responses import JSONResponse
-
-    svc = get_run_service()
-    events = await svc.get_trace_events_from_db(session, run_id, limit=100000)
-    if not events:
-        # Fall back to in-memory
-        mem_events = svc.get_trace_events(run_id, limit=100000)
-        if mem_events is not None:
-            events = mem_events
-    return JSONResponse(
-        content={"run_id": run_id, "events": events or []},
-        headers={"Content-Disposition": f"attachment; filename=trace_run_{run_id}.json"},
-    )

@@ -13,6 +13,23 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Protocol, runtime_checkable
 
+from server.engine.answer_comparison import _fill
+
+
+def _reporting(templates: dict[str, Any] | None, key: str) -> dict[str, Any]:
+    """One ``answer_reporting`` block from the seed data.
+
+    Every ``emit_*`` helper below renders from these templates, so the paragraphs a run
+    produces are editable in the same place as the comparison prose.  ``templates`` is
+    whatever the caller's ``MetadataProvider`` holds — the database, in a served run;
+    the seed data serves callers that have no provider.
+    """
+    from server.engine.metadata import default_commentary_templates
+
+    resolved = templates or default_commentary_templates()
+    section = (resolved.get("answer_reporting") or {}).get(key)
+    return section if isinstance(section, dict) else {}
+
 
 @dataclass
 class CommentaryParagraph:
@@ -26,22 +43,14 @@ class CommentaryParagraph:
 
 @runtime_checkable
 class CommentaryWriter(Protocol):
-    """Where commentary goes — an injected dependency rather than a fixed log.
+    """Where commentary goes — an injected dependency.
 
-    Commentary is output and nothing else: the engine calls ``emit_*``, which calls
-    ``add_comment``, and no part of cognition ever reads a paragraph back.  ``render``,
-    ``get_paragraphs`` and ``count`` are used only by the API.
+    Commentary is output: the engine calls ``emit_*``, which calls ``add_comment``.
+    ``render``, ``get_paragraphs`` and ``count`` serve the API.
 
-    That asymmetry is what makes commentary a *sink* concern.  Fast Run must construct
-    nothing storable, and a log of formatted prose that no one will read is exactly the
-    kind of thing that requirement is about.  Rather than teach the engine to ask
-    whether it is in Fast Run — which would put a mode flag inside
-    ``server/engine/`` and undermine the whole point of the ``RunSink`` port — the
-    engine emits unconditionally and Fast Run supplies a writer that discards.
-
-    ``render`` and ``count`` are part of the protocol because the API calls them
-    regardless of mode.  Fast means *not written down*, not *not observable*: a Fast
-    Run must still answer ``GET /commentary``, and answer it with nothing.
+    The engine emits unconditionally. Every mode supplies a real
+    :class:`CommentaryLog`, so a Run narrates itself identically in each, and
+    ``GET /commentary`` answers with that narration in every mode.
     """
 
     def add_comment(
@@ -101,48 +110,6 @@ class CommentaryLog:
         return len(self._paragraphs)
 
 
-class DiscardingCommentaryLog:
-    """A commentary writer that keeps nothing — Fast Run's (WP3.6, §A2 requirement 2).
-
-    Deliberately a discarder rather than a collector nobody drains.  A buffering
-    implementation would satisfy "nothing is written to the database" while still
-    formatting every paragraph and holding the result, which is the requirement's
-    failure mode, not its satisfaction.  ``__slots__`` is empty so there is nowhere to
-    accumulate even by accident, and the allocation probe in WP3.6 can assert that a
-    Fast Run allocates no paragraphs at all.
-    """
-
-    __slots__ = ()
-
-    def add_comment(
-        self,
-        eliza_text: str,
-        technical_text: str,
-        codelet_count: int = 0,
-        event_type: str = "",
-    ) -> None:
-        """Accept and forget.  The arguments are already-built strings, which is the
-        one cost this cannot avoid: the f-strings in the ``emit_*`` helpers are
-        evaluated at the call site.  They are transient and never retained, so nothing
-        accumulates; removing even that would mean the engine knowing its mode."""
-
-    def render(self, eliza_mode: bool = False) -> str:
-        return ""
-
-    def get_paragraphs(self) -> list[CommentaryParagraph]:
-        return []
-
-    def clear(self) -> None:
-        pass
-
-    @property
-    def count(self) -> int:
-        return 0
-
-    def __repr__(self) -> str:
-        return "DiscardingCommentaryLog()"
-
-
 # ---- Commentary generation helpers ----------------------------------------
 
 
@@ -191,24 +158,25 @@ def emit_answer_discovered(
 ) -> None:
     """Emit commentary when an answer is discovered (non-justify mode).
 
-    Scheme: answers.ss:61-75.
+    Scheme: answers.ss:61-75.  The exclamation mark is reserved for the two ends of the
+    scale — ``(or (< quality 30) (>= quality 85))`` at ``answers.ss:68`` — so the
+    program is emphatic about an answer it thinks is terrible as well as one it thinks
+    is great.
     """
-    also = "also " if prior_answer_count > 0 else ""
-    punct = "!" if quality >= 85 else "."
+    section = _reporting(templates, "discovery")
+    also = section.get("also", "") if prior_answer_count > 0 else ""
+    punctuation = "!" if (quality < 30 or quality >= 85) else "."
+    suffix = "quality_suffix_bad" if quality < 60 else "quality_suffix_good"
 
-    if quality < 60:
-        eliza = (
-            f'The answer "{answer_string}" {also}occurs to me, '
-            f"but that's {quality_phrase}{punct}"
-        )
-    else:
-        eliza = (
-            f'The answer "{answer_string}" {also}occurs to me.  '
-            f"I think this answer is {quality_phrase}{punct}"
-        )
-
-    technical = (
-        f'Found the answer "{answer_string}".  Answer quality = {quality:.0f}.'
+    eliza = _fill(
+        section.get("eliza_prefix", ""), answer=answer_string, also=also
+    ) + _fill(
+        section.get(suffix, ""),
+        quality_phrase=quality_phrase,
+        punctuation=punctuation,
+    )
+    technical = _fill(
+        section.get("technical", ""), answer=answer_string, quality=f"{quality:.0f}"
     )
     commentary.add_comment(
         eliza, technical, codelet_count=codelet_count, event_type="answer_discovered"
@@ -226,22 +194,18 @@ def emit_answer_justified(
 
     Scheme: answers.ss:47-59.
     """
+    section = _reporting(templates, "justify_success")
     if quality < 60:
-        eliza = (
-            f"Aha!  I see why this answer makes sense, "
-            f"but it's a {quality_phrase} answer, in my opinion."
-        )
+        suffix = "quality_suffix_bad"
     elif quality >= 85:
-        eliza = (
-            f"Aha!  I see why this answer makes sense.  "
-            f"I think it's a {quality_phrase} answer!"
-        )
+        suffix = "quality_suffix_extreme"
     else:
-        eliza = (
-            f"Aha!  I see why this answer makes sense.  "
-            f"I think it's a {quality_phrase} answer."
-        )
-    technical = f"Successfully justified answer.  Answer quality = {quality:.0f}."
+        suffix = "quality_suffix_normal"
+
+    eliza = section.get("eliza_prefix", "") + _fill(
+        section.get(suffix, ""), quality_phrase=quality_phrase
+    )
+    technical = _fill(section.get("technical", ""), quality=f"{quality:.0f}")
     commentary.add_comment(
         eliza, technical, codelet_count=codelet_count, event_type="answer_justified"
     )
@@ -251,18 +215,20 @@ def emit_answer_unjustified(
     commentary: CommentaryLog,
     slippage_names: str,
     codelet_count: int,
+    templates: dict[str, Any] | None = None,
+    slippage_count: int = 1,
 ) -> None:
     """Emit commentary when an answer has unjustified slippages.
 
-    Scheme: answers.ss:36-45.
+    Scheme: answers.ss:36-45.  "slippage" is pluralised on the number of slippages.
     """
-    eliza = (
-        "Okay, I'm stumped.  This answer makes no sense to me.  "
-        f"I see no way to make the necessary {slippage_names} slippage(s) here."
+    section = _reporting(templates, "unjustified_slippages")
+    plural = "" if slippage_count == 1 else "s"
+    eliza = _fill(
+        section.get("eliza", ""), slippage_names=slippage_names, plural=plural
     )
-    technical = (
-        f"Run terminated.  Unable to make the necessary "
-        f"{slippage_names} slippage(s)."
+    technical = _fill(
+        section.get("technical", ""), slippage_names=slippage_names, plural=plural
     )
     commentary.add_comment(
         eliza, technical, codelet_count=codelet_count, event_type="answer_unjustified"
@@ -294,15 +260,18 @@ def emit_snag(
 def emit_give_up(
     commentary: CommentaryLog,
     codelet_count: int,
+    templates: dict[str, Any] | None = None,
 ) -> None:
     """Emit commentary when the system gives up.
 
     Scheme: answers.ss:86-92.
     """
-    eliza = "Excuse me -- I think I'll go get some more punch."
-    technical = "Run terminated."
+    section = _reporting(templates, "give_up")
     commentary.add_comment(
-        eliza, technical, codelet_count=codelet_count, event_type="give_up"
+        section.get("eliza", ""),
+        section.get("technical", ""),
+        codelet_count=codelet_count,
+        event_type="give_up",
     )
 
 
@@ -479,149 +448,52 @@ def emit_reminding(
 
 
 # ---------------------------------------------------------------------------
-# Answer comparison  (§4.7.3 – §4.7.4)
+# Answer comparison and explanation  (§4.7.3 – §4.7.4)
 #
 # "What is interesting is Metacat's deeper capacity to recognize subtle
 # similarities and differences between answers on the basis of the common
 # themes, the differing themes, the unique themes, the unjustified themes, the
 # snag-justified themes, and the rules that constitute answer descriptions."
 #
-# The English is a facade over that classification, assembled from the
-# phrase-templates in seed_data/commentary_templates.json.
+# The English is assembled from seed_data/commentary_templates.json.  The assembly
+# itself lives in server/engine/answer_comparison.py, which is the port of
+# answers.ss:336-425 and answers.ss:434-882; these two entry points are here because
+# this is the module the rest of the program asks for commentary.
 # ---------------------------------------------------------------------------
-
-_THEME_DIMENSION_NAMES = {
-    "plato-string-position-category": "string position",
-    "plato-alphabetic-position-category": "alphabetic position",
-    "plato-direction-category": "direction",
-    "plato-group-category": "group type",
-    "plato-bond-facet": "bond facet",
-    "plato-letter-category": "letter category",
-    "plato-length": "length",
-    "plato-object-category": "object type",
-    "plato-bond-category": "bond type",
-}
-
-_RELATION_NAMES = {
-    "identity": "sameness",
-    "opposite": "symmetry",
-    "successor": "successorship",
-    "predecessor": "predecessorship",
-    "diff": "difference",
-}
-
-
-def _theme_phrase(dimension: str, relation: str) -> str:
-    """Render one theme as an English noun phrase."""
-    dim = _THEME_DIMENSION_NAMES.get(dimension, dimension.replace("plato-", ""))
-    rel = _RELATION_NAMES.get(relation, relation)
-    if dimension == "plato-bond-facet" and relation == "diff":
-        return "seeing the strings as bonded together in different ways"
-    return f"seeing {dim} {rel} between the strings"
-
-
-def _join(phrases: list[str]) -> str:
-    if not phrases:
-        return ""
-    if len(phrases) == 1:
-        return phrases[0]
-    return ", ".join(phrases[:-1]) + " and " + phrases[-1]
 
 
 def describe_answer_comparison(
     answer_a: Any,
     answer_b: Any,
-    comparison: dict[str, Any],
+    memory: Any = None,
+    templates: dict[str, Any] | None = None,
+    meta: Any = None,
 ) -> dict[str, Any]:
-    """Explain, in English, how two answers relate and which is preferred."""
-    name_a = answer_a.problem[3]
-    name_b = answer_b.problem[3]
+    """Explain, in English, how two answers relate and which is preferred.
 
-    similarities = [
-        _theme_phrase(dim, rel) for dim, rel in comparison["common_themes"].items()
-    ]
+    Scheme: ``get-answer-comparison-text`` (``answers.ss:434-882``).
 
-    differences: list[str] = []
-    for dim, (a_rel, b_rel) in comparison["differing_themes"].items():
-        differences.append(
-            f"{name_a} rests on {_theme_phrase(dim, a_rel)}, "
-            f"while {name_b} rests on {_theme_phrase(dim, b_rel)}"
-        )
+    ``memory`` is needed because two of MetaCat's distinctions are not properties of
+    the answers at all but of what else the program remembers: whether an unjustified
+    theme is snag-justified (§4.7.3) and what the snag was.  Pass it and the caveats
+    appear; leave it out and the comparison is the theme-and-rule one.
+    """
+    from server.engine.answer_comparison import compare_answers_text
 
-    uniques: list[str] = []
-    for dim, rel in comparison["a_unique_themes"].items():
-        uniques.append(
-            f"In {name_b}'s case, the idea of {_theme_phrase(dim, rel)} does not arise."
-        )
-    for dim, rel in comparison["b_unique_themes"].items():
-        uniques.append(
-            f"In {name_a}'s case, the idea of {_theme_phrase(dim, rel)} does not arise."
-        )
+    return compare_answers_text(answer_a, answer_b, memory, templates, meta)
 
-    caveats: list[str] = []
-    for label, classified in (
-        (name_a, comparison["a_unjustified_themes"]),
-        (name_b, comparison["b_unjustified_themes"]),
-    ):
-        for dim, verdict in classified.items():
-            if verdict == "snag_justified":
-                caveats.append(
-                    f"{label} relies on {_theme_phrase(dim, 'diff')}, which avoids a "
-                    f"snag that would otherwise arise."
-                )
-            else:
-                caveats.append(
-                    f"{label} relies on {_theme_phrase(dim, 'diff')}, although there "
-                    f"is no good reason for doing so."
-                )
 
-    coherence: list[str] = []
-    for label, coherent in ((name_a, comparison["a_coherent"]), (name_b, comparison["b_coherent"])):
-        if not coherent:
-            coherence.append(
-                f"The answer {label}, however, seems incoherent to me, since it "
-                f"involves abstract similarities while at the same time viewing the "
-                f"top change in a more literal way."
-            )
+def describe_answer(
+    answer: Any,
+    memory: Any = None,
+    templates: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Say what a single answer is based on, in both voices.
 
-    preferred = comparison["preferred"]
-    judgments = {
-        "fewer_unjustified": "since it involves fewer unjustified ideas",
-        "one_incoherent": "since it is more coherent",
-        "richer_ideas": "since it is based on a richer set of ideas",
-        "different_quality": "since it is the higher-quality answer",
-    }
-    if preferred["answer"] is None:
-        verdict = "All in all, I'd say they're about equally good answers."
-    else:
-        reason = judgments.get(preferred["reason"], "on balance")
-        verdict = (
-            f"All in all, I'd say {preferred['answer']} is the better answer, {reason}."
-        )
+    Scheme: ``explain`` (``answers.ss:310-333``).  MetaCat offers this alongside
+    comparison: it is what the program says about one answer on its own, rendered from
+    the seed data's ``answer_explanation`` section.
+    """
+    from server.engine.answer_comparison import explain_answer
 
-    paragraphs: list[str] = []
-    if similarities:
-        paragraphs.append(
-            f"The answers {name_a} and {name_b} are alike in {_join(similarities)}."
-        )
-    if differences:
-        paragraphs.append(_join(differences).capitalize() + ".")
-    paragraphs.extend(uniques)
-    paragraphs.extend(caveats)
-    paragraphs.extend(coherence)
-    if not similarities and not differences and not uniques:
-        paragraphs.append(
-            f"I can't see much to say about how {name_a} and {name_b} relate — "
-            f"neither answer settled on a clear set of ideas."
-        )
-    paragraphs.append(verdict)
-
-    return {
-        "text": "  ".join(paragraphs),
-        "paragraphs": paragraphs,
-        "common": similarities,
-        "differing": differences,
-        "unique": uniques,
-        "caveats": caveats,
-        "verdict": verdict,
-    }
+    return explain_answer(answer, memory, templates)

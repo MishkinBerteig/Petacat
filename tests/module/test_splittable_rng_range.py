@@ -111,6 +111,9 @@ def test_the_swap_needs_no_engine_changes():
     assert original <= replacement, f"missing: {sorted(original - replacement)}"
 
 
+# This one runs the engine in-process, so it runs once per numeric backend in the
+# matrix. The range check above runs in a worker pool that sets its own backend.
+@pytest.mark.numeric_matrix
 def test_a_short_run_completes_with_the_splittable_rng():
     """A cheap smoke test, so the unmarked suite still exercises the swap."""
     seed_dir = os.path.join(

@@ -11,6 +11,7 @@ from __future__ import annotations
 import math
 from typing import TYPE_CHECKING, Any
 
+from server.engine.slipnet import opposite_node
 from server.engine.workspace_structures import WorkspaceStructure
 
 if TYPE_CHECKING:
@@ -233,26 +234,8 @@ class Bond(WorkspaceStructure):
                   (bond-category 'get-related-node opposite),
                   bond-facet, to-descriptor, from-descriptor)
         """
-        # Try to get opposite bond category via slipnet
-        new_category = self.bond_category
-        new_dir = self.direction
-        opposite_method = getattr(self.bond_category, "get_related_node", None)
-        if opposite_method is not None:
-            try:
-                opp_cat = opposite_method("plato-opposite")
-                if opp_cat is not None:
-                    new_category = opp_cat
-            except Exception:
-                pass
-        if self.direction is not None:
-            opp_dir_method = getattr(self.direction, "get_related_node", None)
-            if opp_dir_method is not None:
-                try:
-                    opp_dir = opp_dir_method("plato-opposite")
-                    if opp_dir is not None:
-                        new_dir = opp_dir
-                except Exception:
-                    pass
+        new_category = opposite_node(self.bond_category)
+        new_dir = opposite_node(self.direction)
         return Bond(
             from_object=self.to_object,
             to_object=self.from_object,

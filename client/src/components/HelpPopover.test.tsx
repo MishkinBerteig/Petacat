@@ -17,7 +17,8 @@ import { HelpPopover } from './HelpPopover'
 import { useHelpStore } from '@/hooks/useHelp'
 import { getGlossaryHelp, getComponentHelp } from '@/api/client'
 
-vi.mock('@/api/client', () => ({
+vi.mock('@/api/client', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/api/client')>()),
   getConceptHelp: vi.fn(),
   getCodeletHelp: vi.fn(),
   getComponentHelp: vi.fn(),

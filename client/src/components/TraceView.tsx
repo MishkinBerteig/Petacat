@@ -2,7 +2,9 @@
 // TraceView -- Scrollable, filterable list of temporal trace events
 // ---------------------------------------------------------------------------
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+
+import { displayTraceEvent } from '@/api/client';
 import { useRunStore } from '@/store/runStore';
 import type { TraceEvent } from '@/types';
 
@@ -51,7 +53,21 @@ function uniqueTypes(events: TraceEvent[]): string[] {
  * carried (WP3.9). The filtering, the search and the auto-scroll are all functions
  * of the event list, so nothing had to change to make them work on a recorded one.
  */
-export function TraceList({ trace }: { trace: TraceEvent[] }) {
+export function TraceList({
+  trace,
+  onSelect,
+  selected,
+}: {
+  trace: TraceEvent[];
+  /**
+   * Click an event to *display* it: MetaCat imposes that event's theme-pattern over
+   * the live Themespace and highlights its structures (`trace-graphics.ss:66-79` ->
+   * the `display` message every event answers). Absent in the review surfaces, where
+   * there is no live Themespace to impose anything over.
+   */
+  onSelect?: (event: TraceEvent) => void;
+  selected?: number | null;
+}) {
   const [filter, setFilter] = useState<string>('');
   const [search, setSearch] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -127,12 +143,17 @@ export function TraceList({ trace }: { trace: TraceEvent[] }) {
         {filtered.map((evt) => (
           <div
             key={evt.event_number}
+            onClick={onSelect ? () => onSelect(evt) : undefined}
+            title={onSelect ? 'click to display this moment; click again to restore' : undefined}
             style={{
               display: 'flex',
               gap: 6,
               padding: '1px 0',
               borderBottom: '1px solid var(--bg-primary)',
               alignItems: 'baseline',
+              cursor: onSelect ? 'pointer' : 'default',
+              background:
+                selected === evt.event_number ? 'rgba(255,215,0,0.12)' : 'transparent',
             }}
           >
             <span
@@ -196,8 +217,35 @@ export function TraceList({ trace }: { trace: TraceEvent[] }) {
   );
 }
 
-/** The live Trace: `TraceList` fed from the run store. */
+/**
+ * The live Trace: `TraceList` fed from the run store, and interrogable.
+ *
+ * §2.4.3 makes Trace events "themselves subject to examination"; MetaCat's Trace window
+ * makes them examinable by the user as well, and clicking one re-imposes the theme
+ * pattern that was current when it happened (`trace-graphics.ss:66-79`). Clicking the
+ * same event again restores the live Themespace, as it does in MetaCat.
+ */
 export function TraceView() {
   const trace = useRunStore((s) => s.trace);
-  return <TraceList trace={trace} />;
+  const runId = useRunStore((s) => s.runId);
+  const refreshThemespace = useRunStore((s) => s.refreshThemespace);
+  const [displaying, setDisplaying] = useState<number | null>(null);
+
+  const handleSelect = useCallback(
+    async (event: TraceEvent) => {
+      if (runId == null) return;
+      const res = await displayTraceEvent(runId, event.event_number);
+      setDisplaying(res.displaying);
+      await refreshThemespace();
+    },
+    [runId, refreshThemespace],
+  );
+
+  return (
+    <TraceList
+      trace={trace}
+      selected={displaying}
+      onSelect={runId == null ? undefined : handleSelect}
+    />
+  );
 }

@@ -25,8 +25,11 @@ license change was authorised by Dr. Marshall directly (see
 > **Status.** Petacat implements all seven of Metacat's core components
 > (Workspace, Slipnet, Coderack, Themespace, Temporal Trace, Episodic Memory,
 > Temperature) and generates answers to letter-string analogy problems
-> end-to-end. It ships with 1,049 tests covering the engine, the API, and the
-> help/config system. Underneath the seven components sits an execution
+> end-to-end. Episodic Memory shapes the runs that inherit it: a run declines an
+> answer already held for the same problem and rules, so repeating a problem
+> within a [Training Session](#persistence-modes-and-training-sessions) explores
+> a different answer each time. It ships with 1,533 test cases covering the engine, the API, and the
+> help/config system, run on both the CPU and the GPU numeric backends. Underneath the seven components sits an execution
 > substrate — three [persistence modes](#persistence-modes-and-training-sessions),
 > a [GPU numeric substrate](#the-numeric-substrate), and
 > [barrier-free codelet parallelism](#free-running-codelets-across-cpu-cores) —
@@ -47,14 +50,32 @@ license change was authorised by Dr. Marshall directly (see
   Metal (MLX), with vectorised-CPU and pure-Python backends behind the same seam
 - **Parallelism**: codelets can run across CPU cores with no global barrier
 
-Engine parameters, slipnet topology, codelet definitions, and theme dimensions
-are stored in the database and loaded at startup. Codelet behaviour is expressed
-as Python source strings in the `codelet_type_defs` table, compiled once at
-startup, and executed via `exec()` in a sandboxed namespace.
+Engine parameters, slipnet topology, codelet definitions and theme dimensions
+live in `seed_data/*.json`, which the API reads at startup and which seeds the
+database. Codelet behaviour is expressed as Python source strings, compiled once
+at startup and executed via `exec()` in a sandboxed namespace.
+
+Edit that configuration through the Configuration screen: every one of the
+twelve collections has a tab that creates, updates and deletes its rows, and a
+change is written to the database and picked up by the next run created. **Export Current Settings to
+Seed Data** writes the database's configuration back to `seed_data/*.json`,
+which is how a configuration arrived at in the app becomes the project's
+starting point. Each replaced file is copied first, under a timestamp, into
+`seed_data/.backups/`.
+
+`GET /api/admin/export` and `POST /api/admin/import` carry the same twelve
+collections as one JSON object — slipnet nodes and links, codelet types, engine
+parameters, urgency levels, formula coefficients, demo problems, theme
+dimensions, posting rules, commentary templates, slipnet layout and help topics.
+Export orders every collection by primary key, so two exports of one
+configuration are the same bytes and a backup diffs against the file it came
+from. Import matches each row on its primary key, applies every collection the
+payload names, reports the row count it wrote for each, and runs as a single
+transaction.
 
 The engine itself is **database-free**: nothing under `server/engine/` imports
 SQLAlchemy, opens a session, or awaits I/O, and a test
-(`tests/unit/test_engine_purity.py`) fails if that ever stops being true. It is
+(`tests/architecture/test_engine_purity.py`) fails if that ever stops being true. It is
 worth enforcing rather than merely observing, because two useful properties
 depend on it: a run can execute with the database stopped, and the engine can be
 imported into a free-threaded interpreter without the GIL being switched back
@@ -69,7 +90,7 @@ on.
 | Coderack | `server/engine/coderack.py` | Stochastic scheduler (7 urgency bins, 100 max codelets) |
 | Themespace | `server/engine/themes.py` | Self-watching: theme clusters, activation dynamics |
 | Temporal Trace | `server/engine/trace.py` | Chronological event log |
-| Episodic Memory | `server/engine/memory.py` | Cross-run answer/snag storage |
+| Episodic Memory | `server/engine/memory.py` | Cross-run answer/snag storage; gates rediscovery |
 | Temperature | `server/engine/temperature.py` | Global exploration/exploitation control (0–100) |
 | Runner | `server/engine/runner.py` | Main control loop (`init_mcat`, `step_mcat`, `update_everything`) |
 
@@ -83,7 +104,8 @@ original Scheme `run.ss:295-315`):
 3. Update object importances, unhappiness, salience
 4. Snag-period stochastic exit
 5. Clamp-period expiration check
-6. Tick clamp expirations (slipnet + temperature)
+6. Tick clamp expirations (slipnet + temperature) — Petacat's own mechanism, so a
+   clamp lapses on the update cycle that reaches its expiry
 7. Spread activation: workspace → themespace
 8. Spread activation within themespace
 9. Update slipnet: theme→slipnet, then internal decay/spread/jump
@@ -110,9 +132,14 @@ brew install postgresql@17 python@3.14 node
 brew services start postgresql@17
 ```
 
-- **PostgreSQL 17** holds all domain knowledge (slipnet, codelets, parameters,
-  help text) and the history of every run. There is no file-backed fallback —
-  the API does not start without a database.
+- **PostgreSQL 17** holds the history of every run — recorded states, traces,
+  audit actions and episodic memory — and the editable copy of the configuration
+  that the Configuration screen writes to. The API requires it to start.
+
+  The schema lives in `alembic/versions/`. Startup creates any missing tables, so
+  a fresh database is ready as soon as the API comes up. Bring an existing
+  database forward with `.venv/bin/alembic upgrade head`, which is what applies
+  the column additions a newer version expects.
 - **Python 3.14** is the only supported interpreter (`requires-python = ">=3.14"`
   in `pyproject.toml`). Pinning one version matters here: the engine is a
   measurement subject, and results taken on two interpreters are not comparable.
@@ -212,7 +239,7 @@ view. The two left-hand panels split along *what* versus *how*:
 Modified, Target, and optionally Answer — supplying an Answer switches the
 engine into justification mode), the **Seed**, and the demo dropdown.
 
-**Run Controls** (below it) decides how that problem executes, in four groups.
+**Run Controls** (below it) decides how that problem executes, in six groups: Run, Recording, Engine parameters, What this run is, Manual stepping, and Settings.
 
 **Run** picks between the two mutually exclusive execution strategies, and the
 action button and pacing control follow the choice:
@@ -277,12 +304,14 @@ drives the engine:
 - **Posting Rules** -- Codelet posting patterns
 - **Commentary Templates** -- Natural-language output templates
 - **Enums** -- The enum tables (bond categories, proposal levels, and the rest)
-- **Help Topics** -- The in-app help text, editable in place; see
-  [LOCALIZATION.md](LOCALIZATION.md) for the JSON that backs it
+- **Help Topics** -- The in-app help text, editable in place and backed by
+  `seed_data/help_topics.en.json`
 
 All tables support inline editing (double-click a cell to edit). Changes are
-saved to the database immediately. Use the **Export** / **Import** buttons to
-back up or restore the full configuration as a JSON file.
+saved to the database immediately and apply to the next run created; a run keeps
+the configuration it started with for its whole life. Use the **Export** /
+**Import** buttons to move the full configuration as a JSON file, and **Export
+Current Settings to Seed Data** to write it back to `seed_data/*.json`.
 
 You can also navigate directly to a node's configuration by double-clicking it
 in the Slipnet graph (to open the node focus view) and clicking **Edit** when
@@ -293,15 +322,18 @@ no run is active.
 Petacat has two test suites:
 
 - **Backend** (`tests/`) — Python / pytest. Covers the engine, the API, the
-  help-topic system, and database persistence. Organised into four layers:
-  `unit` (pure functions and data structures), `integration` (seed data and
-  codelet compilation), `module` (component assembly), and `e2e` (full HTTP
-  stack against a running database). All four run in a single command against
-  the local Postgres — 1,049 tests, nothing skipped. See
-  [TESTING.md](TESTING.md) for the layer breakdown, the unit-test rules,
-  determinism requirements, test-double conventions, how to run the suite under
-  the free-threaded interpreter, and what to check first if the free-running
-  tests fail.
+  help-topic system, and database persistence. Organised into six layers:
+  `unit` (one class or function against fakes), `seed_unit` (one class or
+  function against the shipped `seed_data/`), `module` (component assembly with
+  codelets running), `architecture` (properties of the source tree),
+  `integration` (the repository's artifacts agreeing), and `e2e` (full HTTP
+  stack against a running database). All six run in a single command against
+  the local Postgres — 1,533 cases, which includes the numeric matrix's second
+  pass over the 250 backend-sensitive tests. See
+  [TESTING.md](TESTING.md) for the layer breakdown, the numeric backend matrix,
+  the session ceiling, the unit-test rules, determinism requirements, test-double
+  conventions, how to run the suite under the free-threaded interpreter, and what
+  to check first if the free-running tests fail.
 - **Frontend** (`client/src/**/*.test.tsx`) — React components with
   [Vitest](https://vitest.dev/) and
   [React Testing Library](https://testing-library.com/docs/react-testing-library/intro/).
@@ -313,14 +345,22 @@ Petacat has two test suites:
 ```bash
 # ---- Backend (Python / pytest) ----
 
-# Everything, including e2e. Needs Postgres up: scripts/dev.sh db
+# THE REQUIRED COMMAND. Every layer including e2e, every backend-sensitive test on
+# both the CPU and the GPU, stopping at a 60-minute ceiling.
+# Needs Postgres up: scripts/dev.sh db
 .venv/bin/python -m pytest tests/ -q
 
-# One layer at a time
+# Fast inner loop: one CPU backend, without the slow expected-range oracle
+.venv/bin/python -m pytest tests/ -q -m "not slow" --numeric-backends=cpu
+
+# One layer at a time: unit, seed_unit, module, architecture, integration, e2e
 .venv/bin/python -m pytest tests/unit/ -v
 
-# Skip the slow expected-range regression oracle during a tight edit-test loop
-.venv/bin/python -m pytest tests/ -q -m "not slow"
+# One backend alone: cpu, gpu, python, numpy, mlx, mlx-cpu, or all
+.venv/bin/python -m pytest tests/ -q --numeric-backends=gpu
+
+# A different wall-clock ceiling, in minutes (0 runs to the end)
+.venv/bin/python -m pytest tests/ -q --test-ceiling=120
 
 # Under the free-threaded interpreter, with the GIL genuinely off
 PYTHON_GIL=0 .venv-ft/bin/python -m pytest tests/ -q
@@ -333,6 +373,34 @@ cd client && npm run test:run
 # Interactive watch mode while developing a new component or test
 cd client && npm test
 ```
+
+`.venv/bin/python -m pytest tests/ -q` is the command a change is verified with,
+and it carries two things a reader can check in its output.
+
+**The numeric backend matrix.** Petacat's arithmetic runs on the Metal GPU by
+default and in float64 on the CPU when asked, and every test whose outcome that
+arithmetic produces runs once on each. The two halves answer different questions.
+The CPU half is float64, agrees with the pure-Python reference exactly, and holds
+a seeded run to the same values and the same number of random draws. The GPU half
+is float32, because Apple's GPUs have no double-precision units: a decayed
+activation that float64 keeps flushes to zero in float32, which changes how many
+draws the run consumes and sends every later probabilistic decision elsewhere. So
+a given seed reaches a different answer on the GPU, which is a correct run —
+Petacat is stochastic, and a different-but-valid run is a right answer. What holds
+across both is the **set** of stopping states each problem can reach, which is what
+`tests/module/test_expected_range.py` compares. Every session ends with a
+`petacat test matrix` block naming the backends that were exercised, their
+precision and how many tests took each, so "both were run" is something the output
+states rather than something to remember.
+
+**A 60-minute ceiling.** The run stops at the first test boundary past the
+deadline, keeping every result collected up to that point, and reports itself as
+`RUN TRUNCATED` with the layers marked `INCOMPLETE` and an exit status of 2. A
+clean run says `run complete` instead. `--test-ceiling=MINUTES` sets the ceiling
+from the machine, and `0` runs to the end.
+
+[TESTING.md](TESTING.md) documents the matrix, where its line is drawn, and how to
+run one backend alone.
 
 The e2e layer talks to `petacat_test`, a database separate from the development
 one on the same instance, so a test run cannot disturb the runs and episodic
@@ -373,18 +441,30 @@ about what the engine computes.
 | May ever run codelets in parallel | yes | yes | no — serial, permanently |
 | Appears in Run History / Review | no — there is no row | yes | yes |
 
-Runs created through the UI or the API execute on the serial loop today,
-whatever their mode; the parallel row above says which modes are *allowed* to
-change that. Audit never is, because a record of actions with no record of the
-order they committed in would not reconstruct anything.
+A run's worker count decides which loop it takes. `workers` defaults to 1, the
+serial loop, which stays the reference every parallel result is measured
+against. Above 1 the run executes free-running. Audit holds `workers` at 1: its
+record is a forward log of actions, and reconstructing from it needs the order
+those actions committed in.
 
-Measured end to end on `abc → abd; mrrjjj → ?` at seed 42, all three producing
-the same 2,229 codelets and the same answer `mrrjjk`:
+Measured end to end on `abc → abd; mrrjjj → ?` at seed 42, on an Apple M2 Max,
+fastest of five runs per cell, all six producing the same 2,255 codelets and the
+same answer `mrrjjk`:
 
 | | Fast | Normal | Audit |
 |---|---|---|---|
-| Wall time | 180 ms | 251 ms (1.39×) | 323 ms (1.79×) |
-| Bytes written | 0 | 137 KB | 381 KB |
+| Wall time, default backend (`mlx`, Metal GPU) | 1,308 ms | 1,348 ms (1.03×) | 1,481 ms (1.13×) |
+| Wall time, `PETACAT_NUMERIC_BACKEND=off` | 192 ms | 227 ms (1.18×) | 329 ms (1.72×) |
+| Bytes written | 0 | 155 KB | 413 KB |
+
+Each row names the backend it was taken under, because the numeric substrate sets
+the size of the run the recording is added to. Recording costs a fixed number of
+milliseconds either way: Normal adds 35 ms with the substrate off and 40 ms on the
+GPU, and Audit adds 137 ms and 173 ms. Bytes are the summed `octet_length` of the
+JSON payloads the run leaves in Postgres, and do not depend on the backend.
+
+`PETACAT_NUMERIC_BACKEND=off` is the quickest way to work: it takes a single run to
+about 190 ms.
 
 Three things worth drawing out.
 
@@ -395,13 +475,14 @@ in force. There is no `if mode == "fast"` anywhere under `server/engine/`. A
 order in every mode, and the mode is entirely a question of which
 implementation (`server/services/sinks.py`) is attached.
 
-**Fast means *nothing*, not "deferred".** A Fast Run never opens a session, not
-even to insert the row that would name it, so it completes with Postgres
-stopped. It has no database identifier either and takes a negative one from an
-in-process counter. It gets its own ephemeral episodic memory and a discarding
-commentary writer, so it leaves nothing behind in the process either. The fast
-sink is a no-op rather than a collector, and its `__slots__` is empty so there
-is nowhere for a well-meaning "buffer now, write later" to accumulate.
+**Fast means *nothing written*.** A Fast Run completes with Postgres stopped. It
+takes its identifier as a negative number from an in-process counter. The fast
+sink is a no-op, and its `__slots__` is empty.
+
+**Mode chooses where a run is recorded.** All three modes share the Training
+Session's Episodic Memory and write real commentary. A Fast Run's answers are
+available to the runs that follow, it is reminded of theirs, and
+`answer_present` stops a later run rediscovering one of them.
 
 **Audit is the serial reference.** It is slower on purpose and it stays serial
 permanently: a fully-recorded one-codelet-at-a-time execution is what everything
@@ -448,11 +529,11 @@ recorded state instead of a running engine.
 
 ### Reproducibility is by re-execution, not replay
 
-A Normal Run records the *complete* state at both boundaries rather than just
-the problem and the seed, and the reason is the Training Session invariant: a
-Run inherits the episodic memory of everything before it, so `(problem, seed)`
-does not determine its behaviour but `(complete starting state, problem, seed)`
-does. Reload the recorded start state, re-run, and the recorded end state
+A Normal Run records the *complete* state at both boundaries, and the reason is
+the Training Session invariant: a Run inherits the Episodic Memory of everything
+before it, and declines an answer that memory already holds for the same problem
+and the same rules. `(complete starting state, problem, seed)` determines a Run's
+behaviour. Reload the recorded start state, re-run, and the recorded end state
 follows. Two further hashes are recorded with each Run — a **config hash** over
 the metadata it executed under and a **memory hash** over the memory it
 inherited — so which configuration and which memory a Run saw are part of its
@@ -460,7 +541,7 @@ identity.
 
 The mid-run snapshot system this replaced wrote a ~43 KB blob every 15 codelets
 and no code path could read any of it back: ten runs came to 230 MB of
-unreadable JSONB. Normal writes 137 KB for the run measured above — 46× less,
+unreadable JSONB. Normal writes 155 KB for the run measured above — 41× less,
 and readable.
 
 ## The numeric substrate
@@ -475,8 +556,13 @@ GPU (float32, because Metal has no float64), and MLX on its CPU stream.
 **The default is the GPU, at every Slipnet size.** That is a deliberate choice
 and it costs throughput today: a Metal dispatch costs about 0.2 ms whether it
 carries 200 edges or 340,000, and today's Slipnet has 59 nodes and 202 links, so
-the engine runs roughly eight to nine times slower with the substrate engaged
-than with it off (8.4× measured on `abc → abd; mrrjjj?`, seed 42). The measured
+the engine runs **7.1× slower** with the substrate on the GPU than with it off.
+Measured on `abc → abd; mrrjjj?` at seed 42 on an Apple M2 Max, engine only with
+no database attached, fastest of seven runs: 1.275 s on `mlx` against 0.180 s at
+`PETACAT_NUMERIC_BACKEND=off`, or 1,769 against 12,565 codelets per second. The
+same run takes 0.217 s on `numpy` — so the GPU is **5.9× slower than the NumPy
+path**, which is the comparison the test matrix's two halves make — and 0.459 s
+on `mlx-cpu`. All four reach `mrrjjk` in 2,255 codelets. The measured
 crossover where the GPU starts to win is around 10⁴ nodes, and the
 long-term target is a Slipnet of roughly 300,000 — LLM-vocabulary scale — at
 which sparse activation spreading is the dominant numeric cost. Running the GPU
@@ -501,6 +587,7 @@ alternatives is the only way the policy above can be defended:
 | Variable | Effect |
 |---|---|
 | `PETACAT_NUMERIC_BACKEND` | `auto` (default), `python`, `numpy`, `mlx`, `mlx-cpu`, or `off`. Anything but `auto`/`off` forces that backend regardless of size; `off` disables the substrate entirely and the engine runs its own loops. |
+| `PETACAT_NUMERIC_MIN_NODES` | Slipnet size at which `auto` reaches for the GPU. Set it to profile the CPU path at a chosen size. |
 | `PETACAT_NUMERIC_MIN_GPU_NODES` | The Slipnet size at or above which `auto` prefers the GPU. Zero by default. Set it to ~10000 to reinstate size-gated selection when what you actually want is to profile the CPU path. |
 
 The three float64 backends are bit-identical to the reference — same answer,
@@ -512,12 +599,15 @@ every change in this layer is held to.
 ## Free-running: codelets across CPU cores
 
 `server/engine/free_running.py` executes codelets on several worker threads with
-no global barrier. It is a wrapper around a prepared runner rather than a mode
-the serial loop grew, so the serial reference keeps exactly the shape it has —
-and, for the same reason, it is not yet attached to the API's run path. Runs
-started from the UI go through the serial loop; free-running is reached from the
-benchmarks (`scripts/bench_free_running.py`) and the tests
-(`tests/module/test_free_running.py`).
+no global barrier. It wraps a prepared runner, which keeps the serial reference
+exactly the shape it has.
+
+Reach it by setting `workers` above 1 — on `POST /api/runs`, or in the
+**Workers** box in the Run Controls panel, which accepts 1 up to the machine's
+performance core count and is fixed at 1 for an Audit run. `workers: 0` on the
+API asks for that count without first having to look it up. The benchmarks
+(`scripts/bench_free_running.py`) and the tests
+(`tests/module/test_free_running.py`) drive it directly.
 
 Three things had to exist first, and each is useful on its own:
 
@@ -549,6 +639,12 @@ interpreter costs single-threaded, the realistic maximum is about 1.52× — so
 1.35× is roughly 89% of what parallelising codelets *can* give. The remainder is
 serial by nature: coderack maintenance and the numeric substrate.
 
+Worker count follows the machine, and the shard count follows the Coderack:
+`max_coderack_size // MIN_SHARD_CAPACITY` is 4 at the default rack of 100, so a
+machine offering more workers than that runs several against one shard.
+`PHASE 1 PLAN.md` carries what a larger rack would take and where parallelism
+past this bound may come from.
+
 Two things are deliberately still serialised. The update cycle is not stopped
 for — whichever worker crosses the boundary runs it while the others carry on,
 which is exactly the staleness the design budgets for. Committing a structure
@@ -562,15 +658,50 @@ nothing moves at N ≤ 5; by N = 15 runs start failing to converge inside the
 codelet cap; by N = 50 a genuinely new answer appears. Five codelets is
 therefore the budget, and no frequently-reached answer was lost at any delay.
 
+## Sizing to the machine
+
+`server/engine/hardware.py` is the one place that answers *what is this machine*,
+and every count that depends on the answer is computed there. It reads `sysctl`
+for the logical core count and the performance/efficiency split, and
+`system_profiler SPDisplaysDataType` for the GPU core count. Every probe returns
+a value or nothing; a machine that answers none of them still gets a description
+and a full set of sizes.
+
+| Size | Rule | Environment variable |
+|---|---|---|
+| Free-running workers | One per performance core. Codelet bodies are interpreted Python and CPU-bound, and a worker holds the commit lock while it mutates the Workspace. | `PETACAT_WORKERS` |
+| Coderack shards | One per worker, floor of two, bounded further by the capacity a shard needs to hold a jootsing sequence (`MIN_SHARD_CAPACITY`). | `PETACAT_CODERACK_SHARDS` |
+| Population processes | Every logical core but one. The runs share nothing, so efficiency cores add throughput, and the reserved core leaves the parent and the OS somewhere to run. | `PETACAT_POPULATION_WORKERS` |
+| GPU dispatch threads | GPU cores × 1,024, rounded up to a power of two. This is the target the Slipnet kernel splits rows against, so a larger GPU splits more widely in the latency-bound regime. | `PETACAT_GPU_CORES`, `PETACAT_GPU_THREADS_PER_CORE` |
+
+`GET /api/system/numeric` reports the detected machine and everything derived
+from it alongside the chosen backend, and `scripts/bench_*.py` write the same
+description into their JSON records — so a timing, a worker count or a crossover
+recorded on one machine is legible on another.
+
+The crossovers themselves are measurements rather than derivations: a crossover
+sits where the CPU's time on the work first exceeds the fixed cost of the
+alternative, so it moves with CPU speed and memory bandwidth.
+`scripts/bench_numeric.py` measures them on the machine in hand;
+`PETACAT_NUMERIC_MIN_NODES`, `PETACAT_NUMERIC_MIN_GPU_NODES` and
+`PETACAT_BATCHING_MIN_NODES` set the results. `PETACAT_NUMERIC_MIN_GPU_NODES`
+stays at 0 by default: the numeric substrate runs on the GPU at every Slipnet
+size, which is a goal of the phase rather than a performance choice.
+
 ## API
 
-Full OpenAPI docs are available at `/docs` when the server is running.
+[API.md](API.md) lists every route the server serves, grouped by area. It is
+generated from the application itself by `scripts/generate_api_docs.py`, so it
+lists exactly what is registered; `--check` reports when it is behind. Full
+interactive OpenAPI docs are at `/docs` while the server is running.
+
+The tables below cover the routes a user drives.
 
 ### Run lifecycle
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| POST | `/api/runs` | Create a new run — takes `mode` (`fast`/`normal`/`audit`) and `spreading_threshold` |
+| POST | `/api/runs` | Create a new run — takes `mode` (`fast`/`normal`/`audit`), `workers` (1–16; above 1 runs free-running), `spreading_threshold`, and `parameters` for per-run overrides |
 | GET | `/api/runs/{id}` | Get run info |
 | POST | `/api/runs/{id}/step` | Step N codelets |
 | POST | `/api/runs/{id}/run` | Run to completion |
@@ -707,7 +838,7 @@ for node in self.nodes.values():
 ```
 
 The original hard-codes this: `update-slipnet-activations` spreads only from
-nodes passing `fully-active?` (`slipnet.ss:381`), and
+nodes passing `fully-active?` (`slipnet.ss:392`, applied at `slipnet.ss:383`), and
 
 ```scheme
 (define fully-active?
@@ -781,13 +912,11 @@ the static [`HELP.md`](HELP.md) reference and matching TypeScript constants.
 
 - **Read help content**: [`HELP.md`](HELP.md) is a human-readable reference
   with every panel, admin action, and glossary term.
-- **Edit, translate, or contribute help text**: see
-  [`LOCALIZATION.md`](LOCALIZATION.md) for the schema, the edit workflow
-  (including the Admin view's **Regenerate Help Documentation** button),
-  and instructions for adding a new language.
-
-The first release ships English only; the plumbing is in place for
-additional languages without schema changes.
+- **Edit help text**: edit `seed_data/help_topics.en.json` and run
+  `python scripts/generate_help_docs.py`, which rewrites `HELP.md` and
+  `client/src/constants/helpTopics.ts`. The Admin view's **Regenerate Help
+  Documentation** button does the same from the running server, and `--check`
+  reports when the derived files are behind.
 
 ## Key Differences from Scheme Original
 

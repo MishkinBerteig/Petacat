@@ -18,7 +18,7 @@ import asyncio
 import pytest
 import httpx
 
-from sqlalchemy import text
+from sqlalchemy import delete, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 TEST_DB_URL = os.environ.get(
@@ -257,12 +257,11 @@ async def _seed_metadata(session: AsyncSession):
     commentary = _load("commentary_templates.json")
     session.add(CommentaryTemplate(template_key="all", template_data=commentary))
 
-    # Help topics: prefer the locale-named file, fall back to legacy name.
     # Matches the production loader in server/main.py::_sync_help_topics.
-    help_candidates = ["help_topics.en.json", "help_topics.json"]
-    help_filename = next(
-        (fn for fn in help_candidates if os.path.exists(os.path.join(seed_dir, fn))),
-        None,
+    help_filename = (
+        "help_topics.en.json"
+        if os.path.exists(os.path.join(seed_dir, "help_topics.en.json"))
+        else None
     )
     if help_filename:
         for t in _load(help_filename):
@@ -274,6 +273,45 @@ async def _seed_metadata(session: AsyncSession):
                 full_desc=t.get("full_desc", ""),
                 metadata_json=t.get("metadata", {}),
             ))
+
+
+@pytest.fixture(autouse=True)
+async def fresh_episodic_memory(test_engine, setup_db):
+    """Start every test with an empty Episodic Memory.
+
+    ``_global_memory`` is process-global and deliberately outlives a Run — that is what
+    a Training Session *is*.  It used to be harmless to let it accumulate across
+    unrelated tests because nothing read it back into cognition.  It is not harmless
+    now: ``answer_present`` makes the program refuse to rediscover an answer already in
+    memory (``answers.ss:982``), so a test could inherit an answer from whichever test
+    happened to run before it and give up instead of solving its own problem.
+
+    ``Metacat/help.txt:31`` puts the same idea the other way round: "resetting a run
+    does not erase Metacat's memory", and clearing it is a separate, deliberate act.
+
+    Both places it lives, for the reason ``clear_memory`` touches both: ``GET
+    /api/memory`` serves the *rows* while cognition reads ``_global_memory``.  Emptying
+    only the object would leave the listing naming answers the live memory no longer
+    holds — the same divergence between the two stores that let
+    ``/api/memory/compare`` resolve an id to the wrong answer, reproduced inside the
+    test suite.
+    """
+    from server.models.run import AnswerDescriptionRow, SnagDescriptionRow
+    from server.services.run_service import _global_memory
+
+    async def _empty() -> None:
+        _global_memory.clear()
+        factory = async_sessionmaker(
+            test_engine, class_=AsyncSession, expire_on_commit=False
+        )
+        async with factory() as session:
+            for table in (AnswerDescriptionRow, SnagDescriptionRow):
+                await session.execute(delete(table))
+            await session.commit()
+
+    await _empty()
+    yield
+    await _empty()
 
 
 @pytest.fixture

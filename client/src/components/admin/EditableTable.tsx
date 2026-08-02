@@ -4,12 +4,92 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 
+import { describeApiError } from '@/api/client';
+
 export interface ColumnDef {
   key: string;
   label: string;
-  type: 'text' | 'number' | 'readonly';
+  /**
+   * `json` holds a list or object: the cell shows it as JSON and the edit box takes
+   * JSON back, so a column like `valid_relations` or `template_data` is editable in
+   * the same table as the scalar ones.
+   */
+  type: 'text' | 'number' | 'readonly' | 'json';
   width?: string;
+  /**
+   * A `number` column whose value may be absent. An empty box submits `null` for a
+   * nullable column and `0` for the rest, so a column that carries a real zero and a
+   * column that carries "no value" each say what they mean.
+   */
+  nullable?: boolean;
 }
+
+/**
+ * What a collection shows in place of itself when the list could not be loaded.
+ *
+ * A tab whose load failed says why and offers the retry, rather than holding "Loading..."
+ * for as long as the reader is willing to wait.
+ */
+export function LoadFailure({
+  message,
+  onRetry,
+}: {
+  message: string;
+  onRetry: () => void;
+}) {
+  return (
+    <div role="alert" style={{ fontSize: 12, color: 'var(--error)' }}>
+      <div>{message}</div>
+      <button onClick={onRetry} style={{ fontSize: 10, marginTop: 6 }}>
+        Retry
+      </button>
+    </div>
+  );
+}
+
+/** What a cell shows: JSON columns as JSON, everything else as its own text. */
+function displayValue(col: ColumnDef, value: any): string {
+  if (value === null || value === undefined) return '';
+  return col.type === 'json' ? JSON.stringify(value) : String(value);
+}
+
+/**
+ * What a cell submits. A number column reports an empty box as `null` — the absence of a
+ * value — which keeps it distinct from `0`, a number a field like a slipnet link's length
+ * genuinely takes. A JSON column reports its own parse error.
+ */
+function parseValue(col: ColumnDef, raw: string): any {
+  if (col.type === 'number') {
+    return raw.trim() === '' ? (col.nullable ? null : 0) : Number(raw);
+  }
+  if (col.type !== 'json') return raw;
+  const text = raw.trim();
+  if (text === '') return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`${col.label} needs valid JSON`);
+  }
+}
+
+/**
+ * What each operation is, in the words the reader would use for it.
+ *
+ * A failure is reported against the phrase for the operation that failed, so the table
+ * says "Could not delete the posting rule" rather than naming a row in the abstract. Each
+ * editor names its own collection here.
+ */
+export interface TableActions {
+  create?: string;
+  update?: string;
+  delete?: string;
+}
+
+const GENERIC_ACTIONS: Required<TableActions> = {
+  create: 'add the row',
+  update: 'save the change',
+  delete: 'delete the row',
+};
 
 interface Props<T extends Record<string, any>> {
   columns: ColumnDef[];
@@ -19,6 +99,8 @@ interface Props<T extends Record<string, any>> {
   onUpdate?: (id: any, row: Partial<T>) => Promise<T | null>;
   onDelete?: (id: any) => Promise<boolean>;
   onRefresh?: () => void;
+  /** The three operation phrases this table's editor names its collection with. */
+  actions?: TableActions;
   highlightId?: string | null;
   highlightRef?: React.Ref<HTMLTableRowElement>;
 }
@@ -37,6 +119,7 @@ export function EditableTable<T extends Record<string, any>>({
   onUpdate,
   onDelete,
   onRefresh,
+  actions,
   highlightId,
   highlightRef,
 }: Props<T>) {
@@ -47,35 +130,45 @@ export function EditableTable<T extends Record<string, any>>({
   const [confirmDelete, setConfirmDelete] = useState<any>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const createAction = actions?.create ?? GENERIC_ACTIONS.create;
+  const updateAction = actions?.update ?? GENERIC_ACTIONS.update;
+  const deleteAction = actions?.delete ?? GENERIC_ACTIONS.delete;
+
   useEffect(() => {
     if (editingCell && inputRef.current) inputRef.current.focus();
   }, [editingCell]);
 
+  // A success announces itself and gets out of the way; a failure stays on screen until
+  // the next operation replaces it, so the reader has as long as they need with it.
   useEffect(() => {
-    if (flash) {
+    if (flash && flash.type === 'success') {
       const t = setTimeout(() => setFlash(null), 2000);
       return () => clearTimeout(t);
     }
   }, [flash]);
 
-  const startEdit = (id: any, key: string, value: any) => {
-    setEditingCell({ id, key });
-    setEditValue(String(value ?? ''));
+  const startEdit = (id: any, col: ColumnDef, value: any) => {
+    setEditingCell({ id, key: col.key });
+    setEditValue(displayValue(col, value));
   };
 
   const saveEdit = useCallback(async () => {
     if (!editingCell || !onUpdate) return;
     const col = columns.find(c => c.key === editingCell.key);
-    const parsed = col?.type === 'number' ? Number(editValue) : editValue;
     try {
+      const parsed = col ? parseValue(col, editValue) : editValue;
       await onUpdate(editingCell.id, { [editingCell.key]: parsed } as Partial<T>);
       setFlash({ id: editingCell.id, type: 'success', message: 'Saved' });
       onRefresh?.();
-    } catch (e: any) {
-      setFlash({ id: editingCell.id, type: 'error', message: e.message ?? 'Error' });
+    } catch (e) {
+      setFlash({
+        id: editingCell.id,
+        type: 'error',
+        message: describeApiError(e, updateAction),
+      });
     }
     setEditingCell(null);
-  }, [editingCell, editValue, columns, onUpdate, onRefresh]);
+  }, [editingCell, editValue, columns, onUpdate, onRefresh, updateAction]);
 
   const cancelEdit = () => setEditingCell(null);
 
@@ -92,19 +185,22 @@ export function EditableTable<T extends Record<string, any>>({
 
   const saveNewRow = useCallback(async () => {
     if (!newRow || !onCreate) return;
-    const parsed: any = {};
-    for (const col of columns) {
-      parsed[col.key] = col.type === 'number' ? Number(newRow[col.key] || 0) : newRow[col.key];
-    }
     try {
+      const parsed: any = {};
+      for (const col of columns) {
+        if (col.type === 'readonly') continue;
+        parsed[col.key] = parseValue(col, newRow[col.key] ?? '');
+      }
       await onCreate(parsed);
       setNewRow(null);
       setFlash({ id: '__new__', type: 'success', message: 'Created' });
       onRefresh?.();
-    } catch (e: any) {
-      setFlash({ id: '__new__', type: 'error', message: e.message ?? 'Error' });
+    } catch (e) {
+      // The typed row stays on screen with the message, so a rejected value is corrected
+      // rather than retyped.
+      setFlash({ id: '__new__', type: 'error', message: describeApiError(e, createAction) });
     }
-  }, [newRow, columns, onCreate, onRefresh]);
+  }, [newRow, columns, onCreate, onRefresh, createAction]);
 
   const handleDelete = useCallback(async (id: any) => {
     if (!onDelete) return;
@@ -113,11 +209,13 @@ export function EditableTable<T extends Record<string, any>>({
       setConfirmDelete(null);
       setFlash({ id, type: 'success', message: 'Deleted' });
       onRefresh?.();
-    } catch (e: any) {
+    } catch (e) {
+      // The row survives a refused delete: it is still there on the server, and the
+      // table goes on showing it alongside the reason it is still there.
       setConfirmDelete(null);
-      setFlash({ id, type: 'error', message: e.message ?? 'Cannot delete' });
+      setFlash({ id, type: 'error', message: describeApiError(e, deleteAction) });
     }
-  }, [onDelete, onRefresh]);
+  }, [onDelete, onRefresh, deleteAction]);
 
   const cellPad = '3px 8px';
   const thStyle = { textAlign: 'left' as const, padding: '4px 8px', fontSize: 11 };
@@ -125,7 +223,7 @@ export function EditableTable<T extends Record<string, any>>({
   return (
     <div>
       {flash && (
-        <div style={{
+        <div role={flash.type === 'error' ? 'alert' : 'status'} style={{
           padding: '4px 8px',
           marginBottom: 4,
           fontSize: 11,
@@ -196,10 +294,10 @@ export function EditableTable<T extends Record<string, any>>({
                         padding: cellPad,
                         cursor: canEdit ? 'pointer' : undefined,
                       }}
-                      onDoubleClick={canEdit ? () => startEdit(id, col.key, row[col.key]) : undefined}
+                      onDoubleClick={canEdit ? () => startEdit(id, col, row[col.key]) : undefined}
                       title={canEdit ? 'Double-click to edit' : undefined}
                     >
-                      {String(row[col.key] ?? '')}
+                      {displayValue(col, row[col.key])}
                     </td>
                   );
                 })}
@@ -230,14 +328,19 @@ export function EditableTable<T extends Record<string, any>>({
             <tr style={{ borderBottom: '1px solid var(--border)', background: 'rgba(0,212,255,0.05)' }}>
               {columns.map(col => (
                 <td key={col.key} style={{ padding: cellPad }}>
-                  <input
-                    value={newRow[col.key] ?? ''}
-                    onChange={e => setNewRow(r => r ? { ...r, [col.key]: e.target.value } : r)}
-                    type={col.type === 'number' ? 'number' : 'text'}
-                    placeholder={col.label}
-                    style={{ width: '100%', fontSize: 11, padding: '1px 4px' }}
-                    onKeyDown={e => { if (e.key === 'Enter') saveNewRow(); if (e.key === 'Escape') setNewRow(null); }}
-                  />
+                  {/* A readonly column is assigned by the server — an id from its own
+                      sequence — so the new row leaves it blank. */}
+                  {col.type !== 'readonly' && (
+                    <input
+                      value={newRow[col.key] ?? ''}
+                      onChange={e => setNewRow(r => r ? { ...r, [col.key]: e.target.value } : r)}
+                      type={col.type === 'number' ? 'number' : 'text'}
+                      placeholder={col.label}
+                      aria-label={col.label}
+                      style={{ width: '100%', fontSize: 11, padding: '1px 4px' }}
+                      onKeyDown={e => { if (e.key === 'Enter') saveNewRow(); if (e.key === 'Escape') setNewRow(null); }}
+                    />
+                  )}
                 </td>
               ))}
               {onDelete && <td></td>}

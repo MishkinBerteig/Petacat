@@ -46,6 +46,13 @@ class Bridge(WorkspaceStructure):
         self.concept_mappings = concept_mappings
         self.spanning: bool = False
         self.group_spanning: bool = False
+        # The *original* group each side replaces, when the proposal rests on a
+        # reversed reading of a spanning group.  Scheme: ``mark-flipped-group1`` /
+        # ``mark-flipped-group2`` (bridges.ss:185-192).  The builder needs the
+        # original to fight it and then to swap it out (bridges.ss:1295-1345);
+        # ``None`` on both sides is the ordinary case.
+        self.flipped_group1: Any = None
+        self.flipped_group2: Any = None
 
     @property
     def orientation(self) -> str:
@@ -659,6 +666,26 @@ def _supported_by_theme(d1: Any, d2: Any, theme: Any) -> bool:
     )
 
 
+def objects_conflict_with_theme(object1: Any, object2: Any, theme: Any) -> bool:
+    """Do the two objects' descriptions contradict *theme*?
+
+    Scheme: the ``conflicts?`` half of ``theme-support-tester``
+    (themes.ss:1023-1026) — plain ``check-descriptions``, with none of the
+    description-possible asymmetry ``Bridge.incompatible_with_theme`` adds.  A
+    thematic scout is asking whether a bridge *could* be built to support the
+    themes, so it must judge the objects as they stand.
+    """
+    return _check_descriptions(object1, object2, _conflicts_with_theme, theme)
+
+
+def objects_support_theme(object1: Any, object2: Any, theme: Any) -> bool:
+    """Do the two objects' descriptions bear *theme* out?
+
+    Scheme: the ``supports?`` half of ``theme-support-tester`` (themes.ss:1027-1028).
+    """
+    return _check_descriptions(object1, object2, _supported_by_theme, theme)
+
+
 def _description_possible(dimension_name: str, obj: Any) -> bool:
     """Can *obj* be described along *dimension_name*?
 
@@ -780,6 +807,39 @@ def make_concept_mappings(
                 )
             )
     return cms
+
+
+def propose_bridge(
+    bridge_type: str,
+    object1: Any,
+    flip1: bool,
+    object2: Any,
+    flip2: bool,
+    identity_node: Any = None,
+) -> Bridge:
+    """Build a proposed bridge, optionally against a reversed reading of a group.
+
+    Scheme: ``propose-bridge`` (bridges.ss:1085-1105).  When a side is flipped the
+    bridge is made to the flipped group — a genuinely different object, with the
+    opposite direction and group-category — and the original is remembered so the
+    builder can fight it and then swap it out.
+
+    Note the mappings are computed *after* flipping, which is the whole point:
+    ``>abc>`` and ``<cba<`` share no Direction concept-mapping, while ``>abc>``
+    and ``>cba>`` do.
+    """
+    obj1 = object1.make_flipped_version() if flip1 else object1
+    obj2 = object2.make_flipped_version() if flip2 else object2
+    bridge = Bridge(
+        obj1, obj2, bridge_type, make_concept_mappings(obj1, obj2, bridge_type, identity_node)
+    )
+    # ``make_flipped_version`` returns the group itself when there is no direction
+    # to reverse, and a bridge to an object that *is* the original is not a flip.
+    if flip1 and obj1 is not object1:
+        bridge.flipped_group1 = object1
+    if flip2 and obj2 is not object2:
+        bridge.flipped_group2 = object2
+    return bridge
 
 
 # ---------------------------------------------------------------------------

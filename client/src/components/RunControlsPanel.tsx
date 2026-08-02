@@ -42,10 +42,16 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRunStore } from '@/store/runStore';
-import { setBreakpoint, clearBreakpoint, getRunIdentity } from '@/api/client';
+import {
+  setBreakpoint,
+  clearBreakpoint,
+  getRunIdentity,
+  describeApiError,
+} from '@/api/client';
 import { ModeBadge, MODE_DESCRIPTIONS } from '@/components/ModeBadge';
 import { RunParametersPanel } from '@/components/RunParametersPanel';
 import { RunDerivedPanel } from '@/components/RunDerivedPanel';
+import { useMachine } from '@/hooks/useMachine';
 import {
   parameterErrors,
   useParameterCatalogue,
@@ -127,6 +133,16 @@ export function RunControlsPanel() {
   const effectiveWorkers = store.persistenceMode === 'audit' ? 1 : store.workers;
 
   /**
+   * The ceiling on the worker count is the server's machine, not a number written
+   * into this page: the workers are threads on the server's performance cores, so a
+   * 32-core machine offers 24 and an 8-core one offers 4. `null` until the answer
+   * arrives, and `null` if it cannot be reached, in which case the control states no
+   * ceiling rather than inventing one.
+   */
+  const { machine, derived } = useMachine();
+  const machineWorkers = derived?.workers ?? null;
+
+  /**
    * The worker count and the engine parameters are fixed at creation for exactly the
    * same reason the mode is: the engine reads them before the first codelet. So they
    * follow the same rule — changing one means a new run.
@@ -170,8 +186,15 @@ export function RunControlsPanel() {
     }
   }, [store, inputsMatchLoadedRun, pendingParams]);
 
+  // A run that cannot be created is reported by the store, on the channel the header
+  // renders, so the button stops quietly here: pressing Run twice would otherwise
+  // stack an unhandled rejection on top of a message that already says what happened.
   const handleRun = useCallback(async () => {
-    await ensureRunMatchesInputs();
+    try {
+      await ensureRunMatchesInputs();
+    } catch {
+      return;
+    }
     if (strategy === 'live') {
       // run() branches on this flag; set it from the strategy rather than relying
       // on the store default so the selector is the single source of truth.
@@ -183,28 +206,36 @@ export function RunControlsPanel() {
   }, [store, ensureRunMatchesInputs, strategy]);
 
   const handleStep = useCallback(async () => {
-    await ensureRunMatchesInputs();
+    try {
+      await ensureRunMatchesInputs();
+    } catch {
+      return;
+    }
     await store.step(stepSize);
   }, [store, ensureRunMatchesInputs, stepSize]);
 
+  // The breakpoint buttons speak through the same channel as the run buttons: a
+  // breakpoint the server did not take is a breakpoint that will not stop the run.
   const handleSetBreakpoint = useCallback(async () => {
     if (!store.runId || !breakpointValue) return;
     try {
       await setBreakpoint(store.runId, parseInt(breakpointValue, 10));
-    } catch {
-      // ignore
+      store.clearLastError();
+    } catch (err) {
+      store.setLastError(describeApiError(err, 'set the breakpoint'));
     }
-  }, [store.runId, breakpointValue]);
+  }, [store, breakpointValue]);
 
   const handleClearBreakpoint = useCallback(async () => {
     if (!store.runId) return;
     try {
       await clearBreakpoint(store.runId);
       setBreakpointValue('');
-    } catch {
-      // ignore
+      store.clearLastError();
+    } catch (err) {
+      store.setLastError(describeApiError(err, 'clear the breakpoint'));
     }
-  }, [store.runId]);
+  }, [store]);
 
 
   const isRunning = store.status === 'running';
@@ -275,7 +306,7 @@ export function RunControlsPanel() {
             id="run-workers"
             type="number"
             min={1}
-            max={16}
+            max={machineWorkers ?? undefined}
             value={effectiveWorkers}
             onChange={(e) => store.setWorkers(parseInt(e.target.value, 10) || 1)}
             disabled={isRunning || store.persistenceMode === 'audit'}
@@ -289,9 +320,18 @@ export function RunControlsPanel() {
               : effectiveWorkers === 1
                 ? 'One codelet at a time, in order. The same problem and seed reproduce the '
                   + 'run exactly, which is why this stays the reference mode.'
-                : 'Codelets execute across CPU cores with no global barrier — about 1.35x at '
-                  + 'four workers. The expected range of answers is unchanged, but a seed no '
-                  + 'longer reproduces a run, because execution order is not determined.'}
+                : 'Codelets execute across CPU cores with no global barrier. The expected '
+                  + 'range of answers is unchanged, but a seed no longer reproduces a run, '
+                  + 'because execution order is not determined.'}
+            {machineWorkers !== null && (
+              <>
+                {' '}
+                {`The server has ${machineWorkers} performance core`}
+                {machineWorkers === 1 ? '' : 's'}
+                {machine?.chip ? ` (${machine.chip})` : ''}
+                {', which is the ceiling here.'}
+              </>
+            )}
           </span>
         </div>
 
@@ -466,9 +506,10 @@ export function RunControlsPanel() {
               color: 'var(--warning)',
             }}
           >
-            Fast runs leave no trace: no row in Run History, nothing in Review, and
-            no contribution to Episodic Memory. They also get a negative run number,
-            because there is no database row to take one from.
+            Fast runs write nothing to the database: no row in Run History and
+            nothing in Review. They get a negative run number, because there is no
+            database row to take one from. They take part in the Training Session's
+            Episodic Memory and narrate themselves like any other run.
           </div>
         )}
       </div>
@@ -552,7 +593,8 @@ export function RunControlsPanel() {
           />
           <span className="text-xs text-muted">
             0 = all active nodes spread; 100 = only fully-active, matching the
-            original. Kept across runs and applied to each new one.
+            original. Shows what the run on screen is using; moving it changes
+            that run, and the value chosen is what each new run starts with.
           </span>
         </div>
 
@@ -579,9 +621,12 @@ export function RunControlsPanel() {
         </div>
 
         <div style={fieldGroupStyle}>
-          <label style={labelStyle}>Breakpoint (codelet #)</label>
+          <label style={labelStyle} htmlFor="run-breakpoint">
+            Breakpoint (codelet #)
+          </label>
           <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
             <input
+              id="run-breakpoint"
               type="number"
               min={0}
               value={breakpointValue}

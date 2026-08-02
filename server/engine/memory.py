@@ -40,6 +40,19 @@ class AnswerDescription:
     top_rule_abstractness: float = 0.0
     bottom_rule_abstractness: float = 0.0
 
+    # §4.7.1 / ``memory.ss:117``: an answer description stores the rules' *clause
+    # lists*, not just their English transcription.  They are what ``answer-present?``
+    # (``memory.ss:190-196``) compares, so without them the duplicate-answer guard
+    # cannot be written.  ``server/engine/rules.py:rule_signature`` produces them in a
+    # form that survives being persisted and read back.
+    top_rule_signature: list | None = None
+    bottom_rule_signature: list | None = None
+
+    #: ``average-theme-abstractness`` (``answers.ss:885-892``), computed when the
+    #: description is built because it needs the Slipnet's conceptual depths, which a
+    #: stored description no longer has access to.
+    theme_abstractness: float = 0.0
+
     # §4.7.5: "Every answer description stored in memory has an associated
     # activation level ranging from 0 to 100 ... the activation level of an
     # answer reflects how strongly the program is reminded of it."
@@ -59,16 +72,31 @@ class AnswerDescription:
         §4.7.3: dyz "involves themes based on the abstract concept of opposite,
         but depends on a literal-minded interpretation of abc => abd.  This
         'dissonance' is the reason that Metacat considers dyz to be incoherent."
+
+        Scheme: ``answer-incoherent?`` (``answers.ss:909-916``)::
+
+            (and (> theme-abstractness 50)
+                 (< rule-abstractness theme-abstractness)
+                 (> abstractness-difference 25))
+
+        The test is **asymmetric** and **directional**: an answer is incoherent only
+        when its themes are abstract and its rule is markedly *more literal*.  A
+        previous version counted ``identity`` as maximally abstract (the Scheme scores
+        it 0, the least abstract of all) and compared with ``abs(...) <= 50``, which
+        made the canonical *coherent* literal answer ``xyd`` come out incoherent and
+        could call an answer incoherent for having too abstract a rule.
         """
-        # With no themes, or no measured rule abstractness, there is nothing to
-        # be dissonant *with*, so the question doesn't arise.
-        if not self.themes or self.top_rule_abstractness <= 0.0:
+        theme_abstractness = self.theme_abstractness
+        rule_abstractness = self.top_rule_abstractness
+        # With no themes there is nothing to be dissonant *with*.
+        if theme_abstractness <= 0.0:
             return True
-        abstract_themes = sum(
-            1 for rel in self.themes.values() if rel in ("opposite", "identity")
+        incoherent = (
+            theme_abstractness > 50.0
+            and rule_abstractness < theme_abstractness
+            and (theme_abstractness - rule_abstractness) > 25.0
         )
-        theme_abstractness = 100.0 * abstract_themes / len(self.themes)
-        return abs(theme_abstractness - self.top_rule_abstractness) <= 50.0
+        return not incoherent
 
 
 @dataclass
@@ -114,6 +142,41 @@ class EpisodicMemory:
         desc.snag_id = self.ids.next(KIND_SNAG)
         self.snags.append(desc)
 
+    def answer_present(
+        self,
+        problem: tuple[str, str, str, str],
+        top_rule: Any = None,
+        bottom_rule: Any = None,
+    ) -> bool:
+        """Has this exact answer, reached this exact way, already been found?
+
+        Scheme: ``memory.ss:90-97`` / ``memory.ss:190-196``.  Two answers are the same
+        episode when the three problem strings agree, the answer letters agree, **and**
+        both rules' clause lists agree structurally.  The rules matter: the same answer
+        string reached by a different rule is a different idea, and MetaCat stores it
+        as a separate episode.
+
+        This is the one place where Episodic Memory reaches back into cognition.
+        ``answers.ss:982`` consults it before reporting and fizzles on a hit — "Already
+        found this answer" — so the search carries on toward a *different* answer
+        instead of rediscovering one already in memory.  The author documents the
+        consequence in ``Metacat/help.txt:29``: rerunning with the same seed after an
+        answer will not produce that answer again.
+        """
+        from server.engine.rules import rule_signature
+
+        top_sig = rule_signature(top_rule)
+        bottom_sig = rule_signature(bottom_rule)
+        for past in self.answers:
+            if tuple(past.problem) != tuple(problem):
+                continue
+            if past.top_rule_signature != top_sig:
+                continue
+            if past.bottom_rule_signature != bottom_sig:
+                continue
+            return True
+        return False
+
     def find_remindings(
         self,
         new_desc: AnswerDescription,
@@ -128,12 +191,18 @@ class EpisodicMemory:
         the threshold is exceeded."
         """
         remindings = []
+        threshold = distance_threshold or 5.0
         for past in self.answers:
             if past is new_desc:
                 continue
             distance = self.distance(new_desc, past)
-            past.activation = max(0.0, 100.0 - distance * 10.0)
-            if distance <= distance_threshold:
+            # ``memory.ss:212``: ``(100- (100* (min 1 (/ distance %distance-threshold%))))``
+            # — reaches zero *at* the threshold rather than crossing it linearly.
+            past.activation = max(
+                0.0, 100.0 * (1.0 - min(1.0, distance / threshold))
+            )
+            # ``memory.ss:214`` reports a reminding only for a non-zero activation.
+            if past.activation > 0.0:
                 remindings.append(past)
         new_desc.activation = 100.0
         remindings.sort(key=lambda a: a.activation, reverse=True)
@@ -149,24 +218,40 @@ class EpisodicMemory:
         3. the difference in abstractness of the rules;
         4. themes justified for one answer but not the other;
         5. whether the answers agree in coherence.
+
+        Scheme: ``calculate-answer-distance`` (``memory.ss:494-583``).  The base of 1
+        is what guarantees the invariant the Scheme documents at ``memory.ss:491-493``:
+        "the distance between two non-identical answers is always at least one".
+        Without it, and with unique themes weighted 1 rather than 2, every stored
+        answer sat inside the reminding threshold of 5 and the program was reminded of
+        everything by everything — two answers to *different problems* measured 0.0
+        apart.
         """
         comparison = self.compare_answers(a, b)
 
-        # 1. Differing + unique themes.
-        distance = float(
+        # Every comparison starts at 1.  ``find_remindings`` never compares an answer
+        # with itself, and ``answer_present`` keeps genuine duplicates out of memory,
+        # so there is no identical-pair case to special-case away.
+        distance = 1.0
+
+        # 1. Differing themes count once; themes unique to one side count double.
+        distance += float(
             len(comparison["differing_themes"])
-            + len(comparison["a_unique_themes"])
-            + len(comparison["b_unique_themes"])
+            + 2 * len(comparison["a_unique_themes"])
+            + 2 * len(comparison["b_unique_themes"])
         )
 
-        # 2. Rule differences, structural and conceptual.
-        if a.top_rule_description != b.top_rule_description:
-            distance += 1.0
-        if a.bottom_rule_description != b.bottom_rule_description:
-            distance += 1.0
-
-        # 3. Disparity in rule abstractness.
-        distance += abs(a.top_rule_abstractness - b.top_rule_abstractness) / 50.0
+        # 2/3. Rule differences.  Structural comparison when the clause lists can be
+        # compared at all; only otherwise does abstractness stand in for them
+        # (``memory.ss:540-560``) — the two are alternatives, not addends.
+        distance += self._rule_distance(
+            a.top_rule_signature, b.top_rule_signature,
+            a.top_rule_abstractness, b.top_rule_abstractness,
+        )
+        distance += self._rule_distance(
+            a.bottom_rule_signature, b.bottom_rule_signature,
+            a.bottom_rule_abstractness, b.bottom_rule_abstractness,
+        )
 
         # 4. Themes justified for one but not the other.
         only_a = set(a.unjustified_themes) - set(b.unjustified_themes)
@@ -179,10 +264,52 @@ class EpisodicMemory:
 
         return distance
 
+    @staticmethod
+    def _rule_distance(
+        sig_a: list | None,
+        sig_b: list | None,
+        abstractness_a: float,
+        abstractness_b: float,
+    ) -> float:
+        """Scheme: the rule half of ``calculate-answer-distance``.
+
+        Structurally comparable clause lists contribute twice the number of differing
+        clauses; incomparable ones fall back to the abstractness disparity.
+        """
+        if sig_a is None and sig_b is None:
+            return 0.0
+        if sig_a is None or sig_b is None or len(sig_a) != len(sig_b):
+            # Not structurally comparable — ``round(|Δabstractness| / 10)``.
+            return float(round(abs(abstractness_a - abstractness_b) / 10.0))
+        differing = sum(1 for x, y in zip(sig_a, sig_b) if x != y)
+        return 2.0 * differing
+
+    def get_equivalent_snag(
+        self, answer: AnswerDescription
+    ) -> SnagDescription | None:
+        """The snag episode this answer's own attempt ran into, if there was one.
+
+        Scheme: ``get-equivalent-snag`` (``memory.ss``), consulted from
+        ``answers.ss:290`` and ``answers.ss:304``.  §4.7.3: "the presence of a snag
+        description in memory involving exactly the same letter-strings and rule as
+        some answer description indicates that the program has tried this problem on
+        its own before — using exactly the same rule — and run into a snag."
+        """
+        problem = tuple(answer.problem[:3])
+        for snag in self.snags:
+            if tuple(snag.problem) != problem:
+                continue
+            if snag.description != answer.top_rule_description:
+                continue
+            return snag
+        return None
+
     def compare_answers(
         self,
         a: AnswerDescription,
         b: AnswerDescription,
+        templates: dict[str, Any] | None = None,
+        meta: Any = None,
     ) -> dict[str, Any]:
         """Classify how two answers relate.
 
@@ -196,29 +323,38 @@ class EpisodicMemory:
         On top of that, an **unjustified** theme is reclassified as
         **snag-justified** when a stored snag description shows the idea is what
         lets the answer avoid a snag.
-        """
-        common: dict[str, Any] = {}
-        differing: dict[str, tuple[Any, Any]] = {}
-        a_unique: dict[str, Any] = {}
-        b_unique: dict[str, Any] = {}
 
-        for dim in set(a.themes) | set(b.themes):
-            a_val, b_val = a.themes.get(dim), b.themes.get(dim)
-            if a_val is not None and b_val is not None:
-                if a_val == b_val:
-                    common[dim] = a_val
-                else:
-                    differing[dim] = (a_val, b_val)
-            elif a_val is not None:
-                a_unique[dim] = a_val
-            else:
-                b_unique[dim] = b_val
+        The classification is delegated to
+        :class:`server.engine.answer_comparison.AnswerComparison`, which is the port of
+        ``get-answer-comparison-text``'s ``let*`` block (``answers.ss:455-543``).  The
+        English MetaCat speaks *is* this classification, so the prose and the structured
+        comparison read the same variables.
+
+        Note that the themes compared are the answer's **justified and unjustified
+        themes together** (``answers.ss:456-464``): an idea the program could not justify
+        is still an idea the answer rests on, and §4.7.3's ``aaabccc``/``aaabaaa``
+        example turns entirely on comparing two answers whose *unjustified* themes are
+        what they share.
+        """
+        from server.engine.answer_comparison import AnswerComparison, _lookup
+        from server.engine.metadata import default_commentary_templates
+
+        comparison = AnswerComparison(
+            a, b, self, templates or default_commentary_templates(), meta
+        )
+        verdict = comparison.verdict()
 
         return {
-            "common_themes": common,
-            "differing_themes": differing,
-            "a_unique_themes": a_unique,
-            "b_unique_themes": b_unique,
+            "common_themes": dict(comparison.common_themes),
+            "differing_themes": {
+                dimension: (
+                    (_lookup(dimension, comparison.all_themes1) or (dimension, None))[1],
+                    (_lookup(dimension, comparison.all_themes2) or (dimension, None))[1],
+                )
+                for dimension in comparison.differing_dimensions
+            },
+            "a_unique_themes": dict(comparison.unique1),
+            "b_unique_themes": dict(comparison.unique2),
             "a_unjustified_themes": self._classify_unjustified(a),
             "b_unjustified_themes": self._classify_unjustified(b),
             "a_coherent": a.is_coherent,
@@ -229,7 +365,10 @@ class EpisodicMemory:
             "b_rule": b.top_rule_description,
             "a_abstractness": a.top_rule_abstractness,
             "b_abstractness": b.top_rule_abstractness,
-            "preferred": self._preferred_answer(a, b),
+            "preferred": {
+                "answer": verdict.get("answer"),
+                "reason": verdict.get("criterion", ""),
+            },
         }
 
     def _classify_unjustified(
@@ -237,42 +376,25 @@ class EpisodicMemory:
     ) -> dict[str, str]:
         """Split an answer's unjustified themes into unjustified / snag-justified.
 
-        §4.7.3: "the presence of a snag description in memory involving exactly
-        the same letter-strings and rule as some answer description indicates
-        that the program has tried this problem on its own before — using
-        exactly the same rule — and run into a snag."  That is what makes
-        ``aaabccc`` justified-after-all while ``aaabaaa`` is not.
+        §4.7.3: what makes ``aaabccc`` justified-after-all while ``aaabaaa`` is not is
+        not merely that *a* snag exists, but that the answer holds an idea the snag
+        episode did not — "the differences between the themes involved in the snag and
+        the themes involved in the answer provide a strong clue as to how ... the snag
+        is avoided".  ``get-snag-justified-themes`` (``answers.ss:285-299``) subtracts
+        the snag's own theme-pattern before intersecting with the unjustified themes, so
+        only an idea the snag episode lacked counts as having avoided it.
         """
-        problem = answer.problem[:3]
-        snag_seen = any(
-            tuple(s.problem) == problem
-            and s.description == answer.top_rule_description
-            for s in self.snags
-        )
-        verdict = "snag_justified" if snag_seen else "unjustified"
-        return {dim: verdict for dim in answer.unjustified_themes}
+        from server.engine.answer_comparison import snag_justified_themes
 
-    def _preferred_answer(
-        self, a: AnswerDescription, b: AnswerDescription
-    ) -> dict[str, Any]:
-        """Which answer the program prefers, and why.
-
-        §4.7.4 gives the reasons in priority order: no unjustified ideas, then
-        coherence, then a richer set of ideas, then quality.
-        """
-        if len(a.unjustified_themes) != len(b.unjustified_themes):
-            winner = a if len(a.unjustified_themes) < len(b.unjustified_themes) else b
-            return {"answer": winner.problem[3], "reason": "fewer_unjustified"}
-        if a.is_coherent != b.is_coherent:
-            winner = a if a.is_coherent else b
-            return {"answer": winner.problem[3], "reason": "one_incoherent"}
-        if len(a.themes) != len(b.themes):
-            winner = a if len(a.themes) > len(b.themes) else b
-            return {"answer": winner.problem[3], "reason": "richer_ideas"}
-        if a.quality != b.quality:
-            winner = a if a.quality > b.quality else b
-            return {"answer": winner.problem[3], "reason": "different_quality"}
-        return {"answer": None, "reason": "same_quality"}
+        snag_justified = {
+            dimension for dimension, _ in snag_justified_themes(answer, self)
+        }
+        return {
+            dimension: (
+                "snag_justified" if dimension in snag_justified else "unjustified"
+            )
+            for dimension in answer.unjustified_themes
+        }
 
     def _theme_distance(
         self,
@@ -292,9 +414,16 @@ class EpisodicMemory:
         return float(differences)
 
     def clear(self) -> None:
-        """Delete all answer and snag descriptions. Matches Scheme clearmem."""
+        """Delete all answer and snag descriptions. Matches Scheme clearmem.
+
+        The identifier counters reset too.  Leaving them running meant that after a
+        clear the next answer took an id that no longer lined up with anything, and a
+        rehydrate-after-clear produced a memory whose ids disagreed with the rows they
+        came from — so ``/api/memory/compare`` could resolve an id to the wrong answer.
+        """
         self.answers.clear()
         self.snags.clear()
+        self.ids = IdAllocator()
 
     def __repr__(self) -> str:
         return f"EpisodicMemory({len(self.answers)} answers, {len(self.snags)} snags)"

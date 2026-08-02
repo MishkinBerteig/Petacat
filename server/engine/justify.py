@@ -85,6 +85,8 @@ def attempt_justification(
     themespace: Themespace | None = None,
     slipnet: Slipnet | None = None,
     memory: Any = None,
+    codelet_count: int = 0,
+    temperature: float = 50.0,
 ) -> JustificationResult:
     """Attempt to justify the answer by finding matching rules.
 
@@ -166,6 +168,8 @@ def attempt_justification(
                 workspace,
                 slipnet,
                 meta,
+                codelet_count=codelet_count,
+                temperature=temperature,
                 concept_patterns=[_get_concept_pattern_dict(matching_rule)],
                 explanation="Matching rule unsupported, clamping",
             )
@@ -204,6 +208,8 @@ def attempt_justification(
                 workspace,
                 slipnet,
                 meta,
+                codelet_count=codelet_count,
+                temperature=temperature,
                 concept_patterns=[_get_concept_pattern_dict(translated_rule)],
                 explanation="Translated rule unsupported, clamping",
             )
@@ -245,7 +251,9 @@ def attempt_justification(
         themespace,
         workspace,
         slipnet,
-        meta,
+            meta,
+            codelet_count=codelet_count,
+            temperature=temperature,
         vertical_pattern_override=vertical_pattern,
         concept_patterns=[
             _get_concept_pattern_dict(chosen_rule),
@@ -270,6 +278,8 @@ def clamp_rules(
     *,
     vertical_theme_pattern: dict[str, Any] | None = None,
     concept_patterns: list[dict[str, Any]] | None = None,
+    codelet_count: int | None = None,
+    temperature: float | None = None,
 ) -> ClampEvent | None:
     """Clamp a set of rules with their theme pattern, concept pattern, and
     codelet pattern for focused exploration.
@@ -310,8 +320,16 @@ def clamp_rules(
         {"type": "thematic_codelet_pattern"},
     ]
 
-    codelet_count = _get_codelet_count(workspace)
-    temperature = _get_temperature(workspace)
+    # The caller supplies these.  They used to be read off the Workspace, which has
+    # neither attribute, so every justify clamp stamped ``codelet_count = 0`` and
+    # ``temperature = 50``.  A clamp timestamped 0 is already older than
+    # ``%max-clamp-period%`` (750) the instant it is made, so justify clamps expired
+    # after 2–14 codelets instead of lasting up to 750 — the reorganisation Figure 4.13
+    # depends on had no time to happen.
+    if codelet_count is None:
+        codelet_count = _get_codelet_count(workspace)
+    if temperature is None:
+        temperature = _get_temperature(workspace)
 
     clamp_event = ClampEvent(
         codelet_count=codelet_count,
@@ -720,12 +738,25 @@ def _answer_already_found(
     top_rule: Rule,
     bottom_rule: Rule,
 ) -> bool:
-    """Check episodic memory for a duplicate answer."""
+    """Check episodic memory for a duplicate answer.
+
+    Scheme: ``justify.ss:62`` and ``justify.ss:99`` — "Already justified this answer."
+
+    This previously guarded on ``hasattr(memory, "answer_present")`` for a method
+    ``EpisodicMemory`` did not have, so it returned ``False`` unconditionally and the
+    guard never fired.  The method now exists (``memory.py``); the ``hasattr`` is gone
+    because a missing method should be an error rather than a silently disabled check.
+    """
     if memory is None:
         return False
-    if hasattr(memory, "answer_present"):
-        return memory.answer_present(workspace, top_rule, bottom_rule)
-    return False
+    answer = getattr(workspace.answer_string, "text", "") or ""
+    problem = (
+        workspace.initial_string.text,
+        workspace.modified_string.text,
+        workspace.target_string.text,
+        answer,
+    )
+    return memory.answer_present(problem, top_rule, bottom_rule)
 
 
 def _attempt_clamp_rules(
@@ -739,6 +770,8 @@ def _attempt_clamp_rules(
     vertical_pattern_override: dict[str, Any] | None = None,
     concept_patterns: list[dict[str, Any]] | None = None,
     explanation: str = "Clamping rules",
+    codelet_count: int = 0,
+    temperature: float = 50.0,
 ) -> JustificationResult:
     """Attempt to clamp rules and return a JustificationResult."""
     if trace is None or themespace is None or slipnet is None:
@@ -754,6 +787,8 @@ def _attempt_clamp_rules(
         slipnet,
         workspace,
         meta,
+        codelet_count=codelet_count,
+        temperature=temperature,
         vertical_theme_pattern=vertical_pattern_override,
         concept_patterns=concept_patterns,
     )

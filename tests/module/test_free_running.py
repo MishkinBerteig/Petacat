@@ -21,6 +21,10 @@ from server.engine.free_running import FreeRunningEngine, run_free
 from server.engine.metadata import MetadataProvider
 from server.engine.runner import EngineRunner
 
+# Every test here executes arithmetic the numeric substrate owns, so each one runs
+# once per backend in the matrix. See tests/conftest.py.
+pytestmark = pytest.mark.numeric_matrix
+
 SEED_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
     "seed_data",
@@ -221,3 +225,28 @@ def test_the_serial_loop_is_untouched_by_free_running(meta):
     assert runner.ctx.commit_lock is None
     assert not isinstance(runner.ctx.coderack, WorkerShardedCoderack)
     assert runner.ctx.access is None
+
+
+def test_a_free_run_stores_exactly_one_answer_like_the_serial_loop(meta):
+    """Episodic Memory must not gain an entry per racing worker.
+
+    ``_collect_outcome`` de-duplicates the run's *status*, but each worker that reached
+    ``report_answer`` had already written its own ``AnswerDescription``.  Under a
+    Training Session that memory is shared with every later Run, so the pollution
+    outlived the run that caused it — and because ``on_answer`` fires once, the database
+    and the live memory silently disagreed about how many answers there were.
+
+    Measured before the guard, at 8 workers: 22 of 40 runs stored 2-5 answers where the
+    serial loop stores exactly 1.
+    """
+    for seed in range(6):
+        runner = EngineRunner(meta)
+        runner.init_mcat("abc", "abd", "mrrjjj", seed=seed)
+        FreeRunningEngine(runner, workers=4).run(max_steps=2500)
+
+        stored = len(runner.ctx.memory.answers)
+        assert stored <= 1, (
+            f"seed {seed}: {stored} answer descriptions stored for one run"
+        )
+        # And the run's own answer list agrees with what memory holds.
+        assert len(runner._answers) == stored

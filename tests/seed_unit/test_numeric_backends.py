@@ -231,9 +231,9 @@ def test_theme_spreading_matches_the_cluster_loop(
     rng = random.Random(7)
     for cluster in themespace.clusters:
         for theme in cluster.themes:
-            theme.positive_activation = rng.choice([0.0, 12.0, 45.0, 88.0, 100.0])
-            theme.negative_activation = rng.choice([0.0, 0.0, -30.0, -70.0])
-            theme.activation = theme.positive_activation + theme.negative_activation
+            theme.activation = rng.choice(
+                [0.0, 12.0, 45.0, 88.0, 100.0, -30.0, -70.0, -100.0]
+            )
         cluster.frozen = rng.random() < 0.1
 
     reference = copy.deepcopy(themespace)
@@ -493,6 +493,11 @@ def test_every_lane_count_computes_the_same_answer(lanes: int) -> None:
     )
 
 
+#: The thread target the lane table in ``metal_kernels`` was measured at: a
+#: 38-core GPU asking for 1,024 threads per core, rounded up to a power of two.
+MEASURED_TARGET_THREADS = 1 << 16
+
+
 @pytest.mark.parametrize(
     "n_rows,n_edges,max_degree,expected",
     [
@@ -518,12 +523,45 @@ def test_lane_count_follows_the_measured_rule(
 
     Not an arbitrary regression lock: each row here is a regime the measurement
     distinguishes, and the module docstring records the milliseconds behind them.
-    A change to ``TARGET_THREADS`` or ``MAX_EDGES_PER_LANE`` should move these,
-    and should be accompanied by a new measurement.
+    The thread target is passed explicitly, because it is read from the GPU this
+    process is running on and the table is an answer for the GPU it was measured
+    on — a change to ``MAX_EDGES_PER_LANE`` should move these rows, a bigger GPU
+    should not.
     """
     from server.engine.numeric.metal_kernels import lanes_per_row
 
-    assert lanes_per_row(n_rows, n_edges, max_degree) == expected
+    assert (
+        lanes_per_row(n_rows, n_edges, max_degree, threads=MEASURED_TARGET_THREADS)
+        == expected
+    )
+
+
+def test_a_larger_gpu_splits_rows_more_widely_in_the_latency_bound_regime() -> None:
+    """The lane rule scales with the machine, in the regime where that matters.
+
+    Below the point where there are enough rows to fill the GPU, a row is split
+    across as many lanes as the GPU can keep busy, so twice the cores buys twice
+    the lanes.  Above it the mean in-degree governs and the two agree, because a
+    row with 3.4 edges has nothing more to hand out however large the GPU is.
+    """
+    from server.engine.numeric.metal_kernels import lanes_per_row
+
+    small, large = 1 << 16, 1 << 17
+    assert lanes_per_row(10_000, 34_237, 29, threads=small) == 8
+    assert lanes_per_row(10_000, 34_237, 29, threads=large) == 16
+    assert lanes_per_row(300_000, 1_026_000, 29, threads=small) == 4
+    assert lanes_per_row(300_000, 1_026_000, 29, threads=large) == 4
+
+
+def test_the_default_thread_target_comes_from_the_detected_gpu() -> None:
+    """``lanes_per_row`` with no target asks the machine for one."""
+    from server.engine import hardware
+    from server.engine.numeric import metal_kernels
+
+    assert metal_kernels.target_threads() == hardware.gpu_target_threads()
+    assert metal_kernels.lanes_per_row(10_000, 34_237, 29) == metal_kernels.lanes_per_row(
+        10_000, 34_237, 29, threads=hardware.gpu_target_threads()
+    )
 
 
 def test_max_in_degree_reads_the_longest_csr_row(real_slipnet: Slipnet) -> None:

@@ -18,8 +18,8 @@
   ],
   "answer_reporting": {
     "unjustified_slippages": {
-      "eliza": "Okay, I'm stumped.  This answer makes no sense to me.  I see no way to make the necessary {slippage_names} slippage(s) here.",
-      "technical": "Run terminated.  Unable to make the necessary {slippage_names} slippage(s)."
+      "eliza": "Okay, I'm stumped.  This answer makes no sense to me.  I see no way to make the necessary {slippage_names} slippage{plural} here.",
+      "technical": "Run terminated.  Unable to make the necessary {slippage_names} slippage{plural}."
     },
     "justify_success": {
       "eliza_prefix": "Aha!  I see why this answer makes sense",
@@ -30,6 +30,7 @@
     },
     "discovery": {
       "eliza_prefix": "The answer \"{answer}\" {also}occurs to me",
+      "also": "also ",
       "quality_suffix_bad": ", but that's {quality_phrase}{punctuation}",
       "quality_suffix_good": ".  I think this answer is {quality_phrase}{punctuation}",
       "technical": "Found the answer \"{answer}\".  Answer quality = {quality}."
@@ -45,29 +46,48 @@
     "quality_suffix_technical": "  Answer quality = {quality}."
   },
   "theme_phrase_templates": {
-    "direction_with_group_category": {
-      "identity": "see{ending} {strings} as groups of the same type going in the same direction",
-      "opposite": "see{ending} {strings} as symmetric predecessor and successor groups going in opposite directions",
-      "diff": "see{ending} {strings} as different kinds of groups going in neither the same nor opposite directions"
+    "strings": {
+      "pair": "{initial} and {target}",
+      "two_strings": "two strings {two_strings}",
+      "the_strings": "the strings"
     },
-    "direction_without_group_category": {
-      "identity": "see{ending} {strings} as going in the same direction",
-      "opposite": "see{ending} {strings} as going in opposite directions"
+    "string_position": {
+      "template": "{prep}see{ending} {strings} as {group_qualifier}{direction}{caveat}",
+      "group_qualifier": {
+        "identity": "groups of the same type ",
+        "opposite": "symmetric predecessor and successor groups ",
+        "diff": "different kinds of groups "
+      },
+      "direction": {
+        "identity": "going in the same direction",
+        "opposite": "going in opposite directions",
+        "diff": "neither going in the same nor in opposite directions"
+      }
     },
     "group_category_standalone": {
-      "identity": "see{ending} {strings} as groups of the same type",
-      "opposite": "see{ending} {strings} as symmetric predecessor and successor groups",
-      "diff": "see{ending} {strings} as different kinds of groups"
+      "template": "{prep}see{ending} {strings} as {group_category}{bond_facet_clause}{caveat}",
+      "group_category": {
+        "identity": "groups of the same type",
+        "opposite": "symmetric predecessor and successor groups",
+        "diff": "different kinds of groups"
+      },
+      "bond_facet_clause": " by viewing one string in terms of letters and the other in terms of numbers"
     },
-    "bond_facet": "view{ending} one of {strings} in terms of letters and the other in terms of numbers",
+    "bond_facet": {
+      "template": "{prep}view{ending} one of {strings} in terms of letters and the other in terms of numbers{caveat}"
+    },
     "alphabetic_position": {
-      "identity": "see{ending} alphabetic-position sameness between {strings}",
-      "opposite": "see{ending} alphabetic-position symmetry between {strings}"
+      "template": "{prep}see{ending} alphabetic-position {relation} between {strings}{caveat}",
+      "relation": {
+        "identity": "sameness",
+        "opposite": "symmetry"
+      }
     }
   },
   "caveat_templates": {
     "unjustified": " (although there is no good reason for doing so)",
-    "snag_justified": " (which avoids a snag that would otherwise arise from the fact that {snag_explanation})"
+    "snag_justified": " (which avoids a snag that would otherwise arise from the fact that {snag_explanation})",
+    "snag_explanation": "the rule \"{rule}\" cannot be applied to {target}"
   },
   "comparison_judgment_priority": [
     "both_incoherent",
@@ -78,15 +98,74 @@
     "neither_better"
   ],
   "comparison_templates": {
-    "essentially_same": "The answer {answer1} is essentially the same as the answer {answer2}.  Both answers {similarities}.  Furthermore, {rule_comparison}.",
-    "similar_with_rule_diffs": "{rule_explanation}  Both answers {similarities}.",
-    "similar_with_justification_diffs": "The answer {answer1} is similar to the answer {answer2}, since both {similarities}.  However, {justification_explanation}.",
-    "one_incoherent": "All in all, I'd say {coherent_answer} is the better answer, since it is more coherent.",
-    "fewer_unjustified_zero": "All in all, I'd say {answer} is the better answer, since it involves no unjustified ideas.",
-    "fewer_unjustified": "All in all, I'd say {answer} is the better answer, since it involves fewer unjustified ideas.",
-    "more_abstract": "All in all, I'd say {answer} is the better answer, since it involves seeing {change} in a more abstract way.",
-    "richer_ideas": "All in all, I'd say {answer} is the better answer, since it is based on a richer set of ideas.",
-    "same_quality": "All in all, I'd say they're both {quality_phrase} answers.",
-    "different_quality": "All in all, I'd say {answer1} is {quality1} and {answer2} is {quality2}."
+    "problem": "\"{initial} -> {modified}, {target} -> ?\"",
+    "change": "the change from {initial} to {modified}",
+    "full_answer": "{answer} to the problem {problem}",
+    "both_answers": "the answer {answer1} and the answer {answer2}",
+    "answer_ordinal": "the {order} {answer}",
+    "no_theme_differences": {
+      "essentially_same": "The answer {answer1} is essentially the same as the answer {answer2}.  Both answers {similarities}.  Furthermore, {rule_sameness}.",
+      "rule_sameness_same_change": "{change1} is viewed in essentially the same way in both cases",
+      "rule_sameness_different_change": "{change1} is viewed in essentially the same way as {change2}",
+      "rule_differences_only": "{rule_explanation}  Both answers {similarities}.",
+      "justification_differences": "The answer {answer1} is similar to the answer {answer2}, since both {similarities}.  However, {no_justification}.",
+      "justification_differences_both": "The answer {answer1} is similar to the answer {answer2}, since both {similarities}.  However, {no_justification1}.  Likewise, {no_justification2}.",
+      "similarities": "rely {theme_phrases}",
+      "similarity_strings_same_problem": "({initial} and {target} in both cases)",
+      "similarity_strings_different_problems": "({initial1} and {target1} in one case and {initial2} and {target2} in the other)",
+      "no_justification_former": "in the former case, there is no compelling reason {theme_phrases}, unlike in the latter case with {initial} and {target}{snag_clause}",
+      "no_justification_latter": "in the latter case, there is no compelling reason {theme_phrases}, unlike in the former case with {initial} and {target}{snag_clause}",
+      "no_justification_snag_clause": ", where {theme_phrases} avoids a snag that would otherwise arise from the fact that {snag_explanation}"
+    },
+    "theme_differences": {
+      "one_answer": "The answer {answer} is based {in_part}{theme_phrases}.",
+      "both_answers": "The answer {answer1} is based {in_part1}{theme_phrases1}, while the answer {answer2} is based {in_part2}{theme_phrases2}.",
+      "in_part": "in part "
+    },
+    "unique_theme": {
+      "template": "{intro} {case}, the idea {theme_phrases} does not arise.",
+      "intro_contrast": "  In contrast, in",
+      "intro_plain": "  In",
+      "case_named": "the case of the answer {answer}",
+      "case_possessive": "{answer}'s case"
+    },
+    "rule_explanation": {
+      "template": "{intro} difference between {subject} is that {change1} is viewed {rule_difference_phrase} for {answer1} than{change2} in {answer2}.",
+      "intro_only_essential": "The only essential",
+      "intro_another_key": "  Another key",
+      "subject_two_identical_answers": "the two {answer} answers",
+      "subject_the_answers": "the answers",
+      "answer1_named": "the answer {answer}",
+      "answer1_ordinal": "the {order} answer",
+      "answer2_named": "the case of {answer}",
+      "answer2_ordinal": "the {order} answer's case",
+      "change2_same": " it is",
+      "change2_different": " {change2}",
+      "phrase_more_abstract": "in a more abstract way",
+      "phrase_more_literal": "in a more literal way",
+      "phrase_completely_different": "in a completely different way",
+      "phrase_somewhat_different": "somewhat differently"
+    },
+    "incoherence": {
+      "first": "  The answer {answer}, however, seems incoherent to me, since it involves seeing{similarity} between {initial} and {target} ({theme_phrases}), while at the same time viewing {change} in a more literal way.",
+      "second_after_first": "  The answer {answer} also seems incoherent, since it involves seeing{similarity} between {initial} and {target} ({theme_phrases}), while at the same time viewing {change} in a more literal way.",
+      "second_alone": "  The answer {answer}, however, seems incoherent to me, since it involves seeing{similarity} between {initial} and {target} ({theme_phrases}), while at the same time viewing {change} in a more literal way.",
+      "similarity_singular": " an abstract similarity",
+      "similarity_plural": " abstract similarities"
+    },
+    "verdict": {
+      "intro_overall": "  Overall, though, ",
+      "intro_all_in_all": "  All in all, ",
+      "better": "{intro}I'd say {answer} is the better answer{reason}.",
+      "both_same_quality": "{intro}I'd say they're both {quality_phrase} answers.",
+      "different_quality": "{intro}I'd say {answer1} is {quality1} and {answer2} is {quality2}.",
+      "reason_less_incoherent": ", because it doesn't seem quite as incoherent as {other}",
+      "reason_more_coherent": ", since it is more coherent",
+      "reason_no_unjustified": ", since it involves no unjustified ideas",
+      "reason_fewer_unjustified": ", since it involves fewer unjustified ideas",
+      "reason_more_abstract_same_change": ", since it involves seeing {change} in a more abstract way",
+      "reason_more_abstract_different_change": ", since {change1} is seen in a more abstract way than {change2}",
+      "reason_richer_ideas": ", since it is based on a richer set of ideas"
+    }
   }
 }

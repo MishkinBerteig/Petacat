@@ -808,6 +808,8 @@ class TestStructureFighting:
 
 
 class TestBottomUpPosting:
+    # Posts against a real Workspace, so it runs once per numeric backend.
+    @pytest.mark.numeric_matrix
     def test_posts_multiple_codelet_types(self, meta, runner):
         """Bottom-up posting should post multiple codelet types per cycle."""
         runner.init_mcat("abc", "abd", "xyz", seed=SEED)
@@ -825,6 +827,8 @@ class TestBottomUpPosting:
 
 
 class TestTopDownSlipnodeArgument:
+    # Posts against a real Workspace, so it runs once per numeric backend.
+    @pytest.mark.numeric_matrix
     def test_top_down_codelets_receive_slipnode(self, meta, runner):
         """Top-down codelets should carry the triggering slipnode."""
         runner.init_mcat("abc", "abd", "xyz", seed=SEED)

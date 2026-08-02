@@ -208,20 +208,21 @@ class PythonBackend(Backend):
         Two properties of the reference dictate the loop structure and are easy to
         lose:
 
-        *It is Gauss-Seidel, not Jacobi.*  The reference updates each theme's
-        activation at the end of its own iteration, and later themes in the same
-        cluster read the *updated* value.  A naive vectorisation that computes all
-        net inputs from the pre-update activations would be a different dynamical
-        system with the same fixed points and different trajectories.  Slots are
-        therefore walked sequentially here, and clusters — which are genuinely
-        independent — are what a vectorised backend parallelises over.
+        *It is Jacobi, not Gauss-Seidel.*  ``themes.ss:520-527`` runs three separate
+        passes over a cluster — clear every buffer, let every theme spread, then let
+        every theme update — so every net input is computed from the activations as
+        they stood at the *start* of the step.  Updating a theme at the end of its own
+        iteration, so later themes read already-updated neighbours, is a different
+        dynamical system: same fixed points, different trajectories, and a result that
+        depends on slot order.  The activations are therefore snapshotted below before
+        any of them is written.
 
         *The source sum is order-sensitive.*  The reference accumulates
         ``net_input`` over sources in slot order; the terms are arbitrary floats,
         so re-associating them would perturb the result.  The loop below walks
         sources in the same order for the same reason.
         """
-        pos, neg, act = state.positive, state.negative, state.activation
+        act = state.activation
         n_slots = layout.n_slots
         decay = params.decay
         self_w = params.self_weight
@@ -233,11 +234,15 @@ class PythonBackend(Backend):
             base = c * n_slots
             alpha = params.sensitivity * (1.0 / 50.0) * (1.0 / layout.n_relations[c])
 
+            # Pass one and two: read only the activations as they stand now.
+            snapshot = [act[base + s] for s in range(n_slots)]
+            net_effects: list[float | None] = [None] * n_slots
+
             for t in range(n_slots):
                 ti = base + t
                 if not layout.valid[ti] or state.frozen[ti]:
                     continue
-                target_act = act[ti]
+                target_act = snapshot[t]
                 net_input = -decay
                 if target_act > 0:
                     net_input += target_act * (self_w / 100.0)
@@ -248,7 +253,7 @@ class PythonBackend(Backend):
                     si = base + s
                     if not layout.valid[si]:
                         continue
-                    source_act = act[si]
+                    source_act = snapshot[s]
                     if source_act == 0:
                         continue
                     if source_act < 0 and target_act < 0:
@@ -261,15 +266,23 @@ class PythonBackend(Backend):
                         weight = params.pos_to_pos
                     net_input += abs(source_act) * (weight / 100.0)
 
-                net_effect = round(spread * math.tanh(alpha * net_input))
+                net_effects[t] = round(spread * math.tanh(alpha * net_input))
 
-                if target_act >= 0:
-                    p = pos[ti] + net_effect
-                    pos[ti] = 0.0 if p < 0.0 else (100.0 if p > 100.0 else p)
+            # Pass three: apply.
+            for t in range(n_slots):
+                net_effect = net_effects[t]
+                if net_effect is None:
+                    continue
+                ti = base + t
+                # ``activation-function`` (``themes.ss:456-459``): a positive theme is
+                # pushed toward +100 by excitation and toward 0 by inhibition; a
+                # negative theme is pushed toward -100 and toward 0 respectively.
+                if snapshot[t] >= 0:
+                    a = act[ti] + net_effect
+                    act[ti] = 0.0 if a < 0.0 else (100.0 if a > 100.0 else a)
                 else:
-                    n = neg[ti] - net_effect
-                    neg[ti] = -100.0 if n < -100.0 else (0.0 if n > 0.0 else n)
-                act[ti] = pos[ti] + neg[ti]
+                    a = act[ti] - net_effect
+                    act[ti] = -100.0 if a < -100.0 else (0.0 if a > 0.0 else a)
 
     # -- Workspace object values -------------------------------------------
 

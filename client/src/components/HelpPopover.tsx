@@ -69,7 +69,7 @@ export function HelpPopover(props: HelpPopoverProps) {
       }
     } else if (helpContent.type === 'component') {
       summary = helpContent.short_desc ?? '';
-      // Related glossary concepts from help_topics.{locale}.json metadata
+      // Related glossary concepts from help_topics.en.json metadata
       const related = helpContent.metadata?.key_concepts;
       if (Array.isArray(related) && related.length > 0) {
         metadata = { 'Related concepts': (related as string[]).join(', ') };

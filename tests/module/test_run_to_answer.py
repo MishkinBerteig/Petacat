@@ -14,6 +14,10 @@ from server.engine.runner import (
     STATUS_RUNNING,
 )
 
+# Every test here executes arithmetic the numeric substrate owns, so each one runs
+# once per backend in the matrix. See tests/conftest.py.
+pytestmark = pytest.mark.numeric_matrix
+
 
 SEED_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
 

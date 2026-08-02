@@ -1,15 +1,10 @@
-"""Unit tests for the CommentaryLog and commentary generation helpers."""
+"""The ``CommentaryLog`` and the emit helpers whose English is written in Python."""
 
-import pytest
 from server.engine.commentary import (
     CommentaryLog,
     CommentaryParagraph,
     emit_new_problem,
-    emit_answer_discovered,
-    emit_answer_justified,
-    emit_answer_unjustified,
     emit_snag,
-    emit_give_up,
     emit_clamp_activate,
     emit_clamp_expired,
     emit_jootsing,
@@ -123,60 +118,6 @@ def test_new_problem_justify():
     assert "justify" in tech.lower()
 
 
-# ---- emit_answer_discovered ----
-
-
-def test_answer_discovered_high_quality():
-    log = CommentaryLog()
-    emit_answer_discovered(log, "xyd", 90.0, "great", 50.0, 100, 0, {})
-    eliza = log.render(eliza_mode=True)
-    tech = log.render(eliza_mode=False)
-    assert '"xyd"' in eliza
-    assert "great" in eliza
-    assert "90" in tech
-
-
-def test_answer_discovered_low_quality():
-    log = CommentaryLog()
-    emit_answer_discovered(log, "xyd", 40.0, "really terrible", 80.0, 100, 0, {})
-    eliza = log.render(eliza_mode=True)
-    assert "really terrible" in eliza
-
-
-def test_answer_discovered_also():
-    """Second answer should include 'also'."""
-    log = CommentaryLog()
-    emit_answer_discovered(log, "xyd", 85.0, "good", 50.0, 200, 1, {})
-    eliza = log.render(eliza_mode=True)
-    assert "also" in eliza
-
-
-# ---- emit_answer_justified ----
-
-
-def test_answer_justified():
-    log = CommentaryLog()
-    emit_answer_justified(log, 85.0, "pretty good", 100, {})
-    eliza = log.render(eliza_mode=True)
-    tech = log.render(eliza_mode=False)
-    assert "Aha" in eliza
-    assert "pretty good" in eliza
-    assert "justified" in tech.lower()
-
-
-# ---- emit_answer_unjustified ----
-
-
-def test_answer_unjustified():
-    log = CommentaryLog()
-    emit_answer_unjustified(log, "leftmost->rightmost", 100)
-    eliza = log.render(eliza_mode=True)
-    tech = log.render(eliza_mode=False)
-    assert "stumped" in eliza
-    assert "leftmost->rightmost" in eliza
-    assert "terminated" in tech.lower()
-
-
 # ---- emit_snag ----
 
 
@@ -197,18 +138,6 @@ def test_snag_repeat():
     tech = log.render(eliza_mode=False)
     assert "again" in eliza
     assert "another snag" in tech
-
-
-# ---- emit_give_up ----
-
-
-def test_give_up():
-    log = CommentaryLog()
-    emit_give_up(log, 500)
-    eliza = log.render(eliza_mode=True)
-    tech = log.render(eliza_mode=False)
-    assert "punch" in eliza
-    assert "terminated" in tech.lower()
 
 
 # ---- emit_clamp_activate ----

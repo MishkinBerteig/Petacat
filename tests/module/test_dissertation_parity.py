@@ -30,6 +30,10 @@ from server.engine.themes import (
     relation_node_name,
 )
 
+# Every test here executes arithmetic the numeric substrate owns, so each one runs
+# once per backend in the matrix. See tests/conftest.py.
+pytestmark = pytest.mark.numeric_matrix
+
 SEED_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
 
 
@@ -728,8 +732,7 @@ class TestMemory:
                 "plato-alphabetic-position-category": "opposite",
             },
         )
-        comparison = memory.compare_answers(xyd, dyz)
-        commentary = describe_answer_comparison(xyd, dyz, comparison)
+        commentary = describe_answer_comparison(xyd, dyz, memory=memory)
 
         assert commentary["paragraphs"]
         assert "xyd" in commentary["text"] and "dyz" in commentary["text"]

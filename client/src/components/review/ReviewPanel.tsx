@@ -14,7 +14,7 @@
 
 import { useEffect, useState } from 'react';
 import type { RecordedRun } from '@/types';
-import { getRecordedRun } from '@/api/client';
+import { ApiError, describeApiError, getRecordedRun } from '@/api/client';
 import { ModeBadge } from '@/components/ModeBadge';
 import { SessionBrowser } from './SessionBrowser';
 import { NormalRunReview } from './NormalRunReview';
@@ -44,13 +44,18 @@ export function ReviewPanel({ initialRunId = null }: ReviewPanelProps) {
         setRun(r);
         setOpenError(null);
       })
-      .catch(() => {
+      .catch((err) => {
         if (cancelled) return;
         setRun(null);
+        // A 404 is the record being absent, which for a Fast Run is the mode
+        // working. Every other status is the server failing to hand over a record
+        // that may well exist, and says so in its own terms.
         setOpenError(
-          `Run #${initialRunId} has no record to review. A Fast Run writes no row at `
-          + 'all, which is the mode working rather than a gap; re-run the problem in '
-          + 'Normal or Audit mode.',
+          err instanceof ApiError && err.status === 404
+            ? `Run #${initialRunId} has no record to review. A Fast Run writes no row at `
+              + 'all, which is the mode working rather than a gap; re-run the problem in '
+              + 'Normal or Audit mode.'
+            : describeApiError(err, `load the recorded run #${initialRunId}`),
         );
       });
     return () => {
@@ -88,6 +93,7 @@ export function ReviewPanel({ initialRunId = null }: ReviewPanelProps) {
       <div style={{ minHeight: 0, overflow: 'auto' }}>
         {run === null ? (
           <div
+            role={openError !== null ? 'alert' : undefined}
             className={openError !== null ? 'text-sm' : 'text-muted text-sm'}
             style={{ padding: 16, color: openError !== null ? 'var(--warning)' : undefined }}
           >

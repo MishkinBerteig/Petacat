@@ -50,6 +50,7 @@ from __future__ import annotations
 import threading
 from typing import TYPE_CHECKING, Any
 
+from server.engine import hardware
 from server.engine.coderack import Codelet, Coderack
 
 if TYPE_CHECKING:
@@ -170,6 +171,12 @@ class LockedCoderack(ShardedCoderack):
 #: it is stuck, and instead answers.  Raising the shard size restores it: 19 at
 #: twenty-five per shard, 27 at fifty, against the serial 23.
 MIN_SHARD_CAPACITY = 25
+
+#: The shard count follows from it: ``max_coderack_size // MIN_SHARD_CAPACITY``, which is
+#: 4 at the default rack of 100.  A machine offering more workers than that runs several
+#: against one shard.  `PHASE 1 PLAN.md` carries the measurement that would decide whether
+#: a larger rack keeps the reachable set, and records that parallelism past this bound may
+#: come from somewhere other than partitioning the Coderack.
 
 
 class _ShardBase(ShardedCoderack):
@@ -492,8 +499,17 @@ CANDIDATES = {
 }
 
 
-def build_candidate(name: str, meta: MetadataProvider, shards: int = 4) -> ShardedCoderack:
-    """Construct one candidate. ``locked`` ignores ``shards`` — it has exactly one."""
+def build_candidate(
+    name: str, meta: MetadataProvider, shards: int | None = None
+) -> ShardedCoderack:
+    """Construct one candidate.
+
+    ``shards=None`` takes this machine's shard count
+    (:func:`server.engine.hardware.shard_count`), which follows from its
+    performance core count.  ``locked`` ignores ``shards`` — it has exactly one.
+    """
+    if shards is None:
+        shards = hardware.shard_count()
     if name not in CANDIDATES:
         raise ValueError(f"unknown coderack candidate {name!r}; expected one of {sorted(CANDIDATES)}")
     if name == "locked":

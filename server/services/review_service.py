@@ -540,6 +540,11 @@ class ReviewService:
                 problem["target"],
                 problem["answer"],
                 seed=state["rng"]["seed"],
+                # Re-execute under the Run's own parameters, not the process's current
+                # globals.  Without this the inspector walked the engine forward with
+                # whatever the Admin panel holds today, and reported a Themespace that
+                # the recorded Run never produced.
+                parameters=state.get("parameters"),
             )
             try:
                 restore_run_state(runner, state)

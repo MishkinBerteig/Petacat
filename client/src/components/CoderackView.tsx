@@ -2,6 +2,14 @@
 // CoderackView -- Horizontal bar chart of codelet types by count and urgency
 // ---------------------------------------------------------------------------
 
+import { useState, useEffect, useCallback } from 'react';
+
+import {
+  clampCodeletPattern,
+  getCodeletPatterns,
+  unclampCodeletPattern,
+  type CodeletPattern,
+} from '@/api/client';
 import { useRunStore } from '@/store/runStore';
 import type { CoderackState } from '@/types';
 
@@ -117,7 +125,89 @@ export function CoderackBars({ coderack }: { coderack: CoderackState | null }) {
 }
 
 /** The live coderack: `CoderackBars` fed from the run store. */
+/**
+ * Clamping a codelet pattern pins a whole line of work at high urgency: a scout
+ * together with the evaluator and builder that finish what it proposes. MetaCat offers
+ * the same five patterns on its Options menu (`gui.ss:597-603`), and it is the third of
+ * its three manual clamp handles, beside Slipnet nodes and themes.
+ */
+function CodeletPatternControls({ runId }: { runId: number }) {
+  const [patterns, setPatterns] = useState<CodeletPattern[]>([]);
+  const [clamped, setClamped] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+    getCodeletPatterns(runId)
+      .then(p => { if (live) setPatterns(p); })
+      .catch(() => { if (live) setPatterns([]); });
+    return () => { live = false; };
+  }, [runId]);
+
+  // A run change leaves nothing clamped by this panel.
+  useEffect(() => { setClamped(null); }, [runId]);
+
+  const toggle = useCallback(async (name: string) => {
+    setBusy(true);
+    try {
+      if (clamped === name) {
+        await unclampCodeletPattern(runId, name);
+        setClamped(null);
+      } else {
+        if (clamped) await unclampCodeletPattern(runId, clamped);
+        await clampCodeletPattern(runId, name);
+        setClamped(name);
+      }
+    } finally {
+      setBusy(false);
+    }
+  }, [runId, clamped]);
+
+  if (patterns.length === 0) return null;
+
+  return (
+    <div style={{ marginTop: 6, borderTop: '1px solid var(--border)', paddingTop: 4 }}>
+      <div className="text-xs text-muted" style={{ marginBottom: 3 }}>
+        Clamp codelet pattern
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+        {patterns.map(p => (
+          <button
+            key={p.name}
+            onClick={() => toggle(p.name)}
+            disabled={busy}
+            title={
+              `${p.label}: pins ${p.entries.length} codelet types at high urgency ` +
+              `(${p.entries.map(e => e.codelet_type).join(', ')}). ` +
+              'Press again to release.'
+            }
+            style={{
+              fontSize: 10,
+              padding: '1px 5px',
+              borderRadius: 2,
+              border: '1px solid var(--border)',
+              background: clamped === p.name ? 'rgba(255,193,7,0.25)' : 'transparent',
+              color: clamped === p.name ? '#ffc107' : 'var(--text-secondary)',
+              cursor: busy ? 'default' : 'pointer',
+            }}
+          >
+            {p.label.replace(' codelet pattern', '')}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function CoderackView() {
   const coderack = useRunStore((s) => s.coderack);
-  return <CoderackBars coderack={coderack} />;
+  const runId = useRunStore((s) => s.runId);
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+        <CoderackBars coderack={coderack} />
+      </div>
+      {runId != null && <CodeletPatternControls runId={runId} />}
+    </div>
+  );
 }

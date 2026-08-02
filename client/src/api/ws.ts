@@ -2,7 +2,15 @@
 // Petacat — WebSocket client for real-time run updates
 // ---------------------------------------------------------------------------
 
-import type { WsMessage } from '../types';
+import type { WsSnapshot } from '../types';
+
+/**
+ * The path prefix every run socket lives under.
+ *
+ * It is the prefix `client/vite.config.ts` proxies with `ws: true`, which is what
+ * carries the connection to the API through the dev server.
+ */
+export const WS_PATH_PREFIX = '/ws';
 
 /** Default delay before attempting reconnection (milliseconds). */
 const RECONNECT_DELAY_MS = 2000;
@@ -32,16 +40,25 @@ export interface WsHandle {
  */
 export function connectWebSocket(
   runId: number,
-  onMessage: (msg: WsMessage) => void,
+  onMessage: (msg: WsSnapshot) => void,
 ): WsHandle {
   let ws: WebSocket | null = null;
   let closed = false;
   let reconnectDelay = RECONNECT_DELAY_MS;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
+  /**
+   * The socket URL for this run: the page's own origin, the `ws:`/`wss:` scheme
+   * matching the page protocol, and the path `server/api/ws.py` declares —
+   * `/ws/runs/{run_id}`.
+   *
+   * `client/vite.config.ts` proxies the `/ws` prefix to the API with WebSocket
+   * upgrade enabled, so the same URL reaches the backend from the dev server and
+   * from the production build alike. `ws.test.ts` pins it to the server route.
+   */
   function buildUrl(): string {
     const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    return `${proto}://${window.location.host}/api/runs/${runId}/ws`;
+    return `${proto}://${window.location.host}${WS_PATH_PREFIX}/runs/${runId}`;
   }
 
   function connect(): void {
@@ -56,11 +73,11 @@ export function connectWebSocket(
 
     ws.onmessage = (event: MessageEvent) => {
       try {
-        const msg: WsMessage = JSON.parse(event.data);
+        const msg: WsSnapshot = JSON.parse(event.data);
         onMessage(msg);
       } catch {
-        // Non-JSON payload — forward as a generic message.
-        onMessage({ type: 'raw', data: event.data });
+        // The server sends JSON snapshots; anything else is not one to act on.
+        console.warn('Ignoring non-JSON WebSocket frame');
       }
     };
 

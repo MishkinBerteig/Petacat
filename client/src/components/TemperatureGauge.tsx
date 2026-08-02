@@ -1,18 +1,33 @@
 // ---------------------------------------------------------------------------
 // TemperatureGauge -- Vertical thermometer with clamp controls
 // ---------------------------------------------------------------------------
+//
+// Clamping is engine state, so the gauge reports it rather than remembering it.
+// The Scheme keeps it in `*temperature-clamped?*` -- set during a snag response
+// (`answers.ss`), cleared by `undo-snag-condition` (`trace.ss:195`) -- and the
+// display reads it. Petacat's store carries the same flag, fed by
+// `GET /runs/{id}/temperature` and by each WebSocket snapshot.
+//
+// Two things follow. A clamp the server refuses lights nothing, because nothing
+// on the server changed. And a clamp in force stays visible -- with its Unclamp
+// button -- across any remounting of the gauge, and whether this display asked
+// for the clamp or the engine imposed one on itself.
+// ---------------------------------------------------------------------------
 
 import { useState, useCallback } from 'react';
+import { clampTemperature, unclampTemperature, describeApiError } from '@/api/client';
 import { useRunStore } from '@/store/runStore';
 
 export function TemperatureGauge() {
   const temperature = useRunStore((s) => s.temperature);
+  const clamped = useRunStore((s) => s.temperatureClamped);
   const runId = useRunStore((s) => s.runId);
+  const refreshTemperature = useRunStore((s) => s.refreshTemperature);
 
   const [showClampDialog, setShowClampDialog] = useState(false);
   const [clampValue, setClampValue] = useState('50');
   const [clampCycles, setClampCycles] = useState('0');
-  const [clamped, setClamped] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Color: blue (0) -> yellow (50) -> red (100)
   const t = Math.max(0, Math.min(100, temperature)) / 100;
@@ -23,36 +38,41 @@ export function TemperatureGauge() {
 
   const handleToggleClamp = useCallback(() => {
     setShowClampDialog((prev) => !prev);
+    setError(null);
   }, []);
 
   const handleClamp = useCallback(async () => {
     if (!runId) return;
     try {
-      await fetch(`/api/runs/${runId}/clamp-temperature`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          value: parseFloat(clampValue),
-          cycles: parseInt(clampCycles, 10) || 0,
-        }),
-      });
-      setClamped(true);
-    } catch {
-      // ignore
+      await clampTemperature(
+        runId,
+        parseFloat(clampValue),
+        parseInt(clampCycles, 10) || 0,
+      );
+    } catch (err) {
+      // The dialog stays open carrying the reason: the request is the only place
+      // the failure is visible, since the gauge itself shows the engine and the
+      // engine is unclamped.
+      setError(describeApiError(err, 'clamp the temperature'));
+      return;
     }
+    setError(null);
+    await refreshTemperature();
     setShowClampDialog(false);
-  }, [runId, clampValue, clampCycles]);
+  }, [runId, clampValue, clampCycles, refreshTemperature]);
 
   const handleUnclamp = useCallback(async () => {
     if (!runId) return;
     try {
-      await fetch(`/api/runs/${runId}/clamp-temperature`, { method: 'DELETE' });
-      setClamped(false);
-    } catch {
-      // ignore
+      await unclampTemperature(runId);
+    } catch (err) {
+      setError(describeApiError(err, 'release the temperature clamp'));
+      return;
     }
+    setError(null);
+    await refreshTemperature();
     setShowClampDialog(false);
-  }, [runId]);
+  }, [runId, refreshTemperature]);
 
   return (
     <div
@@ -222,6 +242,16 @@ export function TemperatureGauge() {
               </button>
             )}
           </div>
+
+          {error !== null && (
+            <div
+              role="alert"
+              className="text-xs"
+              style={{ marginTop: 6, color: 'var(--error)' }}
+            >
+              {error}
+            </div>
+          )}
         </div>
       )}
     </div>

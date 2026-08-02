@@ -444,11 +444,21 @@ def report_engine(results: dict[str, Any], out: Callable[[str], None]) -> None:
 
 
 def environment_info() -> dict[str, Any]:
+    """Everything a reader needs to interpret a crossover measured here elsewhere.
+
+    A crossover is an answer for one machine: it sits where this CPU's time on the
+    work first exceeds this GPU's dispatch cost.  The machine goes into the record
+    beside it.
+    """
+    from server.engine import hardware
+
     info: dict[str, Any] = {
         "python": platform.python_version(),
         "platform": platform.platform(),
         "machine": platform.machine(),
         "cpu_count": os.cpu_count(),
+        "hardware": hardware.detect().as_dict(),
+        "derived": hardware.derived_sizes(),
     }
     try:
         import numpy as np

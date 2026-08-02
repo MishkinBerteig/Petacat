@@ -1,7 +1,22 @@
 import { useState, useEffect, useCallback } from 'react'
+import { request, describeApiError } from '@/api/client'
 import { EditableTable, type ColumnDef } from './EditableTable'
 
 interface FormulaCoeff { name: string; value: number }
+
+/**
+ * Send one write, and describe a refusal in terms of what was being attempted.
+ *
+ * The table shows the thrown message beside the row that was edited, so the sentence it
+ * throws is the sentence the reader gets.
+ */
+async function submit<T>(action: string, path: string, options: RequestInit): Promise<T> {
+  try {
+    return await request<T>(path, options)
+  } catch (err) {
+    throw new Error(describeApiError(err, action))
+  }
+}
 
 const COLUMNS: ColumnDef[] = [
   { key: 'name', label: 'Name', type: 'readonly', width: '60%' },
@@ -11,16 +26,27 @@ const COLUMNS: ColumnDef[] = [
 export function FormulaCoefficientEditor() {
   const [coeffs, setCoeffs] = useState<FormulaCoeff[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(() => {
-    fetch('/api/admin/formula-coefficients').then(r => r.json()).then(data => {
-      setCoeffs(data)
-      setLoading(false)
-    })
+    setLoading(true)
+    request<FormulaCoeff[]>('/admin/formula-coefficients')
+      .then(data => { setCoeffs(data); setError(null) })
+      .catch(err => setError(describeApiError(err, 'load the formula coefficients')))
+      .finally(() => setLoading(false))
   }, [])
 
   useEffect(() => { load() }, [load])
   if (loading) return <div className="text-muted">Loading formula coefficients...</div>
+
+  if (error) {
+    return (
+      <div role="alert" className="text-xs" style={{ color: 'var(--error)' }}>
+        {error}{' '}
+        <button onClick={load} style={{ fontSize: 10, padding: '1px 6px' }}>Retry</button>
+      </div>
+    )
+  }
 
   return (
     <div>
@@ -29,25 +55,22 @@ export function FormulaCoefficientEditor() {
         columns={COLUMNS}
         rows={coeffs}
         idKey="name"
-        onCreate={async (row) => {
-          const res = await fetch('/api/admin/formula-coefficients', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(row),
-          })
-          if (!res.ok) throw new Error(await res.text())
-          return res.json()
-        }}
-        onUpdate={async (name, row) => {
-          const res = await fetch(`/api/admin/formula-coefficients/${encodeURIComponent(name)}`, {
-            method: 'PUT', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ value: row.value }),
-          })
-          if (!res.ok) throw new Error(await res.text())
-          return res.json()
-        }}
+        onCreate={async (row) => submit<FormulaCoeff>(
+          'create the formula coefficient',
+          '/admin/formula-coefficients',
+          { method: 'POST', body: JSON.stringify(row) },
+        )}
+        onUpdate={async (name, row) => submit<FormulaCoeff>(
+          `save the formula coefficient "${name}"`,
+          `/admin/formula-coefficients/${encodeURIComponent(name)}`,
+          { method: 'PUT', body: JSON.stringify({ value: row.value }) },
+        )}
         onDelete={async (name) => {
-          const res = await fetch(`/api/admin/formula-coefficients/${encodeURIComponent(name)}`, { method: 'DELETE' })
-          if (!res.ok) throw new Error(await res.text())
+          await submit<unknown>(
+            `delete the formula coefficient "${name}"`,
+            `/admin/formula-coefficients/${encodeURIComponent(name)}`,
+            { method: 'DELETE' },
+          )
           return true
         }}
         onRefresh={load}

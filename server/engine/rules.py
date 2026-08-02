@@ -1243,6 +1243,58 @@ def _is_group_or_string_name(name: Any) -> bool:
     return name in ("plato-group", "string")
 
 
+def rule_signature(rule: Rule | None) -> list | None:
+    """A canonical, JSON-serialisable structural key for a rule.
+
+    ``rules_equal`` compares clauses by *identity* of their slipnodes, which is fine
+    within one process but cannot survive being written to a database and read back.
+    MetaCat stores the clause lists themselves in an answer description
+    (``memory.ss:117``) precisely so that ``answer-present?`` can compare them
+    (``memory.ss:190-196``), so a stored answer needs a structural key rather than the
+    English transcription — two genuinely different rules can transcribe to the same
+    prose, and one that fails to transcribe reads "Unknown transformation".
+
+    The signature honours the same equivalences ``_clauses_equal`` does, including
+    group/string interchangeability; ``extrinsic_objects`` is excluded because
+    ``_clauses_equal`` does not compare it either.
+    """
+    if rule is None:
+        return None
+    return [_clause_signature(clause) for clause in rule.clauses]
+
+
+def _clause_signature(clause: RuleClause) -> list:
+    if clause.is_verbatim:
+        return [
+            clause.clause_type,
+            [_descriptor_key(letter) for letter in (clause.verbatim_letters or [])],
+        ]
+    return [
+        clause.clause_type,
+        [_descriptor_key(d) for d in (clause.object_description or ())],
+        [
+            [
+                _descriptor_key(change.dimension),
+                _descriptor_key(change.from_descriptor),
+                _descriptor_key(change.to_descriptor),
+                _descriptor_key(change.relation),
+            ]
+            for change in clause.changes
+        ],
+    ]
+
+
+def _descriptor_key(descriptor: Any) -> str | None:
+    if descriptor is None:
+        return None
+    name = getattr(descriptor, "name", descriptor)
+    if _is_group_or_string_name(name):
+        # ``_clauses_equal`` treats plato-group and string as interchangeable, so the
+        # signature must collapse them to one token rather than preserve the difference.
+        return "plato-group|string"
+    return name if isinstance(name, str) else str(name)
+
+
 # ============================================================================
 #  Literal-clause detection
 # ============================================================================

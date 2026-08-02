@@ -41,6 +41,7 @@ import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from server.engine import hardware
 from server.engine.coderack_shards import WorkerShardedCoderack
 from server.engine.ids import use_allocator
 from server.engine.runner import (
@@ -103,10 +104,19 @@ class FreeRunningEngine:
     exactly the shape it has and cannot acquire concurrency bugs by proximity.
     """
 
-    def __init__(self, runner: EngineRunner, workers: int = 4, shards: int | None = None) -> None:
+    def __init__(
+        self,
+        runner: EngineRunner,
+        workers: int | None = None,
+        shards: int | None = None,
+    ) -> None:
         self.runner = runner
-        self.workers = max(1, workers)
-        self.shards = shards if shards is not None else max(2, self.workers)
+        # ``None`` asks the machine: one worker per performance core, one shard
+        # per worker.  Both are stated in ``server.engine.hardware``, along with
+        # the environment variables that pin them, so a run on a 32-core machine
+        # uses 32 cores and a run on an 8-core machine is not asked to.
+        self.workers = max(1, workers if workers is not None else hardware.worker_count())
+        self.shards = shards if shards is not None else hardware.shard_count(self.workers)
 
         # Reentrant, and it has to be.  ``build_structure`` takes the commit lock and
         # then calls ``break_structure`` for each opponent it defeats, and
@@ -155,6 +165,7 @@ class FreeRunningEngine:
         runner = self.runner
         ctx = runner.ctx
         runner.status = STATUS_RUNNING
+        ctx.run_ended = False
         self._stop.clear()
         self._conflicts = 0
         self._update_cycles = 0
@@ -284,6 +295,7 @@ class FreeRunningEngine:
             if runner.status in (STATUS_ANSWER_FOUND, STATUS_GAVE_UP):
                 # Already ended. Discard any later terminal event rather than letting it
                 # overwrite the outcome or leave its flag set for the next worker to find.
+                ctx.run_ended = True
                 ctx._pending_answer = None
                 ctx._gave_up = False
                 return
@@ -296,9 +308,11 @@ class FreeRunningEngine:
             if pending is not None:
                 runner._answers.append(pending)
                 runner.status = STATUS_ANSWER_FOUND
+                ctx.run_ended = True
                 quality = float(getattr(ctx, "_pending_answer_quality", 0) or 0)
             elif gave_up:
                 runner.status = STATUS_GAVE_UP
+                ctx.run_ended = True
                 quality = None
             else:
                 return
@@ -332,7 +346,14 @@ class FreeRunningEngine:
 
 
 def run_free(
-    runner: EngineRunner, workers: int = 4, max_steps: int = 0, shards: int | None = None
+    runner: EngineRunner,
+    workers: int | None = None,
+    max_steps: int = 0,
+    shards: int | None = None,
 ) -> FreeRunResult:
-    """Convenience: execute a prepared runner free-running and return the telemetry."""
+    """Convenience: execute a prepared runner free-running and return the telemetry.
+
+    ``workers=None`` takes the machine's own count — see
+    :func:`server.engine.hardware.worker_count`.
+    """
     return FreeRunningEngine(runner, workers=workers, shards=shards).run(max_steps)

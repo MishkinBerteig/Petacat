@@ -1,6 +1,6 @@
 """The engine computes the same thing with the numeric substrate engaged.
 
-The backend agreement tests in ``tests/unit/test_numeric_backends.py`` compare the
+The backend agreement tests in ``tests/seed_unit/test_numeric_backends.py`` compare the
 backends against each other on arrays.  These compare the *engine* against itself:
 a whole run with the substrate forced on, against the same run with it off.  The
 distinction matters because the substrate does not only replace arithmetic — it

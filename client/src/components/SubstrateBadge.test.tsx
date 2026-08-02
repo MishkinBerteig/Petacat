@@ -44,7 +44,30 @@ function substrate(overrides: Partial<NumericSubstrate> = {}): NumericSubstrate 
     slipnet_links: 202,
     vectorise_threshold: 512,
     gpu_threshold: 0,
-    summary: "Numeric substrate 'mlx' on the GPU (Metal via MLX), float32, over 59 Slipnet nodes.",
+    hardware: {
+      platform: 'darwin',
+      chip: 'Apple M2 Max',
+      logical_cores: 12,
+      performance_cores: 8,
+      efficiency_cores: 4,
+      memory_bytes: 103079215104,
+      gpu_name: 'Apple M2 Max',
+      gpu_cores: 38,
+      metal_available: true,
+      cpu_probe: 'sysctl hw.perflevel',
+      gpu_probe: 'system_profiler SPDisplaysDataType',
+    },
+    derived: {
+      workers: 8,
+      coderack_shards: 8,
+      population_workers: 11,
+      gpu_cores: 38,
+      gpu_target_threads: 65536,
+      overrides: {},
+    },
+    summary:
+      "Numeric substrate 'mlx' on the GPU (Metal via MLX), float32, over 59 Slipnet "
+      + 'nodes on Apple M2 Max, 8P+4E cores, 38-core GPU.',
     ...overrides,
   }
 }

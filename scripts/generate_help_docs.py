@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
 """Generate derived help documentation from the help topics JSON.
 
-Thin CLI wrapper around `server.services.help_docs`. Reads the locale JSON
+Thin CLI wrapper around `server.services.help_docs`. Reads the topics JSON
 and produces:
 
 1. `HELP.md` -- human-readable Markdown reference
 2. `client/src/constants/helpTopics.ts` -- TypeScript key constants/unions
 
 Usage:
-    python scripts/generate_help_docs.py [--locale en] [--check]
+    python scripts/generate_help_docs.py [--check]
 
 Options:
-    --locale LOCALE    Language code (default: "en"). Reads help_topics.{locale}.json.
     --check            Exit non-zero if generated files would change (for CI).
 
 Note: the same generation runs automatically on every backend startup (see
@@ -40,7 +39,6 @@ from server.services.help_docs import (  # noqa: E402
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--locale", default="en", help="Locale code (default: en)")
     parser.add_argument(
         "--check",
         action="store_true",
@@ -49,7 +47,7 @@ def main() -> int:
     args = parser.parse_args()
 
     if args.check:
-        drift = check_drift(args.locale)
+        drift = check_drift()
         if drift:
             print("Derived help docs are out of sync with the JSON source of truth:")
             for p in drift:
@@ -59,7 +57,7 @@ def main() -> int:
         print("Help docs are in sync.")
         return 0
 
-    result = regenerate_all(args.locale)
+    result = regenerate_all()
     if result.help_md_changed:
         print(f"wrote {result.help_md_path}")
     else:

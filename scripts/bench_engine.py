@@ -706,12 +706,17 @@ def git_info() -> dict[str, Any]:
 
 
 def environment_info() -> dict[str, Any]:
+    """Everything a reader needs to interpret a timing on a different machine."""
+    from server.engine import hardware
+
     return {
         "python": platform.python_version(),
         "implementation": platform.python_implementation(),
         "machine": platform.machine(),
         "platform": platform.platform(),
         "cpu_count": os.cpu_count(),
+        "hardware": hardware.detect().as_dict(),
+        "derived": hardware.derived_sizes(),
     }
 
 

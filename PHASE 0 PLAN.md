@@ -13,9 +13,14 @@ provides is what every later phase validates against.
 **Code baseline.** All measurements and code references in this document were taken
 against commit `2c5c086` ("Bring Petacat to functional parity with Metacat"), on an
 **Apple M2 Max** (8 performance + 4 efficiency cores, 38 GPU cores, 96 GB unified
-memory). Engine: 29 modules, 16,619 LOC. Seed data: 59 slipnet nodes, 202 links, 27
-codelet types. Test suite: **590 passing**, 2 skipped (28 unit + 4 integration + 8
-module files run locally; 9 e2e files currently require Docker, which WP2.1 removes).
+memory). Engine: 28 modules, 16,619 LOC — modules counted as the `.py` files under
+`server/engine/` other than the empty `__init__.py` package markers, which is the
+count every engine-size figure in this document uses. Seed data: 59 slipnet nodes,
+202 links, 27 codelet types. Test suite: **590 passing**, 2 skipped (28 unit + 4
+integration + 8 module files run locally; 9 e2e files currently require Docker, which
+WP2.1 removes).
+
+> **As built.** `server/engine/` holds 50 modules and 26,890 lines.
 
 ---
 
@@ -29,6 +34,12 @@ module files run locally; 9 e2e files currently require Docker, which WP2.1 remo
 **A Training Session carries the Episodic Memory across Run boundaries, and in Phase 0
 that is all it carries.** This matches Metacat and the current port; Phase 0 preserves
 it exactly. Verified against `init_mcat` (`runner.py:109–170`):
+
+> **As built.** That memory shapes the Runs that inherit it. `EpisodicMemory.answer_present`
+> is consulted before an answer is reported, and a Run declines an answer the memory
+> already holds for the same problem and the same rules (`answers.ss:982`). Repeating a
+> problem within a Session therefore reaches a different answer each time, and a Run's
+> `memory-hash` is part of what identifies it.
 
 | Component | Across a Run boundary |
 |---|---|
@@ -81,7 +92,7 @@ inherit a parallel engine and do not touch scheduling.
 
 ### A1. Where the database is
 
-**The engine is database-free.** All 29 modules of `server/engine/` (16,619 LOC)
+**The engine is database-free.** All 28 modules of `server/engine/` (16,619 LOC)
 contain **zero** SQLAlchemy imports, zero session handling, and zero awaited I/O.
 `EngineRunner(meta)` plus `MetadataProvider.from_seed_data(seed_dir)` runs a complete
 problem with no Postgres, no Docker, and no FastAPI — every measurement below was taken
@@ -91,6 +102,9 @@ Phase 0 makes that property **explicit, enforced, and switchable** rather than
 incidental.
 
 The database boundary is confined to twelve files:
+
+> **As built.** The database boundary spans `api/`, `services/`, `models/` and `db.py`,
+> with 93 endpoints taking `Depends(get_session)`.
 
 | Module | Role at the boundary |
 |--------|----------------------|
@@ -179,30 +193,45 @@ Normal live dialogue in the same process.
 | **When it is written** | never | twice: Run start, Run end | buffered in memory during the Run; **flushed at Run end** |
 | **DB attached** | **no** | yes | yes |
 | **Execution** | full parallelism | full parallelism | **serial** |
-| **Expected cost** | full engine rate (7k–9.8k codelets/s today) | two state captures per Run | extremely slow, by design |
+| **Expected cost** | full engine rate (7k–9.8k codelets/s at the code baseline) | two state captures per Run | extremely slow, by design |
 
-**Measured**, `abc→abd; mrrjjj?` seed 42, end to end through the service layer:
+**Measured as built**, `abc→abd; mrrjjj?` seed 42, end to end through the service
+layer, on the Apple M2 Max named in the code baseline, fastest of five runs per cell.
+Two conditions, because the numeric substrate dominates the total while the cost of
+recording does not depend on it: the default policy, which puts the arithmetic on the
+Metal GPU, and `PETACAT_NUMERIC_BACKEND=off`, which runs the engine's own loops.
 
 | | Fast | Normal | Audit |
 |---|---|---|---|
-| Codelets / answer | 2,229 / `mrrjjk` | 2,229 / `mrrjjk` | 2,229 / `mrrjjk` |
-| Wall time | **180 ms** | 251 ms | 323 ms |
-| Relative to Fast | 1.00× | 1.39× | 1.79× |
-| Rows written | none | 2 captures + 18 trace | 2 captures + 18 trace + 2,306 actions |
-| Bytes written | **0** | **137 KB** | 381 KB |
+| Codelets / answer | 2,255 / `mrrjjk` | 2,255 / `mrrjjk` | 2,255 / `mrrjjk` |
+| Wall time, `PETACAT_NUMERIC_BACKEND=off` | **192 ms** | 227 ms | 329 ms |
+| Relative to Fast, substrate off | 1.00× | 1.18× | 1.72× |
+| Wall time, default backend (`mlx`, Metal GPU) | **1,308 ms** | 1,348 ms | 1,481 ms |
+| Relative to Fast, default backend | 1.00× | 1.03× | 1.13× |
+| Rows written | none | 2 captures + 6 trace + 1 answer | 2 captures + 6 trace + 1 answer + 2,313 actions |
+| Bytes written | **0** | **155 KB** | 413 KB |
+
+Bytes are the summed `octet_length` of the JSON payloads the Run leaves in Postgres.
+The codelet count is the same figure the run-parameters table quotes, and it is the
+same on both conditions.
 
 Three things this says.
 
-**Cognition is identical across the modes** — same codelet count, same answer. That is
-the rule the whole design rests on, and it is checked rather than assumed.
+**Cognition is identical across the modes** — same codelet count, same answer, under
+both conditions. That is the rule the whole design rests on, and it is checked rather
+than assumed.
 
-**Normal writes 137 KB where the retired snapshot system wrote ~6,300 KB** for the same
-run: a **46× reduction**, and the 137 KB can actually be read back, which the 6.3 MB
+**Normal writes 155 KB where the retired snapshot system wrote ~6,300 KB** for the same
+run: a **41× reduction**, and the 155 KB can actually be read back, which the 6.3 MB
 could not.
 
-**Audit is not "extremely slow" — it is 1.79×.** The plan expected worse. Buffering the
-actions in memory and flushing once at Run end is what makes the difference: the cost is
-in writing 2,306 rows at the end, not in interrupting 2,229 codelets.
+**Audit is not "extremely slow" — it is 1.72× with the substrate off and 1.13× on the
+GPU.** The plan expected worse. Buffering the actions in memory and flushing once at
+Run end is what makes the difference: the cost is in writing 2,313 rows at the end,
+not in interrupting 2,255 codelets. Recording costs a fixed number of milliseconds
+rather than a fixed multiple — Normal adds 35 ms with the substrate off and 40 ms on
+the GPU, Audit adds 137 ms and 173 ms — so the multiple is a property of the pair,
+which is why both conditions are given.
 
 **Fast and Normal differ in exactly one thing.** Not in cadence, not in detail level,
 not in what the engine does: Normal captures the **complete state at the two Run
@@ -229,7 +258,7 @@ built-and-discarded.** Two requirements:
    not create it.
 
 Requirement 2 is why sink methods take the **live context** rather than a payload
-(§A4), and why the fast sink must be a no-op rather than a collector.
+(§A4), and why the fast sink is a no-op.
 
 It also draws a line inside the engine, between accumulation cognition depends on and
 accumulation that is pure output:
@@ -237,11 +266,13 @@ accumulation that is pure output:
 | Structure | Read by cognition? | Fast Run |
 |---|---|---|
 | `ctx.trace.events` | **Yes** — `jootsing.py:460`, `runner.py:420`, `builtins.py:718,893` | **Keep.** Engine state, not persistence; the `TraceEventRow` is the artefact and is never constructed |
-| `ctx.commentary` | **No** — the engine only calls `emit_*`; `render`/`get_paragraphs`/`count` are API-only | **Must not accumulate** |
+| `ctx.commentary` | **No** — the engine only calls `emit_*`; `render`/`get_paragraphs`/`count` are API-only | **Injected** |
+
+> **As built.** Every mode supplies a real `CommentaryLog`. A run narrates itself
+> identically in each, and `GET /commentary` answers with that narration in every mode.
 
 Commentary therefore becomes a sink concern (WP3.10): `ctx.commentary` is an injected
-writer, the engine calls `emit_*` unconditionally, and in Fast Run those calls land on
-a discarding writer.
+writer and the engine calls `emit_*` unconditionally.
 
 **Normal records complete state at the two Run boundaries — nothing in between.**
 Reproducibility is **by re-execution, not by replay**: reload the start state, re-run,
@@ -303,11 +334,13 @@ audit.
   memory-hash).
 - **Metadata gets a config-hash.** `Run.spreading_threshold` (`models/run.py:42`)
   already sets the precedent.
-- **Episodic memory becomes a named, versioned input** with a recorded `memory-hash`;
-  Fast Run defaults to an ephemeral in-process memory.
+- **Episodic memory becomes a named, versioned input** with a recorded `memory-hash`.
+
+  > **As built.** Every mode shares the Training Session's Episodic Memory. Mode
+  > governs persistence alone.
 - **Serializers split from the ORM.**
 - **The API keeps working in every mode.** `ws.py` and most of `controls.py` are
-  already session-free — Fast means *not written down*, not *not observable*.
+  already session-free, and a Fast Run stays fully observable through them.
 
 ---
 
@@ -484,7 +517,7 @@ testing infrastructure as much as training infrastructure.
 A test that fails if anything under `server/engine/**` imports `sqlalchemy`,
 `server.models`, `server.db`, or `server.services`. True today by discipline; make it
 true by construction so every later phase inherits it.
-*Files:* new `tests/unit/test_engine_purity.py`.
+*Files:* new `tests/architecture/test_engine_purity.py`.
 *Verify:* passes now; fails if an import is deliberately added.
 
 **WP0.3 — Per-run identifier counters (fixes D3).**
@@ -602,7 +635,7 @@ Supporting counters, same problem and seed as B2:
 
 The eviction and occupancy rows being unchanged is the point: WP1.1 changed how the
 victim is found, not which victim is found. Runs are bit-identical across the change
-— same codelet counts, same RNG call counts, same answers (`tests/unit/test_coderack_eviction.py`).
+— same codelet counts, same RNG call counts, same answers (`tests/seed_unit/test_coderack_eviction.py`).
 
 *Caveat on the throughput row.* Part of that gain is WP0.3, not WP1.1: replacing the
 class-level `_next_id` counters removed a type-version-tag invalidation on every
@@ -625,9 +658,11 @@ version.
 **Done.** Homebrew `postgresql@17` on `localhost:5432`, Python 3.14.5 in a project
 venv, Node 26, and `scripts/dev.sh` in place of `docker compose up`.
 
-*Result:* **797 passed, 0 skipped, ~96 s** — all four tiers in one command. Before, the
-93 e2e tests were reachable only through `docker compose exec` and were skipped on
-every local run; the suite as normally executed was 590 passed, 2 skipped.
+*Result:* **797 passed, 0 skipped, ~96 s** — all four tiers in one command, measured on
+the checkout at which WP2.1 landed. Before, the 93 e2e tests were reachable only
+through `docker compose exec` and were skipped on every local run; the suite as
+normally executed was 590 passed, 2 skipped. `TESTING.md` carries the size of the
+suite as it now stands, and the suite reports it in its own per-layer summary.
 
 Three things the move turned up that the container stack had been hiding:
 
@@ -657,10 +692,14 @@ Install `python-freethreading` (3.14.6, available via Homebrew) and run the suit
 it, before any threading work is designed.
 *Verify:* suite green under the free-threaded build; benchmark reports single-threaded
 overhead versus the standard build.
+*As built:* `PYTHON_GIL=0 .venv-ft/bin/python -m pytest tests/ -q` is green, the slow
+tests included. The oracle's worker pool resolves its backend from a candidate list, so
+an interpreter without NumPy runs it on the pure-Python reference.
 *Risk:* SQLAlchemy/asyncpg free-threading readiness.
 
 **Done.** `python3.14t` (3.14.6, `Py_GIL_DISABLED=1`) with a parallel venv at
-`.venv-ft`. Suite green: **797 passed** under free-threading.
+`.venv-ft`. Suite green: **797 passed** under free-threading, on the checkout at which
+WP2.2 landed.
 
 *The risk was real, and the engine-purity invariant is what defuses it.* Importing
 SQLAlchemy **re-enables the GIL at runtime** — `sqlalchemy.cyextension.collections` has
@@ -724,7 +763,7 @@ touched.
 Move the pure `serialize_*` functions into `server/engine/serialization.py` with **no
 database imports**; leave persistence in `server/services/snapshot_repository.py`.
 *Files:* `services/snapshot_service.py` → split; callers in `run_service.py`,
-`tests/unit/test_codelet_behaviours.py:920`.
+`tests/module/test_codelet_behaviours.py:920`.
 *Verify:* WP0.2's purity test extended to assert the serialization module imports no
 SQLAlchemy; existing tests green.
 
@@ -840,8 +879,10 @@ The memory hash is taken **before** the run executes: it identifies the memory t
 *inherited*, not the one it left behind.
 
 **WP3.6 — Fast Run.**
-Fast sink; ephemeral in-process episodic memory; no session, no engine, no connection;
-**and no construction of any storable representation** (§A2 requirement 2).
+Fast sink; no session, no engine, no connection; **and no construction of any storable
+representation** (§A2 requirement 2).
+
+> **As built.** The Episodic Memory and the commentary are shared with every mode.
 *Files:* `services/run_service.py`, `api/runs.py`.
 *Verify:* three separate tests, because the two requirements fail differently —
  (a) a Fast run completes normally with **the database stopped**;
@@ -853,8 +894,11 @@ Fast sink; ephemeral in-process episodic memory; no session, no engine, no conne
 **Done**, and stricter than "no writes": a Fast Run **never touches the session at all,
 including at creation**. It has no `runs` row, so it has no database identifier either —
 it takes a negative one from an in-process counter, which a positive autoincrement column
-can never collide with. It also gets an ephemeral Episodic Memory and a discarding
-commentary writer, so it leaves nothing behind in the process either.
+can never collide with.
+
+> **As built.** A Fast Run takes full part in the Training Session: the Episodic Memory is
+> the shared one and the commentary is real. Its answers are available to the runs that
+> follow, and `answer_present` stops them being rediscovered.
 
 Creation had to be included. A run that inserted a row and then wrote nothing more would
 still fail with the database stopped, which is the condition the mode is verified under.
@@ -949,24 +993,23 @@ have caught them:
 **WP3.10 — Commentary becomes a sink concern.**
 `CommentaryLog` accumulates output that no part of cognition reads back — the engine
 only calls `emit_*` → `add_comment`; `render`, `get_paragraphs` and `count` are
-API-only. Replace `ctx.commentary` with an injected writer: the engine calls `emit_*`
-unconditionally, and in Fast Run those calls land on a discarding writer.
+API-only. Replace `ctx.commentary` with an injected writer, so the engine calls
+`emit_*` unconditionally and the writer decides what becomes of the paragraphs.
 *Files:* `engine/commentary.py`, `engine/runner.py` (context construction),
 `engine/jootsing.py`, `engine/codelet_dsl/builtins.py`, `services/run_service.py`
 (`get_commentary`).
-*Verify:* expected range unchanged; commentary unaffected by mode; **zero paragraphs
-allocated in Fast Run**; the `eliza_mode` re-render path still works.
+*Verify:* expected range unchanged; commentary unaffected by mode; the `eliza_mode`
+re-render path still works.
 
-**Done.** `CommentaryWriter` is a protocol; `CommentaryLog` accumulates and
-`DiscardingCommentaryLog` does not. The engine emits unconditionally and never learns
-its mode. Confirmed the plan's premise first: the engine only ever calls `emit_*` →
-`add_comment`, and `render`/`get_paragraphs`/`count` are read solely by
+**Done.** `CommentaryWriter` is a protocol and `CommentaryLog` implements it. The
+engine emits unconditionally. Confirmed the plan's premise first: the engine only ever
+calls `emit_*` → `add_comment`, and `render`/`get_paragraphs`/`count` are read solely by
 `run_service.get_commentary`.
 
-The discarding writer still answers `render` and `count` — Fast means *not written
-down*, not *not observable*, and `GET /commentary` is served in every mode. Its
-`__slots__` is empty, so there is nowhere for a "buffer now, write later"
-implementation to accumulate without the change being visible.
+> **As built.** Every mode is given a real `CommentaryLog`. `GET /commentary` is served
+> in every mode, and `tests/module/test_commentary_writer.py` holds the arrangement:
+> the injected writer receives the run's commentary, both construction paths build a
+> real log, and the engine exposes one writer.
 
 ### Stage 4 — Concurrency and the numeric substrate
 
@@ -1021,6 +1064,8 @@ shared state. Classify each mutating builtin (`propose_bond`, `build_structure`,
 introduce the delta-and-commit split the commit protocol needs.
 *Files:* `engine/codelet_dsl/builtins.py`, `engine/workspace_structures.py`.
 *Verify:* serial behaviour unchanged; read/write sets recorded and inspectable.
+
+> **As built.** `builtins.py` holds 1,424 lines across 62 top-level functions.
 
 **Done**, as `server/engine/access.py`. Ten of the 33 public builtins mutate state; each
 now records what it read and what it wrote, and each codelet is validated at its own

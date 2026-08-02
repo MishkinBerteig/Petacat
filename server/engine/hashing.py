@@ -95,8 +95,8 @@ def memory_hash(memory: Any) -> str:
     ``answer_id`` and ``activation`` are not, being respectively a position in this
     memory and a value the next run overwrites.
 
-    An empty memory hashes to a stable value rather than to a special case, so a Fast
-    Run against a fresh ephemeral memory is recorded as what it is.
+    An empty memory hashes to a stable value rather than to a special case, so a Run at
+    the start of a Training Session is recorded as what it is.
     """
     answers = [
         {

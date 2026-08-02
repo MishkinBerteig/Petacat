@@ -88,9 +88,18 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
         ThemeState,
     )
 
-# Both thresholds below come from ``scripts/bench_numeric.py`` on an M2 Max,
-# milliseconds per update cycle, fastest of 25 repeats.  Two tables, because the
-# substrate has two costs and they cross at different sizes.
+# Both thresholds below come from ``scripts/bench_numeric.py`` on a 12-core CPU
+# (8 performance, 4 efficiency) with a 38-core GPU, milliseconds per update cycle,
+# fastest of 25 repeats.  Two tables, because the substrate has two costs and they
+# cross at different sizes.
+#
+# A crossover is a property of the machine it was measured on: it sits where the
+# CPU's time on the work first exceeds the fixed cost of the alternative, so a
+# faster CPU or a wider memory bus moves it up and a slower one moves it down.
+# Re-run ``scripts/bench_numeric.py`` on a new machine and set the two environment
+# variables below from what it reports.  ``GET /api/system/numeric`` states the
+# machine that was detected alongside the thresholds in force, so a recorded run
+# says which machine's numbers it used.
 #
 # *Kernel only*, with the state resident on the device:
 #

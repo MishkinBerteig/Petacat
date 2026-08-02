@@ -16,13 +16,22 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { RunHistory } from './RunHistory'
 import { useRunStore } from '@/store/runStore'
 import type { RunInfo } from '@/types'
-import { listRuns, getRun } from '@/api/client'
+import { ApiError, listRuns, getRun, deleteRun } from '@/api/client'
 
-vi.mock('@/api/client', () => ({
+// The endpoints are faked; `ApiError` and `describeApiError` are the real ones, so a
+// rejection carries the status a server would have sent and the panel reads it the
+// way it reads a live failure.
+vi.mock('@/api/client', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/api/client')>()),
   listRuns: vi.fn(),
   deleteRun: vi.fn().mockResolvedValue({}),
   getRun: vi.fn().mockResolvedValue({}),
 }))
+
+/** A rejection shaped like the one `request` produces for a given status. */
+function apiError(status: number, statusText: string, detail: string): ApiError {
+  return new ApiError(status, statusText, JSON.stringify({ detail }))
+}
 
 function runInfo(overrides: Partial<RunInfo> = {}): RunInfo {
   return {
@@ -45,6 +54,11 @@ const mockedListRuns = vi.mocked(listRuns)
 
 beforeEach(() => {
   mockedListRuns.mockReset()
+  // Calls only: each test says for itself whether opening a run is expected, and
+  // the resolved value the mock is declared with stays in place.
+  vi.mocked(getRun).mockClear()
+  vi.mocked(deleteRun).mockClear()
+  vi.mocked(deleteRun).mockResolvedValue(undefined)
   useRunStore.setState({ ...ORIGINAL }, true)
 })
 
@@ -235,6 +249,32 @@ describe('RunHistory — spreading threshold per run', () => {
       expect(screen.getByTitle(/Spreading threshold 100 — the original/)).toBeTruthy(),
     )
   })
+
+  // Opening a run means watching that run, threshold included: it decides which
+  // Slipnet nodes spread activation, so the controls describe the run on screen.
+  it('adopts the threshold of the run whose row is clicked', async () => {
+    mockedListRuns.mockResolvedValue({
+      runs: [runInfo({ run_id: 9, status: 'paused', spreading_threshold: 30 })],
+      total: 1,
+    })
+    vi.mocked(getRun).mockResolvedValue(
+      runInfo({ run_id: 9, status: 'paused', spreading_threshold: 30, mode: 'normal' }),
+    )
+    useRunStore.setState({ spreadingThreshold: 100, defaultSpreadingThreshold: 100 })
+
+    render(<RunHistory />)
+    await waitFor(() => expect(screen.getByText('#9')).toBeTruthy())
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('#9'))
+    })
+
+    await waitFor(() => expect(useRunStore.getState().runId).toBe(9))
+    expect(useRunStore.getState().spreadingThreshold).toBe(30)
+    // The preference for the next run is the user's to set, so opening a run
+    // leaves it where they left it.
+    expect(useRunStore.getState().defaultSpreadingThreshold).toBe(100)
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -252,7 +292,7 @@ describe('RunHistory — Fast runs cannot appear', () => {
     useRunStore.setState({ runId: -1, runMode: 'fast' })
 
     render(<RunHistory />)
-    await waitFor(() => expect(screen.getByText(/is not listed/)).toBeTruthy())
+    await waitFor(() => expect(screen.getByText(/shown from memory/)).toBeTruthy())
     expect(screen.getByText(/writes nothing, including the row this list reads/)).toBeTruthy()
   })
 
@@ -264,7 +304,7 @@ describe('RunHistory — Fast runs cannot appear', () => {
     useRunStore.setState({ runId: -2, runMode: 'fast' })
 
     render(<RunHistory />)
-    await waitFor(() => expect(screen.getByText(/is not listed/)).toBeTruthy())
+    await waitFor(() => expect(screen.getByText(/shown from memory/)).toBeTruthy())
     expect(screen.getByText('#4')).toBeTruthy()
   })
 
@@ -277,7 +317,7 @@ describe('RunHistory — Fast runs cannot appear', () => {
 
     render(<RunHistory />)
     await waitFor(() => expect(screen.getByText('#4')).toBeTruthy())
-    expect(screen.queryByText(/is not listed/)).toBeNull()
+    expect(screen.queryByText(/shown from memory/)).toBeNull()
   })
 })
 
@@ -347,5 +387,272 @@ describe('RunHistory — opening a run in the Review browser', () => {
     fireEvent.click(await screen.findByRole('button', { name: /^review$/i }))
 
     expect(vi.mocked(getRun)).not.toHaveBeenCalled()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Reaching the runs past the first window
+// ---------------------------------------------------------------------------
+//
+// `GET /api/runs` takes a limit and an offset and reports a total. The list shows
+// one window at a time, says how many runs exist behind it, and moves the window
+// on request, so every recorded run is reachable from here.
+
+describe('RunHistory — paging', () => {
+  it('reports the total the server has, not only what is on screen', async () => {
+    mockedListRuns.mockResolvedValue({ runs: [runInfo({ run_id: 137 })], total: 137 })
+
+    render(<RunHistory />)
+    await waitFor(() => expect(screen.getByText('1–1 of 137 runs')).toBeTruthy())
+  })
+
+  it('asks for the next window and renders it', async () => {
+    mockedListRuns.mockImplementation(async (_limit, offset) => ({
+      runs: [runInfo({ run_id: offset === 0 ? 137 : 87 })],
+      total: 137,
+    }))
+
+    render(<RunHistory />)
+    await waitFor(() => expect(screen.getByText('#137')).toBeTruthy())
+    expect(mockedListRuns).toHaveBeenCalledWith(50, 0)
+
+    await act(async () => {
+      screen.getByRole('button', { name: /next page of runs/i }).click()
+    })
+
+    await waitFor(() => expect(mockedListRuns).toHaveBeenCalledWith(50, 50))
+    await waitFor(() => expect(screen.getByText('#87')).toBeTruthy())
+    expect(screen.getByText('51–51 of 137 runs')).toBeTruthy()
+    expect(screen.queryByText('#137')).toBeNull()
+  })
+
+  it('goes back to the window before', async () => {
+    mockedListRuns.mockImplementation(async (_limit, offset) => ({
+      runs: [runInfo({ run_id: offset === 0 ? 137 : 87 })],
+      total: 137,
+    }))
+
+    render(<RunHistory />)
+    await waitFor(() => expect(screen.getByText('#137')).toBeTruthy())
+    // Nothing precedes the first window, so there is nowhere to go back to.
+    expect(screen.getByRole('button', { name: /previous page of runs/i })).toBeDisabled()
+
+    await act(async () => {
+      screen.getByRole('button', { name: /next page of runs/i }).click()
+    })
+    await waitFor(() => expect(screen.getByText('#87')).toBeTruthy())
+
+    await act(async () => {
+      screen.getByRole('button', { name: /previous page of runs/i }).click()
+    })
+    await waitFor(() => expect(screen.getByText('#137')).toBeTruthy())
+  })
+
+  it('offers no next window when the whole list is on screen', async () => {
+    mockedListRuns.mockResolvedValue({ runs: [runInfo({ run_id: 7 })], total: 1 })
+
+    render(<RunHistory />)
+    await waitFor(() => expect(screen.getByText('1–1 of 1 runs')).toBeTruthy())
+    expect(screen.getByRole('button', { name: /next page of runs/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /previous page of runs/i })).toBeDisabled()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// A run that writes no row still appears, with its results.
+//
+// A Fast run is absent from `GET /api/runs` by construction — it writes nothing,
+// including the row the listing reads. Its state is known regardless: the store
+// follows the running engine. So the panel lists it from memory and reports what
+// it did, which is what a reader comes to this panel for.
+// ---------------------------------------------------------------------------
+
+describe('RunHistory — a run held only in memory', () => {
+  beforeEach(() => {
+    mockedListRuns.mockResolvedValue({ runs: [], total: 0 })
+  })
+
+  it('lists the run and reports the results it finished with', async () => {
+    useRunStore.setState({
+      ...ORIGINAL,
+      runId: -1,
+      runMode: 'fast',
+      status: 'answer_found',
+      codeletCount: 1875,
+      temperature: 29,
+      workspace: {
+        initial: 'abc', modified: 'abd', target: 'xyz', answer: 'xyd',
+      } as any,
+    })
+
+    render(<RunHistory />)
+
+    await waitFor(() => expect(screen.getByText('#-1')).toBeTruthy())
+    expect(screen.getByText('1875')).toBeTruthy()
+    expect(screen.getByText(/answer found/i)).toBeTruthy()
+    expect(screen.getByText(/xyd/)).toBeTruthy()
+  })
+
+  it('says the run is held in memory rather than recorded', async () => {
+    useRunStore.setState({
+      ...ORIGINAL,
+      runId: -1,
+      runMode: 'fast',
+      status: 'answer_found',
+      codeletCount: 1875,
+      temperature: 29,
+    })
+
+    render(<RunHistory />)
+
+    await waitFor(() =>
+      expect(screen.getByText(/shown from memory/)).toBeTruthy(),
+    )
+    expect(screen.getByText(/not available in Review/)).toBeTruthy()
+  })
+
+  it('follows the run as it finishes rather than showing where it started', async () => {
+    useRunStore.setState({
+      ...ORIGINAL,
+      runId: -1,
+      runMode: 'fast',
+      status: 'running',
+      codeletCount: 40,
+      temperature: 92,
+    })
+
+    render(<RunHistory />)
+    await waitFor(() => expect(screen.getByText('40')).toBeTruthy())
+
+    // The run ends.
+    act(() => {
+      useRunStore.setState({
+        status: 'answer_found',
+        codeletCount: 1875,
+        temperature: 29,
+      })
+    })
+
+    await waitFor(() => expect(screen.getByText('1875')).toBeTruthy())
+    expect(screen.queryByText('40')).toBeNull()
+    expect(screen.getByText(/answer found/i)).toBeTruthy()
+  })
+
+  it('lists a recorded run once, from the listing', async () => {
+    // A Normal run has a row, so the listing carries it and nothing is synthesised.
+    mockedListRuns.mockResolvedValue({
+      runs: [runInfo({ run_id: 7, status: 'answer_found', codelet_count: 900 })],
+      total: 1,
+    })
+    useRunStore.setState({
+      ...ORIGINAL,
+      runId: 7,
+      runMode: 'normal',
+      status: 'answer_found',
+      codeletCount: 900,
+      temperature: 30,
+    })
+
+    render(<RunHistory />)
+
+    await waitFor(() => expect(screen.getAllByText('#7')).toHaveLength(1))
+    expect(screen.queryByText(/shown from memory/)).toBeNull()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// A list that could not be read, told apart from a list with nothing in it
+// ---------------------------------------------------------------------------
+//
+// "No runs yet" is a claim about the database, and it is what a reader concludes
+// from an empty table. It is reserved for the case it describes: a request that
+// failed puts its reason in the table's place.
+
+describe('RunHistory — a list that failed to load', () => {
+  it('gives the reason instead of saying there are no runs', async () => {
+    mockedListRuns.mockRejectedValue(
+      apiError(503, 'Service Unavailable', 'the database is not accepting connections'),
+    )
+
+    render(<RunHistory />)
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(/Could not load the run history: the server failed to complete it/),
+      ).toBeTruthy(),
+    )
+    expect(screen.getByText(/the database is not accepting connections/)).toBeTruthy()
+    expect(screen.queryByText('No runs yet.')).toBeNull()
+  })
+
+  it('says there are no runs when there genuinely are none', async () => {
+    mockedListRuns.mockResolvedValue({ runs: [], total: 0 })
+
+    render(<RunHistory />)
+
+    await waitFor(() => expect(screen.getByText('No runs yet.')).toBeTruthy())
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('names an unreachable server as unreachable', async () => {
+    mockedListRuns.mockRejectedValue(new TypeError('Failed to fetch'))
+
+    render(<RunHistory />)
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(/Could not load the run history: the server is unreachable/),
+      ).toBeTruthy(),
+    )
+  })
+})
+
+// ---------------------------------------------------------------------------
+// The two actions a row offers, each reporting its own failure
+// ---------------------------------------------------------------------------
+
+describe('RunHistory — an action the server refuses', () => {
+  it('says why a run was not deleted, with the row still there', async () => {
+    mockedListRuns.mockResolvedValue({ runs: [runInfo({ run_id: 7 })], total: 1 })
+    vi.mocked(deleteRun).mockRejectedValue(
+      apiError(409, 'Conflict', 'run 7 is still executing'),
+    )
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+
+    render(<RunHistory />)
+    await waitFor(() => expect(screen.getByText('#7')).toBeTruthy())
+    fireEvent.click(screen.getByTitle('Delete run #7'))
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(/Could not delete run #7: that conflicts with something already there/),
+      ).toBeTruthy(),
+    )
+    expect(screen.getByText(/run 7 is still executing/)).toBeTruthy()
+    expect(screen.getByText('#7')).toBeTruthy()
+    vi.mocked(window.confirm).mockRestore()
+  })
+
+  it('says why a clicked run did not open', async () => {
+    mockedListRuns.mockResolvedValue({ runs: [runInfo({ run_id: 9 })], total: 1 })
+    vi.mocked(getRun).mockRejectedValue(
+      apiError(404, 'Not Found', 'run 9 was deleted'),
+    )
+
+    render(<RunHistory />)
+    await waitFor(() => expect(screen.getByText('#9')).toBeTruthy())
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('#9'))
+    })
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(/Could not load run #9: it no longer exists/),
+      ).toBeTruthy(),
+    )
+    expect(screen.getByText(/run 9 was deleted/)).toBeTruthy()
+    // The dashboard was not pointed at a run that could not be fetched.
+    expect(useRunStore.getState().runId).toBeNull()
   })
 })

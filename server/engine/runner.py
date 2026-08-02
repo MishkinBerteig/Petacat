@@ -107,6 +107,12 @@ class EngineContext:
         #: is attached (``server/engine/sink.py``).
         self.sink: RunSink = sink if sink is not None else NullSink()
         self.codelet_count: int = 0
+        #: Has this run's terminal outcome already been claimed?  Free-running lets a
+        #: codelet finish after another has ended the run, and ``report_answer`` would
+        #: otherwise write a second ``AnswerDescription`` into a memory that outlives
+        #: the Run.  Cleared whenever the run starts or resumes, so a resumed run can
+        #: still go on to find a genuinely *different* answer, as MetaCat does.
+        self.run_ended: bool = False
         self.justify_mode: bool = False
         self.self_watching_enabled: bool = True
         self.spreading_activation_threshold: int = 100
@@ -563,6 +569,7 @@ class EngineRunner:
         Scheme: run.ss run-mcat.
         """
         self.status = STATUS_RUNNING
+        self.ctx.run_ended = False
         result = RunResult()
 
         step = 0
@@ -575,7 +582,9 @@ class EngineRunner:
             result.steps.append(step_result)
 
             if step_result.answer_found:
-                self._answers.append(step_result.answer or "")
+                # ``step_mcat`` has already recorded the answer and set the status; it is
+                # the single place a pending answer is collected, so appending again here
+                # reported every answer twice (``RunResult.answers == ['ijl', 'ijl']``).
                 self.status = STATUS_ANSWER_FOUND
 
             step += 1
@@ -631,7 +640,7 @@ class EngineRunner:
         # 5. Clamp-period expiration check (Scheme: run.ss:303-304)
         if ctx.trace.clamp_period_expired(ctx.codelet_count):
             ctx.trace.undo_last_clamp(
-                ctx.themespace, ctx.slipnet, ctx.codelet_count,
+                ctx.themespace, ctx.slipnet, ctx.codelet_count, ctx.coderack,
             )
 
         # 6. Tick clamp expirations (Python mechanism for initial slipnode clamps)
@@ -687,9 +696,14 @@ class EngineRunner:
         for name, node in ctx.slipnet.nodes.items():
             before = activations_before.get(name, 0.0)
             delta = node.activation - before
-            if delta <= 0:
-                continue
-            importance = (node.conceptual_depth + delta) / 2.0
+            # ``trace.ss:1345-1348``: ``(100* (* (% (abs delta)) (% (cd slipnode))))``
+            # — a **product** of the magnitude of the change and the concept's depth,
+            # over the **absolute** change.  An average lets a shallow concept through
+            # on a large jump, which is the opposite of "larger changes to deeper
+            # concepts being more important"; and ignoring decreases hid the
+            # deactivation of a dominant concept, which is as much a milestone as its
+            # activation was.
+            importance = abs(delta) * node.conceptual_depth / 100.0
             if importance >= threshold:
                 ctx.trace.record_event(
                     TraceEvent(

@@ -253,10 +253,12 @@ class ThemeLayout:
 
 @dataclass
 class ThemeState:
-    """Positive and negative activation per theme slot, row-major over clusters."""
+    """One signed activation per theme slot, row-major over clusters.
 
-    positive: list[float]
-    negative: list[float]
+    §4.2: a theme's activation ranges between -100 and +100.  Scheme:
+    ``make-generic-theme`` (``themes.ss:574``).
+    """
+
     activation: list[float]
     #: Per-slot freeze (a clamped theme is skipped entirely).
     frozen: list[bool]
@@ -265,27 +267,19 @@ class ThemeState:
 
     @classmethod
     def from_themespace(cls, themespace: Any, layout: ThemeLayout) -> ThemeState:
-        pos: list[float] = []
-        neg: list[float] = []
         act: list[float] = []
         frz: list[bool] = []
         for cluster in themespace.clusters:
             for theme in cluster.themes:
-                pos.append(theme.positive_activation)
-                neg.append(theme.negative_activation)
                 act.append(theme.activation)
                 frz.append(theme.frozen)
             for _ in range(layout.n_slots - len(cluster.themes)):
-                pos.append(0.0)
-                neg.append(0.0)
                 act.append(0.0)
                 # Padding is frozen so that every backend skips it by the same
                 # rule it already applies to a clamped theme, rather than needing
                 # a second exclusion test in the inner loop.
                 frz.append(True)
         return cls(
-            positive=pos,
-            negative=neg,
             activation=act,
             frozen=frz,
             cluster_frozen=[c.frozen for c in themespace.clusters],
@@ -295,8 +289,6 @@ class ThemeState:
         for c, cluster in enumerate(themespace.clusters):
             base = c * layout.n_slots
             for s, theme in enumerate(cluster.themes):
-                theme.positive_activation = self.positive[base + s]
-                theme.negative_activation = self.negative[base + s]
                 theme.activation = self.activation[base + s]
 
 

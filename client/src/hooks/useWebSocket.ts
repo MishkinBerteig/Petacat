@@ -18,21 +18,7 @@ import { connectWebSocket } from '@/api/ws';
 import type { WsHandle } from '@/api/ws';
 import { useRunStore } from '@/store/runStore';
 import type { RunStatus } from '@/store/runStore';
-import type { WsMessage } from '@/types';
-
-/** Shape of the snapshot the server pushes over the WebSocket. */
-interface WsSnapshot {
-  run_id: number;
-  status: string;
-  codelet_count: number;
-  temperature: number;
-  temperature_clamped: boolean;
-  coderack_count: number;
-  trace_event_count: number;
-  snag_count: number;
-  within_clamp_period: boolean;
-  error?: string;
-}
+import type { WsSnapshot } from '@/types';
 
 /**
  * Connects to the run WebSocket and feeds snapshots into the Zustand store.
@@ -55,12 +41,10 @@ export function useWebSocket(runId: number | null): void {
 
     if (runId === null) return;
 
-    const handle = connectWebSocket(runId, (msg: WsMessage) => {
-      // The server sends snapshot objects directly; cast to our snapshot type
-      const snapshot = msg as unknown as WsSnapshot;
-
-      // Ignore error messages or snapshots for a different run
-      if (snapshot.error || snapshot.run_id !== runId) return;
+    const handle = connectWebSocket(runId, (snapshot: WsSnapshot) => {
+      // A snapshot for another run, or one naming a run the server cannot find, says
+      // nothing about the run on screen.
+      if (snapshot.run_id !== runId || snapshot.status === 'not_found') return;
 
       // Push lightweight fields directly into the store
       const store = useRunStore.getState();
@@ -68,9 +52,15 @@ export function useWebSocket(runId: number | null): void {
         status: RunStatus;
         codeletCount: number;
         temperature: number;
+        temperatureClamped: boolean;
       }> = {};
 
-      if (snapshot.status) {
+      // A run being stepped is running while each batch executes and paused between
+      // batches. The client-driven loop owns that alternation and reports the run as
+      // running for its duration, so the snapshot carries the status forward except
+      // for the one transition the loop is already tracking.
+      const steppingHere = store.status === 'running' && snapshot.status === 'paused';
+      if (snapshot.status && !steppingHere) {
         updates.status = snapshot.status as RunStatus;
       }
       if (snapshot.codelet_count !== undefined) {
@@ -78,6 +68,11 @@ export function useWebSocket(runId: number | null): void {
       }
       if (snapshot.temperature !== undefined) {
         updates.temperature = snapshot.temperature;
+      }
+      // Clamping is the engine's, and the snapshot is the fastest account of it:
+      // a snag response clamps the temperature without the client asking.
+      if (snapshot.temperature_clamped !== undefined) {
+        updates.temperatureClamped = snapshot.temperature_clamped;
       }
 
       useRunStore.setState(updates);

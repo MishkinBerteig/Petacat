@@ -13,7 +13,7 @@
 // ---------------------------------------------------------------------------
 
 import { useEffect, useState } from 'react';
-import { getCapture, getRunComparison } from '@/api/client';
+import { describeApiError, getCapture, getRunComparison } from '@/api/client';
 import type { RecordedRun, RecordedState, RunComparison } from '@/types';
 import { RecordedStatePanels } from './RecordedStateViews';
 
@@ -43,7 +43,11 @@ export function NormalRunReview({ run }: { run: RecordedRun }) {
         setCaptures({ start, end });
         setComparison(cmp);
       })
-      .catch((e) => !cancelled && setError(String(e)))
+      .catch(
+        (e) =>
+          !cancelled &&
+          setError(describeApiError(e, `read the record for run #${run.run_id}`)),
+      )
       .finally(() => !cancelled && setLoading(false));
 
     return () => {
@@ -64,8 +68,8 @@ export function NormalRunReview({ run }: { run: RecordedRun }) {
   }
   if (error) {
     return (
-      <div style={{ padding: 12, color: 'var(--error)', fontSize: 12 }}>
-        Could not read the record for run #{run.run_id}: {error}
+      <div role="alert" style={{ padding: 12, color: 'var(--error)', fontSize: 12 }}>
+        {error}
       </div>
     );
   }

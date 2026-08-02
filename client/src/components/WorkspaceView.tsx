@@ -4,7 +4,14 @@
 // ---------------------------------------------------------------------------
 
 import { useRunStore } from '@/store/runStore';
-import type { WorkspaceState } from '@/types';
+import type {
+  BondState,
+  BridgeState,
+  ConceptMappingState,
+  GroupState,
+  RuleState,
+  WorkspaceState,
+} from '@/types';
 
 // Layout is organised into reserved horizontal bands so that nothing has to
 // share a y with something else. Previously every bridge label was placed at the
@@ -90,46 +97,12 @@ function textWidth(text: string, fontSize: number): number {
   return text.length * fontSize * 0.6;
 }
 
-interface BondData {
-  from_pos: number;
-  to_pos: number;
-  category: string;
-  direction: string | null;
-  strength: number;
-  built: boolean;
-}
-
-interface GroupData {
-  left_pos: number;
-  right_pos: number;
-  category: string;
-  direction: string | null;
-  strength: number;
-  built: boolean;
-  /** Nesting level: 0 for a top-level group, 1 for a subgroup, etc. */
-  depth?: number;
-  length?: number;
-}
-
-interface ConceptMapping {
-  from: string;
-  to: string;
-  label: string | null;
-  /** The interesting half: a non-identity correspondence. */
-  is_slippage?: boolean;
-}
-
-interface BridgeData {
-  obj1_string: string;
-  obj1_pos: number;
-  obj1_right_pos?: number;
-  obj2_string: string;
-  obj2_pos: number;
-  obj2_right_pos?: number;
-  strength: number;
-  built: boolean;
-  concept_mappings: ConceptMapping[];
-}
+// The diagram draws what the API serves, so these name the API's own shapes.
+// `depth` is a group's nesting level: 0 for a top-level group, 1 for a subgroup.
+type BondData = BondState;
+type GroupData = GroupState;
+type ConceptMapping = ConceptMappingState;
+type BridgeData = BridgeState;
 
 /**
  * What a bridge says, shortened to what is worth reading at a glance.
@@ -158,18 +131,8 @@ function bridgeLabel(br: BridgeData): { short: string; full: string } {
   };
 }
 
-interface RuleData {
-  type: string;
-  quality: number;
-  /** §3.3.5's three independent measures, combined into `quality`. */
-  uniformity?: number;
-  abstractness?: number;
-  succinctness?: number;
-  clause_count?: number;
-  verbatim?: boolean;
-  english: string;
-  built: boolean;
-}
+/** §3.3.5's three independent measures travel with the rule and combine into `quality`. */
+type RuleData = RuleState;
 
 /** "q=72 u=100 a=61 s=80" — quality plus the measures it is built from. */
 function ruleMeasures(r: RuleData): string {
@@ -564,13 +527,13 @@ export function WorkspaceDiagram({ workspace }: { workspace: WorkspaceState | nu
   } = workspace;
 
   // Structure data (may be absent in older snapshots)
-  const bondsData = (workspace as any).bonds ?? {};
-  const groupsData = (workspace as any).groups ?? {};
-  const topBridges: BridgeData[] = (workspace as any).top_bridges ?? [];
-  const vertBridges: BridgeData[] = (workspace as any).vertical_bridges ?? [];
-  const bottomBridges: BridgeData[] = (workspace as any).bottom_bridges ?? [];
-  const topRules: RuleData[] = (workspace as any).top_rules ?? [];
-  const bottomRules: RuleData[] = (workspace as any).bottom_rules ?? [];
+  const bondsData = workspace.bonds ?? {};
+  const groupsData = workspace.groups ?? {};
+  const topBridges: BridgeData[] = workspace.top_bridges ?? [];
+  const vertBridges: BridgeData[] = workspace.vertical_bridges ?? [];
+  const bottomBridges: BridgeData[] = workspace.bottom_bridges ?? [];
+  const topRules: RuleData[] = workspace.top_rules ?? [];
+  const bottomRules: RuleData[] = workspace.bottom_rules ?? [];
 
   const bondsFor = (s: string): BondData[] => bondsData[s] ?? [];
   const groupsFor = (s: string): GroupData[] => groupsData[s] ?? [];

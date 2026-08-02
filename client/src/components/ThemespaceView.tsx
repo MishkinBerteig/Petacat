@@ -2,6 +2,9 @@
 // ThemespaceView -- Three-column grid of theme clusters
 // ---------------------------------------------------------------------------
 
+import { useCallback } from 'react';
+
+import { clampThemes, unclampThemes } from '@/api/client';
 import { useRunStore } from '@/store/runStore';
 import type { ClusterState, ThemespaceState, ThemeState } from '@/types';
 
@@ -53,14 +56,32 @@ function isDominant(theme: ThemeState, _cluster: ClusterState): boolean {
 }
 
 /** Activation bar — horizontal bar showing positive (green) / negative (red) */
-function ActivationBar({ theme, dominant }: { theme: ThemeState; dominant: boolean }) {
+function ActivationBar({
+  theme,
+  dominant,
+  onClamp,
+}: {
+  theme: ThemeState;
+  dominant: boolean;
+  /** Absent in the review surfaces, which show a recorded state and cannot steer it. */
+  onClamp?: (activation: number) => void;
+}) {
   const absAct = Math.abs(theme.activation);
   const barWidth = Math.min(absAct, 100);
   const isPositive = theme.activation >= 0;
 
+  // theme-graphics.ss:35-63 — a clamp pins one theme in its dimension and zeroes the
+  // rest; clamping a theme that already holds that value clears it again.
+  const clampTo = (value: number) => {
+    if (!onClamp) return;
+    onClamp(theme.activation === value ? 0 : value);
+  };
+
+  const held = (value: number) => theme.activation === value;
+
   return (
     <div
-      title={`${theme.relation ?? 'base'}: ${theme.activation.toFixed(1)} (pos: ${theme.positive_activation.toFixed(1)}, neg: ${theme.negative_activation.toFixed(1)})`}
+      title={`${theme.relation ?? 'base'}: ${theme.activation.toFixed(1)}`}
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -134,12 +155,89 @@ function ActivationBar({ theme, dominant }: { theme: ThemeState; dominant: boole
       {theme.frozen && (
         <div style={{ fontSize: 9, color: 'cyan', flexShrink: 0 }}>F</div>
       )}
+      {/* Clamping.  Buttons rather than left/right click: a right-click that means
+          something is undiscoverable, and clamping a theme negatively is the whole
+          point of the affordance (§2.4.2) rather than a secondary gesture. */}
+      {onClamp && (
+        <div style={{ display: 'flex', gap: 3, flexShrink: 0 }}>
+          <ClampButton
+            label="Clamp +100"
+            active={held(100)}
+            colour="#4caf50"
+            title={
+              held(100)
+                ? `Clear the clamp on ${theme.relation ?? 'this theme'}.`
+                : `Clamp ${theme.relation ?? 'this theme'} to +100 — positive thematic ` +
+                  `pressure. The program will favour structures compatible with this ` +
+                  `idea, and the rest of this dimension is zeroed first.`
+            }
+            onClick={() => clampTo(100)}
+          />
+          <ClampButton
+            label="Clamp -100"
+            active={held(-100)}
+            colour="#f44336"
+            title={
+              held(-100)
+                ? `Clear the clamp on ${theme.relation ?? 'this theme'}.`
+                : `Clamp ${theme.relation ?? 'this theme'} to -100 — negative thematic ` +
+                  `pressure. The program will avoid structures compatible with this ` +
+                  `idea and prefer ones incompatible with it (S2.4.2). This is the ` +
+                  `manual counterpart of jootsing.`
+            }
+            onClick={() => clampTo(-100)}
+          />
+        </div>
+      )}
     </div>
   );
 }
 
+/** One clamp control: small, labelled, and explained on hover. */
+function ClampButton({
+  label,
+  title,
+  colour,
+  active,
+  onClick,
+}: {
+  label: string;
+  title: string;
+  colour: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      title={title}
+      onClick={onClick}
+      style={{
+        fontSize: 8,
+        fontFamily: 'var(--font-mono)',
+        lineHeight: 1.1,
+        padding: '1px 4px',
+        borderRadius: 2,
+        cursor: 'pointer',
+        whiteSpace: 'nowrap',
+        border: `1px solid ${active ? colour : 'var(--border)'}`,
+        background: active ? `${colour}33` : 'transparent',
+        color: active ? colour : 'var(--text-secondary)',
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
 /** One dimension row showing the dimension label and all its relation bars. */
-function DimensionPanel({ cluster }: { cluster: ClusterState }) {
+function DimensionPanel({
+  cluster,
+  onClamp,
+}: {
+  cluster: ClusterState;
+  onClamp?: (theme: ThemeState, activation: number) => void;
+}) {
   const dimLabel = DIM_LABELS[cluster.dimension] ?? cluster.dimension.replace('plato-', '');
   const hasDominant = cluster.themes.some(t => isDominant(t, cluster));
 
@@ -172,6 +270,7 @@ function DimensionPanel({ cluster }: { cluster: ClusterState }) {
           key={i}
           theme={theme}
           dominant={isDominant(theme, cluster)}
+          onClamp={onClamp ? (a) => onClamp(theme, a) : undefined}
         />
       ))}
     </div>
@@ -185,7 +284,17 @@ function DimensionPanel({ cluster }: { cluster: ClusterState }) {
  * *recorded* state (WP3.9). The grid was already a pure function of the themespace
  * state; only the store read tied it to a live run.
  */
-export function ThemespaceGrid({ themespace }: { themespace: ThemespaceState | null }) {
+export function ThemespaceGrid({
+  themespace,
+  onClamp,
+  onRelease,
+}: {
+  themespace: ThemespaceState | null;
+  /** Omitted by the review surfaces: a recorded Themespace is not steerable. */
+  onClamp?: (theme: ThemeState, cluster: ClusterState, activation: number) => void;
+  /** Release every clamp, as the Options menu's "Undo last clamp" does. */
+  onRelease?: () => void;
+}) {
   if (!themespace) {
     return (
       <div className="text-muted text-sm" style={{ padding: 16, textAlign: 'center' }}>
@@ -242,8 +351,25 @@ export function ThemespaceGrid({ themespace }: { themespace: ThemespaceState | n
         {themespace.thematic_pressure
           ? `THEMATIC PRESSURE ON — ${active_theme_types.join(', ')}`
           : 'thematic pressure off (themes passive)'}
-        <span style={{ float: 'right', opacity: 0.7 }}>
-          dominance margin {themespace.dominant_theme_margin ?? 90}
+        <span style={{ float: 'right', opacity: 0.7, display: 'flex', gap: 8 }}>
+          {onRelease && themespace.thematic_pressure && (
+            <button
+              onClick={onRelease}
+              title="Release every clamped theme and switch thematic pressure off, so the run goes back to building on evidence alone."
+              style={{
+                fontSize: 10,
+                padding: '0 4px',
+                background: 'transparent',
+                border: '1px solid currentColor',
+                borderRadius: 2,
+                color: 'inherit',
+                cursor: 'pointer',
+              }}
+            >
+              Release clamps
+            </button>
+          )}
+          <span>dominance margin {themespace.dominant_theme_margin ?? 90}</span>
         </span>
       </div>
     <div
@@ -292,7 +418,13 @@ export function ThemespaceGrid({ themespace }: { themespace: ThemespaceState | n
             </div>
             {/* Dimension panels */}
             {(grouped[key] ?? []).map((cluster, i) => (
-              <DimensionPanel key={i} cluster={cluster} />
+              <DimensionPanel
+                key={i}
+                cluster={cluster}
+                onClamp={
+                  onClamp ? (theme, a) => onClamp(theme, cluster, a) : undefined
+                }
+              />
             ))}
             {!grouped[key]?.length && (
               <div className="text-xs text-muted" style={{ textAlign: 'center', padding: 8 }}>
@@ -307,8 +439,51 @@ export function ThemespaceGrid({ themespace }: { themespace: ThemespaceState | n
   );
 }
 
-/** The live Themespace: `ThemespaceGrid` fed from the run store. */
+/**
+ * The live Themespace: `ThemespaceGrid` fed from the run store, and clampable.
+ *
+ * MetaCat's theme windows take a left-click to clamp a theme to +100 and a right-click
+ * to -100 (`theme-graphics.ss:35-63`). That is the user's only direct handle on
+ * *negative* thematic pressure — the manual counterpart of jootsing — and it is how the
+ * dissertation produced Figures 4.5 and 4.6. The engine and the API have always
+ * supported it; only the client never asked.
+ */
 export function ThemespaceView() {
   const themespace = useRunStore((s) => s.themespace);
-  return <ThemespaceGrid themespace={themespace} />;
+  const runId = useRunStore((s) => s.runId);
+  const refreshThemespace = useRunStore((s) => s.refreshThemespace);
+  const refreshTrace = useRunStore((s) => s.refreshTrace);
+
+  const handleClamp = useCallback(
+    async (theme: ThemeState, cluster: ClusterState, activation: number) => {
+      if (runId == null) return;
+      await clampThemes(runId, [
+        {
+          type: cluster.theme_type,
+          dimension: cluster.dimension,
+          relation: theme.relation ?? null,
+          activation,
+        },
+      ]);
+      // The clamp changes the Themespace and records a manual-clamp Trace event.
+      await refreshThemespace();
+      await refreshTrace();
+    },
+    [runId, refreshThemespace, refreshTrace],
+  );
+
+  const handleRelease = useCallback(async () => {
+    if (runId == null) return;
+    await unclampThemes(runId);
+    await refreshThemespace();
+    await refreshTrace();
+  }, [runId, refreshThemespace, refreshTrace]);
+
+  return (
+    <ThemespaceGrid
+      themespace={themespace}
+      onClamp={runId == null ? undefined : handleClamp}
+      onRelease={runId == null ? undefined : handleRelease}
+    />
+  );
 }

@@ -16,8 +16,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRunStore } from '@/store/runStore';
 import {
+  describeApiError,
   getComponentHelp,
   regenerateHelpDocs,
+  request,
   type RegenerateHelpResult,
 } from '@/api/client';
 
@@ -89,7 +91,7 @@ export function AdminPanel() {
             ...prev,
             [key]: {
               kind: 'error',
-              message: err instanceof Error ? err.message : 'Failed to load',
+              message: describeApiError(err, `load the help for ${key}`),
             },
           }));
         }
@@ -119,12 +121,18 @@ export function AdminPanel() {
     } catch (err) {
       setRegenStatus({
         kind: 'error',
-        message: err instanceof Error ? err.message : 'Unknown error',
+        message: describeApiError(err, 'regenerate the help documentation'),
       });
     }
   }, [loadTopics]);
 
   // --- Clear episodic memory ---
+  /** What became of the last clear asked for: the session boundary it draws is the
+   *  one thing that crosses a Run, so a clear that did not land has to say so. */
+  const [clearStatus, setClearStatus] = useState<
+    { kind: 'idle' } | { kind: 'done' } | { kind: 'error'; message: string }
+  >({ kind: 'idle' });
+
   const handleClearMemory = useCallback(async () => {
     if (
       // Named as what it is: Episodic Memory is the one thing that crosses a Run
@@ -143,16 +151,22 @@ export function AdminPanel() {
       )
     ) {
       try {
-        await fetch('/api/memory', { method: 'DELETE' });
-        await store.refreshMemory();
-        useRunStore.setState({ epoch: useRunStore.getState().epoch + 1 });
-      } catch {
-        // ignore
+        await request<void>('/memory', { method: 'DELETE' });
+      } catch (err) {
+        // The session is still open and its answers are still stored, so the reader
+        // is told which of the two states they are in.
+        setClearStatus({ kind: 'error', message: describeApiError(err, 'clear episodic memory') });
+        return;
       }
+      setClearStatus({ kind: 'done' });
+      await store.refreshMemory();
+      useRunStore.setState({ epoch: useRunStore.getState().epoch + 1 });
     }
   }, [store]);
 
   // --- Full reset ---
+  const [resetError, setResetError] = useState<string | null>(null);
+
   const handleFullReset = useCallback(async () => {
     if (
       window.confirm(
@@ -165,7 +179,12 @@ export function AdminPanel() {
           + 'This cannot be undone.'
       )
     ) {
-      await store.fullReset();
+      try {
+        await store.fullReset();
+        setResetError(null);
+      } catch (err) {
+        setResetError(describeApiError(err, 'reset everything'));
+      }
     }
   }, [store]);
 
@@ -209,8 +228,8 @@ export function AdminPanel() {
             )}
 
             {regenStatus.kind === 'error' && (
-              <span style={{ fontSize: 11, color: 'var(--error)' }}>
-                Failed: {regenStatus.message}
+              <span role="alert" style={{ fontSize: 11, color: 'var(--error)' }}>
+                {regenStatus.message}
               </span>
             )}
           </div>
@@ -223,9 +242,22 @@ export function AdminPanel() {
           <ActionSection
             state={topicState.admin_clear_memory}
             action={
-              <button onClick={handleClearMemory} style={warningButtonStyle}>
-                Clear Episodic Memory
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                <button onClick={handleClearMemory} style={warningButtonStyle}>
+                  Clear Episodic Memory
+                </button>
+                {clearStatus.kind === 'done' && (
+                  <span style={{ fontSize: 11, color: 'var(--success)' }}>
+                    Cleared — this Training Session is closed and the next one begins
+                    with the next run.
+                  </span>
+                )}
+                {clearStatus.kind === 'error' && (
+                  <span role="alert" style={{ fontSize: 11, color: 'var(--error)' }}>
+                    {clearStatus.message}
+                  </span>
+                )}
+              </div>
             }
           />
         </div>
@@ -234,9 +266,16 @@ export function AdminPanel() {
           <ActionSection
             state={topicState.admin_full_reset}
             action={
-              <button onClick={handleFullReset} style={dangerButtonStyle}>
-                Full Reset (delete everything)
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                <button onClick={handleFullReset} style={dangerButtonStyle}>
+                  Full Reset (delete everything)
+                </button>
+                {resetError !== null && (
+                  <span role="alert" style={{ fontSize: 11, color: 'var(--error)' }}>
+                    {resetError}
+                  </span>
+                )}
+              </div>
             }
           />
         </div>
@@ -267,8 +306,8 @@ function ActionSection({
   if (state.kind === 'error') {
     return (
       <div style={docBlockStyle}>
-        <span style={{ color: 'var(--error)', fontSize: 12 }}>
-          Failed to load help: {state.message}
+        <span role="alert" style={{ color: 'var(--error)', fontSize: 12 }}>
+          {state.message}
         </span>
       </div>
     );

@@ -123,6 +123,21 @@ export interface RunParametersView {
   };
 }
 
+/**
+ * What `GET /runs/{id}/temperature` serves: the value and its clamp state.
+ *
+ * Clamping is engine state, so the gauge's clamped indicator reads it from here
+ * (`answers.ss` sets `*temperature-clamped?*` during a snag response and
+ * `trace.ss:195` clears it; the display reports it).
+ */
+export interface TemperatureState {
+  run_id: number;
+  temperature: number;
+  clamped: boolean;
+  clamp_value: number;
+  clamp_cycles_remaining: number;
+}
+
 export interface RunInfo {
   run_id: number;
   status: string;
@@ -173,6 +188,34 @@ export interface RunIdentity {
   created_at: string | null;
 }
 
+/** The machine the server process is running on, as its own probes report it. */
+export interface DetectedMachine {
+  platform: string;
+  chip: string | null;
+  logical_cores: number;
+  /** Cores on the fastest performance level. */
+  performance_cores: number;
+  efficiency_cores: number;
+  memory_bytes: number | null;
+  gpu_name: string | null;
+  gpu_cores: number | null;
+  metal_available: boolean;
+  cpu_probe: string;
+  gpu_probe: string;
+}
+
+/** The sizes computed from `DetectedMachine`, each overridable by an env var. */
+export interface DerivedSizes {
+  /** Free-running worker threads: one per performance core. */
+  workers: number;
+  coderack_shards: number;
+  population_workers: number;
+  gpu_cores: number;
+  gpu_target_threads: number;
+  /** The environment variables pinning any of the above in this process. */
+  overrides: Record<string, string>;
+}
+
 /** Which implementation of the engine's arithmetic the server process is running. */
 export interface NumericSubstrate {
   policy: string;
@@ -186,6 +229,8 @@ export interface NumericSubstrate {
   slipnet_links: number;
   vectorise_threshold: number;
   gpu_threshold: number;
+  hardware: DetectedMachine;
+  derived: DerivedSizes;
   summary: string;
 }
 
@@ -200,6 +245,76 @@ export interface StepResult {
 
 // --- Workspace types -------------------------------------------------------
 
+/** A built bond, as `serialization.py` serialises it. */
+export interface BondState {
+  from_pos: number;
+  to_pos: number;
+  category: string;
+  direction: string | null;
+  strength: number;
+  built: boolean;
+}
+
+/** A built group. `depth` is nesting depth, so a group of groups draws outside them. */
+export interface GroupState {
+  left_pos: number;
+  right_pos: number;
+  category: string;
+  direction: string | null;
+  strength: number;
+  built: boolean;
+  depth: number;
+  length: number;
+}
+
+/** One concept-mapping carried by a bridge. */
+export interface ConceptMappingState {
+  from: string;
+  to: string;
+  /** The relating concept, or `null` when the two descriptors have none. */
+  label: string | null;
+  /** A slippage is the interesting half of a bridge's mappings; identities are many. */
+  is_slippage: boolean;
+}
+
+/**
+ * A built bridge. The two ends name their string and position, so a bridge can be
+ * drawn between two strings without holding the objects themselves.
+ */
+export interface BridgeState {
+  obj1_string: string;
+  obj1_pos: number;
+  obj1_right_pos: number;
+  obj2_string: string;
+  obj2_pos: number;
+  obj2_right_pos: number;
+  strength: number;
+  built: boolean;
+  concept_mappings: ConceptMappingState[];
+}
+
+/** A built rule, with the four quality measures and its dominant theme pattern. */
+export interface RuleState {
+  type: string;
+  quality: number;
+  uniformity: number;
+  abstractness: number;
+  succinctness: number;
+  clause_count: number;
+  verbatim: boolean;
+  english: string;
+  built: boolean;
+  theme_pattern: string[];
+}
+
+/**
+ * The Workspace as the API serves it: the four strings, the counts the summary lines
+ * use, and the built structures the diagram draws.
+ *
+ * Bonds and groups are keyed by the string they belong to. Bridges come in the three
+ * lists that name the three mappings between the four strings — initial to modified,
+ * initial to target, target to answer.
+ */
 export interface WorkspaceState {
   initial: string;
   modified: string;
@@ -208,8 +323,17 @@ export interface WorkspaceState {
   num_top_bridges: number;
   num_bottom_bridges: number;
   num_vertical_bridges: number;
+  num_top_rules: number;
+  num_bottom_rules: number;
   bonds_per_string: Record<string, number>;
   groups_per_string: Record<string, number>;
+  bonds: Record<string, BondState[]>;
+  groups: Record<string, GroupState[]>;
+  top_bridges: BridgeState[];
+  vertical_bridges: BridgeState[];
+  bottom_bridges: BridgeState[];
+  top_rules: RuleState[];
+  bottom_rules: RuleState[];
 }
 
 // --- Slipnet types ---------------------------------------------------------
@@ -235,8 +359,6 @@ export interface ThemeState {
   dimension: string;
   relation: string | null;
   activation: number;
-  positive_activation: number;
-  negative_activation: number;
   frozen: boolean;
   /** Decided server-side: leads its cluster by the dominance margin (default 90). */
   dominant: boolean;
@@ -287,7 +409,13 @@ export interface AnswerDescription {
   vertical_themes?: Record<string, string>;
   bottom_themes?: Record<string, string>;
   unjustified_themes?: Record<string, string>;
+  /**
+   * §3.3.5: how abstract each rule is, and how abstract the answer's themes are on
+   * average. §4.7.3 weighs two answers partly by these, so they travel with the answer.
+   */
   top_rule_abstractness?: number;
+  bottom_rule_abstractness?: number;
+  theme_abstractness?: number;
   is_coherent?: boolean;
 }
 
@@ -304,6 +432,10 @@ export interface AnswerComparison {
   b_quality: number;
   a_rule: string;
   b_rule: string;
+  /** §3.3.5's abstractness for each answer's top rule — one of §4.7.4's criteria. */
+  a_abstractness: number;
+  b_abstractness: number;
+  /** Which answer the program prefers, and the criterion that decided it (§4.7.4). */
   preferred: { answer: string | null; reason: string };
 }
 
@@ -314,11 +446,43 @@ export interface AnswerComparisonResult {
   commentary: {
     text: string;
     paragraphs: string[];
+    /**
+     * §4.7.4's seven pieces in order: the opening contrast, the two answers' themes,
+     * the unjustified ones on each side, the rules, and the verdict. `text` is these
+     * joined; they arrive separately so a display can lay them out.
+     */
+    segments: string[];
     verdict: string;
+    /** §4.6 footnote 16: the two voices are identical for a comparison. */
+    eliza_text: string;
+    technical_text: string;
+    preferred: { answer: string | null; reason: string };
   };
 }
 
+/** `explain` (`answers.ss:310-333`) — one answer described on its own. */
+export interface AnswerExplanation {
+  answer_id: number;
+  problem: string[];
+  eliza_mode: boolean;
+  /** The voice selected by `eliza_mode`. */
+  text: string;
+  /** The shared first sentence, without either voice's closing remark. */
+  explanation: string;
+  eliza_text: string;
+  technical_text: string;
+  quality_phrase: string;
+  coherence_phrase: string;
+  is_coherent: boolean;
+}
+
 export interface SnagDescription {
+  /**
+   * The Episodic Memory's identifier for this snag. Every endpoint that serves a
+   * snag — `/api/memory` from the live memory, `/api/runs/{id}/memory` from the
+   * stored rows — reports this same id, so a snag read one way is recognisable as
+   * the snag read the other.
+   */
   snag_id: number;
   problem: string[];
   codelet_count: number;
@@ -330,15 +494,16 @@ export interface MemoryState {
   answers: AnswerDescription[];
   snags: SnagDescription[];
   /**
-   * Which memory this is.
+   * How this copy of the Training Session's memory was read.
    *
-   *   shared  the Training Session's memory, read from the database
-   *   run     the Run's own ephemeral memory — a Fast Run gets one of these, and
-   *           contributes nothing to the shared one
+   *   shared  from the stored rows
+   *   live    from the object the engine is using — a Fast Run writes no rows, so
+   *           its memory is read this way
    *
-   * Absent from `/api/memory`, which is only ever the shared one.
+   * Every Run shares one Episodic Memory; `scope` distinguishes the two reads of it.
+   * Absent from `/api/memory`, which always reads the shared rows.
    */
-  scope?: 'shared' | 'run';
+  scope?: 'shared' | 'live';
   /** The persistence mode of the run the memory was read for, when there was one. */
   mode?: string;
   run_id?: number;
@@ -349,6 +514,8 @@ export interface MemoryState {
 export interface DemoProblem {
   id: number;
   name: string;
+  /** Which part of the dissertation the problem comes from. */
+  section: string;
   initial: string;
   modified: string;
   target: string;
@@ -557,8 +724,41 @@ export interface InspectorState {
 
 // --- WebSocket messages ----------------------------------------------------
 
-export interface WsMessage {
-  type: string;
-  run_id?: number;
-  data?: any;
+/**
+ * What `WS /ws/runs/{id}` pushes: a flat snapshot of the run, sent on each tick.
+ *
+ * `status` is `"not_found"` when the run id names nothing loaded, and the remaining
+ * fields are absent in that case.
+ */
+export interface WsSnapshot {
+  run_id: number;
+  status: string;
+  codelet_count?: number;
+  temperature?: number;
+  /** Engine state: the temperature is pinned at its clamp value. */
+  temperature_clamped?: boolean;
+  coderack_count?: number;
+  trace_event_count?: number;
+  snag_count?: number;
+  within_clamp_period?: boolean;
+}
+
+
+/** One Trace event in full, as `GET /runs/{id}/trace/{n}` serves it. */
+export interface TraceEventDetail {
+  event_number: number;
+  event_type: string;
+  codelet_count: number;
+  temperature: number;
+  description: string;
+  strength: number;
+  theme_pattern: unknown;
+  structures: Array<{
+    kind: string;
+    label: string;
+    string: string | null;
+    left_index: number | null;
+    right_index: number | null;
+    strength: number | null;
+  }>;
 }

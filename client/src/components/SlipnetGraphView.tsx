@@ -4,8 +4,16 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useRunStore } from '@/store/runStore';
-import { api } from '@/api/client';
+import { api, describeApiError, request } from '@/api/client';
 import type { SlipnetNodeDef, SlipnetState } from '@/types';
+
+/** What `GET /api/admin/export` carries that the graph draws from. */
+interface SlipnetExport {
+  slipnet_nodes?: SlipnetNodeDef[];
+  slipnet_layout?:
+    | Array<{ node_name: string; grid_row: number; grid_col: number }>
+    | { node_positions?: Record<string, [number, number]> };
+}
 
 interface LinkDef {
   id: number;
@@ -90,6 +98,10 @@ export function SlipnetGraphView({
   const [links, setLinks] = useState<LinkDef[]>([]);
   const [gridPositions, setGridPositions] = useState<Record<string, [number, number]>>({});
   const [loading, setLoading] = useState(true);
+  /** Why the graph is empty: the nodes and links did not arrive. */
+  const [loadError, setLoadError] = useState<string | null>(null);
+  /** Why the last clamp asked for is not in force. */
+  const [actionError, setActionError] = useState<string | null>(null);
   const [linkFilters, setLinkFilters] = useState<Record<string, boolean>>({
     category: true,
     instance: true,
@@ -113,7 +125,7 @@ export function SlipnetGraphView({
 
   useEffect(() => {
     Promise.all([
-      fetch('/api/admin/export').then(r => r.json()),
+      request<SlipnetExport>('/admin/export'),
       api.getSlipnetLinks(),
     ]).then(([exportData, linkData]) => {
       setNodeDefs(exportData.slipnet_nodes ?? []);
@@ -131,8 +143,14 @@ export function SlipnetGraphView({
       }
       setGridPositions(posMap);
       setLinks(linkData);
+      setLoadError(null);
       setLoading(false);
-    }).catch(() => setLoading(false));
+    }).catch((err) => {
+      // The 59 nodes and 202 links are what the graph draws; when they do not
+      // arrive, the reason takes their place.
+      setLoadError(describeApiError(err, 'load the Slipnet graph'));
+      setLoading(false);
+    });
   }, []);
 
   useEffect(() => {
@@ -225,24 +243,30 @@ export function SlipnetGraphView({
   const handleClamp = useCallback(async () => {
     if (!contextMenu || !runId) return;
     try {
-      await fetch(`/api/runs/${runId}/clamp-node`, {
+      await request<void>(`/runs/${runId}/clamp-node`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ node_name: contextMenu.nodeName, cycles: 0 }),
       });
-    } catch { /* ignore */ }
+      setActionError(null);
+    } catch (err) {
+      // The node draws itself from the run's activations, so a refused clamp leaves
+      // the picture unchanged: the reason is the only thing that says what happened.
+      setActionError(describeApiError(err, 'clamp the Slipnet node'));
+    }
     setContextMenu(null);
   }, [contextMenu, runId]);
 
   const handleUnclamp = useCallback(async () => {
     if (!contextMenu || !runId) return;
     try {
-      await fetch(`/api/runs/${runId}/clamp-node`, {
+      await request<void>(`/runs/${runId}/clamp-node`, {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ node_name: contextMenu.nodeName }),
       });
-    } catch { /* ignore */ }
+      setActionError(null);
+    } catch (err) {
+      setActionError(describeApiError(err, 'release the Slipnet node clamp'));
+    }
     setContextMenu(null);
   }, [contextMenu, runId]);
 
@@ -250,10 +274,30 @@ export function SlipnetGraphView({
     return <div className="text-muted text-sm" style={{ padding: 16 }}>Loading slipnet graph...</div>;
   }
 
+  if (loadError !== null) {
+    return (
+      <div role="alert" className="text-sm" style={{ padding: 16, color: 'var(--error)' }}>
+        {loadError}
+      </div>
+    );
+  }
+
   const vb = `${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}`;
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      {/* A clamp that did not take hold, named. The node keeps drawing the run's
+          own activation, so this is where the attempt shows. */}
+      {actionError !== null && (
+        <div
+          role="alert"
+          className="text-xs"
+          style={{ padding: '3px 0', color: 'var(--error)', flexShrink: 0 }}
+        >
+          {actionError}
+        </div>
+      )}
+
       {/* Filter controls */}
       <div style={{ display: 'flex', gap: 8, padding: '4px 0', fontSize: 10, flexWrap: 'wrap', flexShrink: 0 }}>
         {Object.keys(LINK_COLORS).map(lt => (

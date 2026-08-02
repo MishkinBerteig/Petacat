@@ -33,13 +33,32 @@ import os
 from dataclasses import dataclass, field
 from typing import Any, Callable, Sequence
 
+from server.engine import hardware
 from server.engine.metadata import MetadataProvider
 from server.engine.runner import EngineRunner
 
 #: Below this many Slipnet nodes, batching the numeric substrate cannot repay a GPU
 #: dispatch. Measured in WP4.5: the kernel crossover against vectorised float64 CPU is
 #: around 10^4 nodes, and the whole-update crossover is between 10^4 and 10^5.
+#:
+#: The crossover is a property of the machine — it is where the vectorised CPU's time
+#: on a batch first exceeds a Metal dispatch's fixed cost, so a faster CPU or a wider
+#: memory bus moves it up. ``scripts/bench_numeric.py`` measures it on the machine in
+#: hand, and ``PETACAT_BATCHING_MIN_NODES`` sets the result.
 BATCHING_MIN_NODES = 10_000
+
+ENV_BATCHING_MIN_NODES = "PETACAT_BATCHING_MIN_NODES"
+
+
+def batching_min_nodes() -> int:
+    """The Slipnet size at which batching starts to repay a GPU dispatch here."""
+    raw = os.environ.get(ENV_BATCHING_MIN_NODES)
+    if not raw:
+        return BATCHING_MIN_NODES
+    try:
+        return max(0, int(raw.strip()))
+    except ValueError:
+        return BATCHING_MIN_NODES
 
 
 @dataclass
@@ -110,6 +129,9 @@ def run_population(
     free-running is the right tool for a single run. The two solve different problems and
     compose: a population of free-running runs is possible but pointless, because the
     cores are already busy.
+
+    ``workers=None`` takes this machine's pool size — every logical core but one, from
+    :func:`server.engine.hardware.population_worker_count`.
     """
     import time
     from multiprocessing import Pool
@@ -118,7 +140,7 @@ def run_population(
         os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
         "seed_data",
     )
-    workers = workers or max(1, (os.cpu_count() or 4) - 1)
+    workers = workers or hardware.population_worker_count()
     tasks = [
         (tuple(problem), seed_offset + i, max_steps) for i in range(count)
     ]
@@ -144,7 +166,7 @@ def batching_is_worthwhile(node_count: int) -> bool:
     A predicate rather than a policy buried in the batching loop, so the answer is
     inspectable and so the threshold can be re-measured rather than argued about.
     """
-    return node_count >= BATCHING_MIN_NODES
+    return node_count >= batching_min_nodes()
 
 
 def run_population_batched(

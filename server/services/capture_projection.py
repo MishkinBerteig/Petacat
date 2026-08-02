@@ -386,12 +386,10 @@ def project_themespace(state: dict, meta: Any) -> dict:
                 "dimension": c["dimension"],
                 "relation": relation,
                 "activation": activation,
-                "positive_activation": positive,
-                "negative_activation": negative,
                 "frozen": frozen,
                 "dominant": False,
             }
-            for relation, activation, positive, negative, frozen, _buffer in c["themes"]
+            for relation, activation, frozen, _buffer in c["themes"]
         ]
         dominant = _dominant_theme(themes, margin)
         if dominant is not None:

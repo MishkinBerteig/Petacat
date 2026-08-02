@@ -12,7 +12,35 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import dataclass, field
+from functools import lru_cache
 from typing import Any
+
+#: The repository's ``seed_data/`` directory, derived the same way
+#: ``population.py`` derives it.
+DEFAULT_SEED_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    "seed_data",
+)
+
+
+@lru_cache(maxsize=1)
+def default_commentary_templates() -> dict[str, Any]:
+    """The phrase-templates as they stand in ``seed_data/``.
+
+    Every production path renders commentary from ``meta.commentary_templates``, which
+    comes from Postgres and therefore reflects whatever the admin UI last saved.  This
+    serves callers that have no ``MetadataProvider`` — unit tests and the REPL — and
+    keeps the seed data the single place any English phrase is written down.
+
+    Returns ``{}`` when the seed data is not on disk, and the renderers then produce
+    empty strings.
+    """
+    path = os.path.join(DEFAULT_SEED_DIR, "commentary_templates.json")
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except OSError:
+        return {}
 
 
 @dataclass(frozen=True)

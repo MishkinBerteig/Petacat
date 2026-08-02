@@ -58,6 +58,10 @@ markers = [
     # standard regression oracle, but it is marked so a tight edit-test loop can
     # deselect it with -m "not slow".
     "slow: takes seconds to minutes; deselect with -m 'not slow'",
+    # The numeric backend matrix (tests/conftest.py). A test whose outcome is
+    # produced by the arithmetic in server/engine/numeric/ runs once on the CPU in
+    # float64 and once on the Metal GPU in float32, so one suite run covers both.
+    "numeric_matrix: run once per numeric backend in the matrix",
 ]
 
 # The e2e database URL is not set here.  A `[tool.pytest.ini_options.env]` table used

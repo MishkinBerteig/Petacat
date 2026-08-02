@@ -13,8 +13,10 @@ to get Fast Run wrong.
 
 from __future__ import annotations
 
+import contextlib
+
 import pytest
-from sqlalchemy import func, select
+from sqlalchemy import event, func, select
 
 from server.models.run import (
     AuditAction,
@@ -34,6 +36,34 @@ async def _create(client, mode: str, **kw):
     resp = await client.post("/api/runs", json={**PROBLEM, "seed": SEED, "mode": mode, **kw})
     assert resp.status_code == 200, resp.text
     return resp.json()
+
+
+@contextlib.contextmanager
+def _statements_issued(engine):
+    """Every SQL statement the application sends while the block runs.
+
+    Row counts say what a request *left behind*; this says what it *did*.  Fast makes
+    the stronger claim — the database is never spoken to — and a statement that deletes
+    nothing, or selects a row that cannot exist, satisfies a row count while breaking
+    the claim.  Only a statement log holds the mode to what it promises.
+    """
+    seen: list[str] = []
+
+    def _record(conn, cursor, statement, parameters, context, executemany):
+        seen.append(statement)
+
+    event.listen(engine.sync_engine, "before_cursor_execute", _record)
+    try:
+        yield seen
+    finally:
+        event.remove(engine.sync_engine, "before_cursor_execute", _record)
+
+
+async def _table_counts(db_session) -> dict:
+    return {
+        model: (await db_session.execute(select(func.count()).select_from(model))).scalar()
+        for model in (Run, TraceEventRow, RunStateCapture, AuditAction)
+    }
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -81,10 +111,12 @@ async def test_a_fast_run_is_still_fully_observable(app_client):
     assert info["codelet_count"] > 0
     assert info["status"] in {"answer_found", "halted", "paused", "gave_up"}
 
-    # The API surface answers in every mode, and answers Fast with nothing.
+    # The API surface answers in every mode, and a Fast Run's commentary is real:
+    # mode chooses where a run is recorded, not what it is, so the program narrates
+    # itself the same way whichever mode it runs in.
     commentary = await app_client.get(f"/api/runs/{run_id}/commentary")
     assert commentary.status_code == 200
-    assert commentary.json().get("paragraph_count", 0) == 0
+    assert commentary.json().get("paragraph_count", 0) > 0
 
 
 @pytest.mark.asyncio
@@ -108,18 +140,276 @@ async def test_fast_run_builds_no_storable_representation(app_client):
 
 
 @pytest.mark.asyncio
-async def test_fast_run_leaves_the_shared_memory_alone(app_client, db_session):
-    """A Fast Run gets an ephemeral memory: leaving answers behind is leaving
-    something behind, which is exactly what the mode promises not to do."""
+async def test_a_fast_run_resets_to_codelet_zero(app_client):
+    """Reset restores the same problem and seed for a Run with no stored row.
+
+    A Fast Run's parameters live in the runner: the strings on the Workspace, the seed
+    on the RNG. Reset reads them from there and re-initialises, so the control works in
+    every mode.
+    """
+    run = await _create(app_client, MODE_FAST)
+    run_id = run["run_id"]
+    await app_client.post(f"/api/runs/{run_id}/run", json={"max_steps": 600})
+
+    before = (await app_client.get(f"/api/runs/{run_id}")).json()
+    assert before["codelet_count"] > 0
+
+    resp = await app_client.post(f"/api/runs/{run_id}/reset")
+
+    assert resp.status_code == 200, resp.text
+    info = resp.json()
+    assert info["run_id"] == run_id
+    assert info["codelet_count"] == 0
+    assert info["status"] == "initialized"
+    assert (info["initial"], info["modified"], info["target"]) == (
+        PROBLEM["initial"], PROBLEM["modified"], PROBLEM["target"]
+    )
+
+
+@pytest.mark.asyncio
+async def test_a_reset_fast_run_runs_again_from_the_same_seed(app_client):
+    """The reset Run is the same problem at the same seed, so it runs the same way."""
+    run = await _create(app_client, MODE_FAST)
+    run_id = run["run_id"]
+
+    first = (
+        await app_client.post(f"/api/runs/{run_id}/run", json={"max_steps": 400})
+    ).json()
+
+    await app_client.post(f"/api/runs/{run_id}/reset")
+    second = (
+        await app_client.post(f"/api/runs/{run_id}/run", json={"max_steps": 400})
+    ).json()
+
+    assert second["codelet_count"] == first["codelet_count"]
+    assert second["temperature"] == first["temperature"]
+
+
+@pytest.mark.asyncio
+async def test_a_normal_run_resets_from_its_stored_row(app_client, db_session):
+    """A stored Run resets to the row's problem and clears its recorded rows."""
+    run = await _create(app_client, MODE_NORMAL)
+    run_id = run["run_id"]
+    await app_client.post(f"/api/runs/{run_id}/run", json={"max_steps": 600})
+
+    resp = await app_client.post(f"/api/runs/{run_id}/reset")
+
+    assert resp.status_code == 200, resp.text
+    info = resp.json()
+    assert info["codelet_count"] == 0
+    assert (info["initial"], info["modified"], info["target"]) == (
+        PROBLEM["initial"], PROBLEM["modified"], PROBLEM["target"]
+    )
+
+    row = (await db_session.execute(select(Run).where(Run.id == run_id))).scalar_one()
+    await db_session.refresh(row)
+    assert row.codelet_count == 0
+    assert row.status == "initialized"
+
+    captures = (
+        await db_session.execute(
+            select(func.count()).select_from(RunStateCapture).where(
+                RunStateCapture.run_id == run_id
+            )
+        )
+    ).scalar()
+    assert captures == 0
+
+
+@pytest.mark.asyncio
+async def test_a_reset_normal_run_starts_before_the_answer_it_found(app_client, db_session):
+    """A discovered answer belongs to the run that found it.
+
+    ``runs.answer_string`` carries both the answer given at creation for the engine to
+    justify and the answer the engine went on to discover, and ``justify_mode`` is what
+    tells them apart.  A reset returns the Run to codelet 0, which is before its answer
+    existed, so the reset Run has none — in the response, in the engine and in the row.
+    """
+    run = await _create(app_client, MODE_NORMAL)
+    run_id = run["run_id"]
+    finished = (
+        await app_client.post(f"/api/runs/{run_id}/run", json={"max_steps": 2000})
+    ).json()
+    assert finished["answer"] is not None, (
+        f"This test needs a Run that discovered an answer; got status "
+        f"{finished['status']} at codelet {finished['codelet_count']}"
+    )
+    assert finished["justify_mode"] is False
+
+    info = (await app_client.post(f"/api/runs/{run_id}/reset")).json()
+
+    assert info["answer"] is None
+    assert info["justify_mode"] is False
+    assert info["codelet_count"] == 0
+
+    live = (await app_client.get(f"/api/runs/{run_id}")).json()
+    assert live["answer"] is None
+
+    row = (await db_session.execute(select(Run).where(Run.id == run_id))).scalar_one()
+    await db_session.refresh(row)
+    assert row.answer_string is None
+
+
+@pytest.mark.asyncio
+async def test_a_reset_justify_run_keeps_the_answer_it_was_given(app_client, db_session):
+    """A given answer is part of the problem, so it survives the reset.
+
+    Justify mode asks the engine to account for an answer somebody else supplied
+    (``justify.ss``). Resetting means "this same problem again", and the answer is one
+    of the four strings the problem is made of.
+    """
+    run = await _create(app_client, MODE_NORMAL, answer="wyz")
+    run_id = run["run_id"]
+    assert run["answer"] == "wyz"
+    assert run["justify_mode"] is True
+    await app_client.post(f"/api/runs/{run_id}/run", json={"max_steps": 600})
+
+    info = (await app_client.post(f"/api/runs/{run_id}/reset")).json()
+
+    assert info["answer"] == "wyz"
+    assert info["justify_mode"] is True
+    assert info["codelet_count"] == 0
+
+    live = (await app_client.get(f"/api/runs/{run_id}")).json()
+    assert live["answer"] == "wyz"
+    assert live["justify_mode"] is True
+
+    row = (await db_session.execute(select(Run).where(Run.id == run_id))).scalar_one()
+    await db_session.refresh(row)
+    assert row.answer_string == "wyz"
+
+
+@pytest.mark.asyncio
+async def test_a_finished_fast_run_reports_what_it_did(app_client):
+    """A Fast Run's result is readable from the run after it finishes.
+
+    Writing no row is what Fast means; holding no result is not. ``GET /api/runs/{id}``
+    reads a Fast Run from the runner, so the status, codelet count, temperature and
+    answer it finished with are all served — which is what the Run History panel lists
+    it from.
+    """
+    run = await _create(app_client, MODE_FAST)
+    run_id = run["run_id"]
+    assert run["status"] == "initialized"
+    assert run["codelet_count"] == 0
+
+    finished = (
+        await app_client.post(f"/api/runs/{run_id}/run", json={"max_steps": 3000})
+    ).json()
+
+    served = await app_client.get(f"/api/runs/{run_id}")
+
+    assert served.status_code == 200, served.text
+    info = served.json()
+    assert info["status"] == finished["status"] != "initialized"
+    assert info["codelet_count"] == finished["codelet_count"] > 0
+    assert info["temperature"] == finished["temperature"]
+    assert info["answer"] == finished["answer"]
+    assert info["mode"] == MODE_FAST
+
+
+@pytest.mark.asyncio
+async def test_a_fast_run_is_absent_from_the_listing_that_reads_rows(app_client):
+    """The listing reads rows, and a Fast Run has none.
+
+    Its absence here is the mode keeping its promise. The run is served by id, which is
+    where its result is read from.
+    """
+    run = await _create(app_client, MODE_FAST)
+    run_id = run["run_id"]
+    await app_client.post(f"/api/runs/{run_id}/run", json={"max_steps": 600})
+
+    listing = (await app_client.get("/api/runs?limit=50&offset=0")).json()
+
+    assert run_id not in [r["run_id"] for r in listing["runs"]]
+    assert (await app_client.get(f"/api/runs/{run_id}")).status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_fast_run_joins_the_shared_memory(app_client, db_session):
+    """A Fast Run takes part in the Training Session like any other.
+
+    The mode promises not to write to the *database*; it promises nothing about the
+    session, and must not, or a Fast training population would teach the session
+    nothing and a Fast Run would not be comparable with a Normal one.  It is the same
+    ``EpisodicMemory`` object, so its answers are there for the runs that follow and
+    ``answer_present`` will stop them being rediscovered.
+    """
     from server.api.runs import get_run_service
     from server.services.run_service import _global_memory
 
     before = len(_global_memory.answers)
     run = await _create(app_client, MODE_FAST)
-    await app_client.post(f"/api/runs/{run['run_id']}/run", json={"max_steps": 2000})
+    finished = await app_client.post(
+        f"/api/runs/{run['run_id']}/run", json={"max_steps": 2000}
+    )
 
-    assert len(_global_memory.answers) == before
-    assert get_run_service()._runners[run["run_id"]].ctx.memory is not _global_memory
+    assert get_run_service()._runners[run["run_id"]].ctx.memory is _global_memory
+    if finished.json()["answer"] is not None:
+        assert len(_global_memory.answers) == before + 1
+
+
+@pytest.mark.asyncio
+async def test_reading_a_fast_runs_parameters_speaks_to_no_database(
+    app_client, db_session, test_engine
+):
+    """The runner is the account of what a Fast Run is executing under.
+
+    Every parameter is resolved from the live engine context, so the answer is complete
+    — the whole fixed set, plus the derived values that come from the runner — with the
+    database stopped throughout.
+    """
+    run = await _create(app_client, MODE_FAST)
+    run_id = run["run_id"]
+    before = await _table_counts(db_session)
+
+    with _statements_issued(test_engine) as statements:
+        resp = await app_client.get(f"/api/runs/{run_id}/parameters")
+
+    assert statements == []
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["run_id"] == run_id
+    assert set(body["fixed"]) == set(body["defaults"])
+    assert body["derived"]["mode"] == MODE_FAST
+    assert body["derived"]["recorded"] is False
+
+    assert await _table_counts(db_session) == before
+
+
+@pytest.mark.asyncio
+async def test_deleting_a_fast_run_speaks_to_no_database(
+    app_client, db_session, test_engine
+):
+    """A Fast Run lives in the service's dictionaries, so deleting it empties those.
+
+    Its rows are the ones that were never written, and dropping the runner is the whole
+    of its deletion — which keeps the mode's promise at the last moment it could be
+    broken, the run's end.
+    """
+    from server.api.runs import get_run_service
+
+    run = await _create(app_client, MODE_FAST)
+    run_id = run["run_id"]
+    await app_client.post(f"/api/runs/{run_id}/run", json={"max_steps": 400})
+
+    svc = get_run_service()
+    assert run_id in svc._runners
+    before = await _table_counts(db_session)
+
+    with _statements_issued(test_engine) as statements:
+        resp = await app_client.delete(f"/api/runs/{run_id}")
+
+    assert statements == []
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["deleted"] is True
+
+    assert run_id not in svc._runners
+    assert run_id not in svc._sinks
+    assert run_id not in svc._modes
+    assert (await app_client.get(f"/api/runs/{run_id}")).status_code == 404
+
+    assert await _table_counts(db_session) == before
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -306,8 +596,17 @@ async def test_mode_does_not_change_the_run(app_client):
     comparison between a Fast training population and a Normal recorded run would be
     meaningless, and the modes would not be modes but three different programs.
     """
+    from server.services.run_service import _global_memory
+
     outcomes = []
     for mode in (MODE_FAST, MODE_NORMAL, MODE_AUDIT):
+        # Identical cognition needs identical starting conditions, and Episodic Memory
+        # is one of them: since ``answer_present`` went in, a run will not rediscover an
+        # answer already in memory, so the second and third runs here would legitimately
+        # diverge from the first.  ``Metacat/help.txt:29`` says exactly this — "to
+        # reproduce a run exactly, the state of the memory must be the same as it was at
+        # the beginning of the run."
+        _global_memory.clear()
         run = await _create(app_client, mode, seed=4242)
         resp = await app_client.post(
             f"/api/runs/{run['run_id']}/run", json={"max_steps": 1500}

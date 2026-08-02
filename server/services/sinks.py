@@ -30,6 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.engine.runner import EngineContext, StepResult
 from server.engine.sink import STRUCTURE_BUILT, NullSink
+from server.engine.serialization import describe_structure
 from server.engine.state_graph import capture_run_state
 from server.engine.trace import SNAG, TraceEvent
 from server.models.run import (
@@ -88,7 +89,13 @@ class TraceRecordingSink:
     def __init__(self) -> None:
         self._trace_events: list[TraceEvent] = []
         self._answers: list[Any] = []
-        self._snag_problems: dict[int, list[str]] = {}
+        #: The Episodic Memory's snag descriptions, as they are created.  Captured
+        #: here rather than derived from SNAG trace events, because ``record_snag``
+        #: deduplicates: a snag hit repeatedly produces an event each time but one
+        #: description.  Writing a row per event made the database disagree with the
+        #: memory about how many snags there were — ten rows against one description on
+        #: an ordinary run, with the rows' descriptions empty.
+        self._snags: list[Any] = []
 
     # -- engine-facing events ------------------------------------------
 
@@ -101,14 +108,12 @@ class TraceRecordingSink:
     def on_trace_event(self, ctx: EngineContext, event: TraceEvent) -> None:
         self._trace_events.append(event)
         if event.event_type == SNAG:
-            # The problem is captured now rather than at flush time because a snag row
-            # records the problem the snag happened on, and by the flush the Workspace
-            # may have moved on. Keyed by event number, which is unique within a Run.
-            self._snag_problems[event.event_number] = [
-                ctx.workspace.initial_string.text,
-                ctx.workspace.modified_string.text,
-                ctx.workspace.target_string.text,
-            ]
+            # Take whatever snag descriptions the memory has gained.  It gains none for
+            # a snag it already knows (``snag_present?``, ``answers.ss:1162``), which is
+            # exactly the deduplication the rows should inherit.
+            known = len(self._snags)
+            if len(ctx.memory.snags) > known:
+                self._snags.extend(ctx.memory.snags[known:])
 
     def on_structure_change(
         self, ctx: EngineContext, structure: Any, change: str
@@ -129,7 +134,7 @@ class TraceRecordingSink:
     @property
     def pending(self) -> int:
         """How many records are waiting. Used by tests to show Fast Run buffers none."""
-        return len(self._trace_events) + len(self._answers)
+        return len(self._trace_events) + len(self._answers) + len(self._snags)
 
     async def flush(self, session: AsyncSession, run_id: int) -> None:
         """Stage everything buffered so far and forget it.
@@ -148,42 +153,62 @@ class TraceRecordingSink:
                     codelet_count=event.codelet_count,
                     temperature=event.temperature,
                     description=event.description,
-                    structures=None,
+                    # §4.4 makes the structures part of what an event *is* — MetaCat's
+                    # Trace display highlights them — so a recorded run has to keep
+                    # them or its events cannot be inspected the way a live one's can.
+                    # Descriptions rather than references: the objects do not outlive
+                    # the process, and what the reviewer needs is which structure, not
+                    # the structure itself.
+                    structures=[
+                        describe_structure(s) for s in (event.structures or [])
+                    ],
                     theme_pattern=event.theme_pattern,
                 )
             )
-            if event.event_type == SNAG:
-                session.add(
-                    SnagDescriptionRow(
-                        run_id=run_id,
-                        problem=self._snag_problems.get(event.event_number, []),
-                        codelet_count=event.codelet_count,
-                        temperature=event.temperature,
-                        theme_pattern=event.theme_pattern,
-                        description=event.description,
-                    )
-                )
 
-        for answer in self._answers:
-            answer.run_id = run_id
+        for snag in self._snags:
+            snag.run_id = run_id
             session.add(
-                AnswerDescriptionRow(
+                SnagDescriptionRow(
+                    snag_id=snag.snag_id,
                     run_id=run_id,
-                    problem=list(answer.problem),
-                    top_rule_description=answer.top_rule_description,
-                    bottom_rule_description=answer.bottom_rule_description,
-                    top_rule_quality=answer.top_rule_quality,
-                    bottom_rule_quality=answer.bottom_rule_quality,
-                    quality=answer.quality,
-                    temperature=answer.temperature,
-                    themes=answer.themes,
-                    unjustified_slippages=answer.unjustified_slippages,
+                    problem=list(snag.problem),
+                    codelet_count=snag.codelet_count,
+                    temperature=snag.temperature,
+                    theme_pattern=snag.theme_pattern,
+                    description=snag.description,
                 )
             )
 
+        for answer in self._answers:
+            answer.run_id = run_id
+            row = AnswerDescriptionRow(
+                answer_id=answer.answer_id,
+                run_id=run_id,
+                problem=list(answer.problem),
+                top_rule_description=answer.top_rule_description,
+                bottom_rule_description=answer.bottom_rule_description,
+                top_rule_quality=answer.top_rule_quality,
+                bottom_rule_quality=answer.bottom_rule_quality,
+                quality=answer.quality,
+                temperature=answer.temperature,
+                themes=answer.themes,
+                unjustified_slippages=answer.unjustified_slippages,
+                top_themes=answer.top_themes,
+                bottom_themes=answer.bottom_themes,
+                unjustified_themes=answer.unjustified_themes,
+                top_rule_abstractness=answer.top_rule_abstractness,
+                bottom_rule_abstractness=answer.bottom_rule_abstractness,
+                theme_abstractness=answer.theme_abstractness,
+                activation=answer.activation,
+                top_rule_signature=answer.top_rule_signature,
+                bottom_rule_signature=answer.bottom_rule_signature,
+            )
+            session.add(row)
+
         self._trace_events.clear()
         self._answers.clear()
-        self._snag_problems.clear()
+        self._snags.clear()
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}(pending={self.pending})"

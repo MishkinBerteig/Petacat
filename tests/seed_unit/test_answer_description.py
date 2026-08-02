@@ -1,4 +1,9 @@
-"""Tests for EpisodicMemory."""
+"""The EpisodicMemory happy paths: store, remind, compare, clear.
+
+``compare_answers`` resolves the commentary templates from ``seed_data/`` when no
+``MetadataProvider`` supplies them, and ``find_remindings`` reaches it through
+``distance``, so the reminding and comparison paths read the shipped phrasing.
+"""
 
 from server.engine.memory import AnswerDescription, EpisodicMemory
 

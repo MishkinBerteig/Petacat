@@ -2,13 +2,12 @@
 // Petacat — Help topic key constants
 // -------------------------------------------------------------------
 //
-// AUTO-GENERATED from seed_data/help_topics.{locale}.json by
+// AUTO-GENERATED from seed_data/help_topics.en.json by
 // scripts/generate_help_docs.py (or the admin Regenerate Help
 // endpoint / backend lifespan startup). Do NOT edit by hand --
 // changes will be lost on the next regeneration. To add or change
 // help topics, edit the JSON and re-run the generator.
 //
-// Locale: en
 // -------------------------------------------------------------------
 
 /** Every topic_key for topic_type='component'. */
@@ -19,6 +18,7 @@ export const COMPONENT_HELP_KEYS = [
   'admin_regenerate_help',
   'coderack',
   'commentary',
+  'configuration',
   'memory',
   'problem_input',
   'review',

@@ -33,3 +33,6 @@ htmlcov/
 # TypeScript incremental build cache
 client/tsconfig.tsbuildinfo
 client/dist/
+
+# Seed-data copies taken before an export overwrites them
+seed_data/.backups/

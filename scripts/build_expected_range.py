@@ -37,14 +37,16 @@ is simply larger than it needed to be — and is reported so batch size can be t
 at ``f1/N = 0.0001`` a 100-run check has roughly a 1% chance per problem of surfacing a
 state that was always reachable but had not yet been seen.
 
-Absence checking
-----------------
+Absence checking — the p50 set
+------------------------------
 The set test is one-sided: it catches states appearing, not states lost.  So the
-baseline also records the smallest group of most-frequent states whose combined
-frequency reaches 50%.  Those are common enough that their absence from a 100-run check
-is real evidence — a state at 57% is absent from 100 runs with probability ~1e-36 —
-while rarer states are ignored in both directions, because their absence means nothing
-at that sample size.
+baseline also records the **p50 set**: the smallest group of most-frequent states whose
+combined frequency reaches 50%, under ``absence_check``.  Those are common enough that
+their absence from a 100-run check is real evidence — a state at 57% is absent from 100
+runs with probability ~1e-36 — while rarer states are ignored in both directions,
+because their absence means nothing at that sample size.  A checker missing one of them
+is looking at a regression; ``counts`` records the full distribution, so the same set is
+derivable from the record directly.
 
 Scope
 -----
@@ -54,14 +56,27 @@ supplied answer dropped — justification *mode* is not carried forward past Pha
 the analogy problems themselves are perfectly good and excluding them would shrink the
 baseline for no reason.  Duplicate triples are merged: 34 demos reduce to 13 problems.
 
+The numeric backend
+-------------------
+A sample belongs to the backend that produced it, so the backend is pinned in every
+worker and recorded in ``criterion.numeric_backend``.  The default is vectorised
+float64 on the CPU, which is the reference's own arithmetic; ``--backend`` runs the
+sample somewhere else, and writing such a sample requires an explicit ``--out``, so
+the committed baseline stays the float64 sample it says it is.  What a sample from
+another backend is *for* is adjudication: when a check surfaces a state the baseline
+does not list, a deep re-sample on the backend that produced it is the evidence the
+decision needs.
+
 Usage
 -----
     python3 scripts/build_expected_range.py [--out PATH] [--workers N] [--problem NAME]
+                                            [--backend NAME]
 """
 
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import os
 import sys
@@ -95,11 +110,40 @@ MIN_RUNS_IF_NO_SINGLETONS = int(1 / TARGET_UPPER)
 MAX_RUNS = 200000  # backstop against a problem that never saturates
 MAX_STEPS = 6000   # per-run codelet cap
 
+# Candidate backends for a worker, most preferred first: the first one whose
+# dependency is importable is taken. Vectorised float64 where NumPy is installed, the
+# reference loops where it is not — both compute in the reference's precision, so the
+# committed baseline is a float64 sample either way.
+DEFAULT_BACKENDS = ("numpy", "python")
+
+# The module each backend name needs. ``python`` is the reference and needs nothing.
+BACKEND_REQUIREMENT = {
+    "python": None,
+    "numpy": "numpy",
+    "mlx": "mlx.core",
+    "mlx-cpu": "mlx.core",
+}
+
 _META: MetadataProvider | None = None
 
 
-def _init_worker() -> None:
+def resolve_backend(candidates: tuple[str, ...]) -> str:
+    """The first candidate whose dependency is importable.
+
+    ``importlib.util.find_spec`` locates a module without executing it, which keeps
+    the answer free of whatever an import would initialise.
+    """
+    for name in candidates:
+        requirement = BACKEND_REQUIREMENT.get(name, name)
+        if requirement is None or importlib.util.find_spec(requirement) is not None:
+            return name
+    return "python"
+
+
+def _init_worker(backend: str) -> None:
+    """Pin the backend before the first engine object exists, then load the metadata."""
     global _META
+    os.environ["PETACAT_NUMERIC_BACKEND"] = backend
     _META = MetadataProvider.from_seed_data(SEED_DIR)
 
 
@@ -241,7 +285,7 @@ def _meets_criterion(record: dict) -> bool:
     return record["f1_over_n"] <= TARGET_UPPER
 
 
-def _write(path: str, results: list[dict], seconds: float) -> None:
+def _write(path: str, results: list[dict], seconds: float, backend: str) -> None:
     """Serialise the baseline. Called after every problem so an interruption costs
     at most the problem in flight — the first version of this script wrote only at the
     end, and a mid-run stop threw away everything."""
@@ -256,6 +300,7 @@ def _write(path: str, results: list[dict], seconds: float) -> None:
             "max_runs": MAX_RUNS,
             "batch": BATCH,
             "max_steps_per_run": MAX_STEPS,
+            "numeric_backend": backend,
         },
         "scope": (
             "Every unique (initial, modified, target) triple across all demo problems, "
@@ -297,7 +342,18 @@ def main() -> None:
     ap.add_argument("--problem", default=None, help="run a single problem by demo name")
     ap.add_argument("--force", action="store_true",
                     help="resample problems already recorded as saturated")
+    ap.add_argument("--backend", default=None,
+                    help="numeric backend for every worker (default: the first of "
+                         f"{'/'.join(DEFAULT_BACKENDS)} that is installed)")
     args = ap.parse_args()
+
+    backend = args.backend or resolve_backend(DEFAULT_BACKENDS)
+    if args.backend and os.path.abspath(args.out) == os.path.abspath(DEFAULT_OUT):
+        sys.exit(
+            f"--backend {args.backend} writes a sample from a chosen backend, and "
+            f"{DEFAULT_OUT} holds the float64 reference sample. Pass --out to write "
+            f"it somewhere else, and compare the two."
+        )
 
     with open(os.path.join(SEED_DIR, "demo_problems.json")) as fh:
         all_problems = json.load(fh)
@@ -334,7 +390,8 @@ def main() -> None:
     print(
         f"Building expected-range baseline: {len(problems)} distinct analogy problems "
         f"from {len(all_problems)} demos ({deduped} duplicate triples merged), "
-        f"{args.workers} workers, band {TARGET_LOWER} < f1/N <= {TARGET_UPPER}",
+        f"{args.workers} workers on the {backend} backend, "
+        f"band {TARGET_LOWER} < f1/N <= {TARGET_UPPER}",
         flush=True,
     )
 
@@ -361,10 +418,10 @@ def main() -> None:
         """
         touched = {(x["initial"], x["modified"], x["target"]) for x in results}
         merged = results + [r for k, r in prior_by_triple.items() if k not in touched]
-        _write(args.out, merged, time.perf_counter() - overall)
+        _write(args.out, merged, time.perf_counter() - overall, backend)
         return sorted(merged, key=lambda r: (r["initial"], r["modified"], r["target"]))
 
-    with Pool(args.workers, initializer=_init_worker) as pool:
+    with Pool(args.workers, initializer=_init_worker, initargs=(backend,)) as pool:
         for idx, problem in enumerate(problems, 1):
             key = (problem["initial"], problem["modified"], problem["target"])
             arrow = f"{problem['initial']}->{problem['modified']}; {problem['target']}?"

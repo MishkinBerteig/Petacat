@@ -2,48 +2,281 @@
 
 This document defines how Petacat's **backend** tests are written and
 organised. It exists so that new tests stay consistent, deterministic, and
-focused on the research goals of the project. For the commands to *run* the
-suites, see [README.md § Run the tests](README.md#6-run-the-tests).
+focused on the research goals of the project.
+
+## The required command
+
+```bash
+.venv/bin/python -m pytest tests/ -q
+```
+
+This is the command a change is verified with. It runs all six layers against the
+local Postgres, runs every test whose outcome the numeric substrate produces on
+**both the CPU and the GPU**, and stops at a **60-minute wall-clock ceiling**. The
+matrix and the ceiling are properties of the suite, so this one command carries
+them; there is nothing further to remember and nothing to add on the command line.
+
+A tight edit-test loop uses:
+
+```bash
+.venv/bin/python -m pytest tests/ -q -m "not slow" --numeric-backends=cpu
+```
+
+which drops the expected-range oracle and puts the whole session on one CPU
+backend. Verify with the required command before considering a change done.
+
+### The numeric backend matrix
+
+`server/engine/numeric/` computes the engine's arithmetic — activation spreading,
+decay, the probabilistic jump, structure strengths, object values, themespace
+dynamics, temperature — behind four interchangeable backends, and the default
+policy puts a run on the Metal GPU at every Slipnet size. A test whose outcome
+that arithmetic produces therefore has two answers worth knowing, and the matrix
+runs it once for each:
+
+| Role | Backend | Precision | What the role covers |
+|------|---------|-----------|----------------------|
+| `cpu` | `numpy`, or `python` where NumPy is absent | float64 | The engine's arithmetic at the reference's precision. Agreement with the pure-Python reference is exact here — same values, same number of random draws — so a seeded run on this half of the matrix is reproducible down to the draw. |
+| `gpu` | `mlx` | float32 | The arithmetic as a Petacat run actually executes it, on the Metal cores, in the only precision Apple's GPUs offer. |
+
+The `cpu` role is fillable on every machine, so the matrix always has a float64
+half. The `gpu` role appears when MLX is installed and its Metal probe succeeds,
+and is reported as not installed otherwise, which is the same skip-rather-than-fail
+rule the rest of the suite follows.
+
+**Why float32 diverges on individual runs while the reachable set holds.**
+Activations live in [0, 100], and float32 carries about seven significant digits
+where float64 carries sixteen. A Slipnet activation that has decayed to a subnormal
+survives in float64 and flushes to zero in float32, which changes the
+`jump_candidates` list, which changes how many draws the run consumes, which sends
+every subsequent probabilistic decision somewhere else. A given seed therefore
+reaches a different answer on the GPU than on the CPU. That is right behaviour:
+Petacat is stochastic by design, so a different-but-valid run is a correct run, and
+the same thing happens whenever a new scheduler or a new generator reorders the
+draws. What must hold across the two halves is the **set** of stopping states each
+problem can reach, and that is the expected-range oracle's question
+(`tests/module/test_expected_range.py`), which reports its findings in its own
+terms — a missing p50 state is a regression, a novel state is surfaced for
+adjudication — on whichever configuration it is run.
+
+So the matrix asks each half for what that half can promise. The float64 tests
+assert bit-identity where they assert it, and the float32 pass asserts the
+properties that survive a forked random stream: that the run completes, that the
+structures it builds are coherent, that a captured state restores, that the
+concurrency invariants hold.
+
+**Where the line is drawn.** A test is in the matrix when its outcome is produced
+by arithmetic the substrate performs — when it drives a real `Slipnet`,
+`Themespace`, `Workspace` or `Temperature` update, or a run that does. That is
+every module file that assembles and drives the engine, plus the four individual
+tests elsewhere that reach a real engine rather than a fake. Everything else runs
+once, because the backend cannot reach it: `tests/unit/` computes against fakes,
+`tests/seed_unit/` reads shipped values without driving anything, `tests/architecture/`
+inspects source, `tests/integration/` compares seed data against the schema and
+checks the harness's own rules, and `tests/e2e/` exercises the HTTP and persistence
+stack, which adds no numeric path of its own and runs on the policy the
+application ships with.
+
+A module opts in with one line beneath its imports:
+
+```python
+pytestmark = pytest.mark.numeric_matrix
+```
+
+and a single test with `@pytest.mark.numeric_matrix`, which is what
+`tests/seed_unit/test_temperature.py`, `tests/module/test_codelet_dsl.py` and
+`tests/module/test_codelet_behaviours.py` use.
+
+A matrix module's engine-running fixtures are **function-scoped**. The case's
+backend is in force for the duration of the test, so a fixture rebuilt per case
+carries that case's backend into the state it hands over. Module-scoped fixtures
+in these files hold configuration — a `MetadataProvider`, a seed directory —
+which the substrate never touches.
+
+Membership is enforced rather than curated. `tests/conftest.py` wraps
+`select_backend` in the four engine modules that consult it and counts each test's
+calls; a test in any layer but `tests/e2e/` that
+reaches the substrate without the marker is named in the summary and fails the
+session, with the line to add. Two files are exempt because they choose backends
+themselves and more finely than a role can — `tests/seed_unit/test_numeric_backends.py`
+and `tests/module/test_numeric_engine.py` parametrise over *every* installed
+backend and separate the exact ones from the inexact one — and so are the `slow`
+guards, which set their own worker pools' backend or run an interpreter with MLX
+and NumPy made unimportable.
+
+**Running one backend alone.** `--numeric-backends` takes roles (`cpu`, `gpu`),
+backend names (`python`, `numpy`, `mlx`, `mlx-cpu`), `all`, or a comma-separated
+mixture. Naming a single backend also makes it the session's default, so the tests
+outside the matrix take it too and the run is entirely what it says it is.
+`PETACAT_TEST_BACKENDS` sets the same thing from the environment.
+
+```bash
+.venv/bin/python -m pytest tests/ -q --numeric-backends=gpu     # Metal only
+.venv/bin/python -m pytest tests/ -q --numeric-backends=cpu     # float64 only
+.venv/bin/python -m pytest tests/ -q --numeric-backends=all     # every backend
+```
+
+**What a run reports.** Every session ends with a `petacat test matrix` block:
+
+```
+============================= petacat test matrix ==============================
+  cpu  numpy    float64    250 tests
+  gpu  mlx      float32    250 tests
+  whole suite requested: the full matrix is required of this run
+
+  unit           338 collected    338 run    338 passed      0 failed      0 skipped  complete
+  seed_unit      261 collected    261 run    261 passed      0 failed      0 skipped  complete
+  module         626 collected    626 run    626 passed      0 failed      0 skipped  complete
+  architecture    34 collected     34 run     34 passed      0 failed      0 skipped  complete
+  integration     65 collected     65 run     65 passed      0 failed      0 skipped  complete
+  e2e            209 collected    209 run    209 passed      0 failed      0 skipped  complete
+
+  run complete in 14.2 min against a 60 min ceiling
+```
+
+The first block is what makes "both were run" checkable: it names each backend, its
+precision and how many tests took it. A role that no selected test reached says so
+on its own line, and so does a role whose backend is not installed.
+
+**Completeness is required of a run that asked for everything.** The required
+command asks for the whole suite, so it is held to the whole matrix: if a backend
+in the matrix runs none of the selected tests, the session fails with that as the
+reason. A deliberate slice asked a narrower question and answers it on the strength
+of its own tests — `-m slow`, `-m "not slow"`, `-k`, `--numeric-backends=cpu`, a
+single file or node id. Such a run names what narrowed it, names the roles it
+exercised, and exits on whether its tests passed:
+
+```
+  cpu  numpy    float64      0 tests
+  gpu  mlx      float32     14 tests
+  cpu  numpy: no selected test ran on it
+  narrowed by -k 'mlx': this run reports the roles it exercised and is not held to the full matrix
+```
+
+A role whose backend is not installed is never a shortfall, on any run. That is
+what keeps MLX an optional dependency: a machine without a GPU holds a one-role
+matrix, runs all of it, and stays green.
+
+The rules are pinned by `tests/integration/test_numeric_matrix_harness.py`,
+including the exit status of a narrowed run, which a test inside that run cannot
+observe and so is checked in a child interpreter.
+
+### The session ceiling
+
+A full run stops at a wall-clock deadline, 60 minutes by default. The deadline is
+checked at each test boundary, so the run overshoots by at most the duration of the
+test in progress and then stops through pytest's own `session.shouldstop`, which
+keeps every report already collected.
+
+`--test-ceiling=MINUTES` sets it, `PETACAT_TEST_CEILING_MINUTES` sets it from the
+environment, and `--test-ceiling=0` runs to the end. Set it from the machine: the
+same suite takes different wall-clock time on different hardware, and the ceiling
+is there to bound a run, not to describe one.
+
+A truncated run reports itself as truncated, and the difference from a clean run is
+visible three ways:
+
+```
+  module         626 collected    198 run    198 passed      0 failed      0 skipped  INCOMPLETE
+
+  RUN TRUNCATED: the 60 min ceiling was reached after 60.4 min. Everything above is
+  what the run produced before it stopped; the tests it had not reached never ran.
+  Raise the ceiling with --test-ceiling=MINUTES, or narrow the run, to get a
+  complete result.
+! Interrupted: the 60 min test ceiling was reached after 60.4 min — this run is TRUNCATED !
+```
+
+The per-layer line shows `INCOMPLETE` with the collected and run counts beside each
+other, the summary states the truncation in words, and the exit status is pytest's
+`INTERRUPTED` (2) rather than success. The results obtained before the stop are all
+present — the backends exercised, the layers finished, and pytest's own list of
+what passed and failed — so a truncated run is evidence about the part of the suite
+it reached.
 
 ## Test layers
 
-The backend suite (`tests/`) is organised bottom-up into four layers:
+The backend suite (`tests/`) is organised into six layers. A layer is defined by
+what its tests are allowed to reach for, and every test in a layer stays inside
+that allowance.
 
-| Layer | Directory | Scope | Dependencies | Tests |
-|-------|-----------|-------|--------------|-------|
-| **unit** | `tests/unit/` | One class/function, business logic only | None — all collaborators mocked | 601 |
-| **module** | `tests/module/` | Assembly of a few real components | Real engine objects, no DB/HTTP | 282 |
-| **integration** | `tests/integration/` | Seed-data consistency, codelet compilation | Real `seed_data/*.json` | 43 |
-| **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 123 |
+| Layer | Directory | Scope | May depend on | Cases |
+|-------|-----------|-------|---------------|-------|
+| **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 338 |
+| **seed unit** | `tests/seed_unit/` | One class or function, measured against the values Petacat ships with | Real `seed_data/*.json`, and the machine the process is running on | 261 |
+| **module** | `tests/module/` | Several real components assembled and driven | Real engine objects and `seed_data/*.json`; no DB, no HTTP | 626 |
+| **architecture** | `tests/architecture/` | How the source tree is allowed to depend on itself | The repository's source, `seed_data/*.json`, child interpreters | 34 |
+| **integration** | `tests/integration/` | Agreement between the repository's artifacts, and the harness's own rules | Real `seed_data/*.json`, the ORM declarations, the generated client files, the documentation, a real pytest session | 65 |
+| **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 209 |
+
+Those counts are cases, so they include the second pass the numeric matrix makes
+over the 250 backend-sensitive tests.
+
+One line decides each layer. Read them as a question about what a new test's
+subject is, and write the test where the answer lands:
+
+- **unit** — everything it touches is constructed in the test: a hand-rolled
+  fake, or a plain engine object. No file is read and no process is started.
+- **seed unit** — the same shape of test, except that the shipped value is what
+  is being asserted about, so it reads `seed_data/` or the machine. No codelets
+  run.
+- **module** — codelets run.
+- **architecture** — the assertion is about the source tree rather than about
+  what running it produces.
+- **integration** — the assertion is that two artifacts in the repository say
+  the same thing.
+- **e2e** — the assertion travels over HTTP.
 
 A first pass should test **the lowest level of code just above the database
 first**, then move up toward the API and GUI.
 
-All four layers run in one command — `.venv/bin/python -m pytest tests/ -q` —
-and, since Petacat runs natively, all four actually run: **1,049 tests, nothing
-skipped**. This is worth stating because it was not true before. The e2e layer
-used to need `docker compose exec app pytest tests/e2e/`, so a local `pytest`
-skipped it and the number people quoted was the other three layers. A layer that
-is normally skipped is not a layer that is normally green.
+All six layers run in one command — the
+[required command](#the-required-command) — and, since Petacat runs natively, all
+six actually run: **1,533 cases**, every one of them executed. A layer that is
+normally skipped is not a layer that is normally green, and none of these is.
 
 Wall-clock time depends heavily on the machine and on what else it is doing. The
-expected-range check alone is ~1,300 engine runs across a process pool, and the
-numeric-substrate tests dispatch to the GPU; on a quiet M2 Max the whole suite is
-a couple of minutes, and on a busy one it is considerably longer — the run this
-document's counts were taken from took 24 minutes on a machine that was
-simultaneously running GPU benchmarks. Use `-m "not slow"` when you want a fast
-loop rather than a number to compare.
+dominant cost is the numeric substrate: the default policy puts the engine's
+arithmetic on the GPU at every Slipnet size, which at today's 59 nodes runs 5.9×
+slower than the NumPy path the matrix's CPU half takes, and 7.1× slower than the
+engine's own loops (`README.md` carries both measurements). Three invocations,
+measured on an Apple M2 Max:
+
+| Invocation | Wall time |
+|---|---:|
+| `pytest tests/ -q` — the [required command](#the-required-command), full matrix | 14.2, 14.6 and 24.4 min |
+| `pytest tests/ -q --numeric-backends=cpu` — whole session on the CPU | 8.2 min |
+| `pytest tests/ -q -m "not slow" --numeric-backends=cpu` — the tight loop | 1.8 min |
+
+The required command is given as three figures because three runs of it on the
+same machine produced them, and that spread is what "depends on what else it is
+doing" looks like in practice. Budget against the largest: the expected-range
+oracle holds each problem to a per-sample deadline (`PETACAT_RANGE_TIMEOUT`,
+600 s), so on a machine loaded enough to reach 24 minutes that deadline is within
+reach, and a problem that hits it reports the stall and names the workers still
+running.
+
+What `-m "not slow"` drops is the expected-range check, which is ~1,300 engine runs
+across a process pool. Reach for the tight loop when you want a fast loop rather
+than a number to compare, and for the required command when you want the number.
 
 > **If `tests/module/test_free_running.py` fails, check the numeric backend
-> first.** That file is the one place the suite runs codelets concurrently, and
-> it is sensitive to which numeric backend is in force: at the time of writing it
-> is green under `PETACAT_NUMERIC_BACKEND=off`, `=python` and `=numpy`, and
-> red under both `=mlx` and `=mlx-cpu` — and `mlx` is the default, so a plain
-> full run can show failures that a backend-forced run does not. The symptoms
-> have been a lost codelet-count increment and a group reachable from a bond but
-> absent from its string's object list, both races the commit discipline is meant
-> to exclude. Re-running with `PETACAT_NUMERIC_BACKEND=numpy` is the quickest way
-> to tell a genuine concurrency defect from an MLX interaction.
+> first.** That file is the one place the suite runs *codelets* concurrently —
+> `test_coderack_shards`, `test_access_sets`, `test_run_identifiers` and
+> `test_splittable_rng` thread over engine state without executing codelets — and
+> it can be sensitive to which numeric backend is in force. It is currently green
+> under every backend, `mlx` included; an earlier note here recorded it as red
+> under `=mlx` and `=mlx-cpu`, and that was wrong.
+>
+> The reason a backend can matter at all is that the default `mlx` path forks a
+> run's random stream: float32 flushes the Slipnet's decayed subnormal
+> activations to zero, which changes the `jump_candidates` list and shifts every
+> subsequent draw. So a failure seen only under `mlx` is a different run, not a
+> different degree of safety. The file is in the numeric matrix, so each case
+> carries its backend in its name — `…[numpy]` and `…[mlx]` sit side by side in
+> the report, and a red `[mlx]` beside a green `[numpy]` is that seed difference
+> while both red is a concurrency defect. Note also that the "group reachable from a bond but absent from its
+> string's object list" symptom occurs *serially* too, and the file documents it
+> as a pre-existing property rather than a race.
 
 The database it needs is the local Postgres (`scripts/dev.sh db` starts it and
 creates the databases). e2e talks to `petacat_test`, deliberately separate from
@@ -61,28 +294,150 @@ instead of interleaving.
 Shared helpers that more than one test module needs live in `tests/support/`.
 That directory is imported, never collected.
 
-### What each layer covers now
+### The test-file inventory
 
-The four layers are shapes, not subject areas, so it is worth naming where the
-Phase 0 substrate is tested:
+Every backend test file, by layer, with the number of test functions it defines
+and what it covers. Case counts are higher where the numeric matrix or a
+`parametrize` expands a function.
 
-- **`tests/unit/`** — the usual data structures and formulas, plus the numeric
-  backends compared against the pure-Python reference
-  (`test_numeric_backends.py`), the counter-based RNG (`test_splittable_rng.py`),
-  incremental coderack eviction (`test_coderack_eviction.py`), the `RunSink`
-  protocol (`test_sink.py`), and the **engine purity invariant**
-  (`test_engine_purity.py`), which fails if anything under `server/engine/**`
-  imports `sqlalchemy`, `server.models`, `server.db` or `server.services`.
-- **`tests/module/`** — the engine assembled and driven: state-graph round trips
-  (`test_state_graph.py`), read/write sets (`test_access_sets.py`), coderack
-  shard fidelity (`test_coderack_shards.py`), free-running
-  (`test_free_running.py`), the numeric substrate in a live run
-  (`test_numeric_engine.py`), deliberate staleness (`test_staleness.py`),
-  population batching (`test_population.py`), per-run identifiers
-  (`test_run_identifiers.py`), and the expected-range oracle.
-- **`tests/e2e/`** — the HTTP stack, including the three persistence modes
-  (`test_persistence_modes.py`) and the review endpoints
-  (`test_api_review.py`).
+**These figures are checked, not restated.**
+`tests/integration/test_documented_counts.py` compares every layer count, suite
+total and per-file figure in this document, in `README.md` and in the
+repository's `CLAUDE.md` against the collection the running session produced, and
+names the ones that have drifted. It reads `session.items`, the list pytest has
+already built, so the check costs one pass over it. It is held of a run that
+asked for the whole suite; a narrowed invocation collects a subset by design, and
+there the check stands aside and says so.
+`tests/integration/test_documented_code_shape.py` does the same for the figures
+the documentation gives about the source: the engine's module and line counts,
+the number of endpoints taking `Depends(get_session)`, the size of
+`codelet_dsl/builtins.py`, and the number of groups in the Run Controls panel.
+
+**`tests/unit/` — one class or function, against what the test constructs**
+
+| File | Fns | Covers |
+|------|----:|--------|
+| `test_bonds.py` | 18 | `Bond`: direction, facet, strength, flipping |
+| `test_bridge_types.py` | 2 | The bridge-type and orientation constants |
+| `test_codelet_dsl.py` | 3 | Compiling a codelet body: what the interpreter accepts and refuses |
+| `test_commentary.py` | 23 | The `CommentaryLog`, and the emit helpers whose English is written in Python |
+| `test_concept_mappings.py` | 34 | `ConceptMapping`: identity, slippage, distinguishing descriptors |
+| `test_descriptions.py` | 21 | `Description`: relevance, strength, descriptor predicates |
+| `test_episodic_memory.py` | 13 | `EpisodicMemory`: identifier scoping, theme distance, `answer_present` |
+| `test_formulas.py` | 17 | Averaging, the sigmoid, and the five translation-temperature distributions |
+| `test_groups.py` | 18 | `Group`: length, spanning, membership, internal and external strength |
+| `test_rng.py` | 13 | The deterministic RNG wrapper |
+| `test_rule_types.py` | 9 | `Rule` and `RuleClause` predicates and translation |
+| `test_runner_status.py` | 1 | The runner's status constants |
+| `test_sink.py` | 8 | The `RunSink` port: its event vocabulary and `NullSink` |
+| `test_slipnet_node.py` | 6 | Nodes and links built directly: degree of association, probabilistic jump |
+| `test_splittable_rng.py` | 21 | Counter-based per-codelet random streams |
+| `test_temperature.py` | 3 | `Temperature`'s own state: starting value and clamp |
+| `test_thematic_scouting.py` | 20 | The thematic-bridge-scout's decisions (`themes.ss:750-1030`) |
+| `test_theme_types.py` | 6 | `Theme` and `Themespace` type constants |
+| `test_themespace.py` | 30 | Themespace self-watching dynamics: cluster spreading, dominance |
+| `test_trace_event.py` | 6 | `TemporalTrace` event recording |
+| `test_workspace_object.py` | 29 | `WorkspaceObject` and `Letter`: geometry, importance, unhappiness |
+| `test_workspace_string.py` | 21 | `WorkspaceString`: bond and group management, spanning, relevance |
+| `test_workspace_structure.py` | 10 | The base structure class and its proposal levels |
+
+**`tests/seed_unit/` — one class or function against the shipped values**
+
+| File | Fns | Covers |
+|------|----:|--------|
+| `test_answer_comparison.py` | 37 | The answer-comparison and answer-explanation English (`answers.ss:267-882`) |
+| `test_answer_description.py` | 4 | Storing, reminding and comparing inside `EpisodicMemory` |
+| `test_bridge_types.py` | 4 | Bridge orientation over letters of a real Workspace |
+| `test_codelet_dsl.py` | 2 | The codelet registry built from the seeded codelet types |
+| `test_coderack_bin.py` | 10 | The Coderack's urgency bins and temperature-weighted choice |
+| `test_coderack_eviction.py` | 9 | Incremental eviction picks exactly what the flat scan picked |
+| `test_commentary.py` | 6 | The emit helpers that render from the seeded commentary templates |
+| `test_episodic_memory.py` | 8 | Reminding and comparison, which resolve the seeded templates |
+| `test_formulas.py` | 14 | The temperature-dependent formulas against the seeded coefficients |
+| `test_hardware.py` | 21 | The machine description and the sizes derived from it: real probes, faked probes, environment overrides |
+| `test_metadata_provider.py` | 17 | `MetadataProvider` loading every seed collection |
+| `test_numeric_backends.py` | 21 | The numeric backends against the reference, and the engine without them |
+| `test_slipnet_link_lengths.py` | 6 | The Slipnet's link lengths against the reference Scheme |
+| `test_slipnet_node.py` | 15 | The 59-node Slipnet: its nodes, its links, its clamps and its spreading |
+| `test_temperature.py` | 2 | Temperature updating against the seeded coefficients |
+
+**`tests/module/` — real components assembled and driven**
+
+| File | Fns | Covers |
+|------|----:|--------|
+| `test_access_sets.py` | 19 | Read-set / write-set discipline and commit-time validation |
+| `test_capture_projection.py` | 8 | A recorded capture renders exactly as the same state renders live |
+| `test_codelet_behaviours.py` | 41 | What each of the 27 codelet types does to a live workspace |
+| `test_codelet_dsl.py` | 7 | Codelet bodies executed against a live engine context |
+| `test_coderack_shards.py` | 13 | The candidate sharded coderacks: fidelity and contention |
+| `test_commentary_writer.py` | 8 | Commentary is an injected writer, and every Run gets a real one |
+| `test_dissertation_parity.py` | 49 | The dissertation's claims, encoded as tests |
+| `test_expected_range.py` | 20 | The expected-range oracle: the reachable stopping states of 13 problems |
+| `test_free_running.py` | 12 | Free-running execution across worker threads |
+| `test_numeric_engine.py` | 7 | The engine computes the same thing with the substrate engaged |
+| `test_population.py` | 9 | Population batching: K independent runs together |
+| `test_run_identifiers.py` | 8 | Identifiers depend on the run, not on the process's history |
+| `test_run_to_answer.py` | 7 | Run-to-answer behaviour at the `EngineRunner` level |
+| `test_runner.py` | 9 | `EngineRunner`: initialisation, stepping, the update cycle |
+| `test_runner_commentary.py` | 6 | Commentary emitted as the runner drives a problem |
+| `test_runner_status.py` | 6 | The status an `EngineRunner` reports as a run moves through it |
+| `test_sink_emission.py` | 9 | The engine emits a complete run record to its sink |
+| `test_splittable_rng_range.py` | 3 | The expected range holds under the splittable RNG |
+| `test_staleness.py` | 8 | The staleness probe reads a Workspace that lags the live one |
+| `test_state_graph.py` | 11 | A captured run restores to a state that continues identically |
+| `test_thematic_bridge_scout.py` | 9 | The thematic-bridge-scout inside an assembled engine |
+| `test_themespace.py` | 14 | Themespace driven by a real run's bridges |
+| `test_trace_persistence.py` | 7 | Trace event persistence logic |
+| `test_workspace.py` | 7 | Workspace aggregation across its four strings |
+
+**`tests/architecture/` — properties of the source tree**
+
+| File | Fns | Covers |
+|------|----:|--------|
+| `test_engine_purity.py` | 18 | Nothing under `server/engine/**` imports `sqlalchemy`, `server.models`, `server.db` or `server.services`, and the serializers run in an interpreter where those cannot be imported |
+
+**`tests/integration/` — the repository's artifacts agree**
+
+| File | Fns | Covers |
+|------|----:|--------|
+| `test_documented_code_shape.py` | 4 | The engine's size, the endpoint count, the builtins module and the Run Controls groups, as the documentation states them |
+| `test_documented_counts.py` | 3 | Every documented layer count, suite total and per-file figure, against the collection that produced it |
+| `test_enum_constants.py` | 17 | Engine string constants match `seed_data/enums.json` |
+| `test_help_topics.py` | 13 | The help JSON, the generated TypeScript and the panels that reference them |
+| `test_metadata_seeding.py` | 13 | Every seed file is well-formed, and the `MetadataProvider` round-trip holds |
+| `test_numeric_matrix_harness.py` | 11 | The matrix's own reporting rules and the exit status of a narrowed run |
+| `test_seed_reconciliation.py` | 4 | The DB copy of the metadata tracks the seed files without eating runtime data |
+
+**`tests/e2e/` — the HTTP API against a real database**
+
+| File | Fns | Covers |
+|------|----:|--------|
+| `test_api_controls.py` | 20 | Breakpoints, clamping and the threshold endpoints |
+| `test_api_docs.py` | 11 | The documentation endpoints |
+| `test_api_extended.py` | 56 | Extended runs, memory, docs and admin endpoints |
+| `test_api_review.py` | 19 | The review surfaces read back what the persistence modes wrote |
+| `test_api_runs.py` | 26 | The runs API with persistence |
+| `test_api_system.py` | 8 | The system endpoints: what is executing, not what was recorded |
+| `test_help_api.py` | 7 | The help topics API |
+| `test_persistence.py` | 4 | Snapshot save/restore and the DB metadata round-trip |
+| `test_persistence_modes.py` | 30 | The three persistence modes: Fast, Normal, Audit |
+| `test_run_parameters.py` | 13 | Run parameters are settable per Run, stored, and readable back |
+| `test_run_to_answer.py` | 8 | The Run-to-Answer feature over HTTP |
+| `test_snag_identity.py` | 2 | A snag is the same snag whichever endpoint served it |
+
+**Collected by no layer**
+
+| File | Holds |
+|------|-------|
+| `tests/conftest.py` | The numeric backend matrix, the session ceiling, the per-layer summary |
+| `tests/e2e/conftest.py` | The Postgres fixtures and the session advisory lock |
+| `tests/unit/_fakes.py` | The shared hand-rolled doubles |
+| `tests/support/expected_range.py` | The expected-range checker, pointable at a modified engine |
+| `tests/fixtures/expected_range.json` | The saturated baseline the oracle compares against |
+
+Almost every file in `tests/module/` is in the
+[numeric backend matrix](#the-numeric-backend-matrix), because driving the engine
+is what those tests do and the substrate is where its arithmetic happens.
 
 ### The `slow` marker
 
@@ -90,7 +445,11 @@ A test that costs seconds to minutes is marked `@pytest.mark.slow`. Marked tests
 still run by default — they are guards, and a guard that has to be remembered is
 not a guard — but a tight edit-test loop can drop them with `-m "not slow"`.
 
-The one that matters is the **expected-range check**
+Four functions carry the marker, expanding to 28 cases: the expected-range check
+on the CPU, the same check on Metal, the RNG range guard, and the guard that MLX
+stays optional. The Metal pass is 13 of those cases, and `PETACAT_RANGE_GPU=0`
+narrows the check to the CPU role. The one that matters most is the
+**expected-range check**
 (`tests/module/test_expected_range.py`), which samples each of the 13 distinct
 demo problems 100 times and compares the set of stopping states reached against
 the saturated baseline in `tests/fixtures/expected_range.json`.
@@ -112,13 +471,95 @@ the order of the update cycle moves. Its checker
 numeric-backend work is all verified against the same comparison rather than
 against four hand-rolled ones.
 
-A stopping state outside the range means **investigate**, not necessarily
-**fail**: at the baseline's saturation level a genuinely novel state shows up
-about 1% of the time per problem. Re-run that problem deeply, and if the state
-proves old-but-rare, admit it to the baseline under `admitted_states` —
-`build_expected_range.py` carries those through a rebuild, since the range is
-otherwise reconstructed from the saturation counts and they would be silently
-dropped.
+The oracle reports two outcomes, and they call for different things.
+
+A **missing p50 state fails as a regression**. The p50 set is the states that
+account for the top half of a problem's sampled distribution — a healthy run
+reaches them routinely — so one going unreached is a defect, not sampling noise.
+
+A **novel state is reported for adjudication**. At the baseline's saturation
+level a genuinely novel state shows up about 1% of the time per problem, so the
+report names the problem, the state, the backend, the sample size and the
+re-sample command, and the range is left as it stands. Re-run that problem
+deeply with `PETACAT_RANGE_RUNS=1000`, and if the state proves old-but-rare,
+write it into that problem's `admitted_states` in
+`tests/fixtures/expected_range.json`.
+
+`admitted_range` reads `expected_range` and `admitted_states` together, so an
+adjudication takes effect on the next run. `build_expected_range.py` carries
+admitted states through a rebuild, since the range is otherwise reconstructed
+from the saturation counts.
+
+### The oracle's environment
+
+The expected-range pool runs its workers on the NumPy backend, set before any
+engine object exists, so each worker holds one CPU numeric context.
+
+| Variable | Effect |
+|---|---|
+| `PETACAT_NUMERIC_BACKEND_WORKERS` | The backend the pool's workers run on |
+| `PETACAT_ORACLE_ALLOW_GPU` | Lets the workers take the default policy |
+| `PETACAT_RANGE_RUNS` | Samples per problem — `1000` is the deep re-sample above |
+| `PETACAT_RANGE_WORKERS` | Pool size |
+| `PETACAT_RANGE_GPU` | `1` runs the check on Metal as well as on the CPU backend |
+| `PETACAT_RANGE_GPU_RUNS` | Samples per problem for that GPU pass |
+| `PETACAT_RANGE_GPU_WORKERS` | Pool size for the GPU pass |
+| `PETACAT_RANGE_TIMEOUT` | Per-sample deadline in seconds; `0` waits indefinitely |
+| `PETACAT_RNG_RANGE_RUNS` | Samples for the RNG range guard |
+
+Reach for `PETACAT_RANGE_RUNS=1000` when a stopping state falls outside the
+range and you want to know whether it is old-but-rare.
+
+`PETACAT_RANGE_GPU=1` puts the oracle on the same axis the rest of the suite runs:
+the CPU pass in float64 and a Metal pass in float32, on the same 13 problems and
+the same baseline. It is the one place a stopping *set* is compared across
+precisions, which is the claim the float32 half of the matrix rests on. It costs
+what a GPU dispatch costs at 59 nodes: **1,300 runs at 11 workers take 61-74 s on
+NumPy and 316 s on Metal.**
+
+The oracle distinguishes two outcomes, and a reader needs to know which one is on
+screen:
+
+- A **missing p50 state fails as a regression.** The p50 set is the most-frequent
+  states that together make up the top half of the baseline's mass, so their
+  absence from a sample is evidence rather than noise.
+- A **novel state is reported for adjudication.** It names the problem, the state,
+  the seeds and the per-check probability of a spurious one, and it never widens
+  the fixture on its own. Admitting a state to the baseline is a decision taken
+  after re-sampling that problem deeply.
+
+### The client suite
+
+`client/` carries a Vitest suite covering the store, the panels, the admin
+editors and the review surfaces. Run it with `cd client && npx vitest run`, and
+`npx tsc --noEmit` alongside it. **316 cases across 23 files**, all passing, in
+3.2 s on an Apple M2 Max.
+
+| File (`client/src/`) | Cases | Covers |
+|----------------------|------:|--------|
+| `api/errors.test.ts` | 5 | One failure, one sentence a reader can act on |
+| `api/ws.test.ts` | 4 | The URL the client opens is the route the server serves |
+| `store/runStore.test.ts` | 39 | The spreading threshold outliving a page reload, and the store's run lifecycle |
+| `components/AdminPanel.test.tsx` | 5 | The Admin panel's operations report what became of them |
+| `components/CoderackView.test.tsx` | 6 | The Coderack panel's codelet-pattern clamps |
+| `components/CommentaryPanel.test.tsx` | 3 | An empty commentary panel has two different causes |
+| `components/HelpPopover.test.tsx` | 3 | The popover shows a glossary term, and says when it cannot |
+| `components/LastErrorBanner.test.tsx` | 3 | The error channel is rendered where it can be seen |
+| `components/MemoryView.test.tsx` | 16 | The Memory panel shows the memory the run is thinking against |
+| `components/ProblemInputPanel.test.tsx` | 7 | The problem panel owns the problem's identity |
+| `components/RunControlsPanel.test.tsx` | 40 | A run starts on the problem the form actually shows |
+| `components/RunHistory.test.tsx` | 31 | Run History stays current as runs finish |
+| `components/RunParametersPanel.test.tsx` | 14 | The twenty-five run parameters, settable before a run |
+| `components/SearchPalette.test.tsx` | 7 | Cmd+K search reaches every kind of help topic |
+| `components/SlipnetGraphView.test.tsx` | 7 | The Slipnet graph says what it could not do |
+| `components/SlipnetView.test.tsx` | 8 | The node-focus Edit button's visibility |
+| `components/SubstrateBadge.test.tsx` | 5 | The header says which processor the arithmetic runs on |
+| `components/TemperatureGauge.test.tsx` | 8 | The gauge reports the engine's temperature clamp |
+| `components/ThemespaceView.test.tsx` | 8 | The Themespace grid is clampable, as MetaCat's theme windows are |
+| `components/WorkspaceView.test.tsx` | 10 | Workspace labels do not print on top of each other |
+| `components/admin/AdminEditors.test.tsx` | 42 | Every Configuration tab edits the collection it shows |
+| `components/admin/AdminHttpFailures.test.tsx` | 11 | The Configuration screen reports what the server refused |
+| `components/review/ReviewPanel.test.tsx` | 34 | The review surfaces read the record back |
 
 ### Running under the free-threaded interpreter
 
@@ -141,13 +582,15 @@ safety, and CPython silently switches the lock back on when it loads such a
 module — so without the override the e2e layer runs with the GIL on and the
 free-threaded build tells you nothing. Importing the *engine* leaves the GIL off
 unaided, because the engine imports nothing beyond the standard library and
-itself; that is the property `tests/unit/test_engine_purity.py` protects, and it
+itself; that is the property `tests/architecture/test_engine_purity.py` protects, and it
 is the reason codelet parallelism gets a genuinely lock-free interpreter while
 only the API process pays.
 
 NumPy and MLX are not installed in `.venv-ft`, so the numeric substrate falls
 back to its pure-Python reference backend there. Tests that need a specific
-backend skip rather than fail when it is unavailable.
+backend skip rather than fail when it is unavailable, and the matrix reports its
+`cpu` role as filled by `python` and its `gpu` role as not installed — one pass,
+on the reference, stated in the summary.
 
 The interpreter costs roughly 9% single-threaded against the standard build,
 with identical codelet counts — so it is the interpreter's overhead, not
@@ -167,7 +610,10 @@ load the machine, so run them deliberately.
 
 ## Unit-test rules
 
-Every file in `tests/unit/` must obey these five rules:
+Every file in `tests/unit/` must obey these five rules. Rules 1, 2, 4 and 5 hold
+for `tests/seed_unit/` as well, which is the same shape of test with one
+allowance: rule 3 lets the shipped seed data stand in for a double, because there
+the real value is what is being asserted about.
 
 1. **Business logic only.** Test algorithms and behaviour — not glue code,
    framework wiring, or API endpoints. A test that only asserts a constant is
@@ -256,14 +702,16 @@ Discovered during the first unit-testing pass. Ordered by priority.
 - [ ] `images.py` — abstract image pattern matching.
 
 ### P4 — Finish the audit cleanup
-- [ ] Replace the vacuous assertions in `test_codelet_behaviours.py` (tests
+- [x] Replace the vacuous assertions in `test_codelet_behaviours.py` (tests
       that only assert "doesn't crash" or `after >= before`) with meaningful
-      checks, or move them to `tests/module/`.
+      checks, or move them to `tests/module/`. **Done** — the file carries no
+      vacuous assertion.
 - [ ] Decide the fate of the pure constant/enum tests (Rule 1 violations):
       delete, or consciously keep as change-detector guards and document why.
-- [ ] The full-engine-driving tests in `test_runner_status.py` and parts of
-      `test_codelet_dsl.py` are integration tests living under `tests/unit/`;
-      relocate them to `tests/module/`.
+- [x] Place every test in the layer whose dependencies it stays inside.
+      **Done** — `tests/seed_unit/` and `tests/architecture/` hold what the
+      other layers' rows do not cover, and the engine-driving tests live in
+      `tests/module/`.
 
 ### P5 — Testability refactors (source changes, pre-approved)
 - [ ] `concept_mappings._descriptor_is_distinguishing` does an inline
