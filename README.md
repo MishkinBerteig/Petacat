@@ -972,6 +972,12 @@ That document is an invitation to a conversation, not a roadmap. If any of
 it resonates — or breaks, or sparks a different direction — please reach
 out.
 
+## Community
+
+**[Join our Discord](https://discord.gg/WwwBF9urx)** — questions about the
+architecture, notes on runs you have made, and anything from
+[FUTURE_DIRECTION.md](FUTURE_DIRECTION.md) you want to argue with.
+
 ## Author
 
 Petacat is written and maintained by **Mishkin Berteig** — software developer
