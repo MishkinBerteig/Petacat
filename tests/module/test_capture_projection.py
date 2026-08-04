@@ -90,13 +90,41 @@ def _run_to(meta: MetadataProvider, codelets: int) -> EngineRunner:
     return runner
 
 
+def _add_a_built_rule(ctx) -> None:
+    """Put a built rule in the capture, the way the rule-builder would.
+
+    The fixture point used to reach one on its own.  It no longer does: a rule
+    now requires either the 1% verbatim draw or rule-describable bridges covering
+    a whole string pair (``rules.ss:399-416``), and "abc -> abd; mrrjjj" builds
+    only two top bridges in thousands of codelets, so no rule type is ever
+    possible.  Whether that bridge shortfall is itself faithful is a separate
+    question about the bridge codelets; what this fixture needs is a rule in the
+    capture, so the rule projection stays inside the equality check rather than
+    beside it.
+    """
+    from server.engine.rules import CLAUSE_VERBATIM, RULE_TOP, Rule, RuleClause
+
+    letters = [
+        ctx.slipnet.nodes[f"plato-{ch}"] for ch in ctx.workspace.modified_string.text
+    ]
+    rule = Rule(RULE_TOP, [RuleClause(clause_type=CLAUSE_VERBATIM, verbatim_letters=letters)])
+    rule.set_verbatim_rule_information()
+    rule.time_stamp = ctx.codelet_count
+    rule.compute_quality(ctx.meta)
+    rule.english_transcription = rule.transcribe_to_english()
+    rule.proposal_level = rule.BUILT
+    ctx.workspace.add_rule(rule)
+
+
 # The two capture fixtures run the engine, so they are function-scoped: the numeric
 # backend of a matrix case is in force for the test, and a capture built once per
 # module would carry one backend's numbers into both cases.
 @pytest.fixture
 def mid_run_capture(meta: MetadataProvider) -> dict:
     """A capture round-tripped through JSON, as a stored one has been."""
-    return json.loads(json.dumps(capture_run_state(_run_to(meta, RESTORABLE_POINT).ctx)))
+    runner = _run_to(meta, RESTORABLE_POINT)
+    _add_a_built_rule(runner.ctx)
+    return json.loads(json.dumps(capture_run_state(runner.ctx)))
 
 
 @pytest.fixture

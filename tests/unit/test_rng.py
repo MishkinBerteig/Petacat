@@ -108,3 +108,40 @@ def test_state_save_restore():
     # Should reproduce the same values
     vals_after_restore = [rng.random() for _ in range(20)]
     assert vals_after_save == vals_after_restore
+
+
+def test_perturb_of_a_perfect_square_draws_an_integer_delta():
+    """``(~ 4)``: ``(sqrt 4)`` is exact, so ``(random 3)`` yields an integer.
+
+    Scheme: ``utilities.ss:426-429``.  The reachable thresholds are therefore
+    exactly ``{2, 3, 4, 5, 6}``.
+    """
+    rng = RNG(7)
+    seen = {rng.perturb(4) for _ in range(400)}
+    assert seen == {2.0, 3.0, 4.0, 5.0, 6.0} or seen == {2, 3, 4, 5, 6}
+    assert all(float(v).is_integer() for v in seen)
+
+
+def test_perturb_of_a_non_square_draws_a_continuous_delta():
+    """``(~ 2)``: ``(round (sqrt 2))`` is the flonum 1.0, so the delta is real.
+
+    ``(random 2.0)`` returns a flonum in ``[0.0, 2.0)``, giving a threshold
+    anywhere in ``(0.0, 4.0)`` rather than one of ``{1, 2, 3}``.
+    """
+    rng = RNG(7)
+    values = [rng.perturb(2) for _ in range(400)]
+    assert not all(float(v).is_integer() for v in values)
+    assert 0.0 < min(values) and max(values) < 4.0
+
+
+def test_the_blur_makes_two_objects_few_about_half_the_time():
+    """The consequence that makes the flonum reading worth reproducing.
+
+    ``rough-num-of-objects`` (``workspace.ss:683-688``) asks ``(< count (~ 2))``.
+    With the continuous delta a count of 2 is ``few`` half the time — it needs
+    only ``delta > 0`` on the upward branch.  Under an integer delta it would
+    need ``delta = 1``, i.e. a quarter of the time.
+    """
+    rng = RNG(11)
+    few = sum(1 for _ in range(4000) if 2 < rng.perturb(2))
+    assert 0.45 < few / 4000 < 0.55

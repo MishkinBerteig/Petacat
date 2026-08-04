@@ -12,6 +12,11 @@ from server.engine.runner import (
 )
 
 
+# ``init_mcat`` runs ``update-workspace-values`` before the first codelet
+# (``run.ss:233``), so merely initialising a run now reaches the numeric seam.
+pytestmark = pytest.mark.numeric_matrix
+
+
 SEED_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
 
 

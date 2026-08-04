@@ -154,7 +154,7 @@ class SlipnetNode:
         "lateral_sliplinks",
         "incoming_links",
         "intrinsic_link_length",
-        "_rate_of_decay",
+        "_decay_percent",
     )
 
     def __init__(self, name: str, short_name: str, conceptual_depth: int) -> None:
@@ -172,14 +172,45 @@ class SlipnetNode:
         self.lateral_sliplinks: list[SlipnetLink] = []
         self.incoming_links: list[SlipnetLink] = []
         self.intrinsic_link_length: int | None = None
-        self._rate_of_decay: float = 0.0
+        self._decay_percent: float = 0.0
         self.descriptor_predicate: Callable[..., bool] | None = None
 
     def compute_rate_of_decay(self, update_cycle_length: int) -> None:
-        """Scheme: slipnet.ss:72-73."""
-        self._rate_of_decay = 1.0 - (self.conceptual_depth / 100.0) ** (
-            update_cycle_length / 15.0
-        )
+        """The per-cycle decay rate, held as a *percentage* rather than a fraction.
+
+        Scheme: ``reset`` (slipnet.ss:72-73) —
+        ``(1- (expt (% conceptual-depth) (/ %update-cycle-length% 15)))``, where
+        ``1-`` is ``(- 1 x)`` (utilities.ss:500) and ``%`` is exact rational
+        division by 100 (utilities.ss:504).  With ``%update-cycle-length%`` 15 the
+        exponent is 1, so the reference's rate is the *exact rational*
+        ``(100 - depth)/100`` — and every quantity derived from it stays exact,
+        because Scheme never leaves the rationals here.
+
+        That exactness is load-bearing: ``decay-activation`` rounds the product
+        half-to-even, and the plateau it produces (see ``decay``) depends on
+        landing on an exact half.  ``1.0 - depth/100.0`` in float64 does not:
+        depth 90 gives 0.09999999999999998, whose product with 15 is
+        1.4999999999999998 and rounds *down* to 1 where the reference rounds up
+        to 2.  Five of the 10,201 (depth, activation) pairs over [0,100]² differ
+        that way in float64 and three in float32.
+
+        Storing ``100 - depth`` instead removes the problem rather than shrinking
+        it: the numerator is an exact small integer in both float64 and float32,
+        so ``percent * activation`` is exact, the division by 100 is correctly
+        rounded, and a quotient that is exactly a half is exactly representable.
+        See ``decay`` for the consumer.
+
+        A non-15 ``update_cycle_length`` makes the reference's own rate
+        irrational, so there is nothing to be exact about; that path keeps the
+        direct float form.
+        """
+        exponent = update_cycle_length / 15.0
+        if exponent == 1.0:
+            self._decay_percent = float(100 - self.conceptual_depth)
+        else:
+            self._decay_percent = 100.0 * (
+                1.0 - (self.conceptual_depth / 100.0) ** exponent
+            )
 
     def fully_active(self, threshold: float = MAX_ACTIVATION) -> bool:
         """Is this concept at *full* activation?
@@ -239,10 +270,40 @@ class SlipnetNode:
         self.activation_buffer += 100.0
 
     def decay(self) -> None:
-        """Reduce activation by rate_of_decay. Frozen nodes don't decay."""
+        """Lose a *whole number* of activation units. Frozen nodes don't decay.
+
+        Scheme: ``decay-activation`` (slipnet.ss:174-177) —
+        ``(round (* rate-of-decay activation))``, decremented into the buffer
+        rather than out of the activation, so the value the spreading pass reads
+        is the pre-decay one.
+
+        The ``round`` is the whole point.  Every quantity that reaches a
+        slipnode's activation in the reference is an integer — the Workspace
+        jolt is ``%workspace-activation%`` = 100 (slipnet.ss:171-172), a spread
+        contribution is rounded (slipnet.ss:183-185), a clamp or a jump writes
+        ``%max-activation%`` = 100 — so activation is integral throughout, and
+        rounding the decay keeps it so.
+
+        Integral decay has a consequence that geometric decay does not: **deep
+        concepts plateau instead of vanishing.**  Scheme's ``round`` is
+        round-half-to-even, as is Python's, so a depth-90 node (rate 1/10) at
+        activation 5 computes ``round(0.5) = 0`` and stops decaying — it holds a
+        low-level presence in the network indefinitely, until something either
+        re-activates it or a spread contribution moves it off the fixed point.
+        Depth 80 (rate 1/5) settles at 2 the same way; a shallow node, whose rate
+        is large enough that no fixed point exists below 1, does decay to zero.
+        Decaying in floats instead loses those plateaus, and with them the
+        difference between a concept the program has finished with and one it has
+        merely set aside.
+
+        The multiply-then-divide order is deliberate — see
+        ``compute_rate_of_decay``.  It makes the product exact and the halfway
+        cases exactly representable, in float32 as well as float64, which is what
+        lets all four numeric backends round identically.
+        """
         if self.frozen:
             return
-        self.activation_buffer -= self._rate_of_decay * self.activation
+        self.activation_buffer -= round(self._decay_percent * self.activation / 100.0)
 
     def spread_activation_to_neighbors(self, update_cycle_length: int) -> None:
         """Spread activation to linked nodes.
@@ -286,18 +347,19 @@ class SlipnetNode:
             return self.descriptor_predicate(obj)
         return _descriptor_read_from_object(self.name, obj)
 
-    def get_possible_descriptors(self, obj: Any) -> list[SlipnetNode]:
-        """Descriptors of this *category* node that apply to *obj*.
-
-        Scheme: ``get-possible-descriptors`` / ``description-possible?``.
-        """
-        return [
-            link.to_node
-            for link in self.instance_links
-            if link.to_node.describes(obj)
-        ]
-
     def description_possible(self, obj: Any) -> bool:
+        """Scheme: ``description-possible?`` (slipnet.ss:200-201).
+
+        Defers to ``get_possible_descriptors`` below — the faithful one.  A
+        second, more permissive definition of that method used to sit here,
+        routing through ``describes`` and so through
+        ``_descriptor_read_from_object``, which answers "what *is* this object's
+        value along this dimension" rather than "may this descriptor be applied".
+        It was dead: Python keeps the last definition in a class body, so every
+        caller — including this one — already reached the faithful version.  It
+        is deleted rather than reconciled, because two answers to one question is
+        the defect whichever one wins.
+        """
         return bool(self.get_possible_descriptors(obj))
 
     def shrunk_link_length(self) -> int | None:
@@ -410,14 +472,21 @@ class SlipnetNode:
         if len(related_nodes) == 1:
             return related_nodes[0]
 
-        # Multiple matches: pick the one in the same category as self
+        # Multiple matches: the one in the same category as self, or none.
+        #
+        # Scheme (slipnet.ss:123-129) ends in ``(select (lambda (node) (eq?
+        # (tell node 'get-category) (tell self 'get-category))) related-nodes)``,
+        # and ``select`` (utilities.ss:570-577) returns ``#f`` when nothing
+        # satisfies the predicate.  Falling back to the first candidate instead
+        # answers a question that was not asked: with several links carrying the
+        # same label, "the related node" is only well defined when one of them
+        # shares this node's category, and an arbitrary pick propagates into a
+        # slippage or a flipped group as though it had been.
         my_cat = self.category
         for node in related_nodes:
             if node.category is my_cat:
                 return node
-
-        # Fallback: return first
-        return related_nodes[0]
+        return None
 
     def possible_descriptor(self, obj: object) -> bool:
         """Check if this node can describe *obj*.

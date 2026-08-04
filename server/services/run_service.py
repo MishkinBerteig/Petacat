@@ -17,7 +17,11 @@ from server.engine.ids import KIND_ANSWER, KIND_SNAG
 from server.engine.memory import AnswerDescription, EpisodicMemory, SnagDescription
 from server.engine.metadata import MetadataProvider
 from server.engine.runner import EngineContext, EngineRunner, STATUS_ANSWER_FOUND, STATUS_HALTED, STATUS_PAUSED, STATUS_RUNNING, StepResult
-from server.engine.serialization import serialize_themespace_state, serialize_workspace_state
+from server.engine.serialization import (
+    describe_structure,
+    serialize_themespace_state,
+    serialize_workspace_state,
+)
 from server.engine.trace import SNAG
 from server.models.run import (
     _utcnow,

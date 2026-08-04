@@ -147,6 +147,14 @@ class LockedCoderack(ShardedCoderack):
     def current_time(self, value: int) -> None:
         self._rack.current_time = value
 
+    @property
+    def current_temperature(self) -> float:
+        return self._rack.current_temperature
+
+    @current_temperature.setter
+    def current_temperature(self, value: float) -> None:
+        self._rack.current_temperature = value
+
     def __getattr__(self, name: str) -> Any:
         # Everything else — clamping, type counts, bins for inspection — delegates.
         return getattr(self._rack, name)
@@ -221,6 +229,14 @@ class _ShardBase(ShardedCoderack):
         self._local = threading.local()
         self._next_worker = 0
         self._worker_lock = threading.Lock()
+        #: The temperature eviction is weighed at, held here rather than per shard.
+        #:
+        #: A shard's own ``Coderack`` remembers the last temperature *it* was drawn
+        #: at, which for a shard that has not been drawn from recently is stale.
+        #: One write per draw and one read per post is cheap — both threads are
+        #: already touching this object for ``_racks`` and ``_locks`` — and it keeps
+        #: every shard evicting at the same temperature the run is actually at.
+        self.current_temperature: float = 100.0
 
     def worker_index(self) -> int:
         """This thread's shard, assigned once.
@@ -249,11 +265,14 @@ class _ShardBase(ShardedCoderack):
                  current_time: int | None, rng: RNG | None) -> None:
         self._acquire(index)
         try:
-            self._racks[index].post(codelet, current_time, rng)
+            self._racks[index].post(
+                codelet, current_time, rng, self.current_temperature
+            )
         finally:
             self._locks[index].release()
 
     def _draw_from(self, index: int, temperature: float, rng: RNG) -> Codelet | None:
+        self.current_temperature = temperature
         self._acquire(index)
         try:
             return self._racks[index].choose_and_remove(temperature, rng)

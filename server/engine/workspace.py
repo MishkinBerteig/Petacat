@@ -11,6 +11,7 @@ from __future__ import annotations
 import math
 from typing import TYPE_CHECKING, Any
 
+from server.engine.formulas import weighted_average
 from server.engine.numeric.backend import select_backend
 from server.engine.numeric.layout import (
     gather_object_values,
@@ -168,29 +169,21 @@ class WorkspaceString:
                 obj.enclosing_group = None
 
     def get_average_intra_string_unhappiness(self) -> float:
+        """Scheme: ``update-average-intra-string-unhappiness``
+        (``workspace-strings.ss:334-338``) — a plain unweighted mean over the
+        string's objects, **rounded**.  The rounding is the reference's, and it is
+        visible: ``choose-string`` (``bonds.ss:221-239``) picks a string with these
+        as weights, so a fractional tail biases the pick by a fraction of a
+        percentage point that the reference never has.
+
+        Distinct from the *workspace*-level average of the same name
+        (:meth:`Workspace.get_average_intra_string_unhappiness`), which is
+        importance-weighted.
+        """
         if not self.objects:
             return 0.0
         total = sum(o.intra_string_unhappiness for o in self.objects)
-        return total / len(self.objects)
-
-    def get_num_unrelated_objects(self) -> int:
-        """Count objects not in any bond or group."""
-        return sum(
-            1
-            for o in self.objects
-            if isinstance(o, Letter)
-            and o.left_bond is None
-            and o.right_bond is None
-            and o.enclosing_group is None
-        )
-
-    def get_num_ungrouped_objects(self) -> int:
-        """Count objects not in any group."""
-        return sum(
-            1
-            for o in self.objects
-            if isinstance(o, Letter) and o.enclosing_group is None
-        )
+        return float(round(total / len(self.objects)))
 
     def bond_present(self, bond: Bond) -> bool:
         """Check if an equivalent bond already exists in this string.
@@ -408,6 +401,14 @@ class Workspace:
             WorkspaceString(answer, slipnet, string_type="answer") if answer else None
         )
 
+        #: ``%justify-mode%`` — whether this run was given four strings.
+        #:
+        #: A plain flag, fixed for the run, not ``answer_string is not None``:
+        #: ``report_answer`` gives a *discovery* run an answer string the moment it
+        #: finds an answer (``builtins.py:1383``), and a workspace that started
+        #: justifying is the question, not one that has an answer string now.
+        self.justify_mode: bool = answer is not None
+
         self.top_bridges: list[Bridge] = []
         self.bottom_bridges: list[Bridge] = []
         self.vertical_bridges: list[Bridge] = []
@@ -421,6 +422,24 @@ class Workspace:
         self.top_mapping_strength: float = 0.0
         self.bottom_mapping_strength: float = 0.0
         self.vertical_mapping_strength: float = 0.0
+
+        #: The three inter-string averages, likewise recomputed once per update
+        #: cycle and read back as state (Scheme: ``workspace.ss:57-60``,
+        #: ``505-511``).  ``get_max_inter_string_unhappiness`` is what sets the
+        #: thematic-scout count, so these are not derived-on-demand: a codelet
+        #: between two cycles sees what the last cycle left behind.
+        self.average_top_inter_string_unhappiness: float = 0.0
+        self.average_bottom_inter_string_unhappiness: float = 0.0
+        self.average_vertical_inter_string_unhappiness: float = 0.0
+
+        #: What ``check_if_rules_possible`` last decided (Scheme:
+        #: ``workspace.ss:67-68``).  Read by the temperature's rule factor, by the
+        #: rule-scout's posting probability and count, and by the rule-scout
+        #: itself — all of which the reference gates on rule *possibility* rather
+        #: than on the mere existence of bonds.
+        self.top_rule_possible: bool = False
+        self.bottom_rule_possible: bool = False
+
         self.clamped_rules: list[Rule] = []
 
         self.slipnet = slipnet
@@ -432,8 +451,17 @@ class Workspace:
         # string (Bridge._find_workspace).  Without it a bridge could not see
         # its supporting or incompatible peers, so external strength was always
         # 0 and mutually contradictory bridges never fought.
+        #
+        # ``justify_mode`` is pushed down at the same time.  ``WorkspaceObject``
+        # asks its *string* whether the run is justifying (four times, at
+        # ``workspace-objects.ss:484-487, 504-512, 548-555, 574-582``), because a
+        # target-string object maps horizontally to the answer string only then.
+        # Setting it here rather than in ``init_mcat`` covers every construction
+        # path — tests, and the state-graph restore, which rebuilds the answer
+        # string directly.
         for ws_string in self.all_strings:
             ws_string.workspace = self
+            ws_string.justify_mode = self.justify_mode
 
     @property
     def all_strings(self) -> list[WorkspaceString]:
@@ -526,10 +554,25 @@ class Workspace:
     def get_average_unhappiness(self) -> float:
         """Workspace-level average unhappiness, weighted by relative importance.
 
-        Scheme: workspace.ss:581-585.
-        When all importances are 0 (early in a run, before descriptions are
-        activated), falls back to an unweighted average so temperature
-        correctly reflects the lack of structure.
+        Scheme: ``workspace.ss:581-585`` — the importance-weighted mean of each
+        object's **average** unhappiness (``workspace-objects.ss:492-517``), which
+        blends intra-string unhappiness with the inter-string (mapping) unhappiness
+        of whichever orientations that object's string participates in.
+
+        Aggregating intra-string unhappiness alone made this collapse as soon as
+        bonds and groups formed, whether or not a single bridge existed.  It is 70%
+        of the temperature (``formulas.ss:76-79``) and the whole of the
+        description-scout posting probability (``coderack.ss:485-487``), so the
+        reference's temperature stays high until the *mappings* come together —
+        inter-string unhappiness is 100 for an unbridged object — while a purely
+        intra-string reading opened the answer-finder gate, sharpened codelet
+        selection and slowed the breakers long before the analogy existed.
+
+        ``weighted-average`` (``utilities.ss:388-392``) returns **0** on zero total
+        weight; it does not fall back to an unweighted mean.  That case is
+        reachable only before the first ``update-workspace-values``, which
+        ``init_mcat`` now runs (ML-1), so it is a faithfulness detail rather than a
+        live path.
 
         **Cached until the next object-value update.**  The runner asks for this from
         two places inside one update cycle — the temperature update, and the posting
@@ -550,21 +593,16 @@ class Workspace:
         backend = select_backend(len(objects))
         if backend is not None:
             value = backend.average_unhappiness(
-                [o.intra_string_unhappiness for o in objects],
+                [o.average_unhappiness for o in objects],
                 [o.relative_importance for o in objects],
             )
         else:
-            total_weight = sum(o.relative_importance for o in objects)
-            if total_weight > 0:
-                weighted_sum = sum(
-                    o.intra_string_unhappiness * o.relative_importance for o in objects
+            value = round(
+                weighted_average(
+                    [o.average_unhappiness for o in objects],
+                    [o.relative_importance for o in objects],
                 )
-                value = round(weighted_sum / total_weight)
-            else:
-                # No importance assigned yet — use unweighted average
-                value = round(
-                    sum(o.intra_string_unhappiness for o in objects) / len(objects)
-                )
+            )
         self._average_unhappiness = value
         return value
 
@@ -630,58 +668,98 @@ class Workspace:
         return round(raw_strength)
 
     def update_average_unhappiness_values(self) -> None:
-        """Recompute the cached mapping strengths.
+        """Recompute the three inter-string averages and the mapping strengths.
 
         Scheme: ``update-average-unhappiness-values`` (``workspace.ss:541-603``), the
         last step of ``update-workspace-values`` (``run.ss:344``).
-        """
-        top_raw = 100.0 - self._average_inter_string_unhappiness(
-            self.initial_string, self.modified_string, "horizontal"
-        )
-        self.top_mapping_strength = self._mapping_strength_from_raw("top", top_raw)
 
-        vertical_raw = 100.0 - self._average_inter_string_unhappiness(
-            self.initial_string, self.target_string, "vertical"
+        The bottom pair is computed **only** when justifying, exactly as the
+        reference's ``(if* %justify-mode% ...)`` guards it: outside justify mode
+        there is no answer string to map the target onto, and the stored value
+        stays at its initial 0.
+        """
+        self.average_top_inter_string_unhappiness = (
+            self._average_inter_string_unhappiness(
+                self.initial_string, self.modified_string, "horizontal"
+            )
+        )
+        self.top_mapping_strength = self._mapping_strength_from_raw(
+            "top", 100.0 - self.average_top_inter_string_unhappiness
+        )
+
+        self.average_vertical_inter_string_unhappiness = (
+            self._average_inter_string_unhappiness(
+                self.initial_string, self.target_string, "vertical"
+            )
         )
         self.vertical_mapping_strength = self._mapping_strength_from_raw(
-            "vertical", vertical_raw
+            "vertical", 100.0 - self.average_vertical_inter_string_unhappiness
         )
 
-        if self.answer_string is not None:
-            bottom_raw = 100.0 - self._average_inter_string_unhappiness(
-                self.target_string, self.answer_string, "horizontal"
+        if self.justify_mode:
+            self.average_bottom_inter_string_unhappiness = (
+                self._average_inter_string_unhappiness(
+                    self.target_string, self.answer_string, "horizontal"
+                )
             )
             self.bottom_mapping_strength = self._mapping_strength_from_raw(
-                "bottom", bottom_raw
+                "bottom", 100.0 - self.average_bottom_inter_string_unhappiness
             )
 
-    def get_num_unmapped_objects(self, bridge_type: str = "vertical") -> int:
-        """Count objects that don't have a bridge of the given type.
+    def get_average_inter_string_unhappiness(self, bridge_type_name: str) -> float:
+        """Scheme: ``workspace.ss:505-510`` — a plain accessor over what
+        :meth:`update_average_unhappiness_values` last stored."""
+        return {
+            "top": self.average_top_inter_string_unhappiness,
+            "bottom": self.average_bottom_inter_string_unhappiness,
+            "vertical": self.average_vertical_inter_string_unhappiness,
+        }.get(bridge_type_name, 0.0)
 
-        Scheme: workspace.ss:629-630, 708-716 (unmapped?).
-        Only counts objects in the strings relevant to the bridge type.
+    def get_max_inter_string_unhappiness(self) -> float:
+        """The worst of the mappings' unhappiness.
+
+        Scheme: ``workspace.ss:511-517`` — top and vertical, plus bottom when
+        justifying.  This is the **mapping-deficit** signal, and it sets how many
+        thematic bridge scouts enter the rack each cycle
+        (``coderack.ss:547-549``).  It can legitimately be 0, which is the point:
+        with the mappings settled the reference posts no thematic scouts at all.
         """
-        string1, string2 = self._get_bridge_type_strings(bridge_type)
-        count = 0
-        strings = [string1]
-        if string2 is not None:
-            strings.append(string2)
-        for s in strings:
-            for obj in s.objects:
-                if bridge_type == "vertical":
-                    if obj.vertical_bridge is None:
-                        count += 1
-                else:
-                    if obj.horizontal_bridge is None:
-                        count += 1
-        return count
+        values = [
+            self.average_top_inter_string_unhappiness,
+            self.average_vertical_inter_string_unhappiness,
+        ]
+        if self.justify_mode:
+            values.append(self.average_bottom_inter_string_unhappiness)
+        return max(values)
+
+    def get_min_mapping_strength(self) -> float:
+        """Scheme: ``workspace.ss:522-528`` — the weakest mapping, over top and
+        vertical, plus bottom when justifying.  Drives the bridge-scout posting
+        probability, ``(100 - min)/100``."""
+        values = [self.top_mapping_strength, self.vertical_mapping_strength]
+        if self.justify_mode:
+            values.append(self.bottom_mapping_strength)
+        return min(values)
 
     def get_average_intra_string_unhappiness(self) -> float:
-        """Average intra-string unhappiness across all strings."""
-        strings = self.all_strings
-        if not strings:
+        """Workspace-level average intra-string unhappiness.
+
+        Scheme: ``workspace.ss:557-561`` — one importance-weighted mean over
+        *every* object in the workspace, rounded.  Not the mean of the per-string
+        means: those are unweighted and equally sized regardless of how many
+        objects each string holds, which flattens a long unbonded string against a
+        short settled one.  This is the whole of the bond- and group-scout posting
+        probability (``coderack.ss:474-480``).
+        """
+        objects = self.all_objects
+        if not objects:
             return 100.0
-        return sum(s.get_average_intra_string_unhappiness() for s in strings) / len(strings)
+        return round(
+            weighted_average(
+                [o.intra_string_unhappiness for o in objects],
+                [o.relative_importance for o in objects],
+            )
+        )
 
     def has_supported_rule(self) -> bool:
         return len(self.get_supported_rules(True)) > 0
@@ -1008,12 +1086,18 @@ class Workspace:
         return self.clamped_rules
 
     def check_if_rules_possible(self) -> dict[str, bool]:
-        """Determine which rule types can currently be formed.
+        """Determine which rule types can currently be formed, and store it.
 
-        Scheme: workspace.ss:454-472.
+        Scheme: ``check-if-rules-possible`` (``workspace.ss:454-472``), the first
+        step of ``update-everything`` (``run.ss:305``).
         A rule is possible for a bridge type if all letters in both
-        strings are covered by rule-describable bridges. Returns a
-        dict with 'top' and 'bottom' keys.
+        strings are covered by rule-describable bridges.
+
+        The reference *keeps* the answer in ``top-rule-possible?`` /
+        ``bottom-rule-possible?`` and three separate consumers read it back —
+        the temperature's rule factor, the rule-scout's posting probability and
+        count, and the rule-scout itself.  The dict is still returned for callers
+        that want the result directly.
         """
         result = {"top": False, "bottom": False}
 
@@ -1031,8 +1115,8 @@ class Workspace:
             )
             result["top"] = all_top_letters.issubset(covered)
 
-        # Bottom rule: only possible in justify mode (answer_string exists)
-        if self.answer_string is not None:
+        # Bottom rule: only checked when justifying (``workspace.ss:463-471``).
+        if self.justify_mode and self.answer_string is not None:
             bottom_describable = [
                 b for b in self.bottom_bridges if self._rule_describable_bridge(b)
             ]
@@ -1048,7 +1132,40 @@ class Workspace:
                 )
                 result["bottom"] = all_bottom_letters.issubset(covered_b)
 
+        self.top_rule_possible = result["top"]
+        self.bottom_rule_possible = result["bottom"]
         return result
+
+    def get_possible_rule_types(self) -> list[str]:
+        """Scheme: ``workspace.ss:444-449``."""
+        types: list[str] = []
+        if self.top_rule_possible:
+            types.append("top")
+        if self.bottom_rule_possible:
+            types.append("bottom")
+        return types
+
+    def rule_possible(self, rule_type: str) -> bool:
+        """Scheme: ``workspace.ss:450-453``."""
+        return (
+            self.top_rule_possible if rule_type == "top" else self.bottom_rule_possible
+        )
+
+    def rule_established(self) -> bool:
+        """Whether the temperature's rule factor should be 0.
+
+        Scheme: ``update-temperature`` (``formulas.ss:65-75``) — the factor drops
+        to 0 only when the rule is *both* possible and supported, and in justify
+        mode only when that holds for both pairs.  Petacat asked for a supported
+        rule alone, which a vacuously-supported verbatim rule satisfies from the
+        first cycle it is built, dropping 30 points of temperature on evidence the
+        reference does not accept.
+        """
+        top = self.top_rule_possible and bool(self.get_supported_rules(True))
+        if not self.justify_mode:
+            return top
+        bottom = self.bottom_rule_possible and bool(self.get_supported_rules(False))
+        return top and bottom
 
     # ------------------------------------------------------------------
     # Workspace activity
@@ -1088,74 +1205,26 @@ class Workspace:
         return sum(youngest_ages) / len(youngest_ages)
 
     # ------------------------------------------------------------------
-    # Object counts (per string)
+    # Rough object counts — the scout-count aggregates
     # ------------------------------------------------------------------
 
-    def get_num_unrelated_objects(self, string: WorkspaceString) -> int:
-        """Count objects without bonds in the given string.
+    def get_rough_num_of_unrelated_objects(self, rng: RNG) -> str:
+        """Scheme: ``workspace.ss:683-684``."""
+        return rough_num_of_objects(
+            sum(1 for o in self.all_objects if unrelated(o)), rng
+        )
 
-        Scheme: workspace.ss:625-626, 692-698 (unrelated?).
-        An object is unrelated if it is not in a group AND has insufficient
-        incident bonds (0 for edge objects, < 2 for middle objects).
-        """
-        count = 0
-        for obj in string.objects:
-            if obj.enclosing_group is not None:
-                continue
-            # Check if object spans whole string (skip if so)
-            from server.engine.groups import Group as GroupClass
-            if isinstance(obj, GroupClass) and obj.spans_whole_string():
-                continue
-            num_bonds = 0
-            if obj.left_bond is not None:
-                num_bonds += 1
-            if obj.right_bond is not None:
-                num_bonds += 1
-            is_edge = (
-                obj.left_string_pos == 0
-                or obj.right_string_pos == string.length - 1
-            )
-            if is_edge:
-                if num_bonds == 0:
-                    count += 1
-            else:
-                if num_bonds < 2:
-                    count += 1
-        return count
+    def get_rough_num_of_ungrouped_objects(self, rng: RNG) -> str:
+        """Scheme: ``workspace.ss:685-686``."""
+        return rough_num_of_objects(
+            sum(1 for o in self.all_objects if ungrouped(o)), rng
+        )
 
-    def get_num_ungrouped_objects(self, string: WorkspaceString) -> int:
-        """Count objects not in any group in the given string.
-
-        Scheme: workspace.ss:627-628, 700-704 (ungrouped?).
-        An object is ungrouped if it doesn't span the whole string
-        and has no enclosing group.
-        """
-        from server.engine.groups import Group as GroupClass
-        count = 0
-        for obj in string.objects:
-            if isinstance(obj, GroupClass) and obj.spans_whole_string():
-                continue
-            if obj.enclosing_group is None:
-                count += 1
-        return count
-
-    def get_num_unmapped_objects_in_string(
-        self, string: WorkspaceString, bridge_type: str
-    ) -> int:
-        """Count objects without bridges of the given type in a specific string.
-
-        Scheme: workspace.ss:629-630, 708-716 (unmapped?).
-        """
-        count = 0
-        orientation = "horizontal" if bridge_type in ("top", "bottom") else "vertical"
-        for obj in string.objects:
-            if orientation == "vertical":
-                if obj.vertical_bridge is None:
-                    count += 1
-            else:
-                if obj.horizontal_bridge is None:
-                    count += 1
-        return count
+    def get_rough_num_of_unmapped_objects(self, rng: RNG) -> str:
+        """Scheme: ``workspace.ss:687-688``."""
+        return rough_num_of_objects(
+            sum(1 for o in self.all_objects if unmapped(o, self.justify_mode)), rng
+        )
 
     # ------------------------------------------------------------------
     # String partner lookups
@@ -1363,3 +1432,81 @@ class Workspace:
             f"Workspace('{self.initial_string.text}' -> '{self.modified_string.text}'; "
             f"'{self.target_string.text}' -> {ans})"
         )
+
+
+# ======================================================================
+#  Scout-count aggregates  (Scheme: workspace.ss:683-716, utilities.ss:426-429)
+#
+#  Free functions, as in the reference, and over the *whole* workspace rather
+#  than per string: ``get-rough-num-of-*`` counts over ``(tell self 'get-objects)``,
+#  which is every object of every string — letters and groups alike.
+# ======================================================================
+
+
+def rough_num_of_objects(num_of_objects: int, rng: RNG) -> str:
+    """``few`` / ``some`` / ``many`` from an *absolute* count.
+
+    Scheme: ``rough-num-of-objects`` (``workspace.ss:678-683``)::
+
+        ((< num-of-objects (~ 2)) 'few)
+        ((< num-of-objects (~ 4)) 'some)
+        (else 'many)
+
+    The thresholds are 2 and 4, each blurred afresh by ``~``, so the boundary
+    between "a couple" and "a lot" is not a hard line the workspace can sit
+    exactly on cycle after cycle.  Petacat previously compared a *ratio* of
+    unrelated objects to total objects against fixed 0.2 / 0.5 cutoffs, which is
+    a different statistic (it shrinks as strings get longer, where the reference's
+    grows) and a noiseless one.
+
+    Note the reference draws ``(~ 2)`` first and only draws ``(~ 4)`` if the
+    first test fails, so a large count costs two draws and a small one costs one.
+    """
+    if num_of_objects < rng.perturb(2):
+        return "few"
+    if num_of_objects < rng.perturb(4):
+        return "some"
+    return "many"
+
+
+def ungrouped(obj: Any) -> bool:
+    """Scheme: ``ungrouped?`` (``workspace.ss:700-704``).
+
+    A whole-string object is never ungrouped — there is nothing left to group it
+    into — and neither is one already inside a group.
+    """
+    return not obj.spans_whole_string() and obj.enclosing_group is None
+
+
+def unrelated(obj: Any) -> bool:
+    """Scheme: ``unrelated?`` (``workspace.ss:692-698``).
+
+    Ungrouped *and* under-bonded, where "under-bonded" depends on position: an
+    edge object has only one side to bond on, so it is unrelated only with no
+    bonds at all, while an interior object wants two.  Counting "no bonds at all"
+    regardless of position (the previous reading) left every half-bonded interior
+    letter out of the tally that decides how many bond scouts to post.
+    """
+    if not ungrouped(obj):
+        return False
+    num_bonds = len(obj.get_incident_bonds())
+    if obj.leftmost_in_string() or obj.rightmost_in_string():
+        return num_bonds == 0
+    return num_bonds < 2
+
+
+def unmapped(obj: Any, justify_mode: bool = False) -> bool:
+    """Scheme: ``unmapped?`` (``workspace.ss:708-716``).
+
+    What counts as mapped depends on the object's *string role*, because the four
+    strings sit at different corners of the analogy: an initial-string object
+    needs both a horizontal and a vertical bridge, a target-string object needs a
+    vertical one — and, when justifying, a horizontal one too.
+    """
+    string_type = getattr(obj.string, "string_type", "initial")
+    if string_type == "initial":
+        return not obj.mapped("both")
+    if string_type == "target":
+        return not obj.mapped("both" if justify_mode else "vertical")
+    # modified and answer strings map horizontally only.
+    return not obj.mapped("horizontal")

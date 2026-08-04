@@ -265,9 +265,15 @@ class Backend(ABC):
 
     @abstractmethod
     def average_unhappiness(
-        self, intra: Sequence[float], relative_importance: Sequence[float]
+        self, values: Sequence[float], relative_importance: Sequence[float]
     ) -> int:
-        """Importance-weighted mean intra-string unhappiness (workspace.ss:581-585)."""
+        """Importance-weighted mean over the workspace's objects (workspace.ss:581-585).
+
+        *values* are the objects' **average** unhappiness — the per-object blend of
+        intra-string and inter-string unhappiness — not the intra-string term
+        alone.  Zero total weight gives 0, per ``weighted-average``
+        (``utilities.ss:388-392``).
+        """
 
     @abstractmethod
     def temperature(

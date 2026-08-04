@@ -59,7 +59,7 @@ class NumpySlipnetSession(SlipnetSession):
 
     __slots__ = (
         "topology", "n", "activation", "buffer", "frozen", "clamp_remaining",
-        "decay_rate", "src", "dst", "weight", "_scaled_weight", "_scaled_for",
+        "decay_percent", "src", "dst", "weight", "_scaled_weight", "_scaled_for",
     )
 
     def __init__(self, topology: SlipnetTopology) -> None:
@@ -70,7 +70,7 @@ class NumpySlipnetSession(SlipnetSession):
         self.buffer = np.zeros(n, dtype=np.float64)
         self.frozen = np.zeros(n, dtype=bool)
         self.clamp_remaining = np.zeros(n, dtype=np.int32)
-        self.decay_rate = np.asarray(topology.decay_rate, dtype=np.float64)
+        self.decay_percent = np.asarray(topology.decay_percent, dtype=np.float64)
         # int32 rather than the platform default: at 10⁵ nodes and 3.4 links per
         # node the index arrays are the largest thing in the layout, and halving
         # them halves the memory traffic of the gather, which is what this kernel
@@ -105,10 +105,13 @@ class NumpySlipnetSession(SlipnetSession):
         act = self.activation
         buf = self.buffer
 
-        # Decay.  Subtracting a ``where``-masked term rather than indexing keeps
-        # this one pass over contiguous memory; subtracting exact zero from the
-        # frozen entries is bit-identical to skipping them.
-        buf -= np.where(self.frozen, 0.0, self.decay_rate * act)
+        # Decay (slipnet.ss:174-177).  Subtracting a ``where``-masked term rather
+        # than indexing keeps this one pass over contiguous memory; subtracting
+        # exact zero from the frozen entries is bit-identical to skipping them.
+        # ``np.rint`` is round-half-to-even, as Python's ``round`` is, and the
+        # multiply-before-divide keeps the halfway cases exact — see
+        # ``SlipnetNode.decay``.
+        buf -= np.where(self.frozen, 0.0, np.rint(self.decay_percent * act / 100.0))
 
         if self.src.size:
             a = act[self.src]
@@ -344,17 +347,18 @@ class NumpyBackend(Backend):
         return _as_ints(np.rint(np.where(weight == 0.0, intrinsic, thematic)))
 
     def average_unhappiness(
-        self, intra: Sequence[float], relative_importance: Sequence[float]
+        self, values: Sequence[float], relative_importance: Sequence[float]
     ) -> int:
-        n = len(intra)
+        n = len(values)
         if n == 0:
             return 100
-        a = np.asarray(intra, dtype=np.float64)
+        a = np.asarray(values, dtype=np.float64)
         w = np.asarray(relative_importance, dtype=np.float64)
         total = float(w.sum())
-        if total > 0:
-            return int(np.rint(float((a * w).sum()) / total))
-        return int(np.rint(float(a.sum()) / n))
+        # ``weighted-average`` (``utilities.ss:388-392``) is 0 on zero total weight.
+        if total == 0.0:
+            return 0
+        return int(np.rint(float((a * w).sum()) / total))
 
     def temperature(
         self,

@@ -13,6 +13,11 @@ from server.engine.metadata import MetadataProvider
 from server.engine.runner import EngineRunner
 
 
+# ``init_mcat`` runs ``update-workspace-values`` before the first codelet
+# (``run.ss:233``), so every test here reaches the numeric seam.
+pytestmark = pytest.mark.numeric_matrix
+
+
 SEED_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
 
 

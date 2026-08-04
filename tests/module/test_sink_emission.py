@@ -172,8 +172,13 @@ def test_descriptions_built_by_codelets_are_reported(meta):
     construction. A description a description-scout proposes and a builder builds is
     an ordinary state-changing action and must appear in the record like any other.
     """
+    # A longer budget than the other tests here: this seed's first description
+    # builder now lands after codelet 800.  The temperature no longer collapses
+    # as soon as the strings are bonded (it carries the mapping deficit, per
+    # ``workspace.ss:581-585``), so the run explores for longer before any
+    # proposal survives its evaluator.
     sink = RecordingSink()
-    _run(meta, sink)
+    _run(meta, sink, steps=1500)
     described = [
         e for e in sink.events
         if e[0] == "structure" and e[2] == "Description"

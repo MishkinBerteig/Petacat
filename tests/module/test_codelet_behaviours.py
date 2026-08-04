@@ -16,7 +16,7 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from server.engine.bonds import Bond
-from server.engine.bridges import Bridge, BRIDGE_TOP
+from server.engine.bridges import Bridge, BRIDGE_TOP, make_concept_mappings
 from server.engine.codelet_dsl.builtins import (
     build_structure,
     break_structure,
@@ -42,6 +42,12 @@ from server.engine.themes import Themespace
 from server.engine.trace import BOND_BROKEN, BOND_BUILT, TemporalTrace
 from server.engine.workspace import Workspace
 from server.engine.workspace_objects import Letter
+
+
+# ``init_mcat`` runs ``update-workspace-values`` before the first codelet
+# (``run.ss:233``), so every fixture here reaches the numeric seam and the whole
+# module belongs in the backend matrix.
+pytestmark = pytest.mark.numeric_matrix
 
 
 SEED_DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
@@ -490,32 +496,93 @@ class TestTopDownDescriptionScout:
 # ═══════════════════════════════════════════════════════════════════════
 
 class TestRuleScout:
-    def test_falls_back_to_verbatim_without_bridges(self, ctx_abc_abd_xyz, meta):
-        """No bridges → the only available description is a verbatim rule.
+    """Scheme: ``rule-scout`` (rules.ss:397-442).
 
-        §3.3.3: "if no such relationships exist to begin with, then the only way
-        to describe the situation is with a verbatim rule."
-        """
-        ctx = ctx_abc_abd_xyz
+    Two branches, in this order: a 1% verbatim draw taken whatever the workspace
+    looks like, then — only if a rule type is actually *possible* — the
+    abstraction pipeline.  Petacat used to read the first branch as a fallback
+    for having no bridges, which made it certain for the whole early run, and had
+    no possibility gate at all.
+    """
+
+    @staticmethod
+    def _run_scout(ctx, meta, verbatim_probability):
+        ctx.meta = meta.with_overrides(
+            {"verbatim_rule_probability": verbatim_probability}
+        )
         interp = CodeletInterpreter(builtins=_get_test_builtins())
-        registry = CodeletRegistry.from_metadata(meta, interp)
-        compiled = registry.get_compiled("rule-scout")
-
-        coderack_before = sum(b.count for b in ctx.coderack.bins)
-        interp.execute(compiled, ctx)
-        coderack_after = sum(b.count for b in ctx.coderack.bins)
-        assert coderack_after == coderack_before + 1
-
-        evaluators = [
+        registry = CodeletRegistry.from_metadata(ctx.meta, interp)
+        interp.execute(registry.get_compiled("rule-scout"), ctx)
+        return [
             c
             for b in ctx.coderack.bins
             for c in b.codelets
             if c.codelet_type == "rule-evaluator"
         ]
+
+    @staticmethod
+    def _bridge_the_top_pair(ctx):
+        """Three letter→letter top bridges, which makes a top rule possible."""
+        ws = ctx.workspace
+        for init, mod in zip(ws.initial_string.letters, ws.modified_string.letters):
+            bridge = Bridge(
+                init, mod, BRIDGE_TOP, make_concept_mappings(init, mod, BRIDGE_TOP)
+            )
+            bridge.proposal_level = bridge.BUILT
+            ws.add_bridge(bridge)
+        ws.check_if_rules_possible()
+
+    def test_the_verbatim_probability_is_one_percent(self, meta):
+        """``%verbatim-rule-probability%`` (rules.ss:395)."""
+        assert meta.get_param("verbatim_rule_probability") == 0.01
+
+    def test_the_verbatim_branch_does_not_depend_on_the_bridge_state(
+        self, ctx_abc_abd_xyz, meta
+    ):
+        """Drawn first and unconditionally: with the draw forced, a verbatim rule
+        appears even though no bridges exist and no rule type is possible."""
+        evaluators = self._run_scout(ctx_abc_abd_xyz, meta, 1.0)
         assert len(evaluators) == 1
         rule = evaluators[0].arguments["structure"]
         assert rule.is_verbatim_rule
-        assert [n.short_name for n in rule.get_verbatim_letter_categories()] == list("abd")
+        assert [n.short_name for n in rule.get_verbatim_letter_categories()] == list(
+            "abd"
+        )
+
+    def test_the_verbatim_branch_still_wins_when_a_rule_is_possible(
+        self, ctx_abc_abd_xyz, meta
+    ):
+        """It is drawn *before* the possibility gate, not instead of it."""
+        self._bridge_the_top_pair(ctx_abc_abd_xyz)
+        evaluators = self._run_scout(ctx_abc_abd_xyz, meta, 1.0)
+        assert len(evaluators) == 1
+        assert evaluators[0].arguments["structure"].is_verbatim_rule
+
+    def test_fizzles_when_no_rule_type_is_possible(self, ctx_abc_abd_xyz, meta):
+        """rules.ss:413-416.  With the verbatim draw declined and no bridges, the
+        scout proposes nothing at all — where Petacat proposed a verbatim rule
+        with certainty, and a verbatim top rule is vacuously supported, so it
+        opened the answer-finder gate from the first cycle of every run."""
+        ctx = ctx_abc_abd_xyz
+        assert ctx.workspace.get_possible_rule_types() == []
+        before = sum(b.count for b in ctx.coderack.bins)
+        assert self._run_scout(ctx, meta, 0.0) == []
+        assert sum(b.count for b in ctx.coderack.bins) == before
+
+    def test_abstracts_a_rule_once_the_pair_is_fully_bridged(
+        self, ctx_abc_abd_xyz, meta
+    ):
+        """With every letter of both strings covered by rule-describable bridges,
+        the gate opens and the abstraction pipeline runs."""
+        ctx = ctx_abc_abd_xyz
+        self._bridge_the_top_pair(ctx)
+        assert ctx.workspace.get_possible_rule_types() == ["top"]
+
+        evaluators = self._run_scout(ctx, meta, 0.0)
+        assert len(evaluators) == 1
+        rule = evaluators[0].arguments["structure"]
+        assert not rule.is_verbatim_rule
+        assert rule.rule_type == RULE_TOP
 
 
 class TestRuleBuilder:

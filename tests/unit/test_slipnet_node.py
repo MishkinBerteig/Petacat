@@ -111,6 +111,113 @@ def test_a_partially_active_node_jumps_at_the_cube_of_its_activation():
     assert rng.call_count == trials, "every partially-active node consumes one draw"
 
 
+# --- decay is integer arithmetic, and deep concepts plateau ----------------
+#
+# ``decay-activation`` (slipnet.ss:174-177) is
+# ``(round (* rate-of-decay activation))`` over exact rationals, so the amount
+# lost is a whole number and a deep node reaches a fixed point instead of
+# tending to zero.  Decaying in floats loses that: the plateaus are what keeps a
+# concept the program has used quietly present in the network afterwards.
+
+
+def _decayed(depth: int, start: float, cycles: int) -> float:
+    """*start*, decayed *cycles* times by a node of conceptual depth *depth*."""
+    node = SlipnetNode("n", "n", depth)
+    node.compute_rate_of_decay(15)
+    node.activation = start
+    for _ in range(cycles):
+        node.decay()
+        node.activation = max(0.0, min(100.0, node.activation + node.activation_buffer))
+        node.activation_buffer = 0.0
+    return node.activation
+
+
+def test_a_depth_90_node_plateaus_at_5_instead_of_decaying_away():
+    """Rate 1/10, so at 5 the amount is ``round(0.5)`` — 0 under round-half-even.
+
+    Both Scheme's ``round`` and Python's break the tie to even, and 0 is even, so
+    the node stops losing activation entirely.  It is *not* a slow approach to
+    zero: run it a thousand more cycles and it is still 5.
+    """
+    assert _decayed(90, 100.0, cycles=200) == 5.0
+    assert _decayed(90, 100.0, cycles=1200) == 5.0
+    assert _decayed(90, 5.0, cycles=1) == 5.0
+
+
+def test_a_depth_80_node_sticks_at_2():
+    """Rate 1/5: ``round(0.4) = 0`` at 2, while 3 still loses 1 (``round(0.6)``)."""
+    assert _decayed(80, 100.0, cycles=200) == 2.0
+    assert _decayed(80, 3.0, cycles=1) == 2.0
+    assert _decayed(80, 2.0, cycles=1) == 2.0
+
+
+def test_a_shallow_node_has_no_plateau_and_reaches_zero():
+    """At depth 10 the rate is 9/10; no activation below 1 survives rounding."""
+    assert _decayed(10, 100.0, cycles=20) == 0.0
+
+
+def test_the_plateau_is_the_largest_fixed_point_of_the_rounded_rate():
+    """One table, stating the whole shape of it for the nine depths in the seed data.
+
+    Read it as: a node this deep, left alone, ends here.  The value is the
+    largest ``a`` with ``round((100 - depth)/100 · a) == 0``.
+    """
+    assert {d: _decayed(d, 100.0, cycles=400) for d in range(10, 100, 10)} == {
+        10: 0.0, 20: 0.0, 30: 0.0, 40: 0.0,
+        50: 1.0, 60: 1.0, 70: 1.0, 80: 2.0, 90: 5.0,
+    }
+
+
+def test_decay_leaves_the_activation_an_integer():
+    """The amount is rounded, so an integral activation stays integral.
+
+    Every other write to a slipnode's activation in the reference is an integer
+    too — the Workspace jolt is 100 (slipnet.ss:171-172), a spread contribution
+    is rounded (slipnet.ss:183-185), a clamp and a jump write 100 — so this is
+    what keeps the whole network on the integers, and the plateaus reachable.
+    """
+    for depth in range(10, 100, 10):
+        node = SlipnetNode("n", "n", depth)
+        node.compute_rate_of_decay(15)
+        node.activation = 97.0
+        for _ in range(40):
+            node.decay()
+            assert node.activation_buffer == int(node.activation_buffer)
+            node.activation += node.activation_buffer
+            node.activation_buffer = 0.0
+            assert node.activation == int(node.activation), (
+                f"depth {depth} left activation at {node.activation!r}"
+            )
+
+
+def test_a_frozen_node_does_not_decay():
+    """slipnet.ss:174-177 decrements through the buffer, which a frozen node refuses."""
+    node = SlipnetNode("n", "n", 10)
+    node.compute_rate_of_decay(15)
+    node.activation = 100.0
+    node.frozen = True
+    node.decay()
+    assert node.activation_buffer == 0.0
+
+
+def test_the_decay_rate_is_exact_at_the_shipped_update_cycle_length():
+    """``100 - depth``, not ``100 * (1 - depth/100)``.
+
+    The distinction is the whole fix: ``1 - 90/100`` is 0.09999999999999998 in
+    float64, whose product with an activation of 15 is 1.4999999999999998 and
+    rounds *down* where the reference rounds up.  Holding the percentage as a
+    small exact integer makes the product exact and the halfway cases exactly
+    representable — in float32 as well, which is what lets the Metal backend
+    round identically.
+    """
+    node = SlipnetNode("n", "n", 90)
+    node.compute_rate_of_decay(15)
+    assert node._decay_percent == 10.0
+    node.activation = 15.0
+    node.decay()
+    assert node.activation_buffer == -2.0  # round(1.5) == 2, not 1
+
+
 def _labeled_lateral_link():
     """A lateral link whose label is fully active (so dynamic length shrinks)."""
     label = SlipnetNode("label", "label", 50)

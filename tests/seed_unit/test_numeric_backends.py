@@ -167,6 +167,177 @@ def test_float32_backend_matches_the_reference_within_tolerance(
     )
 
 
+# --- decay is rounded, on every backend, with no tolerance ------------------
+#
+# ``decay-activation`` (slipnet.ss:174-177) is ``(round (* rate-of-decay
+# activation))`` over exact rationals.  A whole number is subtracted, so a
+# Slipnet that starts on the integers stays there and deep nodes reach a fixed
+# point — depth 90 at 5, depth 80 at 2 — instead of tending to zero.
+#
+# These are the only Slipnet tests here that hold *every* backend, float32
+# included, to exact equality.  They can, because the quantities involved are
+# integers: the percentage is ``100 - depth``, the product with an activation is
+# at most 10,000, and a quotient that is exactly a half is exactly representable
+# in both precisions.  Getting that wrong would not show up as drift — it would
+# show up as a whole unit, on one node, on one cycle, which is why a tolerance
+# would be the wrong instrument here.
+
+
+def _integral_state(topology: SlipnetTopology, seed: int = 17) -> SlipnetState:
+    """Every activation a whole number, as the engine's own always are."""
+    import random
+
+    rng = random.Random(seed)
+    n = topology.n_nodes
+    return SlipnetState(
+        activation=[float(rng.randrange(0, 101)) for _ in range(n)],
+        buffer=[0.0] * n,
+        frozen=[False] * n,
+        clamp_remaining=[0] * n,
+    )
+
+
+def _exact_decay_only(topology: SlipnetTopology, state: SlipnetState, cycles: int):
+    """The reference's arithmetic, in exact rationals rather than in floats.
+
+    Decay only: the caller drives the backends at the default spreading
+    threshold with no node at full activation, so nothing spreads and this is the
+    whole of the update.  Comparing against ``Fraction`` rather than against the
+    pure-Python backend is deliberate — it is the Scheme's semantics being
+    asserted, not one implementation's agreement with another.
+    """
+    from fractions import Fraction
+
+    out = []
+    for start, depth in zip(state.activation, topology.conceptual_depth):
+        a = int(start)
+        for _ in range(cycles):
+            a -= round(Fraction(100 - int(depth), 100) * a)
+        out.append(float(a))
+    return out
+
+
+@pytest.mark.parametrize("backend_name", ALL_ALTERNATIVES + ["python"])
+def test_every_backend_rounds_decay_the_way_the_reference_does(
+    backend_name: str, real_slipnet: Slipnet
+) -> None:
+    """Exact rational arithmetic, matched unit for unit on all four backends."""
+    topology = SlipnetTopology.from_slipnet(real_slipnet)
+    state = _integral_state(topology)
+    expected = _exact_decay_only(topology, state, cycles=30)
+
+    session = get_backend(backend_name).open_slipnet(topology)
+    session.load(state)
+    for _ in range(30):
+        session.update(100.0, 1.0)
+    observed = session.store().activation
+
+    assert observed == expected
+
+
+@pytest.mark.parametrize("backend_name", ALL_ALTERNATIVES + ["python"])
+def test_every_backend_reaches_the_same_decay_plateaus(
+    backend_name: str, real_slipnet: Slipnet
+) -> None:
+    """The fixed points themselves, keyed by conceptual depth.
+
+    Stated as a table rather than as agreement with a reference run, because the
+    plateau is the observable the fix exists for: a depth-90 concept the program
+    has finished with stays at 5 rather than vanishing, and every backend has to
+    agree about that or a run means something different on the GPU.
+    """
+    topology = SlipnetTopology.from_slipnet(real_slipnet)
+    n = topology.n_nodes
+    state = SlipnetState(
+        activation=[100.0] * n,
+        buffer=[0.0] * n,
+        frozen=[False] * n,
+        clamp_remaining=[0] * n,
+    )
+
+    session = get_backend(backend_name).open_slipnet(topology)
+    session.load(state)
+    for _ in range(400):
+        session.update(100.0, 1.0)
+        # Nothing may re-enter: without this the nodes still at 100 would spread
+        # and the fixed points would never be visible.
+        session.load(
+            SlipnetState(
+                activation=session.store().activation,
+                buffer=[0.0] * n,
+                frozen=[False] * n,
+                clamp_remaining=[0] * n,
+            )
+        )
+    final = session.store().activation
+
+    plateau_by_depth = {
+        int(d): a for d, a in zip(topology.conceptual_depth, final)
+    }
+    assert plateau_by_depth == {
+        10: 0.0, 20: 0.0, 30: 0.0, 40: 0.0,
+        50: 1.0, 60: 1.0, 70: 1.0, 80: 2.0, 90: 5.0,
+    }
+
+
+def _drive_integral(backend_name: str, topology, threshold: float, cycles: int):
+    session = get_backend(backend_name).open_slipnet(topology)
+    session.load(_integral_state(topology, seed=topology.n_nodes + 3))
+    for _ in range(cycles):
+        session.update(threshold, 1.0)
+    return session.store().activation
+
+
+@pytest.mark.parametrize("backend_name", ALL_ALTERNATIVES + ["python"])
+@pytest.mark.parametrize("n_nodes", [1, 200, 5000])
+def test_an_integral_slipnet_stays_integral_on_synthetic_sizes(
+    backend_name: str, n_nodes: int
+) -> None:
+    """At sizes the real Slipnet cannot reach, and with spreading switched on.
+
+    The threshold is 0 here, so every active node spreads and the buffer carries
+    contributions as well as the decay term.  Every one of those is a rounded
+    integer, so the activation must still be a whole number afterwards — on the
+    float32 backend too, where the sums stay far inside the 2²⁴ it represents
+    exactly.  A fractional activation anywhere means something on the path
+    stopped rounding.
+    """
+    observed = _drive_integral(backend_name, synthetic_topology(n_nodes, seed=n_nodes), 0.0, 5)
+    assert all(a == int(a) for a in observed), (
+        f"{backend_name} left a fractional activation at {n_nodes} nodes"
+    )
+
+
+@pytest.mark.parametrize("backend_name", ALL_ALTERNATIVES)
+@pytest.mark.parametrize("n_nodes", [1, 200, 5000])
+def test_backends_agree_unit_for_unit_when_only_full_nodes_spread(
+    backend_name: str, n_nodes: int
+) -> None:
+    """The shipped threshold: 100, so a node spreads only at full activation.
+
+    Exact equality with no tolerance, float32 included, because every quantity
+    in play is a whole number — the decay amount by ``round``, and a
+    contribution from a node at exactly 100 by ``round(assoc/100 · 100)``, which
+    is the association itself.
+
+    **The threshold is load-bearing here, and that is worth stating.**  Below it,
+    a node spreads at some activation *a* < 100 and the contribution is
+    ``round(assoc/100 · a)`` over a genuine fraction, which the backends do
+    *not* all round alike: at (assoc 70, a 45) the exact value is 31.5 and
+    float64 computes 31.499999999999996, and at (assoc 30, a 95) the exact value
+    is 28.5 and float32 computes 28.500002.  That is the same defect this file's
+    decay tests exist for, one function along — ``spread_activation_to_neighbors``
+    still pre-divides the association — and it is reachable only through
+    Petacat's own ``spreading_activation_threshold``, never through the
+    reference, which spreads from fully-active nodes alone.  The companion test
+    above therefore asserts integrality at threshold 0 rather than agreement.
+    """
+    topology = synthetic_topology(n_nodes, seed=n_nodes)
+    assert _drive_integral(backend_name, topology, 100.0, 5) == _drive_integral(
+        "python", topology, 100.0, 5
+    )
+
+
 @pytest.mark.parametrize("backend_name", ALL_ALTERNATIVES)
 @pytest.mark.parametrize("n_nodes", [1, 200, 5000])
 def test_backends_agree_on_synthetic_slipnets(backend_name: str, n_nodes: int) -> None:

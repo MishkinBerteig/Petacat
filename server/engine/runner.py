@@ -318,6 +318,21 @@ class EngineRunner:
         # Add initial descriptions to all letters (matches Scheme init-mcat)
         self._add_initial_descriptions(workspace, slipnet)
 
+        # ``update-workspace-values`` (``run.ss:233``), before the first codelet.
+        # Without it every object entered the run with its constructor defaults —
+        # importance 0, every unhappiness and salience pinned at 100 — and the
+        # description strengths were never computed at all, so the first update
+        # cycle was the first time anything in the workspace had a real value.
+        #
+        # Note what this does *not* do: it runs before ``clamp_initially_relevant``,
+        # exactly as the reference orders it, so the description *types* are still
+        # inactive and no description is yet relevant.  Every raw importance is
+        # therefore 0 and every relative importance falls back to the uniform
+        # 100/n (``workspace-strings.ss:325-328``).  The leftmost and rightmost
+        # letters get no head start here — they get it one cycle later, once the
+        # clamp has made string-position-category active.
+        self._update_workspace_values(workspace)
+
         # Clamp initially relevant slipnet nodes
         slipnet.clamp_initially_relevant(self.meta)
 
@@ -355,6 +370,16 @@ class EngineRunner:
 
         max_act = self.meta.get_param("max_activation", 100)
 
+        # ``run.ss:221-226``: a problem containing any single-letter string starts
+        # with the *concept* of object-category fully active.  A one-letter string
+        # can only be mapped onto a multi-letter one by treating a letter and a
+        # group as playing the same role, so the reference puts that idea on the
+        # table before the first codelet runs rather than waiting for the run to
+        # stumble into it.  Depth 90, so it stays above threshold for about seven
+        # update cycles.
+        if obj_cat_node and any(s.length == 1 for s in workspace.all_strings):
+            obj_cat_node.activation = max_act
+
         for ws_string in workspace.all_strings:
             letters = [o for o in ws_string.objects if isinstance(o, Letter)]
             for letter in letters:
@@ -371,6 +396,13 @@ class EngineRunner:
                     desc = Description(letter, obj_cat_node, letter_obj_node)
                     desc.proposal_level = desc.BUILT
                     letter.descriptions.append(desc)
+                    # ``run.ss:227-232`` activates *every* descriptor of every
+                    # initial description, which includes ``plato-letter`` — the
+                    # descriptor of the object-category description.  Leaving it
+                    # at 0 skipped the brief early presence of the concept of a
+                    # letter, which is what letter⇔group concept-mappings are
+                    # weighed against.
+                    letter_obj_node.activation = max_act
 
                 # String-position descriptions
                 if str_pos_node and len(letters) == 1:
@@ -396,6 +428,19 @@ class EngineRunner:
                         desc.proposal_level = desc.BUILT
                         letter.descriptions.append(desc)
                         middle_node.activation = max_act
+
+    @staticmethod
+    def _update_workspace_values(workspace: Workspace) -> None:
+        """Scheme: ``update-workspace-values`` (``run.ss:325-344``).
+
+        Structure strengths, then every object's importance / unhappiness /
+        salience, then the workspace-level averages the mapping strengths are read
+        off.  Called from two places, exactly as the reference calls it: once at
+        the end of ``init-mcat`` and once at the top of ``update-everything``.
+        """
+        workspace.update_all_structure_strengths()
+        workspace.update_all_object_values()
+        workspace.update_average_unhappiness_values()
 
     def _post_initial_codelets(self) -> None:
         """Post initial bottom-up scout codelets.
@@ -630,14 +675,9 @@ class EngineRunner:
         # 1. Check if rules are possible (Scheme: run.ss:297)
         ctx.workspace.check_if_rules_possible()
 
-        # 2. Update all structure strengths
-        ctx.workspace.update_all_structure_strengths()
-
-        # 3. Update object importances, unhappiness, salience
-        ctx.workspace.update_all_object_values()
-        # ...and then the workspace-level averages the mapping strengths are read
-        # off, which is the last step of ``update-workspace-values`` (run.ss:344).
-        ctx.workspace.update_average_unhappiness_values()
+        # 2-3. Structure strengths, then object importances / unhappiness /
+        #      salience, then the workspace-level averages (run.ss:306, 325-344).
+        self._update_workspace_values(ctx.workspace)
 
         # 4. Snag-period stochastic exit (Scheme: run.ss:299-302)
         if ctx.trace.within_snag_period:
@@ -676,10 +716,19 @@ class EngineRunner:
         ctx.slipnet.update_activations(ctx.rng, threshold=threshold)
         self._record_concept_activation_events(activations_before)
 
-        # 10. Update temperature
+        # 10. Update temperature.  The rule factor asks whether a rule is both
+        #     *possible* and supported — and in justify mode, for both pairs
+        #     (formulas.ss:65-75), not merely whether some supported rule exists.
         avg_unhappiness = ctx.workspace.get_average_unhappiness()
-        has_rule = ctx.workspace.has_supported_rule()
-        ctx.temperature.update(avg_unhappiness, has_rule, ctx.meta)
+        ctx.temperature.update(
+            avg_unhappiness, ctx.workspace.rule_established(), ctx.meta
+        )
+        # ``get-removal-weight`` (``coderack.ss:237-240``) reads the global
+        # ``*temperature*`` at eviction time.  Petacat's Coderack has to be told,
+        # and the posting burst below is the one place a codelet is evicted
+        # *after* the temperature has moved but *before* the next selection would
+        # refresh it, so hand it over here.
+        ctx.coderack.current_temperature = ctx.temperature.value
 
         # 11. Post new bottom-up codelets
         self._post_bottom_up_codelets()
@@ -835,18 +884,20 @@ class EngineRunner:
             return ws.get_average_intra_string_unhappiness() / 100.0
 
         if codelet_type in ("bottom-up-bridge-scout", "important-object-bridge-scout"):
-            min_strength = min(
-                ws.get_mapping_strength("top"),
-                ws.get_mapping_strength("vertical"),
-            ) if ws.top_bridges or ws.vertical_bridges else 0.0
-            return (100.0 - min_strength) / 100.0
+            # ``coderack.ss:482-484`` — over top and vertical, plus bottom when
+            # justifying.  No "are there any bridges yet" guard: with no bridges
+            # every object is maximally unhappy and the strength reaches 0 by
+            # arithmetic.
+            return (100.0 - ws.get_min_mapping_strength()) / 100.0
 
         if codelet_type in ("bottom-up-description-scout", "top-down-description-scout"):
             return ws.get_average_unhappiness() / 100.0
 
         if codelet_type == "rule-scout":
-            has_bonds = any(s.bonds for s in ws.all_strings)
-            return 1.0 if has_bonds else 0.5
+            # ``coderack.ss:488-491``: half probability while no rule type is
+            # possible, full once one is.  Bonds have nothing to do with it — the
+            # question is whether rule-describable bridges cover a whole pair.
+            return 0.5 if not ws.get_possible_rule_types() else 1.0
 
         if codelet_type == "answer-finder":
             if ws.has_supported_rule():
@@ -879,7 +930,13 @@ class EngineRunner:
     def _compute_num_to_post(self, codelet_type: str) -> int:
         """Compute how many codelets to post.
 
-        Scheme: coderack.ss:518-550.
+        Scheme: ``num-of-codelets-to-post`` (``coderack.ss:517-550``).
+
+        The three scout families count objects against *stochastically blurred*
+        absolute thresholds (``rough-num-of-objects``), not against fixed ratios
+        of the object population.  Called only after the posting probability has
+        already passed, exactly as the reference's ``stochastic-if*`` orders it,
+        so the extra ``~`` draws land in the same place in the random stream.
         """
         ctx = self.ctx
         if ctx is None:
@@ -892,14 +949,9 @@ class EngineRunner:
             "top-down-bond-scout:category",
             "top-down-bond-scout:direction",
         ):
-            unrelated = sum(s.get_num_unrelated_objects() for s in ws.all_strings)
-            total = max(1, len(ws.all_objects))
-            ratio = unrelated / total
-            if ratio < 0.2:
-                return 2
-            elif ratio < 0.5:
-                return 4
-            return 6
+            return {"few": 2, "some": 4, "many": 6}[
+                ws.get_rough_num_of_unrelated_objects(ctx.rng)
+            ]
 
         if codelet_type in (
             "top-down-group-scout:category",
@@ -908,38 +960,31 @@ class EngineRunner:
         ):
             if not any(s.bonds for s in ws.all_strings):
                 return 0
-            ungrouped = sum(s.get_num_ungrouped_objects() for s in ws.all_strings)
-            total = max(1, len(ws.all_objects))
-            ratio = ungrouped / total
-            if ratio < 0.2:
-                return 1
-            elif ratio < 0.5:
-                return 2
-            return 3
+            return {"few": 1, "some": 2, "many": 3}[
+                ws.get_rough_num_of_ungrouped_objects(ctx.rng)
+            ]
 
         if codelet_type in ("bottom-up-bridge-scout", "important-object-bridge-scout"):
-            unmapped = ws.get_num_unmapped_objects()
-            total = max(1, len(ws.all_objects))
-            ratio = unmapped / total
-            if ratio < 0.2:
-                return 2
-            elif ratio < 0.5:
-                return 5
-            return 6
+            return {"few": 2, "some": 5, "many": 6}[
+                ws.get_rough_num_of_unmapped_objects(ctx.rng)
+            ]
 
         if codelet_type in ("bottom-up-description-scout", "top-down-description-scout"):
             return 2
 
         if codelet_type == "rule-scout":
-            has_bonds = any(s.bonds for s in ws.all_strings)
-            return max(1, 2) if has_bonds else 1
+            # ``coderack.ss:542``: two scouts per possible rule type, at least one.
+            return max(1, 2 * len(ws.get_possible_rule_types()))
 
         if codelet_type == "thematic-bridge-scout":
-            max_unhappy = max(
-                (s.get_average_intra_string_unhappiness() for s in ws.all_strings),
-                default=100.0,
-            )
-            return max(1, round(10 * max_unhappy / 100.0))
+            # ``coderack.ss:547-549``: ``(round (* 10 (% max-inter-string-unhappiness)))``.
+            # The *mapping* deficit, and no floor — thematic scouts are the vehicle
+            # of clamped-theme pressure, and with the mappings settled the
+            # reference posts none.  Reading intra-string unhappiness instead
+            # posted one scout where the reference posts up to ten, precisely
+            # during a clamp episode: a snag response leaves the strings
+            # well-bonded and the mappings in ruins.
+            return round(10 * ws.get_max_inter_string_unhappiness() / 100.0)
 
         if codelet_type == "progress-watcher":
             return 2

@@ -377,7 +377,15 @@ def description_type_support(
     Used by ``choose-bond-facet`` to weight the stochastic selection of a
     bond facet.
 
-    Scheme: workspace-structure-formulas.ss:57-67.
+    Scheme: ``description-type-support`` (``workspace-structure-formulas.ss:57-67``)::
+
+        (local-support (100* (/ num-of-described-objects num-of-objects)))
+        (round (average local-support (tell description-type 'get-activation)))
+
+    ``100*`` is ``(round (* 100 x))`` (``utilities.ss:502``), so the local fraction
+    is rounded to a whole percentage *before* it is averaged with the activation —
+    two roundings, not one.  Carrying the fraction through shifts the average by
+    up to half a point either way, and this weights the bond-facet pick.
     """
     objects: list = getattr(string, "objects", [])
     num_objects = len(objects)
@@ -389,7 +397,7 @@ def description_type_support(
         for obj in objects
         if _has_description_type(obj, description_type)
     )
-    local_support = 100.0 * num_described / num_objects
+    local_support = round(100.0 * num_described / num_objects)
     activation = description_type.activation
     return round((local_support + activation) / 2.0)
 

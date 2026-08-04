@@ -100,9 +100,15 @@ class SlipnetTopology:
     #: twice; also what makes a synthetic topology inspectable.
     node_names: tuple[str, ...]
 
-    #: ``1 - (conceptual_depth/100) ** (update_cycle_length/15)`` per node,
-    #: precomputed by ``SlipnetNode.compute_rate_of_decay``.
-    decay_rate: tuple[float, ...]
+    #: The decay rate per node as a *percentage* — ``100 - conceptual_depth`` at
+    #: the shipped update-cycle length — precomputed by
+    #: ``SlipnetNode.compute_rate_of_decay``.  A backend spends it as
+    #: ``round(decay_percent * activation / 100)``, in that order: the percentage
+    #: is a small exact integer, so the product is exact and the halfway cases
+    #: that produce the reference's decay plateaus are exactly representable in
+    #: float32 as well as float64.  Carrying the pre-divided fraction instead
+    #: would round those halves inconsistently across backends.
+    decay_percent: tuple[float, ...]
 
     conceptual_depth: tuple[float, ...]
 
@@ -168,7 +174,7 @@ class SlipnetTopology:
 
         return cls(
             node_names=names,
-            decay_rate=tuple(n._rate_of_decay for n in nodes),
+            decay_percent=tuple(n._decay_percent for n in nodes),
             conceptual_depth=tuple(float(n.conceptual_depth) for n in nodes),
             in_indptr=tuple(indptr),
             in_source=tuple(source),

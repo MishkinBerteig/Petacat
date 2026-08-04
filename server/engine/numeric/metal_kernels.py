@@ -189,11 +189,19 @@ SLIPNET_UPDATE_SOURCE = """
     if (lane == 0u) {
         float a_d = activation[row];
         float b = buffer[row];
-        // Frozen nodes do not decay (slipnet.ss:195-199) but *are* flushed, so
+        // Frozen nodes do not decay (slipnet.ss:174-177) but *are* flushed, so
         // a clamped node that received spreading is clipped back to 100 rather
         // than skipped.
+        //
+        // The decay amount is rounded, and `metal::rint` is round-half-to-even
+        // like Python's `round`.  `precise::divide` rather than `/` because MLX
+        // compiles its kernels with fast math, under which `/` may be an
+        // approximate reciprocal-multiply — and this division has to be
+        // correctly rounded, or a quotient of exactly n + 0.5 (which is what
+        // produces the reference's decay plateaus) would land on either side of
+        // the tie at the compiler's discretion.
         if (frozen[row] == 0u) {
-            b -= decay_rate[row] * a_d;
+            b -= metal::rint(metal::precise::divide(decay_percent[row] * a_d, 100.0f));
         }
         b += partial;
         float updated = a_d + b;
@@ -205,7 +213,7 @@ SLIPNET_UPDATE_INPUTS = (
     "activation",
     "buffer",
     "frozen",
-    "decay_rate",
+    "decay_percent",
     "indptr",
     "source",
     "weight",

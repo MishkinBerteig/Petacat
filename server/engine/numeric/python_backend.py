@@ -87,14 +87,19 @@ class PythonSlipnetSession(SlipnetSession):
         top = self.topology
         act = st.activation
         buf = st.buffer
-        rate = top.decay_rate
+        pct = top.decay_percent
 
-        # Decay (slipnet.ss:195-199).  Frozen nodes do not decay; every other
-        # node loses ``rate * activation`` from its buffer, not from its
+        # Decay (slipnet.ss:174-177).  Frozen nodes do not decay; every other
+        # node loses ``round(rate * activation)`` from its buffer, not from its
         # activation, so the value spreading reads below is the pre-decay one.
+        #
+        # The amount is a whole number, and multiplying by the percentage before
+        # dividing by 100 is what makes it the *same* whole number on every
+        # backend — see ``SlipnetNode.decay`` for the reference and for the
+        # plateau the rounding produces.
         for i, frozen in enumerate(st.frozen):
             if not frozen:
-                buf[i] -= rate[i] * act[i]
+                buf[i] -= round(pct[i] * act[i] / 100.0)
 
         self._spread(threshold, scale)
 
@@ -116,11 +121,18 @@ class PythonSlipnetSession(SlipnetSession):
 
         That matters for exactly one reason and to exactly one degree.  Each
         contribution is ``round(...)``, an integer no greater than 100, and a sum
-        of integers is exact in float64 however it is ordered.  The buffer,
-        however, already holds a non-integer decay term when the contributions
-        arrive, so the reference computes ``((b + a₁) + a₂) + a₃`` where this
-        computes ``b + (a₁ + a₂ + a₃)``.  Those differ by at most a few units in
-        the last place of a quantity bounded by ~200, i.e. below 1e-13.
+        of integers is exact in float64 however it is ordered.  The buffer may
+        also hold a non-integer term when the contributions arrive, so the
+        reference computes ``((b + a₁) + a₂) + a₃`` where this computes
+        ``b + (a₁ + a₂ + a₃)``.  Those differ by at most a few units in the last
+        place of a quantity bounded by ~200, i.e. below 1e-13.
+
+        Since decay was rounded (slipnet.ss:174-177) that residual cannot arise
+        from anything the engine itself does: the buffer's decay term is now an
+        integer too, as are the Workspace jolt (100) and the Themespace's, so
+        every addend is a whole number and the reassociation is exact.  What is
+        left is a state *restored* with a fractional activation, or a synthetic
+        one, for which the bound above still stands.
 
         The only place that difference can become visible is the probabilistic
         jump, where a perturbed activation shifts the threshold ``(a/100)³`` that
@@ -419,18 +431,19 @@ class PythonBackend(Backend):
         return out
 
     def average_unhappiness(
-        self, intra: Sequence[float], relative_importance: Sequence[float]
+        self, values: Sequence[float], relative_importance: Sequence[float]
     ) -> int:
-        n = len(intra)
+        n = len(values)
         if n == 0:
             return 100
         total_weight = sum(relative_importance)
-        if total_weight > 0:
-            weighted = sum(
-                intra[i] * relative_importance[i] for i in range(n)
-            )
-            return round(weighted / total_weight)
-        return round(sum(intra) / n)
+        if total_weight == 0:
+            # ``weighted-average`` (``utilities.ss:388-392``) returns 0 on zero
+            # total weight.  An unweighted mean here would report ~100 unhappiness
+            # where the reference reports none.
+            return 0
+        weighted = sum(values[i] * relative_importance[i] for i in range(n))
+        return round(weighted / total_weight)
 
     def temperature(
         self,

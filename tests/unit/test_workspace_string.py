@@ -134,16 +134,18 @@ def test_average_intra_unhappiness_is_mean_over_objects():
     assert s.get_average_intra_string_unhappiness() == 50.0
 
 
-def test_num_unrelated_objects_counts_bondless_ungrouped_letters():
-    s = _string("abc")  # no bonds, no groups
-    assert s.get_num_unrelated_objects() == 3
+def test_average_intra_unhappiness_is_rounded():
+    """``workspace-strings.ss:336-338`` wraps the mean in ``round``.
 
-
-def test_num_ungrouped_objects_ignores_grouped_letters():
+    Three objects rarely average to a whole number, and this value is a
+    selection weight for ``choose-string``.
+    """
     s = _string("abc")
-    s.add_group(_group([s.objects[0], s.objects[1]], s))
-    # letters 0 and 1 are now grouped; only letter 2 remains ungrouped
-    assert s.get_num_ungrouped_objects() == 1
+    s.objects[0].intra_string_unhappiness = 40.0
+    s.objects[1].intra_string_unhappiness = 60.0
+    s.objects[2].intra_string_unhappiness = 61.0
+    # (40 + 60 + 61) / 3 = 53.666...
+    assert s.get_average_intra_string_unhappiness() == 54.0
 
 
 # --- equivalence -----------------------------------------------------------

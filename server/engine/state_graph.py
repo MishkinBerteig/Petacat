@@ -341,6 +341,21 @@ def capture_run_state(ctx: Any) -> dict:
             "bottom": ws.bottom_mapping_strength,
             "vertical": ws.vertical_mapping_strength,
         },
+        # Same argument for the three inter-string averages: the thematic-scout
+        # count reads ``get_max_inter_string_unhappiness`` off them, and for the
+        # rule-possibility flags, which the rule-scout consults between cycles.
+        "inter_string_unhappiness": {
+            "top": ws.average_top_inter_string_unhappiness,
+            "bottom": ws.average_bottom_inter_string_unhappiness,
+            "vertical": ws.average_vertical_inter_string_unhappiness,
+        },
+        "rule_possible": {
+            "top": ws.top_rule_possible,
+            "bottom": ws.bottom_rule_possible,
+        },
+        # Fixed for the run, and *not* recoverable from ``answer_string``: a
+        # discovery run that answered has one too.
+        "justify_mode": ws.justify_mode,
         "average_unhappiness": ws._average_unhappiness,
     }
 
@@ -513,6 +528,14 @@ def restore_run_state(runner: Any, state: dict) -> None:
     ws.top_mapping_strength = strengths.get("top", 0.0)
     ws.bottom_mapping_strength = strengths.get("bottom", 0.0)
     ws.vertical_mapping_strength = strengths.get("vertical", 0.0)
+    inter = ws_state.get("inter_string_unhappiness") or {}
+    ws.average_top_inter_string_unhappiness = inter.get("top", 0.0)
+    ws.average_bottom_inter_string_unhappiness = inter.get("bottom", 0.0)
+    ws.average_vertical_inter_string_unhappiness = inter.get("vertical", 0.0)
+    possible = ws_state.get("rule_possible") or {}
+    ws.top_rule_possible = possible.get("top", False)
+    ws.bottom_rule_possible = possible.get("bottom", False)
+    ws.justify_mode = ws_state.get("justify_mode", ws.answer_string is not None)
     ws._average_unhappiness = ws_state.get("average_unhappiness")
 
     # -- Coderack -----------------------------------------------------

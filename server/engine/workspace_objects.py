@@ -423,8 +423,20 @@ class WorkspaceObject:
     #  (Scheme: workspace-objects.ss:425-601)
     # ------------------------------------------------------------------
 
-    def update_importance(self, max_raw: float = 300.0, enclosed_factor: float = 0.667) -> None:
-        """Scheme: workspace-objects.ss:425-433 (update-raw-importance)."""
+    def update_importance(
+        self, max_raw: float = 300.0, enclosed_factor: float = 2.0 / 3.0
+    ) -> None:
+        """Scheme: ``update-raw-importance`` (``workspace-objects.ss:425-434``).
+
+        The enclosed-object factor is the exact rational ``2/3``, not the 0.667
+        the seed data carries.  Raw importance is a sum of up to three descriptor
+        activations capped at 300, so the two differ by up to 0.1 of a point
+        before the ratio that becomes relative importance is even taken — small,
+        but it is a number the reference computes exactly and there is no reason
+        to approximate it.  (``enclosed_group_importance_factor`` in
+        ``seed_data/formula_coefficients.json`` is read by nothing; wiring it
+        would mean threading a ``MetadataProvider`` down to every object update.)
+        """
         total = sum(
             getattr(d, "descriptor_activation", 0) for d in self.get_relevant_descriptions()
         )

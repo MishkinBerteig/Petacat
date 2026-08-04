@@ -77,17 +77,38 @@ class RNG:
         return items[-1]
 
     def perturb(self, n: float) -> float:
-        """Add random jitter proportional to sqrt(n). Replaces Scheme ~ operator.
+        """Blur ``n`` by up to about its own square root — Scheme's ``~``.
 
-        Scheme: delta = random(1 + round(sqrt(n))), direction = 50% chance.
+        ``utilities.ss:426-429``::
+
+            (define ~
+              (lambda (n)
+                (let ((delta (random (add1 (round (sqrt n))))))
+                  (if (prob? 0.5) (+ n delta) (- n delta)))))
+
+        The delta's *type* follows Chez's numeric tower, and that is not a
+        detail: ``(sqrt n)`` is exact only when ``n`` is a perfect square, and
+        ``random`` returns an exact integer for an exact argument but a flonum
+        for a flonum one.  So ``(~ 4)`` draws an integer delta from ``{0, 1,
+        2}``, while ``(~ 2)`` draws a *continuous* delta from ``[0.0, 2.0)`` —
+        ``(round (sqrt 2))`` is the flonum ``1.0``, not the integer 1.
+
+        The difference is reachable.  ``rough-num-of-objects`` asks
+        ``(< count (~ 2))``, and at a count of 2 the continuous reading answers
+        "few" half the time where the integer reading answers it a quarter of
+        the time.  Both of the reference's two call sites are covered here:
+        ``~ 2`` and ``~ 4``.
         """
         if n <= 0:
             return n
-        delta = self.randint(1 + round(math.sqrt(abs(n))))
-        if self.prob(0.5):
-            return n + delta
+        root = math.isqrt(int(n)) if float(n).is_integer() else -1
+        if root >= 0 and root * root == int(n):
+            # Exact square root: an exact integer delta, as in ``(~ 4)``.
+            delta: float = self.randint(1 + root)
         else:
-            return n - delta
+            # Inexact square root: a flonum delta, as in ``(~ 2)``.
+            delta = self.random() * (1 + round(math.sqrt(abs(n))))
+        return n + delta if self.prob(0.5) else n - delta
 
     def stochastic_filter(
         self, items: Sequence[Any], prob_fn: Callable[[Any], float]

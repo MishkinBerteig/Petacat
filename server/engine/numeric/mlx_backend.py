@@ -106,7 +106,7 @@ class MlxSlipnetSession(SlipnetSession):
     __slots__ = (
         "topology", "device", "dtype", "use_kernel", "n", "lanes",
         "activation", "buffer", "frozen", "clamp_remaining",
-        "decay_rate", "indptr", "source", "dest", "weight", "_zero",
+        "decay_percent", "indptr", "source", "dest", "weight", "_zero",
     )
 
     def __init__(
@@ -133,14 +133,14 @@ class MlxSlipnetSession(SlipnetSession):
             self.buffer = mx.zeros((n,), dtype=dtype)
             self.frozen = mx.zeros((n,), dtype=mx.uint8)
             self.clamp_remaining = mx.zeros((n,), dtype=mx.int32)
-            self.decay_rate = mx.array(list(topology.decay_rate), dtype=dtype)
+            self.decay_percent = mx.array(list(topology.decay_percent), dtype=dtype)
             self.indptr = mx.array(list(topology.in_indptr), dtype=mx.int32)
             self.source = mx.array(list(topology.in_source), dtype=mx.int32)
             self.dest = mx.array(list(topology.in_dest), dtype=mx.int32)
             self.weight = mx.array(list(topology.in_weight), dtype=dtype)
             self._zero = mx.zeros((n,), dtype=dtype)
             mx.eval(
-                self.decay_rate, self.indptr, self.source, self.dest,
+                self.decay_percent, self.indptr, self.source, self.dest,
                 self.weight, self._zero,
             )
 
@@ -189,7 +189,7 @@ class MlxSlipnetSession(SlipnetSession):
         )
         outputs = kernel(
             inputs=[
-                self.activation, self.buffer, self.frozen, self.decay_rate,
+                self.activation, self.buffer, self.frozen, self.decay_percent,
                 self.indptr, self.source, self.weight, params,
             ],
             grid=metal_kernels.grid_for(self.n, self.lanes),
@@ -214,10 +214,14 @@ class MlxSlipnetSession(SlipnetSession):
         """
         act = self.activation
         buf = self.buffer
+        # ``mx.round`` is round-half-to-even, as Python's ``round`` and
+        # ``np.rint`` are, and multiplying by the percentage before dividing by
+        # 100 keeps the halfway cases exactly representable — in float32 too,
+        # since both operands and the quotient are small integers or halves.
         decayed = mx.where(
             self.frozen != 0,
             mx.zeros_like(act),
-            self.decay_rate * act,
+            mx.round(self.decay_percent * act / 100.0),
         )
         buf = buf - decayed
         if self.topology.n_edges:
@@ -430,17 +434,25 @@ class MlxBackend(Backend):
             )
 
             hundred = mx.full((n,), 100.0, dtype=dt)
-            s_intra = mx.where(clamped, hundred, mx.round(0.8 * intra + 0.2 * rel))
+            # MLX materialises a bare Python float as float32 even against a
+            # float64 array, so ``0.2 * rel`` in the mlx-cpu backend was computed
+            # in single precision: 0.2*56.5 + 0.8*19 came back 26.50000039488077
+            # and ``mx.round`` then took it to 27 where the reference gives 26.
+            # Pinning the coefficients to the array's dtype is what makes this
+            # backend the float64 one it claims to be.
+            c2 = mx.array(0.2, dtype=dt)
+            c8 = mx.array(0.8, dtype=dt)
+            s_intra = mx.where(clamped, hundred, mx.round(c8 * intra + c2 * rel))
 
             writes_h = is_initial | is_modified | is_answer | (is_target & justify)
             writes_v = is_initial | is_target
             s_h = mx.where(
                 clamped, hundred,
-                mx.where(writes_h, mx.round(0.2 * h + 0.8 * rel), prev_h),
+                mx.where(writes_h, mx.round(c2 * h + c8 * rel), prev_h),
             )
             s_v = mx.where(
                 clamped, hundred,
-                mx.where(writes_v, mx.round(0.2 * v + 0.8 * rel), prev_v),
+                mx.where(writes_v, mx.round(c2 * v + c8 * rel), prev_v),
             )
 
             s_avg = mx.where(
@@ -505,13 +517,13 @@ class MlxBackend(Backend):
             return _as_ints(mx.round(mx.where(weight == 0.0, intrinsic, thematic)))
 
     def average_unhappiness(
-        self, intra: Sequence[float], relative_importance: Sequence[float]
+        self, values: Sequence[float], relative_importance: Sequence[float]
     ) -> int:
-        n = len(intra)
+        n = len(values)
         if n == 0:
             return 100
         with mx.stream(self.device):
-            a = mx.array(list(intra), dtype=self.dtype)
+            a = mx.array(list(values), dtype=self.dtype)
             w = mx.array(list(relative_importance), dtype=self.dtype)
             # One host sync, not three.
             #
@@ -521,8 +533,11 @@ class MlxBackend(Backend):
             # round trips, not by summing twenty floats.  Reading ``total`` back to decide
             # which branch to take, then reading the branch's result, cost three syncs
             # where the whole decision can be expressed in the graph and read once.
+            # ``weighted-average`` (``utilities.ss:388-392``) is 0 on zero total
+            # weight, not an unweighted mean.  Kept in the graph so the branch
+            # still costs one host sync rather than three.
             total = mx.sum(w)
-            weighted = mx.where(total > 0, mx.sum(a * w) / total, mx.sum(a) / n)
+            weighted = mx.where(total > 0, mx.sum(a * w) / mx.maximum(total, 1e-30), 0.0)
             return int(round(float(weighted.item())))
 
     def temperature(

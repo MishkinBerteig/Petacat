@@ -151,13 +151,19 @@ def synthetic_topology(
             dest_of_edge.append(d)
         indptr.append(len(source))
 
+    # Percentages, not fractions, and by the same rule
+    # ``SlipnetNode.compute_rate_of_decay`` uses — a synthetic topology has to be
+    # substitutable for a real one, including in what it makes exact.
     depths = [rng.choice(REAL_DEPTHS) for _ in range(n_nodes)]
     exponent = update_cycle_length / 15.0
-    decay = [1.0 - (d / 100.0) ** exponent for d in depths]
+    if exponent == 1.0:
+        decay = [float(100 - d) for d in depths]
+    else:
+        decay = [100.0 * (1.0 - (d / 100.0) ** exponent) for d in depths]
 
     return SlipnetTopology(
         node_names=tuple(f"synthetic-{i}" for i in range(n_nodes)),
-        decay_rate=tuple(decay),
+        decay_percent=tuple(decay),
         conceptual_depth=tuple(float(d) for d in depths),
         in_indptr=tuple(indptr),
         in_source=tuple(source),
