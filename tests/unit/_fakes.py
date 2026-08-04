@@ -33,8 +33,12 @@ class FakeNode:
         activation: float = 0.0,
         fully_active: bool = False,
         intrinsic_link_length: int = 0,
+        related: dict[str, FakeNode] | None = None,
     ) -> None:
         self.name = name
+        #: Relation name -> neighbour, for ``get_related_node``.  A Group derives
+        #: its bond category from its group category this way (groups.ss:79).
+        self.related: dict[str, FakeNode] = dict(related) if related else {}
         self.short_name = (
             short_name if short_name is not None else name.replace("plato-", "")
         )
@@ -60,6 +64,13 @@ class FakeNode:
 
     def fully_active(self) -> bool:
         return self._fully_active
+
+    def get_related_node(self, relation: Any) -> FakeNode | None:
+        """Scheme: ``get-related-node`` (slipnet.ss:114-129), reduced to a lookup."""
+        name = relation if isinstance(relation, str) else getattr(relation, "name", "")
+        if name == "plato-identity":
+            return self
+        return self.related.get(name)
 
     def activate_from_workspace(self) -> None:
         """Mirror ``SlipnetNode.activate_from_workspace`` (+100 into the buffer)."""

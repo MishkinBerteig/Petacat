@@ -30,7 +30,7 @@ from server.engine.codelet_dsl.interpreter import CodeletInterpreter, CodeletReg
 from server.engine.coderack import Codelet, Coderack
 from server.engine.concept_mappings import ConceptMapping
 from server.engine.descriptions import Description
-from server.engine.groups import Group
+from server.engine.groups import Group, attach_length_description
 from server.engine.memory import EpisodicMemory
 from server.engine.metadata import MetadataProvider
 from server.engine.rng import RNG
@@ -88,6 +88,11 @@ def ctx_abc_abd_xyz_with_group(meta, runner):
     lcat = slipnet.nodes["plato-letter-category"]
     for members in (letters[1:3], letters[3:6]):
         group = Group(target, samegrp, lcat, None, list(members), [])
+        # ``make-group`` attaches no Length description (GR-1); the reference's
+        # only route to one is ``propose-group``'s stochastic
+        # ``attach-length-description`` (groups.ss:816-818), so a fixture that
+        # wants length-described groups has to ask for them by name.
+        attach_length_description(group)
         group.proposal_level = Group.BUILT
         target.add_group(group)
     return ctx
@@ -652,7 +657,15 @@ class TestGroupBuilder:
         assert group in init.groups
 
     def test_fizzles_if_bonds_broken(self, ctx_abc_abd_xyz_with_bonds, meta):
-        """If constituent bonds are broken before building, builder should fizzle."""
+        """If constituent bonds are broken before building, builder should fizzle.
+
+        The bonds are removed from the string, which is what ``break-bond``
+        (bonds.ss:425-433) does.  Setting the proposal level alone — as this test
+        used to — leaves them in ``string.bonds``, and the builder's real test is
+        ``bond-present?`` (groups.ss:643-650), which reads the string.  The
+        reference's bond table only ever holds built bonds, so "in the string but
+        not built" is not a state either implementation can reach.
+        """
         ctx = ctx_abc_abd_xyz_with_bonds
         init = ctx.workspace.initial_string
         letters = init.letters
@@ -673,12 +686,237 @@ class TestGroupBuilder:
         registry = CodeletRegistry.from_metadata(meta, interp)
         compiled = registry.get_compiled("group-builder")
 
-        # Break the bonds
         for b in bonds:
-            b.proposal_level = Bond.PROPOSED  # Mark as not built
+            break_structure(ctx, b)
 
         interp.execute(compiled, ctx, structure=group)
         assert not group.is_built
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Group hierarchies and the break cascade — GR-5 and GR-6
+# ═══════════════════════════════════════════════════════════════════════
+
+
+def _dangling_references(workspace):
+    """Every reference held anywhere in the Workspace to a structure that has
+    left it.  A clean Workspace has none of these.
+
+    Checks the back-references the Scheme's ``break-group`` (groups.ss:954-1018)
+    is responsible for clearing: constituent lists, enclosing-group pointers,
+    positional bond slots, and the bridges hanging off objects.
+    """
+    live_objects = {id(o) for s in workspace.all_strings for o in s.objects}
+    live_bonds = {id(b) for s in workspace.all_strings for b in s.bonds}
+    live_groups = {id(g) for s in workspace.all_strings for g in s.groups}
+    live_bridges = {
+        id(b)
+        for b in workspace.top_bridges + workspace.bottom_bridges + workspace.vertical_bridges
+    }
+    problems = []
+
+    for string in workspace.all_strings:
+        for group in string.groups:
+            for member in group.objects:
+                if id(member) not in live_objects:
+                    problems.append(f"{group!r} holds departed member {member!r}")
+                if member.enclosing_group is not group:
+                    problems.append(f"{member!r} does not point back at {group!r}")
+            for bond in group.group_bonds:
+                if id(bond) not in live_bonds:
+                    problems.append(f"{group!r} holds departed bond {bond!r}")
+        for obj in string.objects:
+            enclosing = obj.enclosing_group
+            if enclosing is not None and id(enclosing) not in live_groups:
+                problems.append(f"{obj!r} is enclosed by departed {enclosing!r}")
+            for slot in ("left_bond", "right_bond"):
+                bond = getattr(obj, slot)
+                if bond is not None and id(bond) not in live_bonds:
+                    problems.append(f"{obj!r}.{slot} is departed {bond!r}")
+            for slot in ("horizontal_bridge", "vertical_bridge"):
+                bridge = getattr(obj, slot)
+                if bridge is not None and id(bridge) not in live_bridges:
+                    problems.append(f"{obj!r}.{slot} is departed {bridge!r}")
+        for bond in string.bonds:
+            for end in (bond.from_object, bond.to_object):
+                if id(end) not in live_objects:
+                    problems.append(f"{bond!r} joins departed {end!r}")
+
+    for bridge in (
+        workspace.top_bridges + workspace.bottom_bridges + workspace.vertical_bridges
+    ):
+        for end in (bridge.object1, bridge.object2):
+            if id(end) not in live_objects:
+                problems.append(f"{bridge!r} spans departed {end!r}")
+    return problems
+
+
+def _sameness_group(ctx, string, members, *, facet="plato-letter-category"):
+    slipnet = ctx.slipnet
+    group = Group(
+        string,
+        slipnet.nodes["plato-samegrp"],
+        slipnet.nodes[facet],
+        None,
+        list(members),
+        [],
+    )
+    group.proposal_level = Group.EVALUATED
+    return group
+
+
+class TestGroupHierarchy:
+    """GR-5: ``get-incompatible-groups`` (groups.ss:283-286) is the *enclosing
+    groups of the constituents*, so a supergroup over built subgroups fights
+    nothing and the subgroups become nested members (groups.ss:925-928)."""
+
+    def test_a_supergroup_over_built_subgroups_leaves_no_dangling_references(
+        self, ctx_abc_abd_xyz_with_group, meta
+    ):
+        """``[[m][rr][jjj]]`` — the nested reading ``mrrjjj`` turns on.
+
+        Fighting every span-overlapping group meant the supergroup had to beat
+        each of its own constituents and then broke them, leaving
+        ``structure.objects`` holding groups no longer in the string and letters
+        pointing at nothing.
+        """
+        ctx = ctx_abc_abd_xyz_with_group
+        target = ctx.workspace.target_string
+        rr, jjj = target.groups[0], target.groups[1]
+        m = _sameness_group(ctx, target, [target.letters[0]])
+        assert build_structure(ctx, m) is True
+
+        supergroup = _sameness_group(
+            ctx, target, [m, rr, jjj], facet="plato-length"
+        )
+        assert supergroup.get_incompatible_groups() == []
+        assert build_structure(ctx, supergroup) is True
+
+        # The subgroups are still in the string, and are now nested members.
+        assert [g for g in target.groups if g is not supergroup] == [rr, jjj, m]
+        assert m.enclosing_group is supergroup
+        assert rr.enclosing_group is supergroup
+        assert jjj.enclosing_group is supergroup
+        assert target.letters[1].enclosing_group is rr
+
+        assert _dangling_references(ctx.workspace) == []
+
+    def test_breaking_a_subgroup_takes_the_supergroup_with_it(
+        self, ctx_abc_abd_xyz_with_group, meta
+    ):
+        """``break-group`` recurses into the enclosing group (groups.ss:962-963).
+
+        A supergroup over a member that no longer exists is not a reading of
+        anything.
+        """
+        ctx = ctx_abc_abd_xyz_with_group
+        target = ctx.workspace.target_string
+        rr, jjj = target.groups[0], target.groups[1]
+        m = _sameness_group(ctx, target, [target.letters[0]])
+        build_structure(ctx, m)
+        supergroup = _sameness_group(ctx, target, [m, rr, jjj], facet="plato-length")
+        build_structure(ctx, supergroup)
+
+        break_structure(ctx, rr)
+
+        assert rr not in target.groups
+        assert supergroup not in target.groups
+        assert not supergroup.is_built
+        assert m.enclosing_group is None
+        assert _dangling_references(ctx.workspace) == []
+
+
+class TestBreakGroupCascade:
+    """GR-6: ``break-group`` (groups.ss:954-1018) is not a single removal."""
+
+    def test_breaking_a_group_takes_its_bonds_and_bridges_with_it(
+        self, ctx_abc_abd_xyz_with_group, meta
+    ):
+        ctx = ctx_abc_abd_xyz_with_group
+        slipnet = ctx.slipnet
+        target = ctx.workspace.target_string
+        initial = ctx.workspace.initial_string
+        rr, jjj = target.groups[0], target.groups[1]
+
+        # A bond *incident* to [rr]: m -> [rr] on the length facet.
+        m = target.letters[0]
+        incident = Bond(
+            m,
+            rr,
+            slipnet.nodes["plato-successor"],
+            slipnet.nodes["plato-length"],
+            slipnet.nodes["plato-one"],
+            slipnet.nodes["plato-two"],
+            slipnet.nodes["plato-right"],
+        )
+        incident.proposal_level = Bond.BUILT
+        target.add_bond(incident)
+
+        # A constituent bond *inside* [jjj], and a vertical bridge off [rr].
+        constituent = Bond(
+            target.letters[3],
+            target.letters[4],
+            slipnet.nodes["plato-sameness"],
+            slipnet.nodes["plato-letter-category"],
+            slipnet.nodes["plato-j"],
+            slipnet.nodes["plato-j"],
+            None,
+        )
+        constituent.proposal_level = Bond.BUILT
+        target.add_bond(constituent)
+        jjj.group_bonds = [constituent]
+        constituent.enclosing_group = jjj
+
+        bridge = Bridge(
+            initial.letters[1],
+            rr,
+            "vertical",
+            make_concept_mappings(initial.letters[1], rr, ctx.workspace),
+        )
+        bridge.proposal_level = Bridge.BUILT
+        ctx.workspace.add_bridge(bridge)
+        assert rr.vertical_bridge is bridge
+
+        break_structure(ctx, rr)
+
+        assert rr not in target.groups
+        assert incident not in target.bonds, "an incident bond goes with the group"
+        assert bridge not in ctx.workspace.vertical_bridges, "so does its bridge"
+        assert initial.letters[1].vertical_bridge is None
+        assert m.right_bond is None
+        assert target.letters[1].enclosing_group is None
+        assert _dangling_references(ctx.workspace) == []
+
+    def test_breaking_a_group_leaves_its_constituent_bonds_free_standing(
+        self, ctx_abc_abd_xyz_with_group, meta
+    ):
+        """The constituents themselves survive — only the back-reference goes
+        (groups.ss:986-989).  A group is a reading *of* material, not the
+        material."""
+        ctx = ctx_abc_abd_xyz_with_group
+        slipnet = ctx.slipnet
+        target = ctx.workspace.target_string
+        rr = target.groups[0]
+
+        constituent = Bond(
+            target.letters[1],
+            target.letters[2],
+            slipnet.nodes["plato-sameness"],
+            slipnet.nodes["plato-letter-category"],
+            slipnet.nodes["plato-r"],
+            slipnet.nodes["plato-r"],
+            None,
+        )
+        constituent.proposal_level = Bond.BUILT
+        target.add_bond(constituent)
+        rr.group_bonds = [constituent]
+        constituent.enclosing_group = rr
+
+        break_structure(ctx, rr)
+
+        assert constituent in target.bonds
+        assert constituent.enclosing_group is None
+        assert _dangling_references(ctx.workspace) == []
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -1617,3 +1855,319 @@ def _get_test_builtins():
     """Get the full builtins registry for test codelet execution."""
     from server.engine.codelet_dsl.builtins import get_builtins
     return get_builtins()
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Group scanning — GR-4 and GR-8
+# ═══════════════════════════════════════════════════════════════════════
+
+
+def _letter_bond(ctx, left, right, category, direction, facet="plato-letter-category"):
+    slipnet = ctx.slipnet
+    bond = Bond(
+        left,
+        right,
+        slipnet.nodes[category],
+        slipnet.nodes[facet],
+        left.letter_category,
+        right.letter_category,
+        slipnet.nodes[direction] if direction else None,
+    )
+    bond.proposal_level = Bond.BUILT
+    return bond
+
+
+class TestScanBonds:
+    """``scan-bonds`` (groups.ss:879-907) — facet AND category AND direction."""
+
+    def test_a_bond_of_a_different_direction_stops_the_scan(self, ctx_abc_abd_xyz, meta):
+        """GR-4: Petacat could chain a left- and a right-directed successor bond
+        into one "group" whose recorded direction misdescribes its contents — a
+        structure the reference cannot build."""
+        from server.engine.codelet_dsl.builtins import scan_bonds
+
+        init = ctx_abc_abd_xyz.workspace.initial_string
+        a, b, c = init.letters
+        first = _letter_bond(ctx_abc_abd_xyz, a, b, "plato-successor", "plato-right")
+        init.add_bond(first)
+        # b -> c as a *left*-directed predecessor bond: same slot, wrong polarity
+        # for a rightward successor run, and not the exact reversal either.
+        second = Bond(
+            c,
+            b,
+            ctx_abc_abd_xyz.slipnet.nodes["plato-successor"],
+            ctx_abc_abd_xyz.slipnet.nodes["plato-letter-category"],
+            c.letter_category,
+            b.letter_category,
+            ctx_abc_abd_xyz.slipnet.nodes["plato-left"],
+        )
+        second.proposal_level = Bond.BUILT
+        init.add_bond(second)
+
+        assert scan_bonds(ctx_abc_abd_xyz, 5, True, first) == [first]
+
+    def test_a_bond_on_a_different_facet_stops_the_scan(self, ctx_abc_abd_xyz, meta):
+        from server.engine.codelet_dsl.builtins import scan_bonds
+
+        init = ctx_abc_abd_xyz.workspace.initial_string
+        a, b, c = init.letters
+        first = _letter_bond(ctx_abc_abd_xyz, a, b, "plato-successor", "plato-right")
+        init.add_bond(first)
+        second = _letter_bond(
+            ctx_abc_abd_xyz, b, c, "plato-successor", "plato-right", facet="plato-length"
+        )
+        init.add_bond(second)
+
+        assert scan_bonds(ctx_abc_abd_xyz, 5, True, first) == [first]
+
+    def test_an_opposite_polarity_bond_is_taken_flipped(self, ctx_abc_abd_xyz, meta):
+        """groups.ss:899-903.  A right-going successor run can absorb a left-going
+        *predecessor* bond by reading it the other way round — which is how the
+        reference reaches groups whose relation currently exists in the string
+        only in the opposite polarity."""
+        from server.engine.codelet_dsl.builtins import scan_bonds
+
+        ctx = ctx_abc_abd_xyz
+        init = ctx.workspace.initial_string
+        a, b, c = init.letters
+        first = _letter_bond(ctx, a, b, "plato-successor", "plato-right")
+        init.add_bond(first)
+        opposite = Bond(
+            c,
+            b,
+            ctx.slipnet.nodes["plato-predecessor"],
+            ctx.slipnet.nodes["plato-letter-category"],
+            c.letter_category,
+            b.letter_category,
+            ctx.slipnet.nodes["plato-left"],
+        )
+        opposite.proposal_level = Bond.BUILT
+        init.add_bond(opposite)
+
+        scanned = scan_bonds(ctx, 5, True, first)
+        assert len(scanned) == 2
+        flipped = scanned[1]
+        assert flipped is not opposite
+        assert flipped.bond_category is ctx.slipnet.nodes["plato-successor"]
+        assert flipped.direction is ctx.slipnet.nodes["plato-right"]
+        assert init.get_equivalent_flipped_bond(flipped) is opposite
+
+    def test_the_scan_is_bounded_by_the_count(self, ctx_abc_abd_xyz_with_bonds, meta):
+        from server.engine.codelet_dsl.builtins import scan_bonds
+
+        init = ctx_abc_abd_xyz_with_bonds.workspace.initial_string
+        first = init.letters[0].right_bond
+        assert len(scan_bonds(ctx_abc_abd_xyz_with_bonds, 1, True, first)) == 1
+        assert len(scan_bonds(ctx_abc_abd_xyz_with_bonds, 5, True, first)) == 2
+
+
+class TestNumBondsToScan:
+    """``bond-scan-distribution`` (workspace-strings.ss:56-59) — values ``0..n-1``
+    at weights ``i^2``, so zero is unreachable and long scans are favoured."""
+
+    def test_never_zero_and_never_the_string_length(self, ctx_abc_abd_xyz, meta):
+        from server.engine.codelet_dsl.builtins import num_bonds_to_scan
+
+        ctx = ctx_abc_abd_xyz
+        target = ctx.workspace.target_string  # "xyz", three letters
+        drawn = set()
+        for seed in range(200):
+            ctx.rng = RNG(seed)
+            drawn.add(num_bonds_to_scan(ctx, target))
+        assert drawn == {1, 2}
+
+    def test_long_scans_are_favoured_four_to_one(self, ctx_abc_abd_xyz, meta):
+        from server.engine.codelet_dsl.builtins import num_bonds_to_scan
+
+        ctx = ctx_abc_abd_xyz
+        target = ctx.workspace.target_string
+        counts = {1: 0, 2: 0}
+        for seed in range(2000):
+            ctx.rng = RNG(seed)
+            counts[num_bonds_to_scan(ctx, target)] += 1
+        # weights 1 and 4 -> 0.2 / 0.8
+        assert counts[2] / 2000 == pytest.approx(0.8, abs=0.03)
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Group descriptions and proposal — GR-1 and GR-10
+# ═══════════════════════════════════════════════════════════════════════
+
+
+class TestGroupDescriptions:
+    def test_a_group_carries_no_length_description_of_its_own(
+        self, ctx_abc_abd_xyz_with_bonds, meta
+    ):
+        """GR-1: ``make-group`` (groups.ss:20-54) attaches none.  Attaching one to
+        every group jolted ``plato-one/two/three`` — and through them
+        ``plato-length`` — on every build, permanently inflating the length facet."""
+        ctx = ctx_abc_abd_xyz_with_bonds
+        init = ctx.workspace.initial_string
+        group = Group(
+            init,
+            ctx.slipnet.nodes["plato-succgrp"],
+            ctx.slipnet.nodes["plato-letter-category"],
+            ctx.slipnet.nodes["plato-right"],
+            init.letters,
+            list(init.bonds),
+        )
+        assert not group.description_type_present(ctx.slipnet.nodes["plato-length"])
+
+    def test_a_cold_three_group_almost_never_gets_one_at_proposal(
+        self, ctx_abc_abd_xyz_with_bonds, meta
+    ):
+        """``length-description-probability`` (workspace-structure-formulas.ss:21-29)
+        is ``0.5 ** (n^3 * (100 - Length activation)/100)`` — 0.5^27 for a cold
+        three-group, temperature-adjusted."""
+        from server.engine.codelet_dsl.builtins import propose_group
+
+        ctx = ctx_abc_abd_xyz_with_bonds
+        ctx.slipnet.nodes["plato-length"].activation = 0.0
+        init = ctx.workspace.initial_string
+        length = ctx.slipnet.nodes["plato-length"]
+        attached = 0
+        for seed in range(50):
+            ctx.rng = RNG(seed)
+            group = propose_group(
+                ctx, init.letters, list(init.bonds),
+                ctx.slipnet.nodes["plato-succgrp"], ctx.slipnet.nodes["plato-right"],
+            )
+            attached += group.description_type_present(length)
+        assert attached == 0
+
+    def test_a_singleton_always_gets_one_at_proposal(
+        self, ctx_abc_abd_xyz_with_bonds, meta
+    ):
+        """The same formula returns 1 for ``group-length`` 1, so a group of one is
+        always described by its length — which is what makes it an idea rather
+        than a bare letter (trace.ss:1355)."""
+        from server.engine.codelet_dsl.builtins import propose_group
+
+        ctx = ctx_abc_abd_xyz_with_bonds
+        init = ctx.workspace.initial_string
+        group = propose_group(
+            ctx, [init.letters[0]], [], ctx.slipnet.nodes["plato-samegrp"], None
+        )
+        assert group.description_type_present(ctx.slipnet.nodes["plato-length"])
+
+    def test_a_singleton_carries_a_bond_category_description(
+        self, ctx_abc_abd_xyz, meta
+    ):
+        """GR-10: ``groups.ss:30-31`` attaches BondCtgy unconditionally, from the
+        category-derived bond category.  Gating it on the presence of constituent
+        bonds left every singleton without one, so a bridge to a singleton lost
+        its BondCtgy concept-mapping."""
+        ctx = ctx_abc_abd_xyz
+        target = ctx.workspace.target_string
+        group = Group(
+            target,
+            ctx.slipnet.nodes["plato-samegrp"],
+            ctx.slipnet.nodes["plato-letter-category"],
+            None,
+            [target.letters[0]],
+            [],
+        )
+        assert group.bond_category is ctx.slipnet.nodes["plato-sameness"]
+        descriptors = [d.descriptor for d in group.get_all_descriptions()]
+        assert ctx.slipnet.nodes["plato-sameness"] in descriptors
+
+    def test_a_group_between_the_two_edges_is_described_middle(self, meta, runner):
+        """GR-10: ``make-group`` orders the cond whole -> leftmost -> **middle** ->
+        rightmost (groups.ss:34-42).  The middle branch was missing outright, so no
+        group could ever be described ``middle``."""
+        runner.init_mcat("abc", "abd", "abcde", seed=SEED)
+        ctx = runner.ctx
+        target = ctx.workspace.target_string
+        group = Group(
+            target,
+            ctx.slipnet.nodes["plato-samegrp"],
+            ctx.slipnet.nodes["plato-letter-category"],
+            None,
+            target.letters[1:4],
+            [],
+        )
+        position = group.get_descriptor_for(
+            ctx.slipnet.nodes["plato-string-position-category"]
+        )
+        assert position is ctx.slipnet.nodes["plato-middle"]
+
+
+class TestDuplicateGroup:
+    def test_a_duplicate_proposal_hands_over_its_new_descriptions(
+        self, ctx_abc_abd_xyz_with_group, meta
+    ):
+        """GR-10: the duplicate branch (groups.ss:631-642) re-activates the
+        incumbent's descriptors and transfers any description the proposal has and
+        it lacks — canonically the Length one, which is how a group usually
+        acquires one at all."""
+        from server.engine.groups import attach_length_description
+
+        ctx = ctx_abc_abd_xyz_with_group
+        target = ctx.workspace.target_string
+        incumbent = target.groups[0]
+        length = ctx.slipnet.nodes["plato-length"]
+        incumbent.descriptions = [
+            d for d in incumbent.descriptions if d.description_type is not length
+        ]
+        assert not incumbent.description_type_present(length)
+
+        duplicate = Group(
+            target,
+            incumbent.group_category,
+            incumbent.bond_facet,
+            incumbent.direction,
+            list(incumbent.objects),
+            [],
+        )
+        attach_length_description(duplicate)
+        duplicate.proposal_level = Group.EVALUATED
+
+        assert build_structure(ctx, duplicate) is False
+        assert duplicate not in target.groups
+        assert incumbent.description_type_present(length), (
+            "the incumbent should have absorbed the proposal's Length description"
+        )
+
+
+class TestBreaker:
+    def test_a_bond_inside_a_built_group_is_broken_only_with_the_group(
+        self, ctx_abc_abd_xyz_with_bonds, meta
+    ):
+        """``breakers.ss:31-40`` — the joint case, at ``p1 * p2``.
+
+        Breaking a bond on its own leaves a group standing over bonds that no
+        longer exist, which is a Workspace state the reference cannot represent.
+        """
+        ctx = ctx_abc_abd_xyz_with_bonds
+        init = ctx.workspace.initial_string
+        bonds = list(init.bonds)
+        group = Group(
+            init,
+            ctx.slipnet.nodes["plato-succgrp"],
+            ctx.slipnet.nodes["plato-letter-category"],
+            ctx.slipnet.nodes["plato-right"],
+            init.letters,
+            bonds,
+        )
+        group.proposal_level = Group.EVALUATED
+        build_structure(ctx, group)
+        assert bonds[0].enclosing_group is group
+
+        interp = CodeletInterpreter(builtins=_get_test_builtins())
+        registry = CodeletRegistry.from_metadata(meta, interp)
+        compiled = registry.get_compiled("breaker")
+
+        broke = False
+        for seed in range(60):
+            ctx.rng = RNG(seed)
+            ctx.temperature.value = 100.0
+            interp.execute(compiled, ctx)
+            if not group.is_built:
+                broke = True
+                break
+            # Whatever else happened, no constituent bond left on its own.
+            assert all(b in init.bonds for b in bonds), (
+                "a bond inside a built group was broken without its group"
+            )
+        assert broke, "at temperature 100 the pair should eventually break"
+        assert group not in init.groups

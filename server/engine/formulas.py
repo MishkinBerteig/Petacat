@@ -62,6 +62,55 @@ def temp_adjusted_probability(
         return max(0.5, 1.0 - ((1.0 - prob) + adjustment * prob))
 
 
+def group_evaluation_probability(
+    strength: float, temperature: float, meta: MetadataProvider
+) -> float:
+    """The group evaluator's own survival curve.
+
+    Scheme: ``group-evaluation-probability`` (``groups.ss:616-619``)::
+
+        (+ (* (% *temperature*) (- (/ 2 (1+ (exp (/ (- x) 5)))) 1))
+           (* (1- (% *temperature*)) (% x)))
+
+    which the author's own comment (``groups.ss:607-614``) gives as
+
+        f(x) = T/100 * tanh(x/10) + (1 - T/100) * x/100
+
+    and explains: "Copycat has problems building weak groups in strings such as
+    xwyxzy or abijxy, especially in the beginning of a run.  At higher
+    temperatures, the probability is strongly boosted toward 1 for all but the
+    lowest values of x.  At lower temperatures, the probability approaches a
+    linear identity function."
+
+    This is **not** ``temp_adjusted_probability``, and the difference is the
+    point of the function: a strength-20 group at T=100 survives here with
+    p = 0.96, where the generic curve gives 0.28.  Early group formation — the
+    seed of every grouped reading — was being suppressed by a factor of three
+    and a half at exactly the temperature the reference deliberately boosts it.
+    """
+    divisor = meta.get_formula_coeff("group_evaluation_tanh_divisor")  # 5
+    t = temperature / 100.0
+    return t * (2.0 / (1.0 + math.exp(-strength / divisor)) - 1.0) + (1.0 - t) * (
+        strength / 100.0
+    )
+
+
+def bond_degree_of_assoc(bond_category: SlipnetNode) -> float:
+    """A bond category's degree of association, scaled for urgencies and strengths.
+
+    Scheme: ``bond-degree-of-assoc`` (``bonds.ss:490-492``) —
+    ``(min 100 (round (* 11 (sqrt (tell bond-category 'get-degree-of-assoc)))))``.
+
+    ``propose-group`` (``groups.ss:827``) posts its evaluator at this urgency, so
+    it is not a bond-only quantity; :meth:`server.engine.bonds.Bond._bond_degree_of_assoc`
+    is the same formula reached from the other side.
+    """
+    degree = getattr(bond_category, "degree_of_assoc", None)
+    if degree is None:
+        return 0.0
+    return min(100.0, round(11.0 * math.sqrt(max(0.0, degree()))))
+
+
 def temp_adjusted_values(
     values: list[float], temperature: float, meta: MetadataProvider
 ) -> list[float]:

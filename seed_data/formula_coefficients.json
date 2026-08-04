@@ -36,6 +36,7 @@
   "concept_mapping_depth_penalty_exponent": 2.0,
   "length_description_max_group_length": 5,
   "length_description_base": 0.5,
+  "group_evaluation_tanh_divisor": 5.0,
   "single_letter_group_exponent_1_supporting": 4.0,
   "single_letter_group_exponent_2_supporting": 2.0,
   "single_letter_group_exponent_3_plus_supporting": 1.0,

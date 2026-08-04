@@ -43,14 +43,19 @@ SEED = 42
 #: went unrestorable without any test noticing.
 #:
 #: Reseeded from 12345 to 34 when the snag response gained its restart
-#: (``answers.ss:1189-1191``), and from 34 to 12 when the bond round replaced the
+#: (``answers.ss:1189-1191``), from 34 to 12 when the bond round replaced the
 #: local-density walk and the neighbour candidate set (``bonds.ss:136-160``,
-#: ``workspace-objects.ss:375-423``).  Both times for the same reason: which answer a
-#: given seed reaches is not a gate — the standard is expected-range agreement — but
-#: this test needs *some* seed whose trace carries all three rich event types.  12
-#: answers, snags *and* clamps inside 3,000 codelets under all three numeric backends.
+#: ``workspace-objects.ss:375-423``), and from 12 to 50 when the group round put a
+#: group's bond factor back on its category's degree of association
+#: (``groups.ss:392-398``), which makes successor groups markedly weaker and so
+#: moves every trajectory.  Each time for the same reason: which answer a given
+#: seed reaches is not a gate — the standard is expected-range agreement — but this
+#: test needs *some* seed whose trace carries all three rich event types.  50
+#: answers, snags *and* clamps under all three numeric backends, at 6,019 codelets.
 ANSWERING_PROBLEM = ("abc", "abd", "xyz")
-ANSWERING_SEED = 12
+ANSWERING_SEED = 50
+#: Snag-then-answer takes longer than it did; 3,000 codelets no longer reaches it.
+ANSWERING_MAX_STEPS = 8000
 
 
 @pytest.fixture(scope="module")
@@ -300,7 +305,7 @@ def test_an_end_of_run_capture_restores_after_the_run_answered(meta):
     references to it resolve by role.
     """
     runner = _fresh_answering(meta)
-    result = runner.run_mcat(max_steps=3000)
+    result = runner.run_mcat(max_steps=ANSWERING_MAX_STEPS)
     assert result.status == "answer_found", "this seed must answer for the test to bite"
 
     event_types = {type(e).__name__ for e in runner.ctx.trace.events}

@@ -254,6 +254,29 @@ class WorkspaceObject:
                 return True
         return False
 
+    def delete_description_type(self, desc_type: Any) -> list[Any]:
+        """Drop every description along *desc_type*, returning the ones removed.
+
+        Scheme: ``delete-description-type`` (workspace-objects.ss:302-308).  Its
+        one caller is the stale-``middle`` sweep
+        (``workspace-strings.ss:300-321``): a description that has stopped being
+        true has to leave the object, not merely stop being counted.
+        """
+        removed = [d for d in self.descriptions if d.description_type is desc_type]
+        if removed:
+            self.descriptions = [
+                d for d in self.descriptions if d.description_type is not desc_type
+            ]
+        bond_descriptions = getattr(self, "bond_descriptions", None)
+        if bond_descriptions:
+            also = [d for d in bond_descriptions if d.description_type is desc_type]
+            if also:
+                removed.extend(also)
+                self.bond_descriptions = [
+                    d for d in bond_descriptions if d.description_type is not desc_type
+                ]
+        return removed
+
     def descriptor_present(self, descriptor: Any) -> bool:
         """Check if a descriptor is attached to any description.
 

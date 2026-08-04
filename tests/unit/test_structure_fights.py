@@ -299,6 +299,29 @@ def test_bond_fights_a_group_that_nests_both_objects_two_levels_up():
     assert [(o, w1, w2) for o, w1, w2 in incompatibles] == [(outer, 1.0, 4.0)]
 
 
+# groups.ss:283-286 — a proposed group's incompatible groups are exactly the
+# **enclosing groups of its constituents**, not every group whose span overlaps.
+def test_a_supergroup_over_built_subgroups_has_no_incompatible_groups():
+    """``[[m][rr][jjj]]`` is a hierarchy, not a competition.
+
+    Fighting every span-overlapping group meant a supergroup had to beat its own
+    constituents and then broke them, leaving ``structure.objects`` holding groups
+    no longer in the string.  The reference has the subgroups become nested
+    members (groups.ss:925-928) instead.
+    """
+    string = _string("abcd")
+    a, b, c, d = string.objects[:4]
+    samegrp = FakeNode("plato-same-group")
+
+    left_pair = _built(_group([a, b], string, samegrp))
+    right_pair = _built(_group([c, d], string, samegrp))
+    string.groups.extend([left_pair, right_pair])
+
+    supergroup = _group([left_pair, right_pair], string, samegrp)
+    assert supergroup.get_incompatible_groups() == []
+    assert _get_incompatible_structures(_FakeCtx(), supergroup) == []
+
+
 # groups.ss:665-680 — a rival reading of the same material (same category *and*
 # direction) is weighted by ``get-group-length``, the constituent count
 # (groups.ss:80,242), not by letter span.
@@ -313,11 +336,13 @@ def test_group_versus_same_category_group_is_weighted_by_group_length():
     succgrp = FakeNode("plato-successor-group")
     right = FakeNode("plato-right")
 
-    # Two subgroups make a group of *length 2* spanning all four letters.
-    left_pair = _group([a, b], string, succgrp, right)
-    right_pair = _group([c, d], string, succgrp, right)
-    incumbent = _built(_group([left_pair, right_pair], string, succgrp, right))
+    # The incumbent holds ``a`` directly alongside a subgroup: *length 2* spanning
+    # all four letters.  ``a`` is the constituent whose enclosing group it is, and
+    # so the only route by which the proposal meets it (groups.ss:283-286).
+    tail = _group([b, c, d], string, succgrp, right)
+    incumbent = _built(_group([a, tail], string, succgrp, right))
     string.groups.append(incumbent)
+    a.enclosing_group = incumbent
 
     # A rival of *length 3* spanning only three of them.
     proposed = _group([a, b, c], string, succgrp, right)
@@ -342,6 +367,8 @@ def test_group_versus_differently_categorised_group_is_one_to_one():
 
     incumbent = _built(_group([a, b], string, samegrp, None))
     string.groups.append(incumbent)
+    a.enclosing_group = incumbent
+    b.enclosing_group = incumbent
     proposed = _group([a, b, c], string, succgrp, right)
 
     incompatibles = _get_incompatible_structures(_FakeCtx(), proposed)

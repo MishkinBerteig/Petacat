@@ -31,6 +31,12 @@ class WorkspaceStructure:
         self.proposal_level = self.PROPOSED
         self.strength: float = 0.0
         self.time_stamp: int = 0
+        #: The group this structure is a constituent of, if any.  Set for *bonds*
+        #: by ``build-group`` (groups.ss:927-928) and cleared by ``break-group``
+        #: (groups.ss:988-989); the breaker reads it to decide whether a bond can
+        #: be broken on its own (breakers.ss:31-40).  Declared on the base so the
+        #: field set is the same on every structure the state graph captures.
+        self.enclosing_group: object | None = None
 
     @classmethod
     def set_themespace(cls, themespace: object | None) -> None:

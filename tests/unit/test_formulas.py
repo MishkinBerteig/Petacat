@@ -2,8 +2,12 @@
 their own constants: averaging, the sigmoid, and the five
 translation-temperature distributions."""
 
+import math
+
 import pytest
 from server.engine.formulas import (
+    bond_degree_of_assoc,
+    group_evaluation_probability,
     temp_adjusted_probability,
     weighted_average,
     sigmoid,
@@ -260,3 +264,90 @@ class TestDistributionConstants:
         peak_indices = [d.frequencies.index(150) for d in dists]
         # Peaks should be at indices 1, 2, 3, 4, 5 respectively
         assert peak_indices == [1, 2, 3, 4, 5]
+
+
+# ---------------------------------------------------------------------------
+# group_evaluation_probability — groups.ss:607-619
+#
+# The author's own comment gives it as
+#     f(x) = T/100 * tanh(x/10) + (1 - T/100) * x/100
+# and explains that it exists because "Copycat has problems building weak groups
+# in strings such as xwyxzy or abijxy, especially in the beginning of a run.  At
+# higher temperatures, the probability is strongly boosted toward 1 for all but
+# the lowest values of x.  At lower temperatures, the probability approaches a
+# linear identity function."
+# ---------------------------------------------------------------------------
+
+
+class _GroupEvalMeta:
+    def get_formula_coeff(self, name):
+        assert name == "group_evaluation_tanh_divisor"
+        return 5.0
+
+
+@pytest.mark.parametrize(
+    "strength,temperature,expected",
+    [
+        # T=0: the identity on 0..100 -> 0.0..1.0.
+        (0.0, 0.0, 0.0),
+        (20.0, 0.0, 0.20),
+        (100.0, 0.0, 1.0),
+        # T=100: tanh(x/10) alone.
+        (0.0, 100.0, 0.0),
+        (20.0, 100.0, math.tanh(2.0)),
+        (50.0, 100.0, math.tanh(5.0)),
+        # Halfway between the two curves.
+        (20.0, 50.0, 0.5 * math.tanh(2.0) + 0.5 * 0.20),
+    ],
+)
+def test_group_evaluation_probability_matches_the_stated_closed_form(
+    strength, temperature, expected
+):
+    assert group_evaluation_probability(
+        strength, temperature, _GroupEvalMeta()
+    ) == pytest.approx(expected, abs=1e-12)
+
+
+def test_a_weak_group_at_high_temperature_is_boosted_far_above_the_generic_curve():
+    """GR-3: the whole reason the author wrote a separate curve.
+
+    Strength 20 at T=100 survives group evaluation with p = 0.96, where the
+    generic acceptance the port was using gives 0.28 — a suppression of early
+    group formation by a factor of three and a half at exactly the temperature
+    the reference deliberately boosts it.
+    """
+    dedicated = group_evaluation_probability(20.0, 100.0, _GroupEvalMeta())
+    generic = temp_adjusted_probability(0.20, 100.0, _FakeMeta())
+    assert dedicated == pytest.approx(0.964, abs=0.001)
+    assert generic == pytest.approx(0.28, abs=0.001)
+
+
+# ---------------------------------------------------------------------------
+# bond_degree_of_assoc — bonds.ss:490-492
+# ---------------------------------------------------------------------------
+
+
+class _AssocNode:
+    def __init__(self, degree):
+        self._degree = degree
+
+    def degree_of_assoc(self):
+        return self._degree
+
+
+@pytest.mark.parametrize(
+    "degree,expected",
+    [
+        (0.0, 0.0),
+        (40.0, 70.0),    # round(11 * sqrt(40))  = round(69.57)
+        (76.0, 96.0),    # round(11 * sqrt(76))  = round(95.89)
+        (100.0, 100.0),  # round(11 * sqrt(100)) = 110, capped at 100
+    ],
+)
+def test_bond_degree_of_assoc(degree, expected):
+    assert bond_degree_of_assoc(_AssocNode(degree)) == expected
+
+
+def test_bond_degree_of_assoc_of_nothing_is_zero():
+    """``propose-group`` reads it off a category that may not resolve."""
+    assert bond_degree_of_assoc(None) == 0.0

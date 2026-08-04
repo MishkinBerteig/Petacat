@@ -62,14 +62,26 @@ def get_builtins() -> dict[str, Any]:
         "choose_bond_facet": choose_bond_facet,
         "choose_string": choose_string,
         "choose_string_for": choose_string_for,
+        "choose_leftmost_object": choose_leftmost_object,
         # Structure proposals
         "propose_bond": propose_bond,
+        "propose_group": propose_group,
         "propose_description": propose_description,
         "activate_from_workspace": activate_from_workspace,
+        # Group scanning (groups.ss:840-907)
+        "num_bonds_to_scan": num_bonds_to_scan,
+        "scan_bonds": scan_bonds,
+        "polarize_bonds": polarize_bonds,
+        "right_adjacent_bonds": right_adjacent_bonds,
+        "right_adjacent_objects": right_adjacent_objects,
+        "bonds_still_available": bonds_still_available,
         # Structure evaluation
         "evaluate_structure": evaluate_structure,
+        "evaluate_group": evaluate_group,
         "build_structure": build_structure,
         "break_structure": break_structure,
+        "break_group": _break_group_builtin,
+        "break_bond": _break_bond_builtin,
         # Stochastic helpers
         "prob": prob,
         "weighted_pick": weighted_pick,
@@ -316,14 +328,23 @@ def _bond_facets(obj: Any) -> list[Any]:
 
 
 def choose_string(ctx: EngineContext, weight_fn: str = "unhappiness") -> Any:
-    """Choose a workspace string weighted by unhappiness.
+    """Choose a workspace string weighted by unhappiness alone.
 
-    A bare ``stochastic-pick`` in the Scheme (the top-down scouts'
-    string choice, ``bonds.ss:221-239``): no temperature adjustment and no
+    Scheme: ``group-scout:whole-string`` (groups.ss:547-556) — a bare
+    ``stochastic-pick`` with no relevance term, no temperature adjustment and no
     floor, so a perfectly happy string is not chosen at all
     (``utilities.ss:443-448``).
+
+    The range is ``*non-answer-strings*`` unless the run is justifying, exactly as
+    in the top-down scouts' choice: ranging over ``all_strings`` let a discovery
+    run that had posted an answer aim its scouts at the answer string.
     """
-    strings = ctx.workspace.all_strings
+    workspace = ctx.workspace
+    strings = (
+        workspace.all_strings
+        if workspace.justify_mode
+        else [workspace.initial_string, workspace.modified_string, workspace.target_string]
+    )
     weights = [s.get_average_intra_string_unhappiness() for s in strings]
     return ctx.rng.weighted_pick(strings, weights)
 
@@ -392,6 +413,271 @@ def propose_bond(
     urgency = round(bond_category.activation) if hasattr(bond_category, 'activation') else 35
     post_codelet(ctx, "bond-evaluator", urgency, structure=bond)
     return bond
+
+
+def propose_group(
+    ctx: EngineContext,
+    objects: list[Any],
+    bonds: list[Any],
+    group_category: Any,
+    direction: Any = None,
+) -> Group:
+    """Create a proposed group and post its evaluator.
+
+    Scheme: ``propose-group`` (groups.ss:800-828), whole.  Four things happen here
+    that no Petacat scout was doing:
+
+    * the group's bond facet comes from its **first constituent bond**, and is
+      letter-category only when there are no bonds at all (groups.ss:808-811);
+    * a Length description is attached **stochastically**, at
+      ``length-description-probability`` (groups.ss:816-818) — 1 for a singleton,
+      but 0.5^27 for a cold three-group, so an ordinary group almost never gets
+      one at proposal time;
+    * the bond category and the direction are jolted **at proposal**, not only on
+      a successful build (groups.ss:819-821), which is what keeps a category warm
+      through the proposals that fizzle;
+    * the evaluator is posted at ``bond-degree-of-assoc`` of the bond category
+      (groups.ss:827), a property of the idea being proposed, rather than at the
+      current activation of whichever node the scout was launched from.
+    """
+    from server.engine.formulas import bond_degree_of_assoc, length_description_probability
+    from server.engine.groups import attach_length_description
+
+    objects = list(objects)
+    bonds = list(bonds)
+    string = objects[0].string
+    related = getattr(group_category, "get_related_node", None)
+    bond_category = related("plato-bond-category") if related else None
+    bond_facet = (
+        bonds[0].bond_facet if bonds else ctx.slipnet.nodes.get("plato-letter-category")
+    )
+
+    group = Group(string, group_category, bond_facet, direction, objects, bonds)
+    group.time_stamp = ctx.codelet_count
+
+    length_node = ctx.slipnet.nodes.get("plato-length")
+    if length_node is not None:
+        probability = length_description_probability(
+            group, length_node, ctx.temperature.value, ctx.meta
+        )
+        if ctx.rng.prob(probability):
+            attach_length_description(group)
+
+    activate_from_workspace(ctx, bond_category, direction)
+    _read(ctx, *objects)
+    post_codelet(
+        ctx,
+        "group-evaluator",
+        round(bond_degree_of_assoc(bond_category)),
+        structure=group,
+    )
+    return group
+
+
+def evaluate_group(ctx: EngineContext, group: Group) -> bool:
+    """Decide whether a proposed group survives evaluation.
+
+    Scheme: ``group-evaluator`` (groups.ss:582-604).  The survival test is
+    ``group-evaluation-probability`` (groups.ss:616-619), *not* the generic
+    temperature-adjusted acceptance every other evaluator uses — see
+    :func:`server.engine.formulas.group_evaluation_probability` for why the author
+    added a separate curve.  On survival the bond category and the direction are
+    jolted again (groups.ss:598-601).
+    """
+    from server.engine.formulas import group_evaluation_probability
+
+    group.update_strength()
+    _read(ctx, group)
+    survival = group_evaluation_probability(
+        group.strength, ctx.temperature.value, ctx.meta
+    )
+    if not ctx.rng.prob(survival):
+        return False
+    activate_from_workspace(ctx, group.bond_category, group.direction)
+    group.proposal_level = group.EVALUATED
+    _wrote(ctx, group)
+    return True
+
+
+def num_bonds_to_scan(ctx: EngineContext, string: Any) -> int:
+    """How many bonds a group scout may follow.
+
+    Scheme: ``bond-scan-distribution`` (workspace-strings.ss:56-59) — the values
+    are ``ascending-index-list`` of the string's letter count, i.e. ``0..n-1``,
+    weighted by ``i^2``.  Zero carries weight zero, so the draw is effectively
+    over ``1..n-1`` with **long scans strongly favoured**: in a six-letter string
+    5 is 25 times as likely as 1.  A uniform draw over ``1..n`` — which is what
+    the ported scouts used — both flattens that preference and offers a length the
+    string cannot supply.
+    """
+    n = getattr(string, "length", 0)
+    if n < 2:
+        return 0
+    values = list(range(n))
+    return ctx.rng.weighted_pick(values, [float(i * i) for i in values])
+
+
+def choose_leftmost_object(ctx: EngineContext, string: Any) -> Any:
+    """Pick, by relative importance, an object described as leftmost.
+
+    Scheme: ``choose-leftmost-object`` (workspace-strings.ss:351-359) — a
+    ``stochastic-pick-by-method ... 'get-relative-importance`` over every object
+    whose string-position descriptor is ``plato-leftmost``.  *Objects*, not
+    letters: a group edged at position 0 is a candidate, which is what makes a
+    spanning group **of groups** reachable from the whole-string scout at all.
+    """
+    leftmost = ctx.slipnet.nodes.get("plato-leftmost")
+    position_type = ctx.slipnet.nodes.get("plato-string-position-category")
+    if leftmost is None or position_type is None:
+        return None
+    candidates = [
+        obj
+        for obj in getattr(string, "objects", ())
+        if obj.get_descriptor_for(position_type) is leftmost
+    ]
+    if not candidates:
+        return None
+    chosen = ctx.rng.weighted_pick(
+        candidates, [obj.relative_importance for obj in candidates]
+    )
+    _read(ctx, chosen)
+    return chosen
+
+
+def scan_bonds(
+    ctx: EngineContext, max_num_to_scan: int, scan_right: bool, initial_bond: Any
+) -> list[Any]:
+    """Follow a run of like bonds outwards from *initial_bond*.
+
+    Scheme: ``scan-bonds`` (groups.ss:879-907).  A bond extends the run only when
+    its **facet, category and direction** all match the initial bond's — and,
+    additionally, an opposite-category *and* opposite-direction bond is accepted
+    as its own **flipped version**.
+
+    Both halves were missing.  Checking the category alone let a left-going and a
+    right-going successor bond, or a letter-category and a length bond, be chained
+    into one "group" whose recorded direction and facet misdescribe its own
+    contents — a structure the reference cannot build.  And with no flipping, a
+    group whose relation currently exists as opposite-polarity bonds (right-going
+    predecessors where a left-going successor group is wanted) was simply
+    unreachable, where the reference reaches it by proposing the reversals and
+    making the builder pay for them.
+
+    The returned list is always in left-to-right order.
+    """
+    from server.engine.slipnet import opposite_node
+
+    facet = initial_bond.bond_facet
+    category = initial_bond.bond_category
+    direction = initial_bond.direction
+    opposite_category = opposite_node(category)
+    opposite_direction = opposite_node(direction) if direction is not None else None
+
+    collected: list[Any] = []
+    bond = initial_bond
+    remaining = max_num_to_scan
+    while remaining > 0 and bond is not None:
+        if (
+            bond.bond_facet is facet
+            and bond.bond_category is category
+            and bond.direction is direction
+        ):
+            collected.append(bond)
+        elif (
+            opposite_category is not None
+            and bond.bond_facet is facet
+            and bond.bond_category is opposite_category
+            and bond.direction is opposite_direction
+        ):
+            collected.append(bond.flipped())
+        else:
+            break
+        remaining -= 1
+        anchor = bond.right_object if scan_right else bond.left_object
+        bond = anchor.right_bond if scan_right else anchor.left_bond
+
+    return collected if scan_right else list(reversed(collected))
+
+
+def polarize_bonds(
+    ctx: EngineContext,
+    bonds: list[Any],
+    bond_facet: Any,
+    bond_category: Any,
+    direction: Any,
+) -> list[Any]:
+    """Read a whole run of bonds as one polarity, or refuse.
+
+    Scheme: ``polarize-bonds`` (groups.ss:858-876).  Every bond must be on the
+    given facet; it is then kept as it is when its category and direction match,
+    or **flipped** when both are the exact opposite.  Anything else aborts the
+    whole list — the ``(return '())`` — because a group cannot be built over a run
+    that does not read consistently in either polarity.
+    """
+    from server.engine.slipnet import opposite_node
+
+    polarized: list[Any] = []
+    for bond in bonds:
+        if bond.bond_facet is not bond_facet:
+            return []
+        if bond.bond_category is bond_category and bond.direction is direction:
+            polarized.append(bond)
+        elif (
+            opposite_node(bond.bond_category) is bond_category
+            and bond.direction is not None
+            and opposite_node(bond.direction) is direction
+        ):
+            polarized.append(bond.flipped())
+        else:
+            return []
+    return polarized
+
+
+def right_adjacent_bonds(ctx: EngineContext, obj: Any) -> list[Any]:
+    """The unbroken run of right-hand bonds starting at *obj*.
+
+    Scheme: ``right-adjacent-bonds`` (groups.ss:840-846).
+    """
+    bonds: list[Any] = []
+    current = obj
+    while True:
+        bond = getattr(current, "right_bond", None)
+        if bond is None or bond in bonds:
+            return bonds
+        bonds.append(bond)
+        current = bond.right_object
+
+
+def right_adjacent_objects(ctx: EngineContext, obj: Any) -> list[Any]:
+    """*obj* and everything reachable from it by right-hand bonds.
+
+    Scheme: ``right-adjacent-objects`` (groups.ss:849-855).
+    """
+    objects: list[Any] = [obj]
+    current = obj
+    while True:
+        bond = getattr(current, "right_bond", None)
+        if bond is None or bond.right_object in objects:
+            return objects
+        objects.append(bond.right_object)
+        current = bond.right_object
+
+
+def bonds_still_available(ctx: EngineContext, group: Group) -> bool:
+    """Do the group's constituent bonds still exist, in either polarity?
+
+    Scheme: ``group-builder`` (groups.ss:643-650) — ``bond-present?`` *or*
+    ``flipped-bond-present?``.  The second disjunct is what lets a proposal built
+    out of flipped copies survive to the builder, where it pays for the reversal.
+    Testing ``bond.is_built`` instead rejected every flipped proposal on sight,
+    since a flipped copy is a fresh object that was never built.
+    """
+    string = group.string
+    for bond in group.group_bonds:
+        if string.bond_present(bond) or string.flipped_bond_present(bond):
+            continue
+        return False
+    return True
 
 
 def propose_description(
@@ -541,7 +827,12 @@ def _build_structure_locked(ctx: EngineContext, structure: Any) -> bool:
     # all check ``bond-present?`` / ``group-present?`` / ``bridge-present?``
     # before doing anything.  Without this the bridge lists filled up with
     # dozens of duplicate a-a bridges, inflating mapping strength.
-    if _equivalent_structure_exists(ctx, structure):
+    if isinstance(structure, Group):
+        equivalent = structure.string.get_equivalent_group(structure)
+        if equivalent is not None and equivalent is not structure:
+            _absorb_duplicate_group(ctx, structure, equivalent)
+            return False
+    elif _equivalent_structure_exists(ctx, structure):
         if isinstance(structure, Bond):
             # Scheme: ``bond-builder`` (bonds.ss:364-369) jolts the bond category —
             # and the direction, if the bond has one — on its way out of the
@@ -558,9 +849,20 @@ def _build_structure_locked(ctx: EngineContext, structure: Any) -> bool:
         if not _wins_fight(ctx, structure, proposer_weight, opponent, opponent_weight):
             return False  # Lost a fight — don't build
 
-    # Won all fights — break incompatibles and build
+    # Won all fights — break incompatibles and build.  A group's beaten *bonds*
+    # are the exception: ``group-builder`` breaks only the groups and the bridges
+    # here (groups.ss:697-700) and leaves each flipped bond to be swapped for its
+    # reversal one at a time in the consolidation below (groups.ss:774-786), so
+    # that the string never passes through a state with the slot empty.
     for opponent, _, _ in incompatibles:
-        break_structure(ctx, opponent)
+        if isinstance(structure, Group) and isinstance(opponent, Bond):
+            continue
+        _break_structure_locked(ctx, opponent)
+
+    if isinstance(structure, Group):
+        structure = _consolidate_group(ctx, structure)
+        if structure is None:
+            return False
 
     if isinstance(structure, Bridge):
         _apply_group_flips(ctx, structure)
@@ -575,6 +877,11 @@ def _build_structure_locked(ctx: EngineContext, structure: Any) -> bool:
         activate_from_workspace(ctx, structure.bond_category, structure.direction)
     elif isinstance(structure, Group):
         structure.string.add_group(structure)
+        # ``build-group`` (groups.ss:927-928) also claims the *bonds*: a bond
+        # inside a group is no longer free-standing, and the breaker's joint case
+        # (breakers.ss:31-40) reads exactly this back-reference.
+        for bond in structure.group_bonds:
+            bond.enclosing_group = structure
         # Scheme: ``build-group`` (groups.ss:929-930) jolts every description's
         # *descriptor* from the Workspace as the group goes in.  Without it the
         # concepts a group is made of never warm: ``plato-two`` and ``plato-three``
@@ -586,6 +893,10 @@ def _build_structure_locked(ctx: EngineContext, structure: Any) -> bool:
             descriptor = getattr(description, "descriptor", None)
             if descriptor is not None and hasattr(descriptor, "activate_from_workspace"):
                 descriptor.activate_from_workspace()
+        # groups.ss:935-936 — a new non-spanning group can falsify a neighbour's
+        # ``middle`` description, and those go with it.
+        if not structure.spans_whole_string():
+            structure.string.delete_invalid_string_position_middle_descriptions()
         _record_group_event(ctx, structure)
     elif isinstance(structure, Bridge):
         ctx.workspace.add_bridge(structure)
@@ -599,6 +910,227 @@ def _build_structure_locked(ctx: EngineContext, structure: Any) -> bool:
     # two objects are, which is what another codelet reading them must notice.
     _wrote(ctx, structure, *_structure_objects(structure))
     return True
+
+
+def _absorb_duplicate_group(
+    ctx: EngineContext, proposed: Group, existing: Group
+) -> None:
+    """A group the string already holds — warm it, and give it what is new.
+
+    Scheme: the duplicate branch of ``group-builder`` (groups.ss:631-642)::
+
+        (for* each description in (tell equivalent-group 'get-descriptions) do
+          (tell (tell description 'get-descriptor) 'activate-from-workspace))
+        (for* each description in (tell proposed-group 'get-descriptions) do
+          (if* (not (tell equivalent-group 'description-present? description))
+            (build-description ...)))
+
+    Two things, and the second is why the branch exists.  The existing group's
+    concepts are re-activated, so a reading the Workspace keeps re-deriving stays
+    warm.  And any description the *proposal* carries that the incumbent lacks is
+    transferred — canonically the Length description, which
+    ``length-description-probability`` only rarely grants, so the second or third
+    proposal of the same group is how a group usually acquires one.  Returning a
+    bare "already exists" threw both away.
+    """
+    for description in existing.descriptions:
+        descriptor = getattr(description, "descriptor", None)
+        if descriptor is not None and hasattr(descriptor, "activate_from_workspace"):
+            descriptor.activate_from_workspace()
+
+    for description in proposed.descriptions:
+        if existing.description_type_present(description.description_type):
+            continue
+        transferred = Description(
+            existing, description.description_type, description.descriptor
+        )
+        transferred.proposal_level = Description.BUILT
+        existing.descriptions.append(transferred)
+        ctx.sink.on_structure_change(ctx, transferred, STRUCTURE_BUILT)
+    _wrote(ctx, existing)
+
+
+def _consolidate_group(ctx: EngineContext, group: Group) -> Group | None:
+    """Flatten, splice or re-polarise a group on its way into the Workspace.
+
+    Scheme: the ``cond`` of ``group-builder`` (groups.ss:707-786), which runs
+    after every fight is won and before ``build-group``.  Three branches:
+
+    1. A **letter-category sameness group containing groups** is rebuilt flat —
+       the subgroups are broken and one group over all the letters replaces them,
+       with any missing letter-to-letter bonds built on the spot.  ``[a][aa]``
+       becomes ``[aaa]``; the author's comment calls this "consolidate all letters
+       into one group".
+    2. A **length-facet sameness group containing length groups** splices their
+       constituents in, fizzling if the result is not uniform in length, and
+       always takes a Length description.
+    3. Otherwise each constituent bond is resolved against the string: the
+       equivalent bond if one is there, else the opposite-polarity twin is broken
+       and the proposal's own reversed bond built in its place.
+
+    Returns the group to build — possibly a *different* object from the one passed
+    in — or ``None`` to fizzle.
+    """
+    from server.engine.groups import Group as GroupClass, attach_length_description
+
+    string = group.string
+    category_name = getattr(group.group_category, "name", "")
+    facet_name = getattr(group.bond_facet, "name", "")
+    constituents = list(group.objects)
+    sameness = ctx.slipnet.nodes.get("plato-sameness")
+    length_node = ctx.slipnet.nodes.get("plato-length")
+    letter_category = ctx.slipnet.nodes.get("plato-letter-category")
+
+    def _length_group(obj: Any) -> bool:
+        # Scheme: ``length-group?`` (groups.ss:793-795).
+        return isinstance(obj, GroupClass) and obj.bond_facet is length_node
+
+    if (
+        category_name == "plato-samegrp"
+        and facet_name == "plato-letter-category"
+        and any(isinstance(o, GroupClass) for o in constituents)
+    ):
+        letters = group.get_letters()
+        for member in constituents:
+            if isinstance(member, GroupClass):
+                _break_group(ctx, member)
+        bonds = _adjacent_bonds(
+            ctx, letters, sameness, letter_category, lambda obj: obj.letter_category
+        )
+        if bonds is None:
+            return None
+        flat = GroupClass(
+            string, group.group_category, letter_category, group.direction, letters, bonds
+        )
+        flat.time_stamp = group.time_stamp
+        flat.proposal_level = group.proposal_level
+        if length_node is not None and group.description_type_present(length_node):
+            attach_length_description(flat)
+        return flat
+
+    if (
+        category_name == "plato-samegrp"
+        and facet_name == "plato-length"
+        and any(_length_group(o) for o in constituents)
+    ):
+        spliced: list[Any] = []
+        for member in constituents:
+            if _length_group(member):
+                spliced.extend(member.objects)
+            else:
+                spliced.append(member)
+        for member in constituents:
+            if _length_group(member):
+                _break_group(ctx, member)
+        if len({getattr(o, "length", 1) for o in spliced}) > 1:
+            # groups.ss:748-751 — a length-sameness group whose new constituents
+            # are not all the same length is not a group at all.
+            return None
+        bonds = _adjacent_bonds(
+            ctx,
+            spliced,
+            sameness,
+            length_node,
+            lambda obj: ctx.slipnet.nodes.get(_PLATONIC_LENGTH[getattr(obj, "length", 1)])
+            if getattr(obj, "length", 1) in _PLATONIC_LENGTH
+            else None,
+        )
+        if bonds is None:
+            return None
+        spliced_group = GroupClass(
+            string, group.group_category, length_node, group.direction, spliced, bonds
+        )
+        spliced_group.time_stamp = group.time_stamp
+        spliced_group.proposal_level = group.proposal_level
+        attach_length_description(spliced_group)
+        return spliced_group
+
+    # groups.ss:774-786 — the ordinary case.
+    resolved: list[Bond] = []
+    for bond in group.group_bonds:
+        equivalent = string.get_equivalent_bond(bond)
+        if equivalent is not None:
+            resolved.append(equivalent)
+            continue
+        flipped = string.get_equivalent_flipped_bond(bond)
+        if flipped is not None:
+            _break_bond(ctx, flipped)
+        elif (
+            bond.left_object.right_bond is not None
+            or bond.right_object.left_bond is not None
+        ):
+            # Neither the bond nor its reversal is what actually holds the slot.
+            # The reference cannot reach this — ``group-builder`` has just checked
+            # both forms are present (groups.ss:643-650) — but under free-running
+            # that check is made outside the commit lock, so another worker may
+            # have replaced the bond in between.  Conflict resolves as a fizzle.
+            return None
+        bond.proposal_level = bond.BUILT
+        string.add_bond(bond)
+        activate_from_workspace(ctx, bond.bond_category, bond.direction)
+        ctx.sink.on_structure_change(ctx, bond, STRUCTURE_BUILT)
+        resolved.append(bond)
+    group.group_bonds = resolved
+    return group
+
+
+_PLATONIC_LENGTH = {
+    1: "plato-one",
+    2: "plato-two",
+    3: "plato-three",
+    4: "plato-four",
+    5: "plato-five",
+}
+
+
+def _adjacent_bonds(
+    ctx: EngineContext,
+    objects: list[Any],
+    bond_category: Any,
+    bond_facet: Any,
+    descriptor_of: Any,
+) -> list[Bond] | None:
+    """Sameness bonds along a run of objects, reusing what is already there.
+
+    Scheme: the ``adjacency-map`` of both consolidation branches
+    (groups.ss:714-726, 752-764) — ``bonded?`` (bonds.ss:516-523) reuses the
+    existing bond, otherwise a fresh one is made *and built* on the spot.
+
+    Returns ``None`` when a positional slot is held by an unrelated bond, which
+    the reference cannot reach and which resolves here as a fizzle.
+    """
+    bonds: list[Bond] = []
+    for left, right in zip(objects, objects[1:]):
+        existing = getattr(left, "right_bond", None)
+        if existing is not None:
+            # ``bonded?`` (bonds.ss:516-523) asks whether the two are joined, in
+            # either orientation; a sameness bond occupies the slot whichever way
+            # its from/to happen to run.
+            if existing.right_object is right:
+                bonds.append(existing)
+                continue
+            # The slot is held by something else entirely — unreachable in the
+            # reference, where the fights are already won, but reachable under
+            # free-running where they were fought on a stale read.  Fizzle.
+            return None
+        if getattr(right, "left_bond", None) is not None:
+            return None
+        bond = Bond(
+            left,
+            right,
+            bond_category,
+            bond_facet,
+            descriptor_of(left),
+            descriptor_of(right),
+            None,
+        )
+        bond.time_stamp = ctx.codelet_count
+        bond.proposal_level = bond.BUILT
+        left.string.add_bond(bond)
+        activate_from_workspace(ctx, bond_category)
+        ctx.sink.on_structure_change(ctx, bond, STRUCTURE_BUILT)
+        bonds.append(bond)
+    return bonds
 
 
 def _apply_group_flips(ctx: EngineContext, bridge: Bridge) -> None:
@@ -828,15 +1360,13 @@ def _equivalent_structure_exists(ctx: EngineContext, structure: Any) -> bool:
         # pair two bonds that each counted toward support and density.
         return structure.string.bond_present(structure)
     if isinstance(structure, Group):
-        return any(
-            g is not structure
-            and g.is_built
-            and g.group_category is structure.group_category
-            and g.direction is structure.direction
-            and g.bond_facet is structure.bond_facet
-            and [id(o) for o in g.objects] == [id(o) for o in structure.objects]
-            for g in structure.string.groups
-        )
+        # ``get-equivalent-group`` (workspace-strings.ss:227-240) — leftmost
+        # constituent, category, direction, constituent count.  Groups take the
+        # duplicate branch of ``_build_structure_locked`` rather than this one,
+        # because the reference does more there than decline (groups.ss:631-642);
+        # the two must nevertheless agree on what a duplicate *is*.
+        equivalent = structure.string.get_equivalent_group(structure)
+        return equivalent is not None and equivalent is not structure
     if isinstance(structure, Bridge):
         bridge_lists = {
             "top": ctx.workspace.top_bridges,
@@ -919,23 +1449,51 @@ def _get_incompatible_structures(
                         incompatibles.append((bridge, 2.0, 3.0))
 
     elif isinstance(structure, Group):
-        # groups.ss:665-682 — a group of the same category *and* direction is a
-        # rival reading of the same material, so the two are weighted by **group
-        # length** (constituent count, ``get-group-length``, groups.ss:80,242),
-        # not letter span: a group of three subgroups outweighs a group of two
-        # however many letters each covers.  Any other incompatible group is 1-1.
-        for group in structure.string.groups:
-            if not group.is_built or group is structure:
+        # groups.ss:652-664 — constituent bonds that exist in the string only as
+        # their opposite-polarity twins.  A directed group asking to reverse them
+        # is worth its **letter span** against 1 apiece.  Won, they are not broken
+        # here: the else-branch of the consolidation replaces each one in place
+        # (groups.ss:774-786), which is what ``_consolidate_group`` does.
+        if getattr(structure.group_category, "name", "") != "plato-samegrp":
+            span = float(structure.span)
+            for bond in structure.group_bonds:
+                flipped = structure.string.get_equivalent_flipped_bond(bond)
+                if flipped is not None:
+                    incompatibles.append((flipped, span, 1.0))
+
+        # groups.ss:665-682 — the incompatible groups are exactly the **enclosing
+        # groups of the constituents** (``get-incompatible-groups``,
+        # groups.ss:283-286), not every group whose span overlaps.  The difference
+        # decides whether a hierarchy can exist at all: a supergroup proposed over
+        # built subgroups has *no* incompatible groups, and the subgroups become
+        # its nested members.  Fighting every overlapping group instead meant a
+        # supergroup had to beat its own constituents and then broke them, leaving
+        # ``structure.objects`` holding groups no longer in the string.
+        #
+        # A rival of the same category *and* direction is weighted by **group
+        # length** (constituent count, ``get-group-length``, groups.ss:80,242), not
+        # letter span; any other is 1-1.
+        for group in structure.get_incompatible_groups():
+            if not getattr(group, "is_built", False):
                 continue
-            # Overlap check
-            if (structure.left_string_pos <= group.right_string_pos
-                    and group.left_string_pos <= structure.right_string_pos):
-                if group.group_category is structure.group_category and group.direction is structure.direction:
-                    incompatibles.append(
-                        (group, float(structure.length), float(group.length))
-                    )
-                else:
-                    incompatibles.append((group, 1.0, 1.0))
+            if (
+                group.group_category is structure.group_category
+                and group.direction is structure.direction
+            ):
+                incompatibles.append(
+                    (group, float(structure.length), float(group.length))
+                )
+            else:
+                incompatibles.append((group, 1.0, 1.0))
+
+        # groups.ss:685-695 — a directed group whose implied direction mapping
+        # contradicts an existing bridge's string-position mapping has to beat it,
+        # 1 vs 1, and breaks it on winning.  Vertical first, then horizontal, as
+        # the Scheme appends them.
+        for orientation in ("vertical", "horizontal"):
+            for bridge in structure.get_incompatible_bridges(orientation):
+                if bridge.is_built:
+                    incompatibles.append((bridge, 1.0, 1.0))
 
     elif isinstance(structure, Bridge):
         # Two bridges are incompatible if they share an object, carry
@@ -1016,7 +1574,7 @@ def _wins_fight(
 
 
 def break_structure(ctx: EngineContext, structure: Any) -> None:
-    """Remove a structure from the workspace.
+    """Remove a structure from the workspace, together with what rested on it.
 
     The structure also stops reporting itself as built — otherwise a broken
     structure still satisfies ``is_built`` and can be counted as support or as
@@ -1027,21 +1585,118 @@ def break_structure(ctx: EngineContext, structure: Any) -> None:
 
 
 def _break_structure_locked(ctx: EngineContext, structure: Any) -> None:
-    structure.proposal_level = structure.PROPOSED
     # Breaking a structure is subcognitive: none of the seven Trace event types
     # of §4.4 covers it, and recording them drowned the Trace in noise.
-    if isinstance(structure, Bond):
-        structure.string.remove_bond(structure)
-    elif isinstance(structure, Group):
-        structure.string.remove_group(structure)
+    if isinstance(structure, Group):
+        _break_group(ctx, structure)
+    elif isinstance(structure, Bond):
+        _break_bond(ctx, structure)
     elif isinstance(structure, Bridge):
-        ctx.workspace.remove_bridge(structure)
-    elif isinstance(structure, Rule):
-        ctx.workspace.remove_rule(structure)
+        _break_bridge(ctx, structure)
+    else:
+        structure.proposal_level = structure.PROPOSED
+        if isinstance(structure, Rule):
+            ctx.workspace.remove_rule(structure)
+        _wrote(ctx, structure, *_structure_objects(structure))
+        ctx.sink.on_structure_change(ctx, structure, STRUCTURE_BROKEN)
+
+
+def _break_group_builtin(ctx: EngineContext, group: Group) -> None:
+    """``break-group`` as a codelet primitive — the breaker's joint case needs it
+    by name, since it breaks a bond *and* its enclosing group together."""
+    with _committing(ctx):
+        _break_group(ctx, group)
+
+
+def _break_bond_builtin(ctx: EngineContext, bond: Bond) -> None:
+    """``break-bond`` as a codelet primitive (breakers.ss:38-40)."""
+    with _committing(ctx):
+        _break_bond(ctx, bond)
+
+
+def _retire(ctx: EngineContext, structure: Any) -> None:
+    """Mark a structure as no longer built and tell the sink.
+
+    Subcognitive for the Trace, but not for Audit: reconstructing an intermediate
+    Workspace in forward order needs removals as much as additions.
+    """
+    structure.proposal_level = structure.PROPOSED
     _wrote(ctx, structure, *_structure_objects(structure))
-    # Subcognitive for the Trace, but not for Audit: reconstructing an intermediate
-    # Workspace in forward order needs removals as much as additions.
     ctx.sink.on_structure_change(ctx, structure, STRUCTURE_BROKEN)
+
+
+def _break_bond(ctx: EngineContext, bond: Bond) -> None:
+    """Scheme: ``break-bond`` (bonds.ss:425-433).
+
+    Leaves the string, and clears the two positional slots and the from/to
+    bond lists.  ``remove_bond`` does the slot half; the lists are its own.
+    """
+    bond.string.remove_bond(bond)
+    bond.from_object.remove_outgoing_bond(bond)
+    bond.to_object.remove_incoming_bond(bond)
+    bond.enclosing_group = None
+    _retire(ctx, bond)
+
+
+def _break_bridge(ctx: EngineContext, bridge: Bridge) -> None:
+    """Scheme: ``break-bridge`` (bridges.ss:1437-1449)."""
+    ctx.workspace.remove_bridge(bridge)
+    _retire(ctx, bridge)
+
+
+def _break_group(ctx: EngineContext, group: Group) -> None:
+    """Scheme: ``break-group`` (groups.ss:954-1018), in the reference's order.
+
+    A group is not a leaf.  Breaking one takes with it the group *enclosing* it
+    (recursively — a supergroup over a member that no longer exists is not a
+    reading of anything), the bonds *incident* to it, and its own vertical and
+    horizontal bridges; it clears the back-references its members and constituent
+    bonds hold to it; and, because ``middle-in-string?`` is relational, it sweeps
+    the string for ``middle`` descriptions the removal has just falsified.
+
+    Petacat had none of this: ``break_structure`` removed the one structure from
+    the one list.  Bridges went on pointing at removed groups — still feeding
+    mapping strength, rule support and unhappiness — supergroups outlived their
+    members, and stale ``middle`` descriptions accumulated.  Those are Workspace
+    states the reference cannot represent at all.
+
+    The reference's ``delete-proposed-bonds`` / ``delete-proposed-*-bridges``
+    steps have no counterpart here: Petacat keeps no proposed-structure lists on
+    the string, and a proposal whose objects have left the Workspace is refused
+    by ``_premises_still_hold`` at build time instead.
+    """
+    string = group.string
+    vertical = group.vertical_bridge
+    horizontal = group.horizontal_bridge
+    enclosing = group.enclosing_group
+
+    if enclosing is not None and enclosing is not group:
+        _break_group(ctx, enclosing)
+
+    string.remove_group(group)
+
+    for bond in group.get_incident_bonds():
+        _break_bond(ctx, bond)
+
+    if vertical is not None:
+        _break_bridge(ctx, vertical)
+    if horizontal is not None:
+        _break_bridge(ctx, horizontal)
+
+    for obj in group.objects:
+        if obj.enclosing_group is group:
+            obj.enclosing_group = None
+    for bond in group.group_bonds:
+        if getattr(bond, "enclosing_group", None) is group:
+            bond.enclosing_group = None
+    group.enclosing_group = None
+    group.left_bond = None
+    group.right_bond = None
+
+    if not group.spans_whole_string():
+        string.delete_invalid_string_position_middle_descriptions()
+
+    _retire(ctx, group)
 
 
 # ── Stochastic helpers ──

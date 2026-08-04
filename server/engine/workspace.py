@@ -217,16 +217,68 @@ class WorkspaceString:
     def get_equivalent_bond(self, bond: Bond) -> Bond | None:
         """Find an existing bond equivalent to the given one.
 
-        Scheme: workspace-strings.ss:129-137.
-        Equivalence: same from_object, same to_object, same bond category,
-        same direction.
+        Scheme: ``get-equivalent-bond`` (workspace-strings.ss:129-137) — same
+        from-object, same to-object, same category, same direction.
+
+        A **sameness** bond is additionally symmetric: ``add-bond``
+        (workspace-strings.ss:168-172) files one under both ``(from, to)`` and
+        ``(to, from)``, so the reference finds it whichever way round it is asked
+        for.  It has to: ``j -> j`` and ``j -> j`` say the same thing, and the two
+        occupy the same positional slot.  Without the symmetry the group builder's
+        consolidation could propose the mirror image of a sameness bond already in
+        the string, find no equivalent, and try to build into an occupied slot.
         """
+        symmetric = getattr(bond.bond_category, "name", "") == "plato-sameness"
         for existing in self.bonds:
+            if (
+                existing.bond_category is not bond.bond_category
+                or existing.direction is not bond.direction
+            ):
+                continue
             if (
                 existing.from_object is bond.from_object
                 and existing.to_object is bond.to_object
-                and existing.bond_category is bond.bond_category
-                and existing.direction is bond.direction
+            ):
+                return existing
+            if (
+                symmetric
+                and existing.from_object is bond.to_object
+                and existing.to_object is bond.from_object
+            ):
+                return existing
+        return None
+
+    def flipped_bond_present(self, bond: Bond) -> bool:
+        """Scheme: ``flipped-bond-present?`` (workspace-strings.ss:138-139)."""
+        return self.get_equivalent_flipped_bond(bond) is not None
+
+    def get_equivalent_flipped_bond(self, bond: Bond) -> Bond | None:
+        """The bond running the *other way* between the same pair, if it is the
+        exact reversal of *bond*.
+
+        Scheme: ``get-equivalent-flipped-bond`` (workspace-strings.ss:140-148) —
+        the string's bond from *to* to *from*, accepted only when its category and
+        its direction are both the opposite of this one's.
+
+        This is how a group reaches a reading the string does not yet hold: the
+        scouts collect *flipped copies* of opposite-polarity bonds
+        (``scan-bonds``, groups.ss:899-903), and the builder then has to beat the
+        originals and swap them out one at a time.
+        """
+        from server.engine.slipnet import opposite_node
+
+        opposite_category = opposite_node(bond.bond_category)
+        opposite_direction = opposite_node(bond.direction)
+        if opposite_category is None or opposite_direction is None:
+            # ``opposite-bond-category?`` (bonds.ss:459-464) requires both bonds
+            # to be directed, so a sameness bond has no flipped twin.
+            return None
+        for existing in self.bonds:
+            if (
+                existing.from_object is bond.to_object
+                and existing.to_object is bond.from_object
+                and existing.bond_category is opposite_category
+                and existing.direction is opposite_direction
             ):
                 return existing
         return None
@@ -241,9 +293,18 @@ class WorkspaceString:
     def get_equivalent_group(self, group: Group) -> Group | None:
         """Find an existing group equivalent to the given one.
 
-        Scheme: workspace-strings.ss:227-240.
-        Equivalence: same leftmost position, same group category,
-        same direction, and same length (number of objects).
+        Scheme: ``get-equivalent-group`` (workspace-strings.ss:227-240).  The key
+        is the **leftmost constituent object**, which is what indexes the
+        reference's ``group-vector``; the test is then same group category, same
+        direction, same group *length* (constituent count).
+
+        Not the same as matching spans and object lists.  Two readings that start
+        at the same object and hold the same number of constituents are the same
+        group as far as the builder is concerned even if the constituents are at
+        different nesting levels, and the right edge is implied rather than
+        compared.  Requiring identical object *lists* — as the builder's own
+        duplicate check used to — meant a genuine re-proposal of an existing group
+        was built a second time.
         """
         from server.engine.groups import Group as GroupClass
         for existing in self.groups:
@@ -252,14 +313,68 @@ class WorkspaceString:
             if existing is group:
                 return existing
             if (
-                existing.left_string_pos == group.left_string_pos
-                and existing.right_string_pos == group.right_string_pos
+                existing.left_object is group.left_object
                 and existing.group_category is group.group_category
                 and existing.direction is group.direction
                 and len(existing.objects) == len(group.objects)
             ):
                 return existing
         return None
+
+    def delete_invalid_string_position_middle_descriptions(self) -> None:
+        """Strip ``middle`` descriptions from objects that are no longer middle.
+
+        Scheme: ``delete-invalid-string-position-middle-descriptions``
+        (workspace-strings.ss:300-321), called by ``build-group`` (groups.ss:936)
+        and ``break-group`` (groups.ss:994) whenever a non-spanning group appears
+        or disappears.
+
+        ``middle-in-string?`` is a *relational* predicate — it asks whether the
+        object's ungrouped neighbours are the string's two edges — so grouping or
+        ungrouping material next door can silently falsify it.  The reference
+        removes the stale descriptor, and then removes the string-position mapping
+        that was resting on it from each of the object's bridges, breaking a bridge
+        outright if that was its last mapping.  Without this the Workspace keeps
+        asserting a correspondence justified by a description it no longer holds.
+        """
+        slipnet = getattr(getattr(self, "workspace", None), "slipnet", None)
+        if slipnet is None:
+            return
+        middle = slipnet.nodes.get("plato-middle")
+        position_type = slipnet.nodes.get("plato-string-position-category")
+        if middle is None or position_type is None:
+            return
+
+        for obj in list(self.objects):
+            if not obj.descriptor_present(middle):
+                continue
+            if obj.middle_in_string():
+                continue
+            obj.delete_description_type(position_type)
+            for orientation in ("vertical", "horizontal"):
+                bridge = getattr(obj, f"{orientation}_bridge", None)
+                if bridge is None:
+                    continue
+                remaining = [
+                    cm
+                    for cm in bridge.concept_mappings
+                    if cm.description_type1 is not position_type
+                    and cm.description_type2 is not position_type
+                ]
+                if len(remaining) == len(bridge.concept_mappings):
+                    continue
+                bridge.concept_mappings = remaining
+                if not remaining:
+                    self._break_bridge(bridge)
+
+    def _break_bridge(self, bridge: Any) -> None:
+        """Remove a bridge left with nothing to say.  Scheme: ``break-bridge``
+        (bridges.ss:1437-1449), reached from workspace-strings.ss:313,320."""
+        workspace = getattr(self, "workspace", None)
+        if workspace is None:
+            return
+        bridge.proposal_level = bridge.PROPOSED
+        workspace.remove_bridge(bridge)
 
     def get_spanning_group(self) -> Group | None:
         """Get the group that spans the whole string, if any.

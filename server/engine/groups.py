@@ -47,6 +47,14 @@ class Group(WorkspaceObject, WorkspaceStructure):
         self.left_object = min(objects, key=lambda o: o.left_string_pos)
         self.right_object = max(objects, key=lambda o: o.right_string_pos)
 
+        # ``new-group`` (groups.ss:79) derives the bond category from the *group
+        # category*, not from the constituent bonds.  That is what gives a
+        # singleton — which has no bonds at all — a bond category, and hence an
+        # internal strength (groups.ss:392-398) and a BondCtgy description
+        # (groups.ss:30-31) like any other group.
+        related = getattr(group_category, "get_related_node", None)
+        self.bond_category = related("plato-bond-category") if related else None
+
         self._attach_initial_descriptions()
 
     def _attach_initial_descriptions(self) -> None:
@@ -82,37 +90,37 @@ class Group(WorkspaceObject, WorkspaceStructure):
 
         describe("plato-object-category", node("plato-group"))
         describe("plato-group-category", self.group_category)
-        if self.group_bonds:
-            describe(
-                "plato-bond-category",
-                self.group_bonds[0].bond_category,
-                bond_description=True,
-            )
+        # ``groups.ss:30-31`` attaches the BondCtgy description *unconditionally*,
+        # from the category-derived bond category.  Gating it on the presence of
+        # constituent bonds left every singleton group without one, so a bridge to
+        # a singleton lost its BondCtgy concept-mapping.
+        describe("plato-bond-category", self.bond_category, bond_description=True)
         if self.direction is not None:
             describe("plato-direction-category", self.direction)
 
+        # ``make-group`` (groups.ss:34-42) orders these whole -> leftmost ->
+        # **middle** -> rightmost, using the object's own position predicates.  The
+        # middle branch was missing entirely, so no group could ever be described
+        # ``middle`` — closing one of the two avenues by which a middle-to-middle
+        # correspondence is reachable.
         if self.spans_whole_string():
             describe("plato-string-position-category", node("plato-whole"))
-        else:
-            others = [
-                o
-                for o in getattr(self.string, "objects", [])
-                if o is not self and not self.nested_member(o)
-            ]
-            if others:
-                left = min(o.left_string_pos for o in others + [self])
-                right = max(o.right_string_pos for o in others + [self])
-                if self.left_string_pos == left:
-                    describe("plato-string-position-category", node("plato-leftmost"))
-                elif self.right_string_pos == right:
-                    describe("plato-string-position-category", node("plato-rightmost"))
+        elif self.leftmost_in_string():
+            describe("plato-string-position-category", node("plato-leftmost"))
+        elif self.middle_in_string():
+            describe("plato-string-position-category", node("plato-middle"))
+        elif self.rightmost_in_string():
+            describe("plato-string-position-category", node("plato-rightmost"))
 
         describe("plato-bond-facet", self.bond_facet, bond_description=True)
 
-        # Length, when it is one Metacat can name (one..five).
-        length_names = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five"}
-        if self.length in length_names:
-            describe("plato-length", node(f"plato-{length_names[self.length]}"))
+        # No Length description here.  ``make-group`` attaches none; the Scheme's
+        # single site is ``propose-group`` (groups.ss:816-818), which attaches one
+        # with probability ``length-description-probability`` — 0.5^27 for a cold
+        # 3-group, i.e. essentially never unless Length is already active.
+        # Attaching one to every group made ``plato-one/two/three`` — and through
+        # them ``plato-length`` — warm all run, and made every singleton clear the
+        # Trace's "singleton with a length description" bar.
 
         # A letter-category description on a successor/predecessor group is what
         # makes horizontal bridges like [abc] -> [bcd] possible (groups.ss:44-46).
@@ -135,6 +143,21 @@ class Group(WorkspaceObject, WorkspaceStructure):
         Scheme: workspace-objects.ss:162-165 — groups include bond descriptions.
         """
         return list(self.descriptions) + list(self.bond_descriptions)
+
+    def get_letters(self) -> list[Any]:
+        """Every Letter under this group, left to right, at any nesting depth.
+
+        Scheme: ``letters`` in ``new-group`` (groups.ss:83) —
+        ``(apply append (tell-all objects 'get-letters))``.
+        """
+        letters: list[Any] = []
+        for obj in self.objects:
+            getter = getattr(obj, "get_letters", None)
+            if getter is not None:
+                letters.extend(getter())
+            else:
+                letters.append(obj)
+        return letters
 
     def nested_member(self, obj: Any) -> bool:
         """True if *obj* is a direct or recursively nested member.
@@ -160,20 +183,30 @@ class Group(WorkspaceObject, WorkspaceStructure):
         return self.left_string_pos == string_left and self.right_string_pos == string_right
 
     def calculate_internal_strength(self) -> float:
-        """Group internal strength: weighted combination of bond factor and length factor.
+        """Group internal strength: bond factor against length factor, self-weighted.
 
-        Scheme: groups.ss:392-410.
+        Scheme: ``calculate-internal-strength`` (groups.ss:392-410)::
+
+            (bond-factor (* (tell bond-category 'get-degree-of-assoc)
+                            (if (eq? group-bond-facet plato-letter-category) 1 1/2)))
+
+        The bond factor is a property of the group's **category**, not of the
+        strengths of the bonds it happens to contain: a sameness group is worth 100
+        because sameness associates perfectly, whatever its members' bonds are
+        currently scoring.  Averaging the constituent bonds' *overall* strength
+        instead double-counted everything a bond's strength already folds in —
+        facet, compatibility, ``11*sqrt(assoc)``, external support — and, worse,
+        left a bond-less singleton with no bond factor at all, so its strength
+        collapsed to the bare length factor of 5 and it died at the evaluator.  A
+        singleton sameness group scores 92 here, which is what makes the 1-2-3
+        reading of ``mrrjjj`` reachable.
+
+        The length-factor table and the 0.98 self-weighting exponent are unchanged.
         """
-        # Bond factor
-        if not self.group_bonds:
-            bond_factor = 0.0
-        else:
-            avg_strength = sum(b.strength for b in self.group_bonds) / len(self.group_bonds)
-            # Bond facet multiplier
-            if self.bond_facet.name == "plato-letter-category":
-                bond_factor = avg_strength
-            else:
-                bond_factor = avg_strength * 0.5
+        assoc = getattr(self.bond_category, "degree_of_assoc", None)
+        base = float(assoc()) if assoc is not None else 0.0
+        facet_name = getattr(self.bond_facet, "name", "")
+        bond_factor = base if facet_name == "plato-letter-category" else base * 0.5
 
         # Length factor
         length_factors = {1: 5, 2: 40, 3: 60}
@@ -291,6 +324,98 @@ class Group(WorkspaceObject, WorkspaceStructure):
                 result.append(enc)
         return result
 
+    def get_incompatible_bridges(self, bridge_orientation: str) -> list[Any]:
+        """Built bridges this group's direction would contradict.
+
+        Scheme: ``get-incompatible-bridges`` (groups.ss:287-293) — nothing at all
+        for an undirected group, otherwise one candidate per constituent object.
+        """
+        if self.direction is None:
+            return []
+        result: list[Any] = []
+        for obj in self.objects:
+            bridge = self.get_incompatible_bridge(obj, bridge_orientation)
+            if bridge is not None and bridge not in result:
+                result.append(bridge)
+        return result
+
+    def get_incompatible_bridge(self, obj: Any, bridge_orientation: str) -> Any:
+        """Scheme: ``get-incompatible-bridge`` (groups.ss:294-327).
+
+        The mirror image of the bond's test (bonds.ss:89-122).  A *directed* group
+        says "this material runs this way"; a bridge off one of its constituents
+        says "this object plays the role of the leftmost/rightmost object over
+        there".  Where the far object sits at an edge of its own string and
+        carries a directed bond, the two claims can contradict — "leftmost maps to
+        rightmost, but right maps to right" — and then the group has to beat the
+        bridge to be built.
+        """
+        bridge = getattr(
+            obj,
+            "horizontal_bridge" if bridge_orientation == "horizontal" else "vertical_bridge",
+            None,
+        )
+        if bridge is None:
+            return None
+
+        string_position_cm = None
+        for cm in getattr(bridge, "concept_mappings", ()):
+            if getattr(cm.description_type1, "name", "") == "plato-string-position-category":
+                string_position_cm = cm
+                break
+        if string_position_cm is None:
+            return None
+
+        other_object = bridge.object2 if bridge.object1 is obj else bridge.object1
+        if not (other_object.leftmost_in_string() or other_object.rightmost_in_string()):
+            return None
+
+        other_bond = (
+            other_object.right_bond
+            if other_object.leftmost_in_string()
+            else other_object.left_bond
+        )
+        if other_bond is None or not getattr(other_bond, "directed", False):
+            return None
+
+        direction_cm = self._direction_concept_mapping(other_bond)
+        if direction_cm is None:
+            return None
+
+        from server.engine.bridges import _incompatible_cms
+
+        return bridge if _incompatible_cms(direction_cm, string_position_cm) else None
+
+    def _direction_concept_mapping(self, other_bond: Any) -> Any:
+        """The ``DirCtgy`` mapping between this group's direction and *other_bond*'s.
+
+        Scheme: the inline ``make-concept-mapping`` of groups.ss:313-320.
+        """
+        from server.engine.bridges import _IDENTITY_SENTINEL, _label_node
+        from server.engine.concept_mappings import ConceptMapping
+
+        if self.direction is None or other_bond.direction is None:
+            return None
+        direction_category = getattr(self.direction, "category", None)
+        if direction_category is None:
+            return None
+
+        label = _label_node(self.direction, other_bond.direction)
+        if label is _IDENTITY_SENTINEL:
+            # ``_incompatible_cms`` compares labels by identity against the
+            # bridge's own concept-mappings, which carry the real Slipnet node.
+            slipnet = getattr(getattr(self.string, "workspace", None), "slipnet", None)
+            label = getattr(slipnet, "nodes", {}).get("plato-identity") if slipnet else None
+        return ConceptMapping(
+            description_type1=direction_category,
+            descriptor1=self.direction,
+            description_type2=direction_category,
+            descriptor2=other_bond.direction,
+            label=label,
+            object1=self,
+            object2=other_bond,
+        )
+
     def get_subobject_bridges(self, bridge_orientation: str) -> list[Any]:
         """Bridges on constituent objects matching the given orientation.
 
@@ -341,110 +466,22 @@ class Group(WorkspaceObject, WorkspaceStructure):
         # comment gives — the two are the same group seen two ways — and because
         # the builder has to recognise which existing group a flip replaces.
         flipped.id = self.id
+        # groups.ss:344-345 — a Length description is carried across the flip.
+        # Now that ``make-group`` no longer attaches one unconditionally (GR-1),
+        # this is the only way the reversed reading keeps it.
+        length_node = self._node("plato-length")
+        if length_node is not None and self.description_type_present(length_node):
+            attach_length_description(flipped)
         return flipped
 
-    def add_descriptions_for_group(self, slipnet: Any) -> None:
-        """Add automatic descriptions when a Group is created.
-
-        Scheme: groups.ss:20-55.
-        Adds: object-category (group), group-category, bond-category,
-        direction, string-position, bond-facet, and letter-category
-        for the initial letter when bond_facet is letter-category.
-
-        This requires slipnet node references. Call after construction
-        if the slipnet is available.
-        """
-        from server.engine.descriptions import Description
-
-        def _get_node(name: str) -> Any:
-            """Retrieve a slipnet node by name."""
-            if hasattr(slipnet, "get_node"):
-                return slipnet.get_node(name)
-            if hasattr(slipnet, "nodes"):
-                return slipnet.nodes.get(name)
+    def _node(self, name: str) -> Any:
+        """The Slipnet node called *name*, reached from the group's string."""
+        slipnet = getattr(getattr(self.string, "workspace", None), "slipnet", None)
+        if slipnet is None:
+            slipnet = getattr(self.string, "slipnet", None)
+        if slipnet is None:
             return None
-
-        # object-category: group
-        obj_cat = _get_node("plato-object-category")
-        grp = _get_node("plato-group")
-        if obj_cat and grp:
-            self._add_desc(obj_cat, grp)
-
-        # group-category
-        grp_cat = _get_node("plato-group-category")
-        if grp_cat and self.group_category:
-            self._add_desc(grp_cat, self.group_category)
-
-        # bond-category (as bond description)
-        bond_cat_type = _get_node("plato-bond-category")
-        bond_cat = getattr(self, "_bond_category_node", None)
-        if bond_cat is None and self.group_category is not None:
-            # Derive from group_category's related bond-category node
-            get_rel = getattr(self.group_category, "get_related_node", None)
-            if get_rel:
-                try:
-                    bond_cat = get_rel("plato-bond-category")
-                except Exception:
-                    pass
-        if bond_cat_type and bond_cat:
-            self._add_bond_desc(bond_cat_type, bond_cat)
-
-        # direction
-        if self.direction is not None:
-            dir_cat = _get_node("plato-direction-category")
-            if dir_cat:
-                self._add_desc(dir_cat, self.direction)
-
-        # string-position
-        str_pos_cat = _get_node("plato-string-position-category")
-        if str_pos_cat:
-            if self.spans_whole_string():
-                whole = _get_node("plato-whole")
-                if whole:
-                    self._add_desc(str_pos_cat, whole)
-            elif self._is_leftmost():
-                lmost = _get_node("plato-leftmost")
-                if lmost:
-                    self._add_desc(str_pos_cat, lmost)
-            elif self._is_rightmost():
-                rmost = _get_node("plato-rightmost")
-                if rmost:
-                    self._add_desc(str_pos_cat, rmost)
-            elif self._is_middle():
-                mid = _get_node("plato-middle")
-                if mid:
-                    self._add_desc(str_pos_cat, mid)
-
-        # bond-facet (as bond description)
-        bond_facet_type = _get_node("plato-bond-facet")
-        if bond_facet_type and self.bond_facet:
-            self._add_bond_desc(bond_facet_type, self.bond_facet)
-
-        # letter-category for initial letter (when bond_facet is letter-category)
-        if self.bond_facet is not None and getattr(self.bond_facet, "name", "") == "plato-letter-category":
-            letter_cat_type = _get_node("plato-letter-category")
-            if letter_cat_type:
-                initial_letcat = self._get_initial_letter_category()
-                if initial_letcat is not None:
-                    self._add_desc(letter_cat_type, initial_letcat)
-
-    def _add_desc(self, desc_type: Any, descriptor: Any) -> None:
-        """Helper to add a non-bond description."""
-        from server.engine.descriptions import Description
-
-        d = Description(self, desc_type, descriptor)
-        d.proposal_level = self.BUILT
-        if d not in self.descriptions:
-            self.descriptions.append(d)
-
-    def _add_bond_desc(self, desc_type: Any, descriptor: Any) -> None:
-        """Helper to add a bond description."""
-        from server.engine.descriptions import Description
-
-        d = Description(self, desc_type, descriptor)
-        d.proposal_level = self.BUILT
-        if d not in self.bond_descriptions:
-            self.bond_descriptions.append(d)
+        return getattr(slipnet, "nodes", {}).get(name)
 
     def _get_initial_letter_category(self) -> Any:
         """Get the letter-category descriptor of the first object in direction order.
@@ -464,26 +501,43 @@ class Group(WorkspaceObject, WorkspaceStructure):
         # Fallback for Letter objects
         return getattr(first, "letter_category", None)
 
-    def _is_leftmost(self) -> bool:
-        if self.string is None:
-            return False
-        return self.left_string_pos == 0
-
-    def _is_rightmost(self) -> bool:
-        if self.string is None:
-            return False
-        string_len = len(getattr(self.string, "objects", []))
-        return self.right_string_pos == string_len - 1
-
-    def _is_middle(self) -> bool:
-        if self.string is None:
-            return False
-        return not self._is_leftmost() and not self._is_rightmost() and not self.spans_whole_string()
-
     def __repr__(self) -> str:
         cat = getattr(self.group_category, "short_name", "?")
         objs = len(self.objects)
         return f"Group({cat}, {objs} objects, strength={self.strength:.0f})"
+
+
+_PLATONIC_LENGTH_NAMES = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five"}
+
+
+def attach_length_description(group: Group) -> bool:
+    """Give *group* a Length description, if it can have one and hasn't got one.
+
+    Scheme: ``attach-length-description`` (groups.ss:831-837) — a no-op when the
+    group is already described on Length, and when its length is one the Slipnet
+    cannot name (there are only ``plato-one`` .. ``plato-five``).
+
+    Deliberately unconditional: *whether* to attach is the caller's decision, and
+    the reference makes it in exactly four places — ``propose-group``
+    stochastically (groups.ss:816-818), the flip (groups.ss:344-345), and the
+    builder's two consolidation branches (groups.ss:732-733, 771).
+    """
+    length_type = group._node("plato-length")
+    descriptor_name = _PLATONIC_LENGTH_NAMES.get(group.length)
+    if length_type is None or descriptor_name is None:
+        return False
+    if group.description_type_present(length_type):
+        return False
+    descriptor = group._node(f"plato-{descriptor_name}")
+    if descriptor is None:
+        return False
+
+    from server.engine.descriptions import Description
+
+    description = Description(group, length_type, descriptor)
+    description.proposal_level = Description.BUILT
+    group.descriptions.append(description)
+    return True
 
 
 def _disjoint_objects(obj1: Any, obj2: Any) -> bool:
@@ -498,42 +552,51 @@ def _disjoint_objects(obj1: Any, obj2: Any) -> bool:
 
 
 def _walk_group_neighbors(group: Group, direction: str) -> list[Any]:
-    """Walk left or right from a group, collecting neighboring objects.
+    """Walk left or right from a group through *positional* neighbours.
 
-    Scheme: groups.ss:358-366.
-    Walks using left/right neighbors; when a letter is enclosed in a group,
-    uses the enclosing group as the neighbor instead.
+    Scheme: the ``neighbors`` letrec inside ``get-local-density``
+    (groups.ss:357-366)::
+
+        (lambda (object choose-method)
+          (let ((neighbor (tell object choose-method)))
+            (if (not (exists? neighbor))
+              '()
+              (let ((group (tell neighbor 'get-enclosing-group)))
+                (if (not (and (letter? neighbor) (exists? group)))
+                    (cons neighbor (neighbors neighbor choose-method))
+                    (cons group (neighbors group choose-method)))))))
+
+    Two things distinguish it from the bond version (bonds.ss:137-145), and both
+    matter.  It starts from the **group itself**, and it substitutes a letter's
+    *enclosing group* for the letter — so a walk that steps onto a grouped letter
+    continues from the far edge of that group and the group, not the letter, is
+    what gets counted.  Otherwise a string already read as ``[m][rr][jjj]``
+    would see letters in the denominator that the reference sees as groups, and
+    the density that supports a new singleton would come out near zero.
+
+    Following ``left_bond``/``right_bond`` pointers, as this used to, is a
+    different walk again: it stops at the first unbonded slot, so a group with no
+    bond hanging off its edge scored 100 by walking nowhere.
     """
+    method = "choose_left_neighbor" if direction == "left" else "choose_right_neighbor"
     result: list[Any] = []
     current: Any = group
 
     while True:
-        if direction == "left":
-            # Get left neighbor: use the left_object's left_bond
-            left_obj = getattr(current, "left_object", current)
-            bond = getattr(left_obj, "left_bond", None)
-            if bond is None:
-                break
-            neighbor = bond.left_object
-            if neighbor is left_obj:
-                break
-        else:
-            right_obj = getattr(current, "right_object", current)
-            bond = getattr(right_obj, "right_bond", None)
-            if bond is None:
-                break
-            neighbor = bond.right_object
-            if neighbor is right_obj:
-                break
-
-        # If the neighbor is a letter enclosed in a group, use the group
-        enc = getattr(neighbor, "enclosing_group", None)
-        if enc is not None and not hasattr(neighbor, "objects"):
-            # neighbor is a letter in a group — use the group
-            result.append(enc)
-            current = enc
-        else:
-            result.append(neighbor)
-            current = neighbor
+        chooser = getattr(current, method, None)
+        if chooser is None:
+            # A hand-rolled test double rather than a real WorkspaceObject —
+            # the same answer as "at the end of the string".
+            break
+        neighbor = chooser()
+        if neighbor is None or neighbor is current:
+            break
+        enclosing = getattr(neighbor, "enclosing_group", None)
+        if enclosing is not None and not isinstance(neighbor, Group):
+            neighbor = enclosing
+        if neighbor is current:
+            break
+        result.append(neighbor)
+        current = neighbor
 
     return result
