@@ -213,10 +213,12 @@ class SlipnetSession(ABC):
         Returned to the host rather than resolved on the device, because the
         comparison consumes the engine's RNG and the RNG stream must be identical
         to the reference's — same draws, same order, same count.  The reference
-        (``slipnet.ss:388-389``) draws for a node when ``activation > 0`` and the
-        probability ``(activation/100)**3`` is strictly between 0 and 1; a node at
-        exactly 100 short-circuits to True inside ``RNG.prob`` and consumes no
-        draw.  Only nodes that would consume a draw are returned, in index order.
+        (``slipnet.ss:387-389``) draws only for nodes passing
+        ``partially-active?`` — activation in [50, 100) — with probability
+        ``(activation/100)**3``; below 50 a node is not a candidate at all, and a
+        node at exactly 100 short-circuits to True inside ``RNG.prob`` and
+        consumes no draw.  Only nodes that would consume a draw are returned, in
+        index order.
         """
 
     @abstractmethod

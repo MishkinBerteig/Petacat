@@ -14,7 +14,12 @@ import math
 from typing import TYPE_CHECKING, Any, Callable
 
 from server.engine.numeric.backend import select_backend
-from server.engine.numeric.layout import SlipnetState, SlipnetTopology
+from server.engine.numeric.layout import (
+    FULL_ACTIVATION_THRESHOLD,
+    MAX_ACTIVATION,
+    SlipnetState,
+    SlipnetTopology,
+)
 
 if TYPE_CHECKING:
     from server.engine.metadata import MetadataProvider, SlipnodeSpec, SlipnetLinkSpec
@@ -176,8 +181,46 @@ class SlipnetNode:
             update_cycle_length / 15.0
         )
 
-    def fully_active(self, threshold: int = 50) -> bool:
+    def fully_active(self, threshold: float = MAX_ACTIVATION) -> bool:
+        """Is this concept at *full* activation?
+
+        Scheme: ``fully-active?`` (slipnet.ss:392-394) —
+        ``(= (tell node 'get-activation) %max-activation%)``, i.e. exactly 100,
+        not merely past the threshold.  Written ``>=`` rather than ``==`` only
+        because the activation is a float here; it is clipped to exactly 100.0
+        by ``spread_activation``'s flush, by ``clamp`` and by the jump, so the
+        two forms agree on every value the engine can produce.
+
+        This is the predicate behind link shrinking and degree of association
+        (slipnet.ss:90-91, 334-339), concept-mapping relevance
+        (concept-mappings.ss:107-109) and description relevance
+        (descriptions.ss:67).  It is *not* the predicate that gates top-down
+        codelet posting — that one is ``above_threshold``, and conflating the
+        two makes the whole 50-99 band behave as though it were saturated.
+        """
         return self.activation >= threshold
+
+    def above_threshold(
+        self, threshold: float = FULL_ACTIVATION_THRESHOLD
+    ) -> bool:
+        """Is this concept active enough to exert top-down pressure?
+
+        Scheme: ``above-threshold?`` (slipnet.ss:397-399) —
+        ``(>= activation %full-activation-threshold%)``, with the threshold 50.
+        Its sole consumer in the reference is
+        ``attempt-to-post-top-down-codelets`` (slipnet.ss:212-213).
+        """
+        return self.activation >= threshold
+
+    def partially_active(self) -> bool:
+        """Above the threshold but not yet saturated — the jump's candidates.
+
+        Scheme: ``partially-active?`` (slipnet.ss:402-404).
+        """
+        return (
+            self.activation >= FULL_ACTIVATION_THRESHOLD
+            and self.activation < MAX_ACTIVATION
+        )
 
     def activate_from_workspace(self) -> None:
         """Jolt this node from the Workspace.
@@ -303,15 +346,25 @@ class SlipnetNode:
                 self.unclamp()
 
     def probabilistic_jump_to_full(self, rng: RNG) -> None:
-        """Stochastic jump to full activation when above threshold.
+        """Stochastic jump to full activation, for a *partially active* node.
 
-        Scheme: slipnet.ss:388-389.
-        probability = (activation / 100) ^ 3
+        Scheme: ``update-slipnet-activations`` (slipnet.ss:387-389) draws only
+        for nodes passing ``partially-active?`` — activation in [50, 100) — with
+        probability ``(activation/100)^3``.
+
+        The floor matters.  Without it a node at 30 jumps to full with
+        probability 0.027 per update cycle and a residual activation never stops
+        being a candidate, so concepts the run has finished with keep firing back
+        to saturation, spreading, shrinking their links and posting top-down
+        codelets.  The cube alone does not suppress that: it is the threshold
+        that decides *whether* a concept is in the running at all, and the cube
+        that decides how readily one already in the running commits.
         """
-        if self.activation > 0:
-            prob = (self.activation / 100.0) ** 3
-            if rng.prob(prob):
-                self.activation = 100.0
+        if not self.partially_active():
+            return
+        prob = (self.activation / MAX_ACTIVATION) ** 3
+        if rng.prob(prob):
+            self.activation = MAX_ACTIVATION
 
     @property
     def category(self) -> SlipnetNode | None:
@@ -509,7 +562,13 @@ class SlipnetLink:
 
     def link_length(self) -> int:
         """Current link length. Dynamic links use label node's intrinsic length
-        (or shrunk length if fully active)."""
+        (or shrunk length if fully active).
+
+        Scheme: ``get-degree-of-assoc`` on a link (slipnet.ss:334-339) — the
+        shrunk length applies only when the label node is ``fully-active?``,
+        i.e. at exactly 100.  A label merely past the threshold does not shrink
+        its links.
+        """
         if self.fixed_length:
             return self._fixed_link_length  # type: ignore
         if self.label_node is not None:
@@ -693,19 +752,20 @@ class Slipnet:
         the activation_buffer may already contain contributions from themes.
 
         The RNG is consumed identically on both paths, and that is the constraint
-        the substrate's interface is shaped around.  ``RNG.prob`` returns without
-        touching the stream when the probability is 0 or 1, so a node at exactly
-        full activation costs no draw and a node at zero is never asked; the
-        substrate therefore hands back only the nodes that *would* consume a draw,
-        in index order, and the loop below draws for exactly those.  Same draws,
-        same order, same count as the reference — which is what keeps a seeded run
+        the substrate's interface is shaped around.  A draw happens for a node
+        that is ``partially-active?`` — activation in [50, 100) — and for no
+        other: below 50 the node is not a candidate at all, and at exactly 100
+        ``RNG.prob`` short-circuits without touching the stream.  The substrate
+        therefore hands back only the nodes that *would* consume a draw, in index
+        order, and the loop below draws for exactly those.  Same draws, same
+        order, same count as the reference — which is what keeps a seeded run
         comparable across the change.
         """
         ucl = 15  # Will be parameterized later
         session = self._numeric_session()
         if session is None:
             self.spread_activation(ucl, threshold=threshold)
-            # Probabilistic jump for partially-active nodes (50-99)
+            # Probabilistic jump, for partially-active nodes only (50-99).
             for node in self.nodes.values():
                 node.probabilistic_jump_to_full(rng)
             return

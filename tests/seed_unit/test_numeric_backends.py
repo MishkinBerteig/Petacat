@@ -188,19 +188,22 @@ def test_jump_candidates_match_the_rngs_own_short_circuits(
 ) -> None:
     """The draw set is exactly the nodes ``RNG.prob`` would consume a draw for.
 
-    ``RNG.prob`` returns without touching the stream at probability 0 or 1, and
-    ``probabilistic_jump_to_full`` skips a node at zero activation entirely.  A
-    backend that returned one candidate too many or too few would shift every
-    subsequent draw in the run, which is the one way this substrate could move the
-    expected range without any arithmetic being wrong.
+    ``probabilistic_jump_to_full`` asks only about ``partially-active?`` nodes —
+    activation in [50, 100), slipnet.ss:387-389 — and ``RNG.prob`` returns
+    without touching the stream at probability 0 or 1.  A backend that returned
+    one candidate too many or too few would shift every subsequent draw in the
+    run, which is the one way this substrate could move the expected range
+    without any arithmetic being wrong.
     """
     topology = SlipnetTopology.from_slipnet(real_slipnet)
     state = _seeded_state(real_slipnet, seed=9)
-    # A state deliberately containing both endpoints: a node at exactly 100
-    # (probability 1, no draw) and nodes at zero (never asked).
+    # A state deliberately containing every boundary: a node at exactly 100
+    # (probability 1, no draw), a node at zero and a node below the threshold
+    # (neither is a candidate), and a node at exactly 50 (the first that is).
     state.activation[0] = 100.0
     state.activation[1] = 0.0
     state.activation[2] = 50.0
+    state.activation[3] = 49.0
 
     session = get_backend(backend_name).open_slipnet(topology)
     session.load(state)
@@ -208,10 +211,11 @@ def test_jump_candidates_match_the_rngs_own_short_circuits(
 
     assert 0 not in indices, "a node at full activation must not consume a draw"
     assert 1 not in indices, "a node at zero activation is never asked"
-    assert 2 in indices
+    assert 2 in indices, "50 is the floor of partially-active?, inclusive"
+    assert 3 not in indices, "a node below the threshold never jumps"
     assert all(0.0 < p < 1.0 for p in probabilities)
     expected = [
-        i for i, a in enumerate(state.activation) if 0.0 < a and (a / 100.0) ** 3 < 1.0
+        i for i, a in enumerate(state.activation) if 50.0 <= a < 100.0
     ]
     assert indices == expected
 

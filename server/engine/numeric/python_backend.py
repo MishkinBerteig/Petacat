@@ -19,6 +19,8 @@ from typing import Sequence
 
 from server.engine.numeric.backend import Backend, SlipnetSession
 from server.engine.numeric.layout import (
+    FULL_ACTIVATION_THRESHOLD,
+    MAX_ACTIVATION,
     STRING_ANSWER,
     STRING_INITIAL,
     STRING_MODIFIED,
@@ -169,13 +171,15 @@ class PythonSlipnetSession(SlipnetSession):
         indices: list[int] = []
         probs: list[float] = []
         for i, a in enumerate(act):
-            if a <= 0.0:
+            # ``partially-active?`` (slipnet.ss:402-404): the reference filters
+            # the jump's candidates to [50, 100) before drawing at all.
+            if not (FULL_ACTIVATION_THRESHOLD <= a < MAX_ACTIVATION):
                 continue
-            p = (a / 100.0) ** 3
+            p = (a / MAX_ACTIVATION) ** 3
             # ``RNG.prob`` short-circuits at both ends without touching the
-            # stream, so a node at exactly 100 (p == 1) and the theoretical case
-            # of p underflowing to 0 must both be excluded here or the draw count
-            # would diverge from the reference.
+            # stream.  The window above already excludes p == 1 and p == 0, but
+            # the guard is kept so this list is defined by the property that
+            # matters — these are exactly the nodes that consume a draw.
             if 0.0 < p < 1.0:
                 indices.append(i)
                 probs.append(p)

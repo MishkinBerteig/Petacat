@@ -154,24 +154,34 @@ def _wrote_component(ctx: EngineContext, name: str) -> None:
 # ── Object selection ──
 
 def choose_object(ctx: EngineContext, weight_key: str = "intra") -> Any:
-    """Choose a workspace object weighted by salience/importance."""
+    """Choose a workspace object weighted by salience/importance.
+
+    Scheme: ``choose-object`` (``workspace.ss:499-502``) — a ``stochastic-pick``
+    over ``temp-adjusted-values``, so the choice sharpens as temperature falls.
+    """
     view = current_view(ctx)
     chosen = (
         _choose_from_view(ctx, view, view.all_objects, weight_key)
         if view is not None
-        else ctx.workspace.choose_object(weight_key, ctx.rng)
+        else ctx.workspace.choose_object(
+            weight_key, ctx.rng, ctx.temperature.value, ctx.meta
+        )
     )
     _read(ctx, chosen)
     return chosen
 
 
 def choose_string_object(ctx: EngineContext, string: Any, weight_key: str = "intra") -> Any:
-    """Choose an object from a specific string."""
+    """Choose an object from a specific string.
+
+    Scheme: ``choose-object`` (``workspace-strings.ss:340-343``) — a
+    ``stochastic-pick`` over ``temp-adjusted-values``.
+    """
     view = current_view(ctx)
     chosen = (
         _choose_from_view(ctx, view, view.string_objects(string), weight_key)
         if view is not None
-        else string.choose_object(weight_key, ctx.rng)
+        else string.choose_object(weight_key, ctx.rng, ctx.temperature.value, ctx.meta)
     )
     _read(ctx, chosen)
     return chosen
@@ -184,13 +194,18 @@ def _choose_from_view(
 
     Deliberately one ``weighted_pick`` call over one weight list, matching the live
     path, so that switching staleness on shifts *which* object is chosen without
-    changing how many random numbers the choice consumes.
+    changing how many random numbers the choice consumes.  The temperature
+    adjustment is read live, not from the view: staleness is a model of reading
+    the *Workspace* late, and temperature is not in the Workspace.
     """
     if not objects:
         return None
-    return ctx.rng.weighted_pick(
-        objects, [view.object_weight(o, weight_key) for o in objects]
+    weights = temp_adjusted_values(
+        [view.object_weight(o, weight_key) for o in objects],
+        ctx.temperature.value,
+        ctx.meta,
     )
+    return ctx.rng.weighted_pick(objects, weights)
 
 
 def choose_neighbor(ctx: EngineContext, obj: Any) -> Any:
@@ -223,7 +238,11 @@ def choose_neighbor(ctx: EngineContext, obj: Any) -> Any:
     ]
     if not neighbors:
         return None
-    weights = [max(0.1, n.salience.get("intra", 1.0)) for n in neighbors]
+    # Raw intra-string salience, *not* temperature-adjusted: ``choose-neighbor``
+    # (``workspace-objects.ss:417-423``) is a bare ``stochastic-pick-by-method``,
+    # unlike ``choose-object``.  And no floor — ``stochastic-pick``
+    # (``utilities.ss:443-448``) gives a weight-0 neighbour probability 0.
+    weights = [n.salience.get("intra", 1.0) for n in neighbors]
     chosen = ctx.rng.weighted_pick(neighbors, weights)
     # The object *and* the one it neighbours: a bond scout's decision depends on both,
     # so a change to either invalidates it. This is the locality the plan relies on to
@@ -233,9 +252,15 @@ def choose_neighbor(ctx: EngineContext, obj: Any) -> Any:
 
 
 def choose_string(ctx: EngineContext, weight_fn: str = "unhappiness") -> Any:
-    """Choose a workspace string weighted by unhappiness."""
+    """Choose a workspace string weighted by unhappiness.
+
+    A bare ``stochastic-pick`` in the Scheme (the top-down scouts'
+    string choice, ``bonds.ss:221-239``): no temperature adjustment and no
+    floor, so a perfectly happy string is not chosen at all
+    (``utilities.ss:443-448``).
+    """
     strings = ctx.workspace.all_strings
-    weights = [max(0.1, s.get_average_intra_string_unhappiness()) for s in strings]
+    weights = [s.get_average_intra_string_unhappiness() for s in strings]
     return ctx.rng.weighted_pick(strings, weights)
 
 
@@ -711,11 +736,24 @@ def _get_incompatible_structures(
     """Find structures incompatible with the proposed one.
 
     Returns list of (opponent, proposer_weight, opponent_weight).
+
+    The weights are the Scheme builders' own, and they are not all 1-vs-1; each
+    one is cited at its site below.  A weight multiplies a party's *strength*
+    inside ``wins-fight?`` (``workspace-structures.ss:70-78``), so it says how
+    much a structure of that kind is worth relative to its opponent regardless
+    of how strong either happens to be.
+
+    Three fights the Scheme has are still missing here — bond vs incompatible
+    bridge (``bonds.ss:385-398``, 2 vs 3), group vs bonds-to-be-flipped
+    (``groups.ss:652-664``, letter-span vs 1) and bridge vs incompatible bond
+    (``bridges.ss:1259-1276``, 3 vs 2) with its enclosing group
+    (``bridges.ss:1277-1292``, 1 vs 1).  They are tracked separately as BD-3,
+    GR-7 and BR-6.
     """
     incompatibles: list[tuple[Any, float, float]] = []
 
     if isinstance(structure, Bond):
-        # Incompatible bonds: same object pair, different category
+        # bonds.ss:370-376 — 1 vs 1 against each incompatible bond.
         for bond in structure.string.bonds:
             if not bond.is_built:
                 continue
@@ -726,7 +764,11 @@ def _get_incompatible_structures(
             if same_pair and bond.bond_category is not structure.bond_category:
                 incompatibles.append((bond, 1.0, 1.0))
 
-        # Incompatible groups that use conflicting bonds
+        # bonds.ss:377-384 — 1 vs ``(maximum (tell-all incompatible-groups
+        # 'get-letter-span))``.  One *shared* defender weight, the widest group's
+        # letter span, applied to every group in the set: a bond that would break
+        # into a wide group is fought off as hard by the narrow groups beside it.
+        conflicting_groups: list[Any] = []
         for group in structure.string.groups:
             if not group.is_built:
                 continue
@@ -736,11 +778,20 @@ def _get_incompatible_structures(
                     or (gb.from_object is structure.to_object and gb.to_object is structure.from_object)
                 )
                 if same_pair and gb.bond_category is not structure.bond_category:
-                    incompatibles.append((group, 1.0, float(group.span)))
+                    conflicting_groups.append(group)
                     break
+        if conflicting_groups:
+            shared_weight = float(max(g.span for g in conflicting_groups))
+            incompatibles.extend(
+                (group, 1.0, shared_weight) for group in conflicting_groups
+            )
 
     elif isinstance(structure, Group):
-        # Incompatible groups: overlapping span
+        # groups.ss:665-682 — a group of the same category *and* direction is a
+        # rival reading of the same material, so the two are weighted by **group
+        # length** (constituent count, ``get-group-length``, groups.ss:80,242),
+        # not letter span: a group of three subgroups outweighs a group of two
+        # however many letters each covers.  Any other incompatible group is 1-1.
         for group in structure.string.groups:
             if not group.is_built or group is structure:
                 continue
@@ -748,7 +799,9 @@ def _get_incompatible_structures(
             if (structure.left_string_pos <= group.right_string_pos
                     and group.left_string_pos <= structure.right_string_pos):
                 if group.group_category is structure.group_category and group.direction is structure.direction:
-                    incompatibles.append((group, float(structure.span), float(group.span)))
+                    incompatibles.append(
+                        (group, float(structure.length), float(group.length))
+                    )
                 else:
                     incompatibles.append((group, 1.0, 1.0))
 
@@ -759,15 +812,26 @@ def _get_incompatible_structures(
         # let contradictory mappings coexist — "abc -> abcd" was ending up with
         # a-a, a-b and a-d bridges all built at once, from which no coherent
         # rule can be abstracted.
+        #
+        # bridges.ss:1249-1254 weights both sides by the *bridge's* letter span,
+        # which is ``object1 span + object2 span`` (bridges.ss:178-180, 572-574).
+        # Weighting by object1 alone made the far side of the mapping count for
+        # nothing, so a letter-to-group bridge was fought as if it were
+        # letter-to-letter.
+        proposer_span = float(structure.object1.span + structure.object2.span)
         for bridge in structure.get_incompatible_bridges(ctx.workspace):
             if not bridge.is_built or bridge is structure:
                 continue
             incompatibles.append(
-                (bridge, float(structure.object1.span), float(bridge.object1.span))
+                (
+                    bridge,
+                    proposer_span,
+                    float(bridge.object1.span + bridge.object2.span),
+                )
             )
 
         # A bridge proposed against a reversed reading of a spanning group has to
-        # beat the group it would replace, at even odds (bridges.ss:1295-1312).
+        # beat the group it would replace, at even odds (bridges.ss:1292-1312).
         # The group is doing no wrong: the bridge is asking to reinterpret it.
         for original in (structure.flipped_group1, structure.flipped_group2):
             if original is not None and original.is_built:
@@ -785,13 +849,38 @@ def _wins_fight(
 ) -> bool:
     """Probabilistic fight between proposer and opponent.
 
-    Scheme: workspace-structure-formulas.ss.
+    Scheme: ``wins-fight?`` (``workspace-structures.ss:70-78``)::
+
+        (tell challenger 'update-strength)
+        (tell defender 'update-strength)
+        (stochastic-pick '(#t #f)
+          (temp-adjusted-values
+            (list (* challenger-weight (tell challenger 'get-strength))
+                  (* defender-weight (tell defender 'get-strength)))))
+
+    Three things the linear form got wrong.  Both parties' strengths are
+    **recomputed at fight time** — a structure's strength moves with the themes
+    and with everything built since it was evaluated, and a fight is decided on
+    what the two are worth *now*.  The contest is then **temperature-adjusted**
+    (``formulas.ss:32-35``), so 60-vs-40 is 8/14 = 0.571 for the stronger side at
+    T=100 (each adjusted value is *rounded*, as in the Scheme) and 0.826 at T=0:
+    at low temperature MetaCat locks in a strong interpretation
+    rather than overturning it at the linear rate.  And there is **no floor** —
+    ``stochastic-pick`` (``utilities.ss:443-448``) gives a strength-0 challenger
+    probability exactly 0, falling back to a coin flip only when *both* sides
+    weigh 0.
     """
-    p_strength = max(1.0, proposer.strength * proposer_weight)
-    o_strength = max(1.0, opponent.strength * opponent_weight)
-    total = p_strength + o_strength
-    win_prob = p_strength / total
-    return ctx.rng.prob(win_prob)
+    proposer.update_strength()
+    opponent.update_strength()
+    weights = temp_adjusted_values(
+        [
+            proposer_weight * proposer.strength,
+            opponent_weight * opponent.strength,
+        ],
+        ctx.temperature.value,
+        ctx.meta,
+    )
+    return bool(ctx.rng.weighted_pick([True, False], weights))
 
 
 def break_structure(ctx: EngineContext, structure: Any) -> None:
@@ -873,12 +962,19 @@ def get_activation(ctx: EngineContext, name: str) -> float:
 
 
 def fully_active(ctx: EngineContext, name: str) -> bool:
-    """Check if a slipnet node is fully active."""
+    """Whether a slipnet node is at maximum activation.
+
+    ``fully-active?`` (``slipnet.ss:392-394``) is ``(= activation
+    %max-activation%)`` — exactly 100, not the 50 of
+    ``%full-activation-threshold%``.  That threshold belongs to
+    ``above-threshold?`` (``slipnet.ss:397-399``), whose single Scheme call site
+    is top-down codelet posting; a codelet asking whether a concept is *fully*
+    active is asking the stricter question.
+    """
     node = ctx.slipnet.nodes.get(name)
     if node is None:
         return False
-    threshold = ctx.meta.get_param("full_activation_threshold", 50)
-    return node.fully_active(threshold)
+    return node.fully_active()
 
 
 def get_bond_category(ctx: EngineContext, from_desc: Any, to_desc: Any) -> Any:
@@ -920,7 +1016,10 @@ def possible_descriptor(
     candidates = node.get_possible_descriptors(obj)
     if not candidates:
         return None
-    weights = [max(0.1, c.activation) for c in candidates]
+    # No floor: ``stochastic-pick-by-method ... 'get-activation``
+    # (``descriptions.ss:138``, ``themes.ss:962``) leaves a dormant descriptor
+    # unreachable (``utilities.ss:443-448``).
+    weights = [c.activation for c in candidates]
     return ctx.rng.weighted_pick(candidates, weights)
 
 

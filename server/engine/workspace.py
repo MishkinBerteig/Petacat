@@ -35,17 +35,52 @@ def _object_weight(obj: Any, weight_key: str) -> float:
 
     Resolves either a numeric attribute (e.g. ``relative_importance``) or a key
     of the object's ``salience`` dict (``intra``, ``vertical_inter``,
-    ``horizontal_inter``).  Floors at 0.1 so a wholly unsalient object stays
-    reachable — the parallel terraced scan explores in proportion to promise, it
-    does not rule things out.
+    ``horizontal_inter``).
+
+    No floor.  ``stochastic-pick`` (``utilities.ss:443-448``) gives a weight-0
+    item probability exactly 0, and falls back to a uniform pick only when
+    *every* weight is 0.  A 0.1 floor kept wholly unsalient objects reachable,
+    which is not what the parallel terraced scan does: it explores in proportion
+    to promise, and no promise means no exploration.
     """
     value = getattr(obj, weight_key, None)
     if isinstance(value, (int, float)):
-        return max(0.1, float(value))
+        return float(value)
     salience = getattr(obj, "salience", None)
     if isinstance(salience, dict) and weight_key in salience:
-        return max(0.1, float(salience[weight_key]))
+        return float(salience[weight_key])
     return 1.0
+
+
+def selection_weights(
+    objects: list[Any],
+    weight_key: str,
+    temperature: float | None = None,
+    meta: MetadataProvider | None = None,
+) -> list[float]:
+    """The weight vector ``choose-object`` picks over.
+
+    Scheme: ``choose-object`` (``workspace.ss:499-502``,
+    ``workspace-strings.ss:340-343``) is
+
+        (stochastic-pick objects (temp-adjusted-values weights))
+
+    so every object choice is sharpened as the temperature falls —
+    ``temp-adjusted-values`` (``formulas.ss:32-35``) raises each weight to
+    ``(100 - T)/30 + 0.5``, an exponent of 0.5 at T=100 (near-uniform) rising to
+    ≈3.83 at T=0 (near-greedy).  Without it the exploration→exploitation
+    schedule of *attention* does not exist.
+
+    ``temperature``/``meta`` are optional so a caller that genuinely wants the
+    raw weights — the Scheme has those too, e.g. ``choose-neighbor``
+    (``workspace-objects.ss:417-423``) — can ask for them.
+    """
+    weights = [_object_weight(o, weight_key) for o in objects]
+    if temperature is None or meta is None:
+        return weights
+    from server.engine.formulas import temp_adjusted_values
+
+    return temp_adjusted_values(weights, temperature, meta)
 
 
 # ``select_backend`` is imported at module level and the backend *classes* are
@@ -264,8 +299,16 @@ class WorkspaceString:
                 count += 1
         return round(100.0 * count / (len(non_spanning) - 1))
 
-    def choose_object(self, weight_key: str, rng: RNG) -> WorkspaceObject | None:
+    def choose_object(
+        self,
+        weight_key: str,
+        rng: RNG,
+        temperature: float | None = None,
+        meta: MetadataProvider | None = None,
+    ) -> WorkspaceObject | None:
         """Choose an object weighted by a salience/importance measure.
+
+        Scheme: ``choose-object`` (``workspace-strings.ss:340-343``).
 
         *weight_key* names either a numeric attribute (``relative_importance``)
         or an entry in the object's ``salience`` dict (``intra``,
@@ -279,11 +322,14 @@ class WorkspaceString:
         the letters inside it (10-26), which is what lets ``c`` be seen as
         corresponding to the ``jjj`` group rather than to just the rightmost
         ``j`` — the difference between the answers mrrkkk and mrrjjk (§1.5).
+
+        Passing *temperature* and *meta* applies ``temp-adjusted-values``, which
+        is what the Scheme always does here; see ``selection_weights``.
         """
         if not self.objects:
             return None
         return rng.weighted_pick(
-            self.objects, [_object_weight(o, weight_key) for o in self.objects]
+            self.objects, selection_weights(self.objects, weight_key, temperature, meta)
         )
 
     def update_object_values(self) -> None:
@@ -696,13 +742,24 @@ class Workspace:
         ):
             structure.strength = strength
 
-    def choose_object(self, weight_key: str, rng: RNG) -> WorkspaceObject | None:
-        """Choose an object from any string, weighted by salience."""
+    def choose_object(
+        self,
+        weight_key: str,
+        rng: RNG,
+        temperature: float | None = None,
+        meta: MetadataProvider | None = None,
+    ) -> WorkspaceObject | None:
+        """Choose an object from any string, weighted by salience.
+
+        Scheme: ``choose-object`` (``workspace.ss:499-502``).  Passing
+        *temperature* and *meta* applies ``temp-adjusted-values``, which is what
+        the Scheme always does here; see ``selection_weights``.
+        """
         all_objs = self.all_objects
         if not all_objs:
             return None
         return rng.weighted_pick(
-            all_objs, [_object_weight(o, weight_key) for o in all_objs]
+            all_objs, selection_weights(all_objs, weight_key, temperature, meta)
         )
 
     # ------------------------------------------------------------------

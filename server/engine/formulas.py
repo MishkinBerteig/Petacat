@@ -22,24 +22,41 @@ def temp_adjusted_probability(
 ) -> float:
     """Adjust a probability based on temperature.
 
-    High temperature pushes probabilities toward 0.5 (random).
-    Low temperature preserves the original probability.
+    High temperature nudges probabilities toward 0.5 (random); low temperature
+    preserves the original probability.  A *small* probability is not dragged
+    to 0.5 — it is interpolated toward ``10 ** (1 - low_prob_factor)``, one
+    decade above itself, so it stays small.
 
-    Scheme: formulas.ss:20-29.
+    Scheme: formulas.ss:20-29::
+
+        ((<= prob 0.5)
+         (let ((low-prob-factor (max 1.0 (truncate (abs (log10 prob))))))
+           (min 0.5 (+ prob (* (% (10- (sqrt (100- *temperature*))))
+                               (- (expt 10 (1- low-prob-factor)) prob))))))
+        ((> prob 0.5)
+         (max 0.5 (1- (+ (1- prob)
+                         (* (% (10- (sqrt (100- *temperature*)))) prob)))))
+
+    Note that Scheme's ``1-`` is *one minus x* (``utilities.ss:500``), not a
+    decrement: the interpolation target is ``10^(1 - lpf)`` and the high branch
+    is ``1 - ((1 - prob) + adjustment * prob)``.  There is no ``prob = 1.0``
+    special case — 1.0 takes the high branch and comes back as
+    ``1 - adjustment`` (0.9 at temperature 100).
+
+    Scheme's ``truncate`` and Python's ``floor`` agree here: their argument is
+    ``abs(log10(prob))``, which is non-negative.
     """
     if prob == 0.0:
         return 0.0
-    if prob == 1.0:
-        return 1.0
 
     sqrt_base = meta.get_formula_coeff("low_prob_sqrt_base")  # 100
     scale = meta.get_formula_coeff("low_prob_scale_factor")  # 10
 
     adjustment = (scale - math.sqrt(sqrt_base - temperature)) / sqrt_base
 
-    if prob < 0.5:
+    if prob <= 0.5:
         low_prob_factor = max(1.0, math.floor(abs(math.log10(prob))))
-        target = 10 ** (low_prob_factor - 1)
+        target = 10.0 ** (1.0 - low_prob_factor)
         return min(0.5, prob + adjustment * (target - prob))
     else:
         return max(0.5, 1.0 - ((1.0 - prob) + adjustment * prob))

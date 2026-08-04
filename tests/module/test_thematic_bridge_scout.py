@@ -61,12 +61,25 @@ class _AlwaysRNG(RNG):
     """An RNG that takes every chance offered.
 
     Used where the test is about what happens *after* a probabilistic branch —
-    winning a fight, making an available slippage — so the branch is reachable
-    without pinning the assertion to a seed.
+    making an available slippage — so the branch is reachable without pinning the
+    assertion to a seed.
     """
 
     def prob(self, p: float) -> bool:
         return p > 0.0
+
+
+class _AlwaysWinsRNG(_AlwaysRNG):
+    """An RNG whose challenger wins every structure fight.
+
+    ``wins-fight?`` (workspace-structures.ss:70-78) is a ``stochastic-pick`` over
+    ``'(#t #f)``, not a probability test, so taking the first item is what
+    "always wins" means here.  ``prob`` alone used to be enough because the fight
+    was a linear ``rng.prob(win_prob)``; it no longer is.
+    """
+
+    def weighted_pick(self, items, weights):
+        return items[0]
 
 
 def _posted(ctx):
@@ -245,7 +258,7 @@ def test_building_a_flipped_bridge_swaps_the_group_it_reinterprets(engine, meta)
 
     # The bridge has to beat the group it would reinterpret (bridges.ss:1295-1312);
     # this test is about what happens once it has.
-    ctx.rng = _AlwaysRNG(0)
+    ctx.rng = _AlwaysWinsRNG(0)
 
     bridge = propose_bridge(
         BRIDGE_VERTICAL,

@@ -31,7 +31,17 @@ def test_temp_adjusted_probability_zero(meta):
 
 
 def test_temp_adjusted_probability_one(meta):
-    assert temp_adjusted_probability(1.0, 50.0, meta) == 1.0
+    """1.0 has no special case in the Scheme (formulas.ss:20-29): it takes the
+    ``> 0.5`` branch and comes back as ``1 - (10 - sqrt(100 - T)) / 100``.
+    At T=50 that is 1 - (10 - sqrt(50)) / 100 = 1 - 0.0292893... = 0.9707107."""
+    assert temp_adjusted_probability(1.0, 50.0, meta) == pytest.approx(
+        0.9707106781186548
+    )
+
+
+def test_temp_adjusted_probability_one_at_zero_temperature(meta):
+    """The adjustment is zero at T=0, so 1.0 survives intact."""
+    assert temp_adjusted_probability(1.0, 0.0, meta) == 1.0
 
 
 def test_temp_adjusted_probability_high_temp_pushes_low_prob_up(meta):

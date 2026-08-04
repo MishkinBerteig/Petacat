@@ -103,7 +103,9 @@ def attempt_justification(
             justified=False, explanation="No supported rules found"
         )
 
-    weights = [max(1.0, r.quality) for r in all_supported]
+    # No floor: ``stochastic-pick-by-method ... 'get-strength`` (justify.ss:26-27)
+    # leaves a worthless rule unchosen (``utilities.ss:443-448``).
+    weights = [r.quality for r in all_supported]
     chosen_rule: Rule = rng.weighted_pick(all_supported, weights)
 
     rule_type = chosen_rule.rule_type  # "top" or "bottom"
@@ -228,11 +230,12 @@ def attempt_justification(
             explanation="Permission to clamp denied for unification",
         )
 
-    # Pick an other rule weighted by similarity of strength
+    # Pick an other rule weighted by similarity of strength.  No floor:
+    # ``(100- (abs (- strength ...)))`` (justify.ss:142-146) is used raw, so a
+    # rule 100 away in quality is not a unification candidate at all
+    # (``utilities.ss:443-448``).
     strength = chosen_rule.quality
-    other_weights = [
-        max(1.0, 100.0 - abs(strength - r.quality)) for r in other_rules
-    ]
+    other_weights = [100.0 - abs(strength - r.quality) for r in other_rules]
     other_rule: Rule = rng.weighted_pick(other_rules, other_weights)
 
     unifying_pattern = unify_rules(chosen_rule, other_rule, slipnet)

@@ -858,9 +858,10 @@ def propose_description_based_on_theme(
     candidates = dimension.get_possible_descriptors(obj)
     if not candidates:
         return None
-    descriptor = rng.weighted_pick(
-        candidates, [max(0.1, c.activation) for c in candidates]
-    )
+    # No floor: ``stochastic-pick-by-method possible-descriptors 'get-activation``
+    # (``themes.ss:962``) leaves a dormant descriptor unreachable
+    # (``utilities.ss:443-448``).
+    descriptor = rng.weighted_pick(candidates, [c.activation for c in candidates])
     description = Description(obj, dimension, descriptor)
     description.proposal_level = description.PROPOSED
     descriptor.activate_from_workspace()

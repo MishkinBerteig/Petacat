@@ -39,6 +39,8 @@ import numpy as np
 
 from server.engine.numeric.backend import Backend, SlipnetSession
 from server.engine.numeric.layout import (
+    FULL_ACTIVATION_THRESHOLD,
+    MAX_ACTIVATION,
     STRING_ANSWER,
     STRING_INITIAL,
     STRING_MODIFIED,
@@ -124,8 +126,10 @@ class NumpySlipnetSession(SlipnetSession):
 
     def jump_candidates(self) -> tuple[list[int], list[float]]:
         act = self.activation
-        p = (act / 100.0) ** 3
-        eligible = (act > 0.0) & (p > 0.0) & (p < 1.0)
+        p = (act / MAX_ACTIVATION) ** 3
+        # ``partially-active?`` (slipnet.ss:402-404): [50, 100).
+        partial = (act >= FULL_ACTIVATION_THRESHOLD) & (act < MAX_ACTIVATION)
+        eligible = partial & (p > 0.0) & (p < 1.0)
         idx = np.flatnonzero(eligible)
         return idx.tolist(), p[idx].tolist()
 

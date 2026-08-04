@@ -1752,6 +1752,7 @@ def instantiate_rule_clause_template(
     slipnet: Slipnet | None = None,
     rng: RNG | None = None,
     temperature: float = 50.0,
+    meta: MetadataProvider | None = None,
 ) -> RuleClause:
     """Instantiate a rule-clause-template into a RuleClause.
 
@@ -1764,7 +1765,7 @@ def instantiate_rule_clause_template(
         obj_desc = reference_object_to_object_description(ref_object, slipnet)
         sorted_cts = _sort_change_templates(change_templates)
         changes = [
-            _instantiate_change_template(ct, obj_desc, slipnet, rng, temperature)
+            _instantiate_change_template(ct, obj_desc, slipnet, rng, temperature, meta)
             for ct in sorted_cts
         ]
         return RuleClause(
@@ -1793,6 +1794,7 @@ def _instantiate_change_template(
     slipnet: Slipnet | None,
     rng: RNG | None,
     temperature: float,
+    meta: MetadataProvider | None = None,
 ) -> RuleChange:
     """Instantiate a single change template into a RuleChange.
 
@@ -1805,16 +1807,25 @@ def _instantiate_change_template(
     if not possible_descriptors:
         return RuleChange(dimension=dimension, referent=scope)
 
-    # Choose descriptor (by conceptual depth, temperature-weighted)
+    # Choose descriptor by conceptual depth.  rules.ss:894-898 is
+    #
+    #     (stochastic-pick possible-descriptors
+    #       (temp-adjusted-values (tell-all possible-descriptors
+    #                               'get-conceptual-depth)))
+    #
+    # so the choice sharpens toward the deepest descriptor as the temperature
+    # falls, and a depth-0 descriptor has probability 0 — no floor
+    # (``utilities.ss:443-448``).
     if len(possible_descriptors) == 1 or rng is None:
         chosen = possible_descriptors[0]
     else:
-        depths = [getattr(d, "conceptual_depth", 50) for d in possible_descriptors]
-        # Temperature-adjusted pick
-        from server.engine.formulas import temp_adjusted_values as _tav
-        from server.engine.metadata import MetadataProvider
-        # Simple approximation: use depth as weight
-        weights = [max(1, d) for d in depths]
+        weights = [
+            float(getattr(d, "conceptual_depth", 50)) for d in possible_descriptors
+        ]
+        if meta is not None:
+            from server.engine.formulas import temp_adjusted_values
+
+            weights = temp_adjusted_values(weights, temperature, meta)
         chosen = rng.weighted_pick(possible_descriptors, weights)
 
     # If dimension == object_description's desc_type and chosen is a relation,
@@ -2784,7 +2795,7 @@ def build_rule_from_bridges(
 
     # 6. Instantiate templates to clauses
     clauses = [
-        instantiate_rule_clause_template(t, slipnet, rng, temperature)
+        instantiate_rule_clause_template(t, slipnet, rng, temperature, meta)
         for t in templates
     ]
 

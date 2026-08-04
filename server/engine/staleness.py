@@ -117,17 +117,18 @@ class StaleView:
         """The weight ``obj`` carried when this view was captured.
 
         Mirrors ``workspace._object_weight``: *weight_key* names either a numeric
-        attribute or an entry in the object's ``salience`` dict.  Objects that
-        postdate the view have no recorded weight; they cannot be reached through
-        it, so the fallback is only a guard.
+        attribute or an entry in the object's ``salience`` dict, with no floor
+        (``utilities.ss:443-448``).  Objects that postdate the view have no
+        recorded weight; they cannot be reached through it, so the fallback is
+        only a guard.
         """
         entry = self.object_weights.get(id(obj))
         if entry is None:
             return 1.0
         relative_importance, salience = entry
         if weight_key == "relative_importance":
-            return max(0.1, relative_importance)
-        return max(0.1, salience.get(weight_key, 1.0))
+            return relative_importance
+        return salience.get(weight_key, 1.0)
 
     def __repr__(self) -> str:
         return f"StaleView(at_codelet={self.codelet_count}, objects={len(self.all_objects)})"

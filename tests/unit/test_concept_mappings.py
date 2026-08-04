@@ -7,6 +7,7 @@ symmetry logic. No randomness is used.
 """
 
 from server.engine.concept_mappings import ConceptMapping
+from server.engine.slipnet import SlipnetNode
 
 from tests.unit._fakes import FakeLink, FakeNode, FakeObject, FakeString
 
@@ -122,6 +123,31 @@ def test_relevant_false_when_one_description_type_inactive():
     dt2 = FakeNode("plato-letter-category", fully_active=False)
     cm = ConceptMapping(dt1, FakeNode("plato-a"), dt2, FakeNode("plato-a"))
     assert cm.relevant() is False
+
+
+def _cm_with_types_at(activation: float) -> ConceptMapping:
+    """A concept-mapping whose description types are *real* nodes at *activation*.
+
+    ``FakeNode`` carries relevance as a boolean the test sets, which is right for
+    the tests above — they are about ``relevant()``'s conjunction, not about
+    where the line is drawn.  These two are about exactly where the line is
+    drawn, so they need a node that computes it: ``relevant?``
+    (concept-mappings.ss:107-109) asks ``fully-active?``, which is exact equality
+    with %max-activation% (slipnet.ss:392-394), not the >= 50 threshold.
+    """
+    dt1 = SlipnetNode("plato-letter-category", "lettctgy", 20)
+    dt2 = SlipnetNode("plato-letter-category", "lettctgy", 20)
+    dt1.activation = activation
+    dt2.activation = activation
+    return ConceptMapping(dt1, FakeNode("plato-a"), dt2, FakeNode("plato-a"))
+
+
+def test_relevant_false_when_description_types_are_at_99():
+    assert _cm_with_types_at(99.0).relevant() is False
+
+
+def test_relevant_true_when_description_types_are_at_100():
+    assert _cm_with_types_at(100.0).relevant() is True
 
 
 # --- distinguishing --------------------------------------------------------

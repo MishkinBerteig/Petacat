@@ -759,9 +759,14 @@ class TestThematicBridgeScout:
 # ═══════════════════════════════════════════════════════════════════════
 
 class TestStructureFighting:
-    def test_fight_probability_scales_with_strength(self, ctx_abc_abd_xyz):
-        """Stronger structures should win fights more often."""
-        ctx = ctx_abc_abd_xyz
+    def _bonds(self, ctx, monkeypatch):
+        """A 90-strength challenger and a 10-strength defender on one pair.
+
+        ``wins-fight?`` (workspace-structures.ss:71-72) recomputes both strengths
+        before the draw, so the only way to hold a fixture at a chosen pair of
+        strengths is to neutralise that recomputation.  The call itself is the
+        thing under test here.
+        """
         init = ctx.workspace.initial_string
         letters = init.letters
         slipnet = ctx.slipnet
@@ -773,8 +778,6 @@ class TestStructureFighting:
             letters[0].letter_category, letters[1].letter_category,
             slipnet.nodes["plato-right"],
         )
-        strong_bond.strength = 90.0
-
         weak_bond = Bond(
             letters[0], letters[1],
             slipnet.nodes["plato-sameness"],
@@ -782,22 +785,67 @@ class TestStructureFighting:
             letters[0].letter_category, letters[1].letter_category,
             None,
         )
+        monkeypatch.setattr(Bond, "update_strength", lambda self: None)
+        strong_bond.strength = 90.0
         weak_bond.strength = 10.0
+        return strong_bond, weak_bond
 
-        # Run many fights to verify statistical tendency
-        wins = sum(
-            1 for seed in range(100)
+    def _wins(self, ctx, strong_bond, weak_bond, temperature):
+        temp = Temperature(ctx.meta)
+        temp.value = temperature
+        return sum(
+            1 for seed in range(200)
             if _wins_fight(
                 EngineContext(
                     ctx.workspace, ctx.slipnet, ctx.coderack, ctx.themespace,
-                    ctx.trace, ctx.memory, ctx.temperature, ctx.commentary,
+                    ctx.trace, ctx.memory, temp, ctx.commentary,
                     RNG(seed), ctx.meta,
                 ),
                 strong_bond, 1.0, weak_bond, 1.0,
             )
         )
-        # Strong (90) vs weak (10): should win ~90% of the time
-        assert wins > 70
+
+    def test_fight_probability_scales_with_strength(
+        self, ctx_abc_abd_xyz, monkeypatch
+    ):
+        """Stronger structures should win fights more often."""
+        ctx = ctx_abc_abd_xyz
+        strong_bond, weak_bond = self._bonds(ctx, monkeypatch)
+        # At T=100 the exponent is 0.5, so the weights are round(sqrt(90))=9 and
+        # round(sqrt(10))=3 -- p = 9/12 = 0.75.
+        wins = self._wins(ctx, strong_bond, weak_bond, 100.0)
+        assert 130 <= wins <= 170
+
+    def test_fight_sharpens_as_temperature_falls(
+        self, ctx_abc_abd_xyz, monkeypatch
+    ):
+        """``temp-adjusted-values`` inside ``wins-fight?`` (workspace-structures.ss:73).
+
+        The same 90-vs-10 contest is a 3:1 shot at T=100 and effectively settled at
+        T=0 -- at exponent 3.8333 the weights are 90**3.8333 = 3.1e7 against
+        10**3.8333 = 6812.  Without the adjustment the contest is 9:1 at every
+        temperature, and MetaCat never stops overturning strong interpretations.
+        """
+        ctx = ctx_abc_abd_xyz
+        strong_bond, weak_bond = self._bonds(ctx, monkeypatch)
+        hot = self._wins(ctx, strong_bond, weak_bond, 100.0)
+        cold = self._wins(ctx, strong_bond, weak_bond, 0.0)
+        assert cold == 200
+        assert cold > hot
+
+    def test_zero_strength_challenger_never_wins(
+        self, ctx_abc_abd_xyz, monkeypatch
+    ):
+        """``stochastic-pick`` (utilities.ss:443-448) gives weight 0 probability 0.
+
+        The old linear form floored both sides at 1.0, so a structure worth nothing
+        still took one fight in three.
+        """
+        ctx = ctx_abc_abd_xyz
+        strong_bond, weak_bond = self._bonds(ctx, monkeypatch)
+        strong_bond.strength = 0.0
+        weak_bond.strength = 50.0
+        assert self._wins(ctx, strong_bond, weak_bond, 100.0) == 0
 
 
 # NOTE: A second ``class TestReportAnswer`` is defined later in this file and

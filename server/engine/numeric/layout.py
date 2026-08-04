@@ -63,6 +63,25 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 
 
 # ---------------------------------------------------------------------------
+# Activation constants
+#
+# Scheme: ``%max-activation%`` (slipnet.ss:20) and
+# ``%full-activation-threshold%`` (slipnet.ss:22).  They live here, in the module
+# every backend and ``slipnet.py`` already imports, because the probabilistic
+# jump's eligibility window is stated in four places — the object-graph loop and
+# the three backend ``jump_candidates`` — and four copies of a bare ``50.0`` is
+# exactly how the backends would drift apart.
+# ---------------------------------------------------------------------------
+
+#: ``%max-activation%``: the ceiling, and what "fully active" means exactly.
+MAX_ACTIVATION = 100.0
+
+#: ``%full-activation-threshold%``: the floor of ``above-threshold?``, and hence
+#: of ``partially-active?`` (slipnet.ss:397-404).
+FULL_ACTIVATION_THRESHOLD = 50.0
+
+
+# ---------------------------------------------------------------------------
 # Slipnet
 # ---------------------------------------------------------------------------
 

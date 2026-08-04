@@ -329,6 +329,19 @@ def capture_run_state(ctx: Any) -> dict:
         "top_rules": [writer.ref(r) for r in ws.top_rules],
         "bottom_rules": [writer.ref(r) for r in ws.bottom_rules],
         "clamped_rules": writer.value(list(ws.clamped_rules)),
+        # The values ``update_average_unhappiness_values`` leaves behind once per
+        # update cycle.  They are *state*, not derived-on-demand: codelets between
+        # two cycles read whatever the last cycle computed (see
+        # ``Workspace.get_mapping_strength``), so a capture that omitted them
+        # restored a run whose bridge scouts saw every mapping at strength 0 until
+        # the next cycle — and a scout landing in that window picks a different
+        # bridge type from the same random draw.
+        "mapping_strengths": {
+            "top": ws.top_mapping_strength,
+            "bottom": ws.bottom_mapping_strength,
+            "vertical": ws.vertical_mapping_strength,
+        },
+        "average_unhappiness": ws._average_unhappiness,
     }
 
     coderack_state = {
@@ -491,6 +504,16 @@ def restore_run_state(runner: Any, state: dict) -> None:
     ws.top_rules = [reader.resolve(r) for r in ws_state["top_rules"]]
     ws.bottom_rules = [reader.resolve(r) for r in ws_state["bottom_rules"]]
     ws.clamped_rules = reader.resolve(ws_state["clamped_rules"])
+
+    # ``.get`` rather than indexing: these two keys were added to a format that was
+    # already version 1 and are purely additive, so a capture written before them
+    # still restores — to the zeros a fresh Workspace starts at, which is what such
+    # a capture would have restored anyway.
+    strengths = ws_state.get("mapping_strengths") or {}
+    ws.top_mapping_strength = strengths.get("top", 0.0)
+    ws.bottom_mapping_strength = strengths.get("bottom", 0.0)
+    ws.vertical_mapping_strength = strengths.get("vertical", 0.0)
+    ws._average_unhappiness = ws_state.get("average_unhappiness")
 
     # -- Coderack -----------------------------------------------------
     ctx.coderack.clear()

@@ -989,7 +989,11 @@ class EngineRunner:
 
         for node_name in top_down_nodes:
             node = ctx.slipnet.nodes.get(node_name)
-            if node is None or not node.fully_active(threshold):
+            # ``above-threshold?`` (>= 50), not ``fully-active?`` (== 100).
+            # Top-down posting is the *only* consumer of the weaker predicate in
+            # the reference (slipnet.ss:212-213); everything else asks for
+            # saturation.
+            if node is None or not node.above_threshold(threshold):
                 continue
 
             # Compute urgency from conceptual depth and activation

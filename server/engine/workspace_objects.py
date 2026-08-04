@@ -146,12 +146,15 @@ class WorkspaceObject:
     def choose_neighbor(self, rng: RNG) -> WorkspaceObject | None:
         """Stochastically pick a neighbor weighted by intra-string salience.
 
-        Scheme: workspace-objects.ss:417-423.
+        Scheme: workspace-objects.ss:417-423 — a bare
+        ``stochastic-pick-by-method``, so no temperature adjustment and no
+        weight floor: a neighbour of salience 0 is not chosen
+        (``utilities.ss:443-448``).
         """
         neighbors = self.get_all_left_neighbors() + self.get_all_right_neighbors()
         if not neighbors:
             return None
-        weights = [max(0.1, n.salience.get("intra", 1.0)) for n in neighbors]
+        weights = [n.salience.get("intra", 1.0) for n in neighbors]
         return rng.weighted_pick(neighbors, weights)
 
     # ------------------------------------------------------------------

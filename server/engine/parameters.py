@@ -152,8 +152,11 @@ RUN_PARAMETERS: tuple[RunParameter, ...] = (
        "proportion, which explores more widely. A run at any other value is not "
        "comparable with the dissertation's results.", 0, 100),
     _p("full_activation_threshold", KIND_INT, GROUP_SLIPNET, "Full-activation threshold",
-       "The activation at which a node counts as fully active, and so begins to exert "
-       "top-down pressure by posting codelets of its own.", 0, 100),
+       "The activation at which a node begins to exert top-down pressure by posting "
+       "codelets of its own, and above which it may jump to full activation. Not the "
+       "same as being *fully* active: that is exactly 100, and it is what shrinks a "
+       "concept's links and makes its descriptions and concept-mappings count as "
+       "relevant.", 0, 100),
     _p("initial_slipnode_clamp_cycles", KIND_INT, GROUP_SLIPNET,
        "Initial clamp duration (cycles)",
        "How long the initially-relevant nodes are held at full activation at the start "
