@@ -484,18 +484,28 @@ class TestTraceAndSelfWatching:
                 return
         pytest.fail("no snag description stored in 8 runs")
 
-    def test_a_snag_clamps_the_temperature(self, meta):
-        """Metacat clamps temperature while it deals with a snag, to force
-        focused exploration rather than more random search."""
-        for seed in range(8):
-            runner = _run(meta, "abc", "abd", "xyz", seed=seed, steps=800)
-            if runner.ctx.trace.snag_count > 0:
-                assert runner.ctx.trace.within_snag_period or (
-                    runner.ctx.temperature.clamped
-                    or runner.ctx.trace.last_unclamp_time >= 0
-                )
-                return
-        pytest.skip("no snag occurred within 800 codelets")
+    def test_a_snag_clamps_the_temperature_at_100(self, meta):
+        """``answers.ss:1183-1184``: a snag sets ``*temperature*`` to **100** and
+        clamps it there, "which makes codelet selection maximally random and sends
+        the run exploring broadly away from the impasse".
+
+        This test previously asserted the opposite belief — that the clamp exists
+        "to force focused exploration rather than more random search" — and was
+        written loosely enough (``or last_unclamp_time >= 0``) that it could not
+        fail.  A snag happens precisely when a strong rule was about to apply, i.e.
+        at *low* temperature, so clamping at the current value pinned the run greedy
+        on the interpretation that had just failed.
+        """
+        for seed in range(24):
+            runner = EngineRunner(meta)
+            runner.init_mcat("abc", "abd", "xyz", seed=seed)
+            for _ in range(2500):
+                runner.step_mcat()
+                if runner.ctx.trace.snag_count > 0:
+                    assert runner.ctx.temperature.clamped
+                    assert runner.ctx.temperature.value == 100.0
+                    return
+        pytest.fail("no snag in 24 seeds x 2500 codelets of abc=>abd; xyz=>?")
 
     def test_the_trace_stays_at_the_cognitive_level(self, meta):
         """§4.4: "at the level of description of the Trace, a typical run consists

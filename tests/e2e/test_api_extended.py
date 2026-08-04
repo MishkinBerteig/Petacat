@@ -127,9 +127,18 @@ async def test_spreading_threshold_changes_the_run_and_survives_reset(app_client
     away whatever the user had chosen — and since a fresh run also starts at the
     default, a chosen value could easily never reach a run at all.
     """
+    #: A seed of this test's own rather than the module's.  The module ``SEED`` no
+    #: longer reaches a stopping state on this problem inside 4,000 codelets under
+    #: either threshold, so both runs hit the cap and their codelet counts agree —
+    #: which reads as "the threshold made no difference" when what happened is that
+    #: neither run finished.  26 answers in 641 at the strict threshold and does not
+    #: finish at the loose one, which is the difference this test is asserting.
+    threshold_seed = 26
+
     async def run_with(threshold: int) -> dict:
         resp = await app_client.post("/api/runs", json={
-            "initial": "abc", "modified": "abd", "target": "xyz", "seed": SEED,
+            "initial": "abc", "modified": "abd", "target": "xyz",
+            "seed": threshold_seed,
         })
         rid = resp.json()["run_id"]
         await app_client.post(

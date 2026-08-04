@@ -322,6 +322,8 @@ def make_translated_string(
     source: Workspace,
     slipnet: Any,
     workspace: Any = None,
+    *,
+    register_bridges: bool = True,
 ) -> Any:
     """Build the answer string *with the structure the rule implies*.
 
@@ -338,12 +340,24 @@ def make_translated_string(
     them.
 
     Returns ``None`` when the rule cannot be applied, which is the caller's snag.
+
+    ``register_bridges`` is what separates the two callers.  When a *run reaches an
+    answer* the translated string becomes the Workspace's answer string, so the bridges
+    drawn to it are real Workspace bridges and are filed as such.  When *justify mode*
+    tests a translation (``justify.ss:107-112``) the Workspace already has an answer
+    string of its own and the translation is only a hypothesis; filing its bridges would
+    overwrite the real objects' ``horizontal_bridge`` and make ``Rule.supported``
+    vacuously true of exactly the rule whose support is in question.  The Scheme never
+    files them (``make-translated-rule-bridges``, ``answers.ss:1095-1127``, only marks
+    them); ``workspace`` is still passed so the rule information can be resolved
+    against the real strings.
     """
     from server.engine.images import ImageFailure
     from server.engine.rules import _generate_image_letters, apply_rule
     from server.engine.workspace import WorkspaceString
 
-    if apply_rule(rule, source, slipnet) is None:
+    transforms = apply_rule(rule, source, slipnet)
+    if transforms is None:
         return None
 
     image = getattr(source, "image", None)
@@ -389,14 +403,26 @@ def make_translated_string(
             bond.proposal_level = getattr(bond, "BUILT", bond.proposal_level)
             translated.add_bond(bond)
 
-    _bridge_to_translation(source, translated, slipnet, workspace)
+    bridges = _bridge_to_translation(
+        source,
+        translated,
+        slipnet,
+        workspace if register_bridges else None,
+        transforms,
+    )
+    # ``answers.ss:1069`` — the last thing ``make-translated-string`` does is hand the
+    # bridges it drew back to the rule, which is where a translated rule gets its
+    # supporting bridges and its theme pattern.  Until then it rests on nothing, and
+    # ``supported?`` is vacuously true of it.
+    if hasattr(rule, "set_translated_rule_information"):
+        rule.set_translated_rule_information(bridges, workspace, slipnet)
     return translated
 
 
 def _bridge_to_translation(
-    source: Any, translated: Any, slipnet: Any, workspace: Any
+    source: Any, translated: Any, slipnet: Any, workspace: Any, transforms: Any = None
 ) -> list:
-    """Bridge every source object to the object it became.
+    """Bridge each source object the rule *transformed* to the object it became.
 
     Scheme: ``make-translated-rule-bridges`` (``answers.ss:1095-1127``).  The bridges
     are what say *which* part of the answer each part of the target turned into — the
@@ -404,12 +430,50 @@ def _bridge_to_translation(
     proposed, because the translation has already happened: there is nothing left to
     decide, only something to record.  Without them the answer sits beside the target
     with no stated relation to it.
+
+    *transforms* is ``apply-rule``'s own result: the objects the rule named and what it
+    did to each.  Only those are bridged, plus — when the rule spoke about the string
+    as a whole — the string's top-level objects it did not name individually.  Bridging
+    every object regardless is not merely broader: those bridges become the translated
+    rule's supporting bridges, and ``supported?`` is an ``andmap`` over them, so a rule
+    about one letter would have to be underwritten by a horizontal bridge on every
+    object in the string before it counted as supported.
     """
-    from server.engine.bridges import BRIDGE_BOTTOM, Bridge, make_concept_mappings
+    from server.engine.bridges import (
+        BRIDGE_BOTTOM,
+        BRIDGE_TOP,
+        Bridge,
+        make_concept_mappings,
+    )
+    from server.engine.rules import _get_constituent_objects, _is_workspace_string
+
+    # Which horizontal pair the bridges belong to follows from which string was
+    # translated: the initial string becomes the modified string (a top pair), the
+    # target string becomes the answer (a bottom pair).  Justify mode translates a
+    # bottom rule into a top one, so the initial-string case is reachable, and filing
+    # those bridges under ``bottom`` would have misreported the bottom mapping.
+    bridge_type = (
+        BRIDGE_TOP if getattr(source, "string_type", "") == "initial" else BRIDGE_BOTTOM
+    )
+
+    if transforms is None:
+        # No transform record to scope by (a verbatim rule returns none): fall back to
+        # the whole string, which is what the display needs.
+        subjects = list(getattr(source, "objects", []))
+    else:
+        named = [obj for obj, _ in transforms if not _is_workspace_string(obj)]
+        string_transform = next(
+            (t for t in transforms if _is_workspace_string(t[0])), None
+        )
+        subjects = list(named)
+        if string_transform is not None:
+            for obj in _get_constituent_objects(string_transform[0]):
+                if not any(o is obj for o in subjects):
+                    subjects.append(obj)
 
     identity = slipnet.nodes.get("plato-identity")
     bridges = []
-    for obj in list(getattr(source, "objects", [])):
+    for obj in subjects:
         image = getattr(obj, "image", None)
         counterpart = getattr(image, "instantiated_object", None) if image else None
         if counterpart is None:
@@ -417,9 +481,9 @@ def _bridge_to_translation(
         bridge = Bridge(
             object1=obj,
             object2=counterpart,
-            bridge_type=BRIDGE_BOTTOM,
+            bridge_type=bridge_type,
             concept_mappings=make_concept_mappings(
-                obj, counterpart, BRIDGE_BOTTOM, identity
+                obj, counterpart, bridge_type, identity
             ),
         )
         bridge.proposal_level = getattr(bridge, "BUILT", bridge.proposal_level)

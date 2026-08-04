@@ -125,6 +125,11 @@ class Codelet:
         self.id = next_id(KIND_CODELET)
         self.codelet_type = codelet_type
         self.urgency = urgency
+        #: The urgency this codelet was *posted* at.  ``coderack.ss:196-200`` keeps
+        #: ``original-urgency`` alongside the relative urgency precisely so
+        #: ``reset-urgency`` (``coderack.ss:256-257``) can put a codelet back where it
+        #: was when its type's clamp is lifted.
+        self.original_urgency = urgency
         self.arguments = arguments or {}
         self.time_stamp = time_stamp
 
@@ -275,9 +280,12 @@ class Coderack:
         without bound and the codelet mix drifts away from whatever the current
         Workspace state calls for.
         """
-        # Apply urgency clamping if active
+        # A clamped type takes the clamped urgency *exactly* — ``coderack.ss:196-200``
+        # reads ``(if urgency-clamped? clamped-relative-urgency original-urgency)``.
+        # Petacat took the max, which turned a clamp meant to *starve* a type (the
+        # very-low background of ``against-background``) into a no-op.
         if codelet.codelet_type in self.clamped_urgencies:
-            codelet.urgency = max(codelet.urgency, self.clamped_urgencies[codelet.codelet_type])
+            codelet.urgency = self.clamped_urgencies[codelet.codelet_type]
 
         rng = rng if rng is not None else self.rng
         if current_time is None:
@@ -477,19 +485,185 @@ class Coderack:
         self._total_count = 0
 
     def clamp_codelet_type(self, codelet_type: str, urgency: int) -> None:
-        """Force a codelet type to at least the given urgency."""
+        """Pin a codelet type at *urgency*, on the rack and for everything posted after.
+
+        ``coderack.ss:95-105``: a clamp both records the urgency (so ``make-codelet``
+        uses it for new codelets) **and** calls ``(tell *coderack* 'set-urgencies self
+        urgency)``, which re-files every codelet of the type already on the rack into
+        the bin that urgency names.  Petacat did only the first half, so a clamp
+        applied to a rack of 100 changed nothing about the 100 codelets on it —
+        during precisely the episodes self-watching exists for.
+        """
+        if self.clamped_urgencies.get(codelet_type) == urgency:
+            return
         self.clamped_urgencies[codelet_type] = urgency
+        self.set_urgencies(codelet_type, urgency)
 
     def unclamp_codelet_type(self, codelet_type: str) -> None:
-        self.clamped_urgencies.pop(codelet_type, None)
+        """Lift a type's clamp and put its codelets back — ``coderack.ss:107-112``."""
+        if self.clamped_urgencies.pop(codelet_type, None) is None:
+            return
+        self.reset_urgencies(codelet_type)
 
-    def clamp_pattern(self, pattern: list[tuple[str, int]]) -> None:
-        """Apply a codelet urgency clamping pattern."""
-        for codelet_type, urgency in pattern:
+    def set_urgencies(self, codelet_type: str, new_value: int) -> None:
+        """Re-file every codelet of *codelet_type* at *new_value* — ``coderack.ss:447``."""
+        self._move_urgencies(codelet_type, lambda c: new_value)
+
+    def reset_urgencies(self, codelet_type: str) -> None:
+        """Restore posted urgencies for *codelet_type* — ``coderack.ss:452``."""
+        self._move_urgencies(codelet_type, lambda c: c.original_urgency)
+
+    def _move_urgencies(self, codelet_type: str, urgency_of: Any) -> None:
+        """Set each matching codelet's urgency and move it to the bin that names.
+
+        ``set-urgency`` (``coderack.ss:248-255``) removes from the old bin and adds to
+        the new one only when the bin actually changes.  Going through
+        ``CoderackBin.remove``/``add`` keeps ``sum_time_stamp`` correct, which is what
+        the O(1) eviction weights are computed from.
+        """
+        for b in self.bins:
+            # Snapshot: the list is mutated by the moves below.
+            for codelet in list(b.codelets):
+                if codelet.codelet_type != codelet_type:
+                    continue
+                new_urgency = urgency_of(codelet)
+                codelet.urgency = new_urgency
+                new_index = self._urgency_to_bin(new_urgency)
+                if new_index == b.bin_number:
+                    continue
+                b.remove(codelet)
+                self.bins[new_index].add(codelet)
+
+    def clamp_pattern(self, pattern: Any, background: str | None = None) -> None:
+        """Apply a codelet urgency clamping pattern — ``clamp-codelet-pattern``.
+
+        Accepts the resolved form (``[(type, urgency), ...]``) and the named form
+        (``{"type": "rule_codelet_pattern"}``); see :meth:`resolve_codelet_pattern`.
+        ``background`` names the urgency level every *unspecified* codelet type is
+        clamped to, which is the Scheme's ``against-background``.
+        """
+        for codelet_type, urgency in self.resolve_codelet_pattern(pattern, background):
             self.clamp_codelet_type(codelet_type, urgency)
 
     def unclamp_all(self) -> None:
+        """Lift every codelet-type clamp, restoring posted urgencies as it goes."""
+        for codelet_type in list(self.clamped_urgencies):
+            self.unclamp_codelet_type(codelet_type)
         self.clamped_urgencies.clear()
+
+    # ------------------------------------------------------------------
+    # Codelet patterns  (Scheme: trace.ss:1560-1667)
+    # ------------------------------------------------------------------
+
+    def resolve_codelet_pattern(
+        self, pattern: Any, background: str | None = None
+    ) -> list[tuple[str, int]]:
+        """Turn any of the pattern spellings into ``[(codelet_type, urgency), ...]``.
+
+        Three spellings reach here:
+
+        * ``[(name, urgency), ...]`` — already resolved, passed through.  This is what
+          the clamp sites carry, read straight out of ``meta.codelet_patterns``.
+        * ``{"entries": [...]}`` — the structured form, entries as pairs or dicts.
+        * ``{"type": "<named>"}`` — one of the nine patterns in
+          ``seed_data/posting_rules.json`` (``trace.ss:1610-1667``), under either its
+          hyphenated seed key or an underscored spelling of it.  An unknown name
+          resolves to nothing rather than raising, so a placeholder marker no pattern
+          matches leaves the rack alone; it used to be *iterated*, unpacking the dict's
+          keys, which raised on the first entry.
+
+        ``background``, when given, names the urgency level every unspecified codelet
+        type is clamped to.  It belongs to the *clamp* rather than to the pattern,
+        which is where the Scheme puts it: ``(against-background %very-low-urgency%
+        %rule-codelet-pattern%)`` at the clamp site (``jootsing.ss:326-327``), not in
+        the pattern's own definition.
+        """
+        if pattern is None:
+            resolved: list[tuple[str, int]] = []
+        elif isinstance(pattern, dict):
+            # Presence, not truthiness: an empty ``entries`` list is a pattern that
+            # clamps nothing, not a pattern in the other spelling.
+            if "entries" in pattern:
+                resolved = [self._pattern_entry(e) for e in pattern["entries"]]
+            else:
+                name = self._pattern_name(pattern.get("type"))
+                resolved = (
+                    []
+                    if name is None
+                    else [
+                        self._pattern_entry(e)
+                        for e in self.meta.codelet_patterns[name]
+                    ]
+                )
+            if "background" in pattern:
+                background = pattern["background"]
+        else:
+            resolved = [self._pattern_entry(e) for e in pattern]
+
+        if background is None:
+            return resolved
+        return self.against_background(self.meta.get_urgency(background), resolved)
+
+    def _pattern_name(self, name: Any) -> str | None:
+        """The seed-data key for a named pattern, accepting either spelling.
+
+        The clamp sites write ``rule_codelet_pattern``; the seed data is keyed
+        ``rule-codelet-pattern``.  Both resolve, so neither side has to know the
+        other's convention, and an unknown name resolves to nothing rather than
+        raising — a placeholder no pattern matches must leave the rack alone.
+        """
+        if not isinstance(name, str):
+            return None
+        for candidate in (name, name.replace("_", "-")):
+            if candidate in self.meta.codelet_patterns:
+                return candidate
+        return None
+
+    def _pattern_entry(self, entry: Any) -> tuple[str, int]:
+        if isinstance(entry, dict):
+            return (
+                entry["codelet_type"],
+                int(
+                    entry["urgency"]
+                    if isinstance(entry.get("urgency"), (int, float))
+                    else self.meta.get_urgency(entry["urgency"])
+                ),
+            )
+        codelet_type, urgency = entry
+        if isinstance(urgency, str):
+            urgency = self.meta.get_urgency(urgency)
+        return (codelet_type, int(urgency))
+
+    def against_background(
+        self, background_urgency: int, entries: list[tuple[str, int]]
+    ) -> list[tuple[str, int]]:
+        """*entries*, plus every other codelet type at *background_urgency*.
+
+        ``against-background`` (``trace.ss:1578-1581``) via
+        ``get-complement-codelet-pattern`` (``trace.ss:1566-1576``).  This is what
+        makes a clamp a *redirection* rather than a boost: the rule-codelet clamp
+        pins the three rule types at 77/91/91 and the other 24 types at 21, which —
+        with the posting override below — throttles their posting probability to 0.21.
+        """
+        specified = {codelet_type for codelet_type, _ in entries}
+        complement = [
+            (codelet_type, background_urgency)
+            for codelet_type in self.meta.codelet_specs
+            if codelet_type not in specified
+        ]
+        return list(entries) + complement
+
+    def clamped_posting_probability(self, codelet_type: str) -> float | None:
+        """``(% clamped-urgency)`` for a clamped type, else ``None``.
+
+        ``post-codelet-probability`` (``coderack.ss:470-473``) consults the clamp
+        *before* any workspace-driven computation, so while a pattern is clamped the
+        posting mix is the pattern rather than the Workspace's own demands.
+        """
+        urgency = self.clamped_urgencies.get(codelet_type)
+        if urgency is None:
+            return None
+        return urgency / 100.0
 
     def get_codelet_type_counts(self) -> dict[str, int]:
         """Count codelets by type."""

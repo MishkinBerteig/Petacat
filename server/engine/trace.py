@@ -65,6 +65,21 @@ GRACE_PERIOD_DEFAULT = 100
 # Matches Scheme constant %max-clamp-period% in jootsing.ss:248.
 MAX_CLAMP_PERIOD_DEFAULT = 750
 
+#: The urgency level each clamp type puts its codelet pattern *against* — the Scheme's
+#: ``against-background`` (``trace.ss:1578-1581``), applied at the clamp site rather
+#: than baked into the pattern.
+#:
+#: One clamp uses it.  ``jootsing.ss:326-327`` builds the rule-codelet clamp from
+#: ``(against-background %very-low-urgency% %rule-codelet-pattern%)``: the three rule
+#: types at 77/91/91 **and all 24 other types at 21**, which — with the posting
+#: override in ``Coderack.clamped_posting_probability`` — throttles their posting to
+#: 0.21.  The clamp starves everything but rule work.  Petacat had no complement
+#: mechanism at all, so the stall-escape ("I still don't see a good way to describe…")
+#: was a mild boost to rule codelets instead of a redirection of the whole rack.
+CLAMP_TYPE_CODELET_BACKGROUNDS: dict[str, str] = {
+    "rule_codelet_clamp": "very_low",
+}
+
 
 # ---------------------------------------------------------------------------
 # Base event
@@ -249,7 +264,13 @@ class ClampEvent(TraceEvent):
         )
         self.clamp_type = clamp_type
         self.clamped_theme_patterns = clamped_theme_patterns or []
-        self.clamped_concept_patterns = clamped_concept_patterns or []
+        # ``make-clamp-event`` (``trace.ss:526-530``) does not just store the concept
+        # patterns it was handed: it *derives* one from every theme pattern and clamps
+        # those too.  That derivation is the theme pattern's grip on the Slipnet, and
+        # it was missing entirely — every clamp carrying themes left the Slipnet alone.
+        self.clamped_concept_patterns = list(clamped_concept_patterns or []) + [
+            get_associated_concept_pattern(p) for p in self.clamped_theme_patterns
+        ]
         self.clamped_codelet_patterns = clamped_codelet_patterns or []
         self.rules = rules or []
         self.unifying_slippages = unifying_slippages or []
@@ -299,19 +320,34 @@ class ClampEvent(TraceEvent):
         trace: TemporalTrace,
         themespace: Themespace,
         slipnet: Slipnet,
-        coderack: Any = None,
+        coderack: Any,
+        temperature: Temperature,
+        workspace: Any = None,
+        monitor: Any = None,
     ) -> None:
         """Activate all clamped patterns.
 
-        Scheme: ``activate`` message on clamp-event (``trace.ss:620-635``).
-        Undoes any current snag condition, then clamps theme patterns,
-        concept patterns, and codelet patterns.
+        Scheme: ``activate`` message on clamp-event (``trace.ss:619-640``).
+        Undoes any current snag condition, then clamps theme patterns, concept
+        patterns, and codelet patterns.
 
-        ``coderack`` is optional because a caller that has no coderack to hand simply
-        cannot apply a codelet pattern; when it is supplied the third kind of pattern is
-        applied here rather than being stored and forgotten.
+        ``coderack`` and ``temperature`` are **required**.  Both were reachable-but-
+        unpassed before, and both mattered:
+
+        * ``coderack`` — the third kind of pattern was stored and forgotten, so the
+          rack composition during a clamp was whatever it would have been anyway.
+        * ``temperature`` — ``undo-snag-condition`` (``trace.ss:188-196``)
+          unconditionally clears ``*temperature-clamped?*``, and Petacat's version
+          only does so when handed a temperature.  ``activate`` did not hand it one,
+          so once any clamp activated during a snag period the temperature stayed
+          frozen for the rest of the run: the temperature system was permanently
+          disabled after a snag-then-jootsing sequence.
+
+        ``workspace`` is used only to stamp the ending snag's ``progress_achieved``
+        readout; see :meth:`TemporalTrace.undo_snag_condition`.  ``monitor`` is
+        forwarded to :func:`clamp_concept_pattern`.
         """
-        trace.undo_snag_condition(themespace, slipnet)
+        trace.undo_snag_condition(themespace, slipnet, temperature, workspace)
 
         # Clamp theme patterns
         for pattern in self.clamped_theme_patterns:
@@ -319,13 +355,15 @@ class ClampEvent(TraceEvent):
 
         # Clamp concept patterns
         for pattern in self.clamped_concept_patterns:
-            clamp_concept_pattern(pattern, slipnet)
+            clamp_concept_pattern(pattern, slipnet, monitor)
 
-        # Clamp codelet patterns (``trace.ss:632-635``).
+        # Clamp codelet patterns (``trace.ss:636-640``), against this clamp type's own
+        # background (:data:`CLAMP_TYPE_CODELET_BACKGROUNDS`).
         if coderack is not None:
+            background = CLAMP_TYPE_CODELET_BACKGROUNDS.get(self.clamp_type)
             for pattern in self.clamped_codelet_patterns:
                 if pattern:
-                    coderack.clamp_pattern(pattern)
+                    coderack.clamp_pattern(pattern, background)
 
     def deactivate(
         self,
@@ -336,7 +374,7 @@ class ClampEvent(TraceEvent):
     ) -> None:
         """Deactivate all clamped patterns.
 
-        Scheme: ``deactivate`` message on clamp-event (``trace.ss:645-665``).
+        Scheme: ``deactivate`` message on clamp-event (``trace.ss:641-665``).
         """
         # Unclamp theme patterns
         for pattern in self.clamped_theme_patterns:
@@ -344,7 +382,7 @@ class ClampEvent(TraceEvent):
 
         # Unclamp concept patterns
         for pattern in self.clamped_concept_patterns:
-            unclamp_concept_pattern(slipnet)
+            unclamp_concept_pattern(pattern, slipnet)
 
         # Unclamp codelet patterns (``trace.ss:656-664``).  Without this a rule-codelet
         # clamp pinned rule-scout/evaluator/builder urgencies for the rest of the run.
@@ -389,6 +427,7 @@ class SnagEvent(TraceEvent):
         rule_ref_objects: list[Any] | None = None,
         theme_pattern: Any = None,
         structures: list[Any] | None = None,
+        workspace_structures: list[Any] | None = None,
         description: str = "",
     ) -> None:
         super().__init__(
@@ -410,6 +449,18 @@ class SnagEvent(TraceEvent):
         self.supporting_vertical_bridges = supporting_vertical_bridges or []
         self.slippage_log = slippage_log
         self.rule_ref_objects = rule_ref_objects or []
+        #: The Workspace's structure list as it stood when the snag happened.
+        #:
+        #: ``make-generic-event`` (``trace.ss:333-338``) snapshots
+        #: ``(tell *workspace* 'get-structures)`` on every event, and
+        #: ``get-new-structures-since-last`` (``trace.ss:96-103``) subtracts that
+        #: snapshot from the live list.  That subtraction is what
+        #: ``progress-since-last-snag`` measures: every new bridge, group or rule
+        #: counts at its live strength.  Petacat measured over *Trace events* instead,
+        #: which sees only the handful of structures important enough to have been
+        #: recorded — and counted the events' own ``get_strength()``, so a
+        #: post-snag clamp event (strength 100) made the snag exit certain.
+        self.workspace_structures = list(workspace_structures or [])
         self.progress_achieved: float = 0.0
 
     # ------------------------------------------------------------------
@@ -419,11 +470,15 @@ class SnagEvent(TraceEvent):
     def evaluate_progress(self, structure: Any) -> float:
         """Score a workspace structure for progress since this snag.
 
-        Scheme: ``progress-evaluator`` in ``make-snag-event``.
-        Returns the structure's strength unless it is a bond (returns 0).
+        Scheme: ``progress-evaluator`` in ``make-snag-event``
+        (``trace.ss:1069-1073``) — the structure's strength unless it is a bond,
+        which scores 0.
         """
-        # In the Scheme original, bonds are excluded from progress measurement
-        if hasattr(structure, "structure_type") and structure.structure_type == "bond":
+        from server.engine.bonds import Bond
+
+        # The old test was ``hasattr(structure, "structure_type")``, and no structure
+        # class in the port has that attribute — so bonds were never excluded.
+        if isinstance(structure, Bond):
             return 0.0
         if hasattr(structure, "get_strength"):
             return structure.get_strength()
@@ -442,15 +497,28 @@ class SnagEvent(TraceEvent):
     def activate(
         self,
         trace: TemporalTrace,
+        themespace: Themespace,
         slipnet: Slipnet,
+        coderack: Any,
+        codelet_count: int,
+        monitor: Any = None,
     ) -> None:
         """Activate the snag condition.
 
-        Scheme: ``activate`` message on snag-event.
-        Undoes the last clamp, clamps salience on snag objects, and clamps
-        the snag concept pattern.
+        Scheme: ``activate`` on snag-event (``trace.ss:1155-1162``) — three actions,
+        none of which happened in Petacat because nothing ever called this:
+
+        1. ``(tell *trace* 'undo-last-clamp)``.  Note this is the **full** undo, not
+           a flag flip: a snag arriving mid-clamp deactivates that clamp's patterns
+           and records the progress it achieved.  Petacat's ``undo_last_clamp_raw``
+           only cleared ``within_clamp_period``, which would have left the clamp's
+           themes frozen and its codelet urgencies pinned forever.
+        2. ``clamp-salience`` on each snag object, so attention returns to the site
+           of the failure.
+        3. ``clamp-concept-pattern`` on the snag concept pattern, pinning the snag
+           objects' descriptors at max activation.
         """
-        trace.undo_last_clamp_raw()
+        trace.undo_last_clamp(themespace, slipnet, codelet_count, coderack)
 
         # Clamp salience on snag objects
         for obj in self.snag_objects:
@@ -459,19 +527,19 @@ class SnagEvent(TraceEvent):
 
         # Clamp concept pattern
         if self.snag_concept_pattern is not None:
-            clamp_concept_pattern(self.snag_concept_pattern, slipnet)
+            clamp_concept_pattern(self.snag_concept_pattern, slipnet, monitor)
 
     def deactivate(self, slipnet: Slipnet) -> None:
         """Deactivate the snag condition.
 
-        Scheme: ``deactivate`` message on snag-event.
+        Scheme: ``deactivate`` message on snag-event (``trace.ss:1163-1169``).
         """
         for obj in self.snag_objects:
             if hasattr(obj, "unclamp_salience"):
                 obj.unclamp_salience()
 
         if self.snag_concept_pattern is not None:
-            unclamp_concept_pattern(slipnet)
+            unclamp_concept_pattern(self.snag_concept_pattern, slipnet)
 
     def __repr__(self) -> str:
         return (
@@ -577,8 +645,12 @@ def clamp_theme_pattern(pattern: Any, themespace: Themespace) -> None:
                         if theme.activation != 0:
                             theme.frozen = True
 
-        elif not entries:
-            # Simple dict: treat remaining keys as dimension -> relation
+        elif "entries" not in pattern:
+            # Simple dict: treat remaining keys as dimension -> relation.  Keyed on
+            # ``"entries"`` being *absent* rather than empty: a structured pattern that
+            # happens to name no entries clamps nothing, and reading its emptiness as
+            # "this is the other spelling" made the literal key ``"entries"`` a
+            # dimension name.
             for dim, rel in pattern.items():
                 if dim == "type":
                     continue
@@ -608,44 +680,229 @@ def unclamp_theme_pattern(themespace: Themespace) -> None:
     themespace.unclamp_all()
 
 
-def clamp_concept_pattern(pattern: Any, slipnet: Slipnet) -> None:
+def _concept_pattern_entries(pattern: Any) -> list[tuple[str, float]]:
+    """``(node_name, activation)`` pairs out of either concept-pattern spelling.
+
+    Which spelling a pattern is in is decided by whether ``"entries"`` is *present*,
+    not by whether it is non-empty.  An empty list is a perfectly good pattern — it is
+    what ``get_snag_concept_pattern`` returns for a snag whose objects carry no
+    descriptions — and reading its absence off truthiness sent it down the
+    ``node -> activation`` branch, where the key ``"entries"`` became a node name and
+    ``float([])`` raised.  That reached the engine through
+    ``undo_snag_condition -> SnagEvent.deactivate -> unclamp_concept_pattern``.
+    """
+    if not pattern or not isinstance(pattern, dict):
+        return []
+    if "entries" in pattern:
+        out = []
+        for entry in pattern["entries"]:
+            node_name = entry.get("node")
+            if node_name:
+                out.append((node_name, float(entry.get("activation", 100.0))))
+        return out
+    # Simple dict: node_name -> activation
+    return [
+        (name, float(activation))
+        for name, activation in pattern.items()
+        if name != "type"
+    ]
+
+
+def clamp_concept_pattern(
+    pattern: Any, slipnet: Slipnet, monitor: Any = None
+) -> None:
     """Clamp concept nodes according to a pattern.
 
-    Scheme: trace.ss ``clamp-concept-pattern`` (line 1547).
-    """
-    if pattern is None:
-        return
+    Scheme: ``clamp-concept-pattern`` (``trace.ss:1547-1552``), which sends each node
+    ``(tell node 'clamp act)`` — and ``clamp`` (``slipnet.ss:138-145``) applies
+    *unconditionally*.  Petacat skipped any node that happened to be frozen already,
+    which silently dropped entries whenever a clamp landed during the initial
+    slipnode clamp period or on top of an earlier concept pattern.
 
+    ``monitor``, when given, is called with ``(node, before, after)`` for every node
+    the clamp moves.  ``slipnet.ss:139-140`` calls
+    ``monitor-slipnode-activation-change`` from inside ``clamp``, so a clamp can
+    itself put concept-activation events into the Trace — which is where Figure
+    4.12's ``(Opposite)`` events come from, and which the Scheme relies on for event
+    ordering (``justify.ss:172-174``).  Sampling activations at cycle boundaries, as
+    the runner does, nets a clamp's delta out against the decay that follows it.
+    """
+    for node_name, activation in _concept_pattern_entries(pattern):
+        node = slipnet.nodes.get(node_name)
+        if node is None:
+            continue
+        before = node.activation
+        node.clamp(0, activation)
+        if monitor is not None and before != node.activation:
+            monitor(node, before, node.activation)
+
+
+def unclamp_concept_pattern(pattern: Any, slipnet: Slipnet) -> None:
+    """Unfreeze the nodes *this* pattern froze.
+
+    Scheme: ``unclamp-concept-pattern`` (``trace.ss:1554-1557``) — ``(tell (1st entry)
+    'unfreeze)`` for each entry of the pattern, and nothing else.  Petacat unfroze
+    every node in the Slipnet, so ending one clamp released every other clamp in
+    force, including the run's initial slipnode clamp.
+    """
+    for node_name, _activation in _concept_pattern_entries(pattern):
+        node = slipnet.nodes.get(node_name)
+        if node is not None:
+            node.unclamp()
+
+
+def theme_pattern_entries(pattern: Any) -> list[tuple[str, str | None, float]]:
+    """``(dimension, relation, activation)`` triples out of either pattern spelling.
+
+    Petacat carries theme patterns in two shapes — the structured dict
+    ``{"type": t, "entries": [{"dimension", "relation", "activation"}]}`` and the
+    Scheme-shaped list ``[t, (dimension, relation), ...]`` returned by
+    ``get_dominant_theme_pattern``.  Everything that has to *read* a pattern rather
+    than clamp it goes through here, so a new reader cannot silently understand only
+    one of them.  The default activation is ``%max-theme-activation%``, matching
+    ``trace.ss:1509`` (a two-element entry means "at full activation").
+    """
+    if not pattern:
+        return []
     if isinstance(pattern, dict):
-        entries = pattern.get("entries", [])
-        if entries:
-            for entry in entries:
-                node_name = entry.get("node")
-                activation = entry.get("activation", 100)
-                if node_name:
-                    node = slipnet.nodes.get(node_name)
-                    if node and not node.frozen:
-                        node.frozen = True
-                        node.activation = float(activation)
-        else:
-            # Simple dict: node_name -> activation
-            for node_name, activation in pattern.items():
-                if node_name == "type":
+        out: list[tuple[str, str | None, float]] = []
+        for entry in pattern.get("entries", []):
+            if isinstance(entry, dict):
+                dim = entry.get("dimension")
+                if dim is None:
                     continue
-                node = slipnet.nodes.get(node_name)
-                if node:
-                    node.frozen = True
-                    node.activation = float(activation)
+                out.append(
+                    (dim, entry.get("relation"), float(entry.get("activation", 100.0)))
+                )
+            elif len(entry) >= 2:
+                act = float(entry[2]) if len(entry) > 2 else 100.0
+                out.append((entry[0], entry[1], act))
+        return out
+    if isinstance(pattern, (list, tuple)):
+        out = []
+        for entry in pattern[1:]:
+            if isinstance(entry, (list, tuple)) and len(entry) >= 2:
+                act = float(entry[2]) if len(entry) > 2 else 100.0
+                out.append((entry[0], entry[1], act))
+        return out
+    return []
 
 
-def unclamp_concept_pattern(slipnet: Slipnet) -> None:
-    """Remove the current concept pattern clamp.
+def get_associated_concept_pattern(theme_pattern: Any) -> dict[str, Any]:
+    """The concept pattern a theme pattern drags into the Slipnet with it.
 
-    Scheme: trace.ss ``unclamp-concept-pattern`` (line 1554).
-    Unfreezes all slipnet nodes.
+    Scheme: ``get-associated-concept-pattern`` (``trace.ss:1503-1516``).  For every
+    entry, the theme's **dimension node** is pinned at ``%max-activation%``; and when
+    the relation is ``opposite``, ``plato-opposite`` is pinned at 100 for a positive
+    theme and at **0** for a negative one — a negative snag-response clamp does not
+    merely stop favouring "opposite", it actively suppresses the concept.
+
+    Without this, clamping a theme pattern left the Slipnet untouched, and a whole
+    channel of the clamp's influence (§4.2) simply did not exist.
     """
-    for node in slipnet.nodes.values():
-        node.frozen = False
+    entries: list[dict[str, Any]] = []
+    seen: set[tuple[str, float]] = set()
+
+    def add(node_name: str, activation: float) -> None:
+        key = (node_name, activation)
+        if key in seen:
+            return
+        seen.add(key)
+        entries.append({"node": node_name, "activation": activation})
+
+    for dimension, relation, activation in theme_pattern_entries(theme_pattern):
+        add(dimension, 100.0)
+        if relation == "opposite":
+            add("plato-opposite", 100.0 if activation > 0 else 0.0)
+    return {"type": "concepts", "entries": entries}
+
+
+def get_snag_theme_pattern(concept_mappings: list[Any]) -> list[Any]:
+    """The vertical theme pattern a snag rested on.
+
+    Scheme: ``get-snag-theme-pattern`` (``trace.ss:1031-1039``) — one entry per
+    distinct ``(CM-type, label)`` of the concept-mappings on the snag objects'
+    vertical bridges, in the Scheme's list spelling
+    ``[theme_type, (dimension, relation), ...]``.
+
+    This is *not* the Themespace's dominant vertical pattern, which is what Petacat
+    recorded.  Dominance requires a cluster lead of more than 90 points, so a cluster
+    with two live themes contributes nothing and the pattern is routinely empty —
+    and the jootser's snag-overlap table then compares empty patterns and never
+    fires.  What the failed interpretation actually rested on is the complete set of
+    (dimension, relation) pairs its mappings assert, dominant or not.
+    """
+    from server.engine.themes import THEME_VERTICAL_BRIDGE, relation_name_for_label
+
+    entries: list[tuple[str, str]] = []
+    for cm in concept_mappings:
+        dimension = getattr(getattr(cm, "description_type1", None), "name", None)
+        if dimension is None:
+            continue
+        entry = (dimension, relation_name_for_label(getattr(cm, "label", None)))
+        if entry not in entries:
+            entries.append(entry)
+    return [THEME_VERTICAL_BRIDGE, *entries]
+
+
+def get_snag_concept_pattern(snag_objects: list[Any]) -> dict[str, Any]:
+    """Every descriptor of every snag object, pinned at max activation.
+
+    Scheme: ``get-snag-concept-pattern`` (``trace.ss:1042-1048``).  Clamped by
+    ``SnagEvent.activate``, this is what holds the impasse's own concepts up while
+    the program searches for a way around it.
+    """
+    entries: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for obj in snag_objects:
+        for description in getattr(obj, "descriptions", []):
+            name = getattr(getattr(description, "descriptor", None), "name", None)
+            if name is None or name in seen:
+                continue
+            seen.add(name)
+            entries.append({"node": name, "activation": 100.0})
+    return {"type": "concepts", "entries": entries}
+
+
+def concept_activation_importance(node: Any, before: float, after: float) -> float:
+    """How much a change in a node's activation matters — ``trace.ss:1345-1348``.
+
+    ``(100* (* (% (abs delta)) (% (cd slipnode))))`` — the **product** of the
+    magnitude of the change and the concept's depth, over the **absolute** change.
+    """
+    return abs(after - before) * node.conceptual_depth / 100.0
+
+
+def make_concept_activation_monitor(
+    trace: TemporalTrace,
+    codelet_count: int,
+    temperature: float,
+    threshold: float,
+) -> Any:
+    """A ``clamp_concept_pattern`` monitor that records concept-activation events.
+
+    ``slipnet.ss:139-140``: ``clamp`` calls ``monitor-slipnode-activation-change``,
+    so clamping a concept can itself put an event into the Trace.  The Scheme relies
+    on that for event *ordering* (``justify.ss:172-174``), and it is where Figure
+    4.12's ``(Opposite)`` events come from.  Petacat sampled activations only at
+    update-cycle boundaries, where a clamp's delta nets out against the decay that
+    follows it, so a clamp never produced one.
+    """
+
+    def monitor(node: Any, before: float, after: float) -> None:
+        if concept_activation_importance(node, before, after) >= threshold:
+            trace.record_event(
+                TraceEvent(
+                    event_type=CONCEPT_ACTIVATION,
+                    codelet_count=codelet_count,
+                    temperature=temperature,
+                    description=(
+                        f"the concept of {node.short_name} became active"
+                    ),
+                )
+            )
+
+    return monitor
 
 
 def negate_theme_pattern_entry(entry: dict[str, Any]) -> dict[str, Any]:
@@ -937,15 +1194,6 @@ class TemporalTrace:
 
         return progress
 
-    def undo_last_clamp_raw(self) -> None:
-        """Exit clamp period without deactivating patterns.
-
-        Used by SnagEvent.activate which calls trace.undo_last_clamp before
-        applying its own patterns. This just flips the state flag.
-        """
-        if self.within_clamp_period:
-            self.within_clamp_period = False
-
     def progress_since_last_clamp(self) -> float:
         """Measure how much progress was made during the last clamp.
 
@@ -975,52 +1223,63 @@ class TemporalTrace:
             default=0.0,
         )
 
-    def progress_since_last_snag(self) -> float:
-        """Measure how much progress was made since the last snag.
+    def progress_since_last_snag(self, workspace: Any) -> float:
+        """How much has been rebuilt since the last snag.
 
-        Scheme: ``progress-since-last-snag`` (line 182).
-        Gets workspace structures since the last snag and evaluates each one
-        using the snag's progress evaluator. Returns the maximum.
+        Scheme: ``progress-since-last-snag`` (``trace.ss:182-187``) — the snag's
+        progress evaluator applied to ``get-new-structures-since-last 'snag``
+        (``trace.ss:96-103``), which is the *live Workspace structure list* minus the
+        snapshot the snag event took, maximum over the result, 0 when empty.
+
+        Every new bridge, group or rule counts at its live strength; bonds score 0.
+        This is the whole of the stochastic snag exit's input (``run.ss:299-302``:
+        leave the snag period with probability ``progress/100`` per update cycle), so
+        measuring it over Trace events instead — which is what Petacat did — made
+        ordinary rebuilding invisible while making any post-snag clamp event an
+        instant exit.
         """
         last_snag = self.get_last_event(SNAG)
         if last_snag is None:
             return 0.0
 
-        new_events = self.get_new_events_since_last(SNAG)
-
         if isinstance(last_snag, SnagEvent):
-            if not new_events:
-                return 0.0
-            # Evaluate each new event's structures
-            max_progress = 0.0
-            for event in new_events:
-                for struct in event.structures:
-                    p = last_snag.evaluate_progress(struct)
-                    if p > max_progress:
-                        max_progress = p
-                # Also evaluate the event directly
-                p = event.get_strength()
-                if p > max_progress:
-                    max_progress = p
-            return max_progress
+            snapshot = {id(s) for s in last_snag.workspace_structures}
+            return max(
+                (
+                    last_snag.evaluate_progress(structure)
+                    for structure in workspace.all_structures
+                    if id(structure) not in snapshot
+                ),
+                default=0.0,
+            )
 
-        # Fallback for plain TraceEvents (legacy path)
+        # Fallback for plain TraceEvents (``record_snag`` on the trace, used by tests
+        # and by the legacy persistence path): nothing was snapshotted, so there is no
+        # "since" to measure against.
+        new_events = self.get_new_events_since_last(SNAG)
         if not new_events:
             return 0.0
-        return max(
-            (e.get_strength() for e in new_events),
-            default=0.0,
-        )
+        return max((e.get_strength() for e in new_events), default=0.0)
 
     def undo_snag_condition(
         self,
-        themespace: Themespace | None = None,
-        slipnet: Slipnet | None = None,
-        temperature: Temperature | None = None,
+        themespace: Themespace | None,
+        slipnet: Slipnet | None,
+        temperature: Temperature,
+        workspace: Any = None,
     ) -> None:
         """Exit the snag state and unclamp temperature.
 
-        Scheme: ``undo-snag-condition`` (line 188).
+        Scheme: ``undo-snag-condition`` (``trace.ss:188-196``).  ``temperature`` is
+        required: the Scheme's ``(set! *temperature-clamped?* #f)`` is unconditional,
+        and making it conditional on an optional argument is how the temperature came
+        to stay clamped for the rest of any run in which a clamp activated during a
+        snag period.
+
+        ``workspace`` is optional and feeds only the ``progress_achieved`` readout the
+        commentary prints; the *decision* to leave the snag period is the runner's
+        (``run.ss:299-302``) and it always has a Workspace.  Left out, the snag keeps
+        whatever figure it already carried.
         """
         if not self.within_snag_period:
             return
@@ -1028,17 +1287,14 @@ class TemporalTrace:
         self.within_snag_period = False
 
         last_snag = self.get_last_event(SNAG)
-        if last_snag is not None:
-            progress = self.progress_since_last_snag()
-
-            if isinstance(last_snag, SnagEvent):
-                last_snag.progress_achieved = progress
-                if slipnet is not None:
-                    last_snag.deactivate(slipnet)
+        if isinstance(last_snag, SnagEvent):
+            if workspace is not None:
+                last_snag.progress_achieved = self.progress_since_last_snag(workspace)
+            if slipnet is not None:
+                last_snag.deactivate(slipnet)
 
         # Unclamp temperature (Scheme: (set! *temperature-clamped?* #f))
-        if temperature is not None:
-            temperature.unclamp()
+        temperature.unclamp()
 
     # ------------------------------------------------------------------
     # Event query methods

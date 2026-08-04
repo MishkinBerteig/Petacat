@@ -252,11 +252,29 @@ class ImageFailure(Exception):
     object being changed.  ``make-snag-event`` (``trace.ss:1055-1059``) takes the
     snag objects from exactly there, so a snag names what actually went wrong
     rather than everything the rule mentioned.
+
+    ``kind`` names *which* of the three shapes it is.  It is the first element of the
+    Scheme's failure-result and ``make-snag-event`` records it as the snag type
+    (``trace.ss:1053``), which decides the snag's own explanation
+    (``trace.ss:1097-1125``).  Petacat hard-coded ``"change"`` for every snag, so a
+    swap snag and a conflict snag were indistinguishable in the Trace and in memory.
+    ``CHANGE`` is the default because it is the Scheme's own catch-all: every raise
+    site that is not the string-position swap or the conflict check is a change.
     """
 
-    def __init__(self, message: str = "", objects: list | None = None) -> None:
+    SWAP = "swap"
+    CONFLICT = "conflict"
+    CHANGE = "change"
+
+    def __init__(
+        self,
+        message: str = "",
+        objects: list | None = None,
+        kind: str = CHANGE,
+    ) -> None:
         super().__init__(message)
         self.objects: list = objects or []
+        self.kind: str = kind
 
 
 # ---------------------------------------------------------------------------

@@ -41,8 +41,15 @@ SEED = 42
 #: trace contains AnswerEvent, ClampEvent and SnagEvent rather than only the base type.
 #: The ordinary round-trip fixture above does not, which is how a whole class of event
 #: went unrestorable without any test noticing.
+#:
+#: Reseeded from 12345 to 34 when the snag response gained its restart
+#: (``answers.ss:1189-1191``): a snag now empties the Coderack and reposts, so every
+#: run that snags takes a different path afterwards and 12345 no longer answers.  That
+#: is seeded-run agreement, which the phase plan places outside the gates on purpose —
+#: the standard is expected-range agreement.  34 answers, snags *and* clamps under all
+#: three numeric backends, so it exercises all three rich event types as intended.
 ANSWERING_PROBLEM = ("abc", "abd", "xyz")
-ANSWERING_SEED = 12345
+ANSWERING_SEED = 34
 
 
 @pytest.fixture(scope="module")

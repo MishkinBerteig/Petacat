@@ -391,10 +391,22 @@ class SlipnetNode:
         """Is this node an instance of some category?  Scheme: slipnet.ss:94."""
         return bool(self.category_links)
 
-    def clamp(self, cycles: int) -> None:
+    def clamp(self, cycles: int = 0, activation: float = 100.0) -> None:
+        """Freeze this node at *activation* — ``slipnet.ss:138-145``.
+
+        ``activation`` exists because a concept pattern clamps at whatever value the
+        pattern names, and one of them is deliberately **0**: a negative ``opposite``
+        theme clamps ``plato-opposite`` to zero (``trace.ss:1512-1514``), suppressing
+        the concept rather than pinning it high.  Hard-coding 100 made that entry
+        pin the very concept it was meant to shut down.
+
+        ``cycles`` is Petacat's own mechanism for the timed initial clamp; 0 means
+        the clamp lasts until something lifts it explicitly, which is how every
+        concept-pattern clamp behaves in the reference.
+        """
         self.frozen = True
         self.clamp_cycles_remaining = cycles
-        self.activation = 100.0
+        self.activation = float(activation)
 
     def unclamp(self) -> None:
         self.frozen = False

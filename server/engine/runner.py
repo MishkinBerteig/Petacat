@@ -28,7 +28,12 @@ from server.engine.slipnet import Slipnet
 from server.engine.staleness import StaleView
 from server.engine.temperature import Temperature
 from server.engine.themes import Themespace
-from server.engine.trace import CONCEPT_ACTIVATION, TemporalTrace, TraceEvent
+from server.engine.trace import (
+    CONCEPT_ACTIVATION,
+    TemporalTrace,
+    TraceEvent,
+    concept_activation_importance,
+)
 from server.engine.workspace import Workspace
 from server.engine.workspace_structures import WorkspaceStructure
 
@@ -123,6 +128,20 @@ class EngineContext:
         #: Written by the ``apply_rule`` builtin, read by the ``record_snag`` that
         #: follows it within the same codelet; not run state, so nothing restores it.
         self.last_failure_objects: list = []
+
+        #: Which of the Scheme's three ``<failure-result>`` shapes the last rule
+        #: application produced — ``"swap"``, ``"conflict"`` or ``"change"``
+        #: (``answers.ss:1145-1150``).  ``make-snag-event`` records it as the snag
+        #: type, which is what the snag's own explanation and the memory's
+        #: snag-equality test are written against.  Petacat hard-coded ``"change"``.
+        self.last_failure_kind: str = "change"
+
+        #: The snag response's restart (``answers.ss:1189-1191``): empty the Coderack,
+        #: post the initial codelets afresh, run one full update.  A callable rather
+        #: than an import because it is the *runner's* loop the snag reaches into, and
+        #: ``server/engine/`` may not import upwards.  Set by ``EngineRunner`` at
+        #: ``init_mcat``; ``None`` only in tests that build a context by hand.
+        self.on_snag_restart: Any = None
 
         #: How many codelets behind the live Workspace each codelet reads (WP0.5).
         #: 0 — the default — is ordinary live execution; nothing in
@@ -336,6 +355,10 @@ class EngineRunner:
         # Clamp initially relevant slipnet nodes
         slipnet.clamp_initially_relevant(self.meta)
 
+        # The snag response reaches back into the runner's loop; see
+        # ``EngineContext.on_snag_restart``.
+        self.ctx.on_snag_restart = self._restart_after_snag
+
         # Post initial codelets
         self._post_initial_codelets()
 
@@ -454,17 +477,48 @@ class EngineRunner:
         num_objects = len(ctx.workspace.all_objects)
         urgency = self.meta.get_urgency("very_low")
 
+        # Stamped with the codelet count that posts them, as ``add-codelet`` stamps
+        # every codelet (``coderack.ss:405-415``).  A hard-coded 0 made every repost —
+        # the empty-rack repost and, now, the snag response's — maximally eviction-prone
+        # the moment the rack filled, because eviction weight is ``codelet_count -
+        # time_stamp``.  At ``init_mcat`` the count is 0 anyway, so this changes
+        # nothing about the run's first population.
         for _ in range(num_objects):
             ctx.coderack.post(
-                Codelet("bottom-up-bond-scout", urgency, time_stamp=0),
+                Codelet("bottom-up-bond-scout", urgency, time_stamp=ctx.codelet_count),
                 ctx.codelet_count,
                 ctx.rng,
             )
             ctx.coderack.post(
-                Codelet("bottom-up-bridge-scout", urgency, time_stamp=0),
+                Codelet(
+                    "bottom-up-bridge-scout", urgency, time_stamp=ctx.codelet_count
+                ),
                 ctx.codelet_count,
                 ctx.rng,
             )
+
+    def _restart_after_snag(self) -> None:
+        """The last three steps of ``process-snag`` (``answers.ss:1189-1191``).
+
+        ``(tell *coderack* 'delete-all-codelets)``, ``(post-initial-codelets)``,
+        ``(update-everything)`` — the "empty the Coderack and post the initial
+        codelets afresh" reset the architecture's escape behaviour is built on.  None
+        of it existed: the pre-snag population, including the evaluators and builders
+        of the interpretation that just failed, carried straight on.
+
+        The Scheme's explicit purge of proposed bonds, groups and bridges
+        (``answers.ss:1176-1182``) needs no counterpart here, and its own comment says
+        why: "Deleting all codelets automatically erases all proposed bonds, groups,
+        and bridges".  In Petacat a proposed structure exists *only* as a codelet
+        argument — there is no proposed registry to purge — so flushing the rack is
+        the whole of it.
+        """
+        ctx = self.ctx
+        if ctx is None:
+            return
+        ctx.coderack.clear()
+        self._post_initial_codelets()
+        self._update_everything(ctx)
 
     def step_mcat(self) -> StepResult:
         """Execute one codelet.
@@ -681,10 +735,10 @@ class EngineRunner:
 
         # 4. Snag-period stochastic exit (Scheme: run.ss:299-302)
         if ctx.trace.within_snag_period:
-            progress = ctx.trace.progress_since_last_snag()
+            progress = ctx.trace.progress_since_last_snag(ctx.workspace)
             if ctx.rng.prob(progress / 100.0):
                 ctx.trace.undo_snag_condition(
-                    ctx.themespace, ctx.slipnet, ctx.temperature,
+                    ctx.themespace, ctx.slipnet, ctx.temperature, ctx.workspace,
                 )
 
         # 5. Clamp-period expiration check (Scheme: run.ss:303-304)
@@ -747,6 +801,13 @@ class EngineRunner:
         of this type of event is a function of a node's conceptual depth and of
         the magnitude of its activation change, with larger changes to deeper
         concepts being more important."
+
+        This is the *sampled* half of the mechanism, run at cycle boundaries.  The
+        other half is immediate: a concept-pattern clamp reports its own deltas
+        through ``trace.make_concept_activation_monitor``, because a clamp's change
+        would otherwise net out against the decay that follows it before this sampler
+        ever looked.  Both use ``trace.concept_activation_importance``, so they cannot
+        disagree about what counts as important.
         """
         ctx = self.ctx
         if ctx is None:
@@ -754,7 +815,6 @@ class EngineRunner:
         threshold = self.meta.get_param("concept_activation_importance_threshold", 85)
         for name, node in ctx.slipnet.nodes.items():
             before = activations_before.get(name, 0.0)
-            delta = node.activation - before
             # ``trace.ss:1345-1348``: ``(100* (* (% (abs delta)) (% (cd slipnode))))``
             # — a **product** of the magnitude of the change and the concept's depth,
             # over the **absolute** change.  An average lets a shallow concept through
@@ -762,8 +822,7 @@ class EngineRunner:
             # concepts being more important"; and ignoring decreases hid the
             # deactivation of a dominant concept, which is as much a milestone as its
             # activation was.
-            importance = abs(delta) * node.conceptual_depth / 100.0
-            if importance >= threshold:
+            if concept_activation_importance(node, before, node.activation) >= threshold:
                 ctx.trace.record_event(
                     TraceEvent(
                         event_type=CONCEPT_ACTIVATION,
@@ -872,6 +931,17 @@ class EngineRunner:
             return 0.0
 
         ws = ctx.workspace
+
+        # ``post-codelet-probability`` (``coderack.ss:470-473``) consults the codelet
+        # type's clamp *before* any workspace-driven computation: a clamped type posts
+        # at ``clamped-urgency/100`` and the Workspace has no say.  That is what turns
+        # a clamp into a redirection of the whole system — the rule-codelet clamp posts
+        # rule work at 0.77/0.91 and everything else at 0.21 — rather than a nudge.
+        # (The mode exclusions that return 0 in the Scheme are applied by the callers,
+        # before they get here, so this is the right place for the clamp check.)
+        clamped = ctx.coderack.clamped_posting_probability(codelet_type)
+        if clamped is not None:
+            return clamped
 
         if codelet_type in (
             "bottom-up-bond-scout",

@@ -386,13 +386,22 @@ class _ShardBase(ShardedCoderack):
         for rack in self._racks:
             rack.unclamp_codelet_type(codelet_type)
 
-    def clamp_pattern(self, pattern: list[tuple[str, int]]) -> None:
+    def clamp_pattern(self, pattern: Any, background: str | None = None) -> None:
         for rack in self._racks:
-            rack.clamp_pattern(pattern)
+            rack.clamp_pattern(pattern, background)
 
     def unclamp_all(self) -> None:
         for rack in self._racks:
             rack.unclamp_all()
+
+    def resolve_codelet_pattern(
+        self, pattern: Any, background: str | None = None
+    ) -> list[tuple[str, int]]:
+        """Every shard resolves identically, so the first shard is the answer."""
+        return self._racks[0].resolve_codelet_pattern(pattern, background)
+
+    def clamped_posting_probability(self, codelet_type: str) -> float | None:
+        return self._racks[0].clamped_posting_probability(codelet_type)
 
     def occupancy(self) -> list[int]:
         """Per-shard counts — the load-balance signal the comparison reports."""

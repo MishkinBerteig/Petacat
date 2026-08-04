@@ -489,10 +489,18 @@ async def test_a_stepped_run_reports_running_then_paused(app_client):
 
 @pytest.mark.asyncio
 async def test_a_stepped_run_keeps_its_terminal_status(app_client):
-    """A batch that reaches an answer reports the answer, not a pause."""
+    """A batch that reaches an answer reports the answer, not a pause.
+
+    Reseeded from 42 to 26 when the snag response gained its restart
+    (``answers.ss:1189-1191``): a snag now empties the Coderack and reposts, so a run
+    that snags takes a different path afterwards and 42 no longer terminates inside
+    4,000 codelets.  That is seeded-run agreement, which the phase plan places outside
+    the gates on purpose — what this test is about is the *status* a terminal batch
+    reports, and it needs some seed that terminates.  26 answers in 641.
+    """
     create = await app_client.post(
         "/api/runs",
-        json={"initial": "abc", "modified": "abd", "target": "xyz", "seed": 42},
+        json={"initial": "abc", "modified": "abd", "target": "xyz", "seed": 26},
     )
     run_id = create.json()["run_id"]
 

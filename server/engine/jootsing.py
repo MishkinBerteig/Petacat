@@ -79,12 +79,23 @@ class JootserResult:
         give_up: bool = False,
         *,
         clamp_event: ClampEvent | None = None,
+        top_rule: Any = None,
+        bottom_rule: Any = None,
+        unjustified_slippages: list[Any] | None = None,
+        answer_quality: float = 0.0,
     ) -> None:
         self.pattern_detected = pattern_detected
         self.negative_pattern = negative_pattern
         self.action = action
         self.give_up = give_up
         self.clamp_event = clamp_event
+        #: Set only by ``joots_from_justify_clamps`` when it settles for an
+        #: unjustified answer (``jootsing.ss:232-235``): the two rules the answer rests
+        #: on, the slippages it could not account for, and the top rule's quality.
+        self.top_rule = top_rule
+        self.bottom_rule = bottom_rule
+        self.unjustified_slippages = unjustified_slippages or []
+        self.answer_quality = answer_quality
 
 
 # ============================================================================
@@ -105,6 +116,7 @@ def check_progress(
     themespace: Themespace | None = None,
     slipnet: Slipnet | None = None,
     coderack: Any = None,
+    temperature_control: Any = None,
 ) -> ProgressWatcherResult:
     """Progress-watcher logic.
 
@@ -186,10 +198,14 @@ def check_progress(
     poor_bottom = justify_mode and max_bottom_quality < satisfactory_quality
 
     if not poor_top and not poor_bottom:
-        # Rules seem to be of decent quality
+        # "The rules seem to be of decent quality. Fizzling." (``jootsing.ss:337``).
+        # The Scheme posts nothing here.  Posting an answer-finder with probability 1
+        # gave the program a channel to the answer stage that the reference does not
+        # have — one that fires whenever the Workspace is quiet and the rules are good,
+        # bypassing the answer-finder's own mapping-strength gate.
         return ProgressWatcherResult(
             progress_detected=True,
-            action="post_answer_finder" if not justify_mode else "post_answer_justifier",
+            action="rules_are_good_enough",
         )
 
     # Current rules are not good enough -- attempt to clamp codelet pattern
@@ -225,22 +241,27 @@ def check_progress(
             commentary, "rule_codelet_clamp", clamp_count, codelet_count
         )
 
-    # Create and activate a rule-codelet clamp
-    temperature = getattr(workspace, "temperature", 50.0)
+    # Create and activate a rule-codelet clamp.  ``Workspace`` has no ``temperature``
+    # attribute, so reading it off the Workspace stamped every rule-codelet clamp with
+    # the 50.0 default.
     clamp_event = ClampEvent(
         codelet_count=codelet_count,
-        temperature=temperature,
+        temperature=float(getattr(temperature_control, "value", 50.0)),
         clamp_type="rule_codelet_clamp",
         clamped_theme_patterns=[],
         clamped_concept_patterns=[],
-        clamped_codelet_patterns=[{"type": "rule_codelet_pattern"}],
+        clamped_codelet_patterns=[
+            meta.codelet_patterns.get("rule-codelet-pattern", [])
+        ],
         rules=[],
         progress_focus="rule",
     )
 
     trace.add_clamp_event(clamp_event)
-    if themespace is not None and slipnet is not None:
-        clamp_event.activate(trace, themespace, slipnet)
+    if themespace is not None and slipnet is not None and temperature_control is not None:
+        clamp_event.activate(
+            trace, themespace, slipnet, coderack, temperature_control, workspace
+        )
 
     return ProgressWatcherResult(
         stall_detected=True,
@@ -265,6 +286,9 @@ def attempt_jootsing(
     rng: RNG | None = None,
     slipnet: Slipnet | None = None,
     workspace: Workspace | None = None,
+    memory: Any = None,
+    coderack: Any = None,
+    temperature_control: Any = None,
 ) -> JootserResult:
     """Jootser logic.
 
@@ -290,7 +314,7 @@ def attempt_jootsing(
 
     if len(clamps) >= 3:
         clamp_type = clamps[0].clamp_type if isinstance(clamps[0], ClampEvent) else ""
-        jootsing_prob = get_clamp_jootsing_probability(clamps, codelet_count)
+        jootsing_prob = get_clamp_jootsing_probability(clamps, codelet_count, trace)
 
         if rng is not None and rng.prob(jootsing_prob):
             # Jootsing from clamps
@@ -312,6 +336,7 @@ def attempt_jootsing(
                     rng,
                     commentary,
                     codelet_count,
+                    memory=memory,
                 )
 
     # ── Check for recurring snags ──
@@ -381,14 +406,12 @@ def attempt_jootsing(
             chosen_entries.append(entry)
 
     if not chosen_entries:
-        # Can't make negative theme pattern
-        if num_snags > 5:
-            if commentary is not None:
-                from server.engine.commentary import emit_jootsing, emit_give_up
-
-                emit_jootsing(commentary, "snag_response", codelet_count)
-                emit_give_up(commentary, codelet_count)
-            return JootserResult(give_up=True, action="give_up")
+        # "Couldn't make negative theme pattern. Fizzling." (``jootsing.ss:110-112``).
+        # The Scheme simply fizzles here and lets a later jootser try again; there was
+        # an added ``num_snags > 5`` branch that ended the run instead, a termination
+        # condition with no counterpart in the reference.  Metacat gives up only from
+        # recurring rule-codelet or snag-response clamps, and in justify mode by
+        # settling for an unjustified answer.
         return JootserResult(pattern_detected=False)
 
     # Negate the chosen entries
@@ -404,14 +427,12 @@ def attempt_jootsing(
     # naming it, so that the event can actually apply and lift it.
     bottom_up_pattern = meta.codelet_patterns.get("bottom-up-codelet-pattern", [])
 
-    # Create and activate the snag-response clamp
-    temperature = 50.0
-    if workspace is not None:
-        temperature = getattr(workspace, "temperature", 50.0)
-
+    # Create and activate the snag-response clamp.  The temperature is the caller's:
+    # ``Workspace`` has no ``temperature`` attribute, so reading it off the Workspace
+    # stamped every snag-response clamp with the 50.0 default.
     clamp_event = ClampEvent(
         codelet_count=codelet_count,
-        temperature=temperature,
+        temperature=float(getattr(temperature_control, "value", 50.0)),
         clamp_type="snag_response_clamp",
         # ``jootsing.ss:113-118`` passes both patterns to one clamp event and
         # ``make-clamp-event`` (``trace.ss:523-532``) sorts them BY TYPE.  The codelet
@@ -427,8 +448,10 @@ def attempt_jootsing(
     )
 
     trace.add_clamp_event(clamp_event)
-    if slipnet is not None:
-        clamp_event.activate(trace, themespace, slipnet)
+    if slipnet is not None and temperature_control is not None:
+        clamp_event.activate(
+            trace, themespace, slipnet, coderack, temperature_control, workspace
+        )
 
     # Emit commentary
     if commentary is not None:
@@ -503,6 +526,7 @@ def get_most_recent_event_set(
 def get_clamp_jootsing_probability(
     clamps: list[TraceEvent],
     codelet_count: int = 0,
+    trace: TemporalTrace | None = None,
 ) -> float:
     """Compute jootsing probability from clamp history.
 
@@ -543,9 +567,18 @@ def get_clamp_jootsing_probability(
 
     # Clamp type factor
     if clamp_type == "justify_clamp":
-        # For justify clamps: factor is 1 if the last event was a clamp, else 0
-        # This is a simplified check -- the Scheme checks the specific last event
-        clamp_type_factor = 1.0
+        # ``jootsing.ss:135-139``: ``(if (tell (tell *trace* 'get-last-event 'any)
+        # 'type? 'clamp) 1 0)``.  Jootsing away from a justify clamp is permitted only
+        # when the clamp is *still* the most recent thing in the Trace — that is, when
+        # it produced no events at all and everything stalled under it.  A clamp that
+        # is provoking groups, slippages and rules is working, and the program has no
+        # business abandoning it.  Hardcoding 1 removed that condition entirely.
+        last_event = trace.get_last_event() if trace is not None else None
+        clamp_type_factor = (
+            1.0
+            if last_event is not None and last_event.event_type == CLAMP_START
+            else 0.0
+        )
     elif clamp_type == "snag_response_clamp":
         clamp_type_factor = 1.0
     elif clamp_type == "rule_codelet_clamp":
@@ -622,16 +655,27 @@ def joots_from_justify_clamps(
     rng: RNG | None,
     commentary: CommentaryLog | None = None,
     codelet_count: int = 0,
+    *,
+    memory: Any = None,
 ) -> JootserResult:
     """Break out of justify clamp patterns.
 
-    Scheme: jootsing.ss ``joots-from-justify-clamps``.
-    Attempts to give up by extracting the top and bottom rules from the
-    most recent justify clamp, translating the top rule, and checking
-    for unjustified slippages.
+    Scheme: ``joots-from-justify-clamps`` (``jootsing.ss:189-235``).
+
+    "Giving up" here does not mean halting.  The Scheme has exactly two outcomes, and
+    both of them *produce* something:
+
+    * with **no** unjustified slippages, the two rules already say the same thing, so it
+      posts an answer-justifier at extremely-high urgency and fizzles — one more push at
+      the justification it is that close to;
+    * otherwise it **reports the answer**, carrying the unjustified slippages with it.
+      That is the "Settled for unjustified answer" of ``trace.ss:435`` — the program
+      accepts an answer it cannot fully account for rather than stopping with nothing.
+
+    Everything else in the function is a fizzle.
     """
     if not clamps or not isinstance(clamps[0], ClampEvent):
-        return JootserResult(give_up=True, action="give_up")
+        return JootserResult(pattern_detected=False)
 
     most_recent = clamps[0]
     top_rule = None
@@ -647,10 +691,22 @@ def joots_from_justify_clamps(
                     bottom_rule = r
 
     if top_rule is None or bottom_rule is None:
-        return JootserResult(give_up=True, action="give_up")
+        return JootserResult(pattern_detected=False)
+
+    if workspace is None:
+        return JootserResult(pattern_detected=False)
+
+    # "Already justified this answer. Fizzling." (``jootsing.ss:193-197``).  The same
+    # guard the two other Scheme sites apply (``justify.ss:62-66, 99-103``): Episodic
+    # Memory already holds this answer under these rules, so settling for it again
+    # would add nothing.
+    if memory is not None and _answer_already_in_memory(
+        memory, workspace, top_rule, bottom_rule
+    ):
+        return JootserResult(pattern_detected=False)
 
     # Check if rules currently work
-    if workspace is not None and slipnet is not None:
+    if slipnet is not None:
         try:
             if not top_rule.currently_works(workspace, slipnet):
                 return JootserResult(pattern_detected=False)
@@ -659,16 +715,12 @@ def joots_from_justify_clamps(
         except Exception:
             return JootserResult(pattern_detected=False)
 
-    # Try to translate top rule
-    if workspace is None:
-        return JootserResult(give_up=True, action="give_up")
-
     from server.engine.justify import (
         get_unifying_slippages,
         _translate_rule,
     )
 
-    translation_result = _translate_rule(top_rule, workspace, slipnet)
+    translation_result = _translate_rule(top_rule, workspace, slipnet, rng=rng)
     if translation_result is None:
         return JootserResult(pattern_detected=False)
 
@@ -678,24 +730,47 @@ def joots_from_justify_clamps(
     unjustified = get_unifying_slippages(translated_rule, bottom_rule, slipnet)
 
     if not unjustified:
-        # No unjustified slippages -- post answer-justifier
+        # "No unjustified slippages. Posting answer-justifier." (``jootsing.ss:216-219``)
         return JootserResult(
             pattern_detected=True,
             action="post_answer_justifier",
         )
 
-    # Too many unjustified slippages? Stochastic check
+    # "Too many unjustified slippages. Fizzling." (``jootsing.ss:220-222``)
     if rng is not None and len(unjustified) > 1:
         give_up_prob = 1.0 - 1.0 / len(unjustified)
         if rng.prob(give_up_prob):
             return JootserResult(pattern_detected=False)
 
-    # Time to give up -- report the answer with unjustified slippages
+    # "Time to give up" (``jootsing.ss:223``) — settle for the unjustified answer.
+    # No commentary of its own: the Scheme says nothing here, because reporting the
+    # answer is what speaks ("Settled for unjustified answer", ``trace.ss:435``).
     return JootserResult(
         pattern_detected=True,
-        give_up=True,
         action="report_unjustified_answer",
+        top_rule=top_rule,
+        bottom_rule=bottom_rule,
+        unjustified_slippages=unjustified,
+        # ``trace.ss:392-396`` — an answer's quality rests on the top rule's quality.
+        answer_quality=float(getattr(top_rule, "quality", 0.0)),
     )
+
+
+def _answer_already_in_memory(
+    memory: Any,
+    workspace: Workspace,
+    top_rule: Any,
+    bottom_rule: Any,
+) -> bool:
+    """Scheme: ``(tell *memory* 'answer-present? ...)`` (``jootsing.ss:193-195``)."""
+    answer = getattr(workspace.answer_string, "text", "") or ""
+    problem = (
+        workspace.initial_string.text,
+        workspace.modified_string.text,
+        workspace.target_string.text,
+        answer,
+    )
+    return bool(memory.answer_present(problem, top_rule, bottom_rule))
 
 
 # ============================================================================
@@ -762,9 +837,16 @@ def _events_equivalent(e1: TraceEvent, e2: TraceEvent) -> bool:
             return False
         if e1.progress_focus != e2.progress_focus:
             return False
-        return [rule_signature(r) for r in (e1.rules or [])] == [
-            rule_signature(r) for r in (e2.rules or [])
-        ]
+        # ``trace.ss:586-590`` compares the rules with ``sets-equal-pred? rules-equal?``
+        # — set equality, not list equality.  A justify clamp stores ``[chosen, other]``
+        # and which of the two is chosen varies stochastically, so the same pair of
+        # rules could be clamped twice and compare unequal.  Recurring clamps were then
+        # partitioned into separate equivalence sets and the three-clamp jootsing
+        # threshold under-fired.
+        return _same_signature_set(
+            [rule_signature(r) for r in (e1.rules or [])],
+            [rule_signature(r) for r in (e2.rules or [])],
+        )
 
     if isinstance(e1, SnagEvent) and isinstance(e2, SnagEvent):
         if rule_signature(e1.translated_rule) != rule_signature(e2.translated_rule):
@@ -813,6 +895,13 @@ def equivalent_workspace_objects(o1: Any, o2: Any) -> bool:
         and all(
             equivalent_workspace_objects(a, b) for a, b in zip(o1.objects, o2.objects)
         )
+    )
+
+
+def _same_signature_set(sigs1: list[Any], sigs2: list[Any]) -> bool:
+    """Scheme: ``sets-equal-pred? rules-equal?`` — mutual subset, order irrelevant."""
+    return all(any(a == b for b in sigs2) for a in sigs1) and all(
+        any(b == a for a in sigs1) for b in sigs2
     )
 
 

@@ -1053,6 +1053,70 @@ class Rule(WorkspaceStructure):
         self.supporting_bridges = []
         self.theme_pattern = [self.bridge_theme_type]
 
+    def set_translated_rule_information(
+        self,
+        bridges: list[Any],
+        workspace: Workspace | None = None,
+        slipnet: Slipnet | None = None,
+    ) -> None:
+        """Give a translated rule the bridges and theme pattern its translation implies.
+
+        Scheme: ``set-translated-rule-information`` (``rules.ss:164-189``), called at
+        the end of ``make-translated-string`` (``answers.ss:1069``).
+
+        A translated rule is not built by rule-scouts out of Workspace bridges, so
+        until this runs it rests on nothing: ``supported?`` is vacuously true and its
+        theme pattern is empty.  The bridges handed in here are the ones
+        ``make-translated-rule-bridges`` drew from each object of the source string to
+        the object it became, and they are what the rule is *about*.
+
+        The Scheme takes one more step per bridge, which matters for the theme
+        pattern: the bridge's second object belongs to the freshly made translated
+        string, so it is looked up against the Workspace's real string ("get-real-object")
+        and any descriptions the real object carries but the fake one does not are
+        copied across, after which the bridge's concept-mappings are recomputed against
+        the real object.  Without that the thematic relations read off the bridge are
+        those of an undescribed letter.
+        """
+        from server.engine.bridges import make_concept_mappings
+        from server.engine.descriptions import Description
+
+        identity = slipnet.nodes.get("plato-identity") if slipnet is not None else None
+
+        for bridge in bridges:
+            fake_object2 = bridge.object2
+            real_object2 = (
+                _get_real_object(workspace, fake_object2)
+                if workspace is not None
+                else None
+            )
+            if real_object2 is None:
+                continue
+            for d in list(getattr(real_object2, "descriptions", [])):
+                if not fake_object2.description_type_present(d.description_type):
+                    fake_object2.add_description(
+                        Description(fake_object2, d.description_type, d.descriptor)
+                    )
+            bridge.concept_mappings = make_concept_mappings(
+                bridge.object1, real_object2, bridge.bridge_type, identity
+            )
+
+        self.supporting_bridges = list(bridges)
+        self.tagged_supporting_horizontal_bridges = [
+            (False, [bridge]) for bridge in bridges
+        ]
+
+        # ``themes.py`` names the three theme types with underscores; ``bridge_theme_type``
+        # spells them with hyphens, and ``clamp_theme_pattern`` matches a cluster by an
+        # exact string, so a hyphenated type clamps nothing at all.
+        theme_type = "top_bridge" if self.is_top_rule else "bottom_bridge"
+        relations: list[tuple[str, str]] = []
+        for bridge in bridges:
+            for relation in bridge.get_associated_thematic_relations():
+                if relation not in relations:
+                    relations.append(relation)
+        self.theme_pattern = [theme_type] + relations
+
     def translate(
         self,
         slippages: list[ConceptMapping],
@@ -1991,13 +2055,15 @@ def apply_rule(
                         e.objects = [obj]
                     raise
 
-        # Apply string-position swaps — the Scheme's SWAP case names both objects.
+        # Apply string-position swaps — the Scheme's SWAP case names both objects
+        # and types the failure ``SWAP`` (``rules.ss:1433-1447``).
         for swap in string_position_swaps:
             try:
                 _apply_string_position_swap(swap[1], swap[2])
             except ImageFailure as e:
                 if not e.objects:
                     e.objects = [swap[1], swap[2]]
+                e.kind = ImageFailure.SWAP
                 raise
 
         return grouped
@@ -2264,6 +2330,7 @@ def _check_for_conflicts(transforms: list[tuple]) -> None:
                     f"Conflicting transforms on same object for dimension "
                     f"{getattr(dim1, 'short_name', '?')}",
                     objects=[obj1, obj2],
+                    kind=ImageFailure.CONFLICT,
                 )
 
 
@@ -2433,24 +2500,140 @@ def _get_letter_categories(string: WorkspaceString) -> list[SlipnetNode]:
 
 def _bridge_present(workspace: Workspace, bridge: Bridge) -> bool:
     """Check if a bridge (or an equivalent one) exists in the workspace."""
-    all_bridges = (
-        workspace.top_bridges + workspace.bottom_bridges + workspace.vertical_bridges
-    )
-    return any(b is bridge for b in all_bridges)
+    return _get_equivalent_bridge(workspace, bridge) is not None
 
 
 def _get_equivalent_bridge(workspace: Workspace, bridge: Bridge) -> Any:
-    """Find an equivalent bridge in the workspace."""
-    all_bridges = (
-        workspace.top_bridges + workspace.bottom_bridges + workspace.vertical_bridges
+    """Find the Workspace bridge equivalent to *bridge*.
+
+    Scheme: ``get-equivalent-bridge`` (``workspace.ss:268-300``).  A bridge already in
+    the Workspace's own list is its own equivalent.  Otherwise — and this is the case
+    that matters — the bridge's two objects are looked up against the two *real*
+    strings its type spans, and the equivalent bridge is the one already built between
+    those real objects.
+
+    That second half is what makes ``Rule.supported`` mean anything for a translated
+    rule.  A translated rule's supporting bridges run from the source string to a
+    freshly made translated string that is not part of the Workspace, so an identity
+    test over the Workspace's bridge lists would report every translated rule
+    unsupported.  The Scheme asks a different question: does the Workspace, on its own
+    account, already relate these objects the way the translation says it does?
+    """
+    bridge_lists = {
+        "top": workspace.top_bridges,
+        "bottom": workspace.bottom_bridges,
+        "vertical": workspace.vertical_bridges,
+    }
+    own_list = bridge_lists.get(bridge.bridge_type)
+    if own_list is not None and any(b is bridge for b in own_list):
+        return bridge
+
+    strings = {
+        "top": (workspace.initial_string, workspace.modified_string),
+        "bottom": (workspace.target_string, workspace.answer_string),
+        "vertical": (workspace.initial_string, workspace.target_string),
+    }
+    pair = strings.get(bridge.bridge_type)
+    if pair is None:
+        return None
+    string1, string2 = pair
+    if string1 is None or string2 is None:
+        return None
+
+    equivalent1 = _get_equivalent_object(string1, bridge.object1)
+    equivalent2 = _get_equivalent_object(string2, bridge.object2)
+    if equivalent1 is None or equivalent2 is None:
+        return None
+
+    orientation = "vertical" if bridge.bridge_type == "vertical" else "horizontal"
+    existing = (
+        equivalent1.vertical_bridge
+        if orientation == "vertical"
+        else equivalent1.horizontal_bridge
     )
-    for b in all_bridges:
-        if b is bridge:
-            return b
-        if (b.object1 is bridge.object1 and b.object2 is bridge.object2
-                and b.bridge_type == bridge.bridge_type):
-            return b
+    if existing is not None and existing.object2 is equivalent2:
+        return existing
     return None
+
+
+def _get_equivalent_object(string: WorkspaceString, obj: Any) -> Any:
+    """The object of *string* that stands in the same place as *obj*.
+
+    Scheme: ``get-equivalent-object`` / ``get-equivalent-letter`` /
+    ``get-equivalent-group`` (``workspace-strings.ss:390-412``).  The two strings are
+    assumed to hold the same letter-categories; one of them may be a translated string.
+    """
+    from server.engine.groups import Group
+    from server.engine.workspace_objects import Letter
+
+    if obj is None:
+        return None
+    if isinstance(obj, Letter):
+        if any(letter is obj for letter in string.letters):
+            return obj
+        for letter in string.letters:
+            if letter.left_string_pos == obj.left_string_pos:
+                return (
+                    letter if letter.letter_category is obj.letter_category else None
+                )
+        return None
+    if isinstance(obj, Group):
+        if any(group is obj for group in string.groups):
+            return obj
+        for group in string.groups:
+            if (
+                group.left_string_pos == obj.left_string_pos
+                and group.group_category is obj.group_category
+                and group.direction is obj.direction
+                and group.length == obj.length
+            ):
+                return group
+        return None
+    return None
+
+
+def _get_real_object(workspace: Workspace, fake_object: Any) -> Any:
+    """The Workspace object equivalent to one belonging to a translated string.
+
+    Scheme: ``get-real-object`` (``workspace.ss:407-410``).
+    """
+    from server.engine.jootsing import equivalent_workspace_objects
+
+    for string in workspace.all_strings:
+        if string is None:
+            continue
+        for obj in getattr(string, "objects", []):
+            if obj is fake_object:
+                continue
+            try:
+                if equivalent_workspace_objects(obj, fake_object):
+                    return obj
+            except AttributeError:
+                continue
+    return None
+
+
+def get_all_reference_objects(
+    rule: Rule,
+    string: WorkspaceString,
+    slipnet: Slipnet,
+) -> list[Any]:
+    """The objects of *string* that *rule* actually refers to.
+
+    Scheme: ``get-all-reference-objects`` (``workspace-strings.ss:416-419``), with the
+    ``filter-out workspace-string?`` every caller applies to it (``answers.ss:1311-1315``,
+    ``jootsing.ss:230-231``).  Verbatim clauses name nothing (``workspace-strings.ss:420-421``).
+    """
+    result: list[Any] = []
+    for clause in rule.clauses:
+        if clause.is_verbatim:
+            continue
+        for obj in _get_reference_objects_for_clause(clause, string, slipnet):
+            if _is_workspace_string(obj):
+                continue
+            if not any(o is obj for o in result):
+                result.append(obj)
+    return result
 
 
 # ============================================================================

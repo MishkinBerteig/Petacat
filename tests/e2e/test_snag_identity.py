@@ -11,7 +11,13 @@ Requires: a local Postgres — start it with `scripts/dev.sh db`.
 
 import pytest
 
-SEED = 99999
+#: Reseeded from 99999 to 34 when the snag response gained its restart
+#: (``answers.ss:1189-1191``): a snag now empties the Coderack and reposts, so the run
+#: 99999 used to take no longer exists and that seed reaches 3,000 codelets without
+#: snagging.  Which answers a seed reaches is outside the gates on purpose — the
+#: standard is expected-range agreement — and what this file is about is snag
+#: *identity*, which needs some seed that snags.  34 records five.
+SEED = 34
 
 # ``xyz`` has no successor to the ``z``, which is the snag §4.7.2 is written about.
 SNAGGING_PROBLEM = {"initial": "abc", "modified": "abd", "target": "xyz"}

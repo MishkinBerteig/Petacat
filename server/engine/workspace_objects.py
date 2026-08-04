@@ -514,6 +514,24 @@ class WorkspaceObject:
         else:
             self.average_unhappiness = round(intra)
 
+    def clamp_salience(self) -> None:
+        """Hold this object maximally salient — ``workspace-objects.ss:177``.
+
+        Sent to every snag object when a snag event activates
+        (``trace.ss:1156-1157``), so attention returns to the site of the failure
+        instead of wandering off with the temperature at 100.
+
+        The *effect* of the flag was already implemented — ``update_*_salience``
+        below both read it — but the method that sets it did not exist, and
+        ``SnagEvent.activate`` guarded its call with ``hasattr(obj,
+        "clamp_salience")``, so the whole path was silently dead.
+        """
+        self.salience_clamped = True
+
+    def unclamp_salience(self) -> None:
+        """Release the salience clamp — ``workspace-objects.ss:178``."""
+        self.salience_clamped = False
+
     def update_intra_string_salience(self) -> None:
         """Scheme: workspace-objects.ss:524-530."""
         if self.salience_clamped:

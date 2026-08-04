@@ -1182,19 +1182,37 @@ def record_event(
 
 
 def record_snag(ctx: EngineContext, top_rule: Any, translated_rule: Any) -> None:
-    """Record a snag as a real ``SnagEvent`` and remember it.
+    """The snag response — ``process-snag`` (``answers.ss:1153-1193``), in order.
 
     §4.4 lists snags among the seven Trace event types, and §4.7.2 says a snag
     description holds "the Workspace structures directly involved in the snag",
     a vertical theme-pattern, the top rule, and the translated rule that caused
     it.  A bare TraceEvent carries none of that, so the jootser's snag branch
     could never find two comparable snags and never fired.
+
+    The Scheme performs seven steps.  Petacat did the first, a broken version of the
+    third, and the memory/commentary bookkeeping; the rest — activation, the rack
+    flush, the repost, the update — did not exist, and the temperature step pinned the
+    run *greedy* where the reference sends it exploring.  All seven now run:
+
+    1. record the snag event (with its real theme pattern, concept pattern and type);
+    2. delete every proposed structure — subsumed by step 5, see
+       ``EngineRunner._restart_after_snag``;
+    3. ``(set! *temperature* 100)`` **and** ``(set! *temperature-clamped?* #t)``;
+    4. ``(tell snag-event 'activate)``;
+    5. ``(tell *coderack* 'delete-all-codelets)``;
+    6. ``(post-initial-codelets)``;
+    7. ``(update-everything)``.
     """
     from server.engine.memory import SnagDescription
-    from server.engine.trace import SnagEvent
+    from server.engine.trace import (
+        SnagEvent,
+        get_snag_concept_pattern,
+        get_snag_theme_pattern,
+        make_concept_activation_monitor,
+    )
 
     workspace = ctx.workspace
-    theme_pattern = ctx.themespace.get_dominant_theme_pattern("vertical")
 
     # The objects the rule application actually failed on are the ones to blame
     # (Scheme: ``make-snag-event``, ``trace.ss:1055-1059``, reads them off the
@@ -1204,18 +1222,70 @@ def record_snag(ctx: EngineContext, top_rule: Any, translated_rule: Any) -> None
     if not snag_objects:
         snag_objects = _snag_objects(ctx, translated_rule)
 
+    # ``trace.ss:1060-1067``: the concept-mappings of the snag objects' *vertical*
+    # bridges, or — when none of them is bridged — every vertical CM in the
+    # Workspace.  This is what the failed interpretation actually rested on, and it
+    # is what the theme pattern is derived from.  Petacat read the Themespace's
+    # dominant vertical pattern instead, which needs a >90-point cluster lead and is
+    # routinely empty (SN-4).
+    snag_bridges = [
+        b
+        for b in (getattr(o, "vertical_bridge", None) for o in snag_objects)
+        if b is not None
+    ]
+    if snag_bridges:
+        snag_concept_mappings = [
+            cm for bridge in snag_bridges for cm in bridge.concept_mappings
+        ]
+    else:
+        snag_concept_mappings = [
+            cm for bridge in workspace.vertical_bridges for cm in bridge.concept_mappings
+        ]
+
+    theme_pattern = get_snag_theme_pattern(snag_concept_mappings)
+
     event = SnagEvent(
         codelet_count=ctx.codelet_count,
         temperature=ctx.temperature.value,
+        snag_type=getattr(ctx, "last_failure_kind", "change"),
         snag_objects=snag_objects,
+        snag_bridges=snag_bridges,
+        snag_concept_mappings=snag_concept_mappings,
         snag_theme_pattern=theme_pattern,
+        snag_concept_pattern=get_snag_concept_pattern(snag_objects),
         snag_rule=top_rule,
         translated_rule=translated_rule,
+        supporting_vertical_bridges=[
+            b for b in workspace.vertical_bridges if b.is_built
+        ],
+        # The Workspace as it stood at the snag, so progress since it can be measured
+        # against the live list (``trace.ss:96-103, 182-187``).
+        workspace_structures=list(workspace.all_structures),
     )
     ctx.trace.add_snag_event(event)
 
-    # Metacat clamps the temperature while it deals with a snag.
-    ctx.temperature.clamp(ctx.temperature.value)
+    # ``answers.ss:1183-1184``: temperature goes to **100** and is clamped there.  A
+    # snag happens precisely when a strong rule was about to apply — at low
+    # temperature — so clamping at the *current* value, as this used to, pinned the
+    # run greedy on the interpretation that had just failed.  100 is the maximally
+    # random escape regime the whole post-snag search depends on.
+    ctx.temperature.clamp(100.0)
+
+    # ``answers.ss:1187``: undo any live clamp, pull attention back to the snag
+    # objects, and pin their descriptors in the Slipnet.
+    event.activate(
+        ctx.trace,
+        ctx.themespace,
+        ctx.slipnet,
+        ctx.coderack,
+        ctx.codelet_count,
+        make_concept_activation_monitor(
+            ctx.trace,
+            ctx.codelet_count,
+            ctx.temperature.value,
+            ctx.meta.get_param("concept_activation_importance_threshold", 85),
+        ),
+    )
 
     problem = (
         workspace.initial_string.text,
@@ -1245,6 +1315,13 @@ def record_snag(ctx: EngineContext, top_rule: Any, translated_rule: Any) -> None
         ctx.trace.snag_count,
         ctx.codelet_count,
     )
+
+    # ``answers.ss:1189-1191``: empty the rack, post the initial codelets afresh, run
+    # one full update.  Last, so the event, the temperature and the activation are all
+    # in place before the update cycle reads them.
+    restart = getattr(ctx, "on_snag_restart", None)
+    if restart is not None:
+        restart()
 
 
 def _snag_objects(ctx: EngineContext, translated_rule: Any) -> list:
@@ -1534,9 +1611,13 @@ def _apply_rule_locked(ctx: EngineContext, rule: Any, string: Any = None) -> str
     # failure-result it carries.  Stash them so the ``record_snag`` that follows
     # names what actually failed rather than re-resolving every clause.
     ctx.last_failure_objects = []
+    ctx.last_failure_kind = "change"
 
     def _remember(failure: Any) -> None:
         ctx.last_failure_objects = list(getattr(failure, "objects", []) or [])
+        # And *which* of the three failure shapes it was, which decides the snag type
+        # (``trace.ss:1053``) and hence the snag's explanation.
+        ctx.last_failure_kind = getattr(failure, "kind", "change")
 
     result = apply_rule_to_string(rule, target, ctx.slipnet, failure_action=_remember)
     if result is None:

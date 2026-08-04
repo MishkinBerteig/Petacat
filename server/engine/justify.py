@@ -87,6 +87,8 @@ def attempt_justification(
     memory: Any = None,
     codelet_count: int = 0,
     temperature: float = 50.0,
+    coderack: Any = None,
+    temperature_control: Any = None,
 ) -> JustificationResult:
     """Attempt to justify the answer by finding matching rules.
 
@@ -128,10 +130,23 @@ def attempt_justification(
     other_rules = unique_other
 
     # Step 2 -- Translate the chosen rule using vertical bridge slippages
-    translation_result = _translate_rule(chosen_rule, workspace, slipnet)
+    translation_result = _translate_rule(chosen_rule, workspace, slipnet, rng=rng)
 
     if translation_result is not None:
         translated_rule, slippages, supporting_vbridges = translation_result
+
+        # ``justify.ss:50-51``: ref-objs1 is always the *initial*-string side and
+        # ref-objs2 the target side, whichever rule was chosen.  ref-objs1 is what the
+        # vacuous-translation guard below tests.
+        from_string = (
+            workspace.initial_string if rule_type == "top" else workspace.target_string
+        )
+        to_string = (
+            workspace.target_string if rule_type == "top" else workspace.initial_string
+        )
+        from_ref_objects = _reference_objects(chosen_rule, from_string, slipnet)
+        to_ref_objects = _reference_objects(translated_rule, to_string, slipnet)
+        ref_objects1 = from_ref_objects if rule_type == "top" else to_ref_objects
 
         # Step 3a -- Look for a matching existing rule
         matching_rule = _find_matching_rule(other_rules, translated_rule)
@@ -149,14 +164,21 @@ def attempt_justification(
                     explanation="Already found this answer",
                 )
 
-            if matching_rule.is_built and matching_rule.supporting_bridges:
+            # ``rules.ss:219-222``: ``supported?`` is an ``andmap`` over the rule's
+            # supporting bridges, so a rule resting on none is vacuously supported.
+            # Requiring the list to be non-empty inverted the test for exactly those
+            # rules and sent them down the clamp branch instead.
+            if matching_rule.supported(workspace):
                 # Matching rule is supported -- answer justified!
-                quality = (rule1.quality + rule2.quality) / 2.0
                 return JustificationResult(
                     justified=True,
                     top_rule=rule1,
                     bottom_rule=rule2,
-                    quality=quality,
+                    # ``trace.ss:392-396``: an answer's quality comes from the *top*
+                    # rule's quality alone, weighted against the temperature by the
+                    # caller.  Averaging both rules made a strong top rule and a weak
+                    # bottom rule indistinguishable from two middling ones.
+                    quality=rule1.quality,
                     explanation="Rules match via translation",
                     supporting_vertical_bridges=supporting_vbridges,
                     slippage_log=slippages,
@@ -172,12 +194,22 @@ def attempt_justification(
                 meta,
                 codelet_count=codelet_count,
                 temperature=temperature,
+                coderack=coderack,
+                temperature_control=temperature_control,
                 concept_patterns=[_get_concept_pattern_dict(matching_rule)],
                 explanation="Matching rule unsupported, clamping",
             )
 
-        # Step 3b -- No matching rule, but translated rule works
-        if _translated_rule_works(translated_rule, workspace, slipnet, rule_type):
+        # Step 3b -- No matching rule, but translated rule works.
+        #
+        # ``justify.ss:88-95``: the ref-objects test is not decoration.  A bottom rule
+        # can translate into a top rule that works *vacuously* — the Scheme's own
+        # example is ``xqd -> xqd; mrrjjj -> mrrjjjj``, where "increase the length of
+        # the j group by one" translates to "increase the length of letter j by one",
+        # which applies to ``xqd -> xqd`` without referring to anything in it.
+        if _translated_rule_works(
+            translated_rule, workspace, slipnet, rule_type
+        ) and ref_objects1:
             rule1, rule2 = _order_rules(
                 chosen_rule, translated_rule, rule_type
             )
@@ -190,14 +222,25 @@ def attempt_justification(
                     explanation="Already found this answer",
                 )
 
-            # Check if translated rule is supported
-            if translated_rule.supporting_bridges or True:
-                quality = (rule1.quality + rule2.quality) / 2.0
+            # ``justify.ss:104-111``.  These four steps are what give the translated
+            # rule anything to be supported *by*: without them ``supported?`` is asked
+            # of a rule that rests on no bridges and is vacuously true — which is what
+            # the ``or True`` here used to say out loud.
+            translated_rule.compute_quality(meta)
+            _build_translated_string(
+                translated_rule, to_string, workspace, slipnet
+            )
+            workspace.add_rule(translated_rule)
+            _monitor_new_rule(
+                translated_rule, workspace, trace, meta, codelet_count, temperature
+            )
+
+            if translated_rule.supported(workspace):
                 return JustificationResult(
                     justified=True,
                     top_rule=rule1,
                     bottom_rule=rule2,
-                    quality=quality,
+                    quality=rule1.quality,
                     explanation="Translated rule works",
                     supporting_vertical_bridges=supporting_vbridges,
                     slippage_log=slippages,
@@ -212,6 +255,8 @@ def attempt_justification(
                 meta,
                 codelet_count=codelet_count,
                 temperature=temperature,
+                coderack=coderack,
+                temperature_control=temperature_control,
                 concept_patterns=[_get_concept_pattern_dict(translated_rule)],
                 explanation="Translated rule unsupported, clamping",
             )
@@ -224,7 +269,15 @@ def attempt_justification(
             explanation="No other rules exist for unification",
         )
 
-    if trace is not None and not trace.permission_to_clamp():
+    # ``trace.ss:112-119``: the grace period is ``codelet-count < last-unclamp-time +
+    # 100``.  Called with the default ``codelet_count=0`` that comparison is true
+    # forever once any clamp has been undone, so after the first unclamp of a run every
+    # justify clamp was denied and Figure 4.13's repeated reorganisation could not
+    # happen.  Both call sites have the real count in scope.
+    if trace is not None and not trace.permission_to_clamp(
+        codelet_count=codelet_count,
+        grace_period=meta.get_param("grace_period", 100),
+    ):
         return JustificationResult(
             justified=False,
             explanation="Permission to clamp denied for unification",
@@ -246,7 +299,7 @@ def attempt_justification(
         )
 
     vertical_pattern = get_vertical_theme_pattern_to_clamp(
-        unifying_pattern, slipnet
+        unifying_pattern, slipnet, rng=rng
     )
     return _attempt_clamp_rules(
         [chosen_rule, other_rule],
@@ -254,9 +307,11 @@ def attempt_justification(
         themespace,
         workspace,
         slipnet,
-            meta,
-            codelet_count=codelet_count,
-            temperature=temperature,
+        meta,
+        codelet_count=codelet_count,
+        temperature=temperature,
+        coderack=coderack,
+        temperature_control=temperature_control,
         vertical_pattern_override=vertical_pattern,
         concept_patterns=[
             _get_concept_pattern_dict(chosen_rule),
@@ -283,6 +338,8 @@ def clamp_rules(
     concept_patterns: list[dict[str, Any]] | None = None,
     codelet_count: int | None = None,
     temperature: float | None = None,
+    coderack: Any = None,
+    temperature_control: Any = None,
 ) -> ClampEvent | None:
     """Clamp a set of rules with their theme pattern, concept pattern, and
     codelet pattern for focused exploration.
@@ -291,7 +348,14 @@ def clamp_rules(
     Creates a ClampEvent of type ``justify_clamp``, adds it to the trace,
     and activates it.
     """
-    if not trace.permission_to_clamp():
+    if codelet_count is None:
+        codelet_count = _get_codelet_count(workspace)
+    # ``trace.ss:112-119`` again — see the note at the unification gate.  With the
+    # default count this test passed exactly once per run.
+    if not trace.permission_to_clamp(
+        codelet_count=codelet_count,
+        grace_period=meta.get_param("grace_period", 100),
+    ):
         return None
 
     # Gather clamped patterns
@@ -314,13 +378,30 @@ def clamp_rules(
             if tp_dict:
                 clamped_theme_patterns.append(tp_dict)
 
-    # Concept patterns
-    clamped_concept_patterns = concept_patterns or []
+    # Concept patterns.  A rule with no Slipnet nodes to speak of (an identity or
+    # verbatim rule) yields an empty pattern, which clamps nothing; it is dropped here
+    # rather than passed on, because ``_concept_pattern_entries`` (``trace.py``) reads a
+    # dict whose ``entries`` list is empty as the *other* spelling — node name to
+    # activation — and then tries to make a float of the empty list.
+    clamped_concept_patterns = [
+        pattern
+        for pattern in (concept_patterns or [])
+        if pattern and pattern.get("entries")
+    ]
 
-    # Codelet patterns: top-down + thematic
+    # Codelet patterns: top-down + thematic (``justify.ss:167-172``).  The real urgency
+    # lists, not placeholder dicts naming them: a ``{"type": ...}`` marker is inert, so
+    # a justify clamp froze themes and concepts and then left the Coderack running the
+    # very search that had stalled — where the whole point of the clamp is to redirect
+    # it.  The thematic pattern posts thematic-bridge-scouts at 91, which is how the
+    # clamped themes get acted on at all.
     clamped_codelet_patterns: list[Any] = [
-        {"type": "top_down_codelet_pattern"},
-        {"type": "thematic_codelet_pattern"},
+        pattern
+        for pattern in (
+            meta.codelet_patterns.get("top-down-codelet-pattern", []),
+            meta.codelet_patterns.get("thematic-codelet-pattern", []),
+        )
+        if pattern
     ]
 
     # The caller supplies these.  They used to be read off the Workspace, which has
@@ -329,8 +410,6 @@ def clamp_rules(
     # ``%max-clamp-period%`` (750) the instant it is made, so justify clamps expired
     # after 2–14 codelets instead of lasting up to 750 — the reorganisation Figure 4.13
     # depends on had no time to happen.
-    if codelet_count is None:
-        codelet_count = _get_codelet_count(workspace)
     if temperature is None:
         temperature = _get_temperature(workspace)
 
@@ -347,7 +426,10 @@ def clamp_rules(
 
     # Add event first so concept-activation events appear after the clamp
     trace.add_clamp_event(clamp_event)
-    clamp_event.activate(trace, themespace, slipnet)
+    if temperature_control is not None:
+        clamp_event.activate(
+            trace, themespace, slipnet, coderack, temperature_control, workspace
+        )
 
     return clamp_event
 
@@ -478,6 +560,18 @@ def traverse_rule_clauses(
                 return results
             raise _TraversalFailure()
 
+        # ``justify.ss:243-244``: the special object-type ``string`` unifies with
+        # ``plato-group``.  Figure 3.2's ``*string*`` object-description and a
+        # string-spanning group name the same thing from two sides — "the whole of it" —
+        # and the Scheme lets one rule's reading of it match the other's.  Without this
+        # case any rule phrased about the string failed to unify with one phrased about
+        # its spanning group, and the pair went to the clamp branch instead.
+        if x1 == "string" or x2 == "string":
+            other = x2 if x1 == "string" else x1
+            if getattr(other, "name", None) == "plato-group":
+                return results
+            raise _TraversalFailure()
+
         # SlipnetNode objects: delegate to proc
         if _is_slipnet_node(x1) and _is_slipnet_node(x2):
             return proc(x1, x2, results, slipnet=slipnet)
@@ -545,12 +639,20 @@ def compare_rule_clause_lists(
 def get_vertical_theme_pattern_to_clamp(
     unifying_pattern: list,
     slipnet: Slipnet | None = None,
+    *,
+    rng: RNG | None = None,
 ) -> dict[str, Any]:
     """Compute the vertical theme pattern to clamp from a unifying pattern.
 
     Scheme: justify.ss ``get-vertical-theme-pattern-to-clamp``.
     Applies retention probability filtering and heuristic adjustments
     (add direction entry, replace bond-category with group-category).
+
+    The retention filter is a *sample* per entry (``justify.ss:296`` —
+    ``(filter (compose prob? get-probability) pattern-entries)``), not a threshold.
+    Deciding it deterministically at 0.5 made the clamped pattern a function of the
+    conceptual depths alone: shallow entries were never retained and deep ones always
+    were, so the same unification always clamped the same pattern.
     """
     if not unifying_pattern or len(unifying_pattern) < 2:
         return _theme_pattern_list_to_dict(unifying_pattern) if unifying_pattern else {}
@@ -565,8 +667,8 @@ def get_vertical_theme_pattern_to_clamp(
             continue
         dim, rel = entry[0], entry[1]
         prob = _retention_probability(entry, pattern_entries, slipnet)
-        # Deterministic threshold of 0.5 for the non-stochastic helper
-        if prob >= 0.5:
+        retained = rng.prob(prob) if rng is not None else prob >= 0.5
+        if retained:
             final_entries.append((dim, rel))
 
     # Heuristic 1: Add direction entry if StrPos entry exists but Dir doesn't
@@ -678,10 +780,18 @@ def _translate_rule(
     rule: Rule,
     workspace: Workspace,
     slipnet: Slipnet | None,
+    *,
+    rng: RNG | None = None,
 ) -> tuple[Rule, list[Any], list[Any]] | None:
     """Translate a rule using vertical bridge slippages.
 
     Returns (translated_rule, slippages, supporting_vertical_bridges) or None.
+
+    ``rng`` is what lets a translation drag an auxiliary slippage along on a coattail
+    (``slipnet.py:446-447``): ``apply_slippages`` skips coattails entirely without it.
+    The Scheme uses one ``translate`` in both modes, so a justify-mode translation is
+    exactly as free as an answer-finding one; passing no RNG made it strictly more
+    literal.
     """
     # Gather slippages from vertical bridges
     slippages: list[Any] = []
@@ -697,8 +807,97 @@ def _translate_rule(
     direction = (
         "top-to-bottom" if rule.rule_type == "top" else "bottom-to-top"
     )
-    translated = rule.translate(slippages, direction)
+    translated = rule.translate(slippages, direction, rng=rng)
     return (translated, slippages, supporting_vbridges)
+
+
+def _reference_objects(
+    rule: Rule,
+    string: Any,
+    slipnet: Slipnet | None,
+) -> list[Any]:
+    """The objects of *string* that *rule* refers to, Workspace strings excluded.
+
+    Scheme: ``(filter-out workspace-string? (tell <string> 'get-all-reference-objects
+    <rule>))`` (``answers.ss:1311-1315``).
+    """
+    from server.engine.rules import get_all_reference_objects
+
+    if string is None or slipnet is None:
+        return []
+    try:
+        return get_all_reference_objects(rule, string, slipnet)
+    except Exception:
+        return []
+
+
+def _build_translated_string(
+    translated_rule: Rule,
+    source_string: Any,
+    workspace: Workspace,
+    slipnet: Slipnet | None,
+) -> Any:
+    """Build the string the translated rule implies and hand its bridges to the rule.
+
+    Scheme: ``justify.ss:107-109``.  ``make-translated-string`` is what sets the
+    translated rule's supporting horizontal bridges and its theme pattern
+    (``rules.ss:164-189``), so this is the step that makes the ``supported?`` test
+    below a real question rather than a formality.
+
+    The bridges are deliberately *not* filed in the Workspace: in justify mode the
+    answer string already exists, and registering a hypothetical translation's bridges
+    would both overwrite the real objects' horizontal bridges and make the rule
+    trivially supported by its own translation.
+    """
+    from server.engine.answers import make_translated_string
+
+    if slipnet is None or source_string is None:
+        return None
+    try:
+        return make_translated_string(
+            translated_rule,
+            source_string,
+            slipnet,
+            workspace,
+            register_bridges=False,
+        )
+    except Exception:
+        logger.debug("Could not build translated string", exc_info=True)
+        return None
+
+
+def _monitor_new_rule(
+    rule: Rule,
+    workspace: Workspace,
+    trace: TemporalTrace | None,
+    meta: MetadataProvider,
+    codelet_count: int,
+    temperature: float,
+) -> None:
+    """Record the translated rule in the Trace if it is important enough.
+
+    Scheme: ``monitor-new-rules`` (``trace.ss:1338-1343``) with ``rule-importance``
+    (``trace.ss:1359-1363``) — a perfectly uniform rule is maximally important whatever
+    its relative quality; otherwise importance *is* the relative quality.
+    """
+    from server.engine.trace import RULE_BUILT, TraceEvent
+
+    if trace is None:
+        return
+    relative_quality = rule.get_relative_quality(workspace)
+    importance = 100.0 if rule.uniformity == 100 else float(relative_quality)
+    if importance < meta.get_param("rule_importance_threshold", 67):
+        return
+    trace.record_event(
+        TraceEvent(
+            event_type=RULE_BUILT,
+            codelet_count=codelet_count,
+            temperature=temperature,
+            structures=[rule],
+            description=rule.transcribe_to_english(),
+            strength=float(relative_quality),
+        )
+    )
 
 
 def _find_matching_rule(
@@ -775,6 +974,8 @@ def _attempt_clamp_rules(
     explanation: str = "Clamping rules",
     codelet_count: int = 0,
     temperature: float = 50.0,
+    coderack: Any = None,
+    temperature_control: Any = None,
 ) -> JustificationResult:
     """Attempt to clamp rules and return a JustificationResult."""
     if trace is None or themespace is None or slipnet is None:
@@ -792,6 +993,8 @@ def _attempt_clamp_rules(
         meta,
         codelet_count=codelet_count,
         temperature=temperature,
+        coderack=coderack,
+        temperature_control=temperature_control,
         vertical_theme_pattern=vertical_pattern_override,
         concept_patterns=concept_patterns,
     )
@@ -949,13 +1152,16 @@ def _is_identity_label(label: Any) -> bool:
 def _remove_whole_single_concept_mappings(
     concept_mappings: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """Remove concept-mappings whose CM-type is string-position-category and
+    """Remove the concept-mapping whose CM-type is string-position-category and
     whose descriptor1 is whole or single.
 
-    Scheme: justify.ss ``remove-whole/single-concept-mappings``.
+    Scheme: ``remove-whole/single-concept-mappings`` (``justify.ss:220-229``) is
+    ``(remq (select pred cms) cms)``: ``select`` returns the *first* match and ``remq``
+    drops that one element.  Removing every match discarded StrPos mappings the Scheme
+    keeps, and with them theme-pattern entries the clamp is built from.
     """
-    result = []
-    for cm in concept_mappings:
+    result = list(concept_mappings)
+    for index, cm in enumerate(result):
         cm_type = cm.get("cm_type", "")
         d1 = cm.get("descriptor1")
         d1_name = getattr(d1, "name", str(d1)) if d1 else ""
@@ -963,8 +1169,8 @@ def _remove_whole_single_concept_mappings(
             "plato-single",
             "plato-whole",
         ):
-            continue
-        result.append(cm)
+            del result[index]
+            break
     return result
 
 
