@@ -281,3 +281,41 @@ def test_direction_relevance_is_fraction_of_matching_right_bonds():
     s.objects[0].right_bond = _RightBond(direction=direction)
     # 3 non-spanning objects; 1 matches -> round(100*1/2) = 50
     assert s.get_direction_relevance(direction) == 50.0
+
+
+# --- behaving as a spanning group (workspace-strings.ss:385-412) -------------
+#
+# A snag object can be the whole string, and the snag machinery then sends it
+# messages only letters and groups answer.  Upstream Metacat found each of these
+# by having a run die on it; Petacat survived only through `hasattr` guards and
+# `getattr` defaults at the call sites, which is incidental rather than intended.
+
+
+def test_a_string_is_its_own_string():
+    """``(get-string () self)`` — workspace-strings.ss:397.
+
+    The snag explanation asks the failing object which string it sits in.
+    """
+    s = _string("xy")
+    assert s.string is s
+
+
+def test_clamping_a_strings_salience_is_a_no_op():
+    """``(clamp-salience () 'done)`` — workspace-strings.ss:404-405.
+
+    Salience is an object notion; on a real object these set a flag read only by
+    that object's own salience calculation, so a string has nothing to do. The
+    point is that it *answers* rather than raising.
+    """
+    s = _string("xy")
+    assert s.clamp_salience() is None
+    assert s.unclamp_salience() is None
+
+
+def test_a_string_contributes_no_descriptors():
+    """``(get-all-descriptors () '())`` — workspace-strings.ss:410.
+
+    Descriptions attach to letters and groups, never to strings, and the snag
+    concept pattern asks every snag object for its descriptors.
+    """
+    assert _string("xy").get_all_descriptors() == []

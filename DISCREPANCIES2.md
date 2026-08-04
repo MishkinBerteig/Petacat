@@ -88,6 +88,29 @@
 > one clamp released every other; and `evaluate_progress` excluded bonds by testing
 > for an attribute no structure class in the port has.
 >
+> ### Superseded by measurement — see `ORACLE-COMPARISON.md`
+>
+> Several judgements in this document, and in the commits that closed it, end with
+> some version of "I cannot tell from the source alone whether the reference
+> behaves this way". That limit is gone. Metacat's repository now carries a
+> saturated stopping-state benchmark over all nineteen demo problems, produced by
+> the reference implementation running headless (`424feb0`, `d9dddee`), and
+> `ORACLE-COMPARISON.md` records Petacat against it.
+>
+> The headline: eight of nineteen problems agree closely (total-variation distance
+> ≤ 0.06), median TVD 0.20, and the disagreement clusters into a small number of
+> named patterns rather than scattering — chiefly that **Metacat frequently answers
+> with the target string unchanged where Petacat exhausts its alternatives and gives
+> up**. That single pattern accounts for most of the remaining distance.
+>
+> It also **overturns a conclusion reached in this repository**: an investigation of
+> `abc→cba; mrrjjj` traced bridge choice, swap-dimension selection and
+> concept-mapping association values line by line, found every step faithful, and
+> concluded the 70% unchanged-target rate was acceptable. The benchmark shows the
+> reference answers `jjjrrm` 85.1% of the time and the unchanged target only 8.7%.
+> The mechanism did match; the outcome did not. Faithful parts are not proof of
+> faithful behaviour, and this is the case that demonstrates it.
+>
 > ### On the test suite
 >
 > `tests/module/test_dissertation_parity.py`'s frequency-distribution guards were

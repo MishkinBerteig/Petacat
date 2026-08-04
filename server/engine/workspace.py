@@ -388,6 +388,64 @@ class WorkspaceString:
         """
         return self.get_spanning_group() is not None
 
+    # ------------------------------------------------------------------
+    # Behaving as a spanning group
+    #
+    # ``workspace-strings.ss:385-412`` carries a block of methods under
+    # Marshall's own heading: "The following methods allow workspace-strings to
+    # behave as spanning groups, so that a workspace-string can be used as the
+    # reference-object of an intrinsic change-description or
+    # rule-clause-template."
+    #
+    # A *snag* object can be a whole string — the rule failed against the entire
+    # string rather than a letter or a group — and the snag machinery then sends
+    # it messages only letters and groups answer.  Upstream Metacat found each of
+    # these the hard way: every one reached ``report-error-and-halt`` and
+    # ``(reset)``, silently abandoning the run, and between them they killed four
+    # of the ``copy*`` problems partway through a full oracle sample.
+    #
+    # Petacat already behaved correctly here, but *incidentally* — through
+    # ``hasattr`` guards at the call sites and a ``getattr(obj, "descriptions",
+    # [])`` default — rather than because a string had an answer.  That is one
+    # refactor away from a crash, and it is the same shape as the
+    # ``constituent-objects-of`` defect upstream fixed before it.  These four
+    # make the answers explicit, in the block the reference already had for them.
+    # ------------------------------------------------------------------
+
+    @property
+    def string(self) -> WorkspaceString:
+        """A string used as a reference object is its own string.
+
+        Scheme: ``(get-string () self)`` (``workspace-strings.ss:397``).
+        Reproducible upstream at ``xy -> z; xy`` seed 5, where the snag
+        explanation asks the failing object which string it sits in.
+        """
+        return self
+
+    def clamp_salience(self) -> None:
+        """No-op: salience is an object notion and a string has none.
+
+        Scheme: ``(clamp-salience () 'done)`` (``workspace-strings.ss:404``).
+        On a real object this sets a flag read only by that object's own
+        salience calculation, so for a string there is nothing to do.
+        """
+
+    def unclamp_salience(self) -> None:
+        """No-op, the counterpart to :meth:`clamp_salience`.
+
+        Scheme: ``(unclamp-salience () 'done)`` (``workspace-strings.ss:405``).
+        """
+
+    def get_all_descriptors(self) -> list[Any]:
+        """A string contributes no descriptors of its own.
+
+        Scheme: ``(get-all-descriptors () '())``
+        (``workspace-strings.ss:410``).  Descriptions attach to letters and
+        groups, never to strings, and the snag concept pattern asks every snag
+        object for its descriptors.
+        """
+        return []
+
     def get_bond_category_relevance(self, bond_category: Any) -> float:
         """How relevant is a bond category to this string?
 
