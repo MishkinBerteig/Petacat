@@ -474,9 +474,23 @@ class EngineRunner:
         workspace.update_average_unhappiness_values()
 
     def _post_initial_codelets(self) -> None:
-        """Post initial bottom-up scout codelets.
+        """Post the opening population of scouts.
 
-        Scheme: run.ss — 2 * num_objects codelets, half bond scouts, half bridge scouts.
+        Scheme: ``post-initial-codelets`` (run.ss:275-283)::
+
+            (repeat* (* 2 (length (tell *workspace* 'get-objects))) times
+              (add-deferred-codelet bottom-up-bond-scout)
+              (add-deferred-codelet bottom-up-bridge-scout))
+            (post-deferred-codelets)
+
+        ``2N`` iterations of *two* posts each — **4N** codelets, 36 for
+        ``abc/abd/xyz``.  Petacat ran ``N`` iterations, so the run started with
+        half the reference's scouts and reached its first update cycle with
+        proportionally less built.
+
+        Stamped with the codelet count that posts them, as ``add-codelet`` stamps
+        every codelet (``coderack.ss:300-306``); posted as a deferred batch, so
+        the members never evict one another.
         """
         ctx = self.ctx
         if ctx is None:
@@ -485,25 +499,15 @@ class EngineRunner:
         num_objects = len(ctx.workspace.all_objects)
         urgency = self.meta.get_urgency("very_low")
 
-        # Stamped with the codelet count that posts them, as ``add-codelet`` stamps
-        # every codelet (``coderack.ss:405-415``).  A hard-coded 0 made every repost —
-        # the empty-rack repost and, now, the snag response's — maximally eviction-prone
-        # the moment the rack filled, because eviction weight is ``codelet_count -
-        # time_stamp``.  At ``init_mcat`` the count is 0 anyway, so this changes
-        # nothing about the run's first population.
-        for _ in range(num_objects):
-            ctx.coderack.post(
-                Codelet("bottom-up-bond-scout", urgency, time_stamp=ctx.codelet_count),
-                ctx.codelet_count,
-                ctx.rng,
+        batch: list[Codelet] = []
+        for _ in range(2 * num_objects):
+            batch.append(
+                Codelet("bottom-up-bond-scout", urgency, time_stamp=ctx.codelet_count)
             )
-            ctx.coderack.post(
-                Codelet(
-                    "bottom-up-bridge-scout", urgency, time_stamp=ctx.codelet_count
-                ),
-                ctx.codelet_count,
-                ctx.rng,
+            batch.append(
+                Codelet("bottom-up-bridge-scout", urgency, time_stamp=ctx.codelet_count)
             )
+        ctx.coderack.post_deferred(batch, ctx.codelet_count, ctx.rng)
 
     def _restart_after_snag(self) -> None:
         """The last three steps of ``process-snag`` (``answers.ss:1189-1191``).
@@ -792,11 +796,16 @@ class EngineRunner:
         # refresh it, so hand it over here.
         ctx.coderack.current_temperature = ctx.temperature.value
 
-        # 11. Post new bottom-up codelets
-        self._post_bottom_up_codelets()
-
-        # 12. Post new top-down codelets
-        self._post_top_down_codelets()
+        # 11-12. Post the cycle's codelets — bottom-up, then top-down, then
+        # thematic (``run.ss:317-319``, ``coderack.ss:553-572``) — as one
+        # deferred batch.  The order matters because the batch's members never
+        # evict each other but a *later* cycle's do: whichever types are posted
+        # last are the ones the next cycle's overflow finds youngest.
+        batch: list[Codelet] = []
+        self._post_bottom_up_codelets(batch)
+        self._post_top_down_codelets(batch)
+        self._post_thematic_codelets(batch)
+        ctx.coderack.post_deferred(batch, ctx.codelet_count, ctx.rng)
 
     def _record_concept_activation_events(
         self, activations_before: dict[str, float]
@@ -865,10 +874,10 @@ class EngineRunner:
                     bridge.theme_type, dimension, relation, factor
                 )
 
-    def _post_bottom_up_codelets(self) -> None:
-        """Post bottom-up codelets based on workspace state.
+    def _post_bottom_up_codelets(self, batch: list[Codelet] | None = None) -> None:
+        """Collect the cycle's bottom-up codelets into *batch*.
 
-        Scheme: coderack.ss:565-572, 465-550.
+        Scheme: ``add-bottom-up-codelets`` (coderack.ss:565-572), 465-550.
         Each codelet type has a posting probability (from workspace state)
         and a count (from workspace state). Stochastically decide whether
         to post, then post the computed number.
@@ -876,6 +885,11 @@ class EngineRunner:
         ctx = self.ctx
         if ctx is None:
             return
+        if batch is None:
+            batch = []
+            deferred = True
+        else:
+            deferred = False
 
         time = ctx.codelet_count
 
@@ -913,21 +927,39 @@ class EngineRunner:
             num = self._compute_num_to_post(codelet_type)
 
             for _ in range(num):
-                ctx.coderack.post(
-                    Codelet(codelet_type, urgency, time_stamp=time)
+                batch.append(Codelet(codelet_type, urgency, time_stamp=time))
+
+        if deferred:
+            ctx.coderack.post_deferred(batch, time, ctx.rng)
+
+    def _post_thematic_codelets(self, batch: list[Codelet] | None = None) -> None:
+        """Collect the cycle's thematic codelets into *batch*.
+
+        Scheme: the second half of ``add-top-down-codelets``
+        (coderack.ss:557-562) — thematic types are posted *after* the top-down
+        slipnodes, not before either of them, which is where this used to sit.
+        """
+        ctx = self.ctx
+        if ctx is None or not ctx.self_watching_enabled:
+            return
+        if batch is None:
+            batch = []
+            deferred = True
+        else:
+            deferred = False
+
+        thematic_type = "thematic-bridge-scout"
+        post_prob = self._compute_posting_probability(thematic_type)
+        if ctx.rng.prob(post_prob):
+            urgency = round(ctx.themespace.get_max_positive_theme_activation())
+            num = self._compute_num_to_post(thematic_type)
+            for _ in range(num):
+                batch.append(
+                    Codelet(thematic_type, urgency, time_stamp=ctx.codelet_count)
                 )
 
-        # Thematic codelet types
-        if ctx.self_watching_enabled:
-            thematic_type = "thematic-bridge-scout"
-            post_prob = self._compute_posting_probability(thematic_type)
-            if ctx.rng.prob(post_prob):
-                urgency = round(ctx.themespace.get_max_positive_theme_activation())
-                num = self._compute_num_to_post(thematic_type)
-                for _ in range(num):
-                    ctx.coderack.post(
-                        Codelet(thematic_type, urgency, time_stamp=time)
-                    )
+        if deferred:
+            ctx.coderack.post_deferred(batch, ctx.codelet_count, ctx.rng)
 
     def _compute_posting_probability(self, codelet_type: str) -> float:
         """Compute the probability of posting a codelet of this type.
@@ -1096,16 +1128,21 @@ class EngineRunner:
         # Most bottom-up scouts use low urgency
         return self.meta.get_urgency("low")
 
-    def _post_top_down_codelets(self) -> None:
-        """Post top-down codelets driven by active slipnet nodes.
+    def _post_top_down_codelets(self, batch: list[Codelet] | None = None) -> None:
+        """Collect the cycle's top-down codelets into *batch*.
 
-        Scheme: run.ss add-top-down-codelets, slipnet.ss:212-222.
+        Scheme: ``add-top-down-codelets`` (coderack.ss:553-556), slipnet.ss:212-222.
         Each top-down codelet receives the triggering slipnode as an argument
         so it can guide its search (e.g., look for successor bonds specifically).
         """
         ctx = self.ctx
         if ctx is None:
             return
+        if batch is None:
+            batch = []
+            deferred = True
+        else:
+            deferred = False
 
         top_down_nodes = self.meta.get_param("top_down_slipnodes", [])
         threshold = self.meta.get_param("full_activation_threshold", 50)
@@ -1136,7 +1173,7 @@ class EngineRunner:
 
                 num = self._compute_num_to_post(rule.codelet_type)
                 for _ in range(num):
-                    ctx.coderack.post(
+                    batch.append(
                         Codelet(
                             rule.codelet_type,
                             urgency,
@@ -1144,6 +1181,9 @@ class EngineRunner:
                             time_stamp=ctx.codelet_count,
                         )
                     )
+
+        if deferred:
+            ctx.coderack.post_deferred(batch, ctx.codelet_count, ctx.rng)
 
     def __repr__(self) -> str:
         ctx_info = ""

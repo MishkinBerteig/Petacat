@@ -226,10 +226,19 @@ def test_opposite_mapping_true_when_label_is_opposite():
     assert cm.opposite_mapping is True
 
 
-def test_opposite_mapping_true_for_whole_to_single():
+def test_opposite_mapping_false_for_whole_to_single():
+    """``opposite-mapping?`` (concept-mappings.ss:101) is label == opposite, only.
+
+    Rebaselined with BR-3: the whole/single clause belongs to the *wider*
+    ``identity/opposite-mapping?`` (concept-mappings.ss:102-106), and admitting
+    it here would let ``reverse-direction-orientation?`` flip a spanning group
+    on the strength of a string-position mapping that says nothing about
+    direction.
+    """
     dt = FakeNode("plato-string-position-category")
     cm = ConceptMapping(dt, FakeNode("plato-whole"), dt, FakeNode("plato-single"))
-    assert cm.opposite_mapping is True
+    assert cm.opposite_mapping is False
+    assert cm.identity_or_opposite_mapping is True
 
 
 def test_opposite_mapping_false_for_plain_slippage():

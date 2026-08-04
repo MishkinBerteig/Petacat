@@ -1036,12 +1036,15 @@ class StringImage:
             o.image = sub
             sub_images.append(sub)
         first = sub_images[0]
+        letter_relation, length_relation = _group_image_relations(
+            obj, list(sub_objects), self.slipnet
+        )
         return make_group_image(
             self.slipnet,
             first.start_letter,
             getattr(obj, "bond_facet", None),
-            _bond_relation(obj, "plato-letter-category"),
-            _bond_relation(obj, "plato-length"),
+            letter_relation,
+            length_relation,
             # Physical left-to-right order, *not* the group's bonding direction:
             # ``Group.objects`` is stored left-to-right, so an image seeded with a
             # left-going group's direction would generate its letters reversed and
@@ -1062,13 +1065,68 @@ class StringImage:
 # Factory functions
 # ---------------------------------------------------------------------------
 
-def _bond_relation(group: Any, facet_name: str) -> SlipnetNode | None:
-    """The group's bond category, if its bonds run along *facet_name*."""
-    facet = getattr(group, "bond_facet", None)
-    if facet is None or getattr(facet, "name", "") != facet_name:
-        return None
-    bonds = getattr(group, "group_bonds", None) or []
-    return bonds[0].bond_category if bonds else None
+def _initial_letter_category(obj: Any, slipnet: Slipnet) -> SlipnetNode | None:
+    """Scheme: ``get-initial-letter-category`` — a Letter's own category,
+    a Group's leftmost-in-direction constituent's (``workspace-objects.ss:56``,
+    ``groups.ss:227``)."""
+    getter = getattr(obj, "_get_initial_letter_category", None)
+    if getter is not None:
+        return getter()
+    return getattr(obj, "letter_category", None)
+
+
+def _platonic_length(obj: Any, slipnet: Slipnet) -> SlipnetNode | None:
+    """Scheme: ``get-platonic-length`` — ``plato-one`` for a Letter
+    (``workspace-objects.ss:57``), the group's own length node otherwise."""
+    node = getattr(obj, "platonic_length", None)
+    if node is not None:
+        return node
+    objects = getattr(obj, "objects", None)
+    if not objects:
+        return slipnet.nodes.get("plato-one")
+    return number_to_platonic_number(len(objects), slipnet)
+
+
+def _group_image_relations(
+    group: Any, ordered_objects: list[Any], slipnet: Slipnet
+) -> tuple[SlipnetNode | None, SlipnetNode | None]:
+    """The letter and length relations a group's image is built with.
+
+    Scheme: ``groups.ss:84-96``.  Two things here are easy to get wrong, and
+    getting either wrong produces an *answer string containing a relation's
+    name* — ``kksamejjiisame`` rather than ``kkjjii``.
+
+    First, a multi-object group's letter relation is
+    ``relationship-between`` over its constituents' initial letter categories,
+    **not** its bonds' category.  Those differ exactly where it matters:
+    ``get-label`` returns ``plato-identity`` for a node against itself
+    (``slipnet.ss:289-290``), so a sameness group's letter relation is
+    *Identity*, while its bonds are categorised ``plato-sameness``.
+
+    Second, a singleton has no constituents to relate, so the Scheme falls back
+    to the bond category — after mapping ``sameness`` to ``identity`` for the
+    same reason.
+
+    ``plato-sameness`` is not in ``new-start-letter``'s declared domain
+    (``images.ss:164``, "arg in {pred succ iden} U {a … z}"), so passing it
+    through ``extend`` set an image's ``start_letter`` to the relation itself
+    and the letter came out as its short name.
+    """
+    identity = slipnet.nodes.get("plato-identity")
+    sameness = slipnet.nodes.get("plato-sameness")
+
+    if len(ordered_objects) > 1:
+        letter_relation = relationship_between(
+            [_initial_letter_category(o, slipnet) for o in ordered_objects], slipnet
+        )
+        length_relation = relationship_between(
+            [_platonic_length(o, slipnet) for o in ordered_objects], slipnet
+        )
+        return letter_relation, length_relation
+
+    bond_category = getattr(group, "bond_category", None)
+    letter_relation = identity if bond_category is sameness else bond_category
+    return letter_relation, identity
 
 
 def make_letter_image(letter_category: SlipnetNode, slipnet: Slipnet) -> Image:

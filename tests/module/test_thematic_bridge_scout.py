@@ -254,6 +254,20 @@ def test_building_a_flipped_bridge_swaps_the_group_it_reinterprets(engine, meta)
     )
     ctx.workspace.update_all_object_values()
 
+    # ``bridge-builder`` refuses a bridge whose mappings are no longer relevant
+    # (bridges.ss:1233-1237), and a spanning group contributes *all* its
+    # descriptions rather than only the relevant ones (bridges.ss:1092-1097), so
+    # the dimensions this bridge maps have to be warm for it to be buildable at
+    # all.  Nothing in this fixture had activated them; the test is about the
+    # flip mechanics that follow the guard, not about the guard.
+    for name in (
+        "plato-object-category",
+        "plato-group-category",
+        "plato-direction-category",
+        "plato-string-position-category",
+    ):
+        ctx.slipnet.nodes[name].activation = 100.0
+
     from server.engine.bridges import propose_bridge
 
     # The bridge has to beat the group it would reinterpret (bridges.ss:1295-1312);

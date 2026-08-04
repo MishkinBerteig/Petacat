@@ -979,7 +979,12 @@ def look_for_auxiliary_slippages(bridge: Any, slipnet: Any, rng: Any) -> Any:
     from server.engine.concept_mappings import ConceptMapping
     from server.engine.descriptions import Description
 
-    for slippage in [cm for cm in bridge.concept_mappings if cm.is_slippage]:
+    # ``(tell proposed-bridge 'get-slippages)`` (themes.ss:896) — which is the
+    # non-symmetric slippages *plus the symmetric ones* (bridges.ss:167-170).
+    # Reading only the forward list halved the coattail search: ``rightmost =>
+    # leftmost`` is what pulls ``left => right`` after it, and that reverse only
+    # exists because the build stored it.
+    for slippage in bridge.get_slippages():
         object1 = slippage.object1
         object2 = slippage.object2
         label = slippage.label

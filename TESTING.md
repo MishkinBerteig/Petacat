@@ -124,9 +124,9 @@ outside the matrix take it too and the run is entirely what it says it is.
   gpu  mlx      float32    250 tests
   whole suite requested: the full matrix is required of this run
 
-  unit           338 collected    338 run    338 passed      0 failed      0 skipped  complete
-  seed_unit      261 collected    261 run    261 passed      0 failed      0 skipped  complete
-  module         626 collected    626 run    626 passed      0 failed      0 skipped  complete
+  unit           493 collected    493 run    493 passed      0 failed      0 skipped  complete
+  seed_unit      407 collected    407 run    407 passed      0 failed      0 skipped  complete
+  module         873 collected    873 run    873 passed      0 failed      0 skipped  complete
   architecture    34 collected     34 run     34 passed      0 failed      0 skipped  complete
   integration     65 collected     65 run     65 passed      0 failed      0 skipped  complete
   e2e            209 collected    209 run    209 passed      0 failed      0 skipped  complete
@@ -177,7 +177,7 @@ A truncated run reports itself as truncated, and the difference from a clean run
 visible three ways:
 
 ```
-  module         626 collected    198 run    198 passed      0 failed      0 skipped  INCOMPLETE
+  module         873 collected    198 run    198 passed      0 failed      0 skipped  INCOMPLETE
 
   RUN TRUNCATED: the 60 min ceiling was reached after 60.4 min. Everything above is
   what the run produced before it stopped; the tests it had not reached never ran.
@@ -201,9 +201,9 @@ that allowance.
 
 | Layer | Directory | Scope | May depend on | Cases |
 |-------|-----------|-------|---------------|-------|
-| **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 338 |
-| **seed unit** | `tests/seed_unit/` | One class or function, measured against the values Petacat ships with | Real `seed_data/*.json`, and the machine the process is running on | 261 |
-| **module** | `tests/module/` | Several real components assembled and driven | Real engine objects and `seed_data/*.json`; no DB, no HTTP | 626 |
+| **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 493 |
+| **seed unit** | `tests/seed_unit/` | One class or function, measured against the values Petacat ships with | Real `seed_data/*.json`, and the machine the process is running on | 407 |
+| **module** | `tests/module/` | Several real components assembled and driven | Real engine objects and `seed_data/*.json`; no DB, no HTTP | 873 |
 | **architecture** | `tests/architecture/` | How the source tree is allowed to depend on itself | The repository's source, `seed_data/*.json`, child interpreters | 34 |
 | **integration** | `tests/integration/` | Agreement between the repository's artifacts, and the harness's own rules | Real `seed_data/*.json`, the ORM declarations, the generated client files, the documentation, a real pytest session | 65 |
 | **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 209 |
@@ -231,7 +231,7 @@ first**, then move up toward the API and GUI.
 
 All six layers run in one command — the
 [required command](#the-required-command) — and, since Petacat runs natively, all
-six actually run: **1,533 cases**, every one of them executed. A layer that is
+six actually run: **2,081 cases**, every one of them executed. A layer that is
 normally skipped is not a layer that is normally green, and none of these is.
 
 Wall-clock time depends heavily on the machine and on what else it is doing. The
@@ -366,6 +366,7 @@ the number of endpoints taking `Depends(get_session)`, the size of
 | File | Fns | Covers |
 |------|----:|--------|
 | `test_access_sets.py` | 19 | Read-set / write-set discipline and commit-time validation |
+| `test_bridge_scouting.py` | 23 | The bridge scouts' probabilistic gates, the build-time mapping augmentation, the incompatibility refinements, and the deferred posting batch |
 | `test_capture_projection.py` | 8 | A recorded capture renders exactly as the same state renders live |
 | `test_codelet_behaviours.py` | 41 | What each of the 27 codelet types does to a live workspace |
 | `test_codelet_dsl.py` | 7 | Codelet bodies executed against a live engine context |

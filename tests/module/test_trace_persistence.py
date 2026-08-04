@@ -64,10 +64,17 @@ def test_trace_event_serializable_shape():
 
 
 def test_running_produces_trace_events(meta):
-    """Running the engine should produce trace events with string types."""
+    """Running the engine should produce trace events with string types.
+
+    Run to completion rather than to a fixed 200 codelets.  Which codelet
+    clears an event's importance threshold moves with every cognition change —
+    the bridge round shifted this seed's first event from before codelet 200 to
+    after it — and the assertion is about events being recorded at all, not
+    about when.
+    """
     runner = EngineRunner(meta)
     runner.init_mcat("abc", "abd", "xyz", seed=42)
-    runner.run_mcat(max_steps=200)
+    runner.run_mcat(max_steps=5000)
 
     events = runner.ctx.trace.events
     assert len(events) > 0

@@ -299,6 +299,61 @@ class Coderack:
         self.bins[bin_idx].add(codelet)
         self._total_count += 1
 
+    def post_deferred(
+        self,
+        batch: list[Codelet],
+        current_time: int | None = None,
+        rng: RNG | None = None,
+        temperature: float | None = None,
+    ) -> None:
+        """Land a whole update cycle's posts at once.
+
+        Scheme: ``post-deferred-codelets`` (``coderack.ss:389-408``).  Codelets
+        posted by ``add-bottom-up-codelets`` and ``add-top-down-codelets``
+        accumulate as a *deferred batch* and go on together, under two regimes:
+
+        * **batch >= rack capacity** — drop ``len(batch) - capacity`` members of
+          the batch uniformly at random, then flush the rack entirely, then add
+          what is left.  Everything already on the rack loses to a burst that
+          would have displaced it anyway.
+        * **otherwise** — evict ``(current + batch) - capacity`` from the rack
+          *before a single batch member lands*, then add them all.
+
+        Both regimes have the same consequence and it is the point of the
+        mechanism: batch members never evict one another, and the eviction
+        weights are computed against the pre-batch population.  Posting one at a
+        time — as this used to — meant a cycle's later codelets were weighed
+        against its earlier ones, and a codelet posted on the current tick has
+        age 0, so the freshly-posted members were the *most* protected while the
+        rack's older, more considered work was thrown out around them.
+        """
+        rng = rng if rng is not None else self.rng
+        if current_time is None:
+            current_time = self.current_time
+
+        batch = list(batch)
+        if len(batch) >= self.max_size:
+            excess = len(batch) - self.max_size
+            for _ in range(excess):
+                if not batch:
+                    break
+                batch.remove(rng.pick(batch))
+            self.clear()
+        else:
+            surplus = self._total_count + len(batch) - self.max_size
+            if surplus > 0 and rng is not None:
+                self.remove_old_codelets(current_time, surplus, rng, temperature)
+
+        for codelet in batch:
+            self.bins[self._urgency_to_bin(self._clamped_urgency(codelet))].add(codelet)
+            self._total_count += 1
+
+    def _clamped_urgency(self, codelet: Codelet) -> int:
+        """Apply a type clamp to *codelet*, as ``post`` does.  ``coderack.ss:196-200``."""
+        if codelet.codelet_type in self.clamped_urgencies:
+            codelet.urgency = self.clamped_urgencies[codelet.codelet_type]
+        return codelet.urgency
+
     def choose_and_remove(self, temperature: float, rng: RNG) -> Codelet | None:
         """Two-stage probabilistic selection — ``choose-codelet``, ``coderack.ss:417``.
 

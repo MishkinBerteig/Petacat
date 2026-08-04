@@ -402,16 +402,28 @@ def propose_bond(
     """Create a proposed bond and post an evaluator.
 
     Scheme: ``propose-bond`` (bonds.ss:321-337) activates the two object
-    descriptors and the bond facet from the Workspace.
+    descriptors and the bond facet from the Workspace, then posts the evaluator
+    at ``(bond-degree-of-assoc bond-category)`` (bonds.ss:334-336) — a property
+    of the *idea* being proposed, ``min(100, round(11·√assoc))``, which is 100
+    for sameness at every temperature.  Posting at the category's current
+    *activation* instead made the most urgent codelet type in MetaCat as urgent
+    as whatever the Slipnet happened to be feeling: a sameness bond proposed
+    while ``plato-sameness`` sat at 30 landed in bin 2 rather than bin 6.
     """
+    from server.engine.formulas import bond_degree_of_assoc
+
     activate_from_workspace(ctx, from_descriptor, to_descriptor, bond_facet)
     bond = Bond(from_obj, to_obj, bond_category, bond_facet,
                 from_descriptor, to_descriptor, direction)
     bond.time_stamp = ctx.codelet_count
     # The proposal rests on both objects; the bond itself is new and so cannot conflict.
     _read(ctx, from_obj, to_obj)
-    urgency = round(bond_category.activation) if hasattr(bond_category, 'activation') else 35
-    post_codelet(ctx, "bond-evaluator", urgency, structure=bond)
+    post_codelet(
+        ctx,
+        "bond-evaluator",
+        round(bond_degree_of_assoc(bond_category)),
+        structure=bond,
+    )
     return bond
 
 
@@ -827,11 +839,22 @@ def _build_structure_locked(ctx: EngineContext, structure: Any) -> bool:
     # all check ``bond-present?`` / ``group-present?`` / ``bridge-present?``
     # before doing anything.  Without this the bridge lists filled up with
     # dozens of duplicate a-a bridges, inflating mapping strength.
+    if isinstance(structure, Bridge) and not _bridge_descriptions_still_present(
+        structure
+    ):
+        # bridges.ss:1200-1207 — "This is necessary because StrPosCtgy:middle
+        # descriptions can now be deleted": a bridge may not be built on a
+        # description type one of its objects no longer carries.
+        return False
+
     if isinstance(structure, Group):
         equivalent = structure.string.get_equivalent_group(structure)
         if equivalent is not None and equivalent is not structure:
             _absorb_duplicate_group(ctx, structure, equivalent)
             return False
+    elif isinstance(structure, Bridge) and _equivalent_structure_exists(ctx, structure):
+        _merge_duplicate_bridge(ctx, structure)
+        return False
     elif _equivalent_structure_exists(ctx, structure):
         if isinstance(structure, Bond):
             # Scheme: ``bond-builder`` (bonds.ss:364-369) jolts the bond category —
@@ -841,6 +864,15 @@ def _build_structure_locked(ctx: EngineContext, structure: Any) -> bool:
             # stream is what holds a category above the relevance threshold between
             # update cycles.
             activate_from_workspace(ctx, structure.bond_category, structure.direction)
+        return False
+
+    if isinstance(structure, Bridge) and not all(
+        cm.relevant() for cm in structure.concept_mappings
+    ):
+        # bridges.ss:1233-1237 — a bridge is built out of the concepts the
+        # program is attending to, and by the time the builder runs one of them
+        # may have decayed below relevance.  A live gate at high temperature,
+        # where the Slipnet moves fastest.
         return False
 
     # For bonds, groups, bridges: fight incompatibles first
@@ -899,6 +931,7 @@ def _build_structure_locked(ctx: EngineContext, structure: Any) -> bool:
             structure.string.delete_invalid_string_position_middle_descriptions()
         _record_group_event(ctx, structure)
     elif isinstance(structure, Bridge):
+        _augment_bridge_at_build(ctx, structure)
         ctx.workspace.add_bridge(structure)
         _record_slippage_events(ctx, structure)
     else:
@@ -1133,6 +1166,165 @@ def _adjacent_bonds(
     return bonds
 
 
+def _bridge_descriptions_still_present(bridge: Bridge) -> bool:
+    """Do both objects still carry every dimension the bridge maps?
+
+    Scheme: bridges.ss:1200-1207.  ``StrPosCtgy:middle`` descriptions are deleted
+    when a neighbouring group changes what "middle" means, and a bridge resting
+    on one must not be built afterwards.
+    """
+    for cm in bridge.concept_mappings:
+        for obj, description_type in (
+            (bridge.object1, cm.description_type1),
+            (bridge.object2, cm.description_type2),
+        ):
+            present = getattr(obj, "description_type_present", None)
+            if present is not None and not present(description_type):
+                return False
+    return True
+
+
+def _merge_duplicate_bridge(ctx: EngineContext, proposed: Bridge) -> None:
+    """A bridge the Workspace already has — give it whatever is new, then fizzle.
+
+    Scheme: the duplicate branch of ``bridge-builder`` (bridges.ss:1208-1232).
+    Every proposed mapping activates its *label*, and any mapping the incumbent
+    does not already carry is added to it and run through the slippage monitor.
+
+    This is how a bridge first drawn on two descriptions accumulates the rest as
+    relevance shifts — a bridge proposed early, when only Letter-Category is
+    warm, later acquires its String-Position mapping without ever being rebuilt.
+    Returning a bare "already exists" threw all of that away, and with it a
+    second source of slippage Trace events.
+    """
+    existing = _existing_equivalent_bridge(ctx, proposed)
+    if existing is None:
+        return
+    for cm in proposed.concept_mappings:
+        cm.activate_label()
+    novel = [
+        cm for cm in proposed.concept_mappings if not existing.concept_mapping_present(cm)
+    ]
+    if not novel:
+        return
+    existing.add_concept_mappings(novel)
+    _record_slippage_events(ctx, existing, novel)
+    _wrote(ctx, existing)
+
+
+def _existing_equivalent_bridge(ctx: EngineContext, proposed: Bridge) -> Bridge | None:
+    bridge_lists = {
+        "top": ctx.workspace.top_bridges,
+        "bottom": ctx.workspace.bottom_bridges,
+        "vertical": ctx.workspace.vertical_bridges,
+    }
+    for b in bridge_lists.get(proposed.bridge_type, []):
+        if (
+            b is not proposed
+            and b.is_built
+            and b.object1 is proposed.object1
+            and b.object2 is proposed.object2
+        ):
+            return b
+    return None
+
+
+def _augment_bridge_at_build(ctx: EngineContext, bridge: Bridge) -> None:
+    """The four things ``build-bridge`` adds to a bridge (bridges.ss:1365-1414).
+
+    1. **An Object-Category mapping on every horizontal bridge**, relevant or
+       not (bridges.ss:1365-1381).  The reference's own example: in
+       ``ab -> aabb`` the ``a -> aa`` bridge has ``ObjCtgy: letter=>group`` but
+       ``b -> bb`` does not, and the rule abstracted from the pair comes out as
+       "increase length of each object by one; change leftmost letter to a
+       group".  Guaranteeing it is what keeps rule abstraction from seeing an
+       accidental asymmetry.
+    2. **The symmetric version of every slippage** (bridges.ss:1383-1385), so a
+       mapping can be looked up from either end — which is what the
+       important-object scout and the coattail search both do.
+    3. **Bond concept-mappings between two groups** (bridges.ss:1386-1393), in
+       the separate list, so they inform the Themespace and the slippage record
+       without entering strength, incompatibility, support or rule abstraction.
+    4. **A Length mapping between objects of different platonic lengths**
+       (bridges.ss:1395-1411), *even when neither object carries a Length
+       description*.  Without it an ``a -> aa`` bridge says nothing about length
+       having changed, and the rule abstracted from it cannot either.
+    """
+    from server.engine.bridges import (
+        BRIDGE_VERTICAL,
+        make_concept_mappings,
+        platonic_length,
+    )
+    from server.engine.concept_mappings import ConceptMapping
+
+    horizontal = bridge.bridge_type != BRIDGE_VERTICAL
+
+    if horizontal:
+        object_category = ctx.slipnet.get_node("plato-object-category")
+        if object_category is not None and not any(
+            cm.description_type1 is object_category for cm in bridge.concept_mappings
+        ):
+            d1 = bridge.object1.get_descriptor_for(object_category)
+            d2 = bridge.object2.get_descriptor_for(object_category)
+            if d1 is not None and d2 is not None:
+                cm = ConceptMapping(
+                    object_category,
+                    d1,
+                    object_category,
+                    d2,
+                    label=ctx.slipnet.get_label(d1, d2),
+                    object1=bridge.object1,
+                    object2=bridge.object2,
+                )
+                bridge.add_concept_mapping(cm)
+                if cm.is_slippage:
+                    bridge.add_symmetric_slippage(cm)
+
+    for slippage in [cm for cm in bridge.concept_mappings if cm.is_slippage]:
+        bridge.add_symmetric_slippage(slippage)
+
+    if hasattr(bridge.object1, "objects") and hasattr(bridge.object2, "objects"):
+        for bond_cm in make_concept_mappings(
+            bridge.object1,
+            bridge.object2,
+            bridge.bridge_type,
+            ctx.slipnet.get_node("plato-identity"),
+            descriptions1=list(getattr(bridge.object1, "bond_descriptions", [])),
+            descriptions2=list(getattr(bridge.object2, "bond_descriptions", [])),
+        ):
+            bridge.add_bond_concept_mapping(bond_cm)
+            if bond_cm.is_slippage:
+                bridge.add_symmetric_slippage(bond_cm)
+
+    if horizontal:
+        length_node = ctx.slipnet.get_node("plato-length")
+        length1 = platonic_length(bridge.object1)
+        length2 = platonic_length(bridge.object2)
+        if (
+            length_node is not None
+            and length1 is not None
+            and length2 is not None
+            and length1 is not length2
+            and not bridge.cm_type_present(length_node)
+        ):
+            bridge.add_concept_mapping(
+                ConceptMapping(
+                    length_node,
+                    length1,
+                    length_node,
+                    length2,
+                    label=ctx.slipnet.get_label(length1, length2),
+                    object1=bridge.object1,
+                    object2=bridge.object2,
+                )
+            )
+
+    # bridges.ss:1413-1414 — the labels are jolted as the bridge goes in, after
+    # every addition above, so the mappings added here warm their concepts too.
+    for cm in bridge.concept_mappings:
+        cm.activate_label()
+
+
 def _apply_group_flips(ctx: EngineContext, bridge: Bridge) -> None:
     """Put the reversed reading of a spanning group into the Workspace.
 
@@ -1270,7 +1462,9 @@ def _bridge_is_spanning(bridge: Bridge) -> bool:
     return True
 
 
-def _record_slippage_events(ctx: EngineContext, bridge: Bridge) -> None:
+def _record_slippage_events(
+    ctx: EngineContext, bridge: Bridge, concept_mappings: list | None = None
+) -> None:
     """Record the important slippages a new bridge rests on.
 
     §4.4: importance "is normally a function of the conceptual depths of a
@@ -1279,13 +1473,21 @@ def _record_slippage_events(ctx: EngineContext, bridge: Bridge) -> None:
     thematic pressure and is compatible with the set of clamped themes, it is
     deemed to be of very high importance, regardless of the concepts or objects
     involved."
+
+    Scheme: ``monitor-new-concept-mappings``, called with
+    ``get-all-concept-mappings`` from ``build-bridge`` (bridges.ss:1416) and with
+    just the newly-added ones from the duplicate branch of ``bridge-builder``
+    (bridges.ss:1221-1222).  *concept_mappings* is that second case.
     """
     from server.engine.trace import CONCEPT_MAPPING_BUILT
 
     threshold = ctx.meta.get_param("concept_mapping_importance_threshold", 65)
     under_pressure = ctx.themespace.has_thematic_pressure([bridge.theme_type])
 
-    for cm in bridge.concept_mappings:
+    if concept_mappings is None:
+        concept_mappings = bridge.get_all_concept_mappings()
+
+    for cm in concept_mappings:
         if cm.is_identity:
             continue
         importance = _slippage_importance(ctx, bridge, cm)
@@ -1396,11 +1598,9 @@ def _get_incompatible_structures(
     much a structure of that kind is worth relative to its opponent regardless
     of how strong either happens to be.
 
-    Two fights the Scheme has are still missing here — group vs
-    bonds-to-be-flipped (``groups.ss:652-664``, letter-span vs 1) and bridge vs
-    incompatible bond (``bridges.ss:1259-1276``, 3 vs 2) with its enclosing group
-    (``bridges.ss:1277-1292``, 1 vs 1).  They are tracked separately as GR-7 and
-    BR-6.  The bond's three (bonds.ss:370-398) are all here.
+    Every fight the reference has is here: the bond's three (bonds.ss:370-398),
+    the group's three (groups.ss:652-695), and the bridge's four
+    (bridges.ss:1241-1313).
     """
     incompatibles: list[tuple[Any, float, float]] = []
 
@@ -1508,17 +1708,28 @@ def _get_incompatible_structures(
         # Weighting by object1 alone made the far side of the mapping count for
         # nothing, so a letter-to-group bridge was fought as if it were
         # letter-to-letter.
-        proposer_span = float(structure.object1.span + structure.object2.span)
+        proposer_span = float(structure.get_letter_span())
         for bridge in structure.get_incompatible_bridges(ctx.workspace):
             if not bridge.is_built or bridge is structure:
                 continue
             incompatibles.append(
-                (
-                    bridge,
-                    proposer_span,
-                    float(bridge.object1.span + bridge.object2.span),
-                )
+                (bridge, proposer_span, float(bridge.get_letter_span()))
             )
+
+        # bridges.ss:1259-1291 — when *both* objects sit at an edge of their
+        # string, the bridge also fights the directed bond its mappings
+        # contradict, at 3 to 2, and then that bond's enclosing group at 1 to 1.
+        # This is the mechanism by which a new mapping restructures the bonds and
+        # groups beneath it: without it the influence ran only the other way, and
+        # a crosswise reading of ``xyz`` could never dislodge the left-to-right
+        # bonds it disagreed with.
+        if _at_string_edge(structure.object1) and _at_string_edge(structure.object2):
+            incompatible_bond = structure.get_incompatible_bond()
+            if incompatible_bond is not None and incompatible_bond.is_built:
+                incompatibles.append((incompatible_bond, 3.0, 2.0))
+                enclosing = getattr(incompatible_bond, "enclosing_group", None)
+                if enclosing is not None and getattr(enclosing, "is_built", False):
+                    incompatibles.append((enclosing, 1.0, 1.0))
 
         # A bridge proposed against a reversed reading of a spanning group has to
         # beat the group it would replace, at even odds (bridges.ss:1292-1312).
@@ -1528,6 +1739,15 @@ def _get_incompatible_structures(
                 incompatibles.append((original, 1.0, 1.0))
 
     return incompatibles
+
+
+def _at_string_edge(obj: Any) -> bool:
+    """Scheme: ``(or (leftmost-in-string? o) (rightmost-in-string? o))``."""
+    for name in ("leftmost_in_string", "rightmost_in_string"):
+        predicate = getattr(obj, name, None)
+        if callable(predicate) and predicate():
+            return True
+    return False
 
 
 def _wins_fight(

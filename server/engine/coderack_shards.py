@@ -70,6 +70,10 @@ class ShardedCoderack:
              rng: RNG | None = None) -> None:
         raise NotImplementedError
 
+    def post_deferred(self, batch: list[Codelet], current_time: int | None = None,
+                      rng: RNG | None = None, temperature: float | None = None) -> None:
+        raise NotImplementedError
+
     def choose_and_remove(self, temperature: float, rng: RNG) -> Codelet | None:
         raise NotImplementedError
 
@@ -278,6 +282,34 @@ class _ShardBase(ShardedCoderack):
             return self._racks[index].choose_and_remove(temperature, rng)
         finally:
             self._locks[index].release()
+
+    def post_deferred(self, batch: list[Codelet], current_time: int | None = None,
+                      rng: RNG | None = None, temperature: float | None = None) -> None:
+        """Land an update cycle's batch across the shards.
+
+        The batch is dealt out round-robin and each shard runs the reference's
+        two-regime :meth:`Coderack.post_deferred` against its own slice of the
+        capacity.  Dealing rather than routing every member to the poster's own
+        shard keeps a 36-codelet opening batch from overflowing one 25-codelet
+        shard while the others sit empty — the same reason
+        :class:`FamilyShardedCoderack` posts round-robin.
+        """
+        slices: list[list[Codelet]] = [[] for _ in self._racks]
+        for index, codelet in enumerate(batch):
+            slices[index % self.num_shards].append(codelet)
+        for index, part in enumerate(slices):
+            if not part:
+                continue
+            self._acquire(index)
+            try:
+                self._racks[index].post_deferred(
+                    part,
+                    current_time,
+                    rng,
+                    self.current_temperature if temperature is None else temperature,
+                )
+            finally:
+                self._locks[index].release()
 
     def _steal(self, avoid: int, temperature: float, rng: RNG) -> Codelet | None:
         """Take from a neighbouring shard, trying each in turn.

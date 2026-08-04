@@ -41,8 +41,11 @@ def test_init_mcat_justify_mode(runner):
 
 def test_init_posts_codelets(runner):
     runner.init_mcat("abc", "abd", "xyz", seed=42)
-    # Should have posted 2 * 9 = 18 initial codelets (9 objects)
-    assert runner.ctx.coderack.total_count == 18
+    # ``post-initial-codelets`` (run.ss:275-283) runs ``2N`` iterations posting
+    # *two* codelets each — 4N, so 36 for the nine objects of abc/abd/xyz.
+    # Rebaselined from 18 with CR-4: Petacat ran N iterations, so every run
+    # started with half the reference's opening population.
+    assert runner.ctx.coderack.total_count == 36
 
 
 def test_step_mcat(runner):

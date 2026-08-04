@@ -28,6 +28,19 @@ _NON_DISTINGUISHING_NAMES: set[str] = {
 }
 
 
+def _recomputed_label(descriptor1: Any, descriptor2: Any) -> Any:
+    """``get-label`` for two *distinct* descriptors — the link's relating concept.
+
+    Scheme: ``get-label`` (slipnet.ss).  Only the non-identity half is needed
+    here, because the one caller (:meth:`ConceptMapping.symmetric_mapping`)
+    short-circuits on identity.
+    """
+    for link in getattr(descriptor1, "outgoing_links", []):
+        if link.to_node is descriptor2:
+            return link.label_node
+    return None
+
+
 class ConceptMapping:
     """A mapping between two conceptual descriptions."""
 
@@ -64,22 +77,27 @@ class ConceptMapping:
     def strength(self) -> float:
         """Concept mapping strength.
 
-        Scheme: concept-mappings.ss:130-135.
-        - Identity: 100
-        - Labeled slippage: degree_of_assoc * (1 + (depth/100)^2)
-        - Unlabeled slippage: 5
+        Scheme: concept-mappings.ss:130-135 — ``degree-of-assoc * (1 + depth^2)``
+        for every non-identity mapping, with no case analysis of its own.  The
+        case analysis lives one level down, in ``get-degree-of-assoc``
+        (concept-mappings.ss:119-125), and it branches on whether the *slipnet
+        link* exists, not on whether a **label** does.
+
+        The difference is the whole letter <=> group family.  ``plato-letter ->
+        plato-group`` is an unlabelled lateral-sliplink: no relating concept, so
+        ``label`` is ``None``, but a link all the same, worth 10 — which the depth
+        bonus lifts to 12.  Branching on the label scored every such mapping the
+        no-link floor of 5, less than half, and did the same to ``single <=>
+        whole``.  Both sit at the centre of how a letter comes to be seen as
+        playing a group's role.
         """
         if self.is_identity:
             return 100.0
 
-        if self.label is not None:
-            # Find the link between descriptor1 and descriptor2
-            assoc = self._degree_of_association()
-            depth = self.conceptual_depth
-            bonus = 1.0 + (depth / 100.0) ** 2
-            return min(100.0, round(assoc * bonus))
-
-        return 5.0  # Unlabeled slippage
+        assoc = self._degree_of_association()
+        depth = self.conceptual_depth
+        bonus = 1.0 + (depth / 100.0) ** 2
+        return min(100.0, round(assoc * bonus))
 
     def slippability(self) -> float:
         """How likely this mapping is to 'slip'.
@@ -241,7 +259,14 @@ class ConceptMapping:
     def symmetric_mapping(self) -> ConceptMapping:
         """Create the reverse mapping (swap descriptor1/descriptor2).
 
-        Scheme: concept-mappings.ss:154-159.
+        Scheme: concept-mappings.ss:154-159 — the reverse is built by *calling
+        the constructor* with the descriptors swapped, so its label is
+        recomputed: ``a =(succ)=> b`` reverses to ``b =(pred)=> a``, not to
+        ``b =(succ)=> a``.  Carrying the forward label across was harmless only
+        while symmetric slippages went nowhere; BR-5 stores them on the bridge
+        and the thematic scout reads them, and a mislabelled one would drag the
+        wrong coattail slippage after it.
+
         For identity mappings, returns self (swapping identical descriptors
         is a no-op).
         """
@@ -252,7 +277,7 @@ class ConceptMapping:
             descriptor1=self.descriptor2,
             description_type2=self.description_type1,
             descriptor2=self.descriptor1,
-            label=self.label,
+            label=_recomputed_label(self.descriptor2, self.descriptor1),
             object1=self.object1,
             object2=self.object2,
         )
@@ -269,22 +294,59 @@ class ConceptMapping:
 
     @property
     def opposite_mapping(self) -> bool:
-        """True if the label is 'opposite' or this is a whole<->single mapping.
+        """True if the label is 'opposite'.
 
-        Scheme: concept-mappings.ss:101-106 (identity/opposite-mapping? includes
-        whole/single; opposite-mapping? at line 101 is just label == opposite).
+        Scheme: ``opposite-mapping?`` (concept-mappings.ss:101) — and nothing
+        else.  This is the predicate ``reverse-direction-orientation?``
+        (bridges.ss:1060-1066) applies to a bridge's *reversible* mappings when
+        deciding whether to re-read a spanning group backwards, and admitting
+        ``whole <=> single`` there would have flipped groups on the strength of a
+        string-position mapping that says nothing about direction.  The wider
+        predicate the whole/single clause belongs to is
+        :attr:`identity_or_opposite_mapping`.
+        """
+        return getattr(self.label, "name", "") == "plato-opposite"
+
+    @property
+    def identity_or_opposite_mapping(self) -> bool:
+        """Scheme: ``identity/opposite-mapping?`` (concept-mappings.ss:102-106).
+
+        Identity, opposite, or the ``whole``/``single`` pair in either order —
+        the mappings that relate two descriptors by a *named* correspondence
+        rather than by mere linkage.
         """
         label_name = getattr(self.label, "name", "") if self.label else ""
-        if label_name == "plato-opposite":
+        if label_name in ("plato-identity", "plato-opposite"):
             return True
-        # whole <-> single is treated as an opposite-like mapping
         d1_name = getattr(self.descriptor1, "name", "")
         d2_name = getattr(self.descriptor2, "name", "")
-        if (d1_name == "plato-whole" and d2_name == "plato-single") or (
+        return (d1_name == "plato-whole" and d2_name == "plato-single") or (
             d1_name == "plato-single" and d2_name == "plato-whole"
-        ):
-            return True
-        return False
+        )
+
+    def distinguishing_identity_or_opposite(self) -> bool:
+        """Scheme: ``distinguishing-identity/opposite?`` (concept-mappings.ss:116-118).
+
+        A bridge with none of these is one whose *only* justification is
+        slippage, and the reference refuses to propose it from the ordinary
+        scouts: "this prevents making bridges between objects without _some_ a
+        priori justification" (bridges.ss:938-947).  Thematic scouts under
+        pressure may still propose one.
+        """
+        return self.distinguishing() and self.identity_or_opposite_mapping
+
+    @property
+    def reversible_cm_type(self) -> bool:
+        """Scheme: ``reversible-CM-type?`` (concept-mappings.ss:84-87).
+
+        The three dimensions that reverse together when a group is re-read
+        backwards: direction, bond category, group category.
+        """
+        return getattr(self.description_type1, "name", "") in (
+            "plato-direction-category",
+            "plato-bond-category",
+            "plato-group-category",
+        )
 
     @property
     def bond_concept_mapping(self) -> bool:

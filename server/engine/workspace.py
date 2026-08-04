@@ -355,16 +355,10 @@ class WorkspaceString:
                 bridge = getattr(obj, f"{orientation}_bridge", None)
                 if bridge is None:
                     continue
-                remaining = [
-                    cm
-                    for cm in bridge.concept_mappings
-                    if cm.description_type1 is not position_type
-                    and cm.description_type2 is not position_type
-                ]
-                if len(remaining) == len(bridge.concept_mappings):
+                if not bridge.cm_type_present(position_type):
                     continue
-                bridge.concept_mappings = remaining
-                if not remaining:
+                bridge.delete_concept_mapping_type(position_type)
+                if not bridge.get_all_concept_mappings():
                     self._break_bridge(bridge)
 
     def _break_bridge(self, bridge: Any) -> None:
@@ -1062,31 +1056,27 @@ class Workspace:
     def get_all_slippages(self, bridge_type: str) -> list[ConceptMapping]:
         """Collect all slippages from bridges of the given type.
 
-        Scheme: workspace.ss:302-304.
-        Slippages are concept mappings where descriptor1 != descriptor2,
-        plus their symmetric counterparts.
+        Scheme: ``workspace.ss:302-304`` — the concatenation of each bridge's
+        ``get-slippages`` (bridges.ss:167-170), which is its non-symmetric
+        slippages plus the ``symmetric_slippages`` list built at build time.
+        Synthesising the reverses here instead meant a bridge's *stored* reverses
+        went unread, and that only this caller ever saw them.
         """
         result: list[ConceptMapping] = []
         for bridge in self.get_bridges(bridge_type):
-            for cm in bridge.concept_mappings:
-                if cm.is_slippage:
-                    result.append(cm)
-                    # Add symmetric mapping
-                    sym = cm.symmetric_mapping()
-                    if sym is not cm:
-                        result.append(sym)
+            result.extend(bridge.get_slippages())
         return result
 
     def get_all_non_symmetric_slippages(self, bridge_type: str) -> list[ConceptMapping]:
         """Non-symmetric slippages only from bridges of the given type.
 
-        Scheme: workspace.ss:305-308.
+        Scheme: ``workspace.ss:305-308`` — each bridge's
+        ``get-non-symmetric-slippages`` (bridges.ss:162-163), which reads *all*
+        concept-mappings and so includes the bond ones.
         """
         result: list[ConceptMapping] = []
         for bridge in self.get_bridges(bridge_type):
-            for cm in bridge.concept_mappings:
-                if cm.is_slippage:
-                    result.append(cm)
+            result.extend(bridge.get_non_symmetric_slippages())
         return result
 
     def get_possible_bridge_objects(self, bridge_type: str) -> list[WorkspaceObject]:
