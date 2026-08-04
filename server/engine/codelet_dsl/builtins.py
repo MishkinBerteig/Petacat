@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from server.engine.runner import EngineContext
 
 from server.engine.access import AccessSet
-from server.engine.bonds import Bond
+from server.engine.bonds import Bond, get_common_groups
 from server.engine.bridges import Bridge
 from server.engine.coderack import Codelet
 from server.engine.concept_mappings import ConceptMapping
@@ -58,7 +58,10 @@ def get_builtins() -> dict[str, Any]:
         "choose_object": choose_object,
         "choose_string_object": choose_string_object,
         "choose_neighbor": choose_neighbor,
+        "choose_directed_neighbor": choose_directed_neighbor,
+        "choose_bond_facet": choose_bond_facet,
         "choose_string": choose_string,
+        "choose_string_for": choose_string_for,
         # Structure proposals
         "propose_bond": propose_bond,
         "propose_description": propose_description,
@@ -209,46 +212,107 @@ def _choose_from_view(
 
 
 def choose_neighbor(ctx: EngineContext, obj: Any) -> Any:
-    """Choose a positionally-adjacent neighbour at the *same level* as *obj*.
+    """Choose a positionally-adjacent neighbour of *obj*.
 
-    Bonds join adjacent objects, and "adjacent" has to respect the grouping
-    hierarchy: a group's neighbour is the next group, not a letter inside it.
+    Scheme: ``choose-neighbor`` (``workspace-objects.ss:417-423``) — the adjacent
+    *letter*, even when it sits inside a group, **plus every group edged at that
+    position**, at any nesting level, picked by raw intra-string salience.
 
-    ``get_object_at`` returns the first object covering a position, and letters
-    always precede groups in ``string.objects``, so this used to hand back a
-    letter every time.  Groups could therefore never be bonded to one another and
-    a group *of groups* was unreachable — which is how ``kkjjii`` becomes a
-    predecessor group of sameness groups (Fig. 4.2) and ``mrrjjj`` a 1-2-3 length
-    group (§5.2.1 Run 1).
+    This used to admit only objects with the *identical* ``enclosing_group``, so a
+    grouped letter was never a bond candidate for its ungrouped neighbour: ``m``
+    could not be bonded to the ``r`` inside ``[rr]``, and that bond is exactly what
+    then fights the group for the material.  The candidate set of bondable pairs
+    was simply a different one from the reference's.
     """
-    string = getattr(obj, "string", None)
-    if string is None:
+    if not hasattr(obj, "choose_neighbor"):
         return None
-
-    enclosing = getattr(obj, "enclosing_group", None)
-    neighbors = [
-        o
-        for o in getattr(string, "objects", [])
-        if o is not obj
-        and getattr(o, "enclosing_group", None) is enclosing
-        and (
-            o.right_string_pos == obj.left_string_pos - 1
-            or o.left_string_pos == obj.right_string_pos + 1
-        )
-    ]
-    if not neighbors:
-        return None
-    # Raw intra-string salience, *not* temperature-adjusted: ``choose-neighbor``
-    # (``workspace-objects.ss:417-423``) is a bare ``stochastic-pick-by-method``,
-    # unlike ``choose-object``.  And no floor — ``stochastic-pick``
-    # (``utilities.ss:443-448``) gives a weight-0 neighbour probability 0.
-    weights = [n.salience.get("intra", 1.0) for n in neighbors]
-    chosen = ctx.rng.weighted_pick(neighbors, weights)
+    chosen = obj.choose_neighbor(ctx.rng)
     # The object *and* the one it neighbours: a bond scout's decision depends on both,
     # so a change to either invalidates it. This is the locality the plan relies on to
     # bound the blast radius — two adjacent objects, not the string.
     _read(ctx, obj, chosen)
     return chosen
+
+
+def choose_directed_neighbor(ctx: EngineContext, obj: Any, direction: Any) -> Any:
+    """Choose a neighbour on one side only.
+
+    Scheme: ``choose-left-neighbor`` / ``choose-right-neighbor``
+    (``workspace-objects.ss:403-415``), which is what
+    ``top-down-bond-scout:direction`` calls (``bonds.ss:295-297``).  The direction
+    scout used to take ``string.get_object_at(pos)`` instead — always the letter at
+    that position, even when the letter is buried inside an adjacent group — which
+    both hid the groups edged there and paired mismatched nesting levels.
+    """
+    name = getattr(direction, "name", direction)
+    if name == "plato-left":
+        chooser = getattr(obj, "choose_left_neighbor", None)
+    else:
+        chooser = getattr(obj, "choose_right_neighbor", None)
+    if chooser is None:
+        return None
+    chosen = chooser(ctx.rng)
+    _read(ctx, obj, chosen)
+    return chosen
+
+
+def choose_bond_facet(ctx: EngineContext, object1: Any, object2: Any) -> Any:
+    """Pick the facet a bond between these two objects would run along.
+
+    Scheme: ``choose-bond-facet`` (``bonds.ss:475-487``) — the facets *both*
+    objects carry a description on, weighted by ``description-type-support``
+    (``workspace-structure-formulas.ss:57-67``), which is
+
+        average(local support, activation)
+
+    with local support ``100 * (objects in the string described on that type) /
+    (objects in the string)``.
+
+    All three bond scouts call it (``bonds.ss:196, 247, 301``).  The two top-down
+    bodies used to hardcode ``plato-letter-category``, so length bonds could arise
+    only from the bottom-up scout — and the top-down scouts are the heavily-posted
+    channel once succ/pred or left/right go active.  Weighting by activation alone
+    has the same effect by another route: letter-category sits near 100 all run.
+    """
+    facets1 = _bond_facets(object1)
+    facets2 = _bond_facets(object2)
+    facets = [f for f in facets1 if f in facets2]
+    if not facets:
+        return None
+
+    string = getattr(object1, "string", None)
+    string_objects = list(getattr(string, "objects", ())) if string is not None else []
+    weights = []
+    for facet in facets:
+        described = sum(
+            1
+            for o in string_objects
+            if any(d.description_type is facet for d in o.get_all_descriptions())
+        )
+        # ``100*`` (utilities.ss:502) rounds, so the local-support term is a whole
+        # number before it is averaged with the activation.
+        local_support = round(100.0 * described / len(string_objects)) if string_objects else 0
+        weights.append(round((local_support + facet.activation) / 2.0))
+    return ctx.rng.weighted_pick(facets, weights)
+
+
+def _bond_facets(obj: Any) -> list[Any]:
+    """The description types of *obj* that are instances of ``plato-bond-facet``.
+
+    Scheme: ``get-bond-facets`` — the object's descriptions whose type belongs to
+    the bond-facet category (``slipnet.ss:856,860``).
+    """
+    facets: list[Any] = []
+    for description in getattr(obj, "descriptions", ()):
+        dtype = description.description_type
+        if dtype in facets:
+            continue
+        if any(
+            link.to_node.name == "plato-bond-facet"
+            for link in getattr(dtype, "category_links", ())
+        ):
+            facets.append(dtype)
+    return facets
 
 
 def choose_string(ctx: EngineContext, weight_fn: str = "unhappiness") -> Any:
@@ -261,6 +325,44 @@ def choose_string(ctx: EngineContext, weight_fn: str = "unhappiness") -> Any:
     """
     strings = ctx.workspace.all_strings
     weights = [s.get_average_intra_string_unhappiness() for s in strings]
+    return ctx.rng.weighted_pick(strings, weights)
+
+
+def choose_string_for(ctx: EngineContext, node: Any) -> Any:
+    """Choose the string a top-down scout for *node* should work on.
+
+    Scheme: the ``stochastic-pick`` of ``top-down-bond-scout:category``
+    (``bonds.ss:222-241``) and ``:direction`` (``bonds.ss:274-293``)::
+
+        (stochastic-pick
+          (if %justify-mode% *all-strings* *non-answer-strings*)
+          (list (average (tell string 'get-bond-category-relevance category)
+                         (tell string 'get-average-intra-string-unhappiness))
+                ...))
+
+    Two things ``choose_string`` gets wrong for this caller.  It drops the
+    **relevance** term, which is the "success breeds attention" half of the
+    top-down channel — a scout for *successor* should concentrate where successor
+    bonds are already taking hold — leaving bare unhappiness, which points the
+    scout at whatever is *least* organised.  And it ranges over ``all_strings``,
+    so once a discovery run has posted an answer the scouts can be aimed at the
+    answer string, which the reference does only in justify mode.
+    """
+    workspace = ctx.workspace
+    strings = (
+        workspace.all_strings
+        if workspace.justify_mode
+        else [workspace.initial_string, workspace.modified_string, workspace.target_string]
+    )
+    relevance = (
+        "get_direction_relevance"
+        if getattr(node, "name", "") in ("plato-left", "plato-right")
+        else "get_bond_category_relevance"
+    )
+    weights = [
+        (getattr(s, relevance)(node) + s.get_average_intra_string_unhappiness()) / 2.0
+        for s in strings
+    ]
     return ctx.rng.weighted_pick(strings, weights)
 
 
@@ -413,8 +515,18 @@ def _build_structure_locked(ctx: EngineContext, structure: Any) -> bool:
     # Descriptions and rules don't fight
     if isinstance(structure, Description):
         structure.proposal_level = structure.BUILT
-        if structure not in structure.object.descriptions:
-            structure.object.descriptions.append(structure)
+        # Scheme: ``build-description`` (descriptions.ss:185-187) routes a
+        # *bond*-description — one whose type is bond-category or bond-facet
+        # (``bond-description?``, descriptions.ss:69-71) — to the group's separate
+        # ``bond-descriptions`` list.  Reachable from here via the thematic
+        # scout's description proposals, and it matters because the formulas that
+        # count an object's descriptions deliberately exclude the bond ones;
+        # appending them to ``descriptions`` made them visible to every such count.
+        target = structure.object.descriptions
+        if structure.bond_description and hasattr(structure.object, "bond_descriptions"):
+            target = structure.object.bond_descriptions
+        if structure not in target:
+            target.append(structure)
         ctx.sink.on_structure_change(ctx, structure, STRUCTURE_BUILT)
         _wrote(ctx, structure, structure.object)
         return True
@@ -430,6 +542,14 @@ def _build_structure_locked(ctx: EngineContext, structure: Any) -> bool:
     # before doing anything.  Without this the bridge lists filled up with
     # dozens of duplicate a-a bridges, inflating mapping strength.
     if _equivalent_structure_exists(ctx, structure):
+        if isinstance(structure, Bond):
+            # Scheme: ``bond-builder`` (bonds.ss:364-369) jolts the bond category —
+            # and the direction, if the bond has one — on its way out of the
+            # duplicate branch.  A concept the Workspace keeps re-deriving stays
+            # warm even when there is nothing new to build from it, and that steady
+            # stream is what holds a category above the relevance threshold between
+            # update cycles.
+            activate_from_workspace(ctx, structure.bond_category, structure.direction)
         return False
 
     # For bonds, groups, bridges: fight incompatibles first
@@ -448,6 +568,11 @@ def _build_structure_locked(ctx: EngineContext, structure: Any) -> bool:
     structure.proposal_level = structure.BUILT
     if isinstance(structure, Bond):
         structure.string.add_bond(structure)
+        # Scheme: ``build-bond`` (bonds.ss:419-421) jolts the bond category, and
+        # the direction when the bond has one, as the bond goes in.  Together with
+        # the duplicate branch above these are the reference's *only* two sites —
+        # a bond that loses a fight jolts nothing.
+        activate_from_workspace(ctx, structure.bond_category, structure.direction)
     elif isinstance(structure, Group):
         structure.string.add_group(structure)
         # Scheme: ``build-group`` (groups.ss:929-930) jolts every description's
@@ -695,15 +820,13 @@ def _record_rule_event(ctx: EngineContext, rule: Rule) -> None:
 def _equivalent_structure_exists(ctx: EngineContext, structure: Any) -> bool:
     """Is a structurally identical, already-built structure present?"""
     if isinstance(structure, Bond):
-        return any(
-            b is not structure
-            and b.is_built
-            and b.from_object is structure.from_object
-            and b.to_object is structure.to_object
-            and b.bond_category is structure.bond_category
-            and b.bond_facet is structure.bond_facet
-            for b in structure.string.bonds
-        )
+        # Scheme: ``bond-present?`` / ``get-equivalent-bond``
+        # (workspace-strings.ss:127-137) — same from-object, same to-object, same
+        # category, same **direction**.  The facet is deliberately not part of it:
+        # a length-facet sameness bond between the same pair says the same thing
+        # about the string as the letter-category one, and building both gave the
+        # pair two bonds that each counted toward support and density.
+        return structure.string.bond_present(structure)
     if isinstance(structure, Group):
         return any(
             g is not structure
@@ -743,48 +866,57 @@ def _get_incompatible_structures(
     much a structure of that kind is worth relative to its opponent regardless
     of how strong either happens to be.
 
-    Three fights the Scheme has are still missing here — bond vs incompatible
-    bridge (``bonds.ss:385-398``, 2 vs 3), group vs bonds-to-be-flipped
-    (``groups.ss:652-664``, letter-span vs 1) and bridge vs incompatible bond
-    (``bridges.ss:1259-1276``, 3 vs 2) with its enclosing group
-    (``bridges.ss:1277-1292``, 1 vs 1).  They are tracked separately as BD-3,
-    GR-7 and BR-6.
+    Two fights the Scheme has are still missing here — group vs
+    bonds-to-be-flipped (``groups.ss:652-664``, letter-span vs 1) and bridge vs
+    incompatible bond (``bridges.ss:1259-1276``, 3 vs 2) with its enclosing group
+    (``bridges.ss:1277-1292``, 1 vs 1).  They are tracked separately as GR-7 and
+    BR-6.  The bond's three (bonds.ss:370-398) are all here.
     """
     incompatibles: list[tuple[Any, float, float]] = []
 
     if isinstance(structure, Bond):
-        # bonds.ss:370-376 — 1 vs 1 against each incompatible bond.
-        for bond in structure.string.bonds:
-            if not bond.is_built:
-                continue
-            same_pair = (
-                (bond.from_object is structure.from_object and bond.to_object is structure.to_object)
-                or (bond.from_object is structure.to_object and bond.to_object is structure.from_object)
-            )
-            if same_pair and bond.bond_category is not structure.bond_category:
-                incompatibles.append((bond, 1.0, 1.0))
+        # bonds.ss:370-376 — 1 vs 1 against each bond occupying either of the two
+        # **positional slots** this bond needs: the left object's right slot and
+        # the right object's left slot (``get-incompatible-bonds``, bonds.ss:79-83).
+        #
+        # The test used to be "same object pair, different category", which is a
+        # strict subset: a bond from either object to a *different* neighbour, or
+        # to the same material at another nesting level, was never seen as a
+        # conflict at all.  ``add_bond`` then overwrote the displaced bond's
+        # pointers and left it in ``string.bonds`` with dangling slots.
+        incompatibles.extend(
+            (bond, 1.0, 1.0) for bond in structure.get_incompatible_bonds()
+        )
 
-        # bonds.ss:377-384 — 1 vs ``(maximum (tell-all incompatible-groups
-        # 'get-letter-span))``.  One *shared* defender weight, the widest group's
-        # letter span, applied to every group in the set: a bond that would break
-        # into a wide group is fought off as hard by the narrow groups beside it.
-        conflicting_groups: list[Any] = []
-        for group in structure.string.groups:
-            if not group.is_built:
-                continue
-            for gb in group.group_bonds:
-                same_pair = (
-                    (gb.from_object is structure.from_object and gb.to_object is structure.to_object)
-                    or (gb.from_object is structure.to_object and gb.to_object is structure.from_object)
-                )
-                if same_pair and gb.bond_category is not structure.bond_category:
-                    conflicting_groups.append(group)
-                    break
+        # bonds.ss:377-384 — every group nesting *both* objects at any depth
+        # (``get-common-groups``, groups.ss:1026-1033), at 1 vs ``(maximum
+        # (tell-all incompatible-groups 'get-letter-span))``.  One *shared*
+        # defender weight, the widest group's letter span, applied to every group
+        # in the set: a bond that would break into a wide group is fought off as
+        # hard by the narrow groups beside it.
+        #
+        # Matching only groups holding a same-pair constituent bond of a different
+        # category missed the ordinary case — a bond proposed *across* the
+        # constituents of a group that has no such bond at all.
+        conflicting_groups = get_common_groups(structure.from_object, structure.to_object)
         if conflicting_groups:
             shared_weight = float(max(g.span for g in conflicting_groups))
             incompatibles.extend(
                 (group, 1.0, shared_weight) for group in conflicting_groups
             )
+
+        # bonds.ss:385-398 — a *directed* bond at either edge of its string implies
+        # a direction mapping; where that contradicts a bridge's string-position
+        # mapping the two cannot both stand, and the bond is worth 2 to the
+        # bridge's 3.  A bond breaking a bridge is the one direction of influence
+        # that ran only the other way here.
+        if structure.directed and (
+            structure.leftmost_in_string() or structure.rightmost_in_string()
+        ):
+            for orientation in ("horizontal", "vertical"):
+                for bridge in structure.get_incompatible_bridges(orientation):
+                    if bridge.is_built:
+                        incompatibles.append((bridge, 2.0, 3.0))
 
     elif isinstance(structure, Group):
         # groups.ss:665-682 — a group of the same category *and* direction is a

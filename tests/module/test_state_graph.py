@@ -43,13 +43,14 @@ SEED = 42
 #: went unrestorable without any test noticing.
 #:
 #: Reseeded from 12345 to 34 when the snag response gained its restart
-#: (``answers.ss:1189-1191``): a snag now empties the Coderack and reposts, so every
-#: run that snags takes a different path afterwards and 12345 no longer answers.  That
-#: is seeded-run agreement, which the phase plan places outside the gates on purpose —
-#: the standard is expected-range agreement.  34 answers, snags *and* clamps under all
-#: three numeric backends, so it exercises all three rich event types as intended.
+#: (``answers.ss:1189-1191``), and from 34 to 12 when the bond round replaced the
+#: local-density walk and the neighbour candidate set (``bonds.ss:136-160``,
+#: ``workspace-objects.ss:375-423``).  Both times for the same reason: which answer a
+#: given seed reaches is not a gate — the standard is expected-range agreement — but
+#: this test needs *some* seed whose trace carries all three rich event types.  12
+#: answers, snags *and* clamps inside 3,000 codelets under all three numeric backends.
 ANSWERING_PROBLEM = ("abc", "abd", "xyz")
-ANSWERING_SEED = 34
+ANSWERING_SEED = 12
 
 
 @pytest.fixture(scope="module")

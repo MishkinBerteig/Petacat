@@ -5,9 +5,14 @@ logic. Positional workspace objects and strings are represented by tiny local
 fakes (Bond geometry needs left/right string positions and bond slots, which
 the generic fakes don't carry). Slipnet nodes come from the shared fakes.
 No randomness is involved.
+
+The density tests are the exception: ``get-local-density`` walks *positional*
+neighbours, which is behaviour of the real ``WorkspaceObject``, so those build a
+real ``WorkspaceString`` over a slipnet faked down to its ``.nodes`` mapping.
 """
 
 from server.engine.bonds import Bond
+from server.engine.workspace import WorkspaceString
 
 from tests.unit._fakes import FakeNode
 
@@ -198,6 +203,95 @@ def test_num_supporting_bonds_ignores_different_category():
     other.proposal_level = Bond.BUILT
     string.bonds = [self_bond, other]
     assert self_bond.get_num_of_local_supporting_bonds() == 0
+
+
+# --- local density: positional slots, bonded or not ------------------------
+#
+# Scheme: ``get-local-density`` (bonds.ss:136-160).  The walk steps through
+# positional neighbours and counts every step as a bond slot; 100 is reached only
+# when the walk finds no slots at all.  Following ``left_bond``/``right_bond``
+# instead stopped at the first *unbonded* object, keeping unbonded slots out of
+# the denominator entirely, and returned 100 for a bond with no neighbours bonded
+# at all.
+
+
+class _FakeSlipnet:
+    """Provides only the ``.nodes`` mapping ``WorkspaceString`` reads."""
+
+    def __init__(self):
+        self.nodes = {}
+
+
+def _real_string(text):
+    return WorkspaceString(text, _FakeSlipnet(), "initial")
+
+
+def _succ_bond(string, left_index, right_index, category, direction):
+    bond = _bond(
+        string.objects[left_index],
+        string.objects[right_index],
+        category,
+        _letter_category(),
+        direction=direction,
+    )
+    bond.proposal_level = Bond.BUILT
+    string.add_bond(bond)
+    return bond
+
+
+def test_local_density_counts_unbonded_positional_slots():
+    """The audit's worked example: ``abcdef`` with only ``a-b`` built, ``c-d``
+    proposed.  Four slots (b, a to the left of c; e, f to the right of d), one of
+    which — a's right slot, holding a-b — carries a matching bond.  100*1/4 = 25.
+    """
+    string = _real_string("abcdef")
+    successor = _successor()
+    right = FakeNode("plato-right")
+    _succ_bond(string, 0, 1, successor, right)
+
+    proposed = _bond(string.objects[2], string.objects[3], successor,
+                     _letter_category(), direction=right)
+    assert proposed.get_local_density() == 25.0
+
+
+def test_local_support_of_a_lone_early_bond_is_30_not_60():
+    """Support = round(100*sqrt(density/100) * 0.6^(1/n^3)) with n = 1.
+
+    density 25 -> 100*0.5 = 50, times 0.6 -> 30.  Walking bond pointers gave
+    density 100 and so support 60: sparse early bonds snowballed on a denominator
+    of zero.
+    """
+    string = _real_string("abcdef")
+    successor = _successor()
+    right = FakeNode("plato-right")
+    _succ_bond(string, 0, 1, successor, right)
+
+    proposed = _bond(string.objects[2], string.objects[3], successor,
+                     _letter_category(), direction=right)
+    assert proposed.get_num_of_local_supporting_bonds() == 1
+    assert proposed.calculate_external_strength() == 30.0
+
+
+def test_local_density_is_100_only_when_the_bond_spans_the_string():
+    """``(if (zero? num-of-bond-slots) 100 ...)`` — the walk has nowhere to go."""
+    string = _real_string("ab")
+    successor = _successor()
+    right = FakeNode("plato-right")
+    proposed = _bond(string.objects[0], string.objects[1], successor,
+                     _letter_category(), direction=right)
+    assert proposed.get_local_density() == 100.0
+
+
+def test_local_density_ignores_a_neighbour_bond_of_another_category():
+    """The neighbour slots are counted; only *matching* bonds fill them."""
+    string = _real_string("abcdef")
+    successor = _successor()
+    right = FakeNode("plato-right")
+    _succ_bond(string, 0, 1, _sameness(), None)
+
+    proposed = _bond(string.objects[2], string.objects[3], successor,
+                     _letter_category(), direction=right)
+    assert proposed.get_local_density() == 0.0
 
 
 # --- incompatible (slot-conflicting) bonds ---------------------------------

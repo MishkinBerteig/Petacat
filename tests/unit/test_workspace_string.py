@@ -7,6 +7,8 @@ elsewhere) constructed over the string's letters; slipnet nodes are faked.
 No randomness is involved.
 """
 
+import pytest
+
 from server.engine.bonds import Bond
 from server.engine.groups import Group
 from server.engine.workspace import WorkspaceString
@@ -89,6 +91,37 @@ def test_add_bond_links_adjacent_letters():
     assert l1.left_bond is bond
 
 
+def test_add_bond_refuses_an_occupied_right_slot():
+    """``build-bond`` (bonds.ss:410-422) is reached only after ``bond-builder``
+    has broken every bond it displaced.  Overwriting an occupied slot leaves the
+    displaced bond listed as built with both its pointers naming someone else's
+    bond — a corrupt string whose symptoms show up far from the cause."""
+    s = _string("abc")
+    l0, l1 = s.objects[0], s.objects[1]
+    s.add_bond(_bond(l0, l1))
+    with pytest.raises(AssertionError, match="right slot"):
+        s.add_bond(_bond(l0, l1, category=FakeNode("plato-sameness")))
+
+
+def test_add_bond_refuses_an_occupied_left_slot():
+    s = _string("abc")
+    l0, l1, l2 = s.objects[0], s.objects[1], s.objects[2]
+    s.add_bond(_bond(l1, l2))
+    # A bond from l2 leftwards would want l2's left slot, already held.
+    conflicting = _bond(l1, l2, category=FakeNode("plato-sameness"))
+    conflicting.left_object.right_bond = None  # free the right slot only
+    with pytest.raises(AssertionError, match="left slot"):
+        s.add_bond(conflicting)
+
+
+def test_add_bond_accepts_re_adding_the_same_bond():
+    """Idempotent for the bond already in the slot — it is not its own conflict."""
+    s = _string("abc")
+    bond = _bond(s.objects[0], s.objects[1])
+    s.add_bond(bond)
+    s.add_bond(bond)
+
+
 def test_remove_bond_detaches_it_from_objects():
     s = _string("abc")
     l0, l1 = s.objects[0], s.objects[1]
@@ -156,6 +189,37 @@ def test_bond_present_true_for_equivalent_bond():
     s.add_bond(_bond(s.objects[0], s.objects[1], category=cat))
     query = _bond(s.objects[0], s.objects[1], category=cat)
     assert s.bond_present(query) is True
+
+
+def test_bond_present_ignores_the_facet():
+    """``get-equivalent-bond`` (workspace-strings.ss:129-137) compares from-object,
+    to-object, category and direction — and deliberately *not* the facet.
+
+    A length-facet sameness bond between the same pair says the same thing about
+    the string as the letter-category one; requiring the facet to match too let
+    both be built, and the pair then counted twice in support and density.
+    """
+    s = _string("abc")
+    cat = FakeNode("plato-sameness")
+    built = _bond(s.objects[0], s.objects[1], category=cat)
+    s.add_bond(built)
+
+    twin = _bond(s.objects[0], s.objects[1], category=cat)
+    twin.bond_facet = FakeNode("plato-length")
+    assert s.bond_present(twin) is True
+
+
+def test_bond_present_false_when_direction_differs():
+    """Direction *is* part of the equivalence."""
+    s = _string("abc")
+    cat = FakeNode("plato-successor")
+    s.add_bond(
+        _bond(s.objects[0], s.objects[1], category=cat, direction=FakeNode("plato-right"))
+    )
+    query = _bond(
+        s.objects[0], s.objects[1], category=cat, direction=FakeNode("plato-left")
+    )
+    assert s.bond_present(query) is False
 
 
 def test_get_equivalent_bond_none_when_category_differs():

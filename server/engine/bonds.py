@@ -155,11 +155,21 @@ class Bond(WorkspaceStructure):
         return count
 
     def get_local_density(self) -> float:
-        """Proper density computation walking neighbors.
+        """How much of the neighbourhood is bonded the way this bond is.
 
-        Scheme: bonds.ss:136-160.
-        Walk left/right from this bond's objects, counting bond slots and
-        similar bonds among the neighbors.
+        Scheme: ``get-local-density`` (bonds.ss:136-160).  The walk steps through
+        **positional** neighbours — ``choose-left-neighbor`` /
+        ``choose-right-neighbor``, a salience-weighted pick among the adjacent
+        letter and the groups edged there — and *every step is a slot*, bonded or
+        not.  It stops only at the end of the string, so 100 is reached only when
+        there are no slots at all, i.e. the bond already spans the string.
+
+        Following ``left_bond``/``right_bond`` pointers instead, as this used to,
+        stopped the walk at the first unbonded object and so kept unbonded slots
+        out of the denominator entirely.  ``abcdef`` with only ``a-b`` built and
+        ``c-d`` proposed walked nowhere at all and scored 100 — support 60 — where
+        the reference counts four slots, finds one similar bond, and scores 25 —
+        support 30.  Sparse early bonds were snowballing on a denominator of zero.
         """
         if self.string is None:
             return 100.0
@@ -207,6 +217,108 @@ class Bond(WorkspaceStructure):
         if right_left is not None and right_left is not self and right_left not in result:
             result.append(right_left)
         return result
+
+    def leftmost_in_string(self) -> bool:
+        """Scheme: bonds.ss:76."""
+        return self.left_object.left_string_pos == 0
+
+    def rightmost_in_string(self) -> bool:
+        """Scheme: bonds.ss:77-78."""
+        string = self.string
+        if string is None:
+            return False
+        return self.right_object.right_string_pos == getattr(string, "length", 1) - 1
+
+    def get_incompatible_bridges(self, bridge_orientation: str) -> list[Any]:
+        """Bridges this bond would contradict, on one orientation.
+
+        Scheme: ``get-incompatible-bridges`` (bonds.ss:84-88) — the bridge, if
+        any, hanging off each of the bond's two objects.
+        """
+        result: list[Any] = []
+        for obj in (self.left_object, self.right_object):
+            bridge = self._get_incompatible_bridge(obj, bridge_orientation)
+            if bridge is not None and bridge not in result:
+                result.append(bridge)
+        return result
+
+    def _get_incompatible_bridge(self, obj: Any, bridge_orientation: str) -> Any:
+        """Scheme: ``get-incompatible-bridge`` (bonds.ss:89-122).
+
+        A directed bond at the edge of its string implies a direction mapping
+        against whatever bond sits at the corresponding edge on the far side of a
+        bridge.  If that implied mapping contradicts the bridge's own
+        string-position mapping — "leftmost goes to rightmost, but right goes to
+        right" — the bond and the bridge cannot both be right about the string.
+        """
+        bridge = getattr(
+            obj,
+            "horizontal_bridge" if bridge_orientation == "horizontal" else "vertical_bridge",
+            None,
+        )
+        if bridge is None:
+            return None
+
+        string_position_cm = None
+        for cm in getattr(bridge, "concept_mappings", ()):
+            if getattr(cm.description_type1, "name", "") == "plato-string-position-category":
+                string_position_cm = cm
+                break
+        if string_position_cm is None:
+            return None
+
+        other_object = bridge.object2 if bridge.object1 is obj else bridge.object1
+        if not (other_object.leftmost_in_string() or other_object.rightmost_in_string()):
+            return None
+
+        other_bond = (
+            other_object.right_bond
+            if other_object.leftmost_in_string()
+            else other_object.left_bond
+        )
+        if other_bond is None or not other_bond.directed:
+            return None
+
+        from server.engine.bridges import _incompatible_cms
+
+        direction_cm = self._direction_concept_mapping(other_bond)
+        if direction_cm is None:
+            return None
+        return bridge if _incompatible_cms(direction_cm, string_position_cm) else None
+
+    def _direction_concept_mapping(self, other_bond: Bond) -> Any:
+        """The ``DirCtgy`` mapping between this bond's direction and *other_bond*'s.
+
+        Scheme: the inline ``make-concept-mapping`` of bonds.ss:108-115.
+        """
+        from server.engine.bridges import _IDENTITY_SENTINEL, _label_node
+        from server.engine.concept_mappings import ConceptMapping
+
+        if self.direction is None or other_bond.direction is None:
+            return None
+        direction_category = getattr(self.direction, "category", None)
+        if direction_category is None:
+            return None
+
+        label = _label_node(self.direction, other_bond.direction)
+        if label is _IDENTITY_SENTINEL:
+            # ``_incompatible_cms`` compares labels by identity against the
+            # bridge's own concept-mappings, which carry the real Slipnet node.
+            label = self._slipnet_node("plato-identity")
+        return ConceptMapping(
+            description_type1=direction_category,
+            descriptor1=self.direction,
+            description_type2=direction_category,
+            descriptor2=other_bond.direction,
+            label=label,
+            object1=self,
+            object2=other_bond,
+        )
+
+    def _slipnet_node(self, name: str) -> Any:
+        workspace = getattr(self.string, "workspace", None)
+        slipnet = getattr(workspace, "slipnet", None)
+        return getattr(slipnet, "nodes", {}).get(name) if slipnet is not None else None
 
     def bonds_equal(self, other: Bond) -> bool:
         """Structural equality: same from/to objects, same category, same direction.
@@ -268,34 +380,65 @@ def _disjoint_objects(obj1: Any, obj2: Any) -> bool:
 
 
 def _walk_neighbors(obj: Any, direction: str) -> list[Any]:
-    """Walk left or right from an object, collecting neighbors.
+    """Walk left or right from *obj* through positional neighbours.
 
-    Scheme: bonds.ss:139-143. Uses choose-left-neighbor / choose-right-neighbor.
-    In the Scheme code, this walks using 'choose-left-neighbor or
-    'choose-right-neighbor methods. In the Python port, we walk using
-    left_bond/right_bond to find adjacent objects.
+    Scheme: ``neighbors`` inside ``get-local-density`` (bonds.ss:137-145) —
+
+        (lambda (object choose-method)
+          (let ((neighbor (tell object choose-method)))
+            (if (not (exists? neighbor))
+              '()
+              (cons neighbor (neighbors neighbor choose-method)))))
+
+    Each step is a fresh stochastic pick among the objects edged at the adjacent
+    position, so the walk can climb into a group and continue from *its* far edge.
+    That is what makes it terminate: every step moves strictly outwards, and the
+    string is finite.
     """
+    method = "choose_left_neighbor" if direction == "left" else "choose_right_neighbor"
     result: list[Any] = []
     current = obj
     while True:
-        if direction == "left":
-            bond = getattr(current, "left_bond", None)
-            if bond is None:
-                break
-            neighbor = bond.left_object if bond.left_object is not current else bond.right_object
-            # Actually, for walking left, we want the left neighbor
-            neighbor = bond.left_object
-            if neighbor is current:
-                break
-        else:
-            bond = getattr(current, "right_bond", None)
-            if bond is None:
-                break
-            neighbor = bond.right_object
-            if neighbor is current:
-                break
+        chooser = getattr(current, method, None)
+        if chooser is None:
+            # Not a real WorkspaceObject — a hand-rolled test double.  Nothing to
+            # walk, which is the same answer as "at the end of the string".
+            break
+        neighbor = chooser()
+        if neighbor is None or neighbor is current:
+            break
         result.append(neighbor)
         current = neighbor
+    return result
+
+
+def get_common_groups(object1: Any, object2: Any) -> list[Any]:
+    """Built groups of the string that nest *both* objects, at any depth.
+
+    Scheme: ``get-common-groups`` (groups.ss:1026-1033)::
+
+        (filter (lambda (group)
+                  (and (tell group 'nested-member? object1)
+                       (tell group 'nested-member? object2)))
+          (tell (tell object1 'get-string) 'get-groups))
+
+    ``nested-member?`` (groups.ss:271-273) recurses into subgroups, so a group two
+    levels up counts.  This is the set a bond has to beat to be built between two
+    objects that some group already holds together — a bond running *inside* a
+    group contradicts the group's own reading of that material.
+    """
+    string = getattr(object1, "string", None)
+    if string is None:
+        return []
+    result: list[Any] = []
+    for group in getattr(string, "groups", []):
+        if not getattr(group, "is_built", False):
+            continue
+        nested = getattr(group, "nested_member", None)
+        if nested is None:
+            continue
+        if nested(object1) and nested(object2):
+            result.append(group)
     return result
 
 

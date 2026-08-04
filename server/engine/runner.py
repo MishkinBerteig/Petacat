@@ -275,6 +275,14 @@ class EngineRunner:
 
         # Create workspace
         workspace = Workspace(initial, modified, target, answer, slipnet)
+        # ``get-local-density`` walks *stochastically* chosen positional neighbours
+        # (bonds.ss:136-160), so external strength draws on the RNG from call sites
+        # that carry no RNG of their own — ``update-strength`` reaches the Scheme's
+        # as a global.  Hang it off the Workspace, which is per *run*: a class-level
+        # binding would let two runners in one process draw from each other.  Not
+        # captured (``state_graph._ENVIRONMENT_FIELDS``) and not part of the
+        # Workspace's restored state, so a restored run keeps its own.
+        workspace.rng = rng
 
         # Create coderack.  It needs the RNG so it can enforce its own capacity
         # cap when codelets are posted.

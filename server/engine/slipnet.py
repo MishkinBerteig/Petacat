@@ -65,7 +65,36 @@ def _letter_category_name(obj: Any) -> str:
     return getattr(getattr(obj, "letter_category", None), "name", "")
 
 
+def _middle_in_string(obj: Any) -> bool:
+    """``middle-in-string?`` (``workspace-objects.ss:364-370``).
+
+    The reference asks a question about *neighbours*, not about indices: an
+    object is middle when it has an ungrouped left neighbour that is leftmost
+    **and** an ungrouped right neighbour that is rightmost.  Because
+    ``get-ungrouped-{left,right}-neighbor`` reach past letters swallowed by a
+    group to the group itself, the test is group-aware — in ``mrrjjj`` parsed as
+    ``[m][rr][jjj]`` the ``[rr]`` group *is* middle, its neighbours being the
+    letter ``m`` and the group ``[jjj]``.  That is what earns the ``b→[rr]``
+    vertical bridge its distinguishing ``middle⇒middle`` concept-mapping.
+
+    Two consequences worth stating, because index arithmetic gets them wrong in
+    opposite directions.  A group can be middle, and Petacat's predicate used to
+    exclude every group outright.  And the centre letter of a five-letter string
+    is **not** middle: ``c`` in ``abcde`` has ungrouped neighbours ``b`` and
+    ``d``, neither of which is an edge object, so ``middle-in-string?`` is false
+    — "middle" means *between the ends*, not *at the centre*.
+
+    Delegates to the object rather than recomputing, so the predicate and
+    ``WorkspaceObject.middle_in_string`` cannot drift apart; a duck-typed object
+    without the method simply is not middle.
+    """
+    method = getattr(obj, "middle_in_string", None)
+    return bool(method()) if callable(method) else False
+
+
 def _position_in_string(obj: Any, which: str) -> bool:
+    if which == "middle":
+        return _middle_in_string(obj)
     string = getattr(obj, "string", None)
     if string is None:
         return False
@@ -78,12 +107,7 @@ def _position_in_string(obj: Any, which: str) -> bool:
         return obj.left_string_pos == left
     if which == "rightmost":
         return obj.right_string_pos == right
-    # middle: exactly one object to the left and one to the right
-    return (
-        obj.left_string_pos == left + 1
-        and obj.right_string_pos == right - 1
-        and right - left == 2
-    )
+    return False
 
 
 # The vocabulary a ``descriptor_predicate`` expression may use.
@@ -93,6 +117,7 @@ DESCRIPTOR_PREDICATE_NAMESPACE: dict[str, Any] = {
     "spans_whole_string": _spans_whole_string,
     "string_spanning_group": _string_spanning_group,
     "position_in_string": _position_in_string,
+    "middle_in_string": _middle_in_string,
     "letter_category_name": _letter_category_name,
 }
 
@@ -385,6 +410,52 @@ class SlipnetNode:
             if shrunk is not None:
                 return max(0.0, 100.0 - shrunk)
         return max(0.0, 100.0 - self.intrinsic_link_length)
+
+    def get_similar_property_links(
+        self,
+        rng: RNG,
+        temperature: float | None = None,
+        meta: MetadataProvider | None = None,
+    ) -> list[SlipnetLink]:
+        """The property links short enough to be worth following *right now*.
+
+        Scheme: ``get-similar-property-links`` (slipnet.ss:108-112) —
+
+            (filter (lambda (link)
+                      (prob? (temp-adjusted-probability
+                               (% (tell link 'get-degree-of-assoc)))))
+              property-links)
+
+        Each link survives independently with probability
+        ``degree-of-assoc / 100``, temperature-adjusted.  Petacat ships two
+        property links, ``a→alphabetic-first`` and ``z→alphabetic-last``, both of
+        length 75 and so of association 25: a bottom-up description scout that
+        has picked ``a``'s letter-category description follows the link to
+        ``first`` a quarter of the time in a settled run and 0.325 of the time in
+        a maximally confused one.  Following it unconditionally
+        makes ``first``/``last`` descriptions — the fuel of the ``xyz`` family's
+        opposite-mapping answers — two to four times as common as the reference
+        makes them, and makes them at a rate no longer sensitive to temperature.
+
+        ``get-degree-of-assoc`` on a *link* (slipnet.ss:334-339) is the dynamic
+        one: it shrinks with a fully-active label node.  Both shipped property
+        links are fixed-length, so the distinction does not bite today, but a
+        labelled property link added later would want the shrinking behaviour.
+
+        *temperature* and *meta* are optional so a caller with no temperature to
+        hand — a test, or a probe — gets the unadjusted probability rather than a
+        crash.
+        """
+        from server.engine.formulas import temp_adjusted_probability
+
+        kept: list[SlipnetLink] = []
+        for link in self.property_links:
+            prob = link.degree_of_association() / 100.0
+            if temperature is not None and meta is not None:
+                prob = temp_adjusted_probability(prob, temperature, meta)
+            if rng.prob(prob):
+                kept.append(link)
+        return kept
 
     @property
     def is_instance(self) -> bool:

@@ -7,10 +7,20 @@ bonds, bridges, descriptions) are lightweight fakes so no path depends on the
 full engine or the database. No randomness is involved.
 """
 
+from server.engine.groups import Group
+from server.engine.rng import RNG
+from server.engine.workspace import WorkspaceString
 from server.engine.workspace_objects import Letter, WorkspaceObject
 from server.engine.slipnet import SlipnetNode
 
 from tests.unit._fakes import FakeNode, FakeString
+
+
+class _FakeSlipnet:
+    """Provides only the ``.nodes`` mapping ``WorkspaceString`` reads."""
+
+    def __init__(self):
+        self.nodes = {}
 
 
 def test_letter_creation():
@@ -99,6 +109,111 @@ def test_rightmost_in_string_true_at_last_position():
 def test_rightmost_in_string_false_when_no_string():
     obj = WorkspaceObject(string=None, left_pos=2, right_pos=2)
     assert obj.rightmost_in_string() is False
+
+
+# ---- middle-in-string?  (workspace-objects.ss:364-370) --------------------
+#
+# The reference asks about *neighbours*, not about indices:
+#
+#     (and (exists? left-neighbor) (exists? right-neighbor)
+#          (tell left-neighbor 'leftmost-in-string?)
+#          (tell right-neighbor 'rightmost-in-string?))
+#
+# where the neighbours are the *ungrouped* ones, so the test reaches past a
+# letter swallowed by a group to the group itself.  Two consequences that index
+# arithmetic gets wrong in opposite directions are pinned below: a group can be
+# middle, and the centre letter of a five-letter string is not.
+
+def _string_of(letters, groups=()):
+    """A string container holding *letters* and *groups*, as the neighbour walk
+    reads it: ``letters`` positionally, ``groups`` by edge position."""
+    return FakeString(
+        objects=list(letters) + list(groups),
+        letters=list(letters),
+        groups=list(groups),
+        length=len(letters),
+    )
+
+
+def _letters(n, string=None):
+    objs = [WorkspaceObject(string=string, left_pos=i, right_pos=i) for i in range(n)]
+    return objs
+
+
+def _spanning(string, left, right, members):
+    """A group-like object over [left, right] that owns *members*."""
+    group = WorkspaceObject(string=string, left_pos=left, right_pos=right)
+    group.objects = members          # having ``objects`` is what makes it a group
+    group.nested_member = lambda other, _m=members: other in _m
+    for member in members:
+        member.enclosing_group = group
+    return group
+
+
+def test_middle_in_string_true_for_the_centre_letter_of_three():
+    letters = _letters(3)
+    string = _string_of(letters)
+    for letter in letters:
+        letter.string = string
+    assert letters[1].middle_in_string() is True
+
+
+def test_middle_in_string_false_for_an_edge_letter():
+    letters = _letters(3)
+    string = _string_of(letters)
+    for letter in letters:
+        letter.string = string
+    assert letters[0].middle_in_string() is False
+    assert letters[2].middle_in_string() is False
+
+
+def test_middle_in_string_false_for_the_centre_letter_of_five():
+    """``c`` in ``abcde`` is at the centre and is *not* middle.
+
+    Its ungrouped neighbours are ``b`` and ``d``, and ``middle-in-string?``
+    requires the neighbours to *be* the edge objects — ``b`` is not leftmost and
+    ``d`` is not rightmost.  "Middle" in Metacat means *flanked by the ends*, not
+    *at the centre*, which is why a five-letter string has no middle letter at
+    all until grouping gives one edge-to-edge neighbours.
+    """
+    letters = _letters(5)
+    string = _string_of(letters)
+    for letter in letters:
+        letter.string = string
+    assert letters[2].middle_in_string() is False
+
+
+def test_a_group_between_two_edge_objects_is_middle():
+    """``mrrjjj`` read as ``[m][rr][jjj]``: the ``[rr]`` group is middle.
+
+    Its ungrouped left neighbour is the letter ``m`` (leftmost) and its ungrouped
+    right neighbour is the group ``[jjj]`` (rightmost) — the letter ``j`` at
+    position 3 is skipped, being enclosed in a group that does not contain
+    ``[rr]``.  This is the description that earns the ``b→[rr]`` vertical bridge
+    its distinguishing ``middle⇒middle`` concept-mapping in ``abc→abd;
+    mrrjjj→?``, and it is unreachable by any test phrased in indices.
+    """
+    letters = _letters(6)
+    string = _string_of(letters)
+    for letter in letters:
+        letter.string = string
+    rr = _spanning(string, 1, 2, letters[1:3])
+    jjj = _spanning(string, 3, 6 - 1, letters[3:])
+    string.objects.extend([rr, jjj])
+    string.groups.extend([rr, jjj])
+
+    assert rr.middle_in_string() is True
+    assert jjj.middle_in_string() is False
+    assert letters[0].middle_in_string() is False
+
+
+def test_middle_in_string_false_when_a_neighbour_is_missing():
+    letters = _letters(2)
+    string = _string_of(letters)
+    for letter in letters:
+        letter.string = string
+    assert letters[0].middle_in_string() is False
+    assert letters[1].middle_in_string() is False
 
 
 def test_get_nesting_level_counts_enclosing_chain():
@@ -252,3 +367,55 @@ def test_bridge_weakness_uses_bridge_strength():
 def test_bridge_weakness_full_when_no_bridge():
     obj = WorkspaceObject(string=None, left_pos=0, right_pos=0)
     assert obj._bridge_weakness("vertical") == 100.0
+
+
+# ---- neighbour candidate sets  (Scheme: workspace-objects.ss:375-423) ------
+#
+# A bond candidate's neighbours are the adjacent *letter* — even when it sits
+# inside a group — plus every group edged at that position, at any nesting level.
+# The bond scouts used to filter to objects with the *identical*
+# ``enclosing_group``, so a grouped letter was never a candidate for its ungrouped
+# neighbour and whole classes of bond were unreachable.
+
+def _string_with_rr_group():
+    """``mrrjjj`` with the two ``r``s built into a group, as in §5.2.1 Run 1."""
+    string = WorkspaceString("mrrjjj", _FakeSlipnet(), "initial")
+    rr = Group(
+        string=string,
+        group_category=FakeNode("plato-same-group"),
+        bond_facet=FakeNode("plato-letter-category"),
+        direction=None,
+        objects=[string.objects[1], string.objects[2]],
+        bonds=[],
+    )
+    rr.proposal_level = Group.BUILT
+    string.add_group(rr)
+    return string, rr
+
+
+def test_right_neighbours_include_the_letter_inside_an_adjacent_group():
+    string, rr = _string_with_rr_group()
+    m, first_r = string.objects[0], string.objects[1]
+    assert string.text[1] == "r"
+    assert set(map(id, m.get_all_right_neighbors())) == {id(first_r), id(rr)}
+
+
+def test_m_can_be_chosen_as_a_bond_candidate_for_the_r_inside_the_group():
+    """``m`` to the letter ``r`` inside ``[rr]`` — a bond Metacat can propose and
+    Petacat could not reach at all."""
+    string, rr = _string_with_rr_group()
+    m, first_r = string.objects[0], string.objects[1]
+    rng = RNG(0)
+    chosen = {id(m.choose_neighbor(rng)) for _ in range(50)}
+    assert id(first_r) in chosen
+
+
+def test_directed_neighbour_choice_sees_both_levels():
+    """The direction scout used ``get_object_at``, which returns the letter and
+    never the group edged there (workspace-objects.ss:410-415)."""
+    string, rr = _string_with_rr_group()
+    m = string.objects[0]
+    rng = RNG(0)
+    chosen = {id(m.choose_right_neighbor(rng)) for _ in range(50)}
+    assert chosen == {id(string.objects[1]), id(rr)}
+    assert m.choose_left_neighbor(rng) is None

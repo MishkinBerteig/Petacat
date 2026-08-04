@@ -40,7 +40,7 @@ from server.engine.slipnet import Slipnet
 from server.engine.temperature import Temperature
 from server.engine.themes import Themespace
 from server.engine.trace import BOND_BROKEN, BOND_BUILT, TemporalTrace
-from server.engine.workspace import Workspace
+from server.engine.workspace import Workspace, WorkspaceString
 from server.engine.workspace_objects import Letter
 
 
@@ -69,6 +69,28 @@ def ctx_abc_abd_xyz(meta, runner):
     """EngineContext for 'abc -> abd; xyz -> ?'."""
     runner.init_mcat("abc", "abd", "xyz", seed=SEED)
     return runner.ctx
+
+
+@pytest.fixture
+def ctx_abc_abd_xyz_with_group(meta, runner):
+    """'abc -> abd; mrrjjj' with [rr] and [jjj] built as sameness groups.
+
+    Two groups side by side, each carrying a *length* description — the only
+    configuration in which ``choose-bond-facet`` can return ``plato-length``, and
+    the reading ``mrrjjj`` needs to be seen as one-two-three (§5.2.1 Run 1).
+    """
+    runner.init_mcat("abc", "abd", "mrrjjj", seed=SEED)
+    ctx = runner.ctx
+    target = ctx.workspace.target_string
+    slipnet = ctx.slipnet
+    letters = target.letters
+    samegrp = slipnet.nodes["plato-samegrp"]
+    lcat = slipnet.nodes["plato-letter-category"]
+    for members in (letters[1:3], letters[3:6]):
+        group = Group(target, samegrp, lcat, None, list(members), [])
+        group.proposal_level = Group.BUILT
+        target.add_group(group)
+    return ctx
 
 
 @pytest.fixture
@@ -192,6 +214,68 @@ class TestTopDownBondScoutCategory:
         assert coderack_after == coderack_before
 
 
+    def test_proposes_the_reversed_reading_when_the_forward_one_does_not_match(
+        self, ctx_abc_abd_xyz, meta
+    ):
+        """``bonds.ss:258-263`` tries ``(descriptor1, descriptor2)`` and, failing
+        that, ``(descriptor2, descriptor1)`` — proposing the reversed bond.
+
+        Drawing ``c`` with neighbour ``b`` while hunting *successor* is a
+        successor bond, b->c; testing one order threw that draw away.  The two
+        choosers are pinned so the test is about the branch rather than about
+        which pair the scout happened to draw.
+        """
+        ctx = ctx_abc_abd_xyz
+        init = ctx.workspace.initial_string
+        b_letter, c_letter = init.letters[1], init.letters[2]
+
+        builtins = _get_test_builtins()
+        builtins["choose_string_for"] = lambda ctx, node: init
+        builtins["choose_string_object"] = lambda ctx, string, key="intra": c_letter
+        builtins["choose_neighbor"] = lambda ctx, obj: b_letter
+        interp = CodeletInterpreter(builtins=builtins)
+        registry = CodeletRegistry.from_metadata(meta, interp)
+        compiled = registry.get_compiled("top-down-bond-scout:category")
+
+        succ = ctx.slipnet.nodes["plato-successor"]
+        ctx.coderack.clear()
+        interp.execute(compiled, ctx, slipnode=succ)
+
+        proposed = [
+            codelet.arguments["structure"]
+            for bin_ in ctx.coderack.bins
+            for codelet in bin_.codelets
+            if isinstance(codelet.arguments.get("structure"), Bond)
+        ]
+        assert len(proposed) == 1, "the reversed order was not tried"
+        bond = proposed[0]
+        assert bond.bond_category is succ
+        assert (bond.from_object, bond.to_object) == (b_letter, c_letter)
+        assert bond.direction is ctx.slipnet.nodes["plato-right"]
+
+    def test_can_choose_the_length_facet(self, ctx_abc_abd_xyz_with_group, meta):
+        """``choose-bond-facet`` (bonds.ss:247, 475-487), not a hardcoded facet.
+
+        Two adjacent sameness groups share *both* facets — each carries a length
+        description and a letter-category one — so both must be reachable.  The
+        top-down bodies pinned ``plato-letter-category``, which left length bonds
+        to the bottom-up scout alone; length is the facet ``mrrjjj`` needs to be
+        read as one-two-three (§5.2.1 Run 1).
+        """
+        ctx = ctx_abc_abd_xyz_with_group
+        from server.engine.codelet_dsl.builtins import choose_bond_facet
+
+        target = ctx.workspace.target_string
+        first, second = target.groups[0], target.groups[1]
+        facets = set()
+        for try_seed in range(40):
+            ctx.rng = RNG(SEED + try_seed)
+            facet = choose_bond_facet(ctx, first, second)
+            if facet is not None:
+                facets.add(facet.name)
+        assert facets == {"plato-length", "plato-letter-category"}
+
+
 class TestTopDownBondScoutDirection:
     def test_fizzles_at_string_edge(self, ctx_abc_abd_xyz, meta):
         """Seeking left-direction from leftmost letter should fizzle."""
@@ -203,6 +287,101 @@ class TestTopDownBondScoutDirection:
         left_node = ctx.slipnet.nodes["plato-left"]
         # Multiple runs — should never crash, may fizzle
         interp.execute(compiled, ctx, slipnode=left_node)
+
+
+class TestBondDescriptionRouting:
+    """``build-description`` (descriptions.ss:185-191) routes a bond-description
+    to the group's separate list.
+
+    ``bond-description?`` (descriptions.ss:69-71) is bond-category or bond-facet.
+    The build path appended every description to ``object.descriptions``, where the
+    formulas that deliberately exclude bond descriptions could then see them.
+    Reachable through the thematic scout's description proposals.
+    """
+
+    def test_a_bond_facet_description_goes_to_bond_descriptions(
+        self, ctx_abc_abd_xyz_with_group
+    ):
+        ctx = ctx_abc_abd_xyz_with_group
+        group = ctx.workspace.target_string.groups[0]
+        facet_type = ctx.slipnet.nodes["plato-bond-facet"]
+
+        description = Description(
+            group, facet_type, ctx.slipnet.nodes["plato-letter-category"]
+        )
+        description.proposal_level = Description.EVALUATED
+        assert description.bond_description is True
+
+        assert build_structure(ctx, description) is True
+        assert description in group.bond_descriptions
+        assert description not in group.descriptions
+        # ``get-all-descriptions`` still sees it (workspace-objects.ss:162-165).
+        assert description in group.get_all_descriptions()
+
+    def test_an_ordinary_description_still_goes_to_descriptions(
+        self, ctx_abc_abd_xyz_with_group
+    ):
+        ctx = ctx_abc_abd_xyz_with_group
+        group = ctx.workspace.target_string.groups[0]
+
+        description = Description(
+            group,
+            ctx.slipnet.nodes["plato-object-category"],
+            ctx.slipnet.nodes["plato-group"],
+        )
+        description.proposal_level = Description.EVALUATED
+        assert description.bond_description is False
+
+        assert build_structure(ctx, description) is True
+        assert description in group.descriptions
+        assert description not in group.bond_descriptions
+
+
+class TestTopDownScoutStringChoice:
+    """``bonds.ss:222-241, 274-293`` — average(relevance, unhappiness) over the
+    *non-answer* strings (all four only in justify mode)."""
+
+    def test_never_chooses_the_answer_string_in_discovery_mode(
+        self, ctx_abc_abd_xyz, meta
+    ):
+        from server.engine.codelet_dsl.builtins import choose_string_for
+
+        ctx = ctx_abc_abd_xyz
+        # A discovery run gains an answer string the moment it answers
+        # (builtins.report_answer); the scouts must still ignore it.
+        ctx.workspace.answer_string = WorkspaceString("xyd", ctx.slipnet, "answer")
+        ctx.workspace.answer_string.workspace = ctx.workspace
+
+        succ = ctx.slipnet.nodes["plato-successor"]
+        chosen = set()
+        for try_seed in range(60):
+            ctx.rng = RNG(SEED + try_seed)
+            chosen.add(choose_string_for(ctx, succ).string_type)
+        assert "answer" not in chosen
+        assert chosen <= {"initial", "modified", "target"}
+
+    def test_weights_carry_the_relevance_term(self, ctx_abc_abd_xyz_with_bonds, meta):
+        """Bare unhappiness points a scout at whatever is *least* organised; the
+        Scheme averages it with how relevant the category already is, so a scout
+        for successor concentrates where successor bonds are taking hold."""
+        ctx = ctx_abc_abd_xyz_with_bonds
+        from server.engine.codelet_dsl.builtins import choose_string_for
+
+        init = ctx.workspace.initial_string
+        succ = ctx.slipnet.nodes["plato-successor"]
+        sameness = ctx.slipnet.nodes["plato-sameness"]
+        # 'abc' carries two built successor bonds and no sameness bond at all.
+        assert init.get_bond_category_relevance(succ) > 0
+        assert init.get_bond_category_relevance(sameness) == 0
+
+        def rate(node):
+            hits = 0
+            for try_seed in range(200):
+                ctx.rng = RNG(SEED + try_seed)
+                hits += choose_string_for(ctx, node) is init
+            return hits / 200
+
+        assert rate(succ) > rate(sameness)
 
 
 class TestBondEvaluator:
@@ -255,6 +434,123 @@ class TestBondBuilder:
 
         # Bond building is subcognitive: it must not reach the Trace (§4.4).
         assert ctx.trace.get_events_by_type(BOND_BUILT) == []
+
+    def test_a_duplicate_reactivates_the_category_and_direction(
+        self, ctx_abc_abd_xyz, meta
+    ):
+        """``bonds.ss:364-369`` — the duplicate branch jolts the category, and the
+        direction when the bond has one, on its way out.
+
+        The body used to jolt them unconditionally after ``build_structure``,
+        which also jolted them after a *lost fight* — a bond that loses to what is
+        already built has said nothing new about the string.
+        """
+        ctx = ctx_abc_abd_xyz
+        init = ctx.workspace.initial_string
+        letters = init.letters
+        slipnet = ctx.slipnet
+        succ = slipnet.nodes["plato-successor"]
+        right = slipnet.nodes["plato-right"]
+
+        def _bond():
+            b = Bond(
+                letters[0], letters[1], succ,
+                slipnet.nodes["plato-letter-category"],
+                letters[0].letter_category, letters[1].letter_category, right,
+            )
+            b.proposal_level = Bond.EVALUATED
+            return b
+
+        succ.activation_buffer = 0.0
+        right.activation_buffer = 0.0
+        # ``build-bond`` (bonds.ss:419-421) is the first of the two sites.
+        assert build_structure(ctx, _bond()) is True
+        assert succ.activation_buffer > 0
+        assert right.activation_buffer > 0
+
+        succ.activation_buffer = 0.0
+        right.activation_buffer = 0.0
+        # A second, structurally identical proposal is a duplicate — the other site.
+        assert build_structure(ctx, _bond()) is False
+        assert succ.activation_buffer > 0
+        assert right.activation_buffer > 0
+
+    def test_a_length_facet_twin_is_a_duplicate_not_a_second_bond(
+        self, ctx_abc_abd_xyz_with_group, meta
+    ):
+        """``bond-present?`` (workspace-strings.ss:127-137) ignores the facet.
+
+        Requiring the facet to match too let a length-facet sameness bond be built
+        alongside the letter-category one between the same pair, and the pair then
+        counted twice in local support and in density.
+        """
+        ctx = ctx_abc_abd_xyz_with_group
+        target = ctx.workspace.target_string
+        slipnet = ctx.slipnet
+        first, second = target.groups[0], target.groups[1]
+        sameness = slipnet.nodes["plato-sameness"]
+
+        def _bond(facet_name, d1, d2):
+            b = Bond(
+                first, second, sameness, slipnet.nodes[facet_name], d1, d2, None,
+            )
+            b.proposal_level = Bond.EVALUATED
+            return b
+
+        letter_bond = _bond(
+            "plato-letter-category",
+            first.get_descriptor_for(slipnet.nodes["plato-letter-category"]),
+            second.get_descriptor_for(slipnet.nodes["plato-letter-category"]),
+        )
+        assert build_structure(ctx, letter_bond) is True
+
+        length_twin = _bond(
+            "plato-length",
+            first.get_descriptor_for(slipnet.nodes["plato-length"]),
+            second.get_descriptor_for(slipnet.nodes["plato-length"]),
+        )
+        assert build_structure(ctx, length_twin) is False
+        assert target.bonds == [letter_bond]
+
+    def test_a_directed_edge_bond_fights_a_bridge_it_contradicts(
+        self, ctx_abc_abd_xyz, meta
+    ):
+        """``bonds.ss:385-398`` — 2 vs 3 against a bridge whose string-position
+        mapping the bond's implied direction mapping contradicts.
+
+        ``a`` is leftmost in ``abc`` and bridges to ``z``, rightmost in ``xyz``:
+        leftmost=(opp)=>rightmost.  A rightward bond at each end says
+        right=(iden)=>right, and the two readings cannot both hold
+        (``incompatible-vertical-CMs?``, bridges.ss:1691-1703).  A bond breaking a
+        bridge is the one direction of influence the port never had.
+        """
+        ctx = ctx_abc_abd_xyz
+        slipnet = ctx.slipnet
+        init, target = ctx.workspace.initial_string, ctx.workspace.target_string
+        a, b = init.letters[0], init.letters[1]
+        y, z = target.letters[1], target.letters[2]
+        succ = slipnet.nodes["plato-successor"]
+        right = slipnet.nodes["plato-right"]
+        lcat = slipnet.nodes["plato-letter-category"]
+
+        yz = Bond(y, z, succ, lcat, y.letter_category, z.letter_category, right)
+        yz.proposal_level = Bond.BUILT
+        target.add_bond(yz)
+
+        bridge = Bridge(
+            a, z, "vertical",
+            make_concept_mappings(a, z, "vertical", slipnet.nodes["plato-identity"]),
+        )
+        bridge.proposal_level = Bridge.BUILT
+        ctx.workspace.add_bridge(bridge)
+        assert any(
+            cm.description_type1.name == "plato-string-position-category"
+            for cm in bridge.concept_mappings
+        ), "the fixture must give the bridge a string-position mapping"
+
+        proposed = Bond(a, b, succ, lcat, a.letter_category, b.letter_category, right)
+        incompatibles = _get_incompatible_structures(ctx, proposed)
+        assert [(o, w1, w2) for o, w1, w2 in incompatibles] == [(bridge, 2.0, 3.0)]
 
     def test_fizzles_if_object_removed(self, ctx_abc_abd_xyz, meta):
         """Builder should fizzle if the object is no longer in a string."""
@@ -477,6 +773,40 @@ class TestDescriptionBuilder:
         assert len(a_letter.descriptions) == before  # Not added again
 
 
+def _posted(ctx, codelet_type):
+    """Every codelet of *codelet_type* sitting on the coderack."""
+    return [
+        c
+        for b in ctx.coderack.bins
+        for c in b.codelets
+        if c.codelet_type == codelet_type
+    ]
+
+
+def _only_salient(ctx, obj, key="average", value=100):
+    """Make *obj* the sole candidate under *key*: every other object weighs 0.
+
+    ``stochastic-pick`` (``utilities.ss:443-448``) gives a weight-0 candidate
+    probability exactly 0 and falls back to a uniform pick only when *every*
+    weight is 0, so a single non-zero weight makes the choice deterministic and
+    the test independent of the seed.
+    """
+    for other in ctx.workspace.all_objects:
+        other.salience[key] = value if other is obj else 0
+
+
+class _ProbeRNG(RNG):
+    """A real RNG that also records every probability it is asked to judge."""
+
+    def __init__(self, seed):
+        super().__init__(seed)
+        self.probs = []
+
+    def prob(self, p):
+        self.probs.append(p)
+        return super().prob(p)
+
+
 class TestTopDownDescriptionScout:
     def test_fizzles_without_slipnode(self, ctx_abc_abd_xyz, meta):
         """Without slipnode argument, should fizzle."""
@@ -489,6 +819,219 @@ class TestTopDownDescriptionScout:
         interp.execute(compiled, ctx)  # No slipnode
         coderack_after = sum(b.count for b in ctx.coderack.bins)
         assert coderack_after == coderack_before
+
+    def test_chooses_its_object_by_average_salience(self, ctx_abc_abd_xyz, meta):
+        """``(tell scope 'choose-object 'get-average-salience)``, descriptions.ss:132.
+
+        Average salience folds intra-string salience together with the two
+        inter-string ones, so a description is sought where attention is high
+        *overall* rather than only where the string's own bonds are unhappy.
+        Choosing on ``intra`` instead is a different object on most cycles, and
+        the two are set here to disagree outright.
+        """
+        ctx = ctx_abc_abd_xyz
+        by_average = ctx.workspace.target_string.letters[0]      # x
+        by_intra = ctx.workspace.initial_string.letters[2]       # c
+        _only_salient(ctx, by_average, key="average")
+        _only_salient(ctx, by_intra, key="intra")
+
+        interp = CodeletInterpreter(builtins=_get_test_builtins())
+        registry = CodeletRegistry.from_metadata(meta, interp)
+        compiled = registry.get_compiled("top-down-description-scout")
+
+        before = _posted(ctx, "description-evaluator")
+        interp.execute(
+            compiled, ctx, slipnode=ctx.slipnet.nodes["plato-string-position-category"]
+        )
+        new = [c for c in _posted(ctx, "description-evaluator") if c not in before]
+        assert len(new) == 1
+        assert new[0].arguments["structure"].object is by_average
+
+    def test_a_duplicate_still_reaches_the_evaluator(self, ctx_abc_abd_xyz, meta):
+        """No duplicate pre-check in the scout (descriptions.ss:127-140).
+
+        ``x`` already carries string-position-category: leftmost from init, and
+        leftmost is the only descriptor along that dimension it can take — so the
+        scout proposes a description that already exists.  The reference lets it:
+        the *builder* is where a duplicate dies, and it re-activates the
+        description type and the descriptor on its way out
+        (``descriptions.ss:164-168``).  Pre-checking here suppresses that stream
+        of re-activation, and pre-checking on mere *type* presence — as Petacat
+        did — additionally stops an object described as ``leftmost`` from ever
+        being reconsidered as ``whole``.
+        """
+        ctx = ctx_abc_abd_xyz
+        x = ctx.workspace.target_string.letters[0]
+        _only_salient(ctx, x, key="average")
+        existing = [
+            d for d in x.descriptions
+            if d.description_type.name == "plato-string-position-category"
+        ]
+        assert [d.descriptor.name for d in existing] == ["plato-leftmost"]
+
+        interp = CodeletInterpreter(builtins=_get_test_builtins())
+        registry = CodeletRegistry.from_metadata(meta, interp)
+        compiled = registry.get_compiled("top-down-description-scout")
+
+        before = _posted(ctx, "description-evaluator")
+        interp.execute(
+            compiled, ctx, slipnode=ctx.slipnet.nodes["plato-string-position-category"]
+        )
+        new = [c for c in _posted(ctx, "description-evaluator") if c not in before]
+        assert len(new) == 1
+        proposed = new[0].arguments["structure"]
+        assert proposed.object is x
+        assert proposed.descriptor.name == "plato-leftmost"
+
+
+class TestBottomUpDescriptionScout:
+    """Scheme: ``bottom-up-description-scout`` (descriptions.ss:105-124)."""
+
+    def _fire(self, ctx, meta, **kwargs):
+        interp = CodeletInterpreter(builtins=_get_test_builtins())
+        registry = CodeletRegistry.from_metadata(meta, interp)
+        compiled = registry.get_compiled("bottom-up-description-scout")
+        before = _posted(ctx, "description-evaluator")
+        interp.execute(compiled, ctx, **kwargs)
+        return [c for c in _posted(ctx, "description-evaluator") if c not in before]
+
+    @staticmethod
+    def _aim_at_letter_a(ctx):
+        """Force the scout onto ``a``'s letter-category description.
+
+        ``a`` is the only object with any average salience, and among its
+        relevant descriptions only the letter-category one has an active
+        descriptor — so the two weighted picks before the property-link gate are
+        both forced, and what remains stochastic is the gate alone.
+        """
+        a = ctx.workspace.initial_string.letters[0]
+        _only_salient(ctx, a)
+        ctx.slipnet.nodes["plato-a"].activation = 100.0
+        ctx.slipnet.nodes["plato-leftmost"].activation = 0.0
+        return a
+
+    def test_gates_the_property_link_on_its_degree_of_association(
+        self, ctx_abc_abd_xyz, meta
+    ):
+        """``get-similar-property-links`` (slipnet.ss:108-112), through the scout.
+
+        ``a→alphabetic-first`` is association 25, and at temperature 100 the
+        temperature-adjusted probability of following it is 0.325.  Petacat used
+        to follow it unconditionally, which proposed ``first`` — the fuel of the
+        ``xyz`` family's opposite mappings — two to four times as often as the
+        reference does, at a rate independent of temperature.
+        """
+        ctx = ctx_abc_abd_xyz
+        self._aim_at_letter_a(ctx)
+        ctx.temperature.value = 100.0
+        ctx.rng = _ProbeRNG(SEED)
+
+        self._fire(ctx, meta)
+        assert ctx.rng.probs == [0.325]
+
+    def test_the_gate_tightens_as_the_run_cools(self, ctx_abc_abd_xyz, meta):
+        ctx = ctx_abc_abd_xyz
+        self._aim_at_letter_a(ctx)
+        ctx.temperature.value = 0.0
+        ctx.rng = _ProbeRNG(SEED)
+
+        self._fire(ctx, meta)
+        assert ctx.rng.probs == [0.25]
+
+    def test_proposes_the_property_when_the_gate_opens(self, ctx_abc_abd_xyz, meta):
+        """Past the gate, the proposal is alphabetic-position-category: first."""
+        ctx = ctx_abc_abd_xyz
+        a = self._aim_at_letter_a(ctx)
+        ctx.temperature.value = 100.0
+
+        # Seeds differ only in whether the 0.325 draw succeeds; take one that does.
+        for seed in range(40):
+            ctx.rng = RNG(seed)
+            posted = self._fire(ctx, meta)
+            if posted:
+                break
+        else:  # pragma: no cover - would mean the gate never opens
+            pytest.fail("the property-link gate never opened in 40 seeds")
+
+        proposed = posted[0].arguments["structure"]
+        assert proposed.object is a
+        assert proposed.descriptor.name == "plato-alphabetic-first"
+        assert proposed.description_type.name == "plato-alphabetic-position-category"
+
+    def test_the_gate_is_what_decides_whether_anything_is_proposed(
+        self, ctx_abc_abd_xyz, meta
+    ):
+        """Nothing else in the body is stochastic once the picks are forced, so
+        the proposal rate over many seeds *is* the gate's probability."""
+        ctx = ctx_abc_abd_xyz
+        self._aim_at_letter_a(ctx)
+        ctx.temperature.value = 100.0
+
+        proposals = 0
+        for seed in range(400):
+            ctx.rng = RNG(seed)
+            if self._fire(ctx, meta):
+                proposals += 1
+        rate = proposals / 400
+        # 0.325 is the target; the band excludes both 1.0 (no gate at all) and 0.
+        assert 0.25 < rate < 0.40
+
+    def test_chooses_its_object_by_average_salience(self, ctx_abc_abd_xyz, meta):
+        """``(tell *workspace* 'choose-object 'get-average-salience)``,
+        descriptions.ss:107 — the same key as the top-down scout."""
+        ctx = ctx_abc_abd_xyz
+        by_average = ctx.workspace.initial_string.letters[0]     # a
+        by_intra = ctx.workspace.target_string.letters[2]        # z
+        _only_salient(ctx, by_average, key="average")
+        _only_salient(ctx, by_intra, key="intra")
+        ctx.slipnet.nodes["plato-a"].activation = 100.0
+        ctx.slipnet.nodes["plato-z"].activation = 100.0
+        ctx.slipnet.nodes["plato-leftmost"].activation = 0.0
+        ctx.slipnet.nodes["plato-rightmost"].activation = 0.0
+        ctx.temperature.value = 100.0
+
+        for seed in range(40):
+            ctx.rng = RNG(seed)
+            posted = self._fire(ctx, meta)
+            if posted:
+                break
+        else:  # pragma: no cover
+            pytest.fail("the property-link gate never opened in 40 seeds")
+
+        # Both a and z carry a property link, so the object that was chosen is
+        # legible from which property was proposed.
+        assert posted[0].arguments["structure"].object is by_average
+        assert posted[0].arguments["structure"].descriptor.name == "plato-alphabetic-first"
+
+
+class TestDescriptionBuilderReactivation:
+    def test_a_duplicate_reactivates_the_type_and_the_descriptor(
+        self, ctx_abc_abd_xyz, meta
+    ):
+        """``descriptions.ss:164-168``: the fizzle is preceded by two jolts.
+
+        This is why the scouts may stop pre-checking duplicates — the duplicate
+        path is not waste, it is how a concept the Workspace has already
+        committed to is held up against decay.
+        """
+        ctx = ctx_abc_abd_xyz
+        a_letter = ctx.workspace.initial_string.letters[0]
+        existing = a_letter.descriptions[0]
+        dup = Description(a_letter, existing.description_type, existing.descriptor)
+        dup.proposal_level = Description.EVALUATED
+
+        existing.description_type.activation_buffer = 0.0
+        existing.descriptor.activation_buffer = 0.0
+        existing.description_type.frozen = False
+        existing.descriptor.frozen = False
+
+        interp = CodeletInterpreter(builtins=_get_test_builtins())
+        registry = CodeletRegistry.from_metadata(meta, interp)
+        interp.execute(registry.get_compiled("description-builder"), ctx, structure=dup)
+
+        assert existing.description_type.activation_buffer == 100.0
+        assert existing.descriptor.activation_buffer == 100.0
+        assert not dup.is_built
 
 
 # ═══════════════════════════════════════════════════════════════════════

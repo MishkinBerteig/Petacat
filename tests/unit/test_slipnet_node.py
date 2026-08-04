@@ -266,3 +266,69 @@ def test_fixed_link_intrinsic_and_dynamic_degrees_match():
     link = SlipnetLink(n1, n2, "lateral", fixed_link_length=30)
     # A fixed-length link has no label, so shrinking never applies.
     assert link.intrinsic_degree_of_association() == link.degree_of_association()
+
+
+# --- get-similar-property-links  (slipnet.ss:108-112) ----------------------
+#
+# A property link is followed *stochastically*, with probability equal to its
+# degree of association:
+#
+#     (filter (lambda (link)
+#               (prob? (temp-adjusted-probability
+#                        (% (tell link 'get-degree-of-assoc)))))
+#       property-links)
+#
+# Following every property link unconditionally, as Petacat's bottom-up
+# description scout used to, makes the `first`/`last` descriptions that drive the
+# xyz family's opposite mappings several times as common as the reference makes
+# them — and makes them at a rate no longer sensitive to temperature.
+
+
+class _ScriptedRNG:
+    """Answers ``prob`` from a script and records what it was asked."""
+
+    def __init__(self, answers):
+        self._answers = list(answers)
+        self.asked = []
+
+    def prob(self, p):
+        self.asked.append(p)
+        return self._answers.pop(0)
+
+
+def _node_with_property_links(*lengths):
+    node = SlipnetNode("a", "a", 10)
+    for i, length in enumerate(lengths):
+        target = SlipnetNode(f"prop{i}", f"prop{i}", 10)
+        node.property_links.append(
+            SlipnetLink(node, target, "property", fixed_link_length=length)
+        )
+    return node
+
+
+def test_similar_property_links_asks_for_the_links_degree_of_association():
+    node = _node_with_property_links(75)
+    rng = _ScriptedRNG([True])
+    node.get_similar_property_links(rng)
+    # a→alphabetic-first is length 75, so association 25.
+    assert rng.asked == [0.25]
+
+
+def test_similar_property_links_keeps_only_the_links_that_win_their_draw():
+    node = _node_with_property_links(75, 10)
+    rng = _ScriptedRNG([False, True])
+    kept = node.get_similar_property_links(rng)
+    assert kept == [node.property_links[1]]
+
+
+def test_similar_property_links_can_come_back_empty():
+    """An empty result is a fizzle, not a fallback (descriptions.ss:115-117)."""
+    node = _node_with_property_links(75)
+    assert node.get_similar_property_links(_ScriptedRNG([False])) == []
+
+
+def test_a_node_without_property_links_asks_nothing():
+    node = SlipnetNode("b", "b", 10)
+    rng = _ScriptedRNG([])
+    assert node.get_similar_property_links(rng) == []
+    assert rng.asked == []

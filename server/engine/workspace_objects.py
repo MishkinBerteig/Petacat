@@ -94,7 +94,7 @@ class WorkspaceObject:
                 neighbors.append(letters[left_pos])
             # Groups whose right edge is at left_pos
             for g in getattr(string, "groups", []):
-                if g.right_string_pos == left_pos:
+                if g.right_string_pos == left_pos and getattr(g, "is_built", True):
                     neighbors.append(g)
         return neighbors
 
@@ -117,7 +117,7 @@ class WorkspaceObject:
                 neighbors.append(letters[right_pos])
             # Groups whose left edge is at right_pos
             for g in getattr(string, "groups", []):
-                if g.left_string_pos == right_pos:
+                if g.left_string_pos == right_pos and getattr(g, "is_built", True):
                     neighbors.append(g)
         return neighbors
 
@@ -143,17 +143,64 @@ class WorkspaceObject:
                 return n
         return None
 
-    def choose_neighbor(self, rng: RNG) -> WorkspaceObject | None:
+    def choose_neighbor(self, rng: RNG | None = None) -> WorkspaceObject | None:
         """Stochastically pick a neighbor weighted by intra-string salience.
 
         Scheme: workspace-objects.ss:417-423 — a bare
         ``stochastic-pick-by-method``, so no temperature adjustment and no
         weight floor: a neighbour of salience 0 is not chosen
         (``utilities.ss:443-448``).
+
+        The candidate set is *every* object edged at the adjacent position, at any
+        nesting level — the adjacent letter even when it sits inside a group, plus
+        every group edged there.  A same-``enclosing_group`` filter (which is what
+        the ``choose_neighbor`` builtin used to apply) makes whole classes of bond
+        unreachable: ``m`` could never be bonded to the ``r`` inside ``[rr]``, and
+        that bond is precisely what then fights the group.
         """
-        neighbors = self.get_all_left_neighbors() + self.get_all_right_neighbors()
+        return self._pick_neighbor(
+            self.get_all_left_neighbors() + self.get_all_right_neighbors(), rng
+        )
+
+    def choose_left_neighbor(self, rng: RNG | None = None) -> WorkspaceObject | None:
+        """Scheme: ``choose-left-neighbor`` (workspace-objects.ss:403-408)."""
+        return self._pick_neighbor(self.get_all_left_neighbors(), rng)
+
+    def choose_right_neighbor(self, rng: RNG | None = None) -> WorkspaceObject | None:
+        """Scheme: ``choose-right-neighbor`` (workspace-objects.ss:410-415)."""
+        return self._pick_neighbor(self.get_all_right_neighbors(), rng)
+
+    def _pick_neighbor(
+        self, neighbors: list[WorkspaceObject], rng: RNG | None
+    ) -> WorkspaceObject | None:
+        """``stochastic-pick-by-method neighbors 'get-intra-string-salience``.
+
+        A sole candidate is returned without drawing: ``stochastic-pick``
+        (``utilities.ss:443-448``) over a one-element list returns that element
+        whatever the weight is — including via the ``random-pick`` fallback when
+        the weight is 0 — so the draw cannot change the answer.  It matters
+        because the density walk (``bonds.ss:136-160``) runs this at every
+        strength update, and in a string with no groups every position offers
+        exactly one candidate.
+
+        *rng* is the caller's when there is one — a bond scout passes the
+        codelet's.  The density walk is reached from ``update_strength``, which
+        carries no RNG in this port any more than the Scheme's ``update-strength``
+        carries one; it reads the run's own RNG off the Workspace instead.  Per
+        *run*, not per process: two runners stepping in one process (a restore
+        test does exactly that) must not draw from each other.
+        """
         if not neighbors:
             return None
+        if len(neighbors) == 1:
+            return neighbors[0]
+        if rng is None:
+            rng = getattr(getattr(self.string, "workspace", None), "rng", None)
+        if rng is None:
+            # Outside a run — an object built directly by a unit test.  The first
+            # candidate keeps the walk defined without inventing a second source
+            # of randomness; ``init_mcat`` always binds the run's own RNG.
+            return neighbors[0]
         weights = [n.salience.get("intra", 1.0) for n in neighbors]
         return rng.weighted_pick(neighbors, weights)
 

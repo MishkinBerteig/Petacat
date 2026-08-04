@@ -208,8 +208,8 @@
     "name": "plato-middle",
     "short_name": "middle",
     "conceptual_depth": 40,
-    "description": "Represents the string-position concept of being in the middle of a string. An instance of string-position-category, it applies to objects that are neither leftmost nor rightmost and the string has more than two elements. Less commonly involved in slippages than leftmost or rightmost, but relevant for strings of odd length.",
-    "descriptor_predicate": "position_in_string(obj, 'middle')"
+    "description": "Represents the string-position concept of being flanked by the ends of a string. An instance of string-position-category, it applies to an object whose ungrouped left neighbour is leftmost and whose ungrouped right neighbour is rightmost — so it is group-aware: in mrrjjj read as [m][rr][jjj] the group [rr] is middle, while the centre letter of abcde is not, its neighbours b and d being interior. Less commonly involved in slippages than leftmost or rightmost, but it is what gives b->[rr] its distinguishing middle=>middle concept-mapping.",
+    "descriptor_predicate": "middle_in_string(obj)"
   },
   {
     "name": "plato-single",

@@ -134,6 +134,26 @@ class WorkspaceString:
         return None
 
     def add_bond(self, bond: Bond) -> None:
+        # Scheme: ``build-bond`` (bonds.ss:410-422).  The two positional slots must
+        # already be free — ``bond-builder`` breaks every bond it displaced
+        # (bonds.ss:403-404) *before* calling this.  Overwriting an occupied slot
+        # silently leaves the displaced bond in ``self.bonds``, still counted as
+        # support and still reported as built, with both its pointers now naming
+        # someone else's bond.  That is a corrupt string, and the corruption shows
+        # up far from its cause, so refuse it here instead.
+        occupant = bond.left_object.right_bond
+        if occupant is not None and occupant is not bond:
+            raise AssertionError(
+                f"right slot of {bond.left_object} is already held by {occupant}: "
+                f"the builder must break incompatible bonds before building {bond}"
+            )
+        occupant = bond.right_object.left_bond
+        if occupant is not None and occupant is not bond:
+            raise AssertionError(
+                f"left slot of {bond.right_object} is already held by {occupant}: "
+                f"the builder must break incompatible bonds before building {bond}"
+            )
+
         self.bonds.append(bond)
         # A bond's left/right pointers are *positional*, independent of which
         # object the bond happens to run from.  Keying off from/to instead meant
@@ -443,6 +463,12 @@ class Workspace:
         self.clamped_rules: list[Rule] = []
 
         self.slipnet = slipnet
+        #: The run's RNG, bound by ``init_mcat``.  Read by
+        #: :meth:`WorkspaceObject._pick_neighbor` for the stochastic neighbour
+        #: walk of ``get-local-density`` (``bonds.ss:136-160``), which is reached
+        #: from ``update_strength`` and so has no RNG of its own to use.  Left
+        #: ``None`` outside a run.
+        self.rng: RNG | None = None
         #: Cached workspace-level average unhappiness, dropped by
         #: ``update_all_object_values``.  See ``get_average_unhappiness``.
         self._average_unhappiness: float | None = None

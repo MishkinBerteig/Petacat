@@ -184,7 +184,9 @@ def test_two_worthless_structures_are_a_coin_flip():
 # One test per fight the builders stage
 # ═══════════════════════════════════════════════════════════════════════════
 
-# bonds.ss:370-376 — 1 vs 1.
+# bonds.ss:370-376 — 1 vs 1, against whatever occupies either **positional slot**
+# (``get-incompatible-bonds``, bonds.ss:79-83): the left object's right slot and
+# the right object's left slot.
 #
 #   strengths 60 / 40, weights 1 / 1
 #   T=100  round(60**0.5) = 8    round(40**0.5) = 6      p = 8/14  = 0.571429
@@ -195,7 +197,9 @@ def test_bond_versus_incompatible_bond_is_one_to_one():
     a, b = string.objects[0], string.objects[1]
     sameness = FakeNode("plato-sameness")
     successor = FakeNode("plato-successor")
-    string.bonds.append(_built(_bond(a, b, sameness)))
+    # ``add_bond`` rather than ``bonds.append``: occupancy of the slot is the
+    # criterion now, and only ``add_bond`` claims one.
+    string.add_bond(_built(_bond(a, b, sameness)))
     proposed = _bond(a, b, successor)
 
     incompatibles = _get_incompatible_structures(_FakeCtx(), proposed)
@@ -205,9 +209,42 @@ def test_bond_versus_incompatible_bond_is_one_to_one():
     assert _win_rate(1.0, 1.0, 60.0, 40.0, 0.0) == pytest.approx(0.825531, abs=0.04)
 
 
-# bonds.ss:377-384 — 1 vs ``(maximum (tell-all incompatible-groups
-# 'get-letter-span))``: ONE shared defender weight, the widest group's letter
-# span, applied to every group in the set.  Each group's own span was wrong.
+def test_bond_fights_a_bond_from_either_object_to_a_different_neighbour():
+    """``get-incompatible-bonds`` is about *slots*, not about object pairs.
+
+    ``b-c`` and ``c-d`` both stand in the way of ``a-b -> c``'s two slots even
+    though neither joins the same pair.  The old test — same pair, different
+    category — saw neither, and ``add_bond`` then overwrote their pointers and
+    left them listed as built with dangling slots.
+    """
+    string = _string("abcd")
+    a, b, c, d = string.objects[:4]
+    sameness = FakeNode("plato-sameness")
+    successor = FakeNode("plato-successor")
+
+    left_neighbour_bond = _built(_bond(a, b, sameness))   # occupies b's left slot
+    right_neighbour_bond = _built(_bond(c, d, sameness))  # occupies c's right slot
+    string.add_bond(left_neighbour_bond)
+    string.add_bond(right_neighbour_bond)
+
+    # Proposed b-c: its slots are b's right slot (free) and c's left slot (free),
+    # so neither neighbour bond conflicts...
+    assert _get_incompatible_structures(_FakeCtx(), _bond(b, c, successor)) == []
+
+    # ...but a proposed a-b of another category wants b's left slot, and a
+    # proposed c-d wants c's right slot.
+    for proposed, expected in (
+        (_bond(a, b, successor), left_neighbour_bond),
+        (_bond(c, d, successor), right_neighbour_bond),
+    ):
+        incompatibles = _get_incompatible_structures(_FakeCtx(), proposed)
+        assert [opponent for opponent, _, _ in incompatibles] == [expected]
+
+
+# bonds.ss:377-384 — every group nesting *both* objects at any depth
+# (``get-common-groups``, groups.ss:1026-1033), at 1 vs ``(maximum (tell-all
+# incompatible-groups 'get-letter-span))``: ONE shared defender weight, the widest
+# group's letter span, applied to every group in the set.
 #
 #   strengths 80 / 50, weights 1 / 3
 #   T=100  round(80**0.5) = 9    round(150**0.5) = 12    p = 9/21  = 0.428571
@@ -234,6 +271,32 @@ def test_bond_versus_incompatible_groups_shares_one_max_span_weight():
 
     assert _win_rate(1.0, 3.0, 80.0, 50.0, 100.0) == pytest.approx(0.428571, abs=0.04)
     assert _win_rate(1.0, 3.0, 80.0, 50.0, 0.0) == pytest.approx(0.082439, abs=0.03)
+
+
+def test_bond_fights_a_group_that_nests_both_objects_two_levels_up():
+    """``nested-member?`` (groups.ss:271-273) recurses into subgroups.
+
+    ``[[ab][cd]]`` holds ``b`` and ``c`` two levels down, and a bond proposed
+    between them contradicts that reading as squarely as one inside ``[bc]``
+    would.  Matching only groups with a same-pair constituent bond of a different
+    category saw no conflict at any level, so cross-level conflicts were never
+    fought at all.
+    """
+    string = _string("abcd")
+    a, b, c, d = string.objects[:4]
+    samegrp = FakeNode("plato-same-group")
+    successor = FakeNode("plato-successor")
+
+    left_pair = _group([a, b], string, samegrp)
+    right_pair = _group([c, d], string, samegrp)
+    outer = _built(_group([left_pair, right_pair], string, samegrp))
+    string.groups.append(outer)
+
+    # Neither b nor c is a *top-level* member of the group they conflict with.
+    assert b not in outer.objects and c not in outer.objects
+    assert outer.nested_member(b) and outer.nested_member(c)
+    incompatibles = _get_incompatible_structures(_FakeCtx(), _bond(b, c, successor))
+    assert [(o, w1, w2) for o, w1, w2 in incompatibles] == [(outer, 1.0, 4.0)]
 
 
 # groups.ss:665-680 — a rival reading of the same material (same category *and*
