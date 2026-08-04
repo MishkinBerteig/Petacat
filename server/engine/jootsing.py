@@ -718,7 +718,9 @@ def _partition_events(
     for event in events:
         placed = False
         for s in sets:
-            if _events_equivalent(s[0], event):
+            # Scheme: ``partition`` (``utilities.ss:743-757``) admits an event to a
+            # set only when it is equivalent to *every* member, not just the first.
+            if all(_events_equivalent(member, event) for member in s):
                 s.append(event)
                 placed = True
                 break
@@ -772,25 +774,60 @@ def _events_equivalent(e1: TraceEvent, e2: TraceEvent) -> bool:
     return True
 
 
+def equivalent_workspace_objects(o1: Any, o2: Any) -> bool:
+    """Scheme: ``equivalent-workspace-objects?`` (``trace.ss:915-930``).
+
+    Object type is the **first** conjunct and ``and`` short-circuits, which is what
+    makes a heterogeneous snag-object list safe.  The list really is heterogeneous:
+    a rule clause may name the string itself (Figure 3.2's ``*string*``
+    object-description), and ``_find_matching_objects`` returns the WorkspaceString
+    for it (``rules.py``), so a string and a letter can sit in the same set.
+
+    Compared by kind, string and span rather than by identity, because two snags
+    separated by a rebuild refer to equivalent objects, not the same ones.
+    """
+    from server.engine.groups import Group
+    from server.engine.workspace_objects import Letter
+
+    l1, g1 = type(o1) is Letter, isinstance(o1, Group)
+    l2, g2 = type(o2) is Letter, isinstance(o2, Group)
+    if (l1, g1) != (l2, g2):
+        return False
+
+    if not (l1 or g1):
+        # A WorkspaceString.  The Scheme's does not implement ``which-string`` and
+        # would trip its own bad-message handler here; compare what it intended.
+        return o1.string_type == o2.string_type and len(o1.text) == len(o2.text)
+
+    if getattr(o1.string, "string_type", None) != getattr(o2.string, "string_type", None):
+        return False
+    if (o1.left_string_pos, o1.right_string_pos) != (o2.left_string_pos, o2.right_string_pos):
+        return False
+    if l1:
+        return o1.letter_category is o2.letter_category
+    return (
+        o1.group_category is o2.group_category
+        and o1.direction is o2.direction
+        and o1.length == o2.length
+        and len(o1.objects) == len(o2.objects)
+        and all(
+            equivalent_workspace_objects(a, b) for a, b in zip(o1.objects, o2.objects)
+        )
+    )
+
+
 def _same_object_set(objects1: list[Any], objects2: list[Any]) -> bool:
     """Do two lists denote the same Workspace objects?
 
-    Scheme: ``sets-equal-pred?`` with ``equivalent-workspace-objects?``.  Compared by
-    the string they sit in and the span they cover rather than by identity, because two
-    snags separated by a rebuild refer to equivalent objects, not the same ones.
+    Scheme: ``sets-equal-pred?`` (``utilities.ss:806-818``) — mutual subset under a
+    pairwise predicate.  Nothing here is ordered, and nothing needs to be: an earlier
+    port sorted derived keys instead, which both required a total order the objects
+    cannot supply and dropped the type test that keeps the comparison meaningful.
     """
-
-    def key(obj: Any) -> tuple:
-        string = getattr(obj, "string", None)
-        return (
-            getattr(string, "text", None),
-            getattr(obj, "left_index", getattr(obj, "position", None)),
-            getattr(obj, "right_index", getattr(obj, "position", None)),
-        )
-
-    return sorted(key(o) for o in (objects1 or [])) == sorted(
-        key(o) for o in (objects2 or [])
-    )
+    a, b = objects1 or [], objects2 or []
+    return all(
+        any(equivalent_workspace_objects(x, y) for y in b) for x in a
+    ) and all(any(equivalent_workspace_objects(x, y) for y in a) for x in b)
 
 
 def _collect_all_theme_entries(

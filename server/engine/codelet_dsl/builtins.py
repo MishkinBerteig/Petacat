@@ -425,6 +425,17 @@ def _build_structure_locked(ctx: EngineContext, structure: Any) -> bool:
         structure.string.add_bond(structure)
     elif isinstance(structure, Group):
         structure.string.add_group(structure)
+        # Scheme: ``build-group`` (groups.ss:929-930) jolts every description's
+        # *descriptor* from the Workspace as the group goes in.  Without it the
+        # concepts a group is made of never warm: ``plato-two`` and ``plato-three``
+        # stay cold, so ``plato-length`` — which they are instances of — never rises,
+        # and the length facet cannot compete with letter-category in
+        # ``choose-bond-facet``.  That is the facet ``mrrjjj`` needs to be read as
+        # one-two-three, so the reading was unreachable.
+        for description in structure.descriptions:
+            descriptor = getattr(description, "descriptor", None)
+            if descriptor is not None and hasattr(descriptor, "activate_from_workspace"):
+                descriptor.activate_from_workspace()
         _record_group_event(ctx, structure)
     elif isinstance(structure, Bridge):
         ctx.workspace.add_bridge(structure)
@@ -1086,8 +1097,13 @@ def record_snag(ctx: EngineContext, top_rule: Any, translated_rule: Any) -> None
     workspace = ctx.workspace
     theme_pattern = ctx.themespace.get_dominant_theme_pattern("vertical")
 
-    # The objects the translated rule was reaching for are the ones to blame.
-    snag_objects = _snag_objects(ctx, translated_rule)
+    # The objects the rule application actually failed on are the ones to blame
+    # (Scheme: ``make-snag-event``, ``trace.ss:1055-1059``, reads them off the
+    # failure-result).  Only when the failure reported none — a rule that could not
+    # be turned into transforms at all — fall back to everything it mentioned.
+    snag_objects = list(getattr(ctx, "last_failure_objects", []) or [])
+    if not snag_objects:
+        snag_objects = _snag_objects(ctx, translated_rule)
 
     event = SnagEvent(
         codelet_count=ctx.codelet_count,
@@ -1414,7 +1430,16 @@ def _apply_rule_locked(ctx: EngineContext, rule: Any, string: Any = None) -> str
 
     target = string if string is not None else ctx.workspace.target_string
 
-    result = apply_rule_to_string(rule, target, ctx.slipnet)
+    # Scheme: ``apply-rule`` is handed a snag-action (``answers.ss``), and
+    # ``make-snag-event`` (``trace.ss:1055-1059``) takes the snag objects from the
+    # failure-result it carries.  Stash them so the ``record_snag`` that follows
+    # names what actually failed rather than re-resolving every clause.
+    ctx.last_failure_objects = []
+
+    def _remember(failure: Any) -> None:
+        ctx.last_failure_objects = list(getattr(failure, "objects", []) or [])
+
+    result = apply_rule_to_string(rule, target, ctx.slipnet, failure_action=_remember)
     if result is None:
         return None
 

@@ -175,6 +175,18 @@ class WorkspaceObject:
         # for the base/letter case, just return descriptions.
         return list(self.descriptions)
 
+    def get_descriptor_for(self, description_type: Any) -> Any:
+        """The descriptor this object carries on *description_type*, or ``None``.
+
+        Scheme: ``get-descriptor-for`` (workspace-objects.ss:217-222).  Searches
+        ``descriptions`` only — a group's bond-descriptions are deliberately not
+        consulted, exactly as in the reference.
+        """
+        for description in self.descriptions:
+            if description.description_type is description_type:
+                return description.descriptor
+        return None
+
     def get_all_descriptions(self) -> list[Any]:
         """Return all descriptions including bond descriptions for groups.
 

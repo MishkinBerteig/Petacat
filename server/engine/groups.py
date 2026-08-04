@@ -117,13 +117,13 @@ class Group(WorkspaceObject, WorkspaceStructure):
         # A letter-category description on a successor/predecessor group is what
         # makes horizontal bridges like [abc] -> [bcd] possible (groups.ss:44-46).
         if getattr(self.bond_facet, "name", "") == "plato-letter-category":
-            describe("plato-letter-category", self._initial_letter_category())
-
-    def _initial_letter_category(self):
-        obj = self.left_object
-        while hasattr(obj, "left_object"):
-            obj = obj.left_object
-        return getattr(obj, "letter_category", None)
+            # ``groups.ss:47`` takes the first object in *direction* order, not the
+            # leftmost one.  The difference is the whole point of the description: a
+            # leftward group over ``ab`` is the sequence b, a, and its initial letter
+            # is ``b``.  Reading the leftmost letter instead hid every relation that
+            # runs off the end of a leftward group — including the ``b -> c`` of
+            # ``ab -> c``.
+            describe("plato-letter-category", self._get_initial_letter_category())
 
     @property
     def length(self) -> int:

@@ -372,5 +372,71 @@
     "seed": 1108779034,
     "mode": "discovery",
     "description": "Answers flz, then dlz, then hlz at step 1721"
+  },
+  {
+    "name": "copy1",
+    "section": "port",
+    "initial": "ab",
+    "modified": "c",
+    "target": "ab",
+    "answer": null,
+    "seed": 4242001,
+    "mode": "discovery",
+    "description": "ab -> c with the target identical to the initial string"
+  },
+  {
+    "name": "copy2",
+    "section": "port",
+    "initial": "bc",
+    "modified": "d",
+    "target": "bc",
+    "answer": null,
+    "seed": 4242002,
+    "mode": "discovery",
+    "description": "bc -> d with the target identical to the initial string"
+  },
+  {
+    "name": "copy3",
+    "section": "port",
+    "initial": "xy",
+    "modified": "z",
+    "target": "xy",
+    "answer": null,
+    "seed": 4242003,
+    "mode": "discovery",
+    "description": "xy -> z with the target identical to the initial string"
+  },
+  {
+    "name": "copy4",
+    "section": "port",
+    "initial": "zy",
+    "modified": "x",
+    "target": "zy",
+    "answer": null,
+    "seed": 4242004,
+    "mode": "discovery",
+    "description": "zy -> x, a predecessor step, target identical to the initial"
+  },
+  {
+    "name": "copy5",
+    "section": "port",
+    "initial": "aabb",
+    "modified": "cc",
+    "target": "aabb",
+    "answer": null,
+    "seed": 4242005,
+    "mode": "discovery",
+    "description": "aabb -> cc, a length collapse, target identical to the initial"
+  },
+  {
+    "name": "copy6",
+    "section": "port",
+    "initial": "abc",
+    "modified": "d",
+    "target": "abc",
+    "answer": null,
+    "seed": 4242006,
+    "mode": "discovery",
+    "description": "abc -> d with the target identical to the initial string"
   }
 ]

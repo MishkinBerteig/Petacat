@@ -973,10 +973,9 @@ class Rule(WorkspaceStructure):
     def get_degree_of_support(self, workspace: Workspace) -> float:
         """Product of supporting bridge strengths (as fractions).
 
-        Scheme: rules.ss:237-242.
+        Scheme: rules.ss:237-242 — ``(100* (product ...))``, and the product of the
+        empty list is 1, so a rule resting on no bridges is fully supported.
         """
-        if not self.supporting_bridges:
-            return 0.0
         product = 1.0
         for b in self.supporting_bridges:
             equiv = _get_equivalent_bridge(workspace, b)
@@ -1969,21 +1968,32 @@ def apply_rule(
         # Group transforms by object, sorted deepest-first
         grouped = _group_transforms_by_object(all_transforms)
 
-        # Apply transforms to each object's image (inside-out order)
+        # Apply transforms to each object's image (inside-out order).  A failure
+        # here is the Scheme's CHANGE case: the object being changed is to blame.
         for obj, transforms in grouped:
             img = _get_object_image(obj, slipnet)
             if img is not None:
-                _apply_transforms(transforms, img, slipnet)
+                try:
+                    _apply_transforms(transforms, img, slipnet)
+                except ImageFailure as e:
+                    if not e.objects:
+                        e.objects = [obj]
+                    raise
 
-        # Apply string-position swaps
+        # Apply string-position swaps — the Scheme's SWAP case names both objects.
         for swap in string_position_swaps:
-            _apply_string_position_swap(swap[1], swap[2])
+            try:
+                _apply_string_position_swap(swap[1], swap[2])
+            except ImageFailure as e:
+                if not e.objects:
+                    e.objects = [swap[1], swap[2]]
+                raise
 
         return grouped
 
     except ImageFailure as e:
         if failure_action is not None:
-            failure_action(str(e))
+            failure_action(e)
         return None
     except Exception:
         return None
@@ -2238,9 +2248,11 @@ def _check_for_conflicts(transforms: list[tuple]) -> None:
             obj2, (dim2, _) = t2
             # Same object, same dimension = conflict
             if obj1 is obj2 and dim1 is dim2:
+                # Scheme's CONFLICT failure-result names both objects.
                 raise ImageFailure(
                     f"Conflicting transforms on same object for dimension "
-                    f"{getattr(dim1, 'short_name', '?')}"
+                    f"{getattr(dim1, 'short_name', '?')}",
+                    objects=[obj1, obj2],
                 )
 
 

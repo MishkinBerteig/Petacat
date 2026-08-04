@@ -48,6 +48,16 @@ class FakeNode:
         self.lateral_sliplinks: list[FakeLink] = []
         self.frozen = False
 
+    def degree_of_assoc(self) -> float:
+        """Scheme: ``get-degree-of-assoc`` on a slipnode (slipnet.ss:90-91) —
+        ``100 - (fully-active? ? shrunk-link-length : intrinsic-link-length)``,
+        with the shrunk length 40% of the intrinsic one (slipnet.ss:191)."""
+        if self.intrinsic_link_length is None:
+            return 0.0
+        if self.fully_active():
+            return max(0.0, 100.0 - round(0.4 * self.intrinsic_link_length))
+        return max(0.0, 100.0 - self.intrinsic_link_length)
+
     def fully_active(self) -> bool:
         return self._fully_active
 

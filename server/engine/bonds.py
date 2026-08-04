@@ -77,28 +77,30 @@ class Bond(WorkspaceStructure):
         else:
             facet_factor = 0.7
 
-        # Bond degree of association: min(100, 11 * sqrt(degree_of_assoc))
-        raw_assoc = self.bond_category.activation  # Simplified: use activation as proxy
-        # More accurate: find degree of assoc from bond_category
         assoc = self._bond_degree_of_assoc()
 
         return round(compat * facet_factor * assoc)
 
     def _bond_degree_of_assoc(self) -> float:
-        """Scaled degree of association for bond category.
+        """Scaled degree of association for the bond category.
 
-        Scheme: bonds.ss:490-492.
-        min(100, round(11 * sqrt(degree_of_assoc)))
+        Scheme: ``bond-degree-of-assoc`` (bonds.ss:490-492) —
+        ``(min 100 (round (* 11 (sqrt (tell bond-category 'get-degree-of-assoc)))))``.
+
+        The category's own ``get-degree-of-assoc`` (slipnet.ss:90-91) is
+        ``100 - (fully-active? ? shrunk-link-length : intrinsic-link-length)``: a
+        fully-active concept **shrinks** its links and so associates what it labels
+        more strongly.  This used to read ``intrinsic_link_length`` unconditionally,
+        which computed every bond in the system at the unshrunk length — for
+        ``succ``, 40 rather than 76, so ``11*sqrt`` gave 70 rather than 96.  On the
+        length facet, which carries the 0.7 non-letter-category factor, that is an
+        internal strength of 49 rather than 67, and the length bonds that a reading
+        like ``mrrjjj`` as one-two-three depends on were dying at the evaluator.
         """
-        # Get degree of association from the bond category's links
-        # For sameness: intrinsic_link_length = 0, so assoc = 100
-        # For succ/pred: intrinsic_link_length = 60, so assoc = 40
-        if self.bond_category.intrinsic_link_length is not None:
-            raw_assoc = 100.0 - self.bond_category.intrinsic_link_length
-        else:
-            raw_assoc = max(0.0, 100.0 - 50.0)  # Default
-
-        return min(100.0, round(11.0 * math.sqrt(max(0, raw_assoc))))
+        return min(
+            100.0,
+            round(11.0 * math.sqrt(max(0.0, self.bond_category.degree_of_assoc()))),
+        )
 
     def calculate_external_strength(self) -> float:
         """Bond external strength = local support.
@@ -295,3 +297,48 @@ def _walk_neighbors(obj: Any, direction: str) -> list[Any]:
         result.append(neighbor)
         current = neighbor
     return result
+
+
+def incompatible_bond_candidates(
+    object1: Any, object2: Any, bond_facet: Any, bond_category: Any
+) -> bool:
+    """Are these two objects the wrong pair to bond on this facet and category?
+
+    Scheme: ``incompatible-bond-candidates?`` (``bonds.ss:538-550``)::
+
+        (cond
+          ((eq? bond-facet plato-length)
+           (and (directed-group? object1) (directed-group? object2)
+                (not (same-group-direction? object1 object2))))
+          ((eq? bond-category plato-sameness)
+           (or (directed-group? object1) (directed-group? object2)))
+          ((and (directed-group? object1) (directed-group? object2))
+           (or (not (same-group-category? object1 object2))
+               (not (same-group-direction? object1 object2))))
+          (else (or (directed-group? object1) (directed-group? object2))))
+
+    Every bond scout consults it before proposing (``bonds.ss:209``, ``254``,
+    ``313``); none of the ported scouts did, so the model was free to bond, for
+    instance, a successor group to a predecessor group on letter-category.
+    """
+    from server.engine.groups import Group
+
+    def directed(obj: Any) -> bool:
+        # Scheme: ``directed-group?`` (groups.ss:1050-1055).
+        if not isinstance(obj, Group):
+            return False
+        name = getattr(obj.group_category, "name", "")
+        return name in ("plato-succgrp", "plato-predgrp")
+
+    d1, d2 = directed(object1), directed(object2)
+
+    if getattr(bond_facet, "name", "") == "plato-length":
+        return d1 and d2 and object1.direction is not object2.direction
+    if getattr(bond_category, "name", "") == "plato-sameness":
+        return d1 or d2
+    if d1 and d2:
+        return (
+            object1.group_category is not object2.group_category
+            or object1.direction is not object2.direction
+        )
+    return d1 or d2

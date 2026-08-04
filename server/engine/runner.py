@@ -117,6 +117,13 @@ class EngineContext:
         self.self_watching_enabled: bool = True
         self.spreading_activation_threshold: int = 100
 
+        #: The Workspace objects the most recent rule application failed on — the
+        #: Scheme's ``<failure-result>`` objects (``answers.ss:1145-1150``), which is
+        #: where ``make-snag-event`` (``trace.ss:1055-1059``) gets a snag's objects.
+        #: Written by the ``apply_rule`` builtin, read by the ``record_snag`` that
+        #: follows it within the same codelet; not run state, so nothing restores it.
+        self.last_failure_objects: list = []
+
         #: How many codelets behind the live Workspace each codelet reads (WP0.5).
         #: 0 — the default — is ordinary live execution; nothing in
         #: ``server/engine/staleness.py`` runs.  See that module for what a
@@ -628,6 +635,9 @@ class EngineRunner:
 
         # 3. Update object importances, unhappiness, salience
         ctx.workspace.update_all_object_values()
+        # ...and then the workspace-level averages the mapping strengths are read
+        # off, which is the last step of ``update-workspace-values`` (run.ss:344).
+        ctx.workspace.update_average_unhappiness_values()
 
         # 4. Snag-period stochastic exit (Scheme: run.ss:299-302)
         if ctx.trace.within_snag_period:
@@ -954,6 +964,11 @@ class EngineRunner:
 
         if codelet_type == "breaker":
             return self.meta.get_urgency("extremely_low")
+
+        # ``coderack.ss:581-582``: the two self-watching codelets take *medium*
+        # urgency, not the ``else`` branch's low.
+        if codelet_type in ("progress-watcher", "jootser"):
+            return self.meta.get_urgency("medium")
 
         # Most bottom-up scouts use low urgency
         return self.meta.get_urgency("low")

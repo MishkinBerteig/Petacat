@@ -425,7 +425,16 @@ def relative_importances(objects: Sequence[Any]) -> list[int]:
     (``WorkspaceString.update_object_values``).  Kept out of the backends for the
     dynamic-range reason given on ``ObjectValueBatch``.
     """
-    total_raw = sum(o.raw_importance for o in objects) or 1.0
+    total_raw = sum(o.raw_importance for o in objects)
+    if total_raw == 0:
+        # Scheme: ``update-all-relative-importances`` (workspace-strings.ss:326-329)
+        # spreads importance *evenly* when nothing is described yet, rather than
+        # leaving every object at zero.  The difference is visible downstream: the
+        # weighted averages that read these weights return 0 when they all vanish
+        # (utilities.ss:388-392), which reads as "no unhappiness" rather than "no
+        # information".
+        n = len(objects)
+        return [round(100.0 / n)] * n if n else []
     return [round(100.0 * o.raw_importance / total_raw) for o in objects]
 
 

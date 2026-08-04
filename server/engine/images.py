@@ -245,7 +245,18 @@ class ImageFailure(Exception):
 
     This replaces the Scheme ``(fail)`` continuation. Callers should catch
     this to handle rule-application failures gracefully.
+
+    ``objects`` carries the Workspace objects the failure happened *on*, which is
+    the Scheme's ``<failure-result>`` (``answers.ss:1145-1150``): ``SWAP`` reports
+    both swapped objects, ``CONFLICT`` the two in conflict, ``CHANGE`` the single
+    object being changed.  ``make-snag-event`` (``trace.ss:1055-1059``) takes the
+    snag objects from exactly there, so a snag names what actually went wrong
+    rather than everything the rule mentioned.
     """
+
+    def __init__(self, message: str = "", objects: list | None = None) -> None:
+        super().__init__(message)
+        self.objects: list = objects or []
 
 
 # ---------------------------------------------------------------------------

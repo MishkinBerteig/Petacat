@@ -108,17 +108,30 @@ def test_degree_of_assoc_sameness_is_100():
     assert bond._bond_degree_of_assoc() == 100.0
 
 
-def test_degree_of_assoc_successor_is_70():
+def test_degree_of_assoc_successor_is_70_when_the_category_is_not_fully_active():
     bond = _bond(_Obj(0, 0), _Obj(1, 1), _successor(), _letter_category())
     # intrinsic_link_length 60 -> raw 40 -> round(11*sqrt(40)) = 70
     assert bond._bond_degree_of_assoc() == 70.0
 
 
-def test_degree_of_assoc_defaults_when_link_length_none():
+def test_degree_of_assoc_successor_rises_to_96_when_the_category_is_fully_active():
+    """Scheme: slipnet.ss:90-91 — a fully-active concept shrinks its links, so it
+    associates what it labels more strongly.  60 -> shrunk 24 -> raw 76 ->
+    round(11*sqrt(76)) = 96."""
+    cat = FakeNode(
+        "plato-successor", short_name="succ", intrinsic_link_length=60, fully_active=True
+    )
+    bond = _bond(_Obj(0, 0), _Obj(1, 1), cat, _letter_category())
+    assert bond._bond_degree_of_assoc() == 96.0
+
+
+def test_degree_of_assoc_is_zero_when_link_length_none():
     cat = FakeNode("plato-sameness", intrinsic_link_length=None)
     bond = _bond(_Obj(0, 0), _Obj(1, 1), cat, _letter_category())
-    # None -> raw 50 -> round(11*sqrt(50)) = 78
-    assert bond._bond_degree_of_assoc() == 78.0
+    # ``SlipnetNode.degree_of_assoc`` (slipnet.ss:90-91) has nothing to subtract
+    # from 100 without a link length, so the association is 0.  Unreachable for a
+    # real bond: sameness, successor and predecessor all carry link lengths.
+    assert bond._bond_degree_of_assoc() == 0.0
 
 
 # --- internal strength (compatibility * facet * assoc) ---------------------

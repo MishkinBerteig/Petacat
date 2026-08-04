@@ -108,13 +108,18 @@ MIN_RUNS = 3000    # floor before any stop is allowed
 # only 2-3 times.
 MIN_RUNS_IF_NO_SINGLETONS = int(1 / TARGET_UPPER)
 MAX_RUNS = 200000  # backstop against a problem that never saturates
-MAX_STEPS = 6000   # per-run codelet cap
+MAX_STEPS = 100000  # per-run codelet cap; MetaCat has none, so this is only a backstop
 
 # Candidate backends for a worker, most preferred first: the first one whose
 # dependency is importable is taken. Vectorised float64 where NumPy is installed, the
 # reference loops where it is not — both compute in the reference's precision, so the
 # committed baseline is a float64 sample either way.
 DEFAULT_BACKENDS = ("numpy", "python")
+
+# The backends that compute in the committed baseline's own precision — float64 on the
+# CPU. Naming one of these explicitly does not change what a sample *is*, so it may be
+# written to the default path; anything else must be redirected with ``--out``.
+REFERENCE_PRECISION_BACKENDS = frozenset({"numpy", "python"})
 
 # The module each backend name needs. ``python`` is the reference and needs nothing.
 BACKEND_REQUIREMENT = {
@@ -348,7 +353,17 @@ def main() -> None:
     args = ap.parse_args()
 
     backend = args.backend or resolve_backend(DEFAULT_BACKENDS)
-    if args.backend and os.path.abspath(args.out) == os.path.abspath(DEFAULT_OUT):
+    # What the committed baseline claims to be is a float64 CPU sample, and *both*
+    # ``numpy`` and the reference loops compute in that precision — the module
+    # docstring says so, and ``DEFAULT_BACKENDS`` already falls back from one to the
+    # other without changing what the file means. Naming either explicitly therefore
+    # still produces the sample this path holds; only a backend that computes in some
+    # other precision, or somewhere other than the CPU, has to be written elsewhere.
+    if (
+        args.backend
+        and args.backend not in REFERENCE_PRECISION_BACKENDS
+        and os.path.abspath(args.out) == os.path.abspath(DEFAULT_OUT)
+    ):
         sys.exit(
             f"--backend {args.backend} writes a sample from a chosen backend, and "
             f"{DEFAULT_OUT} holds the float64 reference sample. Pass --out to write "

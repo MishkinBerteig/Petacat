@@ -178,18 +178,24 @@ class Bridge(WorkspaceStructure):
         return min(100.0, round(support))
 
     def _is_spanning_singleton(self) -> bool:
-        """Is this a bridge between singleton letters spanning whole strings?"""
-        obj1_is_letter = not hasattr(self.object1, "objects")
-        obj2_is_letter = not hasattr(self.object2, "objects")
-        if not (obj1_is_letter and obj2_is_letter):
-            return False
-        s1 = self.object1.string
-        s2 = self.object2.string
-        if s1 is None or s2 is None:
-            return False
-        s1_len = len(getattr(s1, "objects", []))
-        s2_len = len(getattr(s2, "objects", []))
-        return s1_len == 1 and s2_len == 1
+        """Does *either* object span its whole string as a lone letter?
+
+        Scheme: ``bridges.ss:401-402`` and ``bridges.ss:795-796`` —
+
+            (if (or (and (letter? object1) (tell object1 'spans-whole-string?))
+                    (and (letter? object2) (tell object2 'spans-whole-string?)))
+              100 ...)
+
+        ``or``, not ``and``.  A lone letter has no siblings to draw support from, so
+        it is granted full external strength rather than being starved of it; the
+        earlier reading required *both* sides to be lone letters, which meant a
+        multi-letter string mapping to a one-letter string — ``ab -> c`` — got no
+        external support at all and could never build a horizontal bridge.
+        """
+        for obj in (self.object1, self.object2):
+            if not hasattr(obj, "objects") and obj.spans_whole_string():
+                return True
+        return False
 
     def _get_supporting_bridge_strength(self) -> float:
         """Sum strength of supporting bridges in the same orientation.

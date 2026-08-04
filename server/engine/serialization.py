@@ -272,7 +272,7 @@ def describe_structure(structure: Any) -> dict:
         "kind": type(structure).__name__,
         "label": str(structure),
         "string": getattr(string, "text", None),
-        "left_index": getattr(structure, "left_index", None),
-        "right_index": getattr(structure, "right_index", None),
+        "left_index": getattr(structure, "left_string_pos", None),
+        "right_index": getattr(structure, "right_string_pos", None),
         "strength": getattr(structure, "strength", None),
     }

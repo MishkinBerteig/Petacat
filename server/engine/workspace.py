@@ -368,6 +368,13 @@ class Workspace:
 
         self.top_rules: list[Rule] = []
         self.bottom_rules: list[Rule] = []
+
+        #: Mapping strengths, recomputed once per update cycle by
+        #: :meth:`update_average_unhappiness_values` and read by
+        #: :meth:`get_mapping_strength` (Scheme: ``workspace.ss:517-521``).
+        self.top_mapping_strength: float = 0.0
+        self.bottom_mapping_strength: float = 0.0
+        self.vertical_mapping_strength: float = 0.0
         self.clamped_rules: list[Rule] = []
 
         self.slipnet = slipnet
@@ -457,8 +464,18 @@ class Workspace:
             self.bottom_rules = [r for r in self.bottom_rules if r is not rule]
 
     def get_supported_rules(self, rule_type_top: bool = True) -> list[Rule]:
+        """Scheme: ``workspace.ss:438-439`` —
+
+            (get-supported-rules (rule-type)
+              (filter-meth (tell self 'get-rules rule-type) 'supported?))
+
+        ``supported?`` (``rules.ss:219-222``) is an ``andmap`` over the rule's
+        supporting horizontal bridges, vacuously true for a rule resting on none.
+        No built-ness test: a rule joins ``top-rule-list`` only when the rule-builder
+        builds it (``rules.ss:484``), exactly as it joins ``top_rules`` here.
+        """
         rules = self.top_rules if rule_type_top else self.bottom_rules
-        return [r for r in rules if r.is_built and r.supporting_bridges]
+        return [r for r in rules if r.supported(self)]
 
     def get_average_unhappiness(self) -> float:
         """Workspace-level average unhappiness, weighted by relative importance.
@@ -506,59 +523,91 @@ class Workspace:
         return value
 
     def get_mapping_strength(self, bridge_type_name: str) -> float:
-        """Mapping strength for bridges of a given type.
+        """Scheme: ``workspace.ss:517-521`` — a plain accessor.
 
-        Scheme: workspace.ss:586-624.
-        raw_strength = 100 - average_inter_string_unhappiness
-        Then adjusted based on spanning-bridge / spanning-group-possible / maximal-mapping:
-        - spanning bridge exists: raw_strength (full credit)
-        - spanning groups possible on both strings: raw_strength * 0.5
-        - maximal mapping: 100 * tanh(raw_strength / 40)
-        - else: raw_strength
+        The value is computed once per update cycle by
+        :meth:`update_average_unhappiness_values`, and codelets read whatever that
+        left behind.  Recomputing it on demand instead would hand a codelet a
+        fresher view of the mapping than the reference gives it, which changes how
+        often the answer-finder's gate opens within a cycle.
         """
-        bridges = self.get_bridges(bridge_type_name)
-        built = [b for b in bridges if b.is_built]
-        if not built:
-            return 0.0
+        return {
+            "top": self.top_mapping_strength,
+            "bottom": self.bottom_mapping_strength,
+            "vertical": self.vertical_mapping_strength,
+        }.get(bridge_type_name, 0.0)
 
-        # Compute average inter-string unhappiness for relevant objects
-        string1, string2 = self._get_bridge_type_strings(bridge_type_name)
+    def _average_inter_string_unhappiness(
+        self, string1: WorkspaceString, string2: WorkspaceString | None, orientation: str
+    ) -> float:
+        """Scheme: the ``weighted-average`` calls in ``update-average-unhappiness-values``
+        (``workspace.ss:560-585``), over the objects of *both* strings.
+
+        ``weighted-average`` (``utilities.ss:388-392``) returns **0** when the weights
+        sum to zero — it does not fall back to an unweighted mean.  That matters: with
+        every relative importance at 0 the reference reports no unhappiness at all,
+        and so full mapping strength, where an unweighted mean would report ~100
+        unhappiness and none.
+        """
         objects = list(string1.objects)
         if string2 is not None:
             objects.extend(string2.objects)
-
-        if not objects:
-            return 0.0
-
-        orientation = "horizontal" if bridge_type_name in ("top", "bottom") else "vertical"
         total_weight = sum(o.relative_importance for o in objects)
-        if total_weight > 0:
-            avg_unhappiness = sum(
+        if total_weight == 0:
+            return 0.0
+        return round(
+            sum(
                 o.inter_string_unhappiness.get(orientation, 100.0) * o.relative_importance
                 for o in objects
-            ) / total_weight
-        else:
-            avg_unhappiness = sum(
-                o.inter_string_unhappiness.get(orientation, 100.0)
-                for o in objects
-            ) / len(objects)
+            )
+            / total_weight
+        )
 
-        raw_strength = 100.0 - avg_unhappiness
-
+    def _mapping_strength_from_raw(
+        self, bridge_type_name: str, raw_strength: float
+    ) -> float:
+        """Scheme: the ``cond`` in ``update-average-unhappiness-values``
+        (``workspace.ss:594-603``).  Note there is no "no bridges built" branch: with
+        no bridges every object is maximally unhappy and the arithmetic reaches 0 on
+        its own, so short-circuiting only changes the zero-weight case above."""
+        string1, string2 = self._get_bridge_type_strings(bridge_type_name)
         if self.spanning_bridge_exists(bridge_type_name):
             return round(raw_strength)
-
         if (
             string2 is not None
             and self._spanning_group_possible(string1)
             and self._spanning_group_possible(string2)
         ):
             return round(0.5 * raw_strength)
-
         if self.maximal_mapping(bridge_type_name):
             return round(100.0 * math.tanh(raw_strength / 40.0))
-
         return round(raw_strength)
+
+    def update_average_unhappiness_values(self) -> None:
+        """Recompute the cached mapping strengths.
+
+        Scheme: ``update-average-unhappiness-values`` (``workspace.ss:541-603``), the
+        last step of ``update-workspace-values`` (``run.ss:344``).
+        """
+        top_raw = 100.0 - self._average_inter_string_unhappiness(
+            self.initial_string, self.modified_string, "horizontal"
+        )
+        self.top_mapping_strength = self._mapping_strength_from_raw("top", top_raw)
+
+        vertical_raw = 100.0 - self._average_inter_string_unhappiness(
+            self.initial_string, self.target_string, "vertical"
+        )
+        self.vertical_mapping_strength = self._mapping_strength_from_raw(
+            "vertical", vertical_raw
+        )
+
+        if self.answer_string is not None:
+            bottom_raw = 100.0 - self._average_inter_string_unhappiness(
+                self.target_string, self.answer_string, "horizontal"
+            )
+            self.bottom_mapping_strength = self._mapping_strength_from_raw(
+                "bottom", bottom_raw
+            )
 
     def get_num_unmapped_objects(self, bridge_type: str = "vertical") -> int:
         """Count objects that don't have a bridge of the given type.
@@ -1115,32 +1164,60 @@ class Workspace:
         return len(obj.string.letters) == 1
 
     def _spanning_group_possible(self, string: WorkspaceString) -> bool:
-        """Check if a spanning group could potentially be formed.
+        """Could a group covering the whole string be formed?
 
-        Scheme: workspace.ss:664-680 (spanning-group-possible?).
-        True if a spanning group already exists, or if all adjacent
-        top-level objects share some bond relation along some facet.
+        Scheme: ``spanning-group-possible?`` (``workspace.ss:664-680``)::
+
+            (or (tell string 'spanning-group-exists?)
+                (let ((objects (tell string 'get-constituent-objects)))
+                  (ormap
+                    (lambda (bond-facet)
+                      (let ((relations (adjacency-map ... objects)))
+                        (and (all-exist? relations) (all-same? relations))))
+                    (tell plato-bond-facet 'get-instance-nodes))))
+
+        The question is about *describability*, not about bonds already built: for
+        some bond facet, does every adjacent pair of top-level objects carry a
+        descriptor on that facet, and does every pair yield the **same** relating
+        label?  An earlier reading asked whether each adjacent pair had any incident
+        bond, which is a different question and answers it differently — it can say
+        yes on a string whose adjacent relations disagree, and no on one that is
+        perfectly describable but not yet bonded.
         """
         if string.spanning_group_exists():
             return True
 
-        # Get top-level (non-enclosed) objects sorted by position
-        top_level = sorted(
-            [o for o in string.objects if o.enclosing_group is None],
+        # Scheme: get-constituent-objects (workspace-strings.ss:390-392) — the
+        # top-level objects, left to right.
+        objects = sorted(
+            (o for o in string.objects if o.enclosing_group is None),
             key=lambda o: o.left_string_pos,
         )
-        if len(top_level) < 2:
-            return True  # Single object trivially can form spanning group
 
-        # Check if all adjacent pairs have a consistent bond relation
-        for i in range(len(top_level) - 1):
-            obj1 = top_level[i]
-            obj2 = top_level[i + 1]
-            # Check right bond of obj1 or left bond of obj2
-            if obj1.right_bond is None and obj2.left_bond is None:
-                return False
+        facet_node = self.slipnet.get_node("plato-bond-facet")
+        facets = (
+            [link.to_node for link in facet_node.instance_links]
+            if facet_node is not None
+            else []
+        )
 
-        return True
+        for facet in facets:
+            relations = []
+            for obj1, obj2 in zip(objects, objects[1:]):
+                d1 = obj1.get_descriptor_for(facet)
+                d2 = obj2.get_descriptor_for(facet)
+                relations.append(
+                    self.slipnet.get_label(d1, d2)
+                    if (d1 is not None and d2 is not None)
+                    else None
+                )
+            # all-exist? then all-same? (utilities.ss:178-184); both hold vacuously
+            # for the empty list, so a single top-level object says yes.
+            if all(r is not None for r in relations) and len(
+                {id(r) for r in relations}
+            ) <= 1:
+                return True
+        return False
 
     def _get_nested_letters(self, obj: WorkspaceObject) -> list[Letter]:
         """Get all letters nested within an object (recursively for groups)."""

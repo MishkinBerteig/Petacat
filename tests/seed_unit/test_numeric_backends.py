@@ -324,7 +324,9 @@ def test_relative_importance_survives_denormal_raw_importances() -> None:
 
     # The all-zero case the ``or 1.0`` guard exists for: no descriptor is active
     # yet, so nothing is relatively more important than anything else.
-    assert relative_importances([FakeObject(0.0) for _ in range(4)]) == [0, 0, 0, 0]
+    # Scheme: ``update-all-relative-importances`` (workspace-strings.ss:326-329)
+    # spreads importance evenly when nothing is described yet.
+    assert relative_importances([FakeObject(0.0) for _ in range(4)]) == [25, 25, 25, 25]
     assert relative_importances([]) == []
 
 
