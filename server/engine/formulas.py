@@ -321,7 +321,6 @@ def length_description_probability(
     plato_length: SlipnetNode,
     temperature: float,
     meta: MetadataProvider,
-    rng: RNG | None = None,
 ) -> float:
     """Probability of attaching a length description to a group.
 
@@ -362,6 +361,7 @@ def single_letter_group_probability(
     plato_length: SlipnetNode,
     temperature: float,
     meta: MetadataProvider,
+    rng: RNG | None = None,
 ) -> float:
     """Probability of forming a single-letter group.
 
@@ -371,6 +371,11 @@ def single_letter_group_probability(
     flattens) the probability.
 
     Scheme: workspace-structure-formulas.ss:32-41.
+
+    Local support runs the stochastic density walk, so *rng* is the calling
+    codelet's stream; see ``WorkspaceStructure.update_strength``.  (The builtin
+    of the same name is what the codelet DSL actually calls; this one takes its
+    collaborators as arguments instead of off the context.)
     """
     num_supporting = _count_local_supporting_groups(group)
 

@@ -16,7 +16,13 @@ import pytest
 #: 99999 used to take no longer exists and that seed reaches 3,000 codelets without
 #: snagging.  Which answers a seed reaches is outside the gates on purpose — the
 #: standard is expected-range agreement — and what this file is about is snag
-#: *identity*, which needs some seed that snags.  34 records five.
+#: *identity*, which needs some seed that snags.
+#:
+#: The parity repair (b1fd7a8..c20abed) moved this seed's trajectory too, so the count
+#: quoted here changed from five to four; 34 is kept because the precondition it has to
+#: meet is "snags at all", and four against a floor of one is not a close thing.  The
+#: run reaches the 3,000-codelet budget rather than a stopping state, so those snags are
+#: not competing with an early answer for the budget either.
 SEED = 34
 
 # ``xyz`` has no successor to the ``z``, which is the snag §4.7.2 is written about.

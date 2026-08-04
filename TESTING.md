@@ -317,7 +317,7 @@ the number of endpoints taking `Depends(get_session)`, the size of
 
 | File | Fns | Covers |
 |------|----:|--------|
-| `test_bonds.py` | 18 | `Bond`: direction, facet, strength, flipping |
+| `test_bonds.py` | 25 | `Bond`: direction, facet, strength, flipping |
 | `test_bridge_types.py` | 2 | The bridge-type and orientation constants |
 | `test_codelet_dsl.py` | 3 | Compiling a codelet body: what the interpreter accepts and refuses |
 | `test_commentary.py` | 23 | The `CommentaryLog`, and the emit helpers whose English is written in Python |
@@ -337,7 +337,7 @@ the number of endpoints taking `Depends(get_session)`, the size of
 | `test_theme_types.py` | 6 | `Theme` and `Themespace` type constants |
 | `test_themespace.py` | 30 | Themespace self-watching dynamics: cluster spreading, dominance |
 | `test_trace_event.py` | 6 | `TemporalTrace` event recording |
-| `test_workspace_object.py` | 29 | `WorkspaceObject` and `Letter`: geometry, importance, unhappiness |
+| `test_workspace_object.py` | 40 | `WorkspaceObject` and `Letter`: geometry, importance, unhappiness |
 | `test_workspace_string.py` | 21 | `WorkspaceString`: bond and group management, spanning, relevance |
 | `test_workspace_structure.py` | 10 | The base structure class and its proposal levels |
 
@@ -375,7 +375,7 @@ the number of endpoints taking `Depends(get_session)`, the size of
 | `test_commentary_writer.py` | 8 | Commentary is an injected writer, and every Run gets a real one |
 | `test_dissertation_parity.py` | 49 | The dissertation's claims, encoded as tests |
 | `test_expected_range.py` | 20 | The expected-range oracle: the reachable stopping states of 13 problems |
-| `test_free_running.py` | 12 | Free-running execution across worker threads |
+| `test_free_running.py` | 14 | Free-running execution across worker threads |
 | `test_numeric_engine.py` | 7 | The engine computes the same thing with the substrate engaged |
 | `test_population.py` | 9 | Population batching: K independent runs together |
 | `test_run_identifiers.py` | 8 | Identifiers depend on the run, not on the process's history |

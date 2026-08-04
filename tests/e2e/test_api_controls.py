@@ -496,11 +496,17 @@ async def test_a_stepped_run_keeps_its_terminal_status(app_client):
     that snags takes a different path afterwards and 42 no longer terminates inside
     4,000 codelets.  That is seeded-run agreement, which the phase plan places outside
     the gates on purpose — what this test is about is the *status* a terminal batch
-    reports, and it needs some seed that terminates.  26 answers in 641.
+    reports, and it needs some seed that terminates.
+
+    Reseeded again from 26 to 10 by the parity repair (b1fd7a8..c20abed), which moved
+    26's trajectory: it no longer answers at all but gives up at 2,508 codelets.  The
+    assertions below still passed, but only through their weaker disjunct — the batch
+    this test is written about, the one that *reaches an answer*, had stopped being
+    exercised.  10 answers ``xyd`` in 632, a sixth of the batch it is given.
     """
     create = await app_client.post(
         "/api/runs",
-        json={"initial": "abc", "modified": "abd", "target": "xyz", "seed": 26},
+        json={"initial": "abc", "modified": "abd", "target": "xyz", "seed": 10},
     )
     run_id = create.json()["run_id"]
 

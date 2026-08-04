@@ -1638,7 +1638,10 @@ class TestStructureFighting:
             letters[0].letter_category, letters[1].letter_category,
             None,
         )
-        monkeypatch.setattr(Bond, "update_strength", lambda self: None)
+        # Pinned strengths: the fight is being measured, not the strength formula.
+        # ``rng`` is the drawing codelet's stream, which a real ``update_strength``
+        # would hand to the density walk; there is no walk here to hand it to.
+        monkeypatch.setattr(Bond, "update_strength", lambda self, rng=None: None)
         strong_bond.strength = 90.0
         weak_bond.strength = 10.0
         return strong_bond, weak_bond

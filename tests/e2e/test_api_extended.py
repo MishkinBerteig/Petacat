@@ -131,9 +131,16 @@ async def test_spreading_threshold_changes_the_run_and_survives_reset(app_client
     #: longer reaches a stopping state on this problem inside 4,000 codelets under
     #: either threshold, so both runs hit the cap and their codelet counts agree —
     #: which reads as "the threshold made no difference" when what happened is that
-    #: neither run finished.  26 answers in 641 at the strict threshold and does not
-    #: finish at the loose one, which is the difference this test is asserting.
-    threshold_seed = 26
+    #: neither run finished.
+    #:
+    #: Reseeded from 26 to 6 when the parity repair (b1fd7a8..c20abed) moved 26's
+    #: trajectory.  26 no longer answers at either threshold: it gives up at 2,508
+    #: strict and 2,384 loose, which still differ but by 5%, and two runs that both
+    #: end by giving up are one small shift away from ending at the same codelet —
+    #: or from both hitting the 4,000 cap, which is the exact failure the paragraph
+    #: above is about.  6 answers in 664 strict and 3,049 loose: both reach a
+    #: stopping state, well inside the cap, and the counts differ by 4.6x.
+    threshold_seed = 6
 
     async def run_with(threshold: int) -> dict:
         resp = await app_client.post("/api/runs", json={
@@ -255,8 +262,20 @@ async def test_run_info_reports_live_progress_while_running(app_client):
     import asyncio
 
     # A problem that does not resolve, so there is a run to observe.
+    #
+    # Reproblemed from ``abc -> aabbcc; ijk`` at the module ``SEED`` when the parity
+    # repair (b1fd7a8..c20abed) moved that seed's trajectory: it now *does* resolve,
+    # in about 1,200 codelets, which is roughly 0.4s of engine work sampled at 0.1s.
+    # The run could therefore finish before the first sample and the test failed
+    # intermittently on "never caught the run in flight" — the precondition had gone
+    # stale, not the behaviour under test.  ``aabc -> aabd; ijkk`` at seed 1 reaches
+    # the 20,000-codelet cap without a stopping state, about 12s of engine work
+    # against this loop's 4s ceiling, so the run is still in flight throughout.  It
+    # is the problem class that makes this robust rather than the one seed: 3 seeds
+    # in 40 reach the cap and 12 in 40 run past 3.5s, so a later trajectory shift
+    # lands somewhere that is still long.
     resp = await app_client.post("/api/runs", json={
-        "initial": "abc", "modified": "aabbcc", "target": "ijk", "seed": SEED,
+        "initial": "aabc", "modified": "aabd", "target": "ijkk", "seed": 1,
     })
     run_id = resp.json()["run_id"]
 
@@ -265,8 +284,10 @@ async def test_run_info_reports_live_progress_while_running(app_client):
     )
     try:
         observations = []
-        for _ in range(40):
-            await asyncio.sleep(0.1)
+        # Sampled twice as often, over the same 4s ceiling, so a run that a later
+        # change makes short is still caught rather than missed between samples.
+        for _ in range(80):
+            await asyncio.sleep(0.05)
             info = (await app_client.get(f"/api/runs/{run_id}")).json()
             if info["status"] == "running" and info["codelet_count"] > 0:
                 observations.append(info)

@@ -470,7 +470,7 @@ def propose_group(
     length_node = ctx.slipnet.nodes.get("plato-length")
     if length_node is not None:
         probability = length_description_probability(
-            group, length_node, ctx.temperature.value, ctx.meta, ctx.rng
+            group, length_node, ctx.temperature.value, ctx.meta
         )
         if ctx.rng.prob(probability):
             attach_length_description(group)

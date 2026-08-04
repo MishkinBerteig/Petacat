@@ -419,3 +419,60 @@ def test_directed_neighbour_choice_sees_both_levels():
     chosen = {id(m.choose_right_neighbor(rng)) for _ in range(50)}
     assert chosen == {id(string.objects[1]), id(rr)}
     assert m.choose_left_neighbor(rng) is None
+
+
+# ---------------------------------------------------------------------------
+#  Which generator the neighbour pick draws from
+# ---------------------------------------------------------------------------
+#
+# The pick is reached from the density walk of ``get-local-density``
+# (bonds.ss:136-160, groups.ss:354-383), which runs on every strength update.
+# It used to fall back to an RNG hung off the Workspace when the caller passed
+# none, which under free-running meant the walk drew from the run's shared
+# ``random.Random`` instead of from the executing codelet's own stream.
+
+
+class _RecordingRNG:
+    """Only the one method ``_pick_neighbor`` calls."""
+
+    def __init__(self):
+        self.picks = 0
+
+    def weighted_pick(self, items, weights):
+        self.picks += 1
+        return items[0]
+
+
+def test_the_neighbour_pick_draws_from_the_rng_it_is_given():
+    string, rr = _string_with_rr_group()
+    m = string.objects[0]
+    rng = _RecordingRNG()
+
+    assert m.choose_right_neighbor(rng) is string.objects[1]
+    assert rng.picks == 1
+
+
+def test_the_neighbour_pick_looks_for_no_generator_of_its_own():
+    """With no RNG the walk stays defined and consults nothing.
+
+    Specifically it does not go looking on the Workspace. Hanging the run's
+    generator there was how the density walk got randomness before it was
+    threaded from the call site, and it is the back-reference this pins closed:
+    a caller with no RNG gets the first candidate, not a hidden shared one.
+    """
+    string, rr = _string_with_rr_group()
+    m = string.objects[0]
+
+    class _Workspace:
+        def __getattr__(self, name):  # pragma: no cover - must never be reached
+            raise AssertionError(f"the neighbour pick reached the Workspace for {name!r}")
+
+    string.workspace = _Workspace()
+    assert m.choose_right_neighbor(None) is string.objects[1]
+
+
+def test_the_workspace_holds_no_generator_for_the_density_walk_to_find():
+    from server.engine.workspace import Workspace
+
+    workspace = Workspace("abc", "abd", "ijk", None, _FakeSlipnet())
+    assert not hasattr(workspace, "rng")

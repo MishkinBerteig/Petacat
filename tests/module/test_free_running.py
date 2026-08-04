@@ -13,6 +13,7 @@ allocate the same identifier is not a faster engine.
 from __future__ import annotations
 
 import os
+import threading
 
 import pytest
 
@@ -20,6 +21,8 @@ from server.engine.coderack_shards import WorkerShardedCoderack
 from server.engine.free_running import FreeRunningEngine, run_free
 from server.engine.metadata import MetadataProvider
 from server.engine.runner import EngineRunner
+from server.engine.splittable_rng import SplittableRNG
+from server.engine.workspace_objects import WorkspaceObject
 
 # Every test here executes arithmetic the numeric substrate owns, so each one runs
 # once per backend in the matrix. See tests/conftest.py.
@@ -198,6 +201,114 @@ def test_update_cycles_run_without_stopping_the_workers(meta):
     # Within a wide band: workers cross boundaries concurrently, so the count is
     # approximate by construction rather than exact.
     assert 0.5 * expected <= result.update_cycles <= 1.5 * expected + 2
+
+
+# --- every draw inside a codelet comes from that codelet's stream -----------
+
+
+def test_a_codelet_stream_is_bound_per_thread(meta):
+    """``ctx.rng`` resolves per thread while a codelet holds a stream.
+
+    It was a plain attribute, swapped around each codelet and restored afterwards.
+    That is shared state: worker A's swap was visible to worker B, so B ran against
+    A's stream — or, once A restored, against the run's own ``random.Random``, which
+    two threads drawing from concurrently is a data race under the free-threaded
+    interpreter rather than merely a reordering.
+    """
+    runner = _prepared(meta)
+    ctx = runner.ctx
+    run_rng = ctx.rng
+
+    entered = threading.Event()
+    release = threading.Event()
+    seen_by_the_other_thread = []
+
+    def holder():
+        with ctx.use_codelet_rng(SplittableRNG(1, stream=99)):
+            entered.set()
+            release.wait(5)
+
+    thread = threading.Thread(target=holder)
+    thread.start()
+    assert entered.wait(5)
+    # This thread has bound nothing, so it still sees the run's generator.
+    seen_by_the_other_thread.append(ctx.rng)
+    release.set()
+    thread.join(5)
+
+    assert seen_by_the_other_thread == [run_rng]
+    # And the binding leaves nothing behind when it unwinds.
+    assert ctx.rng is run_rng
+
+
+def test_the_density_walk_draws_from_the_codelets_own_stream(meta):
+    """The stochastic neighbour walk must not reach past its codelet for randomness.
+
+    Bond and group external strength is local density (``bonds.ss:136-160``,
+    ``groups.ss:354-383``), and every step of that walk is a salience-weighted
+    stochastic pick, re-rolled on each strength update. The walk used to read an RNG
+    hung off the Workspace — the run's single shared generator — which both bypassed
+    the per-codelet streams free-running derives from ``(seed, worker, slot)`` and put
+    one ``random.Random`` in reach of every worker at once.
+
+    Recorded at the pick itself, and only where a pick is real: a position offering
+    one candidate is returned without drawing, so the draws counted here are the ones
+    where two or more objects are edged at a walk position — which needs groups, and
+    is why the problem is ``mrrjjj``.
+
+    The sharp assertion is the last one. A stream is created by the worker thread
+    that is about to run the codelet, so "created on the thread that drew from it"
+    says the walk used *this* codelet's stream and not a neighbour's. Measured
+    against the mechanism this replaced — a codelet's stream assigned to a shared
+    ``ctx.rng`` — 16 of 159 draws at four workers came from another thread's stream.
+    """
+    runner = _prepared(meta)
+    ctx = runner.ctx
+    run_rng = ctx.rng
+
+    #: ``id(stream) -> the thread that asked for it``.
+    owner: dict[int, int] = {}
+    make_stream = SplittableRNG.for_codelet
+    original = WorkspaceObject._pick_neighbor
+    drawn: list[tuple[bool, object, int]] = []
+    lock = threading.Lock()
+
+    def for_codelet(self, worker, slot):
+        stream = make_stream(self, worker, slot)
+        with lock:
+            owner[id(stream)] = threading.get_ident()
+        return stream
+
+    def recording(self, neighbors, rng):
+        if len(neighbors) > 1:
+            # ``access.current`` is per-thread and is set for exactly the span of
+            # ``_execute_codelet``, so it says whether this walk is a codelet's or the
+            # update cycle's.
+            recorder = ctx.access
+            inside = recorder is not None and recorder.current is not None
+            with lock:
+                drawn.append((inside, rng, threading.get_ident()))
+        return original(self, neighbors, rng)
+
+    SplittableRNG.for_codelet = for_codelet
+    WorkspaceObject._pick_neighbor = recording
+    try:
+        run_free(runner, workers=4, max_steps=2500)
+    finally:
+        WorkspaceObject._pick_neighbor = original
+        SplittableRNG.for_codelet = make_stream
+
+    inside_a_codelet = [(rng, ident) for inside, rng, ident in drawn if inside]
+    assert inside_a_codelet, (
+        "no density walk drew inside a codelet, so this test proved nothing; the "
+        "problem must build groups for a walk position to offer two candidates"
+    )
+    assert all(isinstance(rng, SplittableRNG) for rng, _ in inside_a_codelet)
+    assert all(rng is not run_rng for rng, _ in inside_a_codelet)
+    foreign = [
+        rng for rng, ident in inside_a_codelet if owner.get(id(rng), ident) != ident
+    ]
+    assert not foreign, f"{len(foreign)} draws came from another thread's stream"
 
 
 def test_one_worker_still_uses_the_parallel_path(meta):

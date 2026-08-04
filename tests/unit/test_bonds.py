@@ -12,6 +12,7 @@ real ``WorkspaceString`` over a slipnet faked down to its ``.nodes`` mapping.
 """
 
 from server.engine.bonds import Bond
+from server.engine.groups import Group
 from server.engine.workspace import WorkspaceString
 
 from tests.unit._fakes import FakeNode
@@ -292,6 +293,87 @@ def test_local_density_ignores_a_neighbour_bond_of_another_category():
     proposed = _bond(string.objects[2], string.objects[3], successor,
                      _letter_category(), direction=right)
     assert proposed.get_local_density() == 0.0
+
+
+# --- which generator the walk draws from ------------------------------------
+#
+# Every step of the walk is a salience-weighted stochastic pick among the objects
+# edged at the adjacent position, so a position offering two candidates — a letter
+# and the group edged there — is a draw.  The generator is threaded from the call
+# site (``update_strength(rng)``) rather than read off the Workspace, so that under
+# free-running the walk consumes the executing codelet's own stream.
+
+
+class _RecordingRNG:
+    """Only the one method the neighbour pick calls."""
+
+    def __init__(self):
+        self.picks = 0
+
+    def weighted_pick(self, items, weights):
+        self.picks += 1
+        return items[0]
+
+
+def test_update_strength_hands_its_rng_to_the_density_walk():
+    string = _real_string("mrrjjj")
+    rr = Group(
+        string=string,
+        group_category=FakeNode("plato-same-group"),
+        bond_facet=_letter_category(),
+        direction=None,
+        objects=[string.objects[1], string.objects[2]],
+        bonds=[],
+    )
+    rr.proposal_level = Group.BUILT
+    string.add_group(rr)
+
+    sameness = _sameness()
+    # One disjoint supporting bond, so local support gets as far as the density
+    # walk instead of short-circuiting to 0.
+    _succ_bond(string, 4, 5, sameness, None)
+    proposed = _bond(string.objects[3], string.objects[4], sameness,
+                     _letter_category())
+
+    rng = _RecordingRNG()
+    proposed.update_strength(rng)
+
+    # Walking left from the first ``j`` reaches position 2, where both the letter
+    # ``r`` and the group ``[rr]`` are edged: two candidates, so a real draw.
+    assert rng.picks > 0
+
+
+def test_the_density_walk_asks_no_one_else_for_a_generator():
+    """Given none, it takes the first candidate rather than finding one.
+
+    The generator used to be hung off the Workspace and read from here, which is
+    how the walk came to bypass the per-codelet streams free-running derives.
+    """
+    string = _real_string("mrrjjj")
+    rr = Group(
+        string=string,
+        group_category=FakeNode("plato-same-group"),
+        bond_facet=_letter_category(),
+        direction=None,
+        objects=[string.objects[1], string.objects[2]],
+        bonds=[],
+    )
+    rr.proposal_level = Group.BUILT
+    string.add_group(rr)
+
+    class _Workspace:
+        def __getattr__(self, name):  # pragma: no cover - must never be reached
+            raise AssertionError(f"the density walk reached the Workspace for {name!r}")
+
+    string.workspace = _Workspace()
+
+    sameness = _sameness()
+    _succ_bond(string, 4, 5, sameness, None)
+    proposed = _bond(string.objects[3], string.objects[4], sameness,
+                     _letter_category())
+
+    # No generator, no exception, and the same answer every time.
+    assert proposed.get_local_density() == proposed.get_local_density()
 
 
 # --- incompatible (slot-conflicting) bonds ---------------------------------
