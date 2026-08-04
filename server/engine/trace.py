@@ -564,11 +564,20 @@ def _rule_quality(rule: Any) -> float:
 
 
 def _rule_relative_quality(rule: Any) -> float:
-    """Safely extract relative quality from a rule object."""
+    """Safely extract relative quality from a rule object.
+
+    ``get_relative_quality`` ranks the rule against its Workspace's other rules of
+    the same type (``rules.ss:244-251``), so it needs that Workspace; a rule the
+    engine built carries the reference.  A rule with none — a translated rule, or
+    one a test constructed by hand — has no peers to rank against and scores its
+    raw quality, which is the Scheme's own answer when ``(member? self
+    ranked-rules)`` is false.
+    """
     if rule is None:
         return 0.0
-    if hasattr(rule, "get_relative_quality"):
-        return float(rule.get_relative_quality())
+    workspace = getattr(rule, "workspace", None)
+    if workspace is not None and hasattr(rule, "get_relative_quality"):
+        return float(rule.get_relative_quality(workspace))
     if hasattr(rule, "relative_quality"):
         return float(rule.relative_quality)
     return _rule_quality(rule)

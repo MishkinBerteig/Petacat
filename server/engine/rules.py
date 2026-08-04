@@ -71,48 +71,291 @@ _RULE_DIMENSION_ORDER_NAMES: list[str] = [
 ]
 
 
-def _slippages_for_clause(
+#: ``answers.ss:1365`` — on every translation attempt each conceptual dimension
+#: present among a clause's transform slippages is dropped with this probability.
+#: A designed source of answer diversity: the same rule and the same mapping yield
+#: different translated rules on different attempts, which is how a literal answer
+#: and an abstract one coexist for the same problem.
+DEFAULT_SLIPPAGE_IGNORE_PROBABILITY = 0.4
+
+
+class _TranslationFailure(Exception):
+    """The Scheme's ``(fail)`` continuation inside ``translate`` (answers.ss:1299)."""
+
+
+def _translate_rule_clause(
     clause: RuleClause,
-    slippages: list[ConceptMapping],
-    source_string: Any,
+    from_string: Any,
+    to_string: Any,
     slipnet: Any,
-) -> list[ConceptMapping]:
-    """The slippages that bear on *clause*, ordered so its own come first.
+    rng: Any = None,
+    meta: MetadataProvider | None = None,
+) -> RuleClause | None:
+    """Scheme: ``translate-rule-clause`` (``answers.ss:1350-1389``).
 
-    Scheme: ``translate-object-description`` (answers.ss:1430-1450) resolves the
-    clause's reference objects in the source string and takes the slippages from
-    *their* vertical bridges — not from the mapping as a whole.
-
-    This matters because ``apply-slippages`` returns on the first slippage that
-    matches the concept being translated.  Handed every vertical slippage at
-    once, an unrelated identity mapping shadows the one that counts: translating
-    "change letter-category of rightmost **letter**" against the mapping
-    {a-m: letter=>letter, c-jjj: letter=>group} hit ``a-m`` first and kept
-    ``letter``, so ``c`` standing for the ``jjj`` group never reached the rule and
-    the answer came out ``mrrjjk`` instead of ``mrrkkk``.
+    Returns the translated clause, or ``None`` when the translation fails.
     """
-    if source_string is None or slipnet is None:
-        return slippages
+    if clause.is_verbatim:
+        return clause
 
-    reference_objects = _get_reference_objects_for_clause(
-        clause, source_string, slipnet
+    try:
+        translated_ods: list[tuple] = []
+        od_slippages: list[Any] = []
+        enclosing_slippages: list[Any] = []
+        for od in clause.object_descriptions:
+            new_od, applicable, enclosing = _translate_object_description(
+                od, from_string, to_string, slipnet, rng=rng
+            )
+            translated_ods.append(new_od)
+            od_slippages.extend(applicable)
+            for slippage in enclosing:
+                if not any(slippage is s for s in enclosing_slippages):
+                    enclosing_slippages.append(slippage)
+    except _TranslationFailure:
+        return None
+
+    possible_transform_slippages = od_slippages + enclosing_slippages
+
+    # The p=0.4 per-dimension drop (``answers.ss:1364-1371``).  Note it applies to
+    # the *transform* slippages only — the object-descriptions were already
+    # translated with the full set.
+    ignore_probability = (
+        meta.get_param("slippage_ignore_probability", DEFAULT_SLIPPAGE_IGNORE_PROBABILITY)
+        if meta is not None
+        else DEFAULT_SLIPPAGE_IGNORE_PROBABILITY
     )
-    if not reference_objects:
-        return slippages
+    dimensions: list[Any] = []
+    for slippage in possible_transform_slippages:
+        cm_type = slippage.description_type1
+        if not any(cm_type is d for d in dimensions):
+            dimensions.append(cm_type)
+    ignored = [d for d in dimensions if rng is not None and rng.prob(ignore_probability)]
+    applicable_transform_slippages = [
+        s
+        for s in possible_transform_slippages
+        if not any(s.description_type1 is d for d in ignored)
+    ]
 
-    own: list[ConceptMapping] = []
-    for obj in reference_objects:
-        for attribute in ("vertical_bridge", "horizontal_bridge"):
-            bridge = getattr(obj, attribute, None)
-            if bridge is not None and bridge.is_built:
-                own.extend(bridge.concept_mappings)
-    if not own:
-        return slippages
+    if clause.is_extrinsic:
+        return RuleClause(
+            clause_type=CLAUSE_EXTRINSIC,
+            object_description=translated_ods[0] if len(translated_ods) == 1 else None,
+            extrinsic_objects=translated_ods if len(translated_ods) > 1 else None,
+            dimensions=[
+                _slip(dim, applicable_transform_slippages, rng)
+                for dim in clause.dimensions
+            ],
+        )
 
-    # The clause's own slippages take precedence; the rest of the mapping stays
-    # available for concepts the reference objects say nothing about.
-    rest = [cm for cm in slippages if not any(cm is o for o in own)]
-    return own + rest
+    return RuleClause(
+        clause_type=CLAUSE_INTRINSIC,
+        object_description=translated_ods[0] if translated_ods else None,
+        changes=[
+            _translate_change(change, applicable_transform_slippages, rng)
+            for change in clause.changes
+        ],
+    )
+
+
+def _translate_change(change: RuleChange, slippages: list[Any], rng: Any) -> RuleChange:
+    """Scheme: ``apply-to-change`` (``answers.ss:1513-1518``).
+
+    A Scheme change is ``(<scope> <dimension> <descriptor>)`` and both the
+    dimension and the single descriptor are slipped; the scope is untouched.  The
+    descriptor's *kind* is re-read after slipping rather than assumed, since a
+    slippage is free to hand back a literal where a relation stood.
+    """
+    dimension = _slip(change.dimension, slippages, rng)
+    descriptor = _slip(change.relation or change.to_descriptor, slippages, rng)
+    from_descriptor = _slip(change.from_descriptor, slippages, rng)
+    if descriptor is not None and is_platonic_relation(descriptor):
+        return RuleChange(
+            dimension=dimension,
+            from_descriptor=from_descriptor,
+            relation=descriptor,
+            referent=change.referent,
+        )
+    return RuleChange(
+        dimension=dimension,
+        from_descriptor=from_descriptor,
+        to_descriptor=descriptor,
+        referent=change.referent,
+    )
+
+
+def _translate_object_description(
+    od: tuple,
+    from_string: Any,
+    to_string: Any,
+    slipnet: Any,
+    rng: Any = None,
+) -> tuple[tuple, list[Any], list[Any]]:
+    """Scheme: ``translate-object-description`` (``answers.ss:1432-1494``).
+
+    Returns ``(translated_od, applicable_slippages, enclosing_bond_slippages)``,
+    and raises ``_TranslationFailure`` in the two cases the Scheme aborts the whole
+    translation: the source string contains no object the description names, and
+    the named objects do not share one enclosing group on each side.
+    """
+    from_objects = _find_matching_objects(od, from_string, slipnet)
+    if not from_objects:
+        raise _TranslationFailure("no reference objects for object-description")
+
+    vertical_bridges = [getattr(o, "vertical_bridge", None) for o in from_objects]
+    if not all(b is not None for b in vertical_bridges):
+        # No vertical mapping for these objects: nothing slips, but a whole-string
+        # description still has to be re-expressed for the target string.
+        if _is_whole_string_object_description(od):
+            return _translate_whole_string_object_description(od, to_string, slipnet), [], []
+        return od, [], []
+
+    enclosing1 = [getattr(b.object1, "enclosing_group", None) for b in vertical_bridges]
+    enclosing2 = [getattr(b.object2, "enclosing_group", None) for b in vertical_bridges]
+    if not _all_same(enclosing1) or not _all_same(enclosing2):
+        raise _TranslationFailure("inconsistent enclosing groups")
+
+    all_bridge_slippages: list[Any] = []
+    for bridge in vertical_bridges:
+        all_bridge_slippages.extend(bridge.get_slippages())
+
+    # ``answers.ss:1459-1472``.  Translating downward the *reversed* copies of the
+    # bridge's slippages are excluded; translating upward the forward ones are.
+    # Either way a slippage labelled ``opposite`` survives, because opposition
+    # reads the same in both directions.
+    going_down = getattr(from_string, "string_type", "") in ("initial", "modified")
+    directional: list[Any] = []
+    for bridge in vertical_bridges:
+        directional.extend(
+            bridge.symmetric_slippages
+            if going_down
+            else bridge.get_non_symmetric_slippages()
+        )
+    opposite = slipnet.nodes.get("plato-opposite") if slipnet is not None else None
+    applicable = [
+        s
+        for s in all_bridge_slippages
+        if not (any(s is d for d in directional) and getattr(s, "label", None) is not opposite)
+    ]
+
+    translated_od = _apply_to_object_description(applicable, od, rng)
+
+    # ``answers.ss:1478-1490`` — the bond slippages of the bridge between the two
+    # enclosing groups, if such a bridge exists.
+    group1, group2 = enclosing1[0], enclosing2[0]
+    enclosing_bond_slippages: list[Any] = []
+    if group1 is not None and group2 is not None:
+        enclosing_bridge = getattr(group1, "vertical_bridge", None)
+        if enclosing_bridge is not None and enclosing_bridge.object2 is group2:
+            enclosing_bond_slippages = enclosing_bridge.get_bond_slippages()
+
+    return translated_od, applicable, enclosing_bond_slippages
+
+
+def _is_whole_string_object_description(od: tuple) -> bool:
+    """Scheme: ``whole-string-object-description?`` (``answers.ss:1500-1503``)."""
+    if not od or len(od) < 3:
+        return False
+    return od[0] == "string" or getattr(od[2], "name", "") == "plato-whole"
+
+
+def _translate_whole_string_object_description(
+    od: tuple, to_string: Any, slipnet: Any,
+) -> tuple:
+    """Scheme: ``translate-whole-string-object-description`` (``answers.ss:1506-1510``).
+
+    A whole-string description becomes a *group* description when the target string
+    has a spanning group, and a *string* description when it has not.  Petacat used
+    to pass the ``'string'`` token through unchanged, so a rule translated onto a
+    target that does have a spanning group aimed its transforms at the string
+    image — whose ``new_length`` always fails.
+    """
+    str_pos = slipnet.nodes.get("plato-string-position-category") if slipnet else od[1]
+    whole = slipnet.nodes.get("plato-whole") if slipnet else od[2]
+    if to_string is not None and _spanning_group_exists(to_string):
+        group = slipnet.nodes.get("plato-group") if slipnet else None
+        return (group, str_pos, whole)
+    return ("string", str_pos, whole)
+
+
+def _spanning_group_exists(string: Any) -> bool:
+    """Scheme: ``spanning-group-exists?`` (``workspace-strings.ss:412-413``)."""
+    for group in getattr(string, "groups", []):
+        spans = getattr(group, "spans_whole_string", None)
+        if spans is not None and spans():
+            return True
+    return False
+
+
+def _apply_to_object_description(slippages: list[Any], od: tuple, rng: Any) -> tuple:
+    """Scheme: ``apply-to-object-description`` (``answers.ss:1527-1533``).
+
+    The ``'string`` token is a symbol rather than a slipnode and passes through;
+    the object-category node, the attribute and the descriptor are all slipped.
+    """
+    object_type = od[0] if od[0] == "string" else _slip(od[0], slippages, rng)
+    return (object_type, _slip(od[1], slippages, rng), _slip(od[2], slippages, rng))
+
+
+def _slip(node: Any, slippages: list[Any], rng: Any = None) -> Any:
+    """Apply slippages to a Slipnet node.
+
+    ``rng`` matters: ``SlipnetNode.apply_slippages`` only makes a *coattail*
+    slippage probabilistically (§3.4.1 — "the probability of such coattail
+    slippages occurring is a function of the activation of the original
+    slippage's label node").  Called without an RNG it makes none at all.
+    """
+    if node is None:
+        return None
+    if hasattr(node, "apply_slippages"):
+        return node.apply_slippages(slippages, rng=rng)
+    return node
+
+
+def _valid_rule_clause(clause: RuleClause) -> bool:
+    """Scheme: ``valid-rule-clause?`` (``answers.ss:1536-1545``).
+
+    Translation can produce nonsense — an attribute paired with a descriptor of a
+    different category, a one-object swap of a *letter* (a letter has no
+    components to swap).  MetaCat rejects such a clause outright and the
+    answer-finder reports "Couldn't translate chosen rule"; Petacat had no
+    counterpart, so the clause flowed into ``apply_rule``, matched no object, was
+    silently skipped, and yielded an *unchanged target* as the answer.
+    """
+    if clause.is_verbatim:
+        return True
+
+    ods = clause.object_descriptions
+    if clause.is_extrinsic:
+        if not ods or not all(_valid_object_description(od) for od in ods):
+            return False
+        if len(ods) > 1:
+            return True
+        return getattr(ods[0][0], "name", "") != "plato-letter"
+
+    if not ods or not _valid_object_description(ods[0]):
+        return False
+    return all(_valid_change(change) for change in clause.changes)
+
+
+def _valid_object_description(od: tuple) -> bool:
+    """Scheme: ``valid-object-description?`` (``answers.ss:1548-1551``).
+
+    The descriptor has to belong to the attribute it is stated under: ``leftmost``
+    under String-Position, not under Letter-Category.
+    """
+    if not od or len(od) < 3 or od[1] is None or od[2] is None:
+        return False
+    return getattr(od[2], "category", None) is od[1]
+
+
+def _valid_change(change: RuleChange) -> bool:
+    """Scheme: ``valid-change?`` (``answers.ss:1554-1557``)."""
+    descriptor = change.relation or change.to_descriptor
+    if descriptor is None or change.dimension is None:
+        return False
+    if is_platonic_relation(descriptor):
+        return True
+    return getattr(descriptor, "category", None) is change.dimension
 
 
 def _object_description_node(od: Any) -> SlipnetNode | None:
@@ -137,6 +380,38 @@ def _homogeneity(values: list[Any]) -> float:
     for v in values:
         counts[v] = counts.get(v, 0) + 1
     return max(counts.values()) / len(values)
+
+
+def _average(values: list[float]) -> float:
+    """Scheme's ``average`` (``utilities.ss:380-386``) — the empty list averages 0."""
+    if not values:
+        return 0.0
+    return sum(values) / len(values)
+
+
+def _object_description_uniformity(object_descriptions: list[Any]) -> float:
+    """Scheme: ``object-description-uniformity`` (``rules.ss:1640-1644``).
+
+    How far the object-descriptions agree on which *attribute* names their object —
+    "leftmost", "the letter c", "length three".  1 when they all use the same one.
+    """
+    if not object_descriptions:
+        return 1.0
+    return _homogeneity(
+        [_object_description_attribute(od) for od in object_descriptions]
+    )
+
+
+def _change_abstractness_uniformity(changes: list[Any]) -> float:
+    """Scheme: ``change-abstractness-uniformity`` (``rules.ss:1650-1654``).
+
+    ``2|p - ½|`` over one dimension's changes, where *p* is the fraction stated as
+    a relation.  All-relation or all-literal scores 1; an even mix scores 0.
+    """
+    if not changes:
+        return 1.0
+    relations = sum(1 for c in changes if c.is_relation)
+    return 2.0 * abs(relations / len(changes) - 0.5)
 
 
 def _dim_sort_key(dim: SlipnetNode) -> int:
@@ -528,18 +803,35 @@ def _get_enclosing_object(obj: Any) -> Any:
 
 
 def _get_constituent_objects(obj: Any) -> list[Any]:
-    """Return the constituent (sub-)objects of a group or string.
+    """The constituent (sub-)objects of a group or string — **empty for a letter**.
 
-    For a group: its direct member objects.
-    For a string: its top-level letters/groups (not enclosed in another group).
+    For a group: its direct member objects.  For a string: its top-level
+    letters/groups (not enclosed in another group).  For a letter: nothing.
+
+    Scheme: ``constituent-objects-of`` (``utilities.ss:110-114``), which exists
+    precisely because a reference object *can* be a letter — whenever a rule names a
+    group the string it is being applied to does not actually have, ``middle`` or
+    ``rightmost`` resolves to a letter instead.  The Scheme's two rule-application
+    sites originally sent ``'get-constituent-objects`` to whatever came back and
+    halted the run when that was a letter (reproducible at ``aabc -> aabd; ijkk``
+    seed 35); the fix returns ``'()``, the clause then denotes fewer than two
+    objects, and the rule simply does not apply — an outcome the surrounding code
+    already handles.
+
+    This is the single accessor for that question, and the empty list is stated
+    rather than incidental: falling out of ``getattr(obj, "objects", [])`` would put
+    the same defect one refactor away.
     """
+    from server.engine.groups import Group
+
     if _is_workspace_string(obj):
-        from server.engine.workspace_objects import Letter
         return [
             o for o in getattr(obj, "objects", [])
             if getattr(o, "enclosing_group", None) is None
         ]
-    return list(getattr(obj, "objects", []))
+    if isinstance(obj, Group):
+        return list(obj.objects)
+    return []
 
 
 def _get_ending_letter_category(group: Any) -> SlipnetNode | None:
@@ -641,12 +933,36 @@ class RuleClause:
         changes: list[RuleChange] | None = None,
         extrinsic_objects: list[tuple] | None = None,
         verbatim_letters: list[Any] | None = None,
+        dimensions: list[SlipnetNode] | None = None,
     ) -> None:
         self.clause_type = clause_type
         self.object_description = object_description
         self.changes = changes or []
         self.extrinsic_objects = extrinsic_objects
         self.verbatim_letters = verbatim_letters
+        # An extrinsic clause is ``('extrinsic <object-descriptions> <dimensions>)``
+        # (``rules.ss:871-875``): the third element is the list of conceptual
+        # dimensions whose descriptors are swapped among the named objects, and
+        # ``get-extrinsic-transforms`` (``rules.ss:1430``) reads it to generate the
+        # transforms.  It was previously dropped on the floor at instantiation and
+        # the transforms were read from ``changes``, which is empty for every
+        # pipeline-built extrinsic clause — so every swap rule applied as a no-op,
+        # failed ``currently_works``, and was never built.
+        self.dimensions: list[SlipnetNode] = list(dimensions or [])
+
+    @property
+    def object_descriptions(self) -> list[tuple]:
+        """The clause's object-descriptions as a list — Scheme's ``(2nd clause)``.
+
+        Intrinsic clauses always have exactly one; extrinsic clauses have one or
+        more, and the single-object case is what ``rules.ss:1426`` tests to decide
+        that the *subobjects* of the reference object are what get swapped.
+        """
+        if self.extrinsic_objects:
+            return list(self.extrinsic_objects)
+        if self.object_description is not None:
+            return [self.object_description]
+        return []
 
     @property
     def is_intrinsic(self) -> bool:
@@ -671,10 +987,15 @@ class Rule(WorkspaceStructure):
         self,
         rule_type: str,
         clauses: list[RuleClause],
+        workspace: Workspace | None = None,
     ) -> None:
         super().__init__()
         self.rule_type = rule_type
         self.clauses = clauses
+        # The Scheme reaches for the global ``*workspace*`` whenever a rule needs to
+        # rank itself against its peers (``rules.ss:244-251``).  Petacat has no
+        # global, so the rule carries the reference.
+        self.workspace: Workspace | None = workspace
         self.supporting_bridges: list[Any] = []
         self.uniformity: float = 0.0
         self.abstractness: float = 0.0
@@ -755,12 +1076,15 @@ class Rule(WorkspaceStructure):
         Scheme: rules.ss:266-269.
         Returns list of (node, max_activation) for all slipnet nodes in clauses.
         """
+        # ``(remq-duplicates (filter-out symbol? (flatten rule-clauses)))`` — every
+        # slipnode anywhere in the clause structure, which includes an extrinsic
+        # clause's swap dimensions.
         nodes: list[SlipnetNode] = []
         for clause in self.clauses:
             if clause.is_verbatim:
                 continue
-            if clause.object_description:
-                for item in clause.object_description:
+            for od in clause.object_descriptions:
+                for item in od:
                     if hasattr(item, "activation"):
                         nodes.append(item)
             for change in clause.changes:
@@ -768,6 +1092,9 @@ class Rule(WorkspaceStructure):
                              change.to_descriptor, change.relation]:
                     if node is not None and hasattr(node, "activation"):
                         nodes.append(node)
+            for dimension in clause.dimensions:
+                if hasattr(dimension, "activation"):
+                    nodes.append(dimension)
         # Deduplicate
         seen: set[int] = set()
         unique: list[SlipnetNode] = []
@@ -792,10 +1119,12 @@ class Rule(WorkspaceStructure):
             self.quality = 100.0
             return
 
-        if self.is_verbatim_rule:
-            self.quality = 10.0
-            return
-
+        # No verbatim short-circuit.  ``rules.ss:1544-1549`` runs the same formula
+        # for every rule, and a verbatim rule's (100, 0, 100) lands on
+        # ``round((0*3 + 100*2)/5) = 40`` — the least *abstract* rule MetaCat can
+        # state, but a perfectly succinct and uniform one.  Petacat hard-coded 10,
+        # which is ``compute-rule-intrinsic-quality``'s verbatim constant
+        # (``rules.ss:1662``) — a different quantity entirely.
         abs_weight = meta.get_formula_coeff("rule_abstractness_weight")  # 3
         succ_weight = meta.get_formula_coeff("rule_succinctness_weight")  # 2
         combined = weighted_average(
@@ -805,111 +1134,153 @@ class Rule(WorkspaceStructure):
         self.quality = round((self.uniformity / 100.0) * combined)
 
     def _compute_uniformity(self, meta: MetadataProvider) -> None:
-        """§3.3.5 "Uniformity" — four independent factors.
+        """§3.3.5 "Uniformity" — ``compute-rule-uniformity`` (``rules.ss:1552-1596``).
 
         "When several objects change in a string, there should be pressure to
         refer to these objects in a uniform way, using the same object-attribute
         ... Likewise, there should be pressure to describe the changes in a
         uniform way — either all in terms of abstract relationships (such as
         successor), or all in terms of literal descriptors (such as d)."
+
+        Three terms at weights 5, 5 and 1, squashed by ``exp(4(x-1))``:
+
+        * *intrinsic* — the mean of (a) the **product** over conceptual dimensions
+          of ``2|p-½|``, where p is the fraction of that dimension's changes stated
+          as relations, and (b) the homogeneity of the intrinsic clauses'
+          object-attributes.  ObjCtgy and BondFacet changes are excluded: neither
+          is ever a matter of style.
+        * *extrinsic* — the mean of the **cubed** object-attribute homogeneity of
+          each extrinsic clause.
+        * *clause type* — how far the rule is from mixing the two kinds.
+
+        Absent terms are 1, not omitted, which is why a single-clause rule does not
+        score 100 by short-circuit: the intrinsic term still measures its changes.
         """
         if self.is_identity_rule or self.is_verbatim_rule:
             self.uniformity = 100.0
             return
-        if len(self.clauses) <= 1:
-            self.uniformity = 100.0
-            return
 
-        factors: list[float] = []
-
-        # 1. Uniformity of intrinsic-clause object-description attributes.
         intrinsic = self.intrinsic_clauses
-        if len(intrinsic) > 1:
-            factors.append(
-                _homogeneity([_object_description_attribute(c.object_description)
-                              for c in intrinsic])
-            )
+        extrinsic = self.extrinsic_clauses
 
-        # 2. Uniformity of extrinsic-clause object-description attributes.
-        for clause in self.extrinsic_clauses:
-            descriptions = clause.extrinsic_objects or (
-                [clause.object_description] if clause.object_description else []
-            )
-            if len(descriptions) > 1:
-                factors.append(
-                    _homogeneity([_object_description_attribute(od) for od in descriptions])
-                )
-
-        # 3. Uniformity of intrinsic-clause change-descriptors: an abstract
-        #    relationship (successor) or a literal descriptor (`d'), not a mix.
-        change_kinds = [
-            "relation" if change.is_relation else "literal"
+        # ``(flatmap 3rd intrinsic-clauses)``, minus ObjCtgy and BondFacet changes.
+        changes = [
+            change
             for clause in intrinsic
             for change in clause.changes
+            if getattr(change.dimension, "name", "")
+            not in ("plato-object-category", "plato-bond-facet")
         ]
-        if len(change_kinds) > 1:
-            factors.append(_homogeneity(change_kinds))
 
-        # 4. Uniformity of the clause types themselves.
-        factors.append(_homogeneity([c.clause_type for c in self.clauses]))
+        if not intrinsic:
+            intrinsic_uniformity = 1.0
+        else:
+            by_dimension: dict[int, list[RuleChange]] = {}
+            order: list[int] = []
+            for change in changes:
+                key = id(change.dimension)
+                if key not in by_dimension:
+                    by_dimension[key] = []
+                    order.append(key)
+                by_dimension[key].append(change)
+            # ``(product '())`` is 1 — a clause whose every change was excluded
+            # contributes nothing rather than zeroing the term.
+            product = 1.0
+            for key in order:
+                product *= _change_abstractness_uniformity(by_dimension[key])
+            intrinsic_uniformity = _average(
+                [
+                    product,
+                    _object_description_uniformity(
+                        [od for clause in intrinsic for od in clause.object_descriptions]
+                    ),
+                ]
+            )
 
-        if not factors:
-            self.uniformity = 100.0
-            return
+        exponent = meta.get_formula_coeff("rule_uniformity_extrinsic_obj_desc_exponent")  # 3
+        if not extrinsic:
+            extrinsic_uniformity = 1.0
+        else:
+            extrinsic_uniformity = _average(
+                [
+                    _object_description_uniformity(clause.object_descriptions) ** exponent
+                    for clause in extrinsic
+                ]
+            )
 
+        clause_type_uniformity = max(len(intrinsic), len(extrinsic)) / len(self.clauses)
+
+        raw = weighted_average(
+            [intrinsic_uniformity, extrinsic_uniformity, clause_type_uniformity],
+            [
+                meta.get_formula_coeff("rule_uniformity_intrinsic_weight"),  # 5
+                meta.get_formula_coeff("rule_uniformity_extrinsic_weight"),  # 5
+                meta.get_formula_coeff("rule_uniformity_clause_type_weight"),  # 1
+            ],
+        )
         decay = meta.get_formula_coeff("rule_uniformity_adjusted_decay_constant")  # 4
-        mean = sum(factors) / len(factors)
-        self.uniformity = round(100.0 * math.exp(decay * (mean - 1.0)))
+        self.uniformity = round(100.0 * math.exp(decay * (raw - 1.0)))
 
     def _compute_abstractness(self, meta: MetadataProvider) -> None:
-        """§3.3.5 "Abstractness" — three independent factors.
+        """§3.3.5 "Abstractness" — ``compute-rule-abstractness`` (``rules.ss:1599-1625``).
 
-        Note the change *descriptor* depth is what separates "…to successor"
-        (depth 50) from "…to `d'" (depth 10); using only the dimension's depth
-        scores those two rules identically, which is the very comparison the
-        dissertation uses to introduce the measure.
+        The mean of up to three *per-category* averages — object-description
+        attributes, intrinsic change descriptors, extrinsic swap dimensions — each
+        averaged on its own before they are averaged together, with empty
+        categories dropped.  Pooling all the depths into one flat mean, as this used
+        to, silently weights a rule by how many changes it happens to state.
+
+        The change *descriptor* depth is what separates "…to successor" (depth 50)
+        from "…to `d'" (depth 10); using the dimension's depth would score those two
+        rules identically, which is the comparison §3.3.5 uses to introduce the
+        measure.
         """
-        if self.is_verbatim_rule:
-            self.abstractness = 0.0
-            return
         if self.is_identity_rule:
             self.abstractness = 100.0
             return
-
-        depths: list[float] = []
-
-        for clause in self.clauses:
-            # 1. Depth of the object-description attributes (String-Position is
-            #    deeper than Letter-Category, so "leftmost letter" beats "the
-            #    letter `a'").
-            for od in (clause.extrinsic_objects or [clause.object_description]):
-                attribute = _object_description_node(od)
-                if attribute is not None:
-                    depths.append(attribute.conceptual_depth)
-
-            # 2. Depth of intrinsic change-descriptors.
-            for change in clause.changes:
-                descriptor = change.relation or change.to_descriptor
-                if descriptor is not None:
-                    depths.append(descriptor.conceptual_depth)
-
-            # 3. Depth of extrinsic-clause object-attributes (the things swapped).
-            if clause.is_extrinsic:
-                for change in clause.changes:
-                    if change.dimension is not None:
-                        depths.append(change.dimension.conceptual_depth)
-
-        if not depths:
-            self.abstractness = 50.0
+        if self.is_verbatim_rule:
+            self.abstractness = 0.0
             return
 
-        avg_depth = sum(depths) / len(depths)
+        def depth(node: Any) -> float:
+            return float(getattr(node, "conceptual_depth", 0) or 0)
+
+        attribute_depths = [
+            depth(_object_description_node(od))
+            for clause in self.clauses
+            for od in clause.object_descriptions
+            if _object_description_node(od) is not None
+        ]
+        change_depths = [
+            depth(change.relation or change.to_descriptor)
+            for clause in self.intrinsic_clauses
+            for change in clause.changes
+            if (change.relation or change.to_descriptor) is not None
+        ]
+        swap_depths = [
+            depth(dim)
+            for clause in self.extrinsic_clauses
+            for dim in clause.dimensions
+        ]
+
+        categories = [
+            _average(attribute_depths),
+            _average(change_depths),
+            _average(swap_depths),
+        ]
         beta = meta.get_formula_coeff("rule_abstractness_sigmoid_beta")  # 3
         mid = meta.get_formula_coeff("rule_abstractness_sigmoid_midpoint")  # 40
-        self.abstractness = round(100.0 * sigmoid(avg_depth, beta, mid))
+        mean = _average([c for c in categories if c != 0.0])
+        self.abstractness = round(100.0 * sigmoid(mean, beta, mid))
 
     def _compute_succinctness(self, meta: MetadataProvider) -> None:
-        """§3.3.5 "Succinctness" — fewer clauses, and components over enumeration.
+        """§3.3.5 "Succinctness" — ``compute-rule-succinctness`` (``rules.ss:1628-1637``).
+
+        ``100 * 4/(3 + cost)``, where an intrinsic clause costs 1 and an extrinsic
+        clause costs 2 only when it names more than one object — describing a swap
+        via one object's components is cheaper than naming both objects.  Every
+        clause costs at least 1, so succinctness cannot exceed 100; the previous
+        half-cost for a components-only intrinsic clause let it reach 114.
 
         Both the identity rule and verbatim rules are maximally succinct.
         """
@@ -920,44 +1291,50 @@ class Rule(WorkspaceStructure):
         base_cost = meta.get_formula_coeff("rule_succinctness_base_cost")  # 3
         total_cost = 0.0
         for clause in self.clauses:
-            # Factor 1: every clause costs.  Factor 2: describing a change via
-            # an object's components costs less than naming each component, so
-            # "Increase lengths of all objects in string by one" beats three
-            # separate "Increase length of <x> letter by one" clauses.
-            if clause.is_extrinsic:
-                n_objects = len(clause.extrinsic_objects or [clause.object_description])
-                total_cost += 1.0 if n_objects == 1 else float(n_objects)
+            if clause.is_extrinsic and len(clause.object_descriptions) > 1:
+                total_cost += 2.0
             else:
-                per_change = [
-                    0.5 if change.changes_components else 1.0
-                    for change in clause.changes
-                ] or [1.0]
-                total_cost += max(per_change)
+                total_cost += 1.0
         self.succinctness = round(100.0 * (base_cost + 1) / (base_cost + total_cost))
 
     def calculate_internal_strength(self) -> float:
-        """Scheme: rules.ss:286 — uses relative quality."""
-        return self.get_relative_quality()
+        """Scheme: ``rules.ss:286`` — a rule's internal strength IS its *relative*
+        quality, not its raw quality.
+
+        ``get-relative-quality`` consults the global ``*workspace*``; Petacat's
+        equivalent is the back-reference stamped on every rule the engine makes
+        (``Rule.workspace``).  Calling it without one used to fall back silently to
+        raw quality, which lost the percentile spreading that makes the best current
+        rule dominant in the answer-finder's temperature-adjusted pick.
+        """
+        if self.workspace is None:
+            raise ValueError(
+                "Rule.calculate_internal_strength needs the rule's workspace: "
+                "internal strength is rank-relative quality (rules.ss:286). "
+                "Construct the Rule with workspace=..., or set rule.workspace."
+            )
+        return self.get_relative_quality(self.workspace)
 
     def calculate_external_strength(self) -> float:
         """Scheme: rules.ss:287 — same as internal strength for rules."""
         return self.calculate_internal_strength()
 
-    def get_relative_quality(self, workspace: Workspace | None = None) -> float:
-        """Quality relative to other rules of the same type.
+    def get_relative_quality(self, workspace: Workspace) -> float:
+        """Quality relative to the workspace's other rules of the same type.
 
-        Scheme: rules.ss:244-251.
-        rank / total_count * 100.
+        Scheme: ``rules.ss:244-251``.  The rules are ranked by quality and the
+        score is ``100 * rank / count``, so the best of *n* rules scores 100
+        whatever its absolute quality.  A rule not among them — a proposed rule
+        being evaluated, or a translated one — keeps its raw quality, which is what
+        ``(member? self ranked-rules)`` decides in the Scheme.
         """
-        if workspace is None:
-            return self.quality
         rules = (
             workspace.top_rules if self.is_top_rule else workspace.bottom_rules
         )
-        ranked = sorted(rules, key=lambda r: r.quality)
-        if self not in ranked:
+        if not any(r is self for r in rules):
             return self.quality
-        rank = ranked.index(self) + 1
+        ranked = sorted(rules, key=lambda r: r.quality)
+        rank = next(i for i, r in enumerate(ranked) if r is self) + 1
         return round(100.0 * rank / len(ranked))
 
     def supported(self, workspace: Workspace) -> bool:
@@ -1046,6 +1423,61 @@ class Rule(WorkspaceStructure):
         else:
             self.theme_pattern = [self.bridge_theme_type]
 
+    def revise_abstracted_rule_information(self, proposed_rule: Rule) -> None:
+        """Upgrade this rule's supporting bridges from a newly-proposed equivalent.
+
+        Scheme: ``revise-abstracted-rule-information`` (``rules.ss:270-285``), called
+        by the rule-builder when the proposed rule turns out to duplicate one already
+        built (``rules.ss:481``).
+
+        The point is the *tag*.  A rule-clause-template that specifies a change to an
+        object for which no horizontal bridge yet exists is recorded as an
+        unsupported self-change, standing on the object's subobject bridges instead
+        (``rules.ss:294-304``): for ``[abc] -> [cba]`` the bridges a-a, b-b, c-d hold
+        the place of the [abc]--[cba] bridge.  When that bridge is later built, a
+        fresh scout proposes the same rule with the real bridge behind it, and this
+        swaps it in.  What changes as a result is ``supported?`` and
+        ``get_degree_of_support`` — the two gates the answer-finder puts a rule
+        through.  The theme pattern is refreshed unconditionally.
+        """
+        old_tags = self.tagged_supporting_horizontal_bridges
+        new_tags = proposed_rule.tagged_supporting_horizontal_bridges
+        if any(tag[0] for tag in old_tags) and len(old_tags) == len(new_tags):
+            merged = [
+                new if (old[0] and not new[0]) else old
+                for old, new in zip(old_tags, new_tags)
+            ]
+            self.tagged_supporting_horizontal_bridges = merged
+            bridges: list[Any] = []
+            for _tag, tag_bridges in merged:
+                for bridge in tag_bridges:
+                    if not any(bridge is b for b in bridges):
+                        bridges.append(bridge)
+            self.supporting_bridges = bridges
+        self.theme_pattern = proposed_rule.theme_pattern
+
+    def get_descriptors_to_activate(self) -> list[SlipnetNode]:
+        """The nodes a rule activates when it is built.
+
+        Scheme: ``activate-rule-descriptors-from-workspace`` (``rules.ss:494-502``) —
+        each object-description's *descriptor*, and each intrinsic change's
+        *descriptor*.  Narrower than ``get_concept_pattern``, which is for clamping
+        and takes every node in the clause structure.
+        """
+        nodes: list[SlipnetNode] = []
+        for clause in self.clauses:
+            if clause.is_verbatim:
+                continue
+            for od in clause.object_descriptions:
+                if len(od) >= 3 and hasattr(od[2], "activation"):
+                    nodes.append(od[2])
+            if clause.is_intrinsic:
+                for change in clause.changes:
+                    descriptor = change.relation or change.to_descriptor
+                    if descriptor is not None and hasattr(descriptor, "activation"):
+                        nodes.append(descriptor)
+        return nodes
+
     def set_verbatim_rule_information(self) -> None:
         """Scheme: rules.ss:189-194."""
         self.rule_clause_templates = []
@@ -1119,106 +1551,64 @@ class Rule(WorkspaceStructure):
 
     def translate(
         self,
-        slippages: list[ConceptMapping],
-        direction: str = "top-to-bottom",
+        from_string: Any,
+        to_string: Any,
+        slipnet: Any,
         rng: Any = None,
-        source_string: Any = None,
-        slipnet: Any = None,
-    ) -> Rule:
-        """Translate this rule by applying conceptual slippages.
+        meta: MetadataProvider | None = None,
+    ) -> Rule | None:
+        """Translate this rule across the vertical mapping.
 
-        Scheme: rules.ss translate method.
-        Returns a new Rule with slipped descriptors.  Each slipnet node in
-        the rule clauses is passed through the slippages (using the node's
-        apply_slippages method when available for coattail slippage support).
+        Scheme: ``translate`` (``answers.ss:1281-1342``).  Returns the translated
+        rule, or ``None`` when the translation *fails* — which it can, in four ways
+        the previous implementation had none of:
 
-        Parameters
-        ----------
-        slippages : list[ConceptMapping]
-            The vertical bridge concept-mappings to apply.
-        direction : str
-            Either "top-to-bottom" or "bottom-to-top".
+        * a clause names an object the source string does not contain
+          (``answers.ss:1438-1439``);
+        * a clause's reference objects sit inside different enclosing groups on one
+          side or the other (``answers.ss:1453-1455``);
+        * a translated clause is nonsense — a descriptor that is not of its stated
+          attribute's category (``answers.ss:1304-1305``, ``valid-rule-clause?``).
+
+        The slippages a clause is translated by come from the vertical bridges of
+        **that clause's own reference objects** and nowhere else, plus the bond
+        slippages of the bridge between their enclosing groups.  Handing every
+        clause every vertical slippage — as this used to — let an unrelated
+        mapping shadow the one that counts, and let *horizontal* mappings rewrite a
+        rule during a vertical translation.
         """
-        new_clauses = []
+        direction = "top-to-bottom" if self.is_top_rule else "bottom-to-top"
+        new_clauses: list[RuleClause] = []
         for clause in self.clauses:
-            new_clauses.append(
-                self._translate_clause(
-                    clause,
-                    _slippages_for_clause(
-                        clause, slippages, source_string, slipnet
-                    ),
-                    rng=rng,
-                )
+            translated_clause = _translate_rule_clause(
+                clause, from_string, to_string, slipnet, rng=rng, meta=meta
             )
+            if translated_clause is None:
+                return None
+            new_clauses.append(translated_clause)
+
+        if not all(_valid_rule_clause(c) for c in new_clauses):
+            return None
 
         new_rule_type = RULE_BOTTOM if self.is_top_rule else RULE_TOP
         translated = Rule(
             rule_type=new_rule_type,
             clauses=new_clauses,
+            workspace=self.workspace,
         )
-        translated.quality = self.quality
-        translated.uniformity = self.uniformity
-        translated.abstractness = self.abstractness
-        translated.succinctness = self.succinctness
+        # ``answers.ss:987`` recomputes the translated rule's quality values before
+        # it is used: slippages change the literal/relation mix and the conceptual
+        # depths, so copying the source rule's four numbers across describes the
+        # wrong rule.
+        if meta is not None:
+            translated.compute_quality(meta)
+        else:
+            translated.quality = self.quality
+            translated.uniformity = self.uniformity
+            translated.abstractness = self.abstractness
+            translated.succinctness = self.succinctness
         translated.mark_as_translated(self, direction)
         return translated
-
-    def _translate_clause(
-        self,
-        clause: RuleClause,
-        slippages: list[ConceptMapping],
-        rng: Any = None,
-    ) -> RuleClause:
-        """Translate a single clause by applying slippages."""
-        if clause.is_verbatim:
-            return clause  # Verbatim clauses don't translate
-
-        new_changes = []
-        for change in clause.changes:
-            new_change = RuleChange(
-                dimension=self._slip(change.dimension, slippages, rng),
-                from_descriptor=self._slip(change.from_descriptor, slippages, rng),
-                to_descriptor=self._slip(change.to_descriptor, slippages, rng),
-                relation=self._slip(change.relation, slippages, rng),
-            )
-            new_changes.append(new_change)
-
-        new_obj_desc = None
-        if clause.object_description:
-            new_obj_desc = tuple(
-                self._slip(d, slippages, rng)
-                if hasattr(d, "name")
-                else d
-                for d in clause.object_description
-            )
-
-        return RuleClause(
-            clause_type=clause.clause_type,
-            object_description=new_obj_desc,
-            changes=new_changes,
-        )
-
-    def _slip(self, node: Any, slippages: list[ConceptMapping], rng: Any = None) -> Any:
-        """Apply slippages to a Slipnet node.
-
-        ``rng`` matters: ``SlipnetNode.apply_slippages`` only makes a *coattail*
-        slippage probabilistically (§3.4.1 — "the probability of such coattail
-        slippages occurring is a function of the activation of the original
-        slippage's label node").  Called without an RNG it falls into a
-        deterministic mode that fires every eligible coattail, which would make
-        a first=>last slippage always drag successor=>predecessor along with it.
-        """
-        if node is None:
-            return None
-        if hasattr(node, "apply_slippages"):
-            return node.apply_slippages(slippages, rng=rng)
-        # Fallback: simple direct match
-        for cm in slippages:
-            if cm.descriptor1 is node:
-                return cm.descriptor2
-            if cm.descriptor2 is node:
-                return cm.descriptor1
-        return node
 
     def transcribe_to_english(self) -> str:
         """Generate English description of this rule.
@@ -1267,23 +1657,37 @@ def rules_equal(rule1: Rule, rule2: Rule) -> bool:
 
 
 def _clauses_equal(c1: RuleClause, c2: RuleClause) -> bool:
-    """Scheme: rule-clauses-equal?"""
+    """Scheme: ``rule-clauses-equal?`` (``rules.ss:375-382``).
+
+    The clause type, the object-description *list*, and the third element — the
+    changes for an intrinsic clause, the swap **dimensions** for an extrinsic one.
+    Comparing only ``changes`` made every extrinsic clause over the same objects
+    equal whatever it swapped, which is what the duplicate check in the rule
+    builder rests on.
+    """
     if c1.clause_type != c2.clause_type:
         return False
     if c1.is_verbatim:
         return c1.verbatim_letters == c2.verbatim_letters
     # Compare object descriptions
-    od1 = c1.object_description or ()
-    od2 = c2.object_description or ()
-    if len(od1) != len(od2):
+    ods1 = c1.object_descriptions
+    ods2 = c2.object_descriptions
+    if len(ods1) != len(ods2):
         return False
-    for d1, d2 in zip(od1, od2):
-        if d1 is not d2:
-            # Allow group/string interchangeability
-            n1 = getattr(d1, "name", d1)
-            n2 = getattr(d2, "name", d2)
-            if not (_is_group_or_string_name(n1) and _is_group_or_string_name(n2)):
-                return False
+    for od1, od2 in zip(ods1, ods2):
+        if len(od1) != len(od2):
+            return False
+        for d1, d2 in zip(od1, od2):
+            if d1 is not d2:
+                # Allow group/string interchangeability
+                n1 = getattr(d1, "name", d1)
+                n2 = getattr(d2, "name", d2)
+                if not (_is_group_or_string_name(n1) and _is_group_or_string_name(n2)):
+                    return False
+    if c1.is_extrinsic:
+        if len(c1.dimensions) != len(c2.dimensions):
+            return False
+        return all(d1 is d2 for d1, d2 in zip(c1.dimensions, c2.dimensions))
     # Compare changes
     if len(c1.changes) != len(c2.changes):
         return False
@@ -1318,8 +1722,7 @@ def rule_signature(rule: Rule | None) -> list | None:
     prose, and one that fails to transcribe reads "Unknown transformation".
 
     The signature honours the same equivalences ``_clauses_equal`` does, including
-    group/string interchangeability; ``extrinsic_objects`` is excluded because
-    ``_clauses_equal`` does not compare it either.
+    group/string interchangeability.
     """
     if rule is None:
         return None
@@ -1331,6 +1734,12 @@ def _clause_signature(clause: RuleClause) -> list:
         return [
             clause.clause_type,
             [_descriptor_key(letter) for letter in (clause.verbatim_letters or [])],
+        ]
+    if clause.is_extrinsic:
+        return [
+            clause.clause_type,
+            [[_descriptor_key(d) for d in od] for od in clause.object_descriptions],
+            [_descriptor_key(dim) for dim in clause.dimensions],
         ]
     return [
         clause.clause_type,
@@ -1533,9 +1942,9 @@ def abstract_change_descriptions(
 
     # 2. Extrinsic (swap) change descriptions
     if bridges:
+        # ``rules.ss:579-582`` — the bound is ``(add1 (random (length bridges)))``.
         swap_partition = _bounded_random_partition(
-            _disjoint_left_objects_pred, bridges,
-            rng=rng, max_clusters=len(bridges) + 1,
+            _disjoint_left_objects_pred, bridges, rng=rng,
         )
         for cluster in swap_partition:
             all_swaps = _get_all_swaps(cluster)
@@ -1848,7 +2257,8 @@ def instantiate_rule_clause_template(
             clause_type=CLAUSE_EXTRINSIC,
             object_description=obj_descs[0] if len(obj_descs) == 1 else None,
             extrinsic_objects=obj_descs if len(obj_descs) > 1 else None,
-            changes=[],  # Extrinsic clauses don't have changes in this form
+            changes=[],  # Extrinsic clauses carry dimensions, not changes.
+            dimensions=sorted_dims,
         )
 
 
@@ -2072,8 +2482,6 @@ def apply_rule(
         if failure_action is not None:
             failure_action(e)
         return None
-    except Exception:
-        return None
 
 
 def _fresh_string_image(string: WorkspaceString, slipnet: Slipnet) -> StringImage:
@@ -2143,55 +2551,113 @@ def _get_extrinsic_transforms(
         if not ref_objects:
             continue
 
-        # Determine denoted objects
-        obj_descs = clause.extrinsic_objects or ([clause.object_description] if clause.object_description else [])
-        if len(obj_descs) == 1:
-            # Denoted objects = subobjects of the single reference object
+        # Determine denoted objects.  A clause naming ONE object swaps that
+        # object's constituents among themselves (rules.ss:1425-1429).
+        if len(clause.object_descriptions) == 1:
             denoted = []
             for r in ref_objects:
                 denoted.extend(_get_constituent_objects(r))
         else:
             denoted = ref_objects
 
-        # Get dimensions from extrinsic clause
-        # For extrinsic clauses, changes encode the dimensions
-        dimensions: list[SlipnetNode] = []
-        if clause.changes:
-            for ch in clause.changes:
-                if ch.dimension is not None:
-                    dimensions.append(ch.dimension)
+        dimensions: list[SlipnetNode] = list(clause.dimensions)
 
         if len(denoted) < 2:
             continue
 
+        # rules.ss:1433-1434 — a swap among objects that are not pairwise
+        # disjoint (one enclosing another) cannot be carried out at all.
+        if not _pairwise_disjoint(denoted):
+            raise ImageFailure(
+                "Swap objects are not disjoint",
+                objects=list(denoted),
+                kind=ImageFailure.SWAP,
+            )
+
         for dim in dimensions:
             dim_name = getattr(dim, "name", "")
             if dim_name == "plato-string-position-category":
-                if len(denoted) == 2:
-                    result.append((dim, denoted[0], denoted[1]))
-                    # Also add StrPosCtgy transforms for each object
-                    d1 = _get_descriptor_for(denoted[1], dim)
-                    d2 = _get_descriptor_for(denoted[0], dim)
-                    if d1 is not None:
-                        result.append((denoted[0], (dim, d1)))
-                    if d2 is not None:
-                        result.append((denoted[1], (dim, d2)))
+                # rules.ss:1444-1447 — a position swap is defined for two objects
+                # only; three or more is a failure, not a silent skip.
+                if len(denoted) > 2:
+                    raise ImageFailure(
+                        "String-position swap needs exactly two objects",
+                        objects=list(denoted),
+                        kind=ImageFailure.SWAP,
+                    )
+                result.append((dim, denoted[0], denoted[1]))
+                # Also add StrPosCtgy transforms for each object
+                d1 = _get_descriptor_for(denoted[1], dim)
+                d2 = _get_descriptor_for(denoted[0], dim)
+                if d1 is not None:
+                    result.append((denoted[0], (dim, d1)))
+                if d2 is not None:
+                    result.append((denoted[1], (dim, d2)))
             else:
-                # Regular dimension swap
-                descs = [_get_descriptor_for(o, dim) for o in denoted]
-                unique_descs = list(set(d for d in descs if d is not None))
-                if len(unique_descs) == 2:
-                    sd1, sd2 = unique_descs[0], unique_descs[1]
-                    for obj, desc in zip(denoted, descs):
-                        if desc is sd1:
-                            result.append((obj, (dim, sd2)))
-                        else:
-                            result.append((obj, (dim, sd1)))
-                elif len(unique_descs) == 1:
-                    # All same descriptor — no swap needed
-                    pass
+                # rules.ss:1448-1480.  A Length swap on a group with no Length
+                # description attaches one — noticing the group's length is part
+                # of deciding to swap it.
+                descs = [
+                    _swap_descriptor_for(o, dim, dim_name, slipnet) for o in denoted
+                ]
+                if any(d is None for d in descs):
+                    raise ImageFailure(
+                        f"No {dim_name} descriptor for every swap object",
+                        objects=list(denoted),
+                        kind=ImageFailure.SWAP,
+                    )
+                unique_descs: list[Any] = []
+                for d in descs:
+                    if not any(d is u for u in unique_descs):
+                        unique_descs.append(d)
+                if len(unique_descs) > 2:
+                    raise ImageFailure(
+                        f"More than two {dim_name} descriptors to swap",
+                        objects=list(denoted),
+                        kind=ImageFailure.SWAP,
+                    )
+                sd1 = unique_descs[0]
+                sd2 = unique_descs[1] if len(unique_descs) > 1 else unique_descs[0]
+                for obj, desc in zip(denoted, descs):
+                    result.append((obj, (dim, sd2 if desc is sd1 else sd1)))
 
     return result
+
+
+def _pairwise_disjoint(objects: list[Any]) -> bool:
+    """Scheme: ``(pairwise-andmap disjoint-objects? denoted-objects)``."""
+    for i in range(len(objects)):
+        for j in range(i + 1, len(objects)):
+            if not _disjoint_objects(objects[i], objects[j]):
+                return False
+    return True
+
+
+def _swap_descriptor_for(
+    obj: Any, dim: SlipnetNode, dim_name: str, slipnet: Slipnet,
+) -> Any:
+    """The descriptor of *obj* along *dim*, for an extrinsic swap.
+
+    Scheme: ``rules.ss:1448-1462``.  Length is the special case: a letter is
+    length *one* without carrying a Length description, and a group that lacks
+    one has it attached — "this amounts to explicitly noticing the group's
+    Length".
+    """
+    if dim_name != "plato-length":
+        return _get_descriptor_for(obj, dim)
+
+    from server.engine.workspace_objects import Letter
+
+    if isinstance(obj, Letter):
+        return slipnet.nodes.get("plato-one")
+    existing = _get_descriptor_for(obj, dim)
+    if existing is not None:
+        return existing
+    from server.engine.groups import Group, attach_length_description
+
+    if isinstance(obj, Group):
+        attach_length_description(obj)
+    return _get_descriptor_for(obj, dim)
 
 
 def _get_intrinsic_transforms(
@@ -2285,51 +2751,123 @@ def _find_matching_objects(
     # length change.  "Increase length of whole group by one" therefore always
     # failed, and with it every abc => abcd style answer.
     if obj_type == "string":
-        return [string]
+        # ``workspace-strings.ss:433-444``: a "string" object-description resolves
+        # to the **whole group if one exists**, not to the string.  The comment
+        # there gives the reason: in abc->aaa the rule may be abstracted before
+        # [abc] is perceived, and once it is, retrieving the string leaves the
+        # rule's subobject changes aimed at ([abc]) instead of (a b c).  Petacat
+        # returned the string unconditionally, so a rule abstracted before the
+        # spanning group existed aimed its transforms at the string image — whose
+        # ``new_length`` always fails — and snagged where MetaCat succeeds.
+        whole_group = _get_whole_group(string, slipnet)
+        return [whole_group] if whole_group is not None else [string]
 
-    result = []
     from server.engine.groups import Group
     from server.engine.workspace_objects import Letter
 
+    obj_type_name = getattr(obj_type, "name", "") if obj_type is not None else ""
+    candidates = []
     for obj in string.objects:
-        # Check object type match
-        if obj_type is not None:
-            obj_type_name = getattr(obj_type, "name", "")
-            if obj_type_name == "plato-letter" and not isinstance(obj, Letter):
-                continue
-            if obj_type_name == "plato-group" and not isinstance(obj, Group):
-                continue
-
-        # Check description match
+        if obj_type_name == "plato-letter" and not isinstance(obj, Letter):
+            continue
+        if obj_type_name == "plato-group" and not isinstance(obj, Group):
+            continue
         if desc_type is not None and descriptor is not None:
-            obj_desc = _get_descriptor_for(obj, desc_type)
-            if obj_desc is descriptor:
-                result.append(obj)
+            if _get_descriptor_for(obj, desc_type) is descriptor:
+                candidates.append(obj)
 
-    return result
+    # ``workspace-strings.ss:449-458``: when a String-Position description matches
+    # more than one object — "the rightmost object" is both the letter j and the
+    # group [jjj] enclosing it — MetaCat picks exactly ONE: the lowest-level
+    # object, preferring those that already carry a vertical bridge.  Returning
+    # every match applied the same transform twice and manufactured conflicts.
+    if (
+        desc_type is not None
+        and getattr(desc_type, "name", "") == "plato-string-position-category"
+        and len(candidates) > 1
+    ):
+        bridged = [o for o in candidates if getattr(o, "vertical_bridge", None) is not None]
+        return [_lowest_level_object(bridged or candidates)]
+
+    return candidates
+
+
+def _get_whole_group(string: WorkspaceString, slipnet: Slipnet) -> Any:
+    """The group of *string* described as ``whole``, if there is one.
+
+    Scheme: ``(select-meth group-list 'descriptor-present? plato-whole)``
+    (``workspace-strings.ss:440-441``).
+    """
+    whole = slipnet.nodes.get("plato-whole") if slipnet is not None else None
+    if whole is None:
+        return None
+    for group in getattr(string, "groups", []):
+        present = getattr(group, "descriptor_present", None)
+        if present is not None and present(whole):
+            return group
+    return None
+
+
+def _lowest_level_object(objects: list[Any]) -> Any:
+    """Scheme: ``lowest-level-object`` (``workspace-objects.ss:624-630``).
+
+    The object with the *greatest* nesting level — lowest in the drawn tree.  In
+    ``mrrjjj`` the rightmost object is both the group ``[jjj]`` (level 0) and the
+    letter ``j`` inside it (level 1); this picks the letter.
+    """
+    best = objects[0]
+    best_level = _nesting_level(best)
+    for obj in objects[1:]:
+        level = _nesting_level(obj)
+        if level > best_level:
+            best, best_level = obj, level
+    return best
 
 
 def _check_for_conflicts(transforms: list[tuple]) -> None:
     """Check for conflicting transforms on the same or related objects.
 
-    Scheme: check-for-conflicts (rules.ss:1321-1338).
-    Raises ImageFailure if conflicts found.
+    Scheme: ``check-for-conflicts`` (``rules.ss:1321-1338``).  Every
+    object-transform pair is re-expressed as a ``self`` intrinsic
+    change-description and tested pairwise with ``conflicts?``
+    (``rules.ss:1018-1020``), which is ``intrinsic-implies-intrinsic?`` run in
+    *both* directions — the same battery of heuristics rule abstraction uses to
+    sieve out redundant changes (``rules.ss:1194-1231``).
+
+    The test used to be ``obj1 is obj2 and dim1 is dim2``, which is only the
+    first of six cases.  A Length change to a group alongside a Letter-Category
+    change to one of its letters, an Alphabetic-Position change enclosing a
+    Letter-Category change, an ObjCtgy:letter change alongside a Length change —
+    all of those the reference refuses to apply, and Petacat applied in sequence,
+    producing answer strings the reference cannot produce and suppressing the
+    CONFLICT snag with all its trace, memory and jootsing consequences.
     """
-    for i in range(len(transforms)):
-        for j in range(i + 1, len(transforms)):
-            t1 = transforms[i]
-            t2 = transforms[j]
-            if len(t1) != 2 or len(t2) != 2:
-                continue
-            obj1, (dim1, _) = t1
-            obj2, (dim2, _) = t2
-            # Same object, same dimension = conflict
-            if obj1 is obj2 and dim1 is dim2:
-                # Scheme's CONFLICT failure-result names both objects.
+    descriptions: list[tuple[IntrinsicChangeDescription, Any]] = []
+    for t in transforms:
+        if len(t) != 2:
+            continue
+        obj, (dim, descriptor) = t
+        descriptions.append(
+            (
+                IntrinsicChangeDescription(obj, SCOPE_SELF, dim, None, None, descriptor),
+                obj,
+            )
+        )
+
+    for i in range(len(descriptions)):
+        ic1, _ = descriptions[i]
+        for j in range(i + 1, len(descriptions)):
+            ic2, _ = descriptions[j]
+            if ic1.conflicts(ic2):
+                # Scheme's CONFLICT failure-result names both objects and both
+                # dimensions (``rules.ss:1331-1335``).
                 raise ImageFailure(
-                    f"Conflicting transforms on same object for dimension "
-                    f"{getattr(dim1, 'short_name', '?')}",
-                    objects=[obj1, obj2],
+                    "Conflicting transforms: "
+                    f"{getattr(ic1.dimension, 'short_name', '?')} of "
+                    f"{_ascii_name(ic1.reference_object)} vs "
+                    f"{getattr(ic2.dimension, 'short_name', '?')} of "
+                    f"{_ascii_name(ic2.reference_object)}",
+                    objects=[ic1.reference_object, ic2.reference_object],
                     kind=ImageFailure.CONFLICT,
                 )
 
@@ -2679,15 +3217,52 @@ def _bounded_random_partition(
     pred: Any,
     items: list,
     rng: RNG | None = None,
-    max_clusters: int = 10,
+    bound: int | None = None,
 ) -> list[list]:
-    """Bounded random partition.
+    """Scheme: ``bounded-random-partition`` (``utilities.ss:790-813``).
 
-    Scheme: bounded-random-partition (utilities.ss).
+    Two things distinguish it from the deterministic ``partition``, and this
+    ignored both: elements are drawn in **random order**, and a class may not grow
+    past *bound* members.  The caller's bound is ``1 + random(len(items))``
+    (``rules.ss:582``), so on a given attempt swaps are clustered as tightly or as
+    loosely as the draw allows — different clusterings of the same bridges yield
+    different extrinsic rule clauses, and derandomising it removed reachable rule
+    variants.
+
+    The Scheme recursion picks an element, partitions the *rest*, then inserts the
+    picked element into that result — so the first element drawn is inserted last.
+    ``insert`` puts it in the leftmost class with room that it agrees with, else
+    starts a new class at the end.
     """
     if not items:
         return []
-    return _partition_by(pred, items)
+    if rng is None:
+        return _partition_by(pred, items)
+
+    if bound is None:
+        bound = 1 + rng.randint(len(items))
+
+    remaining = list(items)
+    draw_order: list[Any] = []
+    while remaining:
+        chosen = rng.pick(remaining)
+        draw_order.append(chosen)
+        for i, item in enumerate(remaining):
+            if item is chosen:
+                del remaining[i]
+                break
+
+    clusters: list[list] = []
+    for item in reversed(draw_order):
+        placed = False
+        for cluster in clusters:
+            if len(cluster) < bound and all(pred(item, other) for other in cluster):
+                cluster.insert(0, item)
+                placed = True
+                break
+        if not placed:
+            clusters.append([item])
+    return clusters
 
 
 def _disjoint_left_objects_pred(b1: Bridge, b2: Bridge) -> bool:
@@ -2918,6 +3493,7 @@ def build_rule_from_bridges(
     temperature: float = 50.0,
     themespace: Any = None,
     meta: MetadataProvider | None = None,
+    workspace: Workspace | None = None,
 ) -> Rule | None:
     """Full rule-abstraction pipeline: bridges -> change descriptions -> rule.
 
@@ -2957,7 +3533,7 @@ def build_rule_from_bridges(
     final_cds = remove_redundant_change_descriptions(all_cds)
     if not final_cds:
         # Identity rule
-        rule = Rule(rule_type, [])
+        rule = Rule(rule_type, [], workspace=workspace)
         if meta:
             rule.compute_quality(meta)
         return rule
@@ -2983,7 +3559,7 @@ def build_rule_from_bridges(
     ]
 
     # 7. Build rule
-    rule = Rule(rule_type, clauses)
+    rule = Rule(rule_type, clauses, workspace=workspace)
     rule.set_abstracted_rule_information(templates, themespace)
     if meta:
         rule.compute_quality(meta)

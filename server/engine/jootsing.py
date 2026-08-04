@@ -337,6 +337,7 @@ def attempt_jootsing(
                     commentary,
                     codelet_count,
                     memory=memory,
+                    meta=meta,
                 )
 
     # ── Check for recurring snags ──
@@ -657,6 +658,7 @@ def joots_from_justify_clamps(
     codelet_count: int = 0,
     *,
     memory: Any = None,
+    meta: Any = None,
 ) -> JootserResult:
     """Break out of justify clamp patterns.
 
@@ -720,7 +722,9 @@ def joots_from_justify_clamps(
         _translate_rule,
     )
 
-    translation_result = _translate_rule(top_rule, workspace, slipnet, rng=rng)
+    translation_result = _translate_rule(
+        top_rule, workspace, slipnet, rng=rng, meta=meta
+    )
     if translation_result is None:
         return JootserResult(pattern_detected=False)
 

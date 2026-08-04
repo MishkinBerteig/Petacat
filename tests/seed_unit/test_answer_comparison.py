@@ -379,6 +379,113 @@ def test_concepts_of_equal_depth_are_not_a_rule_difference():
     assert count_rule_differences(differences, _Meta()) == 0
 
 
+def test_a_clause_type_mismatch_makes_the_rules_incomparable():
+    """``traverse-rule-clauses`` fails on two *symbols* that are not the same symbol
+    (``justify.ss:242``), and a clause's type is the first symbol the walk reaches.
+
+    The distinction matters because it is not recoverable afterwards.  Flattened into
+    strings, ``intrinsic`` against ``verbatim`` reads as one more pair to compare;
+    neither token names a Slipnet node, so both score depth 0, the depth filter at
+    ``answers.ss:607-609`` discards the pair, and two rules with nothing whatever in
+    common come out *zero* apart.
+    """
+    intrinsic = [
+        [
+            "intrinsic",
+            ["plato-letter", "plato-string-position-category", "plato-rightmost"],
+            [["plato-letter-category", "plato-c", "plato-d", "plato-successor"]],
+        ]
+    ]
+    verbatim = [["verbatim", ["plato-x", "plato-y", "plato-d"]]]
+    assert compare_rule_signatures(intrinsic, verbatim) is None
+    assert compare_rule_signatures(verbatim, intrinsic) is None
+
+
+def test_two_verbatim_rules_are_compared_whole_not_letter_by_letter():
+    """``compare-rule-clause-lists`` short-circuits verbatim clause lists
+    (``justify.ss:256-260``) to "equal, or not comparable at all".
+
+    Walking into them instead would produce a pair per letter, and every letter node
+    sits at depth 10, so the depth filter would discard the lot: two verbatim rules
+    spelling different strings would measure identical rather than taking the
+    abstractness fallback the Scheme gives them.
+    """
+    spelled_xyd = [["verbatim", ["plato-x", "plato-y", "plato-d"]]]
+    spelled_wyz = [["verbatim", ["plato-w", "plato-y", "plato-z"]]]
+    assert compare_rule_signatures(spelled_xyd, list(spelled_xyd)) == []
+    assert compare_rule_signatures(spelled_xyd, spelled_wyz) is None
+
+
+def test_clauses_of_different_internal_shape_are_not_comparable():
+    """``justify.ss:237-241``: the walk recurs pairwise and fails the moment one side
+    runs out, so a clause carrying two changes cannot be lined up against one carrying
+    a single change."""
+    one_change = [
+        [
+            "intrinsic",
+            ["plato-letter", "plato-string-position-category", "plato-rightmost"],
+            [["plato-letter-category", "plato-c", "plato-d", "plato-successor"]],
+        ]
+    ]
+    two_changes = [
+        [
+            "intrinsic",
+            ["plato-letter", "plato-string-position-category", "plato-rightmost"],
+            [
+                ["plato-letter-category", "plato-c", "plato-d", "plato-successor"],
+                ["plato-length", "plato-one", "plato-two", "plato-successor"],
+            ],
+        ]
+    ]
+    assert compare_rule_signatures(one_change, two_changes) is None
+
+
+def test_an_abstract_rule_and_a_literal_one_line_up_slot_for_slot():
+    """§4.7.4's rule contrast: "abc => abd is viewed in a more abstract way for the
+    answer xyd than in the case of dyz".
+
+    The Scheme's change is ``(scope dimension descriptor)`` (``rules.ss:900-909``) and
+    that single descriptor slot holds ``plato-successor`` for the abstract reading and
+    ``plato-d`` for the literal one, so the two rules *are* alignable and differ by one
+    concept pair — 50 against 10, a real difference in level.
+
+    ``RuleChange`` fills one of ``to_descriptor`` and ``relation`` and leaves the other
+    ``None``, in different positions for the two readings.  Compared position by
+    position that reads as a structural mismatch, and §4.7.4's canonical pair comes out
+    "viewed in a completely different way" with the pair count replaced by an
+    abstractness guess.
+    """
+    abstract = [
+        [
+            "intrinsic",
+            ["plato-letter", "plato-string-position-category", "plato-rightmost"],
+            [["plato-letter-category", None, None, "plato-successor"]],
+        ]
+    ]
+    literal = [
+        [
+            "intrinsic",
+            ["plato-letter", "plato-string-position-category", "plato-rightmost"],
+            [["plato-letter-category", None, "plato-d", None]],
+        ]
+    ]
+    differences = compare_rule_signatures(abstract, literal)
+    assert differences == [("plato-successor", "plato-d")]
+    assert count_rule_differences(differences) == 1
+
+
+def test_the_depth_filter_falls_back_to_the_shipped_conceptual_depths():
+    """``count_rule_differences`` is reached from ``EpisodicMemory.distance`` with no
+    ``MetadataProvider`` in hand (``find_remindings`` has none), so the filter has to
+    have depths of its own or it silently stops filtering.
+
+    ``seed_data/slipnet_nodes.json``: leftmost and rightmost are both 40, successor is
+    50 and sameness is 80.
+    """
+    assert count_rule_differences([("plato-leftmost", "plato-rightmost")]) == 0
+    assert count_rule_differences([("plato-successor", "plato-sameness")]) == 1
+
+
 # ---------------------------------------------------------------------------
 # The comparison paragraph  (answers.ss:670-805)
 # ---------------------------------------------------------------------------

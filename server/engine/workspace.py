@@ -661,6 +661,10 @@ class Workspace:
     def add_rule(self, rule: Rule) -> None:
         if self.rule_present(rule):
             return
+        # A rule ranks itself against this Workspace's other rules whenever its
+        # strength is asked for (``rules.ss:244-251, 286``); the Scheme reaches for
+        # the global ``*workspace*``, Petacat carries the reference on the rule.
+        rule.workspace = self
         if rule.is_top_rule:
             self.top_rules.append(rule)
         else:

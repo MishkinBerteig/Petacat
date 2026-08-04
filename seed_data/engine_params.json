@@ -23,6 +23,7 @@
   "grace_period": 100,
   "distance_threshold": 5,
   "verbatim_rule_probability": 0.01,
+  "slippage_ignore_probability": 0.4,
   "maximum_rule_line_length": 60,
   "concept_mapping_importance_threshold": 65,
   "concept_activation_importance_threshold": 85,

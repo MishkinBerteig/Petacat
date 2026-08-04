@@ -27,6 +27,7 @@ Two facts about the shape of the output are worth stating before the code:
 
 from __future__ import annotations
 
+from functools import lru_cache
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -391,63 +392,208 @@ def coherence_score(answer: AnswerDescription) -> float:
 # ---------------------------------------------------------------------------
 
 
-def _flatten(value: Any, into: list[str]) -> None:
+#: Every Slipnet node's name begins with this, and nothing else in a rule signature
+#: does.  ``rule_signature`` (``server/engine/rules.py``) renders a clause as a nest of
+#: plain strings, which flattens the Scheme's distinction between a *symbol* leaf (the
+#: clause type ``'intrinsic``) and a *slipnode* leaf (``plato-successor``) —
+#: ``traverse-rule-clauses`` treats the two completely differently, so the walk below
+#: has to recover the distinction, and the prefix is what recovers it.
+_CONCEPT_PREFIX = "plato-"
+
+#: ``_descriptor_key`` collapses ``plato-group`` and the ``'string`` symbol into one
+#: token, honouring the equivalence ``traverse-rule-clauses`` spells out at
+#: ``justify.ss:243-244``.  For a *conceptual depth* the token still has to name a real
+#: node, so it resolves back to the group.
+_COLLAPSED_GROUP_TOKEN = "plato-group|string"
+
+
+def _is_concept(leaf: Any) -> bool:
+    """Is this leaf a Slipnet node, as opposed to one of the Scheme's bare symbols?"""
+    return isinstance(leaf, str) and leaf.startswith(_CONCEPT_PREFIX)
+
+
+def _is_verbatim_signature(signature: Any) -> bool:
+    """Scheme: ``verbatim-rule-clause-list?`` (``justify.ss:250-253``)."""
+    return (
+        isinstance(signature, (list, tuple))
+        and len(signature) == 1
+        and isinstance(signature[0], (list, tuple))
+        and len(signature[0]) > 0
+        and signature[0][0] == "verbatim"
+    )
+
+
+def _without_empty_slots(value: Any) -> Any:
+    """Drop the empty optional slots the port's clause encoding carries.
+
+    A Scheme rule clause has no empty slots.  A change is ``(scope dimension
+    descriptor)`` (``rules.ss:889-909``), and that one descriptor slot holds *either* a
+    relation such as ``plato-successor`` *or* the literal node the relation was
+    substituted for — "this avoids rules such as 'Change LettCtgy of object with LettCtgy
+    `c` to successor' by substituting the literal descriptor (i.e., `d`) for the
+    relation".  So the abstract reading of a change and the literal reading of it line up
+    slot for slot, and ``traverse-rule-clauses`` compares ``plato-successor`` against
+    ``plato-d`` as one concept pair — which is precisely §4.7.4's contrast between xyd's
+    rule and dyz's.
+
+    ``RuleChange`` spreads that slot across ``from_descriptor``, ``to_descriptor`` and
+    ``relation`` and fills exactly one of them
+    (``rules.py:_instantiate_change_template``), so ``rule_signature`` writes two
+    ``None``s beside every descriptor — and they land in *different* positions for an
+    abstract change than for a literal one.  Left in, they turn the Scheme's single
+    concept pair into two half-empty ones; the empty slots carry no concept, so they take
+    no part in a comparison the Scheme defines over concepts.
+    """
     if isinstance(value, (list, tuple)):
-        for item in value:
-            _flatten(item, into)
-    else:
-        into.append("" if value is None else str(value))
+        return [_without_empty_slots(item) for item in value if item is not None]
+    return value
+
+
+def _traverse(x1: Any, x2: Any, differences: list[tuple[str, str]]) -> bool:
+    """Scheme: ``traverse-rule-clauses`` (``justify.ss:232-247``) under
+    ``rule-clause-comparison-proc`` (``justify.ss:269-273``).
+
+    Walks the two clause trees in lockstep.  Returns ``False`` for the Scheme's
+    ``(fail)`` — a shape mismatch, or two symbols that are not the same symbol — and
+    otherwise appends every pair of *concepts* the two rules disagree about.
+    """
+    x1_is_list = isinstance(x1, (list, tuple))
+    x2_is_list = isinstance(x2, (list, tuple))
+    if x1_is_list and x2_is_list:
+        # ``justify.ss:237-240``: equal-length lists recur element by element; unequal
+        # lengths reach ``(or (null? x1) (null? x2))`` and fail.
+        if len(x1) != len(x2):
+            return False
+        for item1, item2 in zip(x1, x2):
+            if not _traverse(item1, item2, differences):
+                return False
+        return True
+    if x1_is_list or x2_is_list:
+        # ``justify.ss:241``: a list against an atom.
+        return False
+    concept1, concept2 = _is_concept(x1), _is_concept(x2)
+    if concept1 and concept2:
+        # ``justify.ss:246``: both leaves are Slipnet nodes, so the proc decides.
+        if x1 != x2:
+            differences.append((x1, x2))
+        return True
+    if concept1 or concept2:
+        # ``justify.ss:245``: a symbol against a node is a structural mismatch.
+        return False
+    # ``justify.ss:242``: two symbols, which have to *be* the same symbol.
+    return x1 == x2
 
 
 def compare_rule_signatures(
     signature_a: list | None, signature_b: list | None
 ) -> list[tuple[str, str]] | None:
-    """Scheme: ``compare-rule-clause-lists``, used at ``answers.ss:603-604``.
+    """Scheme: ``compare-rule-clause-lists`` (``justify.ss:256-266``), used at
+    ``answers.ss:603-604`` and ``memory.ss:556-559``.
 
     Returns the pairs of concepts the two rules disagree about, or ``None`` when the
     clause lists cannot be aligned at all.  ``None`` is what makes MetaCat say the
-    change is viewed "in a completely different way".
+    change is viewed "in a completely different way", and what sends
+    ``calculate-answer-distance`` to its abstractness fallback.
+
+    Two properties of the Scheme that a flatten-and-zip comparison loses, and that the
+    reminding distance depends on:
+
+    * **A symbol mismatch is a failure, not a difference.**  An intrinsic rule against a
+      verbatim one shares no structure at all; ``traverse-rule-clauses`` fails on the
+      clause-type symbols before reaching any concept.  Flattened, the clause types read
+      as two more strings, the pair is dropped by the depth filter (neither names a
+      Slipnet node, so both score depth 0), and two utterly unrelated rules come out
+      *zero* apart.
+    * **Verbatim clause lists are compared whole.**  ``compare-rule-clause-lists``
+      short-circuits them to "equal or incomparable" rather than walking into the
+      letters, so two different verbatim rules take the abstractness fallback instead of
+      contributing a pile of same-depth letter pairs that the filter then discards.
+
+    (The Scheme tests ``rc-list1`` twice at ``justify.ss:258-259`` where it plainly means
+    ``rc-list1`` and ``rc-list2``.  The typo is inert: whenever exactly one side is
+    verbatim, the walk it falls through to fails on ``verbatim`` against ``intrinsic``
+    and returns ``#f`` — the same answer the short-circuit would have given.  This port
+    tests both sides, which is the same function.)
     """
     if signature_a is None or signature_b is None:
         return None
-    if len(signature_a) != len(signature_b):
-        return None
+    clauses_a = _without_empty_slots(signature_a)
+    clauses_b = _without_empty_slots(signature_b)
+    if _is_verbatim_signature(clauses_a) or _is_verbatim_signature(clauses_b):
+        return [] if clauses_a == clauses_b else None
     differences: list[tuple[str, str]] = []
-    for clause_a, clause_b in zip(signature_a, signature_b):
-        names_a: list[str] = []
-        names_b: list[str] = []
-        _flatten(clause_a, names_a)
-        _flatten(clause_b, names_b)
-        if len(names_a) != len(names_b):
-            # Structurally different clauses — not alignable, so the rules are not
-            # comparable at all.
-            return None
-        differences.extend(
-            (x, y) for x, y in zip(names_a, names_b) if x != y
-        )
+    if not _traverse(clauses_a, clauses_b, differences):
+        return None
     return differences
+
+
+def _depth_key(name: str) -> str:
+    return "plato-group" if name == _COLLAPSED_GROUP_TOKEN else name
+
+
+@lru_cache(maxsize=1)
+def default_conceptual_depths() -> dict[str, float]:
+    """Every Slipnet node's conceptual depth as it stands in ``seed_data/``.
+
+    ``count_rule_differences`` needs depths whether or not its caller holds a
+    ``MetadataProvider``: ``EpisodicMemory.distance`` is reached from
+    ``find_remindings`` with no metadata in hand, and dropping the filter there would
+    silently restore the very behaviour the filter exists to prevent.  Served requests
+    still pass ``meta``, so an admin edit to a depth takes effect at once; this is the
+    fallback, in the same spirit as ``default_commentary_templates``.
+    """
+    import json
+    import os
+
+    from server.engine.metadata import DEFAULT_SEED_DIR
+
+    path = os.path.join(DEFAULT_SEED_DIR, "slipnet_nodes.json")
+    try:
+        with open(path) as f:
+            nodes = json.load(f)
+    except OSError:
+        return {}
+    if isinstance(nodes, dict):
+        nodes = nodes.get("nodes", [])
+    return {
+        node["name"]: float(node.get("conceptual_depth", 0) or 0)
+        for node in nodes
+        if isinstance(node, dict) and "name" in node
+    }
+
+
+def conceptual_depth_lookup(meta: Any = None):
+    """A ``name -> depth`` function, from ``meta`` when there is one and the seed data
+    otherwise."""
+    specs = getattr(meta, "slipnet_node_specs", None) if meta is not None else None
+    if specs:
+
+        def from_meta(name: str) -> float:
+            spec = specs.get(_depth_key(name))
+            return float(getattr(spec, "conceptual_depth", 0) or 0)
+
+        return from_meta
+
+    depths = default_conceptual_depths()
+    return lambda name: depths.get(_depth_key(name), 0.0)
 
 
 def count_rule_differences(
     differences: list[tuple[str, str]] | None, meta: Any = None
 ) -> int:
-    """``num-rule-differences`` (``answers.ss:605-610``): −1 when incomparable.
+    """``num-rule-differences`` (``answers.ss:605-610``, ``memory.ss:560-565``): −1 when
+    incomparable.
 
     Differences between two concepts of *equal conceptual depth* do not count — a rule
     that says "predecessor" where another says "successor" is a different rule, but not
     a rule pitched at a different level, and MetaCat's "the only essential difference"
-    sentence is about level.  Without a Slipnet to ask, every difference counts.
+    sentence is about level.  ``leftmost`` against ``rightmost`` is the canonical case:
+    both sit at depth 40, so a rule that changes the leftmost letter and one that
+    changes the rightmost are, on this measure, the same distance from anything.
     """
     if differences is None:
         return -1
-    if meta is None:
-        return len(differences)
-    specs = getattr(meta, "slipnet_node_specs", None) or {}
-
-    def depth(name: str) -> float:
-        spec = specs.get(name)
-        return float(getattr(spec, "conceptual_depth", 0) or 0)
-
+    depth = conceptual_depth_lookup(meta)
     return sum(1 for x, y in differences if depth(x) != depth(y))
 
 

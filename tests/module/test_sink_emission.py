@@ -137,6 +137,16 @@ def test_structure_changes_account_for_the_final_workspace(meta):
     the second is part of building the group, and replaying the group's construction
     reproduces it. Asserting over descriptions anyway would only pin how many the
     engine happens to create up front.
+
+    The **answer string is excluded for the same reason**, and this became visible
+    only when the phase-5 rule work made this seed answer inside its step budget
+    where it used to halt. ``make_translated_string`` (``answers.ss:1035-1071``)
+    creates the answer string's letters, its groups, those groups' bonds and the
+    bridges drawn to it in one go, at answer time — none of them through
+    ``build_structure``. They are not a gap in the record either: the answer event is
+    the recorded action, and replaying it reconstructs the whole translated string
+    from the rule. In discovery mode every bottom bridge comes from that same call,
+    so they go with it.
     """
     sink = RecordingSink()
     runner, _ = _run(meta, sink)
@@ -153,11 +163,13 @@ def test_structure_changes_account_for_the_final_workspace(meta):
     )
     assert built > 0 and broken > 0, "the run must both build and break structures"
 
+    codelet_built_strings = [
+        s for s in ws.all_strings if s is not ws.answer_string
+    ]
     live = (
-        sum(len([b for b in s.bonds if b.is_built]) for s in ws.all_strings)
-        + sum(len([g for g in s.groups if g.is_built]) for s in ws.all_strings)
+        sum(len([b for b in s.bonds if b.is_built]) for s in codelet_built_strings)
+        + sum(len([g for g in s.groups if g.is_built]) for s in codelet_built_strings)
         + len([b for b in ws.top_bridges if b.is_built])
-        + len([b for b in ws.bottom_bridges if b.is_built])
         + len([b for b in ws.vertical_bridges if b.is_built])
         + len([r for r in ws.top_rules if r.is_built])
         + len([r for r in ws.bottom_rules if r.is_built])

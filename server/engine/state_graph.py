@@ -492,7 +492,18 @@ def restore_run_state(runner: Any, state: dict) -> None:
     strings = {role: getattr(ws, f"{role}_string") for role in _STRING_ROLES
                if getattr(ws, f"{role}_string", None) is not None}
     reader = _Reader(state["graph"], ctx.slipnet, strings)
-    reader.build()
+    rebuilt = reader.build()
+
+    # Re-link the environment the capture omitted.  A rule's strength is its quality
+    # *relative to its Workspace's other rules of the same type* (``rules.ss:286``), so
+    # a restored rule with no Workspace could not compute a strength at all; and rules
+    # reach the graph from more places than the Workspace's two lists — trace events,
+    # answer descriptions, a clamped set, a pending codelet's arguments.
+    from server.engine.rules import Rule as _Rule
+
+    for obj in rebuilt:
+        if isinstance(obj, _Rule):
+            obj.workspace = ws
 
     # -- Workspace ----------------------------------------------------
     for role, s_state in ws_state["strings"].items():

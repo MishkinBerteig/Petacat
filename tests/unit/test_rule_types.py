@@ -57,11 +57,15 @@ def test_bottom_rule():
     assert not rule.is_identity_rule
 
 
+# ``translate`` now takes the two strings it maps between and the Slipnet, because
+# a clause's slippages come from the vertical bridges of *its own* reference objects
+# (``answers.ss:1432-1494``) rather than from a list handed in.  A rule with no
+# clauses names no objects, so no string is consulted and None is admissible here.
 def test_translate_top_rule_becomes_bottom():
     rule = Rule(rule_type=RULE_TOP, clauses=[])
-    assert rule.translate([]).rule_type == RULE_BOTTOM
+    assert rule.translate(None, None, None).rule_type == RULE_BOTTOM
 
 
 def test_translate_bottom_rule_becomes_top():
     rule = Rule(rule_type=RULE_BOTTOM, clauses=[])
-    assert rule.translate([]).rule_type == RULE_TOP
+    assert rule.translate(None, None, None).rule_type == RULE_TOP

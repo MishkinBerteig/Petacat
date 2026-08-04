@@ -101,6 +101,17 @@ class Bridge(WorkspaceStructure):
         """``get-slippages`` (bridges.ss:167-170) — non-symmetric plus symmetric."""
         return self.get_non_symmetric_slippages() + self.symmetric_slippages
 
+    def get_bond_slippages(self) -> list[ConceptMapping]:
+        """``get-bond-slippages`` (bridges.ss:171-172).
+
+        The slippages between two groups' *bond* descriptions.  Rule translation
+        adds these to the slippages a clause is translated by when the clause's
+        reference objects sit inside groups that are themselves bridged
+        (``answers.ss:1487-1490``) — a successor group standing for a predecessor
+        group is a fact about the enclosing groups, not about their members.
+        """
+        return [cm for cm in self.get_slippages() if cm.bond_concept_mapping]
+
     def get_letter_span(self) -> int:
         """``get-letter-span`` (bridges.ss:178-180) — span(object1) + span(object2).
 

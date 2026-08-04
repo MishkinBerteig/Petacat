@@ -143,6 +143,14 @@ class EngineContext:
         #: ``init_mcat``; ``None`` only in tests that build a context by hand.
         self.on_snag_restart: Any = None
 
+        #: ``report-new-answer``'s first act is ``(update-everything)``
+        #: (``answers.ss:24``), so the temperature and structure strengths an answer
+        #: is recorded with are this instant's rather than up to fifteen codelets
+        #: stale.  Same shape and same reason as ``on_snag_restart``: the update
+        #: cycle belongs to the runner's loop, and ``server/engine/`` may not import
+        #: upwards.  ``None`` only in tests that build a context by hand.
+        self.on_update_everything: Any = None
+
         #: How many codelets behind the live Workspace each codelet reads (WP0.5).
         #: 0 — the default — is ordinary live execution; nothing in
         #: ``server/engine/staleness.py`` runs.  See that module for what a
@@ -366,6 +374,7 @@ class EngineRunner:
         # The snag response reaches back into the runner's loop; see
         # ``EngineContext.on_snag_restart``.
         self.ctx.on_snag_restart = self._restart_after_snag
+        self.ctx.on_update_everything = self.update_everything
 
         # Post initial codelets
         self._post_initial_codelets()

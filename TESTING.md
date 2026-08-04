@@ -345,18 +345,19 @@ the number of endpoints taking `Depends(get_session)`, the size of
 
 | File | Fns | Covers |
 |------|----:|--------|
-| `test_answer_comparison.py` | 37 | The answer-comparison and answer-explanation English (`answers.ss:267-882`) |
+| `test_answer_comparison.py` | 42 | The answer-comparison and answer-explanation English (`answers.ss:267-882`) |
 | `test_answer_description.py` | 4 | Storing, reminding and comparing inside `EpisodicMemory` |
 | `test_bridge_types.py` | 4 | Bridge orientation over letters of a real Workspace |
 | `test_codelet_dsl.py` | 2 | The codelet registry built from the seeded codelet types |
 | `test_coderack_bin.py` | 10 | The Coderack's urgency bins and temperature-weighted choice |
 | `test_coderack_eviction.py` | 9 | Incremental eviction picks exactly what the flat scan picked |
 | `test_commentary.py` | 6 | The emit helpers that render from the seeded commentary templates |
-| `test_episodic_memory.py` | 8 | Reminding and comparison, which resolve the seeded templates |
+| `test_episodic_memory.py` | 13 | Reminding, comparison and the reminding distance, which resolve the seeded templates and the seeded conceptual depths |
 | `test_formulas.py` | 14 | The temperature-dependent formulas against the seeded coefficients |
 | `test_hardware.py` | 21 | The machine description and the sizes derived from it: real probes, faked probes, environment overrides |
 | `test_metadata_provider.py` | 17 | `MetadataProvider` loading every seed collection |
 | `test_numeric_backends.py` | 21 | The numeric backends against the reference, and the engine without them |
+| `test_rule_quality.py` | 13 | Rule uniformity, abstractness and succinctness against the Scheme's formulas, hand-computed from the seeded depths |
 | `test_slipnet_link_lengths.py` | 6 | The Slipnet's link lengths against the reference Scheme |
 | `test_slipnet_node.py` | 15 | The 59-node Slipnet: its nodes, its links, its clamps and its spreading |
 | `test_temperature.py` | 2 | Temperature updating against the seeded coefficients |
@@ -386,6 +387,7 @@ the number of endpoints taking `Depends(get_session)`, the size of
 | `test_splittable_rng_range.py` | 3 | The expected range holds under the splittable RNG |
 | `test_staleness.py` | 8 | The staleness probe reads a Workspace that lags the live one |
 | `test_state_graph.py` | 11 | A captured run restores to a state that continues identically |
+| `test_swaps_and_translation.py` | 14 | Extrinsic (swap) rules end to end, the conflict battery, the per-dimension slippage ignore, and the ways a translation fails |
 | `test_thematic_bridge_scout.py` | 9 | The thematic-bridge-scout inside an assembled engine |
 | `test_themespace.py` | 14 | Themespace driven by a real run's bridges |
 | `test_trace_persistence.py` | 7 | Trace event persistence logic |

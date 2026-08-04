@@ -181,6 +181,7 @@ class EpisodicMemory:
         self,
         new_desc: AnswerDescription,
         distance_threshold: float = 5.0,
+        meta: Any = None,
     ) -> list[AnswerDescription]:
         """Reactivate past answers close enough to the new one to come to mind.
 
@@ -195,7 +196,7 @@ class EpisodicMemory:
         for past in self.answers:
             if past is new_desc:
                 continue
-            distance = self.distance(new_desc, past)
+            distance = self.distance(new_desc, past, meta=meta)
             # ``memory.ss:212``: ``(100- (100* (min 1 (/ distance %distance-threshold%))))``
             # — reaches zero *at* the threshold rather than crossing it linearly.
             past.activation = max(
@@ -208,55 +209,83 @@ class EpisodicMemory:
         remindings.sort(key=lambda a: a.activation, reverse=True)
         return remindings
 
-    def distance(self, a: AnswerDescription, b: AnswerDescription) -> float:
+    def distance(
+        self, a: AnswerDescription, b: AnswerDescription, meta: Any = None
+    ) -> float:
         """How far apart two answers are.
 
-        §4.7.5 defines distance over five components:
+        Scheme: ``calculate-answer-distance`` (``memory.ss:494-583``), which is the same
+        classification ``get-answer-comparison-text`` performs (``answers.ss:455-620``)
+        read as a number instead of as English.  Both are computed here from one
+        :class:`~server.engine.answer_comparison.AnswerComparison`, so the distance and
+        the prose can never disagree about what the two answers share.
 
-        1. the number of differing and unique themes;
-        2. structural and conceptual differences between the rules;
-        3. the difference in abstractness of the rules;
-        4. themes justified for one answer but not the other;
-        5. whether the answers agree in coherence.
+        Five components, and the Scheme's own weights:
 
-        Scheme: ``calculate-answer-distance`` (``memory.ss:494-583``).  The base of 1
-        is what guarantees the invariant the Scheme documents at ``memory.ss:491-493``:
-        "the distance between two non-identical answers is always at least one".
-        Without it, and with unique themes weighted 1 rather than 2, every stored
-        answer sat inside the reminding threshold of 5 and the program was reminded of
-        everything by everything — two answers to *different problems* measured 0.0
-        apart.
+        1. **themes** — ``differing-dimensions + 2·unique1 + 2·unique2``
+           (``memory.ss:552-555``).  A dimension both answers hold with *different*
+           relations counts once; an idea one answer has and the other does not mention
+           at all counts twice.
+        2. **the top rule** — twice the number of concept pairs that differ *and* differ
+           in conceptual depth (``memory.ss:556-565, 571``).  There is no bottom-rule
+           term: ``memory.ss:558-559`` passes ``get-top-rule-clauses`` for both answers,
+           and the comparison at ``answers.ss:598-599`` does the same.  The bottom rule
+           is the *translation* of the top one into the target's terms, so counting it
+           would count the same disagreement twice over.
+        3. **abstractness**, but only as the rule term's alternative
+           (``memory.ss:568-571``): when the clause lists cannot be aligned at all there
+           are no pairs to count, and ``round(|Δabstractness| / 10)`` stands in.
+        4. **justification** — ideas *common* to both answers that only one of them
+           could justify (``memory.ss:572-574``), after the snag-justified ones have
+           been subtracted and the ones already charged as differing themes excluded.
+        5. **coherence** — 1 when the answers disagree about whether they hang together
+           (``memory.ss:575-578``).
+
+        The base of 1 (``memory.ss:580``) guarantees the invariant the Scheme documents
+        at ``memory.ss:490-493``: two identical answers are 0 apart and two non-identical
+        answers are always at least 1 apart.
+
+        ``meta`` supplies the conceptual depths component 2 filters on.  With none, the
+        depths come from ``seed_data/slipnet_nodes.json`` — the filter is not optional,
+        because without it ``leftmost`` against ``rightmost`` would read as a difference
+        in level when the two sit at the same depth.
         """
-        comparison = self.compare_answers(a, b)
+        from server.engine.answer_comparison import AnswerComparison
 
-        # Every comparison starts at 1.  ``find_remindings`` never compares an answer
-        # with itself, and ``answer_present`` keeps genuine duplicates out of memory,
-        # so there is no identical-pair case to special-case away.
+        # ``memory.ss:496-497``: identical answers are zero apart, before anything else
+        # is computed.
+        if self._answers_equal(a, b):
+            return 0.0
+
+        comparison = AnswerComparison(a, b, self, None, meta)
+
         distance = 1.0
 
         # 1. Differing themes count once; themes unique to one side count double.
         distance += float(
-            len(comparison["differing_themes"])
-            + 2 * len(comparison["a_unique_themes"])
-            + 2 * len(comparison["b_unique_themes"])
+            len(comparison.differing_dimensions)
+            + 2 * len(comparison.unique1)
+            + 2 * len(comparison.unique2)
         )
 
-        # 2/3. Rule differences.  Structural comparison when the clause lists can be
-        # compared at all; only otherwise does abstractness stand in for them
-        # (``memory.ss:540-560``) — the two are alternatives, not addends.
-        distance += self._rule_distance(
-            a.top_rule_signature, b.top_rule_signature,
-            a.top_rule_abstractness, b.top_rule_abstractness,
-        )
-        distance += self._rule_distance(
-            a.bottom_rule_signature, b.bottom_rule_signature,
-            a.bottom_rule_abstractness, b.bottom_rule_abstractness,
-        )
+        # 2/3. The *top* rules, and abstractness only as their alternative.
+        # ``comparison.num_rule_differences`` is ``count_rule_differences`` over
+        # ``compare_rule_signatures``, so it is already depth-filtered and already −1
+        # for clause lists that cannot be aligned.
+        if comparison.num_rule_differences == -1:
+            # Python's ``round`` breaks ties to even, as Chez's does on the exact
+            # rational ``(/ (abs (- a1 a2)) 10)``: a gap of 25 is 2, not 3.
+            distance += float(
+                round(abs(a.top_rule_abstractness - b.top_rule_abstractness) / 10.0)
+            )
+        else:
+            distance += 2.0 * comparison.num_rule_differences
 
-        # 4. Themes justified for one but not the other.
-        only_a = set(a.unjustified_themes) - set(b.unjustified_themes)
-        only_b = set(b.unjustified_themes) - set(a.unjustified_themes)
-        distance += float(len(only_a) + len(only_b))
+        # 4. Ideas common to both answers that only one of them could justify.
+        distance += float(
+            len(comparison.common_a_only_unjustified)
+            + len(comparison.common_b_only_unjustified)
+        )
 
         # 5. Coherence mismatch.
         if a.is_coherent != b.is_coherent:
@@ -265,24 +294,22 @@ class EpisodicMemory:
         return distance
 
     @staticmethod
-    def _rule_distance(
-        sig_a: list | None,
-        sig_b: list | None,
-        abstractness_a: float,
-        abstractness_b: float,
-    ) -> float:
-        """Scheme: the rule half of ``calculate-answer-distance``.
+    def _answers_equal(a: AnswerDescription, b: AnswerDescription) -> bool:
+        """Scheme: ``answers-equal?`` (``memory.ss:182-196``).
 
-        Structurally comparable clause lists contribute twice the number of differing
-        clauses; incomparable ones fall back to the abstractness disparity.
+        The four strings and *both* rules' clause lists.  A ``None`` signature means the
+        clause list was never recorded rather than that the rule was empty, and two
+        unrecorded rules are not thereby known to be the same rule — so an answer whose
+        top rule was not captured is never declared identical to another.
         """
-        if sig_a is None and sig_b is None:
-            return 0.0
-        if sig_a is None or sig_b is None or len(sig_a) != len(sig_b):
-            # Not structurally comparable — ``round(|Δabstractness| / 10)``.
-            return float(round(abs(abstractness_a - abstractness_b) / 10.0))
-        differing = sum(1 for x, y in zip(sig_a, sig_b) if x != y)
-        return 2.0 * differing
+        if tuple(a.problem) != tuple(b.problem):
+            return False
+        if a.top_rule_signature is None or b.top_rule_signature is None:
+            return False
+        return (
+            a.top_rule_signature == b.top_rule_signature
+            and a.bottom_rule_signature == b.bottom_rule_signature
+        )
 
     def get_equivalent_snag(
         self, answer: AnswerDescription

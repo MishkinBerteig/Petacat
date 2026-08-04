@@ -403,6 +403,10 @@ def make_translated_string(
             bond.proposal_level = getattr(bond, "BUILT", bond.proposal_level)
             translated.add_bond(bond)
 
+    # ``answers.ss:1061`` — before the bridges are drawn, whichever groups the rule's
+    # Length and BondFacet transforms bear on are given a Length description.
+    _attach_length_to_appropriate_groups(transforms)
+
     bridges = _bridge_to_translation(
         source,
         translated,
@@ -410,13 +414,105 @@ def make_translated_string(
         workspace if register_bridges else None,
         transforms,
     )
-    # ``answers.ss:1069`` — the last thing ``make-translated-string`` does is hand the
+
+    # ``answers.ss:1064-1069`` — a group of the translated string that no bridge maps
+    # onto is an artefact of the image walk rather than a reading of the answer, and is
+    # deleted.  The Scheme's own example: swapping ``m`` and ``[jjj]`` in
+    # ``[m][rr][jjj]`` produces ``[[jjj]][rr]m``, whose outer ``[[jjj]]`` says nothing.
+    _prune_irrelevant_translated_groups(translated, bridges)
+
+    # ``answers.ss:1070`` — the last thing ``make-translated-string`` does is hand the
     # bridges it drew back to the rule, which is where a translated rule gets its
     # supporting bridges and its theme pattern.  Until then it rests on nothing, and
     # ``supported?`` is vacuously true of it.
     if hasattr(rule, "set_translated_rule_information"):
         rule.set_translated_rule_information(bridges, workspace, slipnet)
     return translated
+
+
+def _attach_length_to_appropriate_groups(transforms: Any) -> None:
+    """Scheme: ``attach-length-to-appropriate-groups`` (``answers.ss:1074-1092``).
+
+    A Length transform means the rule spoke about how long something is, so the group
+    it produced should carry a Length description — on the *source* group when that
+    one lacks it, otherwise on the instantiated one.  A BondFacet:Length transform
+    means the group was read by its members' lengths, so its members get theirs.
+    Without this the answer string's groups are undescribed on the very dimension the
+    rule turned on.
+    """
+    from server.engine.groups import Group, attach_length_description
+    from server.engine.rules import _get_constituent_objects
+
+    if not transforms:
+        return
+
+    for entry in transforms:
+        if len(entry) != 2:
+            continue
+        obj, object_transforms = entry
+        image = getattr(obj, "image", None)
+        instantiated = getattr(image, "instantiated_object", None) if image else None
+        if not isinstance(instantiated, Group):
+            continue
+        length_transform = _select_transform(object_transforms, "plato-length")
+        bond_facet_transform = _select_transform(object_transforms, "plato-bond-facet")
+        if length_transform is not None:
+            if isinstance(obj, Group) and not _has_length(obj):
+                attach_length_description(obj)
+            else:
+                attach_length_description(instantiated)
+        elif (
+            bond_facet_transform is not None
+            and getattr(bond_facet_transform[1], "name", "") == "plato-length"
+        ):
+            for subobject in _get_constituent_objects(instantiated):
+                if isinstance(subobject, Group):
+                    attach_length_description(subobject)
+
+
+def _select_transform(transforms: Any, dimension_name: str) -> Any:
+    """Scheme's ``(assq <dimension> transforms)`` over ``(dimension descriptor)`` pairs."""
+    for transform in transforms or ():
+        if len(transform) >= 2 and getattr(transform[0], "name", "") == dimension_name:
+            return transform
+    return None
+
+
+def _has_length(group: Any) -> bool:
+    length_type = group._node("plato-length")
+    return length_type is not None and group.description_type_present(length_type)
+
+
+def _prune_irrelevant_translated_groups(translated: Any, bridges: list) -> None:
+    """Scheme: ``irrelevant-translated-string-group?`` (``answers.ss:1134-1142``).
+
+    A group survives only if it is one of the mapped objects on the translated side,
+    or nested inside one.
+    """
+    from server.engine.groups import Group
+
+    kept: list[Any] = []
+    for bridge in bridges:
+        obj = bridge.object2
+        if isinstance(obj, Group):
+            kept.append(obj)
+            kept.extend(_nested_groups(obj))
+
+    for group in list(getattr(translated, "groups", [])):
+        if not any(group is k for k in kept):
+            translated.remove_group(group)
+
+
+def _nested_groups(group: Any) -> list:
+    """Every group nested inside *group*, at any depth (``get-all-nested-groups``)."""
+    from server.engine.groups import Group
+
+    found: list[Any] = []
+    for obj in getattr(group, "objects", ()) or ():
+        if isinstance(obj, Group):
+            found.append(obj)
+            found.extend(_nested_groups(obj))
+    return found
 
 
 def _bridge_to_translation(

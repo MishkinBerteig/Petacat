@@ -597,16 +597,20 @@ class Image:
 
         new_image = self.sub_images[-1].copy()
 
+        # ``images.ss:326-345`` passes ``letter-arg`` and ``length-arg`` straight to
+        # ``new-start-letter`` and ``new-length``, both of which ``(fail)`` on a
+        # non-existent argument (``images.ss:271, 291``).  ``extend`` is reached from
+        # ``new-length`` with the group's own ``letter-relation`` / ``length-relation``
+        # (``images.ss:300``), so a group with no uniform sub-relation — ``[aa][b][cc]``
+        # has neither — cannot be lengthened at all, and the application fails with a
+        # CHANGE snag.  Guarding the ``None`` and silently copying the last sub-image
+        # instead let such a rule "succeed" and produce an answer the reference cannot.
         if change_length_first(length_arg, new_image.get_length(), self.slipnet):
-            if length_arg is not None:
-                new_image.new_length(length_arg)
-            if letter_arg is not None:
-                new_image.new_start_letter(letter_arg)
+            new_image.new_length(length_arg)
+            new_image.new_start_letter(letter_arg)
         else:
-            if letter_arg is not None:
-                new_image.new_start_letter(letter_arg)
-            if length_arg is not None:
-                new_image.new_length(length_arg)
+            new_image.new_start_letter(letter_arg)
+            new_image.new_length(length_arg)
 
         self.sub_images.append(new_image)
         self.letter_relation = relationship_between(

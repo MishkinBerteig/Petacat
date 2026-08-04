@@ -1370,8 +1370,12 @@ class TestRuleBuilder:
     def test_builds_the_rule_and_activates_its_concepts(self, ctx_abc_abd_xyz, meta):
         """Rule builder builds the rule and activates its constituent concepts.
 
-        It does *not* post an answer-finder: answer-finders come from the
-        bottom-up posting rules and from progress-watchers.
+        ``activate-rule-descriptors-from-workspace`` (``rules.ss:494-502``) activates
+        each object-description's *descriptor* and each intrinsic change's
+        *descriptor* — so the object-description has to be the real three-part
+        ``(object-type, attribute, descriptor)`` of Fig. 3.2.  This test used to
+        supply a two-element pair, which only passed because the builder activated
+        every node it could find anywhere in the clause.
         """
         ctx = ctx_abc_abd_xyz
         interp = CodeletInterpreter(builtins=_get_test_builtins())
@@ -1386,12 +1390,13 @@ class TestRuleBuilder:
         clause = RuleClause(
             clause_type=CLAUSE_INTRINSIC,
             object_description=(
+                slipnet.nodes["plato-letter"],
                 slipnet.nodes["plato-string-position-category"],
                 slipnet.nodes["plato-rightmost"],
             ),
             changes=[change],
         )
-        rule = Rule(RULE_TOP, [clause])
+        rule = Rule(RULE_TOP, [clause], workspace=ctx.workspace)
         rule.proposal_level = Rule.EVALUATED
         rule.quality = 80.0
 

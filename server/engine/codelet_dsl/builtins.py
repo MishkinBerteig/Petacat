@@ -725,13 +725,28 @@ def activate_from_workspace(ctx: EngineContext, *nodes: Any) -> None:
 
 # ── Structure lifecycle ──
 
-def evaluate_structure(ctx: EngineContext, structure: Any) -> bool:
-    """Evaluate a proposed structure. Returns True if it passes."""
+def evaluate_structure(
+    ctx: EngineContext, structure: Any, temperature_adjusted: bool = True
+) -> bool:
+    """Evaluate a proposed structure. Returns True if it passes.
+
+    Bonds, descriptions and bridges survive with ``temp-adjusted-probability``
+    (``bonds.ss:343``, ``descriptions.ss:149``, ``bridges.ss:1166``).  The **rule**
+    evaluator does not: ``rules.ss:468`` is a bare ``(1- (% strength))``, so a
+    rule's survival is its strength and nothing else, however confused the program
+    currently is.  That is deliberate — a rule is the one structure whose worth is
+    already measured relative to its peers (``get-relative-quality``), so
+    re-weighting it by temperature would apply the adjustment twice.
+    """
     structure.update_strength()
-    accept_prob = temp_adjusted_probability(
-        structure.strength / 100.0,
-        ctx.temperature.value,
-        ctx.meta,
+    accept_prob = (
+        temp_adjusted_probability(
+            structure.strength / 100.0,
+            ctx.temperature.value,
+            ctx.meta,
+        )
+        if temperature_adjusted
+        else structure.strength / 100.0
     )
     _read(ctx, structure)
     if ctx.rng.prob(accept_prob):
@@ -2445,6 +2460,34 @@ def _report_answer_locked(
     if getattr(ctx, "_pending_answer", None) is not None or ctx.run_ended:
         return
 
+    # ``answers.ss:24-26`` — the first two things ``report-new-answer`` does, before
+    # any of the answer is recorded:
+    #
+    #   (update-everything)
+    #   (if* (tell *trace* 'within-clamp-period?) (tell *trace* 'undo-last-clamp))
+    #
+    # The update makes the temperature and the structure strengths that go into the
+    # answer description this instant's rather than up to fifteen codelets stale; the
+    # undo means the answer *ends* the clamp episode that led to it and books the
+    # progress it achieved, rather than leaving a live clamp to survive into a
+    # resumed run.
+    update = getattr(ctx, "on_update_everything", None)
+    if update is not None:
+        update()
+    if ctx.trace.within_clamp_period:
+        ctx.trace.undo_last_clamp(
+            ctx.themespace, ctx.slipnet, ctx.codelet_count, ctx.coderack
+        )
+
+    # The quality the answer is stored with follows the temperature, so it has to be
+    # taken after the update, not before (``make-answer-event``, ``trace.ss:945``).
+    if top_rule is not None:
+        from server.engine.answers import compute_answer_quality
+
+        quality = compute_answer_quality(
+            top_rule.quality, ctx.temperature.value, ctx.meta
+        )
+
     # Create the answer string on the workspace so it is visible to
     # serialization and the UI.
     if ctx.workspace.answer_string is None or not ctx.justify_mode:
@@ -2555,38 +2598,41 @@ def translate_rule(ctx: EngineContext, rule: Any) -> Any:
 def _translate_rule_locked(ctx: EngineContext, rule: Any) -> Any:
     """Translate a rule through the vertical mapping.
 
-    Scheme: ``apply-slippages`` (slipnet.ss:257-277).  A slippage whose
+    Scheme: ``translate`` (``answers.ss:1281-1342``).  A slippage whose
     ``descriptor1`` *is* the concept being translated is applied
-    unconditionally; the only probabilistic step is the **coattail** slippage,
-    whose likelihood is the sliplink's degree of association (§3.4.1).  The
-    nondeterminism §3.4 describes comes from which slippages the vertical mapping
-    happens to contain at the moment of translation, and from those coattails —
-    not from second-guessing the mapping's own slippages.
+    unconditionally; the probabilistic steps are the **coattail** slippage, whose
+    likelihood is the sliplink's degree of association (§3.4.1), and the
+    per-dimension ignore at p=0.4 (``answers.ss:1364-1371``).
 
-    This previously dropped each direct slippage with probability
-    ``1 - slippability``, which meant deep slippages were discarded most often:
-    the ``letter => group`` mapping that lets ``c`` stand for the ``jjj`` group
-    survived only about 7% of the time, so ``mrrkkk`` — documented as "by far the
-    most common" answer to ``abc => abd; mrrjjj => ?`` — never appeared at all.
+    Which slippages a clause sees is decided clause by clause inside
+    ``Rule.translate``, from the vertical bridges of that clause's own reference
+    objects.  Collecting every vertical CM here and handing the lot to every
+    clause let unrelated mappings shadow the one that counts.
+
+    Returns ``None`` when the translation fails — no vertical mapping at all, a
+    clause naming an object the source string has lost, reference objects in
+    inconsistent enclosing groups, or a translated clause that is not
+    well-formed.  The answer-finder reports "Couldn't translate chosen rule".
     """
-    slippages = []
-    for bridge in ctx.workspace.vertical_bridges:
-        if bridge.is_built:
-            slippages.extend(bridge.concept_mappings)
-
-    if not slippages:
+    if not any(bridge.is_built for bridge in ctx.workspace.vertical_bridges):
         return None
 
-    source_string = (
+    from_string = (
         ctx.workspace.initial_string
         if rule.is_top_rule
         else ctx.workspace.target_string
     )
+    to_string = (
+        ctx.workspace.target_string
+        if rule.is_top_rule
+        else ctx.workspace.initial_string
+    )
     return rule.translate(
-        slippages,
+        from_string,
+        to_string,
+        ctx.slipnet,
         rng=ctx.rng,
-        source_string=source_string,
-        slipnet=ctx.slipnet,
+        meta=ctx.meta,
     )
 
 

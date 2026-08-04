@@ -130,7 +130,9 @@ def attempt_justification(
     other_rules = unique_other
 
     # Step 2 -- Translate the chosen rule using vertical bridge slippages
-    translation_result = _translate_rule(chosen_rule, workspace, slipnet, rng=rng)
+    translation_result = _translate_rule(
+        chosen_rule, workspace, slipnet, rng=rng, meta=meta
+    )
 
     if translation_result is not None:
         translated_rule, slippages, supporting_vbridges = translation_result
@@ -782,16 +784,18 @@ def _translate_rule(
     slipnet: Slipnet | None,
     *,
     rng: RNG | None = None,
+    meta: Any = None,
 ) -> tuple[Rule, list[Any], list[Any]] | None:
     """Translate a rule using vertical bridge slippages.
 
     Returns (translated_rule, slippages, supporting_vertical_bridges) or None.
 
     ``rng`` is what lets a translation drag an auxiliary slippage along on a coattail
-    (``slipnet.py:446-447``): ``apply_slippages`` skips coattails entirely without it.
-    The Scheme uses one ``translate`` in both modes, so a justify-mode translation is
-    exactly as free as an answer-finding one; passing no RNG made it strictly more
-    literal.
+    (``slipnet.py:446-447``): ``apply_slippages`` skips coattails entirely without it,
+    and the per-dimension ignore at p=0.4 (``answers.ss:1364-1371``) is likewise a
+    no-op.  The Scheme uses one ``translate`` in both modes, so a justify-mode
+    translation is exactly as free as an answer-finding one; passing no RNG made it
+    strictly more literal.
     """
     # Gather slippages from vertical bridges
     slippages: list[Any] = []
@@ -804,10 +808,17 @@ def _translate_rule(
     if not slippages:
         return None
 
-    direction = (
-        "top-to-bottom" if rule.rule_type == "top" else "bottom-to-top"
+    from_string = (
+        workspace.initial_string if rule.rule_type == "top" else workspace.target_string
     )
-    translated = rule.translate(slippages, direction, rng=rng)
+    to_string = (
+        workspace.target_string if rule.rule_type == "top" else workspace.initial_string
+    )
+    translated = rule.translate(
+        from_string, to_string, slipnet, rng=rng, meta=meta
+    )
+    if translated is None:
+        return None
     return (translated, slippages, supporting_vbridges)
 
 
