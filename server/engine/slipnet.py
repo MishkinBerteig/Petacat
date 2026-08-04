@@ -335,11 +335,20 @@ class SlipnetNode:
 
         Scheme: slipnet.ss:183-185.
         amount = round((ucl/15) * (association/100) * activation)
+
+        A **frozen destination takes nothing**: ``increment-activation-buffer``
+        (``slipnet.ss:157-160``) refuses while the node is frozen, which is what makes
+        a clamp a clamp.  Buffering into frozen nodes let a concept pinned *below* 100
+        — a negative theme's ``plato-opposite`` clamped to 0 (``trace.ss:1512-1514``),
+        or the run's initial clamp period — climb back up on the next flush, so the
+        clamp suppressed the concept for one cycle and then released it.
         """
         if self.activation <= 0:
             return
         scale = update_cycle_length / 15.0
         for link in self.outgoing_links:
+            if link.to_node.frozen:
+                continue
             assoc = link.intrinsic_degree_of_association()
             amount = round(scale * (assoc / 100.0) * self.activation)
             if amount > 0:
@@ -402,9 +411,14 @@ class SlipnetNode:
         question of a particular link; this asks it of the relating concept
         itself, and is what sets the probability of an auxiliary slippage in
         ``look-for-auxiliary-slippages`` (themes.ss:920-924).
+
+        A node with no length set carries ``slipnet.ss:31``'s initial **0**, i.e. full
+        association — not the 0 association this used to answer.  Only reachable for a
+        node that is not one of the five relating concepts, and only those are ever
+        asked.
         """
         if self.intrinsic_link_length is None:
-            return 0.0
+            return 100.0
         if self.fully_active():
             shrunk = self.shrunk_link_length()
             if shrunk is not None:
@@ -474,10 +488,15 @@ class SlipnetNode:
         ``cycles`` is Petacat's own mechanism for the timed initial clamp; 0 means
         the clamp lasts until something lifts it explicitly, which is how every
         concept-pattern clamp behaves in the reference.
+
+        The buffer is discarded, as ``slipnet.ss:142`` discards it: whatever the node
+        was about to receive is superseded by the clamped value, and leaving it there
+        let the very next flush add it on top of a value that was supposed to be held.
         """
         self.frozen = True
         self.clamp_cycles_remaining = cycles
         self.activation = float(activation)
+        self.activation_buffer = 0.0
 
     def unclamp(self) -> None:
         self.frozen = False
@@ -730,7 +749,12 @@ class SlipnetLink:
                     return shrunk
             if self.label_node.intrinsic_link_length is not None:
                 return self.label_node.intrinsic_link_length
-        return 50  # Default fallback
+        # ``slipnet.ss:31`` initialises ``intrinsic-link-length`` to **0**, and only
+        # the five relating concepts are ever given a value (``slipnet.ss:548-552``),
+        # so an unlabelled non-fixed link reads 0 — association 100 — rather than a
+        # made-up midpoint.  Unreachable with the shipped seeds: every one of the 202
+        # links is either fixed-length or labelled by a node that carries a length.
+        return 0
 
     def intrinsic_degree_of_association(self) -> float:
         """Scheme: slipnet.ss:330-333. Always uses intrinsic length, never shrunk."""
@@ -739,7 +763,7 @@ class SlipnetLink:
         if self.label_node is not None:
             if self.label_node.intrinsic_link_length is not None:
                 return max(0.0, 100.0 - self.label_node.intrinsic_link_length)
-        return 50.0  # Default fallback
+        return 100.0  # length 0 — see ``link_length``
 
     def degree_of_association(self) -> float:
         """Scheme: slipnet.ss:334-339. Dynamic — uses shrunk length when label is fully active."""

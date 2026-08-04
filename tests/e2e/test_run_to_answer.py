@@ -197,18 +197,25 @@ async def test_stop_already_stopped_run(app_client):
 async def test_run_preserves_trace_events(app_client):
     """Trace events should be persisted during run_to_completion.
 
-    Note: trace events (bonds, groups, bridges) require enough codelets
-    to actually build structures. 30 steps is not enough; 200+ is.
+    Note: trace events (bonds, groups, bridges) require enough codelets to actually
+    build structures. 30 steps is not enough.
+
+    The budget was 200 until the Trace/Memory parity round moved this seed's stream:
+    a codelet now runs with the count of codelets already finished (``run.ss:178-183``)
+    and the initial descriptions are attached object-category first
+    (``workspace-objects.ss:21-26``), so seed 12345 reaches its first important group
+    between codelet 200 and 300 instead of before 200.  Rebaselined at 400, where it
+    has five events rather than sitting on the boundary.
     """
     resp = await app_client.post("/api/runs", json={
         "initial": "abc", "modified": "abd", "target": "xyz", "seed": SEED,
     })
     run_id = resp.json()["run_id"]
 
-    await app_client.post(f"/api/runs/{run_id}/run", json={"max_steps": 200})
+    await app_client.post(f"/api/runs/{run_id}/run", json={"max_steps": 400})
 
     resp = await app_client.get(f"/api/runs/{run_id}/trace")
     assert resp.status_code == 200
     data = resp.json()
     events = data if isinstance(data, list) else data.get("events", [])
-    assert len(events) > 0, "Run of 200 steps should have produced trace events"
+    assert len(events) > 0, "Run of 400 steps should have produced trace events"

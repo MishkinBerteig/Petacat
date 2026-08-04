@@ -253,4 +253,9 @@ class SnagDescriptionRow(Base):
     temperature = Column(Float, default=0)
     theme_pattern = Column(JSONB, default=dict)
     description = Column(Text, default="")
+    # The structural clause keys ``snag_present`` and ``get_equivalent_snag`` compare
+    # (``memory.ss:289-291, 336-340``).  Without them a rehydrated snag could only be
+    # matched on its English prose, which is what the structural comparison replaced.
+    rule_signature = Column(JSONB, nullable=True)
+    translated_rule_signature = Column(JSONB, nullable=True)
     created_at = Column(DateTime, default=_utcnow)

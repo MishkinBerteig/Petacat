@@ -51,10 +51,25 @@ def test_strength_labeled_slippage_scales_association_by_depth_bonus():
     assert cm.strength() == 81.0
 
 
-def test_strength_labeled_slippage_capped_at_100():
+def test_strength_of_a_deep_slippage_is_not_capped_at_100():
+    """``concept-mappings.ss:130-135`` has no upper bound.
+
+    The depth bonus is there to say that a slippage between *deep* concepts is worth
+    more than the association alone; a ``min(100, ...)`` erased exactly that
+    distinction for the mappings it applies most strongly to.
+    """
     cm = _labeled_slippage(degree=90, depth1=100, depth2=100)
-    # bonus = 1 + 1 = 2, 90 * 2 = 180 -> capped to 100
+    # bonus = 1 + 1 = 2, 90 * 2 = 180
+    assert cm.strength() == 180.0
+
+
+def test_a_full_association_scores_a_flat_100_rather_than_the_product():
+    """``concept-mappings.ss:131`` branches on ``(= degree-of-assoc 100)``, not on
+    identity: a mapping over a zero-length link is 100 like an identity, not 100 times
+    the depth bonus."""
+    cm = _labeled_slippage(degree=100, depth1=100, depth2=100)
     assert cm.strength() == 100.0
+    assert cm.slippability() == 100.0
 
 
 def test_strength_unlabeled_slippage_is_5():

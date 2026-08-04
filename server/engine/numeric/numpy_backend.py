@@ -121,7 +121,13 @@ class NumpySlipnetSession(SlipnetSession):
             # does for a float, so the per-edge contribution is the same integer
             # the reference computes.
             np.multiply(contrib, gate, out=contrib)
-            buf += np.bincount(self.dst, weights=contrib, minlength=self.n)
+            # ``increment-activation-buffer`` (``slipnet.ss:157-160``) refuses while
+            # the destination is frozen: a clamped node receives no spreading.
+            buf += np.where(
+                self.frozen,
+                0.0,
+                np.bincount(self.dst, weights=contrib, minlength=self.n),
+            )
 
         np.add(act, buf, out=act)
         np.clip(act, 0.0, 100.0, out=act)

@@ -1218,6 +1218,8 @@ class RunService:
                 theme_pattern=s.theme_pattern or {},
                 description=s.description or "",
                 run_id=s.run_id,
+                rule_signature=s.rule_signature,
+                translated_rule_signature=s.translated_rule_signature,
             )
             _global_memory.store_snag(desc)
             # A restart keeps each snag's identifier, so the id the listing shows before

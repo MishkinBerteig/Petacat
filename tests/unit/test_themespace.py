@@ -309,3 +309,31 @@ def test_reset_clears_all_theme_activation():
     _top_direction_cluster(ts).get_theme("identity").activation = 80.0
     ts.reset()
     assert ts.get_max_positive_theme_activation() == 0.0
+
+
+# --- unclamp per theme type  (trace.ss:1538-1542) --------------------------
+
+
+def test_unclamping_one_theme_type_leaves_the_others_clamped():
+    """``unclamp-theme-pattern`` unfreezes and releases pressure for the pattern's
+    *own* theme type.
+
+    Releasing everything meant the end of one clamp episode silently ended every
+    other — reachable whenever two patterns are clamped at once, which justify-mode's
+    rule unification does by construction.
+    """
+    ts = _themespace()
+    ts.clamp_negative_pattern({"direction": "opposite"}, THEME_TOP_BRIDGE)
+    ts.clamp_negative_pattern({"direction": "opposite"}, THEME_VERTICAL_BRIDGE)
+
+    ts.unclamp_theme_type(THEME_TOP_BRIDGE)
+
+    assert ts.has_thematic_pressure([THEME_TOP_BRIDGE]) is False
+    assert ts.has_thematic_pressure([THEME_VERTICAL_BRIDGE]) is True
+    assert _top_direction_cluster(ts).get_theme("opposite").frozen is False
+    vertical = next(
+        c for c in ts.clusters
+        if c.theme_type == THEME_VERTICAL_BRIDGE and c.dimension == "direction"
+    )
+    assert vertical.get_theme("opposite").frozen is True
+    assert vertical.get_theme("opposite").activation == -100.0

@@ -97,6 +97,10 @@ class TraceEvent:
         description: str = "",
         theme_pattern: Any = None,
         strength: float = 0.0,
+        concept_mapping: Any = None,
+        bridge: Any = None,
+        group: Any = None,
+        slipnode: Any = None,
     ) -> None:
         self.event_number = next_id(KIND_TRACE_EVENT)
         self.event_type = event_type
@@ -105,6 +109,20 @@ class TraceEvent:
         self.structures = structures or []
         self.description = description
         self.theme_pattern = theme_pattern
+        #: The *particular* slippage a concept-mapping event records, and the bridge it
+        #: was made on (``trace.ss:750-800``).  The Scheme's event closes over one
+        #: concept-mapping and reports a one-entry theme pattern built from it
+        #: (``trace.ss:763-766``); reading every non-identity mapping back off the
+        #: bridge instead — as this used to — attributes to the event slippages it
+        #: never recorded, and those go straight into the answer's index.
+        self.concept_mapping = concept_mapping
+        self.bridge = bridge
+        #: The group a group event records (``trace.ss:871``), needed because
+        #: ``abstract-answer-description-theme-pattern`` asks a whole-string group event
+        #: for its group (``answers.ss:173, 177``).
+        self.group = group
+        #: The Slipnet node a concept-activation event records (``trace.ss:718``).
+        self.slipnode = slipnode
         #: How strong the thing this event records was, at the moment it happened.
         #: §4.5.1 measures a clamp by "the strengths of the most important Workspace
         #: structures that get built in the aftermath of the clamp ... recorded in the
@@ -378,7 +396,7 @@ class ClampEvent(TraceEvent):
         """
         # Unclamp theme patterns
         for pattern in self.clamped_theme_patterns:
-            unclamp_theme_pattern(themespace)
+            unclamp_theme_pattern(pattern, themespace)
 
         # Unclamp concept patterns
         for pattern in self.clamped_concept_patterns:
@@ -680,13 +698,29 @@ def clamp_theme_pattern(pattern: Any, themespace: Themespace) -> None:
             themespace.thematic_pressure_on([theme_type])
 
 
-def unclamp_theme_pattern(themespace: Themespace) -> None:
-    """Remove the current theme pattern clamp.
+def unclamp_theme_pattern(pattern: Any, themespace: Themespace) -> None:
+    """Release the clamp *this* pattern imposed.
 
-    Scheme: trace.ss ``unclamp-theme-pattern`` (line 1538).
-    Unfreezes all clusters and themes.
+    Scheme: ``unclamp-theme-pattern`` (``trace.ss:1538-1542``)::
+
+        (let ((theme-type (1st theme-pattern)))
+          (tell *themespace* 'unfreeze-theme-type theme-type)
+          (tell *themespace* 'thematic-pressure-off theme-type))
+
+    Per theme *type*, not globally: the pattern names one, and the other two are none
+    of this clamp's business.  Releasing everything meant the end of one clamp episode
+    silently ended every other — which is reachable, since justify-mode's rule
+    unification clamps the top and bottom patterns as separate entries of the same
+    clamp event, and a manual clamp can be laid on top of a live snag-response one.
+
+    A pattern with no readable type falls back to releasing everything, which is what
+    the previous behaviour was for every pattern.
     """
-    themespace.unclamp_all()
+    theme_type = pattern.get("type") if isinstance(pattern, dict) else None
+    if theme_type:
+        themespace.unclamp_theme_type(theme_type)
+    else:
+        themespace.unclamp_all()
 
 
 def _concept_pattern_entries(pattern: Any) -> list[tuple[str, float]]:
@@ -908,6 +942,10 @@ def make_concept_activation_monitor(
                     description=(
                         f"the concept of {node.short_name} became active"
                     ),
+                    # ``trace.ss:718, 720`` — the node itself, and its conceptual depth
+                    # as the event's strength.
+                    slipnode=node,
+                    strength=float(node.conceptual_depth),
                 )
             )
 

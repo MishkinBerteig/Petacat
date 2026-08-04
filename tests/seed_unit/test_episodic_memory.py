@@ -7,6 +7,8 @@ depth filter reads the shipped conceptual depths when no ``MetadataProvider`` su
 them — so every figure below is a figure about the values Petacat ships with.
 """
 
+import os
+
 import pytest
 
 from server.engine.memory import AnswerDescription, EpisodicMemory, SnagDescription
@@ -457,6 +459,10 @@ def test_a_snag_justified_theme_leaves_the_justification_component():
             temperature=40.0,
             theme_pattern={STRING_POSITION: "identity"},
             description=rule,
+            # ``get-equivalent-snag`` (``memory.ss:84-89``) matches on the rule's
+            # *clause list*, not its prose, so the snag has to carry the same
+            # signature the answer does for the episodes to be the same episode.
+            rule_signature=_rule(),
         )
     )
 
@@ -532,3 +538,172 @@ def test_compare_answers_includes_quality_and_rule_fields():
     assert result["b_quality"] == 55.0
     assert result["a_rule"] == "rule-a"
     assert result["b_rule"] == "rule-b"
+
+
+# --- snag identity: memory.ss:78-89, 289-291, 336-340 ----------------------
+#
+# ``make-snag-description`` stores the rule's *clause list*, and ``equal?`` compares
+# the three problem strings plus ``rule-clause-lists-equal?``.  The English
+# transcription cannot stand in for it, for the two reasons ``rules.py:rule_signature``
+# already documents on the answer side.
+
+
+@pytest.fixture(scope="module")
+def nodes():
+    from server.engine.metadata import MetadataProvider
+    from server.engine.slipnet import Slipnet
+
+    seed_dir = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
+    return Slipnet.from_metadata(MetadataProvider.from_seed_data(seed_dir)).nodes
+
+
+def _real_rule(nodes, position="plato-rightmost", relation="plato-successor"):
+    """A real one-clause rule: "change letter-category of the <position> letter by <r>"."""
+    from server.engine.rules import CLAUSE_INTRINSIC, RULE_TOP, Rule, RuleChange, RuleClause
+
+    clause = RuleClause(
+        clause_type=CLAUSE_INTRINSIC,
+        object_description=(
+            nodes["plato-letter"],
+            nodes["plato-string-position-category"],
+            nodes[position],
+        ),
+        changes=[
+            RuleChange(
+                dimension=nodes["plato-letter-category"], relation=nodes[relation]
+            )
+        ],
+    )
+    return Rule(rule_type=RULE_TOP, clauses=[clause])
+
+
+def _changeless_rule(nodes, position="plato-rightmost"):
+    """A clause with no changes — the shape that transcribes to "Unknown transformation"."""
+    from server.engine.rules import CLAUSE_INTRINSIC, RULE_TOP, Rule, RuleClause
+
+    clause = RuleClause(
+        clause_type=CLAUSE_INTRINSIC,
+        object_description=(
+            nodes["plato-letter"],
+            nodes["plato-string-position-category"],
+            nodes[position],
+        ),
+        changes=[],
+    )
+    return Rule(rule_type=RULE_TOP, clauses=[clause])
+
+
+def _snag_for(rule, problem=("abc", "abd", "xyz")):
+    from server.engine.rules import rule_signature
+
+    return SnagDescription(
+        problem=problem,
+        codelet_count=100,
+        temperature=100.0,
+        theme_pattern={},
+        description=rule.transcribe_to_english(),
+        rule_signature=rule_signature(rule),
+    )
+
+
+def test_snag_present_matches_the_same_rule_on_the_same_problem(nodes):
+    """``snag-present?`` (``memory.ss:78-83``) — the guard that keeps one impasse from
+    being recorded twice."""
+    memory = EpisodicMemory()
+    memory.store_snag(_snag_for(_real_rule(nodes)))
+    assert memory.snag_present(("abc", "abd", "xyz"), _real_rule(nodes)) is True
+
+
+def test_two_structurally_different_rules_with_identical_prose_do_not_collide(nodes):
+    """The first of the two collisions a prose comparison has.
+
+    ``transcribe_to_english`` renders the *changes* and says nothing about which object
+    a clause names, so "change the leftmost letter by successor" and "change the
+    rightmost letter by successor" come out as the same sentence.  As prose they were
+    one snag episode; as clause lists they are two.
+    """
+    memory = EpisodicMemory()
+    rightmost = _real_rule(nodes, position="plato-rightmost")
+    leftmost = _real_rule(nodes, position="plato-leftmost")
+    assert rightmost.transcribe_to_english() == leftmost.transcribe_to_english()
+
+    memory.store_snag(_snag_for(rightmost))
+    assert memory.snag_present(("abc", "abd", "xyz"), leftmost) is False
+
+
+def test_two_untranscribable_rules_do_not_collide(nodes):
+    """The second: every rule that fails to transcribe reads "Unknown transformation",
+    so under a prose comparison the first such snag matched *every* later one and no
+    further impasse was ever recorded.  ``rules.py:rule_signature`` documents exactly
+    this hazard for answers; the snag path had it open."""
+    memory = EpisodicMemory()
+    first = _changeless_rule(nodes, position="plato-rightmost")
+    second = _changeless_rule(nodes, position="plato-leftmost")
+    assert first.transcribe_to_english() == "Unknown transformation"
+    assert second.transcribe_to_english() == "Unknown transformation"
+
+    memory.store_snag(_snag_for(first))
+    assert memory.snag_present(("abc", "abd", "xyz"), second) is False
+    assert memory.snag_present(("abc", "abd", "xyz"), first) is True
+
+
+def test_a_snag_with_no_recorded_clause_list_matches_nothing(nodes):
+    """A null signature means the clause list was never captured, not that the rule was
+    empty — the same reservation ``_answers_equal`` makes for an answer."""
+    memory = EpisodicMemory()
+    memory.store_snag(
+        SnagDescription(
+            problem=("abc", "abd", "xyz"),
+            codelet_count=100,
+            temperature=100.0,
+            theme_pattern={},
+            description="change LettCtgy by succ",
+        )
+    )
+    assert memory.snag_present(("abc", "abd", "xyz"), _real_rule(nodes)) is False
+
+
+def test_get_equivalent_snag_matches_on_the_clause_list(nodes):
+    """``get-equivalent-snag`` (``memory.ss:84-89``) passes the answer's *top-rule
+    clauses*, which is what §4.7.3's snag-justified distinction rests on."""
+    from server.engine.rules import rule_signature
+
+    memory = EpisodicMemory()
+    rule = _real_rule(nodes)
+    snag = _snag_for(rule)
+    memory.store_snag(snag)
+
+    answer = _described(
+        ("abc", "abd", "xyz", "xyd"), {}, signature=rule_signature(rule)
+    )
+    assert memory.get_equivalent_snag(answer) is snag
+
+    other = _described(
+        ("abc", "abd", "xyz", "xyd"),
+        {},
+        signature=rule_signature(_real_rule(nodes, position="plato-leftmost")),
+    )
+    assert memory.get_equivalent_snag(other) is None
+
+
+def test_a_snag_on_another_problem_is_a_different_episode(nodes):
+    memory = EpisodicMemory()
+    memory.store_snag(_snag_for(_real_rule(nodes), problem=("abc", "abd", "mrrjjj")))
+    assert memory.snag_present(("abc", "abd", "xyz"), _real_rule(nodes)) is False
+
+
+# --- clear_activations: run.ss:212 ----------------------------------------
+
+
+def test_clear_activations_zeroes_every_stored_answer():
+    """``init-mcat`` clears them at the start of every run (``run.ss:212``): an
+    activation says how strongly *this* run is reminded of a past answer, so a new run
+    of a Training Session starts reminded of nothing."""
+    memory = EpisodicMemory()
+    past = _answer({"direction": "opposite"})
+    memory.store_answer(past)
+    memory.find_remindings(_answer({"direction": "opposite"}), distance_threshold=5.0)
+    assert past.activation > 0.0
+
+    memory.clear_activations()
+    assert past.activation == 0.0

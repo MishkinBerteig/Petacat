@@ -177,6 +177,8 @@ class TraceRecordingSink:
                     temperature=snag.temperature,
                     theme_pattern=snag.theme_pattern,
                     description=snag.description,
+                    rule_signature=snag.rule_signature,
+                    translated_rule_signature=snag.translated_rule_signature,
                 )
             )
 

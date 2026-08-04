@@ -332,3 +332,57 @@ def test_a_node_without_property_links_asks_nothing():
     rng = _ScriptedRNG([])
     assert node.get_similar_property_links(rng) == []
     assert rng.asked == []
+
+
+# --- a frozen node takes nothing in  (slipnet.ss:139-145, 157-163) ---------
+
+
+def test_a_frozen_node_receives_no_spreading():
+    """``increment-activation-buffer`` (``slipnet.ss:157-160``) refuses while the node
+    is frozen, which is what makes a clamp hold a value rather than merely start it
+    there.
+
+    Live for any concept pinned *below* 100 — a negative theme clamps
+    ``plato-opposite`` to zero (``trace.ss:1512-1514``) — where buffering the spread in
+    let the concept climb back on the next flush.
+    """
+    source = SlipnetNode("source", "source", 50)
+    target = SlipnetNode("target", "target", 50)
+    source.lateral_links.append(
+        SlipnetLink(source, target, "lateral", fixed_link_length=0)
+    )
+    source.activation = 100.0
+    target.clamp(0, activation=0.0)
+
+    source.spread_activation_to_neighbors(15)
+
+    assert target.activation_buffer == 0.0
+
+
+def test_an_unfrozen_node_does_receive_spreading():
+    source = SlipnetNode("source", "source", 50)
+    target = SlipnetNode("target", "target", 50)
+    source.lateral_links.append(
+        SlipnetLink(source, target, "lateral", fixed_link_length=0)
+    )
+    source.activation = 100.0
+
+    source.spread_activation_to_neighbors(15)
+
+    assert target.activation_buffer == 100.0
+
+
+def test_clamping_discards_whatever_the_node_was_about_to_receive():
+    """``slipnet.ss:142`` sets ``activation-buffer`` to 0 inside ``clamp``.
+
+    Left in place, a jolt a codelet delivered just before the clamp was added on top of
+    the clamped value at the next flush.
+    """
+    node = SlipnetNode("n", "n", 50)
+    node.activate_from_workspace()
+    assert node.activation_buffer == 100.0
+
+    node.clamp(0, activation=0.0)
+
+    assert node.activation_buffer == 0.0
+    assert node.activation == 0.0

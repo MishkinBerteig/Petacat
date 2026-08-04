@@ -200,3 +200,88 @@ def test_scout_counts_come_from_blurred_absolute_counts(runner):
     assert runner._compute_num_to_post("bottom-up-bridge-scout") == 6
     # No bonds anywhere yet, so group scouts are not posted at all.
     assert runner._compute_num_to_post("group-scout:whole-string") == 0
+
+
+# --- the loop's own order  (run.ss:146-183) --------------------------------
+
+
+def test_a_codelet_runs_with_the_count_of_codelets_already_finished(runner):
+    """``step-mcat`` (``run.ss:178-183``) runs the codelet and *then* increments.
+
+    Every time-stamp a codelet writes — the stamp on a codelet it posts, the
+    ``codelet_count`` of an event it records, a clamp's start time — is therefore one
+    lower than the count reported for the codelet itself.  Incrementing first made all
+    of them one higher than the reference's.
+    """
+    runner.init_mcat("abc", "abd", "xyz", seed=42)
+    ctx = runner.ctx
+    seen: list[int] = []
+    real_execute = runner._execute_codelet
+
+    def watching(codelet):
+        seen.append(ctx.codelet_count)
+        return real_execute(codelet)
+
+    runner._execute_codelet = watching  # type: ignore[method-assign]
+    for _ in range(5):
+        runner.step_mcat()
+
+    assert seen == [0, 1, 2, 3, 4]
+    assert ctx.codelet_count == 5
+
+
+def test_the_coderack_stamps_a_posted_codelet_with_the_pre_increment_count(runner):
+    """``add-codelet`` (``coderack.ss``) stamps with ``*codelet-count*``, which during
+    the k-th codelet is k-1.  ``Coderack.current_time`` is Petacat's stand-in for that
+    global, so it has to hold the same value while a codelet runs."""
+    runner.init_mcat("abc", "abd", "xyz", seed=42)
+    ctx = runner.ctx
+    seen: list[int] = []
+    real_execute = runner._execute_codelet
+
+    def watching(codelet):
+        seen.append(ctx.coderack.current_time)
+        return real_execute(codelet)
+
+    runner._execute_codelet = watching  # type: ignore[method-assign]
+    for _ in range(3):
+        runner.step_mcat()
+
+    assert seen == [0, 1, 2]
+
+
+def test_an_empty_rack_is_refilled_before_the_update_cycle_runs(runner):
+    """``run.ss:155-159`` checks after each codelet and *before* the update.
+
+    A rack that empties exactly on a cycle boundary would otherwise be hidden by
+    ``update_everything``'s own posting, and the initial-slipnode re-clamp — a
+    deliberate restart of the run's opening conditions — skipped altogether.
+    """
+    runner.init_mcat("abc", "abd", "xyz", seed=42)
+    ctx = runner.ctx
+    ucl = runner.meta.get_param("update_cycle_length", 15)
+
+    # Drive to one codelet short of a boundary, so the step below is the one whose
+    # increment crosses it.
+    while (ctx.codelet_count + 1) % ucl != 0:
+        runner.step_mcat()
+
+    for node in list(ctx.slipnet.nodes.values()):
+        node.unclamp()
+
+    # Empty the rack as the codelet finishes, which is the state ``run.ss:155`` tests.
+    real_execute = runner._execute_codelet
+
+    def emptying(codelet):
+        real_execute(codelet)
+        ctx.coderack.clear()
+
+    runner._execute_codelet = emptying  # type: ignore[method-assign]
+    runner.step_mcat()
+
+    assert ctx.codelet_count % ucl == 0
+    assert not ctx.coderack.is_empty
+    # ``clamp-initial-slipnodes`` ran alongside the repost.
+    assert {n.name for n in ctx.slipnet.nodes.values() if n.frozen} == set(
+        runner.meta.get_param("initially_clamped_slipnodes", [])
+    )

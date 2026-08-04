@@ -229,9 +229,12 @@ class MlxSlipnetSession(SlipnetSession):
             gate = mx.logical_and(a > 0.0, a >= threshold)
             contribution = mx.round((scale * self.weight) * a)
             contribution = mx.where(gate, contribution, mx.zeros_like(contribution))
-            buf = mx.zeros((self.n,), dtype=self.dtype).at[self.dest].add(
+            gathered = mx.zeros((self.n,), dtype=self.dtype).at[self.dest].add(
                 contribution
-            ) + buf
+            )
+            # ``increment-activation-buffer`` (``slipnet.ss:157-160``) refuses while
+            # the destination is frozen: a clamped node receives no spreading.
+            buf = mx.where(self.frozen != 0, mx.zeros_like(gathered), gathered) + buf
         self.activation = mx.clip(act + buf, 0.0, 100.0)
 
     # -- the probabilistic jump --------------------------------------------

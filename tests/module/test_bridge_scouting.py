@@ -372,13 +372,17 @@ def test_a_spanning_pair_is_proposed_flipped_when_opposite_is_not_saturated(meta
 # --- BR-5: the build-time concept-mapping augmentation ---------------------
 
 
-def _built_bridge(ctx, object1, object2, bridge_type=BRIDGE_TOP) -> Bridge:
+def _proposed_bridge(ctx, object1, object2, bridge_type=BRIDGE_TOP) -> Bridge:
     from server.engine.bridges import propose_bridge
 
-    bridge = propose_bridge(
+    return propose_bridge(
         bridge_type, object1, False, object2, False,
         ctx.slipnet.nodes["plato-identity"], ctx,
     )
+
+
+def _built_bridge(ctx, object1, object2, bridge_type=BRIDGE_TOP) -> Bridge:
+    bridge = _proposed_bridge(ctx, object1, object2, bridge_type)
     assert build_structure(ctx, bridge) is True
     return bridge
 
@@ -869,3 +873,84 @@ def test_a_batch_at_or_over_capacity_flushes_the_rack(meta):
     assert rack.total_count == rack.max_size
     survivors = [c for b in rack.bins for c in b.codelets]
     assert all(c.codelet_type == "rule-scout" for c in survivors)
+
+
+# --- TH-1: the Themespace boost at build time ------------------------------
+
+
+def test_building_a_bridge_boosts_its_themes_at_once(meta):
+    """``bridges.ss:1348-1352`` — ``boost-themespace-activations`` runs immediately
+    after ``build-bridge``, *in addition to* the per-cycle boost of every built bridge.
+
+    Without it a bridge's themes lag up to fifteen codelets behind its construction,
+    and a bridge built and broken inside one cycle leaves no thematic residue at all —
+    so a dominance readout taken between cycles (rule building, answer descriptions,
+    slippage importance) can differ near the 90-point margin.
+    """
+    engine = _engine(meta, "abc", "abd", "xyz")
+    ctx = engine.ctx
+    _all_active(ctx.slipnet)
+    for cluster in ctx.themespace.clusters:
+        for theme in cluster.themes:
+            theme.activation = 0.0
+
+    proposed = _proposed_bridge(
+        ctx,
+        ctx.workspace.initial_string.letters[0],
+        ctx.workspace.modified_string.letters[0],
+    )
+    # The evaluator runs before the builder and is what gives a bridge its strength;
+    # ``boost-themes`` (bridges.ss:297) reads exactly that value.
+    proposed.update_strength()
+    assert build_structure(ctx, proposed) is True
+    bridge = proposed
+
+    boosted = {
+        (c.theme_type, c.dimension, t.relation)
+        for c in ctx.themespace.clusters
+        for t in c.themes
+        if t.activation != 0.0
+    }
+    assert boosted, "the build must have reached the Themespace"
+    # Every boosted theme is one this bridge's own descriptions imply, and all of them
+    # belong to the bridge's theme type.
+    relations = set(bridge.get_associated_thematic_relations())
+    for theme_type, dimension, relation in boosted:
+        assert theme_type == bridge.theme_type
+        assert (dimension, relation) in relations
+
+
+def test_the_build_time_boost_is_the_per_cycle_one_applied_early(meta):
+    """The immediate boost and the cycle's boost are the same computation, so a bridge
+    built and left alone accumulates two of them by the end of its first cycle."""
+    engine = _engine(meta, "abc", "abd", "xyz")
+    ctx = engine.ctx
+    _all_active(ctx.slipnet)
+    for cluster in ctx.themespace.clusters:
+        for theme in cluster.themes:
+            theme.activation = 0.0
+
+    proposed = _proposed_bridge(
+        ctx,
+        ctx.workspace.initial_string.letters[0],
+        ctx.workspace.modified_string.letters[0],
+    )
+    proposed.update_strength()
+    assert build_structure(ctx, proposed) is True
+    after_build = {
+        id(t): t.activation
+        for c in ctx.themespace.clusters
+        for t in c.themes
+        if t.activation != 0.0
+    }
+
+    engine._spread_activation_to_themespace()
+    after_cycle = {
+        id(t): t.activation
+        for c in ctx.themespace.clusters
+        for t in c.themes
+        if t.activation != 0.0
+    }
+
+    assert set(after_build) == set(after_cycle)
+    assert all(after_cycle[k] > after_build[k] for k in after_build)

@@ -206,3 +206,63 @@ def test_hash_matches_for_equal_descriptions():
     assert hash(Description(obj, dtype, descriptor)) == hash(
         Description(obj, dtype, descriptor)
     )
+
+
+# --- theme types  (descriptions.ss:54-61) ----------------------------------
+
+
+class _ModeThemespace:
+    """Enough Themespace to answer "is this a justify-mode run?"."""
+
+    def __init__(self, justify: bool) -> None:
+        self.possible_theme_types = (
+            ["top_bridge", "vertical_bridge", "bottom_bridge"]
+            if justify
+            else ["top_bridge", "vertical_bridge"]
+        )
+
+
+def _target_description():
+    return _description(obj=FakeObject(string=FakeString(string_type="target")))
+
+
+def test_a_target_description_answers_to_bottom_themes_only_in_justify_mode(monkeypatch):
+    """``descriptions.ss:57-59``::
+
+        (target (if %justify-mode% '(vertical-bridge bottom-bridge)
+                                   '(vertical-bridge)))
+
+    Outside justify mode there is no answer string for a bottom bridge to reach, so a
+    target description answering to bottom themes was answering to a cluster set the
+    run cannot populate.
+    """
+    from server.engine.workspace_structures import WorkspaceStructure
+
+    description = _target_description()
+
+    WorkspaceStructure.set_themespace(_ModeThemespace(justify=False))
+    try:
+        assert description.theme_types == ["vertical_bridge"]
+
+        WorkspaceStructure.set_themespace(_ModeThemespace(justify=True))
+        assert description.theme_types == ["vertical_bridge", "bottom_bridge"]
+    finally:
+        WorkspaceStructure.set_themespace(None)
+
+
+def test_the_other_three_string_roles_do_not_depend_on_the_mode():
+    from server.engine.workspace_structures import WorkspaceStructure
+
+    roles = {
+        "initial": ["top_bridge", "vertical_bridge"],
+        "modified": ["top_bridge"],
+        "answer": ["bottom_bridge"],
+    }
+    for justify in (False, True):
+        WorkspaceStructure.set_themespace(_ModeThemespace(justify=justify))
+        try:
+            for role, expected in roles.items():
+                d = _description(obj=FakeObject(string=FakeString(string_type=role)))
+                assert d.theme_types == expected
+        finally:
+            WorkspaceStructure.set_themespace(None)

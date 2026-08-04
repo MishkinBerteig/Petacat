@@ -103,9 +103,10 @@ class PythonSlipnetSession(SlipnetSession):
 
         self._spread(threshold, scale)
 
-        # Flush (slipnet.ss:583-585).  Applies to every node including frozen
-        # ones: a clamped node that received spreading is clipped back to 100
-        # rather than being skipped, which is what keeps ``clamp`` idempotent.
+        # Flush (``flush-activation-buffer``, slipnet.ss:165-170).  Applies to every
+        # node including frozen ones, exactly as the reference's does — and it is a
+        # no-op for a frozen node, because nothing was allowed into its buffer:
+        # neither decay above nor spreading below nor a Workspace jolt touches one.
         for i in range(top.n_nodes):
             a = act[i] + buf[i]
             act[i] = 0.0 if a < 0.0 else (100.0 if a > 100.0 else a)
@@ -162,7 +163,12 @@ class PythonSlipnetSession(SlipnetSession):
         indptr = top.in_indptr
         source = top.in_source
 
+        frozen = self.state.frozen
         for d in range(top.n_nodes):
+            # ``increment-activation-buffer`` (``slipnet.ss:157-160``) refuses while
+            # the destination is frozen, so a clamped node receives nothing at all.
+            if frozen[d]:
+                continue
             total = 0.0
             for e in range(indptr[d], indptr[d + 1]):
                 a = act[source[e]]

@@ -90,26 +90,40 @@ class ConceptMapping:
         no-link floor of 5, less than half, and did the same to ``single <=>
         whole``.  Both sit at the centre of how a letter comes to be seen as
         playing a group's role.
+
+        **Uncapped**, and the branch is on the association rather than on identity.
+        ``concept-mappings.ss:130-135`` reads::
+
+            (let ((degree-of-assoc (tell self 'get-degree-of-assoc)))
+              (if (= degree-of-assoc 100)
+                100
+                (round (* degree-of-assoc (+ 1 (^2 (% depth)))))))
+
+        so a *deep* mapping over a strong link deliberately scores above 100 —
+        ``sameness => same-group`` at depth 80 comes to 115 — and a ``min(100, ...)``
+        erased exactly the distinction the depth bonus exists to make.  The flat-100
+        case is the *association's*, not identity's: an identity mapping has
+        association 100, but so does any mapping over a zero-length link, and the
+        reference gives both the flat 100 rather than the product.
         """
-        if self.is_identity:
+        assoc = self._degree_of_association()
+        if assoc == 100:
             return 100.0
 
-        assoc = self._degree_of_association()
         depth = self.conceptual_depth
         bonus = 1.0 + (depth / 100.0) ** 2
-        return min(100.0, round(assoc * bonus))
+        return round(assoc * bonus)
 
     def slippability(self) -> float:
         """How likely this mapping is to 'slip'.
 
-        Scheme: concept-mappings.ss:136-141.
-        - Identity: 100
-        - Slippage: degree_of_assoc * (1 - (depth/100)^2)
+        Scheme: ``concept-mappings.ss:136-141`` — the same ``(= degree-of-assoc 100)``
+        branch as :meth:`strength`, then ``degree_of_assoc * (1 - (depth/100)^2)``.
         """
-        if self.is_identity:
+        assoc = self._degree_of_association()
+        if assoc == 100:
             return 100.0
 
-        assoc = self._degree_of_association()
         depth = self.conceptual_depth
         penalty = 1.0 - (depth / 100.0) ** 2
         return max(0.0, round(assoc * penalty))

@@ -949,6 +949,7 @@ def _build_structure_locked(ctx: EngineContext, structure: Any) -> bool:
         _augment_bridge_at_build(ctx, structure)
         ctx.workspace.add_bridge(structure)
         _record_slippage_events(ctx, structure)
+        _boost_themespace_activations(ctx, structure)
     else:
         return False
     # Emitted after the structure is in the Workspace, so a sink that reads the
@@ -1433,6 +1434,10 @@ def _record_group_event(
             ),
             # ``trace.ss:880`` — a group event's strength is the group's own.
             strength=float(group.strength),
+            # ``trace.ss:871`` — the event holds the group itself, which is what
+            # ``abstract-answer-description-theme-pattern`` asks it for
+            # (``answers.ss:173, 177``) when it looks for the two spanning groups.
+            group=group,
         )
 
 
@@ -1477,6 +1482,47 @@ def _bridge_is_spanning(bridge: Bridge) -> bool:
     return True
 
 
+def _boost_themespace_activations(ctx: EngineContext, bridge: Bridge) -> None:
+    """Push a newly-built bridge's relations into the Themespace at once.
+
+    Scheme: ``bridges.ss:1348-1352`` — ``boost-themespace-activations`` runs
+    immediately after ``build-bridge``, *in addition to* the per-cycle boost of every
+    built bridge (``workspace.ss:495-498``), and the author's own comment says why it
+    is placed after the build: "building the bridge may cause bond-concept-mappings to
+    be added to it (and possibly an ObjCtgy concept-mapping, for horizontal bridges)".
+
+    Without it a bridge's themes lag up to fifteen codelets behind its construction,
+    and a bridge built and broken inside one cycle leaves no thematic residue at all —
+    so a dominance readout taken between cycles (rule building, answer descriptions,
+    slippage importance) can differ near the 90-point margin.
+
+    The Scheme's second step, ``update-dominant-themes``, has no counterpart here:
+    Petacat computes dominance on demand from the activations
+    (``Themespace.get_dominant_themes``) rather than caching it.
+    """
+    strength = bridge.strength
+    factor = strength * (2 if bridge.is_spanning_bridge else 1)
+    for dimension, relation in bridge.get_associated_thematic_relations():
+        ctx.themespace.boost_theme(bridge.theme_type, dimension, relation, factor)
+
+
+def _cm_event_theme_pattern(bridge: Bridge, cm: Any) -> dict:
+    """The one-entry theme pattern a concept-mapping event carries.
+
+    Scheme: ``trace.ss:763-766`` —
+    ``(list (bridge-type->theme-type bridge-type) (list CM-type label))``.  One entry,
+    from this mapping alone, not the bridge's other mappings.
+    """
+    from server.engine.themes import relation_name_for_label
+
+    dimension = getattr(getattr(cm, "description_type1", None), "name", None)
+    relation = relation_name_for_label(getattr(cm, "label", None))
+    entries = []
+    if dimension is not None and relation is not None:
+        entries.append({"dimension": dimension, "relation": relation})
+    return {"type": bridge.theme_type, "entries": entries}
+
+
 def _record_slippage_events(
     ctx: EngineContext, bridge: Bridge, concept_mappings: list | None = None
 ) -> None:
@@ -1517,6 +1563,11 @@ def _record_slippage_events(
                 # ``trace.ss:796`` — a concept-mapping event's strength is the
                 # concept-mapping's own.  ``strength`` is a method here, not a property.
                 strength=float(cm.strength()),
+                # ``trace.ss:750-766`` — the event *is* this one mapping, and its theme
+                # pattern is the single entry ``(CM-type label)`` read off it.
+                concept_mapping=cm,
+                bridge=bridge,
+                theme_pattern=_cm_event_theme_pattern(bridge, cm),
             )
 
 
@@ -2162,11 +2213,20 @@ def record_event(
     structures: list | None = None,
     description: str = "",
     strength: float = 0.0,
+    concept_mapping: Any = None,
+    bridge: Any = None,
+    group: Any = None,
+    theme_pattern: Any = None,
 ) -> None:
     """Record an event to the temporal trace.
 
     ``strength`` is what a clamp's progress-evaluator reads (§4.5.1); group, rule and
     slippage events supply it.  Also emits commentary for snag and clamp events.
+
+    ``concept_mapping`` / ``bridge`` / ``group`` are the event's own subject — what the
+    Scheme's per-type event constructors close over (``trace.ss:750-800, 837-880``).
+    An answer description is built out of them (``answers.ss:155-220``), so an event
+    that carries only a description string cannot be read back.
     """
     event = TraceEvent(
         event_type=event_type,
@@ -2175,6 +2235,10 @@ def record_event(
         structures=structures,
         description=description,
         strength=strength,
+        concept_mapping=concept_mapping,
+        bridge=bridge,
+        group=group,
+        theme_pattern=theme_pattern,
     )
     with _committing(ctx):
         ctx.trace.record_event(event)
@@ -2314,10 +2378,14 @@ def record_snag(ctx: EngineContext, top_rule: Any, translated_rule: Any) -> None
         workspace.modified_string.text,
         workspace.target_string.text,
     )
-    if not any(
-        s.problem == problem and s.description == top_rule.transcribe_to_english()
-        for s in ctx.memory.snags
-    ):
+    # ``answers.ss:1162`` consults ``snag-present?`` (``memory.ss:78-83``), which
+    # compares the three problem strings and the rule's **clause lists**, structurally.
+    # Two structurally different rules can transcribe to the same English, and a rule
+    # that fails to transcribe reads "Unknown transformation" and would otherwise
+    # match every other such rule.
+    from server.engine.rules import rule_signature
+
+    if not ctx.memory.snag_present(problem, top_rule):
         ctx.memory.store_snag(
             SnagDescription(
                 problem=problem,
@@ -2325,6 +2393,10 @@ def record_snag(ctx: EngineContext, top_rule: Any, translated_rule: Any) -> None
                 temperature=ctx.temperature.value,
                 theme_pattern=_theme_pattern_dict(theme_pattern),
                 description=top_rule.transcribe_to_english(),
+                # ``make-snag-description`` (``memory.ss:289-291``) is given both clause
+                # lists: the rule that was found and the translation that failed.
+                rule_signature=rule_signature(top_rule),
+                translated_rule_signature=rule_signature(translated_rule),
             )
         )
 

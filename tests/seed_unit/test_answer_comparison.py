@@ -283,11 +283,15 @@ def test_only_themes_the_snag_lacked_count_as_snag_justified():
     """
     memory = EpisodicMemory()
     rule = "Swap letter-categories of all objects in string"
+    # ``get-equivalent-snag`` (``memory.ss:84-89``) matches the answer's top-rule
+    # *clause list* against the snag's, so both carry the same signature.
+    signature = [["intrinsic", [], []]]
     answer = _answer(
         ("eqe", "qeq", "abbbc", "aaabccc"),
         {STRING_POSITION: "identity"},
         unjustified={BOND_FACET: "diff"},
         rule=rule,
+        signature=signature,
     )
     memory.store_snag(
         SnagDescription(
@@ -296,6 +300,7 @@ def test_only_themes_the_snag_lacked_count_as_snag_justified():
             temperature=40.0,
             theme_pattern={STRING_POSITION: "identity"},
             description=rule,
+            rule_signature=signature,
         )
     )
     assert snag_justified_themes(answer, memory) == [(BOND_FACET, "diff")]
@@ -306,11 +311,13 @@ def test_a_theme_the_snag_also_held_stays_unjustified():
     too stays unjustified, since it is not what the answer did differently."""
     memory = EpisodicMemory()
     rule = "Swap letter-categories of all objects in string"
+    signature = [["intrinsic", [], []]]
     answer = _answer(
         ("eqe", "qeq", "abbbc", "aaabccc"),
         {},
         unjustified={BOND_FACET: "diff"},
         rule=rule,
+        signature=signature,
     )
     memory.store_snag(
         SnagDescription(
@@ -319,6 +326,7 @@ def test_a_theme_the_snag_also_held_stays_unjustified():
             temperature=40.0,
             theme_pattern={BOND_FACET: "diff"},
             description=rule,
+            rule_signature=signature,
         )
     )
     assert snag_justified_themes(answer, memory) == []

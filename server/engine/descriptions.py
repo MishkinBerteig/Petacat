@@ -109,10 +109,21 @@ class Description(WorkspaceStructure):
     def theme_types(self) -> list[str]:
         """Theme types this description's object participates in.
 
-        Scheme: ``get-theme-types`` (descriptions.ss:52-61) — objects in the
+        Scheme: ``get-theme-types`` (``descriptions.ss:54-61``) — objects in the
         initial string speak to both top and vertical themes; modified-string
-        objects to top themes; target-string objects to vertical (and, in
-        justify mode, bottom) themes; answer-string objects to bottom themes.
+        objects to top themes; target-string objects to vertical themes **and, only
+        in justify mode, bottom ones**; answer-string objects to bottom themes.
+
+        The justify gate is the reference's own::
+
+            (target (if %justify-mode% '(vertical-bridge bottom-bridge)
+                                       '(vertical-bridge)))
+
+        Outside justify mode there is no answer string for a bottom bridge to reach,
+        so a target description that also answered to bottom themes was answering to a
+        cluster set the run cannot populate.  Read live off the Themespace, which is
+        told the mode at ``init_mcat``, rather than stored: a description outlives the
+        moment it was made and the mode belongs to the run.
         """
         from server.engine.themes import (
             THEME_BOTTOM_BRIDGE,
@@ -126,7 +137,14 @@ class Description(WorkspaceStructure):
         if role == "modified":
             return [THEME_TOP_BRIDGE]
         if role == "target":
-            return [THEME_VERTICAL_BRIDGE, THEME_BOTTOM_BRIDGE]
+            themespace = WorkspaceStructure.get_themespace()
+            justify = bool(
+                themespace is not None
+                and THEME_BOTTOM_BRIDGE in themespace.possible_theme_types
+            )
+            if justify:
+                return [THEME_VERTICAL_BRIDGE, THEME_BOTTOM_BRIDGE]
+            return [THEME_VERTICAL_BRIDGE]
         if role == "answer":
             return [THEME_BOTTOM_BRIDGE]
         return [THEME_TOP_BRIDGE, THEME_VERTICAL_BRIDGE, THEME_BOTTOM_BRIDGE]

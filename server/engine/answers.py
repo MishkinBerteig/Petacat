@@ -129,8 +129,11 @@ def create_answer_description(
             getattr(meta, "answer_description_theme_types", None) or allowed
         )
 
-    vertical = _filter_vertical_themes(themes.get("vertical_bridge", {}), allowed)
-    vertical = _distil_vertical_pattern(vertical, workspace, trace, allowed)
+    # The *whole* dominant vertical pattern, unfiltered: ``answers.ss:157-158`` reads
+    # it as it stands and consults exactly one of its entries.
+    vertical = _distil_vertical_pattern(
+        themes.get("vertical_bridge", {}), workspace, trace, allowed
+    )
 
     return AnswerDescription(
         problem=(
@@ -164,6 +167,9 @@ def create_answer_description(
 
 
 _STRING_POSITION = "plato-string-position-category"
+_DIRECTION = "plato-direction-category"
+_BOND_FACET = "plato-bond-facet"
+_IDENTITY = "identity"
 
 
 def _distil_vertical_pattern(
@@ -172,69 +178,209 @@ def _distil_vertical_pattern(
     trace: Any,
     allowed: tuple[str, ...],
 ) -> dict[str, Any]:
-    """Build the answer's vertical theme-pattern from the Trace as well as the Themespace.
+    """Build the answer's vertical theme-pattern.
 
     §4.7.1: "To create the vertical theme-pattern, Metacat examines the activations of
     vertical themes in the Themespace, **along with recent group and slippage events
     appearing in the Temporal Trace**.  If slippages have recently been made ... the
     themes associated with these slippage events will be included."
 
-    Scheme: ``abstract-answer-description-theme-pattern`` (``answers.ss:155-220``).  Two
-    of its rules are reproduced here:
+    Scheme: ``abstract-answer-description-theme-pattern`` (``answers.ss:155-220``), and
+    the recipe *is* the mechanism — this pattern is the index an answer is stored,
+    reminded and compared under (``memory.ss:431``, ``answers.ss:158``), so a pattern
+    assembled some other way changes every distance in Episodic Memory.
 
-    * non-identity themes drawn from recent, still-present vertical slippage events take
-      precedence over the merely-dominant pattern;
-    * ``;; Always include a string-position theme no matter what`` (``answers.ss:204``)
-      — falling back to String-Position: identity.
+    The pattern is built **dimension by dimension**, over the five permitted dimensions
+    only, in this precedence order:
 
-    The second matters out of proportion to its size.  Without it an answer could be
-    stored with an *empty* theme-pattern, and §2.4.1 makes that pattern the index the
-    answer is stored and retrieved under — an answer with no themes has no index, and
-    every distance computed against it degenerates.
+    1. A dimension named by one of the recent, still-present important **slippage
+       events** takes it, with that event's relation (``answers.ss:187-189``).  Those
+       events are the program's own record of the slippages that mattered; the merely
+       *dominant* Themespace pattern does not enter here at all.
+    2. **String-Position** always yields an entry (``answers.ss:202-203`` — "Always
+       include a string-position theme no matter what"): the Direction relation if a
+       Direction slippage event exists — "StringPos and Direction themes should agree
+       if possible" (``answers.ss:192``) — else the dominant String-Position theme,
+       else ``identity``.
+    3. **Bond-Facet** is dropped unless rule 1 supplied it (``answers.ss:205``): a
+       Bond-Facet *identity* theme says nothing about the answer.
+    4. Any other dimension enters as ``identity`` only when the spanning **vertical
+       bridge between the two whole-string groups** carries an identity mapping on it
+       (``answers.ss:206-209``).  An identity theme is a claim that the two strings
+       correspond along that dimension, and the whole-string bridge is what backs it.
+    5. Otherwise the dimension is absent.
+
+    Seeding the pattern from the full dominant Themespace pattern instead — as this
+    used to — let a Direction or Group-Category theme that happened to lead its cluster
+    enter an answer's index with nothing in the Workspace supporting it.
     """
-    pattern = dict(dominant)
+    events = _important_answer_description_events(workspace, trace)
+    cm_entries = _slippage_event_entries(events)
+    initial_group = _spanning_group_from_events(events, "initial")
+    target_group = _spanning_group_from_events(events, "target")
 
-    for dimension, relation in _trace_slippage_themes(workspace, trace).items():
-        if dimension in allowed:
-            pattern[dimension] = relation
-
-    if _STRING_POSITION in allowed and _STRING_POSITION not in pattern:
-        pattern[_STRING_POSITION] = "identity"
-
+    pattern: dict[str, Any] = {}
+    for dimension in allowed:
+        if dimension in cm_entries:
+            pattern[dimension] = cm_entries[dimension]
+        elif dimension == _STRING_POSITION:
+            if _DIRECTION in cm_entries:
+                pattern[_STRING_POSITION] = cm_entries[_DIRECTION]
+            elif _STRING_POSITION in dominant:
+                pattern[_STRING_POSITION] = dominant[_STRING_POSITION]
+            else:
+                pattern[_STRING_POSITION] = _IDENTITY
+        elif dimension == _BOND_FACET:
+            continue
+        elif _whole_string_identity_concept_mapping(
+            dimension, initial_group, target_group, workspace
+        ):
+            pattern[dimension] = _IDENTITY
     return pattern
 
 
-def _trace_slippage_themes(workspace: Workspace, trace: Any) -> dict[str, str]:
-    """Non-identity themes from vertical slippage events that are still current.
+def _important_answer_description_events(workspace: Workspace, trace: Any) -> list[Any]:
+    """The group and slippage events an answer description is built from.
 
-    ``relevant-for-answer-description?`` (``trace.ss:783-785``) admits a concept-mapping
-    event when its bridge is vertical and still present in the Workspace — a slippage
-    that has since been broken did not contribute to this answer.
+    Scheme: ``most-recent-group-and-concept-mapping-events`` (``answers.ss:108-121``) —
+    every group or concept-mapping event that is ``relevant-for-answer-description?``,
+    partitioned into equivalence classes, one representative per class: the most recent.
+
+    ``relevant-for-answer-description?`` is *equivalence*-based on both branches: a
+    concept-mapping event asks ``bridge-present?`` (``trace.ss:789-790``,
+    ``workspace.ss:266``) and a group event asks ``group-present?``
+    (``trace.ss:872-873``).  Comparing by object identity instead loses the slippage of
+    every bridge that was broken and rebuilt during the run — which happens routinely,
+    since a rebuilt bridge is how a reading is confirmed.
     """
     if trace is None:
-        return {}
+        return []
 
+    from server.engine.jootsing import equivalent_workspace_objects
+    from server.engine.trace import CONCEPT_MAPPING_BUILT, GROUP_BUILT
+
+    relevant: list[Any] = []
+    for event in getattr(trace, "events", []) or []:
+        if event.event_type == CONCEPT_MAPPING_BUILT:
+            bridge = getattr(event, "bridge", None)
+            if bridge is None or getattr(bridge, "bridge_type", None) != "vertical":
+                continue
+            if workspace.bridge_present(bridge):
+                relevant.append(event)
+        elif event.event_type == GROUP_BUILT:
+            group = getattr(event, "group", None)
+            if group is None or not group.spans_whole_string():
+                continue
+            string = getattr(group, "string", None)
+            if string is not None and string.group_present(group):
+                relevant.append(event)
+
+    def equal(e1: Any, e2: Any) -> bool:
+        if e1.event_type != e2.event_type:
+            return False
+        if e1.event_type == CONCEPT_MAPPING_BUILT:
+            # ``CMs-equal?`` (``concept-mappings.ss:175-178``) — the two descriptors,
+            # by identity.  Not the objects: the same slippage seen on two bridges is
+            # one idea.
+            cm1, cm2 = e1.concept_mapping, e2.concept_mapping
+            return (
+                cm1 is not None
+                and cm2 is not None
+                and cm1.descriptor1 is cm2.descriptor1
+                and cm1.descriptor2 is cm2.descriptor2
+            )
+        return equivalent_workspace_objects(e1.group, e2.group)
+
+    # ``partition`` (``utilities.ss:792-806``) recurses to the end of the list first,
+    # so classes are created oldest-event-first — and Petacat's event list is already
+    # oldest-first, so a straight left fold reproduces the reference's class order.
+    classes: list[list[Any]] = []
+    for event in relevant:
+        for cls in classes:
+            if all(equal(event, member) for member in cls):
+                cls.append(event)
+                break
+        else:
+            classes.append([event])
+
+    # ``pick-most-recent-event`` (``answers.ss:124-128``): ``select-extreme min`` over
+    # event age, which takes the *first* minimum — the newest, and on a tie the one the
+    # reference's newest-first class list puts first, i.e. the last appended here.
+    representatives = []
+    for cls in classes:
+        newest = cls[0]
+        for event in cls[1:]:
+            if event.codelet_count >= newest.codelet_count:
+                newest = event
+        representatives.append(newest)
+    return representatives
+
+
+def _slippage_event_entries(events: list[Any]) -> dict[str, str]:
+    """``dimension -> relation`` from the slippage events, first entry per dimension.
+
+    Scheme: ``get-entry`` (``answers.ss:136-141``) is ``assq`` over the flattened
+    entries of ``important-cm-patterns``, so the earliest-established class wins when
+    two events name the same dimension with different relations.
+    """
     from server.engine.themes import relation_name_for_label
     from server.engine.trace import CONCEPT_MAPPING_BUILT
 
-    live = {id(b) for b in getattr(workspace, "vertical_bridges", []) or []}
-    found: dict[str, str] = {}
-    for event in getattr(trace, "events", []):
+    entries: dict[str, str] = {}
+    for event in events:
         if event.event_type != CONCEPT_MAPPING_BUILT:
             continue
-        for bridge in event.structures or []:
-            if id(bridge) not in live:
-                continue
-            for cm in getattr(bridge, "concept_mappings", []) or []:
-                if cm.is_identity:
-                    continue
-                dimension = getattr(cm.description_type1, "name", "")
-                relation = relation_name_for_label(cm.label)
-                if dimension and relation:
-                    # Later events win: the most recent equivalent event is the one the
-                    # Scheme keeps (``answers.ss:108-121``).
-                    found[dimension] = relation
-    return found
+        cm = event.concept_mapping
+        if cm is None:
+            continue
+        dimension = getattr(getattr(cm, "description_type1", None), "name", None)
+        relation = relation_name_for_label(getattr(cm, "label", None))
+        if dimension is None or relation is None:
+            continue
+        entries.setdefault(dimension, relation)
+    return entries
+
+
+def _spanning_group_from_events(events: list[Any], string_type: str) -> Any:
+    """The whole-string group event for *string_type*, if the Trace holds one.
+
+    Scheme: ``answers.ss:159-178`` — ``select`` over the important events, which takes
+    the first match in list order.
+    """
+    from server.engine.trace import GROUP_BUILT
+
+    for event in events:
+        if event.event_type != GROUP_BUILT:
+            continue
+        group = event.group
+        if group is None:
+            continue
+        if getattr(getattr(group, "string", None), "string_type", None) == string_type:
+            return group
+    return None
+
+
+def _whole_string_identity_concept_mapping(
+    dimension: str, initial_group: Any, target_group: Any, workspace: Workspace
+) -> bool:
+    """Does the spanning vertical bridge map *dimension* to itself?
+
+    Scheme: ``whole-string-identity-concept-mapping?`` (``answers.ss:144-152``).  Both
+    spanning groups must exist, there must be a vertical bridge between them, and that
+    bridge's mapping on this dimension must be an identity.
+    """
+    if initial_group is None or target_group is None:
+        return False
+    for bridge in workspace.vertical_bridges:
+        if not bridge.is_built:
+            continue
+        if bridge.object1 is not initial_group or bridge.object2 is not target_group:
+            continue
+        for cm in bridge.get_all_concept_mappings():
+            if getattr(getattr(cm, "description_type1", None), "name", None) == dimension:
+                return bool(cm.is_identity)
+        return False
+    return False
 
 
 # §4.7.3 coherence.  These need the Slipnet's conceptual depths, so they run here,
@@ -290,22 +436,17 @@ def average_theme_abstractness(
     return round(sum(values) / len(values))
 
 
-def _filter_vertical_themes(
-    vertical: dict[str, Any], allowed: tuple[str, ...]
-) -> dict[str, Any]:
-    """Apply the §4.7.1 footnote-18 restriction to a vertical theme pattern."""
-    result: dict[str, Any] = {}
-    for dimension, relation in vertical.items():
-        if dimension not in allowed:
-            continue
-        if dimension == "plato-bond-facet" and relation != "diff":
-            continue
-        result[dimension] = relation
-    return result
-
-
 def _unjustified_themes(slippages: list[Any]) -> dict[str, Any]:
-    """The theme-pattern implied by slippages the program failed to justify."""
+    """The theme-pattern implied by slippages the program failed to justify.
+
+    Scheme: ``get-unjustified-theme-pattern`` (``answers.ss:239-264``).  One entry per
+    slippage — and then the **Bond-Facet augmentation**: a Bond-Facet theme implies the
+    existence of groups, so an unjustified Bond-Facet slippage brings accompanying
+    Group-Category and Direction entries with it, defaulting to ``identity`` because
+    the Bond-Facet slippage by itself says nothing about which.  The augmented pattern
+    is what ``all_themes`` compares and what feeds the reminding distance, so leaving
+    it out understated how much two Bond-Facet answers have in common.
+    """
     from server.engine.themes import relation_name_for_label
 
     themes: dict[str, Any] = {}
@@ -314,6 +455,16 @@ def _unjustified_themes(slippages: list[Any]) -> dict[str, Any]:
         if dimension is None:
             continue
         themes[dimension] = relation_name_for_label(getattr(cm, "label", None))
+
+    if _BOND_FACET in themes:
+        # ``answers.ss:261-264`` conses the two entries onto the *front* of the
+        # pattern; a dict keeps insertion order, so build them first.
+        augmented = {
+            "plato-group-category": themes.get("plato-group-category", _IDENTITY),
+            _DIRECTION: themes.get(_DIRECTION, _IDENTITY),
+        }
+        augmented.update(themes)
+        themes = augmented
     return themes
 
 

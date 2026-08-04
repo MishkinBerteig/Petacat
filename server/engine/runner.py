@@ -307,6 +307,12 @@ class EngineRunner:
         # Use provided or new memory
         if memory is None:
             memory = EpisodicMemory()
+        # ``run.ss:212`` — ``(tell *memory* 'clear-activations)``.  A stored answer's
+        # activation is how strongly the program is *currently* reminded of it (§4.7.5),
+        # so it belongs to the run that did the reminding.  Carried into the next run of
+        # a Training Session it would show a fresh run as already reminded of answers it
+        # has not thought about, and the Memory panel renders exactly this value.
+        memory.clear_activations()
 
         # Create temperature
         temperature = Temperature(
@@ -423,15 +429,11 @@ class EngineRunner:
         for ws_string in workspace.all_strings:
             letters = [o for o in ws_string.objects if isinstance(o, Letter)]
             for letter in letters:
-                # Letter-category description (e.g., letter-category: a)
-                if letter_cat_node and letter.letter_category:
-                    desc = Description(letter, letter_cat_node, letter.letter_category)
-                    desc.proposal_level = desc.BUILT
-                    letter.descriptions.append(desc)
-                    # Activate the descriptor
-                    letter.letter_category.activation = max_act
-
-                # Object-category: letter
+                # Object-category: letter — **first**.  ``make-letter``
+                # (``workspace-objects.ss:21-26``) attaches object-category before
+                # letter-category, and a description list is walked in order by every
+                # stochastic description pick and by the bridge's theme cross-product,
+                # so the order is part of what the run does rather than presentation.
                 if obj_cat_node and letter_obj_node:
                     desc = Description(letter, obj_cat_node, letter_obj_node)
                     desc.proposal_level = desc.BUILT
@@ -443,6 +445,14 @@ class EngineRunner:
                     # letter, which is what letter⇔group concept-mappings are
                     # weighed against.
                     letter_obj_node.activation = max_act
+
+                # Letter-category description (e.g., letter-category: a)
+                if letter_cat_node and letter.letter_category:
+                    desc = Description(letter, letter_cat_node, letter.letter_category)
+                    desc.proposal_level = desc.BUILT
+                    letter.descriptions.append(desc)
+                    # Activate the descriptor
+                    letter.letter_category.activation = max_act
 
                 # String-position descriptions
                 if str_pos_node and len(letters) == 1:
@@ -561,8 +571,9 @@ class EngineRunner:
         # no-op at the default delay of 0.
         ctx.capture_view()
 
-        # If coderack is empty, repost initial codelets and re-clamp
-        # initial slipnodes (Scheme: run.ss:155-157)
+        # A safety net rather than the reference's check, which is the one below: the
+        # rack is refilled after each codelet, so it is never empty here except at the
+        # very start of a Run driven codelet-by-codelet from the service layer.
         if ctx.coderack.is_empty:
             self._post_initial_codelets()
             ctx.slipnet.clamp_initially_relevant(self.meta)
@@ -574,14 +585,18 @@ class EngineRunner:
         if codelet is None:
             return result
 
-        ctx.codelet_count += 1
+        # ``step-mcat`` (``run.ss:178-183``) runs the codelet and *then* increments,
+        # so a codelet executes with the count of codelets already finished.  Every
+        # time-stamp a codelet writes — the stamp on a codelet it posts, the
+        # ``codelet_count`` of an event it records, a clamp's start time — is
+        # therefore one lower than the count reported for the codelet itself.
         ctx.coderack.current_time = ctx.codelet_count
         result.codelet_type = codelet.codelet_type
-        result.codelet_count = ctx.codelet_count
+        result.codelet_count = ctx.codelet_count + 1
 
         logger.info(
             "codelet #%d: %s (T=%.0f)",
-            ctx.codelet_count,
+            ctx.codelet_count + 1,
             codelet.codelet_type,
             ctx.temperature.value,
         )
@@ -602,8 +617,22 @@ class EngineRunner:
         else:
             self._execute_codelet(codelet)
 
+        # ``run.ss:182`` — the increment is the last thing ``step-mcat`` does.
+        ctx.codelet_count += 1
+        ctx.coderack.current_time = ctx.codelet_count
+
         self._emit_new_trace_events(ctx)
         ctx.sink.on_codelet(ctx, codelet, result)
+
+        # ``run.ss:155-157``: checked after each codelet and *before* the update, so a
+        # rack that empties exactly on a cycle boundary is refilled and its slipnodes
+        # re-clamped before the update cycle posts anything.  Checking only at the top
+        # of the next step let ``update_everything``'s own posting hide the emptiness,
+        # and the initial-slipnode re-clamp — a deliberate restart of the run's opening
+        # conditions — was skipped altogether.
+        if ctx.coderack.is_empty:
+            self._post_initial_codelets()
+            ctx.slipnet.clamp_initially_relevant(self.meta)
 
         # A jootser may have decided the program is looping and given up
         # (§4.5.2 — "Metacat simply 'gives up' in a graceful manner and stops").
@@ -855,6 +884,13 @@ class EngineRunner:
                         codelet_count=ctx.codelet_count,
                         temperature=ctx.temperature.value,
                         description=f"the concept of {node.short_name} became active",
+                        # ``trace.ss:718, 720`` — the event holds the node itself, and
+                        # its strength is the node's conceptual depth.  Recording only a
+                        # sentence left the event unreadable by anything but a human,
+                        # and gave a clamp whose progress focus is concept-activation
+                        # nothing to measure.
+                        slipnode=node,
+                        strength=float(node.conceptual_depth),
                     )
                 )
 

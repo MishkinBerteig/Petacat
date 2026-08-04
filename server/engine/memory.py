@@ -111,6 +111,32 @@ class SnagDescription:
     run_id: int | None = None
     snag_id: int = 0
 
+    # ``memory.ss:289-291`` stores the snag's **rule clause lists**, and ``equal?``
+    # (``memory.ss:336-340``) compares them with ``rule-clause-lists-equal?`` — the
+    # three problem strings plus a *structural* comparison of the rule.  Petacat
+    # compared the rule's English transcription, which collides two ways: two
+    # structurally different rules can transcribe to the same prose, and every rule
+    # that fails to transcribe reads "Unknown transformation" and so matches every
+    # other such rule.  ``rules.py:rule_signature`` documents exactly that hazard for
+    # answers; the snag path had it open.
+    rule_signature: list | None = None
+    translated_rule_signature: list | None = None
+
+    def equal(
+        self, problem: tuple[str, str, str], signature: list | None
+    ) -> bool:
+        """Scheme: ``equal?`` on a snag description (``memory.ss:336-340``).
+
+        A ``None`` signature means the clause list was never recorded rather than that
+        the rule was empty, and two unrecorded rules are not thereby the same rule —
+        the same reservation :meth:`EpisodicMemory._answers_equal` makes.
+        """
+        if tuple(self.problem) != tuple(problem):
+            return False
+        if self.rule_signature is None or signature is None:
+            return False
+        return self.rule_signature == signature
+
 
 class EpisodicMemory:
     """Cross-run episodic memory.
@@ -141,6 +167,21 @@ class EpisodicMemory:
     def store_snag(self, desc: SnagDescription) -> None:
         desc.snag_id = self.ids.next(KIND_SNAG)
         self.snags.append(desc)
+
+    def snag_present(
+        self, problem: tuple[str, str, str], rule: Any = None
+    ) -> bool:
+        """Has this rule already run aground on this problem?
+
+        Scheme: ``snag-present?`` (``memory.ss:78-83``) — the three problem strings and
+        the rule's clause list, compared structurally.  Consulted before a snag
+        description is stored, so one impasse is recorded once however many times the
+        run rediscovers it.
+        """
+        from server.engine.rules import rule_signature
+
+        signature = rule_signature(rule)
+        return any(snag.equal(problem, signature) for snag in self.snags)
 
     def answer_present(
         self,
@@ -324,11 +365,10 @@ class EpisodicMemory:
         """
         problem = tuple(answer.problem[:3])
         for snag in self.snags:
-            if tuple(snag.problem) != problem:
-                continue
-            if snag.description != answer.top_rule_description:
-                continue
-            return snag
+            # ``memory.ss:84-89`` passes ``get-top-rule-clauses``, so the match is the
+            # same structural one ``snag_present`` makes — not the English prose.
+            if snag.equal(problem, answer.top_rule_signature):
+                return snag
         return None
 
     def compare_answers(
@@ -439,6 +479,16 @@ class EpisodicMemory:
             if v1 != v2:
                 differences += 1
         return float(differences)
+
+    def clear_activations(self) -> None:
+        """Zero every stored answer's reminding activation.
+
+        Scheme: ``clear-activations`` (``memory.ss``), called from ``init-mcat``
+        (``run.ss:212``).  An activation says how strongly *this* run is reminded of a
+        past answer, so a new run starts reminded of nothing.
+        """
+        for answer in self.answers:
+            answer.activation = 0.0
 
     def clear(self) -> None:
         """Delete all answer and snag descriptions. Matches Scheme clearmem.

@@ -726,6 +726,25 @@ class Themespace:
                         if rel_node and not rel_node.frozen:
                             rel_node.activation_buffer += workspace_activation
 
+    def unclamp_theme_type(self, theme_type: str) -> None:
+        """Release the clamp on one theme type and switch its pressure off.
+
+        Scheme: ``unclamp-theme-pattern`` (``trace.ss:1538-1542``) — ``unfreeze-theme-
+        type`` and ``thematic-pressure-off`` are both given the *pattern's own* theme
+        type.  Releasing every type instead (:meth:`unclamp_all`) meant that ending one
+        clamp lifted every other clamp in force: a justify-mode run clamps the top and
+        the bottom patterns separately, and the expiry of the first switched pressure
+        off globally.
+        """
+        tt = _BRIDGE_TYPE_TO_THEME_TYPE.get(theme_type, theme_type)
+        for cluster in self.clusters:
+            if cluster.theme_type != tt:
+                continue
+            cluster.frozen = False
+            for theme in cluster.themes:
+                theme.unclamp()
+        self.thematic_pressure_off([tt])
+
     def unclamp_all(self) -> None:
         """Release every clamp and switch thematic pressure back off."""
         for cluster in self.clusters:
