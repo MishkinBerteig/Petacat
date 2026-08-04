@@ -12,6 +12,7 @@ from server.engine.ids import KIND_STRUCTURE, next_id
 
 if TYPE_CHECKING:
     from server.engine.metadata import MetadataProvider
+    from server.engine.rng import RNG
 
 
 class WorkspaceStructure:
@@ -59,7 +60,7 @@ class WorkspaceStructure:
     def is_built(self) -> bool:
         return self.proposal_level == self.BUILT
 
-    def update_strength(self) -> None:
+    def update_strength(self, rng: RNG | None = None) -> None:
         """Recompute strength from internal, external, and thematic terms.
 
         Scheme: ``update-strength`` (workspace-structures.ss:50-63)::
@@ -76,9 +77,22 @@ class WorkspaceStructure:
         §4.1.2 / Fig. 4.4 — a small amount of negative theme activation quickly
         undermines a structure, a small amount of positive activation quickly
         boosts it, and with no active themes the strength reverts to intrinsic.
+
+        **Why this takes an RNG when the Scheme's does not.**  A bond's and a
+        group's external strength is local density (``bonds.ss:136-160``,
+        ``groups.ss:354-383``), and that walk chooses each positional neighbour
+        by a salience-weighted stochastic pick, re-rolled on every strength
+        update.  The Scheme reaches its generator as a global; this port has
+        none, so the generator is threaded from the call site instead.  Pass the
+        RNG the *calling codelet* is drawing from — ``ctx.rng``, which under
+        free-running is that codelet's own counter-based stream — so a run's
+        randomness stays a function of where a codelet ran rather than of the
+        order workers happened to execute in.  ``None`` is for callers with no
+        run context (unit tests): the walk then takes the first candidate at
+        each step rather than inventing a generator of its own.
         """
         internal = self.calculate_internal_strength()
-        external = self.calculate_external_strength()
+        external = self.calculate_external_strength(rng)
 
         intrinsic_strength = weighted_average(
             [internal, external],
@@ -101,7 +115,10 @@ class WorkspaceStructure:
     def calculate_internal_strength(self) -> float:
         return 0.0
 
-    def calculate_external_strength(self) -> float:
+    def calculate_external_strength(self, rng: RNG | None = None) -> float:
+        """*rng* is used only by Bond and Group, whose external strength is the
+        stochastic density walk.  Every override takes it so the seam is one
+        signature rather than a special case."""
         return 0.0
 
     def get_thematic_compatibility(self) -> float:

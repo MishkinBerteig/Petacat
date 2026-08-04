@@ -243,9 +243,16 @@ class FreeRunningEngine:
                 # Each codelet draws from a stream of its own, addressed by where it ran
                 # rather than by what ran before it — which is the property that survives
                 # an execution order that is not determined (WP4.1).
+                #
+                # Bound **per thread**.  Assigning ``ctx.rng`` and restoring it, as this
+                # did, is a shared attribute: worker A's assignment was visible to worker
+                # B, so B ran its codelet against A's stream, and whichever worker
+                # restored last left ``ctx.rng`` holding some finished codelet's stream.
+                # That defeated the entire purpose of the per-codelet streams and put the
+                # run's ``random.Random`` — an object with 19,937 bits of mutable state —
+                # in reach of two threads at once.
                 codelet_rng = local_rng.for_codelet(worker=index, slot=step)
-                previous_rng, ctx.rng = ctx.rng, codelet_rng
-                try:
+                with ctx.use_codelet_rng(codelet_rng):
                     ctx.access.begin()
                     try:
                         runner._execute_codelet(codelet)
@@ -254,8 +261,6 @@ class FreeRunningEngine:
                             with self._count_lock:
                                 self._conflicts += 1
                         ctx.access.end()
-                finally:
-                    ctx.rng = previous_rng
 
                 self._collect_outcome(step)
 

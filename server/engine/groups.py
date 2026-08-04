@@ -17,6 +17,7 @@ from server.engine.workspace_structures import WorkspaceStructure
 
 if TYPE_CHECKING:
     from server.engine.bonds import Bond
+    from server.engine.rng import RNG
     from server.engine.slipnet import SlipnetNode
 
 
@@ -223,16 +224,18 @@ class Group(WorkspaceObject, WorkspaceStructure):
             return 0.0
         return round((bond_factor * bf_weight + length_factor * lf_weight) / total)
 
-    def calculate_external_strength(self) -> float:
+    def calculate_external_strength(self, rng: RNG | None = None) -> float:
         """External strength: 100 if spanning, otherwise local support.
 
         Scheme: groups.ss:411-414.
+
+        *rng* is the drawing codelet's; see :meth:`get_local_density`.
         """
         if self.spans_whole_string():
             return 100.0
-        return self._local_support()
+        return self._local_support(rng)
 
-    def _local_support(self) -> float:
+    def _local_support(self, rng: RNG | None = None) -> float:
         """Support from similar nearby groups.
 
         Scheme: groups.ss:384-391.
@@ -243,7 +246,7 @@ class Group(WorkspaceObject, WorkspaceStructure):
         if num_supporting == 0:
             return 0.0
 
-        density = self.get_local_density()
+        density = self.get_local_density(rng)
         adjusted_density = 100.0 * math.sqrt(density / 100.0)
         number_factor = min(1.0, 0.6 ** (1.0 / max(1, num_supporting ** 3)))
         return round(adjusted_density * number_factor)
@@ -273,12 +276,18 @@ class Group(WorkspaceObject, WorkspaceStructure):
             count += 1
         return count
 
-    def get_local_density(self) -> float:
+    def get_local_density(self, rng: RNG | None = None) -> float:
         """Density of similar groups in the local neighborhood.
 
         Scheme: groups.ss:354-383.
         If spanning, returns 100. Otherwise walks left/right neighbors,
         counting similar groups among them.
+
+        Each step of the walk is a salience-weighted **stochastic** pick, and the
+        reference re-rolls it on every strength update.  *rng* is the calling
+        codelet's stream, threaded down from
+        :meth:`WorkspaceStructure.update_strength`; ``None`` means no run context
+        (see ``WorkspaceObject._pick_neighbor``).
         """
         if self.spans_whole_string():
             return 100.0
@@ -287,8 +296,8 @@ class Group(WorkspaceObject, WorkspaceStructure):
             return 100.0
 
         # Walk neighbors in both directions
-        left_neighbors = _walk_group_neighbors(self, "left")
-        right_neighbors = _walk_group_neighbors(self, "right")
+        left_neighbors = _walk_group_neighbors(self, "left", rng)
+        right_neighbors = _walk_group_neighbors(self, "right", rng)
         other_objects = left_neighbors + right_neighbors
         num_of_objects = len(other_objects)
 
@@ -551,7 +560,9 @@ def _disjoint_objects(obj1: Any, obj2: Any) -> bool:
     )
 
 
-def _walk_group_neighbors(group: Group, direction: str) -> list[Any]:
+def _walk_group_neighbors(
+    group: Group, direction: str, rng: RNG | None = None
+) -> list[Any]:
     """Walk left or right from a group through *positional* neighbours.
 
     Scheme: the ``neighbors`` letrec inside ``get-local-density``
@@ -588,7 +599,7 @@ def _walk_group_neighbors(group: Group, direction: str) -> list[Any]:
             # A hand-rolled test double rather than a real WorkspaceObject —
             # the same answer as "at the end of the string".
             break
-        neighbor = chooser()
+        neighbor = chooser(rng)
         if neighbor is None or neighbor is current:
             break
         enclosing = getattr(neighbor, "enclosing_group", None)

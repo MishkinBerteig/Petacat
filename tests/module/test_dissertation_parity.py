@@ -697,9 +697,16 @@ class TestMemory:
         """
         memory = EpisodicMemory()
         rule = "Swap letter-categories of all objects in string"
+        # TM-3: a snag is matched to an answer by the rule's *clause list*, not by
+        # its English prose (``memory.ss:78-89``).  The transcription ignores
+        # ``object_description``, so a leftmost rule and a rightmost rule read
+        # alike; both answers and the snag therefore carry the signature that
+        # actually decides the match.
+        signature = [["intrinsic", ["letter", "StrPos", "whole"], ["LettCtgy", "swap"]]]
 
         with_snag = AnswerDescription(
             problem=("eqe", "qeq", "abbbc", "aaabccc"),
+            top_rule_signature=signature,
             top_rule_description=rule,
             bottom_rule_description="",
             top_rule_quality=70.0,
@@ -712,6 +719,7 @@ class TestMemory:
         )
         without_snag = AnswerDescription(
             problem=("eqe", "qeq", "abbba", "aaabaaa"),
+            top_rule_signature=signature,
             top_rule_description=rule,
             bottom_rule_description="",
             top_rule_quality=70.0,
@@ -729,6 +737,7 @@ class TestMemory:
                 temperature=40.0,
                 theme_pattern={"plato-string-position-category": "identity"},
                 description=rule,
+                rule_signature=signature,
             )
         )
 

@@ -20,7 +20,7 @@ count every engine-size figure in this document uses. Seed data: 59 slipnet node
 integration + 8 module files run locally; 9 e2e files currently require Docker, which
 WP2.1 removes).
 
-> **As built.** `server/engine/` holds 50 modules and 32,921 lines.
+> **As built.** `server/engine/` holds 50 modules and 33,028 lines.
 
 ---
 

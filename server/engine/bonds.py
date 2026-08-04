@@ -15,6 +15,7 @@ from server.engine.slipnet import opposite_node
 from server.engine.workspace_structures import WorkspaceStructure
 
 if TYPE_CHECKING:
+    from server.engine.rng import RNG
     from server.engine.slipnet import SlipnetNode
     from server.engine.workspace_objects import WorkspaceObject
 
@@ -102,14 +103,16 @@ class Bond(WorkspaceStructure):
             round(11.0 * math.sqrt(max(0.0, self.bond_category.degree_of_assoc()))),
         )
 
-    def calculate_external_strength(self) -> float:
+    def calculate_external_strength(self, rng: RNG | None = None) -> float:
         """Bond external strength = local support.
 
         Scheme: bonds.ss:182-183, 162-168.
-        """
-        return self._local_support()
 
-    def _local_support(self) -> float:
+        *rng* is the drawing codelet's; see :meth:`get_local_density`.
+        """
+        return self._local_support(rng)
+
+    def _local_support(self, rng: RNG | None = None) -> float:
         """Support from similar nearby bonds.
 
         Scheme: bonds.ss:162-168.
@@ -120,7 +123,7 @@ class Bond(WorkspaceStructure):
         if num_supporting == 0:
             return 0.0
 
-        density = self.get_local_density()
+        density = self.get_local_density(rng)
         adjusted_density = 100.0 * math.sqrt(density / 100.0)
         number_factor = min(1.0, 0.6 ** (1.0 / max(1, num_supporting ** 3)))
         return round(adjusted_density * number_factor)
@@ -154,7 +157,7 @@ class Bond(WorkspaceStructure):
             count += 1
         return count
 
-    def get_local_density(self) -> float:
+    def get_local_density(self, rng: RNG | None = None) -> float:
         """How much of the neighbourhood is bonded the way this bond is.
 
         Scheme: ``get-local-density`` (bonds.ss:136-160).  The walk steps through
@@ -170,12 +173,19 @@ class Bond(WorkspaceStructure):
         ``c-d`` proposed walked nowhere at all and scored 100 — support 60 — where
         the reference counts four slots, finds one similar bond, and scores 25 —
         support 30.  Sparse early bonds were snowballing on a denominator of zero.
+
+        Each step of that walk is a salience-weighted **stochastic** pick, so the
+        walk needs a generator and the reference re-rolls it on every strength
+        update.  *rng* is the one the calling codelet is drawing from, threaded
+        down from :meth:`WorkspaceStructure.update_strength`; ``None`` means no
+        run context, and the walk then takes the first candidate at each step
+        (see ``WorkspaceObject._pick_neighbor``).
         """
         if self.string is None:
             return 100.0
 
-        left_neighbors = _walk_neighbors(self.left_object, "left")
-        right_neighbors = _walk_neighbors(self.right_object, "right")
+        left_neighbors = _walk_neighbors(self.left_object, "left", rng)
+        right_neighbors = _walk_neighbors(self.right_object, "right", rng)
         num_of_bond_slots = len(left_neighbors) + len(right_neighbors)
 
         if num_of_bond_slots == 0:
@@ -379,7 +389,7 @@ def _disjoint_objects(obj1: Any, obj2: Any) -> bool:
     )
 
 
-def _walk_neighbors(obj: Any, direction: str) -> list[Any]:
+def _walk_neighbors(obj: Any, direction: str, rng: RNG | None = None) -> list[Any]:
     """Walk left or right from *obj* through positional neighbours.
 
     Scheme: ``neighbors`` inside ``get-local-density`` (bonds.ss:137-145) —
@@ -391,9 +401,9 @@ def _walk_neighbors(obj: Any, direction: str) -> list[Any]:
               (cons neighbor (neighbors neighbor choose-method)))))
 
     Each step is a fresh stochastic pick among the objects edged at the adjacent
-    position, so the walk can climb into a group and continue from *its* far edge.
-    That is what makes it terminate: every step moves strictly outwards, and the
-    string is finite.
+    position, drawn from *rng* — the calling codelet's stream — so the walk can
+    climb into a group and continue from *its* far edge.  That is what makes it
+    terminate: every step moves strictly outwards, and the string is finite.
     """
     method = "choose_left_neighbor" if direction == "left" else "choose_right_neighbor"
     result: list[Any] = []
@@ -404,7 +414,7 @@ def _walk_neighbors(obj: Any, direction: str) -> list[Any]:
             # Not a real WorkspaceObject — a hand-rolled test double.  Nothing to
             # walk, which is the same answer as "at the end of the string".
             break
-        neighbor = chooser()
+        neighbor = chooser(rng)
         if neighbor is None or neighbor is current:
             break
         result.append(neighbor)

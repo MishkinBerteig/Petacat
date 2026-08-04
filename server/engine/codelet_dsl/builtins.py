@@ -470,7 +470,7 @@ def propose_group(
     length_node = ctx.slipnet.nodes.get("plato-length")
     if length_node is not None:
         probability = length_description_probability(
-            group, length_node, ctx.temperature.value, ctx.meta
+            group, length_node, ctx.temperature.value, ctx.meta, ctx.rng
         )
         if ctx.rng.prob(probability):
             attach_length_description(group)
@@ -498,7 +498,7 @@ def evaluate_group(ctx: EngineContext, group: Group) -> bool:
     """
     from server.engine.formulas import group_evaluation_probability
 
-    group.update_strength()
+    group.update_strength(ctx.rng)
     _read(ctx, group)
     survival = group_evaluation_probability(
         group.strength, ctx.temperature.value, ctx.meta
@@ -738,7 +738,7 @@ def evaluate_structure(
     already measured relative to its peers (``get-relative-quality``), so
     re-weighting it by temperature would apply the adjustment twice.
     """
-    structure.update_strength()
+    structure.update_strength(ctx.rng)
     accept_prob = (
         temp_adjusted_probability(
             structure.strength / 100.0,
@@ -1846,8 +1846,8 @@ def _wins_fight(
     probability exactly 0, falling back to a coin flip only when *both* sides
     weigh 0.
     """
-    proposer.update_strength()
-    opponent.update_strength()
+    proposer.update_strength(ctx.rng)
+    opponent.update_strength(ctx.rng)
     weights = temp_adjusted_values(
         [
             proposer_weight * proposer.strength,
@@ -2134,7 +2134,7 @@ def single_letter_group_probability(ctx: EngineContext, group: Any) -> float:
             "single_letter_group_exponent_1_supporting"
         )
     length_activation = ctx.slipnet.nodes["plato-length"].activation
-    base = (group._local_support() / 100.0) * (length_activation / 100.0)
+    base = (group._local_support(ctx.rng) / 100.0) * (length_activation / 100.0)
     return temp_adjusted_probability(
         base ** exponent, ctx.temperature.value, ctx.meta
     )

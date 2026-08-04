@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any
 from server.engine.workspace_structures import WorkspaceStructure
 
 if TYPE_CHECKING:
+    from server.engine.rng import RNG
     from server.engine.slipnet import SlipnetNode
 
 
@@ -58,8 +59,11 @@ class Description(WorkspaceStructure):
         """
         return float(self.descriptor.conceptual_depth)
 
-    def calculate_external_strength(self) -> float:
+    def calculate_external_strength(self, rng: RNG | None = None) -> float:
         """External strength = average(local_support, description_type activation).
+
+        *rng* is accepted to match the base signature and unused: a description's
+        local support is a count of siblings, not a stochastic walk.
 
         Scheme: descriptions.ss:84-86.
         (average (tell self 'calculate-local-support)

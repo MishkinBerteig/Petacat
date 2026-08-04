@@ -321,6 +321,7 @@ def length_description_probability(
     plato_length: SlipnetNode,
     temperature: float,
     meta: MetadataProvider,
+    rng: RNG | None = None,
 ) -> float:
     """Probability of attaching a length description to a group.
 
@@ -380,7 +381,7 @@ def single_letter_group_probability(
     else:
         exponent = 1
 
-    local_support = _get_group_local_support(group)
+    local_support = _get_group_local_support(group, rng)
     activation = plato_length.activation
 
     # (% local-support) * (% activation)  →  both divided by 100
@@ -505,18 +506,21 @@ def _count_local_supporting_groups(group: Group) -> int:
     return count
 
 
-def _get_group_local_support(group: Group) -> float:
+def _get_group_local_support(group: Group, rng: RNG | None = None) -> float:
     """Compute the local support for *group*.
 
     If the Group class provides a ``_local_support`` method (or
     ``get_local_support``), delegate to it.  Otherwise fall back to
     a minimal reimplementation of groups.ss:384-391.
+
+    *rng* reaches the density walk inside the canonical method, and is the
+    calling codelet's stream; see ``WorkspaceStructure.update_strength``.
     """
     # Prefer the canonical method on the Group object if available.
     for method_name in ("_local_support", "get_local_support"):
         method = getattr(group, method_name, None)
         if callable(method):
-            return method()
+            return method(rng)
 
     # Fallback inline implementation
     num = _count_local_supporting_groups(group)

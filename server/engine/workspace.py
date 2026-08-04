@@ -572,12 +572,13 @@ class Workspace:
         self.clamped_rules: list[Rule] = []
 
         self.slipnet = slipnet
-        #: The run's RNG, bound by ``init_mcat``.  Read by
-        #: :meth:`WorkspaceObject._pick_neighbor` for the stochastic neighbour
-        #: walk of ``get-local-density`` (``bonds.ss:136-160``), which is reached
-        #: from ``update_strength`` and so has no RNG of its own to use.  Left
-        #: ``None`` outside a run.
-        self.rng: RNG | None = None
+        # There is deliberately no ``self.rng`` here.  The stochastic neighbour
+        # walk of ``get-local-density`` (``bonds.ss:136-160``) used to read the
+        # run's RNG off the Workspace, because ``update_strength`` had none of its
+        # own.  That both bypassed the per-codelet streams free-running derives
+        # from ``(seed, worker, slot)`` and shared one ``random.Random`` across
+        # worker threads.  The generator is now threaded from the call site;
+        # see ``WorkspaceStructure.update_strength``.
         #: Cached workspace-level average unhappiness, dropped by
         #: ``update_all_object_values``.  See ``get_average_unhappiness``.
         self._average_unhappiness: float | None = None
@@ -910,7 +911,7 @@ class Workspace:
         # has to be dropped.
         self._average_unhappiness = None
 
-    def update_all_structure_strengths(self) -> None:
+    def update_all_structure_strengths(self, rng: RNG | None = None) -> None:
         """Recompute every structure's strength, in the reference's own order.
 
         Order is load-bearing and the substrate has to respect it.  ``Group.
@@ -926,17 +927,22 @@ class Workspace:
         descriptions override it (§4.1.2).  Those two kinds are therefore batched
         per string; bridges and rules stay sequential, because batching them would
         be a change to the model rather than to its implementation.
+
+        *rng* is the caller's — the update cycle passes ``ctx.rng`` — and reaches
+        the stochastic density walk inside every bond's and group's external
+        strength.  Both routes below pass it, so whether the numeric substrate is
+        engaged cannot change which generator the walk draws from.
         """
         backend = select_backend(len(self.all_structures))
         if backend is None:
             for structure in self.all_structures:
                 if hasattr(structure, "update_strength"):
-                    structure.update_strength()
+                    structure.update_strength(rng)
             return
 
         for s in self.all_strings:
-            self._update_strengths_batched(backend, s.bonds)
-            self._update_strengths_batched(backend, s.groups)
+            self._update_strengths_batched(backend, s.bonds, rng)
+            self._update_strengths_batched(backend, s.groups, rng)
         for structure in (
             self.top_bridges
             + self.bottom_bridges
@@ -945,14 +951,16 @@ class Workspace:
             + self.bottom_rules
         ):
             if hasattr(structure, "update_strength"):
-                structure.update_strength()
+                structure.update_strength(rng)
 
     @staticmethod
-    def _update_strengths_batched(backend: Any, structures: list[Any]) -> None:
+    def _update_strengths_batched(
+        backend: Any, structures: list[Any], rng: RNG | None = None
+    ) -> None:
         if not structures:
             return
         internal = [s.calculate_internal_strength() for s in structures]
-        external = [s.calculate_external_strength() for s in structures]
+        external = [s.calculate_external_strength(rng) for s in structures]
         compatibility = [s.get_thematic_compatibility() for s in structures]
         for structure, strength in zip(
             structures, backend.structure_strengths(internal, external, compatibility)

@@ -1315,8 +1315,11 @@ class Rule(WorkspaceStructure):
             )
         return self.get_relative_quality(self.workspace)
 
-    def calculate_external_strength(self) -> float:
-        """Scheme: rules.ss:287 — same as internal strength for rules."""
+    def calculate_external_strength(self, rng: RNG | None = None) -> float:
+        """Scheme: rules.ss:287 — same as internal strength for rules.
+
+        *rng* is accepted to match the base signature and unused.
+        """
         return self.calculate_internal_strength()
 
     def get_relative_quality(self, workspace: Workspace) -> float:

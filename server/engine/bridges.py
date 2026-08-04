@@ -16,6 +16,7 @@ from server.engine.workspace_structures import WorkspaceStructure
 if TYPE_CHECKING:
     from server.engine.bonds import Bond
     from server.engine.concept_mappings import ConceptMapping
+    from server.engine.rng import RNG
     from server.engine.slipnet import SlipnetNode
     from server.engine.workspace_objects import WorkspaceObject
 
@@ -266,10 +267,13 @@ class Bridge(WorkspaceStructure):
             return 1.0 if _is_group(o1) else 0.1
         return 1.0
 
-    def calculate_external_strength(self) -> float:
+    def calculate_external_strength(self, rng: RNG | None = None) -> float:
         """External strength from supporting bridges.
 
         Scheme: bridges.ss:400-410, 794-804.
+
+        *rng* is accepted to match the base signature and unused: a bridge's
+        external strength counts peers, it does not walk neighbours.
         """
         # Check for spanning singleton letter
         if self._is_spanning_singleton():

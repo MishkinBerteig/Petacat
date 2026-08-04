@@ -8,9 +8,11 @@ Scheme source: run.ss
 from __future__ import annotations
 
 import logging
+import threading
 from collections import deque
+from contextlib import contextmanager
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Iterator
 
 logger = logging.getLogger("petacat.engine")
 
@@ -105,7 +107,11 @@ class EngineContext:
         self.memory = memory
         self.temperature = temperature
         self.commentary = commentary
-        self.rng = rng
+        #: The run's generator.  Read through the :attr:`rng` property, which
+        #: prefers a per-thread codelet stream when one is bound; see
+        #: :meth:`use_codelet_rng`.
+        self._rng = rng
+        self._codelet_rng = threading.local()
         self.meta = meta
         #: Where this run's record goes.  ``NullSink`` rather than ``None`` so every
         #: emission site can call unconditionally; the engine never learns which mode
@@ -170,6 +176,43 @@ class EngineContext:
         #: A codelet is a long read-and-decide followed by a short mutation, so
         #: serialising only the mutation leaves the expensive part parallel.
         self.commit_lock: Any = None
+
+    # -- the generator a codelet draws from ---------------------------------
+
+    @property
+    def rng(self) -> RNG:
+        """The generator the current thread should draw from.
+
+        Serially there is only ever one: the run's own, seeded at ``init_mcat``.
+
+        Under free-running each codelet is given a counter-based stream of its
+        own, addressed by ``(seed, worker, slot)`` rather than by what ran before
+        it (``server/engine/splittable_rng.py``) — that is the whole point of the
+        splittable generator, and it is what makes a parallel run's randomness a
+        function of *where* a codelet ran.  The binding has to be **per thread**:
+        held as a plain attribute and swapped around each codelet, as it once was,
+        worker A's swap was visible to worker B, so B executed against A's stream
+        — or against the run's shared ``random.Random``, which is a data race
+        under the free-threaded interpreter as well as a determinism hole.
+        """
+        rng = getattr(self._codelet_rng, "value", None)
+        return rng if rng is not None else self._rng
+
+    @rng.setter
+    def rng(self, value: RNG) -> None:
+        """Replace the *run's* generator.  Restore and a few tests do this; a
+        codelet stream is bound with :meth:`use_codelet_rng` instead."""
+        self._rng = value
+
+    @contextmanager
+    def use_codelet_rng(self, rng: RNG) -> Iterator[RNG]:
+        """Bind *rng* as this thread's generator for the duration of one codelet."""
+        previous = getattr(self._codelet_rng, "value", None)
+        self._codelet_rng.value = rng
+        try:
+            yield rng
+        finally:
+            self._codelet_rng.value = previous
 
     def enable_access_tracking(self, enabled: bool = True) -> None:
         """Turn read/write-set recording on or off.
@@ -283,14 +326,6 @@ class EngineRunner:
 
         # Create workspace
         workspace = Workspace(initial, modified, target, answer, slipnet)
-        # ``get-local-density`` walks *stochastically* chosen positional neighbours
-        # (bonds.ss:136-160), so external strength draws on the RNG from call sites
-        # that carry no RNG of their own — ``update-strength`` reaches the Scheme's
-        # as a global.  Hang it off the Workspace, which is per *run*: a class-level
-        # binding would let two runners in one process draw from each other.  Not
-        # captured (``state_graph._ENVIRONMENT_FIELDS``) and not part of the
-        # Workspace's restored state, so a restored run keeps its own.
-        workspace.rng = rng
 
         # Create coderack.  It needs the RNG so it can enforce its own capacity
         # cap when codelets are posted.
@@ -372,7 +407,7 @@ class EngineRunner:
         # 100/n (``workspace-strings.ss:325-328``).  The leftmost and rightmost
         # letters get no head start here — they get it one cycle later, once the
         # clamp has made string-position-category active.
-        self._update_workspace_values(workspace)
+        self._update_workspace_values(workspace, rng)
 
         # Clamp initially relevant slipnet nodes
         slipnet.clamp_initially_relevant(self.meta)
@@ -480,15 +515,18 @@ class EngineRunner:
                         middle_node.activation = max_act
 
     @staticmethod
-    def _update_workspace_values(workspace: Workspace) -> None:
+    def _update_workspace_values(workspace: Workspace, rng: RNG | None = None) -> None:
         """Scheme: ``update-workspace-values`` (``run.ss:325-344``).
 
         Structure strengths, then every object's importance / unhappiness /
         salience, then the workspace-level averages the mapping strengths are read
         off.  Called from two places, exactly as the reference calls it: once at
         the end of ``init-mcat`` and once at the top of ``update-everything``.
+
+        *rng* reaches the stochastic density walk that bond and group external
+        strength is computed from; see ``WorkspaceStructure.update_strength``.
         """
-        workspace.update_all_structure_strengths()
+        workspace.update_all_structure_strengths(rng)
         workspace.update_all_object_values()
         workspace.update_average_unhappiness_values()
 
@@ -781,7 +819,7 @@ class EngineRunner:
 
         # 2-3. Structure strengths, then object importances / unhappiness /
         #      salience, then the workspace-level averages (run.ss:306, 325-344).
-        self._update_workspace_values(ctx.workspace)
+        self._update_workspace_values(ctx.workspace, ctx.rng)
 
         # 4. Snag-period stochastic exit (Scheme: run.ss:299-302)
         if ctx.trace.within_snag_period:

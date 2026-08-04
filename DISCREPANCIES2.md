@@ -1,5 +1,104 @@
 # DISCREPANCIES2 — Unintended cognitive divergences between Petacat and the Metacat source
 
+> ## STATUS: ALL FINDINGS APPLIED (2026-08-04)
+>
+> Every finding in this document has been fixed, in the five-phase order of
+> Appendix A, across commits `b1fd7a8`, `39a8ec4`, `0417251`, `eff9578`,
+> `2720128`, `08e9c54`, `b47ac5a` and `c20abed`. **The findings below are kept as
+> written — they are the record of what was wrong, not a to-do list.** Where a
+> finding turned out to be inaccurate, the correction is recorded in the commit
+> that touched it and summarised under "Corrections" below.
+>
+> Two deviations from the stated plan, both deliberate: **RU-5** was pulled
+> forward into phase 2, because its own fix plan requires the possible-rule-types
+> that WS-2 stores — they are one change. And phase 4 was run in three rounds
+> (bonds, then groups, then bridges) rather than one, per this document's own
+> advice that group fixes change the workspace states the bridge fixes are tested
+> against.
+>
+> ### What it did to behaviour
+>
+> The binding constraint turned out to be bridge formation. RU-5 restored the
+> reference's gate that no rule may be abstracted until every letter of both
+> strings is covered by rule-describable bridges (`rules.ss:413-416`), and
+> Petacat passed it far too rarely — so until section 11 landed, the engine's
+> answers were mostly the rare vacuous verbatim rule translating into the
+> modified string. Measured over 40 seeds, before and after section 11:
+>
+> | | `abc→abd; xyz` | `abc→abd; mrrjjj` |
+> |---|---|---|
+> | mean rules built per run | 0.20 → 2.00 | 0.375 → 1.20 |
+> | runs building any rule | 8/40 → 40/40 | 13/40 → 40/40 |
+> | answers found | 3/40 → 37/40 | 8/40 → 40/40 |
+>
+> Two results are worth naming. **RU-1 made the extrinsic rule family reachable
+> for the first time**: an instantiated swap clause was built with its dimensions
+> discarded, so every one applied as a no-op and the whole of §3.3.4 was dead. With
+> it fixed, `eqe→qeq; abbba?` answers `baaab` — the dissertation's own documented
+> answer for that problem (§5.2.3) — on 42.7% of 300 seeds, having never once
+> produced it before. And **GR-5 made Metacat's nested group hierarchy
+> representable**: `abc→abd; mrrjjj` now builds the nested successor group on the
+> Length facet spanning all six letters over `[m][rr][jjj]`, the 1-2-3 reading,
+> which the old "supergroup destroys its own constituents" path could not express.
+>
+> Not everything moved in the flattering direction, and the honest cases are
+> recorded in the commits: **GR-2** lowers the rule rate on short successor
+> problems (successor groups score 40 in the reference, not the ~96 Petacat gave
+> them), and **RU-6** raises the give-up rate on `abc→abd; xyz` by making the best
+> rule of *n* dominate at rank-relative strength. Both were verified faithful
+> against the Scheme line by line and kept.
+>
+> ### Corrections to this document
+>
+> Fourteen findings were wrong in some respect, and each was verified against the
+> Scheme before being overruled. The consequential ones: the **bond-relevance
+> rounding** row is inverted — `100*` *is* `(round (* 100 x))`, so the Scheme
+> rounds and Petacat already matched; following its fix plan would have introduced
+> the divergence it claimed to remove. **GR-2**'s stated consequence has the wrong
+> sign (directed group strengths shift *down*). **SL-3**'s fix plan asserts the
+> centre letter of `abcde` is `middle` while its own parenthetical cautions
+> otherwise — the parenthetical is right, and the reference in fact contradicts
+> *itself* here, since `run.ss:297-301` attaches a `middle` description by index
+> arithmetic that `middle-in-string?` would deny. **BD-8**'s fix plan would have
+> introduced a new bug (`build_structure` returns False for duplicates too, and the
+> duplicate jolt is a large share of the activation stream). **SN-2** and **SN-3**
+> claim dead code was present and faithful when `Coderack.clear` already existed,
+> `clamp_salience` did not exist at all, and `undo_last_clamp_raw` was not the
+> faithful call. **TM-2**'s "faithful pieces" were not faithful:
+> `compare_rule_signatures` flatten-and-zipped, so two structurally unrelated rules
+> could measure *zero* apart. And **SL-1**'s claim that spread amounts are already
+> rounded correctly on both sides is false — Petacat pre-divides, which mis-rounds
+> exact halves and makes float32 and float64 disagree by a whole activation unit.
+> That last one is unreachable at the shipped `spreading_activation_threshold` of
+> 100 and becomes reachable the moment the slider is lowered; it is pinned by a
+> test and is the one item here left as a **new finding rather than a fix**.
+>
+> ### Defects found while fixing, not in this document
+>
+> A group's image took its letter relation from its bonds' category, so a sameness
+> group carried `plato-sameness` — outside `new-start-letter`'s declared domain
+> (`images.ss:164`) — and `abc→aabbcc; kkjjii?` answered **`kksamejjiisame`**, an
+> answer string with a relation's name embedded in it. Also: `state_graph` omitted
+> the workspace's three mapping strengths and its average unhappiness from capture,
+> so restored runs diverged; `MlxBackend.combine_object_values` materialised its
+> float coefficients as float32 even against a float64 array, so the mlx-cpu
+> backend was not the float64 backend it claims to be; `get_equivalent_bond` was
+> not symmetric for sameness bonds although `add-bond` files them under both key
+> orders; `unclamp_concept_pattern` unfroze every node in the Slipnet, so ending
+> one clamp released every other; and `evaluate_progress` excluded bonds by testing
+> for an attribute no structure class in the port has.
+>
+> ### On the test suite
+>
+> `tests/module/test_dissertation_parity.py`'s frequency-distribution guards were
+> **deleted**, not retuned. Their floors were calibrated by sampling Petacat before
+> this repair, so they encoded the very defects it removes and failed precisely
+> when the engine moved closer to the reference. The invariants and mechanism tests
+> remain; that file is now 110 passed, 0 failed on both numeric backends, from
+> roughly 40 red at the start. `tests/fixtures/expected_range.json` is likewise a
+> pre-repair sample and **has not been regenerated** — the smoke sampling used
+> throughout was compared against it for orientation only, never as an oracle.
+
 **Scope.** A static, code-only parity scan of Petacat's cognitive engine against the
 Metacat Scheme source (`../Metacat/*.ss`). No code was executed. The reference is the
 Scheme *code*, not the dissertation and not any project documentation ("code is the

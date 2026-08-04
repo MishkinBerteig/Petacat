@@ -92,8 +92,12 @@ class _FixedStrength:
         self.strength = strength
         self.updated = 0
 
-    def update_strength(self):
+    def update_strength(self, rng=None):
+        # ``rng`` is the drawing codelet's stream, threaded down to the density
+        # walk inside a real structure's external strength; a fixed strength has
+        # no walk, so it is recorded and ignored.
         self.updated += 1
+        self.updated_with_rng = rng
 
 
 def _win_rate(proposer_weight, opponent_weight, p_strength, o_strength, temperature,

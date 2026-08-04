@@ -183,23 +183,26 @@ class WorkspaceObject:
         strength update, and in a string with no groups every position offers
         exactly one candidate.
 
-        *rng* is the caller's when there is one — a bond scout passes the
-        codelet's.  The density walk is reached from ``update_strength``, which
-        carries no RNG in this port any more than the Scheme's ``update-strength``
-        carries one; it reads the run's own RNG off the Workspace instead.  Per
-        *run*, not per process: two runners stepping in one process (a restore
-        test does exactly that) must not draw from each other.
+        *rng* is always the caller's.  The Scheme's ``update-strength`` reaches
+        the generator as a global; this port has no global to reach, so the
+        density walk's RNG is **threaded down from the call site** —
+        ``update_strength(rng)`` → ``calculate_external_strength(rng)`` →
+        ``_local_support(rng)`` → ``get_local_density(rng)`` → here.  Every
+        strength update inside a codelet therefore draws from *that codelet's*
+        stream (``server/engine/splittable_rng.py``), which is what makes a
+        free-running run's randomness a function of where a codelet ran rather
+        than of what ran before it.  Reading the run's RNG off the Workspace, as
+        this used to, both bypassed that and shared one ``random.Random`` across
+        worker threads.
         """
         if not neighbors:
             return None
         if len(neighbors) == 1:
             return neighbors[0]
         if rng is None:
-            rng = getattr(getattr(self.string, "workspace", None), "rng", None)
-        if rng is None:
-            # Outside a run — an object built directly by a unit test.  The first
-            # candidate keeps the walk defined without inventing a second source
-            # of randomness; ``init_mcat`` always binds the run's own RNG.
+            # No run context at all — an object built directly by a unit test.
+            # The first candidate keeps the walk defined without inventing a
+            # second source of randomness.  Inside a run every path carries one.
             return neighbors[0]
         weights = [n.salience.get("intra", 1.0) for n in neighbors]
         return rng.weighted_pick(neighbors, weights)
