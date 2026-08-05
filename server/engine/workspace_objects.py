@@ -301,37 +301,9 @@ class WorkspaceObject:
         """True if *descriptor* distinguishes this object from others in
         the same string.
 
-        Scheme: workspace-objects.ss:223-245.
+        Scheme: ``distinguishing-descriptor?`` (``workspace-objects.ss:223-244``).
         """
-        name = getattr(descriptor, "name", "")
-        if name in _NON_DISTINGUISHING_NAMES:
-            return False
-
-        string = self.string
-        if string is None:
-            return True
-
-        # Determine the relevant set of "other objects" to compare with
-        from server.engine.groups import Group
-        if isinstance(self, Letter):
-            other_objects = [o for o in getattr(string, "objects", [])
-                            if isinstance(o, Letter) and o is not self]
-        elif isinstance(self, Group):
-            supergroup = self.enclosing_group
-            subgroups = [o for o in getattr(self, "objects", []) if isinstance(o, Group)]
-            other_objects = [
-                g for g in getattr(string, "groups", [])
-                if g is not self and g is not supergroup and g not in subgroups
-            ]
-        else:
-            other_objects = [o for o in getattr(string, "objects", []) if o is not self]
-
-        # Collect descriptors from other objects
-        other_descriptors: set[int] = set()
-        for obj in other_objects:
-            for d in getattr(obj, "descriptions", []):
-                other_descriptors.add(id(getattr(d, "descriptor", None)))
-        return id(descriptor) not in other_descriptors
+        return distinguishing_descriptor(self, descriptor)
 
     def get_distinguishing_descriptions(self) -> list[Any]:
         """Descriptions whose descriptor distinguishes this object from
@@ -789,6 +761,74 @@ def _average(*values: float) -> float:
     if not values:
         return 0.0
     return sum(values) / len(values)
+
+
+def distinguishing_descriptor(obj: Any, descriptor: Any) -> bool:
+    """Does *descriptor* tell *obj* apart from the other objects of its string?
+
+    Scheme: ``distinguishing-descriptor?`` (``workspace-objects.ss:223-244``), whose
+    last line is
+
+    .. code-block:: scheme
+
+        (not (member? descriptor other-descriptors))
+
+    — **any** other object carrying the descriptor is enough to disqualify it. Two
+    of Petacat's three call sites had independently written this as "not *all*
+    other objects carry it", which reads as distinguishing whenever a single
+    sibling differs. In ``eqe`` that made the leftmost ``e`` distinguished by
+    ``e``, even though the rightmost letter is an ``e`` too.
+
+    That is not a cosmetic difference. The predicate gates bridge proposal
+    (``bridges.ss:938-952`` refuses a bridge with no distinguishing
+    Identity/Opposite mapping), sets bridge urgency, and decides which
+    descriptions a rule may name its object by. Under the inverted reading,
+    ``eqe -> qeq`` built 42 *crossing* horizontal-top bridges per 172 built, where
+    the reference builds none, and those became String-Position swap rules that
+    rearranged the target instead of changing its letters.
+
+    The generic category nodes — ``plato-letter``, ``plato-group`` and the numbers
+    — never distinguish anything, and a group's siblings exclude its own enclosing
+    group and its own subgroups, both as in the Scheme.
+    """
+    name = getattr(descriptor, "name", "")
+    if name in _NON_DISTINGUISHING_NAMES:
+        return False
+
+    string = getattr(obj, "string", None)
+    if string is None:
+        return True
+
+    from server.engine.groups import Group
+
+    if isinstance(obj, Letter):
+        others = [
+            o for o in getattr(string, "objects", [])
+            if isinstance(o, Letter) and o is not obj
+        ]
+    elif isinstance(obj, Group):
+        supergroup = obj.enclosing_group
+        subgroups = [o for o in getattr(obj, "objects", []) if isinstance(o, Group)]
+        others = [
+            g for g in getattr(string, "groups", [])
+            if g is not obj and g is not supergroup and g not in subgroups
+        ]
+    else:
+        # Not a reference path: the Scheme's object is always a letter or a group.
+        # Kept so the predicate is total, and reading every sibling the string
+        # knows about is the conservative choice for anything else.
+        others = [o for o in getattr(string, "objects", []) if o is not obj]
+        seen = {id(o) for o in others} | {id(obj)}
+        for o in getattr(string, "letters", []):
+            if id(o) not in seen:
+                others.append(o)
+                seen.add(id(o))
+
+    for other in others:
+        for d in getattr(other, "descriptions", []):
+            if getattr(d, "descriptor", None) is descriptor:
+                return False
+    return True
 
 
 def _description_is_relevant(d: Any) -> bool:

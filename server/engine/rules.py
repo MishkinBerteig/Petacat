@@ -2150,14 +2150,25 @@ def sort_templates(templates: list[tuple]) -> list[tuple]:
 def reference_object_to_object_description(
     ref_object: Any,
     slipnet: Slipnet | None = None,
+    rng: RNG | None = None,
+    temperature: float = 50.0,
+    meta: MetadataProvider | None = None,
 ) -> tuple:
     """Convert a reference object into a rule object-description.
 
-    Scheme: reference-object->object-description (rules.ss:878-886).
+    Scheme: ``reference-object->object-description`` (``rules.ss:878-886``).
 
     Returns a tuple of (object_type, description_type, descriptor).
-    For a string: ('string', plato-string-position-category, plato-whole).
-    For an object: (obj_category_descriptor, chosen_desc_type, chosen_descriptor).
+    For a string: ``('string', plato-string-position-category, plato-whole)``.
+    For an object: ``(obj_category_descriptor, chosen_desc_type, chosen_descriptor)``.
+
+    There is **no fallback** when the object has no rule-eligible description. The
+    Scheme never reaches this function in that case, because
+    ``possible-to-instantiate?`` (``rules.ss:445-458``) refused the template first.
+    Petacat used to instantiate anyway and then invent a description from any
+    relevant one, or failing that from ``descriptions[0]`` — which is how
+    ``(letter ObjectCtgy letter)`` and ``(group Direction left)`` reached rules the
+    reference cannot express.
     """
     if _is_workspace_string(ref_object):
         # Need plato-string-position-category and plato-whole nodes
@@ -2174,48 +2185,103 @@ def reference_object_to_object_description(
         if obj_ctgy_node is not None:
             obj_ctgy = _get_descriptor_for(ref_object, obj_ctgy_node)
 
-    # Choose description for rule
-    chosen_desc = _choose_description_for_rule(ref_object)
-    if chosen_desc is not None:
-        return (obj_ctgy, chosen_desc.description_type, chosen_desc.descriptor)
-
-    # Fallback: use first relevant distinguishing description
-    for d in getattr(ref_object, "descriptions", []):
-        if d.is_relevant() and d.is_distinguishing():
-            return (obj_ctgy, d.description_type, d.descriptor)
-
-    # Last resort
-    if ref_object.descriptions:
-        d = ref_object.descriptions[0]
-        return (obj_ctgy, d.description_type, d.descriptor)
-
-    return (obj_ctgy, None, None)
+    chosen_desc = _choose_description_for_rule(ref_object, rng, temperature, meta)
+    if chosen_desc is None:
+        return (obj_ctgy, None, None)
+    return (obj_ctgy, chosen_desc.description_type, chosen_desc.descriptor)
 
 
-def _choose_description_for_rule(obj: Any) -> Any:
-    """Choose the best description for a rule.
+#: The description types a rule may name its object by, per
+#: ``get-descriptions-for-rule`` (``workspace-objects.ss:260-268``).  Letter-Category
+#: is admissible too, but conditionally — see :func:`descriptions_for_rule`.
+_RULE_OBJECT_DESCRIPTION_TYPES = frozenset(
+    {
+        "plato-string-position-category",
+        "plato-alphabetic-position-category",
+    }
+)
 
-    Prefers relevant distinguishing descriptions with highest conceptual depth.
+
+def descriptions_for_rule(obj: Any) -> list[Any]:
+    """The descriptions *obj* may be named by in a rule clause.
+
+    Scheme: ``get-descriptions-for-rule`` (``workspace-objects.ss:260-268``)::
+
+        (filter
+          (lambda (rdd)
+            (or (tell rdd 'description-type? plato-string-position-category)
+                (tell rdd 'description-type? plato-alphabetic-position-category)
+                (and (tell rdd 'description-type? plato-letter-category)
+                     (or (letter? self)
+                         (eq? (tell self 'get-group-category) plato-samegrp)))))
+          (tell self 'get-relevant-distinguishing-descriptions))
+
+    Three kinds and no others: String-Position, Alphabetic-Position, and
+    Letter-Category on a letter or on a same-group. Petacat previously admitted
+    every relevant distinguishing description except Object-Category, which let a
+    rule name its object by Group-Category, Length or Direction.
+
+    Those descriptors are not unique within a string, and that is what made the
+    difference. ``(group GroupCtgy samegrp)`` names *every* group of ``aabb`` at
+    once, so a three-clause rule collided with itself — 322 ``Conflicting
+    transforms`` failures per run on ``aabb -> cc`` — no rule survived
+    ``currently_works``, rule-codelet clamps recurred, and the jootser gave up. At
+    the other extreme ``(group GroupCtgy succgrp)`` names *nothing* in ``mrrjjj``,
+    so the clause applied as a silent no-op and the answer came out as the target
+    string unchanged.
     """
-    candidates = []
+    from server.engine.groups import Group
+
+    out: list[Any] = []
     for d in getattr(obj, "descriptions", []):
-        dt_name = getattr(d.description_type, "name", "")
-        # Skip object-category descriptions
-        if dt_name == "plato-object-category":
+        if not (d.is_relevant() and d.is_distinguishing()):
             continue
-        if d.is_relevant() and d.is_distinguishing():
-            candidates.append(d)
-    if not candidates:
-        # Fall back to any relevant description
-        candidates = [
-            d for d in getattr(obj, "descriptions", [])
-            if d.is_relevant()
-            and getattr(d.description_type, "name", "") != "plato-object-category"
-        ]
+        dt_name = getattr(d.description_type, "name", "")
+        if dt_name in _RULE_OBJECT_DESCRIPTION_TYPES:
+            out.append(d)
+        elif dt_name == "plato-letter-category":
+            if not isinstance(obj, Group):
+                out.append(d)
+            elif getattr(getattr(obj, "group_category", None), "name", "") == (
+                "plato-samegrp"
+            ):
+                out.append(d)
+    return out
+
+
+def _choose_description_for_rule(
+    obj: Any,
+    rng: RNG | None = None,
+    temperature: float = 50.0,
+    meta: MetadataProvider | None = None,
+) -> Any:
+    """Pick one of the descriptions a rule may name *obj* by.
+
+    Scheme: ``choose-description-for-rule`` (``workspace-objects.ss:270-275``)::
+
+        (stochastic-pick possible-descriptions
+          (temp-adjusted-values (tell-all possible-descriptions 'get-conceptual-depth)))
+
+    A temperature-adjusted stochastic pick, not an argmax: the choice sharpens
+    toward the deepest description as the temperature falls, and stays open to the
+    shallower ones while it is high. Petacat took ``max(...)`` on conceptual depth,
+    which both removed a source of variation the reference has and permanently
+    preferred one descriptor over every other.
+    """
+    candidates = descriptions_for_rule(obj)
     if not candidates:
         return None
-    # Pick the one with highest conceptual depth
-    return max(candidates, key=lambda d: getattr(d.descriptor, "conceptual_depth", 0))
+    if len(candidates) == 1 or rng is None:
+        return candidates[0]
+
+    weights = [float(getattr(d.descriptor, "conceptual_depth", 50)) for d in candidates]
+    if meta is not None:
+        from server.engine.formulas import temp_adjusted_values
+
+        weights = temp_adjusted_values(weights, temperature, meta)
+    if not any(w > 0 for w in weights):
+        return candidates[0]
+    return rng.weighted_pick(candidates, weights)
 
 
 # ============================================================================
@@ -2238,7 +2304,9 @@ def instantiate_rule_clause_template(
     if clause_type == CLAUSE_INTRINSIC:
         ref_object = template[1]
         change_templates = template[2]
-        obj_desc = reference_object_to_object_description(ref_object, slipnet)
+        obj_desc = reference_object_to_object_description(
+            ref_object, slipnet, rng, temperature, meta
+        )
         sorted_cts = _sort_change_templates(change_templates)
         changes = [
             _instantiate_change_template(ct, obj_desc, slipnet, rng, temperature, meta)
@@ -2254,7 +2322,10 @@ def instantiate_rule_clause_template(
         ref_objects = template[1]
         dimensions = template[2]
         sorted_refs = sorted(ref_objects, key=lambda o: getattr(o, "left_string_pos", 0))
-        obj_descs = [reference_object_to_object_description(r, slipnet) for r in sorted_refs]
+        obj_descs = [
+            reference_object_to_object_description(r, slipnet, rng, temperature, meta)
+            for r in sorted_refs
+        ]
         sorted_dims = sorted(dimensions, key=_dim_sort_key)
         return RuleClause(
             clause_type=CLAUSE_EXTRINSIC,
@@ -2460,13 +2531,23 @@ def apply_rule(
         # here is the Scheme's CHANGE case: the object being changed is to blame.
         for obj, transforms in grouped:
             img = _get_object_image(obj, slipnet)
-            if img is not None:
-                try:
-                    _apply_transforms(transforms, img, slipnet)
-                except ImageFailure as e:
-                    if not e.objects:
-                        e.objects = [obj]
-                    raise
+            if img is None:
+                # In the reference every object owns an image from the moment it
+                # is constructed (``groups.ss:84``), so there is no such case and
+                # no such branch. Petacat builds the image tree lazily, and an
+                # object the tree missed used to have its transforms skipped **in
+                # silence** — which does not decline to apply the rule, it applies
+                # a *different* rule and reports the result as an answer. Failing
+                # here routes it into the snag machinery instead.
+                raise ImageFailure(
+                    f"no image for reference object {obj!r}", objects=[obj]
+                )
+            try:
+                _apply_transforms(transforms, img, slipnet)
+            except ImageFailure as e:
+                if not e.objects:
+                    e.objects = [obj]
+                raise
 
         # Apply string-position swaps — the Scheme's SWAP case names both objects
         # and types the failure ``SWAP`` (``rules.ss:1433-1447``).
@@ -3473,14 +3554,22 @@ def possible_to_instantiate(templates: list[tuple]) -> bool:
 
 
 def _object_description_possible(obj: Any) -> bool:
-    """Check if an object can be described for a rule.
+    """Can a rule clause name *obj* at all?
 
-    Scheme: object-description-possible? (rules.ss:456-458).
+    Scheme: ``object-description-possible?`` (``rules.ss:455-458``)::
+
+        (or (workspace-string? object)
+            (not (null? (tell object 'get-descriptions-for-rule))))
+
+    The test is on the **rule-eligible** descriptions, not on having any
+    description whatever. Petacat tested ``len(descriptions) > 0``, so a template
+    naming an object with no legal description was instantiated anyway and the
+    description invented downstream. Fixing :func:`descriptions_for_rule` without
+    fixing this gate would only move the illegal description into the fallback.
     """
     if _is_workspace_string(obj):
         return True
-    descs = getattr(obj, "descriptions", [])
-    return len(descs) > 0
+    return len(descriptions_for_rule(obj)) > 0
 
 
 # ============================================================================

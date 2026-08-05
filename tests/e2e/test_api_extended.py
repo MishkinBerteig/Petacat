@@ -809,9 +809,12 @@ async def test_the_session_and_run_memory_describe_an_answer_the_same_way(app_cl
     §4.7.3 weighs answers by how abstract their rules and themes are, so a reader gets
     the same judgement whichever route it arrives by.
     """
+    # Seed 9 answers in 627 codelets on every numeric backend. The precondition this
+    # test needs is only "the run produced an answer" — which seed delivers it is not
+    # part of what is being tested, and moves whenever the engine's perception changes.
     create = await app_client.post(
         "/api/runs",
-        json={"initial": "abc", "modified": "abd", "target": "xyz", "seed": 0},
+        json={"initial": "abc", "modified": "abd", "target": "xyz", "seed": 9},
     )
     run_id = create.json()["run_id"]
     await app_client.post(f"/api/runs/{run_id}/run", json={"max_steps": 3000})

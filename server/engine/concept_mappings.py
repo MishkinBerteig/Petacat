@@ -14,18 +14,9 @@ if TYPE_CHECKING:
     from server.engine.slipnet import Slipnet, SlipnetLink, SlipnetNode
 
 
-# Names of slipnet nodes considered non-distinguishing (generic categories).
-# These correspond to plato-letter, plato-group, and the five number nodes
-# (*slipnet-numbers*) in the Scheme source.
-_NON_DISTINGUISHING_NAMES: set[str] = {
-    "plato-letter",
-    "plato-group",
-    "plato-one",
-    "plato-two",
-    "plato-three",
-    "plato-four",
-    "plato-five",
-}
+# The generic-category node names (plato-letter, plato-group and the five numbers —
+# the Scheme's *slipnet-numbers*) now live beside the one predicate that reads them,
+# in workspace_objects.distinguishing_descriptor.
 
 
 def _recomputed_label(descriptor1: Any, descriptor2: Any) -> Any:
@@ -214,54 +205,18 @@ class ConceptMapping:
 
     @staticmethod
     def _descriptor_is_distinguishing(descriptor: SlipnetNode, obj: Any) -> bool:
-        """Check if a descriptor distinguishes an object from its string-siblings.
+        """Does *descriptor* tell *obj* apart from the other objects of its string?
 
-        Scheme: workspace-objects.ss:223-244.
-        Returns False if the descriptor is a generic category (letter, group,
-        or a number node). Otherwise checks whether all sibling objects in the
-        same string share the same descriptor.
+        Delegates to the one predicate (``workspace_objects.distinguishing_descriptor``,
+        Scheme ``workspace-objects.ss:223-244``). This used to be a second,
+        independently-written copy that read "not *all* siblings carry it" where the
+        Scheme reads "no sibling carries it" — and it disagreed both with the Scheme
+        and with the copy on ``Description``. One predicate is how they stop
+        disagreeing.
         """
-        desc_name = getattr(descriptor, "name", "")
-        if desc_name in _NON_DISTINGUISHING_NAMES:
-            return False
+        from server.engine.workspace_objects import distinguishing_descriptor
 
-        string = getattr(obj, "string", None)
-        if string is None:
-            return True
-
-        # Gather sibling objects of the same kind (letters vs groups)
-        from server.engine.groups import Group
-
-        if isinstance(obj, Group):
-            other_objects = [
-                g for g in getattr(string, "groups", [])
-                if g is not obj
-            ]
-        else:
-            other_objects = [
-                ltr for ltr in getattr(string, "letters", getattr(string, "objects", []))
-                if ltr is not obj
-            ]
-
-        if not other_objects:
-            return True  # No siblings to compare against
-
-        # Check if all other objects share this descriptor
-        other_descriptors = []
-        for other in other_objects:
-            for d in getattr(other, "descriptions", []):
-                other_descriptors.append(d.descriptor)
-
-        # If all siblings have this descriptor, it's not distinguishing
-        # (The Scheme checks: is descriptor NOT a member of other-descriptors)
-        all_have_it = all(
-            any(
-                d.descriptor is descriptor
-                for d in getattr(other, "descriptions", [])
-            )
-            for other in other_objects
-        )
-        return not all_have_it
+        return distinguishing_descriptor(obj, descriptor)
 
     def relevant_distinguishing(self) -> bool:
         """True if this CM is both relevant and distinguishing.

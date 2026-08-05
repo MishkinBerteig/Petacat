@@ -994,7 +994,27 @@ class StringImage:
             if not candidates:
                 position += 1
                 continue
-            widest = max(candidates, key=lambda o: o.right_string_pos)
+            # Ties matter. A **singleton group** spans exactly the position of the
+            # letter it encloses, so the two tie on width — and ``max`` is
+            # first-wins while ``string.objects`` lists letters before groups, so
+            # the letter used to win and the group never became a constituent of
+            # the string image. Its ``image`` then stayed None, ``apply_rule``
+            # skipped its transforms, and "change the middle group to `e'" applied
+            # to eeqee produced qqq instead of qeeq: the rule failed
+            # ``currently_works``, was never built, and the run gave up.
+            #
+            # The reference has no tie to break — ``get-top-level-objects``
+            # (``workspace-strings.ss:411-417``) selects on having no enclosing
+            # group, and the letter inside a singleton group has one. Prefer the
+            # group, then the group that is not itself enclosed.
+            widest = max(
+                candidates,
+                key=lambda o: (
+                    o.right_string_pos,
+                    1 if _is_group(o) else 0,
+                    0 if getattr(o, "enclosing_group", None) is None else -1,
+                ),
+            )
             top_level.append(widest)
             position = widest.right_string_pos + 1
 

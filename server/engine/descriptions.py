@@ -195,25 +195,22 @@ class Description(WorkspaceStructure):
         return self.description_type.fully_active()
 
     def is_distinguishing(self) -> bool:
-        """A description is distinguishing if not all objects in the string
-        share the same descriptor for this description type."""
-        if self.object is None or self.object.string is None:
+        """True when this description's descriptor tells its object apart from
+        the other objects of its string.
+
+        Delegates to the one predicate (``workspace_objects.distinguishing_descriptor``,
+        Scheme ``workspace-objects.ss:223-244``, reached from
+        ``get-distinguishing-descriptions`` at ``:250-254``). This used to be a
+        second, independently-written copy that asked whether *all* siblings
+        carried the descriptor, and matched on the ``(type, descriptor)`` pair
+        where the Scheme matches on the descriptor alone.
+        """
+        if self.object is None or getattr(self.object, "string", None) is None:
             return True
-        string = self.object.string
-        objects = getattr(string, "objects", [])
-        if len(objects) <= 1:
-            return True
-        for obj in objects:
-            if obj is self.object:
-                continue
-            has_same = any(
-                d.description_type is self.description_type
-                and d.descriptor is self.descriptor
-                for d in getattr(obj, "descriptions", [])
-            )
-            if not has_same:
-                return True
-        return False
+
+        from server.engine.workspace_objects import distinguishing_descriptor
+
+        return distinguishing_descriptor(self.object, self.descriptor)
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Description):

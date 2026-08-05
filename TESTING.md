@@ -124,9 +124,9 @@ outside the matrix take it too and the run is entirely what it says it is.
   gpu  mlx      float32    250 tests
   whole suite requested: the full matrix is required of this run
 
-  unit           493 collected    493 run    493 passed      0 failed      0 skipped  complete
-  seed_unit      407 collected    407 run    407 passed      0 failed      0 skipped  complete
-  module         873 collected    873 run    873 passed      0 failed      0 skipped  complete
+  unit           508 collected    508 run    508 passed      0 failed      0 skipped  complete
+  seed_unit      448 collected    448 run    448 passed      0 failed      0 skipped  complete
+  module         945 collected    945 run    945 passed      0 failed      0 skipped  complete
   architecture    34 collected     34 run     34 passed      0 failed      0 skipped  complete
   integration     65 collected     65 run     65 passed      0 failed      0 skipped  complete
   e2e            209 collected    209 run    209 passed      0 failed      0 skipped  complete
@@ -177,7 +177,7 @@ A truncated run reports itself as truncated, and the difference from a clean run
 visible three ways:
 
 ```
-  module         873 collected    198 run    198 passed      0 failed      0 skipped  INCOMPLETE
+  module         945 collected    198 run    198 passed      0 failed      0 skipped  INCOMPLETE
 
   RUN TRUNCATED: the 60 min ceiling was reached after 60.4 min. Everything above is
   what the run produced before it stopped; the tests it had not reached never ran.
@@ -201,9 +201,9 @@ that allowance.
 
 | Layer | Directory | Scope | May depend on | Cases |
 |-------|-----------|-------|---------------|-------|
-| **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 493 |
-| **seed unit** | `tests/seed_unit/` | One class or function, measured against the values Petacat ships with | Real `seed_data/*.json`, and the machine the process is running on | 407 |
-| **module** | `tests/module/` | Several real components assembled and driven | Real engine objects and `seed_data/*.json`; no DB, no HTTP | 873 |
+| **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 508 |
+| **seed unit** | `tests/seed_unit/` | One class or function, measured against the values Petacat ships with | Real `seed_data/*.json`, and the machine the process is running on | 448 |
+| **module** | `tests/module/` | Several real components assembled and driven | Real engine objects and `seed_data/*.json`; no DB, no HTTP | 945 |
 | **architecture** | `tests/architecture/` | How the source tree is allowed to depend on itself | The repository's source, `seed_data/*.json`, child interpreters | 34 |
 | **integration** | `tests/integration/` | Agreement between the repository's artifacts, and the harness's own rules | Real `seed_data/*.json`, the ORM declarations, the generated client files, the documentation, a real pytest session | 65 |
 | **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 209 |
@@ -231,7 +231,7 @@ first**, then move up toward the API and GUI.
 
 All six layers run in one command — the
 [required command](#the-required-command) — and, since Petacat runs natively, all
-six actually run: **2,081 cases**, every one of them executed. A layer that is
+six actually run: **2,209 cases**, every one of them executed. A layer that is
 normally skipped is not a layer that is normally green, and none of these is.
 
 Wall-clock time depends heavily on the machine and on what else it is doing. The
@@ -321,24 +321,29 @@ the number of endpoints taking `Depends(get_session)`, the size of
 | `test_bridge_types.py` | 2 | The bridge-type and orientation constants |
 | `test_codelet_dsl.py` | 3 | Compiling a codelet body: what the interpreter accepts and refuses |
 | `test_commentary.py` | 23 | The `CommentaryLog`, and the emit helpers whose English is written in Python |
-| `test_concept_mappings.py` | 34 | `ConceptMapping`: identity, slippage, distinguishing descriptors |
-| `test_descriptions.py` | 21 | `Description`: relevance, strength, descriptor predicates |
+| `test_concept_mappings.py` | 37 | `ConceptMapping`: identity, slippage, distinguishing descriptors |
+| `test_descriptions.py` | 23 | `Description`: relevance, strength, descriptor predicates |
 | `test_episodic_memory.py` | 13 | `EpisodicMemory`: identifier scoping, theme distance, `answer_present` |
-| `test_formulas.py` | 17 | Averaging, the sigmoid, and the five translation-temperature distributions |
-| `test_groups.py` | 18 | `Group`: length, spanning, membership, internal and external strength |
-| `test_rng.py` | 13 | The deterministic RNG wrapper |
+| `test_formulas.py` | 25 | Averaging, the sigmoid, and the five translation-temperature distributions |
+| `test_groups.py` | 22 | `Group`: length, spanning, membership, internal and external strength |
+| `test_jootsing_outcomes.py` | 7 | The jootser's outcomes: what counts as the same clamp, and when it gives up |
+| `test_object_choice.py` | 8 | Weighted object choice: the temperature exponent, and the absence of floors |
+| `test_rng.py` | 16 | The deterministic RNG wrapper |
 | `test_rule_types.py` | 9 | `Rule` and `RuleClause` predicates and translation |
 | `test_runner_status.py` | 1 | The runner's status constants |
+| `test_scout_counts.py` | 14 | The scout-count aggregates that decide how many codelets a cycle posts |
 | `test_sink.py` | 8 | The `RunSink` port: its event vocabulary and `NullSink` |
-| `test_slipnet_node.py` | 6 | Nodes and links built directly: degree of association, probabilistic jump |
+| `test_slipnet_node.py` | 30 | Nodes and links built directly: degree of association, probabilistic jump |
+| `test_snag_response.py` | 21 | The snag response and the clamp machinery, one piece at a time |
 | `test_splittable_rng.py` | 21 | Counter-based per-codelet random streams |
+| `test_structure_fights.py` | 13 | `wins-fight?` and the weights the builders bring to a fight |
 | `test_temperature.py` | 3 | `Temperature`'s own state: starting value and clamp |
 | `test_thematic_scouting.py` | 20 | The thematic-bridge-scout's decisions (`themes.ss:750-1030`) |
 | `test_theme_types.py` | 6 | `Theme` and `Themespace` type constants |
-| `test_themespace.py` | 30 | Themespace self-watching dynamics: cluster spreading, dominance |
+| `test_themespace.py` | 31 | Themespace self-watching dynamics: cluster spreading, dominance |
 | `test_trace_event.py` | 6 | `TemporalTrace` event recording |
 | `test_workspace_object.py` | 40 | `WorkspaceObject` and `Letter`: geometry, importance, unhappiness |
-| `test_workspace_string.py` | 21 | `WorkspaceString`: bond and group management, spanning, relevance |
+| `test_workspace_string.py` | 28 | `WorkspaceString`: bond and group management, spanning, relevance |
 | `test_workspace_structure.py` | 10 | The base structure class and its proposal levels |
 
 **`tests/seed_unit/` — one class or function against the shipped values**
@@ -350,16 +355,17 @@ the number of endpoints taking `Depends(get_session)`, the size of
 | `test_bridge_types.py` | 4 | Bridge orientation over letters of a real Workspace |
 | `test_codelet_dsl.py` | 2 | The codelet registry built from the seeded codelet types |
 | `test_coderack_bin.py` | 10 | The Coderack's urgency bins and temperature-weighted choice |
-| `test_coderack_eviction.py` | 9 | Incremental eviction picks exactly what the flat scan picked |
+| `test_coderack_clamping.py` | 14 | Codelet-type clamping, against the urgencies Petacat ships with |
+| `test_coderack_eviction.py` | 19 | Incremental eviction picks exactly what the flat scan picked |
 | `test_commentary.py` | 6 | The emit helpers that render from the seeded commentary templates |
-| `test_episodic_memory.py` | 13 | Reminding, comparison and the reminding distance, which resolve the seeded templates and the seeded conceptual depths |
-| `test_formulas.py` | 14 | The temperature-dependent formulas against the seeded coefficients |
+| `test_episodic_memory.py` | 20 | Reminding, comparison and the reminding distance, which resolve the seeded templates and the seeded conceptual depths |
+| `test_formulas.py` | 15 | The temperature-dependent formulas against the seeded coefficients |
 | `test_hardware.py` | 21 | The machine description and the sizes derived from it: real probes, faked probes, environment overrides |
 | `test_metadata_provider.py` | 17 | `MetadataProvider` loading every seed collection |
-| `test_numeric_backends.py` | 21 | The numeric backends against the reference, and the engine without them |
+| `test_numeric_backends.py` | 25 | The numeric backends against the reference, and the engine without them |
 | `test_rule_quality.py` | 13 | Rule uniformity, abstractness and succinctness against the Scheme's formulas, hand-computed from the seeded depths |
 | `test_slipnet_link_lengths.py` | 6 | The Slipnet's link lengths against the reference Scheme |
-| `test_slipnet_node.py` | 15 | The 59-node Slipnet: its nodes, its links, its clamps and its spreading |
+| `test_slipnet_node.py` | 23 | The 59-node Slipnet: its nodes, its links, its clamps and its spreading |
 | `test_temperature.py` | 2 | Temperature updating against the seeded coefficients |
 
 **`tests/module/` — real components assembled and driven**
@@ -367,23 +373,29 @@ the number of endpoints taking `Depends(get_session)`, the size of
 | File | Fns | Covers |
 |------|----:|--------|
 | `test_access_sets.py` | 19 | Read-set / write-set discipline and commit-time validation |
-| `test_bridge_scouting.py` | 23 | The bridge scouts' probabilistic gates, the build-time mapping augmentation, the incompatibility refinements, and the deferred posting batch |
+| `test_answer_description_pattern.py` | 13 | The vertical theme-pattern an answer description is indexed by |
+| `test_bridge_scouting.py` | 25 | The bridge scouts' probabilistic gates, the build-time mapping augmentation, the incompatibility refinements, and the deferred posting batch |
 | `test_capture_projection.py` | 8 | A recorded capture renders exactly as the same state renders live |
-| `test_codelet_behaviours.py` | 41 | What each of the 27 codelet types does to a live workspace |
+| `test_codelet_behaviours.py` | 79 | What each of the 27 codelet types does to a live workspace |
 | `test_codelet_dsl.py` | 7 | Codelet bodies executed against a live engine context |
 | `test_coderack_shards.py` | 13 | The candidate sharded coderacks: fidelity and contention |
 | `test_commentary_writer.py` | 8 | Commentary is an injected writer, and every Run gets a real one |
-| `test_dissertation_parity.py` | 49 | The dissertation's claims, encoded as tests |
+| `test_dissertation_parity.py` | 45 | The dissertation's claims, encoded as tests |
 | `test_expected_range.py` | 20 | The expected-range oracle: the reachable stopping states of 13 problems |
 | `test_free_running.py` | 14 | Free-running execution across worker threads |
+| `test_image_relations.py` | 4 | The relations a group's image is built with, and what happens when they are wrong |
+| `test_justify_and_jootsing.py` | 11 | Justify mode's verdicts and the jootser's justify outcomes |
 | `test_numeric_engine.py` | 7 | The engine computes the same thing with the substrate engaged |
 | `test_population.py` | 9 | Population batching: K independent runs together |
 | `test_run_identifiers.py` | 8 | Identifiers depend on the run, not on the process's history |
+| `test_rule_object_descriptions.py` | 8 | What a rule may name its object by, and whether that name finds anything |
 | `test_run_to_answer.py` | 7 | Run-to-answer behaviour at the `EngineRunner` level |
-| `test_runner.py` | 9 | `EngineRunner`: initialisation, stepping, the update cycle |
+| `test_runner.py` | 19 | `EngineRunner`: initialisation, stepping, the update cycle |
 | `test_runner_commentary.py` | 6 | Commentary emitted as the runner drives a problem |
 | `test_runner_status.py` | 6 | The status an `EngineRunner` reports as a run moves through it |
+| `test_singleton_group_images.py` | 3 | Every object a rule names owns an image, singleton groups included |
 | `test_sink_emission.py` | 9 | The engine emits a complete run record to its sink |
+| `test_snag_response.py` | 7 | The snag response driven end to end through a real run |
 | `test_splittable_rng_range.py` | 3 | The expected range holds under the splittable RNG |
 | `test_staleness.py` | 8 | The staleness probe reads a Workspace that lags the live one |
 | `test_state_graph.py` | 11 | A captured run restores to a state that continues identically |
@@ -391,7 +403,7 @@ the number of endpoints taking `Depends(get_session)`, the size of
 | `test_thematic_bridge_scout.py` | 9 | The thematic-bridge-scout inside an assembled engine |
 | `test_themespace.py` | 14 | Themespace driven by a real run's bridges |
 | `test_trace_persistence.py` | 7 | Trace event persistence logic |
-| `test_workspace.py` | 7 | Workspace aggregation across its four strings |
+| `test_workspace.py` | 19 | Workspace aggregation across its four strings |
 
 **`tests/architecture/` — properties of the source tree**
 
