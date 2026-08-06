@@ -55,9 +55,10 @@ from server.engine.metadata import MetadataProvider  # noqa: E402
 from server.engine.runner import EngineRunner  # noqa: E402
 from tests.support.expected_range import (  # noqa: E402
     MAX_STEPS,
+    Baseline,
     check_problem,
     default_workers,
-    load_baseline,
+    p50_states,
     problem_label,
     sample_problem,
     worker_pool,
@@ -65,6 +66,85 @@ from tests.support.expected_range import (  # noqa: E402
 
 DEFAULT_DELAYS = (0, 1, 5, 15, 50)
 DEFAULT_RUNS = 150
+
+#: Problems to sweep.  Previously taken from the committed expected-range fixture;
+#: that fixture is gone, so the catalogue comes from the seed data instead and the
+#: baseline is measured here — see :func:`baseline_at_zero`.
+CATALOGUE = os.path.join(REPO, "seed_data", "demo_problems.json")
+
+
+def catalogue_problems(only: str | None = None) -> list[dict]:
+    """The distinct analogy problems, deduplicated by (initial, modified, target).
+
+    ``demo_problems.json`` lists 40 entries but many are the same problem under a
+    different section heading, and a staleness sweep wants each distinct problem
+    once.  The first entry for a triple supplies its name.
+    """
+    with open(CATALOGUE) as fh:
+        entries = json.load(fh)
+    seen: dict[tuple[str, str, str], dict] = {}
+    for e in entries:
+        key = (e["initial"], e["modified"], e["target"])
+        if key not in seen:
+            seen[key] = {"name": e["name"], "initial": e["initial"],
+                         "modified": e["modified"], "target": e["target"]}
+    problems = list(seen.values())
+    if only:
+        problems = [p for p in problems if p["name"] == only]
+        if not problems:
+            sys.exit(f"no problem named {only!r} in {CATALOGUE}")
+    return problems
+
+
+def baseline_at_zero(problems: list[dict], runs: int, workers: int) -> Baseline:
+    """Measure the baseline here, at delay 0, rather than reading a committed one.
+
+    This used to load ``tests/fixtures/expected_range.json``, a saturated sample of
+    Petacat's own behaviour.  That fixture has been retired: Petacat is now measured
+    against Metacat's published sets, and a self-sampled baseline could only ever
+    detect drift from its own past.
+
+    Metacat's sets are the wrong reference for *this* script, though, and swapping
+    one for the other would have been the obvious mistake.  The question here is not
+    "does Petacat agree with Metacat" but "at what delay does staleness change what
+    this engine reaches" — a within-engine comparison by construction.  Against
+    Metacat every pre-existing divergence would appear at every delay including
+    zero, burying the signal in a constant offset.
+
+    So delay 0 is the baseline, which is what the script already sampled as a
+    control.  The states it reaches, and their p50 subset, are what each delay above
+    zero is compared against.  One consequence worth holding on to: a sample this
+    size is not saturated the way the retired fixture was, so a novel state at a
+    higher delay is weaker evidence than it used to be, while a *missing* p50 state
+    means the same thing it always did.
+    """
+    run_one = functools.partial(run_with_staleness, delay=0)
+    records: list[dict] = []
+    with worker_pool(workers=workers, run_one=run_one) as pool:
+        for problem in problems:
+            observed = sample_problem(problem, runs, pool=pool, max_steps=MAX_STEPS)
+            record = dict(problem)
+            record["counts"] = dict(observed)
+            record["expected_range"] = sorted(observed)
+            record["distinct_states"] = len(observed)
+            singletons = sum(1 for c in observed.values() if c == 1)
+            total = sum(observed.values())
+            record["f1_over_n"] = (singletons / total) if total else 0.0
+            record["absence_check"] = {"states": p50_states(record)}
+            records.append(record)
+            print(
+                f"    {record['name']:<14} {problem_label(record):<24} "
+                f"states={len(observed):>3}  p50={len(record['absence_check']['states'])}"
+                f"  f1/n={record['f1_over_n']:.4f}",
+                flush=True,
+            )
+    return Baseline(
+        path=f"measured at delay 0, {runs} runs/problem",
+        criterion={"source": "delay-0 control sample", "runs": runs,
+                   "max_steps": MAX_STEPS},
+        totals={"problems": len(records), "runs": runs * len(records)},
+        problems=tuple(records),
+    )
 
 
 def run_with_staleness(
@@ -147,16 +227,15 @@ def main() -> None:
     args = ap.parse_args()
 
     delays = [int(d) for d in args.delays.split(",") if d.strip()]
-    baseline = load_baseline()
-    if args.problem:
-        baseline = type(baseline)(
-            path=baseline.path,
-            criterion=baseline.criterion,
-            totals=baseline.totals,
-            problems=tuple(r for r in baseline if r["name"] == args.problem),
-        )
-        if not len(baseline):
-            sys.exit(f"no problem named {args.problem!r} in the baseline")
+    problems = catalogue_problems(args.problem)
+
+    # Delay 0 is measured first and becomes the reference for every delay above it.
+    # It is still swept as a control below, where it must come back empty: a
+    # non-empty result at delay 0 means the sample is not reproducible run to run,
+    # which invalidates the whole sweep rather than saying anything about staleness.
+    print(f"Baseline: {len(problems)} problems x {args.runs} runs at delay 0",
+          flush=True)
+    baseline = baseline_at_zero(problems, args.runs, args.workers)
 
     print(
         f"Staleness sweep: {len(baseline)} problems x {args.runs} runs x "
