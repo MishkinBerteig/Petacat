@@ -40,6 +40,27 @@ from server.engine.workspace import Workspace
 from server.engine.workspace_structures import WorkspaceStructure
 
 # Run status string constants (values live in DB run_statuses table)
+@contextmanager
+def _commit_guard(ctx: Any) -> Iterator[None]:
+    """Hold the free-running commit lock, if there is one.
+
+    ``FreeRunningLoop`` publishes its ``RLock`` as ``ctx.commit_lock``
+    (``free_running.py:158``) and takes it around every scheduled update cycle.
+    Anything else that mutates shared engine state from inside a codelet has to
+    take the same lock, and this is the seam for it. Serially the attribute is
+    ``None`` and this costs a branch.
+
+    Re-entrant by design: the lock is an ``RLock``, so a caller that already holds
+    it is not deadlocked by taking it again.
+    """
+    lock = getattr(ctx, "commit_lock", None)
+    if lock is None:
+        yield
+        return
+    with lock:
+        yield
+
+
 STATUS_INITIALIZED = "initialized"
 STATUS_RUNNING = "running"
 STATUS_PAUSED = "paused"
@@ -585,9 +606,28 @@ class EngineRunner:
         ctx = self.ctx
         if ctx is None:
             return
-        ctx.coderack.clear()
-        self._post_initial_codelets()
-        self._update_everything(ctx)
+        # Under the commit lock, because all three of these touch state a
+        # free-running worker is concurrently reading and writing: the coderack is
+        # emptied and refilled, and ``_update_everything`` runs a whole update
+        # cycle.  ``FreeRunningLoop`` takes the same lock around its scheduled
+        # update (``free_running.py:271``) and publishes it as ``ctx.commit_lock``
+        # (``free_running.py:158``); this path is reached from ``record_snag``
+        # inside a codelet, which does not hold it.
+        #
+        # Two workers therefore ran the update cycle at once — one on the schedule,
+        # one restarting after a snag — and the Slipnet's numeric backend is shared
+        # mutable state. On the pure-Python and NumPy backends that is a silent data
+        # race; on MLX it aborts the interpreter, because two threads land in
+        # ``mlx_backend.store``'s ``mx.eval`` together and MLX's streams are
+        # thread-local. The abort is the visible symptom, not the defect.
+        #
+        # The lock is an RLock and is absent when running serially, so taking it
+        # here is safe on a path that already holds it and free when there is no
+        # concurrency at all.
+        with _commit_guard(ctx):
+            ctx.coderack.clear()
+            self._post_initial_codelets()
+            self._update_everything(ctx)
 
     def step_mcat(self) -> StepResult:
         """Execute one codelet.
