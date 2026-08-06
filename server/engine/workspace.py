@@ -446,6 +446,95 @@ class WorkspaceString:
         """
         return []
 
+    # -- and the five upstream added afterwards, in ``ca8f7e0`` -------------
+    #
+    # The first four were found when a snag object reached the *explanation*
+    # machinery.  These five are reached when two snag EVENTS are compared:
+    # ``equivalent-workspace-objects?`` (``trace.ss:917-930``) asks each object
+    # which string it is in, and then, since a string is not a letter, treats it
+    # as a group and asks for category, direction and length before recursing on
+    # the constituents.  Upstream needs two snags in one run to get there, which
+    # 374,500 single runs never produced; episodes reach it easily.
+    #
+    # Petacat is again correct here only incidentally — every reader of
+    # ``group_category`` and ``direction`` uses ``getattr(..., None)``, and
+    # ``descriptions`` is behind a ``hasattr`` — so these are spelled out for the
+    # same reason the four above are.  Adding them changes no existing caller:
+    # the getattr defaults already were ``None``, and the hasattr branch already
+    # contributed nothing.
+
+    @property
+    def which_string(self) -> Any:
+        """A string is in itself, so its own string-type.
+
+        Scheme: ``(which-string () string-type)``.  The same answer
+        ``workspace-objects.ss:150`` computes for a letter or group by asking
+        the string it sits in.
+        """
+        return self.string_type
+
+    @property
+    def group_category(self) -> None:
+        """A string is not a group and has no category.
+
+        Scheme: ``(get-group-category () #f)``.  ``None == None`` makes two
+        strings compare equal on it, which is the wanted answer.
+        """
+        return None
+
+    @property
+    def direction(self) -> None:
+        """A string is not a group and has no direction.
+
+        Scheme: ``(get-direction () #f)``.
+        """
+        return None
+
+    @property
+    def group_length(self) -> int:
+        """Constituent count, the analogue of a group's ``(length objects)``.
+
+        Scheme: ``(get-group-length () (length (tell self 'get-top-level-objects)))``.
+        Deliberately NOT :attr:`length`, which is the number of *letters*: a
+        group's ``group-length`` counts its constituent objects (``groups.ss:80``),
+        and the string's constituents are its top-level objects.
+        """
+        return len(self.constituent_objects)
+
+    @property
+    def descriptions(self) -> list[Any]:
+        """A string carries no descriptions.
+
+        Scheme: ``(get-descriptions () '())``.  Same reason as
+        :meth:`get_all_descriptors`, one level up: the jootser gathers the
+        descriptions of every snag object to choose theme entries
+        (``jootsing.ss:86-88``).
+        """
+        return []
+
+    @property
+    def constituent_objects(self) -> list[Any]:
+        """Top-level objects, ordered by position.
+
+        Scheme: ``(get-constituent-objects () (sort-by-method
+        'get-left-string-pos < (tell self 'get-top-level-objects)))``
+        (``workspace-strings.ss:427-429``).
+
+        **The sort is load-bearing.** ``objects`` holds letters in order and
+        then groups in creation order, so filtering to the unenclosed ones can
+        put a group before a letter that precedes it: on ``abc -> abd ; mrrjjj``
+        seed 1 the target string's constituents come out at positions
+        ``[1, 3, 0]``.  Rule application pairs a swap's denoted objects with its
+        descriptors positionally and reads ``1st``/``2nd`` for a
+        String-Position swap, so the order changes the answer.  This only became
+        reachable when upstream's ``bf06847`` let a rule clause name the whole
+        string again.
+        """
+        return sorted(
+            (o for o in self.objects if getattr(o, "enclosing_group", None) is None),
+            key=lambda o: o.left_string_pos,
+        )
+
     def get_bond_category_relevance(self, bond_category: Any) -> float:
         """How relevant is a bond category to this string?
 

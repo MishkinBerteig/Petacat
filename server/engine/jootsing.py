@@ -881,9 +881,32 @@ def equivalent_workspace_objects(o1: Any, o2: Any) -> bool:
         return False
 
     if not (l1 or g1):
-        # A WorkspaceString.  The Scheme's does not implement ``which-string`` and
-        # would trip its own bad-message handler here; compare what it intended.
-        return o1.string_type == o2.string_type and len(o1.text) == len(o2.text)
+        # A WorkspaceString.  This used to compare only string-type and length,
+        # noting that the Scheme could not get here at all: it had no
+        # ``which-string`` for a string and tripped its own bad-message handler.
+        # Upstream ``ca8f7e0`` gave a string all five answers, so the comparison
+        # is now defined, and it is stricter than what stood here.
+        #
+        # The Scheme runs the full predicate (``trace.ss:919-930``): string-type,
+        # then left/right string position — 0 and length-1, so text length — and
+        # then, since a string is not a letter, the GROUP branch. There
+        # ``group-category`` and ``direction`` are #f on both sides and compare
+        # equal, ``group-length`` is the constituent count, and the constituents
+        # are compared pairwise.
+        #
+        # So two strings with the same text but different grouping are equivalent
+        # under the old test and distinct under this one, which is the point: a
+        # snag against ``mrrjjj`` read as three groups is not the same snag as one
+        # against ``mrrjjj`` read as six letters.
+        return (
+            o1.string_type == o2.string_type
+            and o1.length == o2.length
+            and o1.group_length == o2.group_length
+            and all(
+                equivalent_workspace_objects(a, b)
+                for a, b in zip(o1.constituent_objects, o2.constituent_objects)
+            )
+        )
 
     if getattr(o1.string, "string_type", None) != getattr(o2.string, "string_type", None):
         return False

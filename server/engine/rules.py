@@ -825,10 +825,15 @@ def _get_constituent_objects(obj: Any) -> list[Any]:
     from server.engine.groups import Group
 
     if _is_workspace_string(obj):
-        return [
-            o for o in getattr(obj, "objects", [])
-            if getattr(o, "enclosing_group", None) is None
-        ]
+        # Ordered by position, which the Scheme does with an explicit
+        # ``sort-by-method 'get-left-string-pos <`` (``workspace-strings.ss:427``)
+        # and this did not.  ``objects`` holds letters in order and then groups in
+        # creation order, so the unenclosed ones can come back out of position --
+        # ``abc -> abd ; mrrjjj`` seed 1 gives ``[1, 3, 0]``.  A swap pairs its
+        # denoted objects with descriptors positionally and reads the 1st and 2nd
+        # for a String-Position swap, so the order changes the answer.  Delegated
+        # to the string so there is one definition of it.
+        return list(obj.constituent_objects)
     if isinstance(obj, Group):
         return list(obj.objects)
     return []
