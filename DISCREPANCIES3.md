@@ -29,6 +29,63 @@ the implementation surfaced that the investigation had not:
   fixture being stale, not the engine regressing — see
   [The expected-range fixture](#the-expected-range-fixture-needs-adjudication).
 
+**Amendment, 2026-08-05 (later).** RC-5's diagnostic has been run and RC-5 is
+**settled**: the divergence is not in Petacat. The Metacat build that produced the
+oracle carries a regression, introduced by its own commit `130314d`, that stops a
+rule clause naming the *whole string* from denoting anything. Petacat reproduces
+Marshall's behaviour; the oracle records the regression. The evidence and the
+measurement are in [RC-5](#rc-5--a-reference-side-regression-in-constituent-objects-of),
+and **the decision it forces is open** — see
+[What RC-5 leaves to decide](#what-rc-5-leaves-to-decide).
+
+**Amendment, 2026-08-06. This document is now a record of how the divergence was
+found, not of where Petacat currently stands.** Four things happened, and each
+invalidates part of what is below. Current standing is in
+[Where things actually stand](#where-things-actually-stand) at the end.
+
+1. **RC-5's decision was taken: repair the reference.** Petacat was not changed.
+   `constituent-objects-of` now tests `letter?` rather than `group?`
+   (Metacat `bf06847`), which restores the string path Marshall documents.
+2. **The oracle was re-sampled on the repaired reference** — 374,500 runs, all 19
+   problems. **Every TVD in this document is measured against the superseded
+   oracle.** Five problems moved materially: `eqe-baaab` 0.335, `fig5.4-top`
+   0.236, `run6` 0.124, `misc3` 0.053, `copy5` 0.020, with the other fourteen
+   inside 0.006. Those five are precisely the ones this document analyses in most
+   depth, so their numbers are not merely stale — they are measured against a
+   reference that has since been corrected.
+3. **TVD is no longer the comparison.** It was replaced by two set comparisons
+   that flag rather than fail, in both a single-run and an episodic mode. See
+   [The comparison changed](#the-comparison-changed).
+4. **The expected-range fixture is gone**, along with the two tests that read it,
+   which closes the adjudication this document asked for. See
+   [The expected-range fixture](#the-expected-range-fixture-needs-adjudication).
+
+### What earlier amendments got wrong
+
+Kept rather than quietly edited, because the reasoning that produced them is the
+subject of this document.
+
+- **The RC-5 heading was wrong.** It read "a swap abstracted one level too high",
+  which named the abstraction step as the defect. Both programs abstract the swap
+  identically; the reference could not *apply* the resulting clause. The heading
+  is corrected in place and the original noted there.
+- **The three candidate explanations listed in the `eqe → qeq ; abbba` plan were
+  all wrong.** The diagnostic was still worth running: it eliminated them and
+  pointed one step further on.
+- **"Found by enumeration in one pass" overstated the technique.** Replacing
+  `report-error-and-halt` with a recorder that returns `#f` does let a run
+  continue, but `#f` corrupts the computation, so the run usually dies of a
+  downstream type error before the next genuine bad message. It took three sweeps
+  to find nine missing methods, not one.
+- **The single-run oracle was described as saturated throughout.** Three problems
+  never reached the 1e-4 target: `fig5.4-top` (0.00037) and `eqe-baaab` (0.00025)
+  stopped at the run ceiling, `misc3` (0.00021) was stopped by hand. The practical
+  cost is under 0.04 spurious flags per 100 runs, but the claim was too strong.
+- **Predicting that the 2026-08-06 engine fixes would move the measurement was
+  wrong.** Re-measuring on identical seeds gave byte-identical results. The fixes
+  are real divergences from the repaired reference but too rare to shift a
+  100-sample distribution.
+
 ## Provenance of the two samples
 
 | | Metacat | Petacat |
@@ -171,9 +228,10 @@ the Scheme with a code site on both sides.
 
 Four of the five (RC-1 … RC-4) were then **verified by intervention**: applied to
 a live engine as monkeypatches and every problem re-sampled against the oracle.
-The per-problem effect is recorded in that problem's own block below. **RC-5 has
-been located and measured but not fixed** — its evidence is a rule-population
-count, not a re-sample, and it is the open item of the five.
+The per-problem effect is recorded in that problem's own block below. RC-5 has
+since been settled too, and it is not a Petacat defect: it is a divergence
+between the reference build the oracle was sampled from and the reference's own
+source. See its block below.
 
 | | Defect | Petacat site | Reference |
 |---|---|---|---|
@@ -181,7 +239,7 @@ count, not a re-sample, and it is the open item of the five.
 | **RC-2** | A rule may name its object by *any* description type | `rules.py:2195` | `workspace-objects.ss:260-268` |
 | **RC-3** | A rule's object-description is an argmax, not a stochastic pick | `rules.py:2195,2182-2190`, `rules.py:3475` | `workspace-objects.ss:270-275`, `rules.ss:455-458` |
 | **RC-4** | A singleton group never gets an image, and `apply_rule` skips it in silence | `images.py:997`, `rules.py:2463` | `groups.ss:84`, `workspace-strings.ss:411-417` |
-| **RC-5** | A swap is abstracted to its enclosing object where the reference names the objects | `rules.py:651` | `rules.ss:948-990` |
+| **RC-5** | *(reference-side)* a rule clause naming the whole string denotes nothing | — | `utilities.ss:110-114`, `rules.ss:1432`, `rules.ss:1540` |
 
 ### RC-1 — `distinguishing?` is inverted
 
@@ -333,7 +391,11 @@ Not one of the applied transforms in any traced run of this problem is
 `currently_works` passed **2 of 2,736 times** for three-clause rules here; the
 reference builds such a rule in about half its runs.
 
-### RC-5 — a swap abstracted one level too high
+### RC-5 — the rule shape only Petacat reaches
+
+*(This heading read "a swap abstracted one level too high" until the diagnostic
+was run. The measurement below is unchanged; the cause it was attributed to was
+wrong, and is corrected in the sub-block that follows.)*
 
 The reference's rules for `eqe → qeq` name the swapped objects — "Swap
 letter-categories of leftmost letter, middle letter, and rightmost letter" —
@@ -357,8 +419,155 @@ Measured on `eqe → qeq ; abbba` (120 runs each, RC-1…RC-4 applied to Petacat
 The quality formulas agree exactly wherever both programs produce the same rule
 shape, so this is not a formula divergence: it is that Petacat *reaches* a rule
 shape the reference does not, and that shape outranks every other rule in the
-Workspace, so the answer-finder takes it. This is the one root cause of the five
-that is **not yet closed** — see the plan in the `eqe → qeq ; abbba` block.
+Workspace, so the answer-finder takes it.
+
+**Where the two programs part company is not the marking.**
+
+#### RC-5 — a reference-side regression in `constituent-objects-of`
+
+Both programs mark the swap. Instrumenting
+`mark_as_subobjects_swap_if_possible` (`rules.py:651`) over 20 runs of
+`eqe → qeq ; abbba` records the marking condition being met 107 times and failing
+72 — and where it is met, the enclosing object is the *WorkspaceString* `eqe`, with
+three constituents against the swap's three reference objects:
+
+```
+(enclosing kind, #constituents, #reference objects, marked) -> count
+('WorkspaceString', 3, 3, True)  -> 107
+('WorkspaceString', 3, 2, False) ->  72
+```
+
+That is exactly what `mark-as-subobjects-swap-if-possible` (`rules.ss:987-991`)
+computes in the Scheme, whose `get-enclosing-object` (`rules.ss:674-679`) answers
+the string when an object has no enclosing group and whose string answers
+`get-constituent-objects` with its top-level objects
+(`workspace-strings.ss:411-413`). `eqe` admits no bonds and so has no groups, so
+the enclosing object is the string in both programs and the three letters are its
+constituents in both. **The reference marks the swap too.**
+
+What the reference then cannot do is *apply* it.
+`change-descriptions->rule-clause-template` (`rules.ss:793-809`) turns a marked
+swap into a clause with one object-description, and
+`reference-object->object-description` (`rules.ss:878-886`) renders a string as
+`(string StrPosCtgy whole)`. `get-extrinsic-transforms` (`rules.ss:1425-1436`)
+sees a single object-description and asks for the reference object's
+constituents — through `constituent-objects-of` (`utilities.ss:110-114`):
+
+```scheme
+(define constituent-objects-of
+  (lambda (object)
+    (if (group? object)
+      (tell object 'get-constituent-objects)
+      '())))
+```
+
+A workspace-string is not a `group?`. The clause denotes nothing, `(< (length
+denoted-objects) 2)` yields no transforms, the string generates unchanged,
+`currently-works?` (`rules.ss:223-235`) fails, and the rule is never built. The
+oracle's zero in the table above is that fizzle, not an abstraction the reference
+declines to make.
+
+`constituent-objects-of` is **not Marshall's**. It was added in the Metacat
+repository's commit `130314d` to stop a *letter* reference object reaching
+`report-error-and-halt`, replacing `(tell-all reference-objects
+'get-constituent-objects)` at both `rules.ss:1432` and `rules.ss:1540`. Excluding
+letters was right; narrowing to groups was wider than the bug, and it caught
+strings. Marshall's `workspace-strings.ss:385-388` says what it cost, in his own
+words and directly above the method it disables:
+
+```scheme
+;; The following methods allow workspace-strings to behave as spanning
+;; groups, so that a workspace-string can be used as the reference-object
+;; of an intrinsic change-description or rule-clause-template:
+```
+
+His comment at `workspace-strings.ss:455-460` names a rule of exactly that shape
+— `abc → aaa` giving `CHANGE (string <StrPos> <whole>) (subobjs <LetCat> <a>)` —
+and the second patched site, `rules.ss:1540`, is the one that applies it. Both
+oracle commits (`424feb0`, `d9dddee`) postdate `130314d`, so the whole oracle
+carries the regression.
+
+**Measured by intervention, the other way round.** Narrowing Petacat's
+`_get_constituent_objects` to the reference build's semantics — `[]` for a
+WorkspaceString — at exactly those two sites, and re-sampling all nineteen
+problems, 500 seeds, `numpy`, 20,000-codelet cap:
+
+| problem | TVD, shipped | TVD, emulating the reference build | |
+|---|---:|---:|---|
+| `eqe-baaab` | 0.300 | **0.072** | extrinsic site |
+| `fig5.4-top` | 0.230 | **0.044** | extrinsic site |
+| `run6` | 0.096 | **0.058** | extrinsic site |
+| `misc3` | 0.269 | **0.234** | intrinsic site |
+| `copy5` | 0.195 | **0.182** | intrinsic site |
+| the other fourteen | — | unchanged to ±0.001 | |
+
+Median 0.073 → 0.059. Nothing gets worse. On `eqe-baaab` the rank inversion
+reverses to the oracle's own ordering — `qeeeq` 27.8% → 46.0% against the
+reference's 49.4%, `baaab` 51.8% → 25.8% against 24.9% — and on `fig5.4-top` the
+`ixxi` over-production the RC-4 block left behind disappears. Splitting the two
+call sites apart (500 seeds each) separates the two effects cleanly: patching
+only `_get_extrinsic_transforms` gives `eqe-baaab` 0.072, `fig5.4-top` 0.042 and
+`run6` 0.058 with `copy5` and `misc3` untouched; patching only
+`_get_intrinsic_transforms` gives `copy5` 0.182 and `misc3` 0.234 with the other
+three untouched.
+
+**What was run, and what was not.** The Petacat side is measured — the marking
+instrumentation, the nineteen-problem sweep, and the two-site split. The
+reference side is *read*: the Scheme above is quoted from the working tree at
+`5cb8afc`, and the claim that its rule fizzles rather than builds follows from
+those five procedures rather than from a Chez run, because no Chez toolchain is
+installed here (`Metacat/docker/` builds one). Confirming it directly means
+building that image and running `eqe → qeq ; abbba` headless with and without the
+one-line reference change; the prediction is 49/25 before and roughly 28/52
+after, matching Petacat's two columns.
+
+Reproducing the oracle from Petacat by adopting the reference build's semantics
+is *not* an argument that those semantics are right. It is the same one-word
+difference reproduced from the other side.
+
+#### What RC-5 leaves to decide
+
+Petacat is not wrong here and the oracle is not neutral. Two ways forward, and
+the choice is not one to make while editing a file:
+
+1. **Repair the reference and re-measure.** Change `constituent-objects-of` to
+   exclude letters rather than admit only groups — `(if (letter? object) '()
+   (tell object 'get-constituent-objects))` — which fixes the crash `130314d`
+   was written for and restores the string path Marshall documents. The oracle
+   then has to be re-sampled; five problems' distributions move, and every TVD in
+   this document that involves them is provisional until it is. Petacat needs no
+   change.
+2. **Track the oracle.** Narrow Petacat to the reference build's semantics at the
+   two sites, buying the five improvements above at the cost of shipping a
+   divergence from Marshall's source that this document would then have to record
+   as deliberate.
+
+The measurement cannot choose between them; only a decision about what the oracle
+is *for* can. Nothing has been changed in either program pending that decision.
+
+**Decided, 2026-08-06: option 1.** The reference was repaired and the whole
+oracle re-sampled. Petacat was not changed, which is the point — it already
+implemented Marshall's semantics, and the divergence was in the instrument.
+
+What the repair cost and confirmed:
+
+- The reference was verified from its own side before anything was rebuilt.
+  Running `eqe → qeq ; abbba` headless, 300 seeds: `constituent-objects-of` on
+  the initial string answers **0 objects as built and 3 repaired**, and built top
+  rules carrying a single-object extrinsic clause go **0 → 202**. As built it
+  reproduces its own oracle (`qeeeq` 47.7% against 49.4%, `baaab` 25.3% against
+  24.9%); repaired it lands on Petacat's distribution (30.3% / 54.3% against
+  27.8% / 51.8%). The loop closes from both sides.
+- The repair was regression-checked against the crash `130314d` was written for:
+  950 runs over all 19 problems plus `aabc → aabd; ijkk` seed 35 specifically, no
+  bad messages, every run completed.
+- **Five further latent bugs surfaced**, all the same family: a workspace-string
+  used as a snag object being sent messages only letters and groups answer. They
+  need two snags in one run, so 374,500 single runs never hit them; a
+  session-based sample reaches them easily and they killed shards on `copy1`,
+  `copy2` and `copy4`. Fixed in the reference (`ca8f7e0`), and the corresponding
+  divergences in Petacat are recorded in
+  [Where things actually stand](#where-things-actually-stand).
 
 ### The fix set, and what it is worth
 
@@ -431,8 +640,11 @@ letter-category, a same-group *may* — because testing against a node name that
 does not exist in the Slipnet fails silently in the permissive direction, which is
 how the `plato-samegrp` error survived into the measurement.
 
-**RC-5** is not closed and should not be attempted until its diagnostic (in the
-`eqe → qeq ; abbba` block) has been run.
+**RC-5**'s diagnostic has since been run. It is a reference-side regression, no
+Petacat change is implied by it, and the five "after" figures it touches —
+`eqe-baaab`, `fig5.4-top`, `run6`, `misc3`, `copy5` — are measured against an
+oracle that carries it. See [RC-5](#rc-5--a-reference-side-regression-in-constituent-objects-of)
+and [What RC-5 leaves to decide](#what-rc-5-leaves-to-decide).
 
 ### The expected-range fixture needs adjudication
 
@@ -465,6 +677,24 @@ expected next step — but which states belong in a baseline is not a decision t
 take while regenerating a file. The argument for admitting them is that they are
 states the reference itself reaches; that argument is for the author to accept or
 refuse.
+
+**Resolved, 2026-08-06: the fixture was deleted rather than rebuilt**, and with
+it `test_expected_range.py` and `test_splittable_rng_range.py`, which is the same
+check under the splittable RNG.
+
+Rebuilding would have re-made the underlying mistake. That fixture was 410,000
+runs *of Petacat*, so it could detect drift but never divergence: an engine that
+disagreed with MetaCat from the outset agreed with itself perfectly. Every
+"novel state" listed above is an instance — they are the reference's own answers
+arriving, read as anomalies because the baseline was Petacat's past behaviour.
+The comparison now points at Metacat's published sets instead.
+
+`tests/support/expected_range.py` survives, because `test_population.py` uses its
+`default_run_one`; its baseline half is dead within the suite and still imported
+by `scripts/measure_staleness.py`, which will fail against the deleted fixture
+and needs a decision.
+
+The MLX hazard noted above is unchanged and still avoided by running on `numpy`.
 
 ---
 
@@ -634,7 +864,9 @@ same-group. Three clauses each naming all three objects collide: 477
 (0.2%). **TVD 0.56 → 0.20.** The give-up rate lands near the reference's, and the
 four states Petacat could not reach at all — `ixxi`, `qiq`, `qxeeq`, `qeexq` —
 all appear. The residual is now almost entirely `ixxi` over-production, which is
-RC-5.
+RC-5 — and the RC-5 diagnostic confirms it: emulating the reference build's
+`constituent-objects-of` at the extrinsic site takes this problem from 0.230 to
+**0.042** with nothing else changed.
 
 ### `eqe → qeq ; abbbc → ?` — run6, TVD 0.50
 
@@ -807,18 +1039,32 @@ it the highest-quality rule in the Workspace, so the answer-finder takes it, and
 
 The marking condition itself reads identically on both sides — the swapped
 objects must be set-equal to the enclosing object's constituents, where a letter
-with no enclosing group takes the string as its enclosing object. **Why the
-reference's condition does not fire on `eqe` while Petacat's does is not yet
-established**, and no claim is made here about which side of the condition is
-wrong. That is the open question.
+with no enclosing group takes the string as its enclosing object.
+
+**The diagnostic below has been run, and the answer is none of the three
+candidates it listed.** The reference marks the swap exactly as Petacat does; it
+then cannot *apply* the clause, because the build the oracle was sampled from
+answers a workspace-string's constituents with `'()`. The full account, with the
+Scheme, is in
+[RC-5](#rc-5--a-reference-side-regression-in-constituent-objects-of); what it
+leaves open is [a decision, not a measurement](#what-rc-5-leaves-to-decide). The
+plan is kept below as it stood, because step 2 is what was run.
 
 **Plan.**
 
-1. Land RC-1 (see the `eqe → qeq ; abbbc` block). It removes `qabbb`, `bbbaq`
+1. ~~Land RC-1 (see the `eqe → qeq ; abbbc` block). It removes `qabbb`, `bbbaq`
    and the five rare rearrangement states, and is a prerequisite for measuring
-   RC-5 cleanly.
-2. **Settle RC-5 by direct comparison before changing anything.** Instrument
-   both programs at the same point: in the reference, print
+   RC-5 cleanly.~~ Done.
+2. ~~**Settle RC-5 by direct comparison before changing anything.**~~ Done —
+   Petacat side instrumented at `mark_as_subobjects_swap_if_possible`
+   (`rules.py:651`), reference side read rather than run. Of the three candidate
+   explanations listed here, none holds: `_get_constituent_objects` on a
+   *WorkspaceString* **does** reproduce `get-top-level-objects`; the swap's
+   reference-object set is the same three letters on both sides; and the 0.75
+   gate fires at the same point. The divergence is one step further on, in
+   `constituent-objects-of` (`utilities.ss:110-114`) at `rules.ss:1432` and
+   `rules.ss:1540`.
+   *Original text:* Instrument both programs at the same point: in the reference, print
    `subobjects-swap?`, the reference objects and
    `(tell (get-enclosing-object (1st reference-objects)) 'get-constituent-objects)`
    inside `mark-as-subobjects-swap-if-possible` (`rules.ss:987-991`); in Petacat,
@@ -833,12 +1079,16 @@ wrong. That is the open question.
      (e.g. two objects rather than three), so set-equality legitimately fails;
    - the 0.75 `subobjects_abstraction_probability` gate is consuming its random
      draw at a different point in the stream.
-3. Only then decide the fix. If it is the first, RC-5 folds into RC-4's fix and
-   costs nothing extra. Do **not** reach for the succinctness formula: it is
-   verified identical on both sides and is not where the divergence lives.
-4. Regression-guard with a module test asserting the built top-rule population on
-   `eqe → qeq` contains no single-object extrinsic clause, and an oracle check
-   that `qeeeq` outnumbers `baaab` roughly two to one.
+3. Only then decide the fix. Do **not** reach for the succinctness formula: it is
+   verified identical on both sides and is not where the divergence lives. What
+   the diagnostic found puts the fix in the *reference*, not in Petacat, at the
+   cost of re-sampling the oracle — which is the decision recorded under
+   [What RC-5 leaves to decide](#what-rc-5-leaves-to-decide) and not yet taken.
+4. Regression-guard once that decision is taken. Which direction the guard points
+   depends on it: either that a rule clause naming the whole string denotes the
+   string's top-level objects (Marshall's semantics, Petacat's today), or that it
+   denotes nothing (the oracle's). Both are testable in one module test on `eqe`;
+   only one of them is worth writing.
 
 **Measured effect.** With RC-1 through RC-4 (500 seeds): `baaab` 51.8%
 (reference 24.9%), `qeeeq` 27.8% (49.4%), `qbbbq` 6.4% (7.3%), `qaaab` 4.2%
@@ -1141,3 +1391,103 @@ Metacat n=11,454 (no_singletons) · Petacat n=500 · 1 distinct states in Metaca
 | `*NONE*` | 0.0% | 0.4% | +0.4 | 0 | 2 |
 | `bc` | 0.0% | 0.2% | +0.2 | 0 | 1 |
 
+
+---
+
+## The comparison changed
+
+Everything above compares two *distributions* by total-variation distance. That
+is no longer how Petacat is measured, for two reasons the work above exposed.
+
+TVD needs both sides sampled densely, and Petacat is not going to be. It runs
+100 tries per problem and compares against sets Metacat published; it never
+generates oracle data of its own. At n=100 a TVD estimate is dominated by
+small-sample bias that scales with the number of states — measured null bands
+ran from 0.00 to 0.20 across the 19 problems, tracking state count rather than
+behaviour, so a single threshold could not work and a per-problem one would be
+calibrating noise.
+
+And TVD answers the wrong question. Metacat is stochastic and self-watching with
+no ground truth; there is no right answer to `abc → cba ; mrrjjj`. A distance
+invites a pass/fail reading of something that has neither.
+
+**What replaced it.** Two set comparisons, in each of two modes, every one of
+which *flags* rather than fails:
+
+| | |
+|---|---|
+| MISSING | a p50 member of the reference set that Petacat did not produce |
+| NOVEL | something Petacat produced that the reference never did |
+
+  *single* — 100 runs from a fresh Episodic Memory, against the single-run sets.
+  *episodic* — 100 episodes of 8 runs with memory carried forward, against the
+  convergence sets. An episode's convergence answer is its last run that produced
+  an answer; `*NONE*` and `*CAP*` are skipped looking backwards.
+
+The episodic mode is new, and it exists because memory is the one thing that
+survives `init-mcat`. It is what makes a session more than eight independent
+runs: `answers.ss:982` refuses to report an answer already stored, so a session
+is pushed toward novelty. That is also why five reference bugs hid there for
+374,500 single runs.
+
+The two flags are not equally strong, and the reference publishes the numbers to
+weigh them. A missing p50 member has a **0.0000** false-alarm rate at n=100 on
+every problem, so it is decisive. A novel member is only as strong as the
+reference set's saturation: `f1/n ≤ 1e-4` on the single-run sets, but the
+convergence sets are deliberately left unsaturated, at up to 0.0160, because
+novel convergence answers are a signal the research programme wants rather than
+noise to be sampled away. About eight novel convergence answers per 100-episode
+cycle across the 19 problems are expected from a *correct* port.
+
+Protocol: `../Metacat/ORACLE-USAGE.md`. Harness: `scripts/compare_to_metacat.py`.
+
+## Where things actually stand
+
+Measured 2026-08-06, numpy backend, 20,000-codelet cap, seeds from 900,000, all
+19 problems. Full results in `measurements/vs-metacat.json`.
+
+**No p50 member is missing anywhere — 0 across all 19 problems in both modes.**
+That is the decisive check, and it is completely clean. Every dominant behaviour
+the reference exhibits, Petacat reaches.
+
+**Two novel answers are reproducible**, appearing in both modes:
+
+| problem | answer | single runs | episodes | reference |
+|---|---|---:|---:|---|
+| `eqe-baaab` | `abbbb` | 1 of 100 | **7 of 100** | absent from 51,000 runs |
+| `run6` | `cdddb` | 1 of 100 | **5 of 100** | absent from 47,500 runs |
+
+Everything else is a singleton, consistent with the convergence sets' expected
+rate. In single runs, 5 novel members against an expected ~0.2 is above noise,
+but three are singletons and `run1`'s `*CAP*` is most likely this cap against the
+reference's 100,000 rather than a divergence — worth re-running at 100,000 to
+remove the confound before reading anything into it.
+
+`cdddb` is not new to this document: the pre-repair table for `run6` lists it as
+a Petacat-only state at 0.6%. It survived RC-1 through RC-4 and the oracle
+re-sample. Those two answers are the only findings the current data supports
+pursuing.
+
+### Engine changes since the oracle re-run
+
+Three, all tracking Metacat's `ca8f7e0` and `bf06847`, committed as `e76cae8`:
+
+1. `WorkspaceString` gains the five methods a snag object needs. Four were
+   already correct *incidentally* — `getattr(..., None)` and a `hasattr` — which
+   is one refactor from the same defect the reference had.
+2. `equivalent_workspace_objects` compared two strings on type and text length
+   alone. The repaired reference also compares constituent count and recurses, so
+   `mrrjjj` read as three groups was equivalent to `mrrjjj` read as six letters.
+3. A string's constituents were returned unsorted where
+   `workspace-strings.ss:427` sorts by position — `[1, 3, 0]` on
+   `abc → abd ; mrrjjj` seed 1. Swaps pair denoted objects with descriptors
+   positionally, so order changes the answer. Latent until `bf06847` made the
+   string path reachable.
+
+None of the three moved the measurement: re-running on identical seeds gave
+byte-identical results. They are correctness fixes, not distribution fixes.
+
+**Suite:** 1,398 passed, 12 skipped, 0 failed across unit, seed_unit, module and
+architecture on `numpy`. Not covered: e2e and integration need a Postgres
+instance; the GPU half of the matrix needs MLX, avoided for the interpreter
+abort recorded above.
