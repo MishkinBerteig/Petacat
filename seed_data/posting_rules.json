@@ -17,7 +17,7 @@
       "posting_formula": "average_intra_string_unhappiness / 100",
       "count_formula": "num_unrelated_objects_based",
       "count_values": {"few": 2, "some": 4, "many": 6},
-      "condition": "slipnode_fully_active",
+      "condition": "always",
       "triggering_slipnodes": ["plato-predecessor", "plato-successor", "plato-sameness"]
     },
     {
@@ -28,7 +28,7 @@
       "posting_formula": "average_intra_string_unhappiness / 100",
       "count_formula": "num_unrelated_objects_based",
       "count_values": {"few": 2, "some": 4, "many": 6},
-      "condition": "slipnode_fully_active",
+      "condition": "always",
       "triggering_slipnodes": ["plato-left", "plato-right"]
     },
     {
@@ -39,7 +39,7 @@
       "posting_formula": "average_intra_string_unhappiness / 100",
       "count_formula": "num_ungrouped_objects_based",
       "count_values": {"none": 0, "few": 1, "some": 2, "many": 3},
-      "condition": "slipnode_fully_active_and_bonds_exist",
+      "condition": "always",
       "triggering_slipnodes": ["plato-predgrp", "plato-succgrp", "plato-samegrp"]
     },
     {
@@ -50,7 +50,7 @@
       "posting_formula": "average_intra_string_unhappiness / 100",
       "count_formula": "num_ungrouped_objects_based",
       "count_values": {"none": 0, "few": 1, "some": 2, "many": 3},
-      "condition": "slipnode_fully_active_and_bonds_exist",
+      "condition": "always",
       "triggering_slipnodes": ["plato-left", "plato-right"]
     },
     {
@@ -60,7 +60,7 @@
       "posting_formula": "average_intra_string_unhappiness / 100",
       "count_formula": "num_ungrouped_objects_based",
       "count_values": {"none": 0, "few": 1, "some": 2, "many": 3},
-      "condition": "bonds_exist"
+      "condition": "always"
     },
     {
       "codelet_type": "bottom-up-bridge-scout",
@@ -97,7 +97,7 @@
       "posting_formula": "average_unhappiness / 100",
       "count_formula": "fixed",
       "count_values": {"fixed": 2},
-      "condition": "slipnode_fully_active",
+      "condition": "always",
       "triggering_slipnodes": ["plato-string-position-category", "plato-alphabetic-position-category", "plato-length"]
     },
     {
@@ -116,7 +116,7 @@
       "posting_formula": "(100 - temperature) / 100 if supported_top_rule_exists else 0.0",
       "count_formula": "fixed",
       "count_values": {"fixed": 1},
-      "condition": "not_justify_mode_and_supported_top_rule_exists"
+      "condition": "not justify_mode"
     },
     {
       "codelet_type": "answer-justifier",
@@ -126,7 +126,7 @@
       "posting_formula": "(100 - temperature) / 100 if supported_rule_exists else 0.0",
       "count_formula": "fixed",
       "count_values": {"fixed": 1},
-      "condition": "justify_mode_and_supported_rule_exists"
+      "condition": "justify_mode"
     },
     {
       "codelet_type": "thematic-bridge-scout",
@@ -135,7 +135,7 @@
       "urgency_formula": "round(max_positive_theme_activation)",
       "posting_formula": "max_positive_theme_activation / 100",
       "count_formula": "round(10 * max_inter_string_unhappiness / 100)",
-      "condition": "self_watching_enabled_and_active_themes_exist"
+      "condition": "self_watching_enabled"
     },
     {
       "codelet_type": "progress-watcher",

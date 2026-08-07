@@ -266,3 +266,34 @@ def test_each_posted_urgency_is_one_of_the_named_urgency_levels():
     assert by_type["progress-watcher"] == meta.get_urgency("medium")
     assert by_type["jootser"] == meta.get_urgency("medium")
     assert by_type["breaker"] == meta.get_urgency("extremely_low")
+
+
+def test_every_condition_is_a_predicate_the_engine_can_evaluate():
+    """Conditions are boolean expressions over the posting vocabulary, or `always`.
+
+    They used to be labels: eight distinct strings, none of them read anywhere, whose
+    meaning lived in three separate pieces of Python. Now they are evaluated, so each
+    one has to name quantities the engine supplies.
+    """
+    import ast
+    import os
+
+    from server.engine.metadata import MetadataProvider
+    from server.engine.posting import POSTING_FORMULA_NAMES
+
+    seed_dir = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
+    meta = MetadataProvider.from_seed_data(seed_dir)
+
+    for rule in meta.posting_rules:
+        if rule.condition in ("", "always"):
+            continue
+        used = {
+            node.id
+            for node in ast.walk(ast.parse(rule.condition, mode="eval"))
+            if isinstance(node, ast.Name)
+        }
+        unknown = used - POSTING_FORMULA_NAMES
+        assert not unknown, (
+            f"{rule.codelet_type}'s condition {rule.condition!r} names {sorted(unknown)}, "
+            f"which server/engine/posting.py does not supply"
+        )
