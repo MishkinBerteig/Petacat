@@ -19,6 +19,9 @@ Phase 0's is carried forward into this phase rather than closed there — see *C
 forward: parallelism beyond sharding* below, which is unimplemented work this phase
 owns.
 
+**Starts with Step 0 (§0).** All configuration moves into the database and is actually
+read from it. Everything else in this phase is expressed as data, so this comes first.
+
 **Why capitals.** They are the smallest possible expansion of the perceptual space
 that is still a genuine one. Unlike arbitrary bytes (Phase 3), capitals arrive with
 an *intended* relational structure we can check the system against: `A` is a
@@ -27,6 +30,130 @@ sequence `A…Z` is isomorphic to `a…z`. So we can ask a sharp, falsifiable qu
 did the system discover that structure, or merely memorise instances? Arbitrary
 bytes cannot be graded that way. This phase is the controlled experiment that Phase 3
 generalises.
+
+---
+
+## 0. Step 0 — all configuration lives in the database
+
+**The requirement.** Fix the system to load all configuration from the database (not the
+JSON) on startup: all rules, codelets, slipnet, thresholds, parameters, **everything**.
+This is a **bi-directional** change. It may require new database columns or tables to
+hold values that are currently hardcoded — with the JSON files doing the initial load —
+and it may require currently-hardcoded code paths to read from the database instead.
+**Every small change that carries one value from JSON seed → database → runtime, and
+back out as an editable database field, must be implemented with guard tests.**
+
+### 0.1 What is actually broken
+
+The load *path* already exists and is not the problem. `server/main.py` seeds twelve bulk
+JSON files into the metadata tables under a content fingerprint, and
+`metadata_service.load_metadata_from_db` builds the `MetadataProvider` the engine runs
+on. The app reads the database. (`MetadataProvider.from_seed_data` is the test and
+script path.)
+
+The problem is the other end: **the engine ignores much of what it loads, and other
+values were never given a database representation at all.** Measured — a copy of
+`seed_data` with every `posting_formula` set to `0.0`, every `count_formula` to `0`,
+every `count_values` to zero, every urgency to `0`, every `condition` to `"never"`, and
+`initial_codelets` emptied:
+
+| | seed 42 | seed 7 | seed 900001 |
+|---|---|---|---|
+| shipped | `mrrkkk`, 777 codelets | `mrrkkk`, 871 | `mrrkkk`, 598 |
+| everything zeroed | `mrrkkk`, 777 codelets | `mrrkkk`, 871 | `mrrkkk`, 598 |
+
+Bit-identical, on `abc → abd; mrrjjj → ?`. A configuration reading "post nothing, ever,
+at zero urgency" runs exactly like the shipped one.
+
+**And the failure is silent in the worst possible direction.** The same edit changes the
+config hash (`f22b4640…` → `2739bb68…`, via `hashing.py:80`) and is displayed back
+through the admin API. So a change is accepted, stored, hashed, and shown — and the
+engine does not read it. Phase 0 named this exact hazard when it made 25 parameters
+per-Run: *"a parameter accepted, stored and displayed but never applied is the worst
+outcome, because everything looks right."*
+
+### 0.2 The three kinds of work
+
+**(a) Loaded but ignored — needs an evaluator.** Of the eight fields on a posting rule,
+five are dead everywhere: `posting_formula`, `count_formula`, `count_values`,
+`urgency_formula`, `condition`. Their only occurrences in `server/` are the
+`PostingRuleSpec` declaration (`metadata.py:86-90`) and the two loaders that populate it
+(`metadata.py:231-234`, `metadata_service.py:118-122`). Nothing compiles or evaluates
+them. The remaining three — `codelet_type`, `direction`, `triggering_slipnodes` — are
+live *only* on the five `top_down` rules (`runner.py:1286-1291`; verified by mutation,
+which changes the answer), and dead on all eleven `bottom_up` rules, because
+`_post_bottom_up_codelets` never reads `meta.posting_rules` at all. `initial_codelets`
+in the same file is dead too.
+
+**(b) Hardcoded with no database representation.** `bottom_up_types`, a Python list
+literal of eleven strings (`runner.py:1020-1032`); the three switches keyed on codelet
+name — `_compute_posting_probability` (`runner.py:1087`), `_compute_num_to_post`
+(`runner.py:1163`), `_compute_bottom_up_urgency` (`runner.py:1231`); the opening
+population in `_post_initial_codelets` (`runner.py:583-587`); `MIN_SHARD_CAPACITY = 25`
+(`coderack_shards.py:185`), which the *Carried forward* section below needs to sweep.
+
+**(c) Two sources of truth for one concept.** `codelet_patterns.py:23` hardcodes five
+clamp patterns in Python, consumed by the control API (`api/controls.py:211,245,265`)
+and `run_service.py:1736,1755`. The engine's own clamp sites read a *different* set of
+nine from the database (`meta.codelet_patterns` — `jootsing.py:253,429`,
+`justify.py:403`). Same concept, two definitions, different contents. Cases like this
+are the reason the change is bi-directional rather than a one-way migration: the
+duplicate has to be resolved, not merely re-homed.
+
+### 0.3 The pattern to follow — it already exists here
+
+The missing shape is in this codebase, at `slipnet.py:113-143`: a namespace of
+names → callables (`DESCRIPTOR_PREDICATE_NAMESPACE`), a compile-at-load step
+(`compile_descriptor_predicate`) that **raises at startup** on a bad expression rather
+than failing silently mid-run, and a call site that invokes it (`slipnet.py:801-804`).
+`SlipnetNodeDef.descriptor_predicate` got all three. `PostingRuleSpec.posting_formula`
+got the column, the loader, the admin API and a place in the config hash, and none of
+the three.
+
+The formulas are already written as expressions against a small vocabulary —
+`average_intra_string_unhappiness`, `min_mapping_strength`, `possible_rule_types`,
+`temperature`, `thematic_pressure`, `within_snag_or_clamp_period`,
+`num_unrelated_objects_based`, `conceptual_depth`, `activation` — so the work is to give
+those names values, compile the expressions at load, and change the two `_compute_*`
+signatures to take **the rule** rather than the rule's name. That is where the gap is
+visible in a single line: `runner.py:1293` holds a `PostingRuleSpec` whose
+`posting_formula` states the answer, and passes `rule.codelet_type` into a switch that
+re-derives it by matching the name against string literals.
+
+### 0.4 Guard tests — what one has to assert
+
+A guard test that only checks the value round-trips JSON → DB → `MetadataProvider` is
+not a guard test, because everything above already passes that. Each one must assert
+**both** directions:
+
+1. The shipped database value reproduces today's behaviour exactly.
+2. **A changed database value changes the run.** This is the assertion that would have
+   caught the current state, and the only one that distinguishes "wired" from "stored".
+
+Note the trap: the config hash moves on any edit, so *hash difference is not evidence
+the value is live*. The assertion has to be on the run — status, answer, codelet count —
+as in the table in §0.1. Phase 0's per-Run parameter table is the model: each row is one
+override, with the codelets and answer it produced.
+
+### 0.5 The bar
+
+**No cognitive change.** This is Phase 0's constraint applied inside Phase 1: the
+seventeen posting rules must reproduce the current switches exactly before a single new
+rule is added, and `MIN_SHARD_CAPACITY` must still be 25 when it becomes a row. Verified
+against Metacat's oracle per §5 — a data-driven engine that reaches a different set of
+stopping states is a different engine, not a refactor.
+
+### 0.6 Why this phase owns it
+
+Because the rest of the phase is unbuildable on top of it. §2's noticing codelet is a new
+codelet type; today a new type added as data is accepted, hashed, displayed in the admin
+panel, and **never posted**, because posting is a Python switch that has never heard of
+it. §5's provenance marker and the new node and link rows are the same bi-directional
+change in the Slipnet tables. And the *Carried forward* sweep cannot vary
+`MIN_SHARD_CAPACITY` while it is a module constant.
+
+The phase's premise is "growth is data, not code" (§5). Step 0 is the work of making
+that true.
 
 ---
 
@@ -86,7 +213,10 @@ today. Noticing is an addition to this behaviour, not a replacement for it.
 
 ## 2. What this phase must produce
 
-Three capabilities, in dependency order:
+Three capabilities, in dependency order — all of them downstream of Step 0, which is the
+substrate they are expressed in rather than a capability of its own. (The `(0)` below
+numbers a cognitive capability; §0 numbers the phase's first work item. They are
+different things.)
 
 - **(0) Noticing.** The system can tell that an object is unrelatable — that it has
   no concept, or a concept with no useful links. Today it cannot.
@@ -242,6 +372,10 @@ today and that a wired node makes possible.
 
 ## 6. Exit criteria
 
+- **Step 0 complete (§0):** every configuration value the engine reads comes from the
+  database, each one covered by a guard test that shows a changed value changes the run.
+  No posting formula, condition, count or urgency is a Python literal, and no concept has
+  two definitions.
 - The system **notices** unrelatable objects — signalling them while still degrading
   gracefully, as it does today.
 - Capitals acquire concepts *and* links, with provenance recorded.
@@ -303,7 +437,8 @@ rethinking before being built on top.
 ### Carried forward: parallelism beyond sharding
 
 **Unimplemented; this phase owns it.** Phase 0 established the bound and the reason for
-it but did not run the measurement that would lift it.
+it but did not run the measurement that would lift it. It also needs Step 0 first:
+`MIN_SHARD_CAPACITY` is a module constant, so the sweep cannot vary it until it is a row.
 
 Free-running splits the Coderack into shards, one per worker, with stealing. The shard
 count is bounded by `max_coderack_size // MIN_SHARD_CAPACITY` — 100 // 25 = 4 today
@@ -368,3 +503,5 @@ data point on a curve every later phase depends on.
 | **Participation history** | The record of which structures a candidate appeared in — the leading internal source of evidence for links. **Does not exist yet**: episodic memory stores answers and snags, not per-object structural participation (§3c) |
 | **Provenance** | Marker distinguishing learned nodes/links from the innate seed ontology — a column neither `slipnet_node_defs` nor `slipnet_link_defs` has today |
 | **Transfer** | Generalising to untaught instances — the criterion separating learning from memorisation |
+| **Stored but not wired** | A configuration value that loads from the database, appears in the admin panel and moves the config hash, while the engine reads a Python literal instead — the condition Step 0 exists to remove |
+| **Guard test** | A test asserting *both* that the shipped value reproduces today's behaviour and that a changed value changes the run; the second half is what distinguishes wired from stored |
