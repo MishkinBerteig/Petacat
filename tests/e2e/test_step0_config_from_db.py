@@ -799,3 +799,76 @@ async def test_a_false_condition_costs_no_draw(db_session):
 
     assert runner._rule_condition_holds(rule) is False
     assert runner.ctx.rng.call_count == before, "a refused condition consumed a draw"
+
+
+# ──────────────────────────────────────────────────────────────────
+# initial_codelets
+# ──────────────────────────────────────────────────────────────────
+
+
+async def test_the_opening_population_is_four_per_object_from_the_database(db_session):
+    """Direction 1: the shipped configuration posts what the reference posts.
+
+    ``post-initial-codelets`` (``run.ss:275-283``) is ``2N`` rounds of *two* posts —
+    **4N** codelets, 36 for `abc/abd/xyz`'s nine objects.
+    """
+    from server.engine.runner import EngineRunner
+
+    db_meta = await load_metadata_from_db(db_session)
+    runner = EngineRunner(db_meta)
+    runner.init_mcat("abc", "abd", "xyz", seed=PROBLEM_SEED)
+
+    assert len(runner.ctx.workspace.all_objects) == 9
+    assert runner.ctx.coderack.total_count == 36
+
+
+async def test_the_opening_population_alternates_the_two_types(db_session):
+    """Direction 1, on the ordering, which is not cosmetic.
+
+    The Scheme repeats a *body* containing both posts, so the batch alternates rather
+    than running all of one type and then all of the other.  It matters when the batch
+    reaches the rack's capacity: `post_deferred` then drops `len(batch) - capacity`
+    members **uniformly at random**, and which codelet each drawn index lands on
+    depends on the order they were appended in.
+    """
+    from server.engine.runner import EngineRunner
+
+    db_meta = await load_metadata_from_db(db_session)
+    runner = EngineRunner(db_meta)
+    runner.init_mcat("abc", "abd", "xyz", seed=PROBLEM_SEED)
+
+    # The rack bins by urgency, so read the batch the runner built rather than the
+    # rack's own ordering: the property is what was appended, in what order.
+    batch = runner.build_initial_codelet_batch()
+    assert [c.codelet_type for c in batch[:4]] == [
+        "bottom-up-bond-scout",
+        "bottom-up-bridge-scout",
+        "bottom-up-bond-scout",
+        "bottom-up-bridge-scout",
+    ]
+    assert len(batch) == 36
+
+
+async def test_changing_the_opening_population_changes_the_run(db_session):
+    """Direction 2.
+
+    `_post_initial_codelets` hardcoded both types, the round count and the urgency
+    tier (`PHASE 1 PLAN.md` §0.2(b)), and the `initial_codelets` block in the seed data
+    that states all three was read by nothing.
+    """
+    from sqlalchemy import update as sql_update
+
+    from server.models.metadata import EngineParam
+
+    shipped = run_outcome(await load_metadata_from_db(db_session))
+
+    await db_session.execute(
+        sql_update(EngineParam)
+        .where(EngineParam.name == "initial_codelet_rounds")
+        .values(value="num_workspace_objects")
+    )
+    await db_session.commit()
+
+    changed = run_outcome(await load_metadata_from_db(db_session))
+
+    assert changed != shipped

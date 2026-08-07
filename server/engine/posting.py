@@ -66,6 +66,7 @@ _PRODUCERS: dict[str, Callable[["PostingContext"], Any]] = {
     "self_watching_enabled": lambda c: c.ctx.self_watching_enabled,
     # -- Counts ---------------------------------------------------------------
     "num_possible_rule_types": lambda c: len(c.workspace.get_possible_rule_types()),
+    "num_workspace_objects": lambda c: len(c.workspace.all_objects),
     # -- The triggering slipnode, for a top-down rule's urgency ----------------
     #
     # Only a `top_down` rule has one.  Reading either of these from a bottom-up or
