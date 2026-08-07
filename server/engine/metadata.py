@@ -238,6 +238,13 @@ class MetadataProvider:
             for pr in posting_data.get("posting_rules", [])
         ]
 
+        # Compile every posting formula now, so a bad expression fails here rather
+        # than the first time its rule is consulted.  Same contract as
+        # ``compile_descriptor_predicate``.
+        from server.engine.posting import validate_posting_formulas
+
+        validate_posting_formulas(posting_rules)
+
         codelet_patterns = {
             name: [(entry[0], entry[1]) for entry in entries]
             for name, entries in posting_data.get("codelet_patterns", {}).items()

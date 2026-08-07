@@ -554,3 +554,77 @@ async def test_the_bottom_up_rules_the_engine_posts_are_the_database_rows(db_ses
         "jootser",
         "breaker",
     ]
+
+
+# ──────────────────────────────────────────────────────────────────
+# posting_formula
+# ──────────────────────────────────────────────────────────────────
+
+
+async def test_zeroing_every_posting_formula_changes_the_run(db_session):
+    """Direction 2, and the measurement `PHASE 1 PLAN.md` §0.1 opens with.
+
+    The plan records that a copy of the seed data with every `posting_formula` set to
+    `0.0` produced a **bit-identical** run — same answer, same codelet count, on three
+    seeds — because nothing compiled or evaluated the field.  A configuration reading
+    "post nothing, ever" ran exactly like the shipped one, while the edit moved the
+    config hash and was displayed back through the admin API.
+
+    So this is the assertion that measurement demands: a database in which every rule
+    says never to post must not run like the one that says when to.
+    """
+    shipped = run_outcome(await load_metadata_from_db(db_session))
+
+    await db_session.execute(update(PostingRule).values(posting_formula="0.0"))
+    await db_session.commit()
+
+    changed = run_outcome(await load_metadata_from_db(db_session))
+
+    assert changed != shipped
+
+
+async def test_changing_one_posting_formula_changes_the_run(db_session):
+    """Direction 2, on a single rule rather than all seventeen.
+
+    `breaker` posts at `temperature / 100`, so halving it leaves the rule in place,
+    posting, at a different rate — the smallest edit that is still an edit.
+    """
+    shipped = run_outcome(await load_metadata_from_db(db_session))
+
+    await db_session.execute(
+        update(PostingRule)
+        .where(PostingRule.codelet_type == "breaker")
+        .values(posting_formula="temperature / 200")
+    )
+    await db_session.commit()
+
+    changed = run_outcome(await load_metadata_from_db(db_session))
+
+    assert changed != shipped
+
+
+async def test_an_unparseable_posting_formula_is_refused_at_load(db_session):
+    """A bad formula fails where it can be seen, not mid-run.
+
+    §0.3 names this as the third of the three parts `descriptor_predicate` got and
+    `posting_formula` did not: a compile step that raises at load.  Mid-run the same
+    fault would surface as one codelet type quietly not posting, which reads as the
+    engine exploring differently rather than as a broken configuration.
+    """
+    await db_session.execute(
+        update(PostingRule)
+        .where(PostingRule.codelet_type == "breaker")
+        .values(posting_formula="temperature / ")
+    )
+    await db_session.commit()
+
+    with pytest.raises(ValueError, match="does not compile"):
+        await load_metadata_from_db(db_session)
+
+
+async def test_a_posting_formula_naming_something_unknown_is_refused(db_session):
+    """A formula that names nothing real must not evaluate to "never post"."""
+    from server.engine.posting import PostingContext, evaluate_posting_formula
+
+    with pytest.raises(ValueError, match="unknown name"):
+        evaluate_posting_formula("no_such_quantity / 100", "breaker", PostingContext(None))

@@ -196,3 +196,35 @@ def test_the_bottom_up_posting_rules_are_in_the_order_the_engine_posts_them():
         "jootser",
         "breaker",
     ]
+
+
+def test_every_posting_formula_uses_only_names_the_engine_supplies():
+    """The seed data and the formula vocabulary agree, checked from both ends.
+
+    A formula naming something the engine does not supply would raise the first time
+    its rule was consulted, which for a rarely-reached rule could be a long way into a
+    run.  Checking the shipped formulas against the namespace makes that a property of
+    the repository rather than of a particular run.
+    """
+    import ast
+    import os
+
+    from server.engine.metadata import MetadataProvider
+    from server.engine.posting import POSTING_FORMULA_NAMES
+
+    seed_dir = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
+    meta = MetadataProvider.from_seed_data(seed_dir)
+
+    for rule in meta.posting_rules:
+        if not rule.posting_formula:
+            continue
+        used = {
+            node.id
+            for node in ast.walk(ast.parse(rule.posting_formula, mode="eval"))
+            if isinstance(node, ast.Name)
+        }
+        unknown = used - POSTING_FORMULA_NAMES
+        assert not unknown, (
+            f"{rule.codelet_type}'s posting formula {rule.posting_formula!r} names "
+            f"{sorted(unknown)}, which server/engine/posting.py does not supply"
+        )

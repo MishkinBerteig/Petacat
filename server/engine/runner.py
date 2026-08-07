@@ -23,7 +23,8 @@ from server.engine.access import AccessRecorder
 from server.engine.coderack import Codelet, Coderack
 from server.engine.ids import IdAllocator, use_allocator
 from server.engine.memory import EpisodicMemory
-from server.engine.metadata import MetadataProvider
+from server.engine.metadata import MetadataProvider, PostingRuleSpec
+from server.engine.posting import PostingContext, evaluate_posting_formula
 from server.engine.rng import RNG
 from server.engine.sink import STRUCTURE_BUILT, NullSink, RunSink
 from server.engine.slipnet import Slipnet
@@ -1013,11 +1014,20 @@ class EngineRunner:
         because the list is what the oracle measured; `breaker` sat ninth in the file
         and last in the code, and it is last here.
         """
+        return [rule.codelet_type for rule in self.bottom_up_posting_rules()]
+
+    def bottom_up_posting_rules(self) -> list[PostingRuleSpec]:
+        """The bottom-up rules themselves, in posting order."""
         return [
-            rule.codelet_type
-            for rule in self.meta.posting_rules
-            if rule.direction == "bottom_up"
+            rule for rule in self.meta.posting_rules if rule.direction == "bottom_up"
         ]
+
+    def posting_rule_for(self, codelet_type: str) -> PostingRuleSpec | None:
+        """The rule governing *codelet_type*, or `None` if the data names none."""
+        for rule in self.meta.posting_rules:
+            if rule.codelet_type == codelet_type:
+                return rule
+        return None
 
     def _post_bottom_up_codelets(self, batch: list[Codelet] | None = None) -> None:
         """Collect the cycle's bottom-up codelets into *batch*.
@@ -1038,7 +1048,8 @@ class EngineRunner:
 
         time = ctx.codelet_count
 
-        for codelet_type in self.bottom_up_codelet_types():
+        for rule in self.bottom_up_posting_rules():
+            codelet_type = rule.codelet_type
             # Skip types inappropriate for current mode
             if ctx.justify_mode and codelet_type == "answer-finder":
                 continue
@@ -1049,7 +1060,7 @@ class EngineRunner:
             ):
                 continue
 
-            post_prob = self._compute_posting_probability(codelet_type)
+            post_prob = self._compute_posting_probability(rule)
             if not ctx.rng.prob(post_prob):
                 continue
 
@@ -1079,7 +1090,8 @@ class EngineRunner:
             deferred = False
 
         thematic_type = "thematic-bridge-scout"
-        post_prob = self._compute_posting_probability(thematic_type)
+        thematic_rule = self.posting_rule_for(thematic_type)
+        post_prob = self._compute_posting_probability(thematic_rule)
         if ctx.rng.prob(post_prob):
             urgency = round(ctx.themespace.get_max_positive_theme_activation())
             num = self._compute_num_to_post(thematic_type)
@@ -1091,16 +1103,22 @@ class EngineRunner:
         if deferred:
             ctx.coderack.post_deferred(batch, ctx.codelet_count, ctx.rng)
 
-    def _compute_posting_probability(self, codelet_type: str) -> float:
-        """Compute the probability of posting a codelet of this type.
+    def _compute_posting_probability(self, rule: PostingRuleSpec | None) -> float:
+        """The probability of posting a codelet under *rule*.
 
         Scheme: coderack.ss:465-515.
+
+        The probability is the rule's own ``posting_formula``, evaluated against the
+        vocabulary in ``server/engine/posting.py``.  It used to be a switch on the
+        codelet's *name* that re-derived what the rule already stated — the single line
+        `PHASE 1 PLAN.md` §0.3 points at, where a `PostingRuleSpec` whose
+        ``posting_formula`` says the answer had its ``codelet_type`` passed into a
+        chain of string comparisons instead.  So the eight arms below are gone and the
+        formulas they duplicated are read.
         """
         ctx = self.ctx
-        if ctx is None:
+        if ctx is None or rule is None:
             return 0.0
-
-        ws = ctx.workspace
 
         # ``post-codelet-probability`` (``coderack.ss:470-473``) consults the codelet
         # type's clamp *before* any workspace-driven computation: a clamped type posts
@@ -1109,63 +1127,20 @@ class EngineRunner:
         # rule work at 0.77/0.91 and everything else at 0.21 — rather than a nudge.
         # (The mode exclusions that return 0 in the Scheme are applied by the callers,
         # before they get here, so this is the right place for the clamp check.)
-        clamped = ctx.coderack.clamped_posting_probability(codelet_type)
+        #
+        # It stays in Python because it is not a property of the rule: the clamp is a
+        # state of the *rack*, set by a jootser or by justify mode while the run is
+        # going, and it overrides whatever the rule would otherwise compute.
+        clamped = ctx.coderack.clamped_posting_probability(rule.codelet_type)
         if clamped is not None:
             return clamped
 
-        if codelet_type in (
-            "bottom-up-bond-scout",
-            "top-down-bond-scout:category",
-            "top-down-bond-scout:direction",
-            "top-down-group-scout:category",
-            "top-down-group-scout:direction",
-            "group-scout:whole-string",
-        ):
-            return ws.get_average_intra_string_unhappiness() / 100.0
+        if not rule.posting_formula:
+            return 0.5  # Default, for a rule that states no formula at all.
 
-        if codelet_type in ("bottom-up-bridge-scout", "important-object-bridge-scout"):
-            # ``coderack.ss:482-484`` — over top and vertical, plus bottom when
-            # justifying.  No "are there any bridges yet" guard: with no bridges
-            # every object is maximally unhappy and the strength reaches 0 by
-            # arithmetic.
-            return (100.0 - ws.get_min_mapping_strength()) / 100.0
-
-        if codelet_type in ("bottom-up-description-scout", "top-down-description-scout"):
-            return ws.get_average_unhappiness() / 100.0
-
-        if codelet_type == "rule-scout":
-            # ``coderack.ss:488-491``: half probability while no rule type is
-            # possible, full once one is.  Bonds have nothing to do with it — the
-            # question is whether rule-describable bridges cover a whole pair.
-            return 0.5 if not ws.get_possible_rule_types() else 1.0
-
-        if codelet_type == "answer-finder":
-            if ws.has_supported_rule():
-                return (100.0 - ctx.temperature.value) / 100.0
-            return 0.0
-
-        if codelet_type == "answer-justifier":
-            top = ws.get_supported_rules(True)
-            bottom = ws.get_supported_rules(False)
-            if top or bottom:
-                return (100.0 - ctx.temperature.value) / 100.0
-            return 0.0
-
-        if codelet_type == "breaker":
-            return ctx.temperature.value / 100.0
-
-        if codelet_type == "progress-watcher":
-            return 1.0 if ctx.themespace.has_thematic_pressure() else 0.25
-
-        if codelet_type == "jootser":
-            if ctx.trace.within_snag_period or ctx.trace.within_clamp_period:
-                return 0.4
-            return 0.1
-
-        if codelet_type == "thematic-bridge-scout":
-            return ctx.themespace.get_max_positive_theme_activation() / 100.0
-
-        return 0.5  # Default
+        return evaluate_posting_formula(
+            rule.posting_formula, rule.codelet_type, PostingContext(ctx)
+        )
 
     def _compute_num_to_post(self, codelet_type: str) -> int:
         """Compute how many codelets to post.
@@ -1297,7 +1272,7 @@ class EngineRunner:
                     continue
 
                 # Stochastic posting based on workspace state
-                post_prob = self._compute_posting_probability(rule.codelet_type)
+                post_prob = self._compute_posting_probability(rule)
                 if not ctx.rng.prob(post_prob):
                     continue
 

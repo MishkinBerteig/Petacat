@@ -12,6 +12,7 @@ from typing import Any
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from server.engine.posting import validate_posting_formulas
 from server.engine.metadata import (
     CodeletSpec,
     DemoProblem,
@@ -137,6 +138,11 @@ async def load_metadata_from_db(session: AsyncSession) -> MetadataProvider:
         )
         for row in result.scalars()
     ]
+
+    # A bad posting formula fails here, at load, rather than mid-run — where it would
+    # look like one codelet type exploring differently rather than like a broken
+    # configuration.  The same contract the descriptor predicates get.
+    validate_posting_formulas(posting_rules)
 
     # Commentary templates
     result = await session.execute(select(CommentaryTemplate))

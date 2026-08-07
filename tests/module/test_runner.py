@@ -182,12 +182,17 @@ def test_rule_scout_posting_is_gated_on_rule_possibility(runner):
     runner.init_mcat("abc", "abd", "xyz", seed=42)
     ws = runner.ctx.workspace
 
+    # The probability is asked of the *rule* rather than of the codelet's name: the
+    # rule's ``posting_formula`` states it, and the switch that used to re-derive it
+    # from the name is gone (`PHASE 1 PLAN.md` §0.3).
+    rule = runner.posting_rule_for("rule-scout")
+
     ws.top_rule_possible = False
-    assert runner._compute_posting_probability("rule-scout") == 0.5
+    assert runner._compute_posting_probability(rule) == 0.5
     assert runner._compute_num_to_post("rule-scout") == 1
 
     ws.top_rule_possible = True
-    assert runner._compute_posting_probability("rule-scout") == 1.0
+    assert runner._compute_posting_probability(rule) == 1.0
     assert runner._compute_num_to_post("rule-scout") == 2
 
 
