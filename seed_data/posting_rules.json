@@ -165,11 +165,6 @@
       "condition": "always"
     }
   ],
-  "initial_codelets": {
-    "types": ["bottom-up-bond-scout", "bottom-up-bridge-scout"],
-    "urgency": 21,
-    "count_formula": "2 * num_workspace_objects"
-  },
   "codelet_patterns": {
     "top-down-codelet-pattern": [
       ["top-down-bond-scout:direction", 77],

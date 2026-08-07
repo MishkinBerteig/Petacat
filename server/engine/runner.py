@@ -558,8 +558,8 @@ class EngineRunner:
         workspace.update_all_object_values()
         workspace.update_average_unhappiness_values()
 
-    def _post_initial_codelets(self) -> None:
-        """Post the opening population of scouts.
+    def build_initial_codelet_batch(self) -> list[Codelet]:
+        """The opening population, from the database.
 
         Scheme: ``post-initial-codelets`` (run.ss:275-283)::
 
@@ -568,31 +568,67 @@ class EngineRunner:
               (add-deferred-codelet bottom-up-bridge-scout))
             (post-deferred-codelets)
 
-        ``2N`` iterations of *two* posts each — **4N** codelets, 36 for
-        ``abc/abd/xyz``.  Petacat ran ``N`` iterations, so the run started with
-        half the reference's scouts and reached its first update cycle with
-        proportionally less built.
+        ``2N`` rounds of *two* posts each — **4N** codelets, 36 for ``abc/abd/xyz``.
+        Petacat ran ``N`` rounds, so the run started with half the reference's scouts
+        and reached its first update cycle with proportionally less built.
+
+        All three of the types, the round count and the urgency tier were Python
+        literals here (`PHASE 1 PLAN.md` §0.2(b)) while the `initial_codelets` block in
+        the seed data stated the same three and was read by nothing.  They are now
+        `initial_codelet_types`, `initial_codelet_rounds` and
+        `initial_codelet_urgency`, so a new opening scout is a configuration change.
+
+        **The alternation is part of the value.**  The Scheme repeats a *body*
+        containing both posts, so the batch goes bond, bridge, bond, bridge rather than
+        all of one type then all of the other.  That is invisible until the batch
+        reaches the rack's capacity, at which point ``post_deferred`` drops
+        ``len(batch) - capacity`` members **uniformly at random** — and which codelet
+        each drawn index lands on depends on the order they were appended in.  So the
+        loop is rounds-outer, types-inner, exactly as the ``repeat*`` is.
+
+        The urgency is a *named* tier rather than a number, resolved through
+        `urgency_levels`, which is what `codelet_patterns.py` says the design intends
+        and what keeps 21 from being written down in a second place.
+        """
+        ctx = self.ctx
+        if ctx is None:
+            return []
+
+        types = self.meta.get_param(
+            "initial_codelet_types", ["bottom-up-bond-scout", "bottom-up-bridge-scout"]
+        )
+        urgency = self.meta.get_urgency(
+            self.meta.get_param("initial_codelet_urgency", "very_low")
+        )
+        rounds = int(
+            evaluate_posting_formula(
+                self.meta.get_param("initial_codelet_rounds", "2 * num_workspace_objects"),
+                "initial_codelets",
+                PostingContext(ctx),
+            )
+        )
+
+        batch: list[Codelet] = []
+        for _ in range(rounds):
+            for codelet_type in types:
+                batch.append(
+                    Codelet(codelet_type, urgency, time_stamp=ctx.codelet_count)
+                )
+        return batch
+
+    def _post_initial_codelets(self) -> None:
+        """Post the opening population.
 
         Stamped with the codelet count that posts them, as ``add-codelet`` stamps
-        every codelet (``coderack.ss:300-306``); posted as a deferred batch, so
-        the members never evict one another.
+        every codelet (``coderack.ss:300-306``); posted as a deferred batch, so the
+        members never evict one another.
         """
         ctx = self.ctx
         if ctx is None:
             return
-
-        num_objects = len(ctx.workspace.all_objects)
-        urgency = self.meta.get_urgency("very_low")
-
-        batch: list[Codelet] = []
-        for _ in range(2 * num_objects):
-            batch.append(
-                Codelet("bottom-up-bond-scout", urgency, time_stamp=ctx.codelet_count)
-            )
-            batch.append(
-                Codelet("bottom-up-bridge-scout", urgency, time_stamp=ctx.codelet_count)
-            )
-        ctx.coderack.post_deferred(batch, ctx.codelet_count, ctx.rng)
+        ctx.coderack.post_deferred(
+            self.build_initial_codelet_batch(), ctx.codelet_count, ctx.rng
+        )
 
     def _restart_after_snag(self) -> None:
         """The last three steps of ``process-snag`` (``answers.ss:1189-1191``).
