@@ -628,3 +628,79 @@ async def test_a_posting_formula_naming_something_unknown_is_refused(db_session)
 
     with pytest.raises(ValueError, match="unknown name"):
         evaluate_posting_formula("no_such_quantity / 100", "breaker", PostingContext(None))
+
+
+# ──────────────────────────────────────────────────────────────────
+# count_formula / count_values
+# ──────────────────────────────────────────────────────────────────
+
+
+async def test_zeroing_every_count_formula_changes_the_run(db_session):
+    """Direction 2, the counterpart of §0.1's `posting_formula` measurement.
+
+    The plan set every `count_formula` to `0` and every `count_values` to zero along
+    with the rest, and the run came out bit-identical.  A rule saying "post none of
+    these" has to mean it.
+    """
+    shipped = run_outcome(await load_metadata_from_db(db_session))
+
+    await db_session.execute(
+        update(PostingRule).values(count_formula="fixed", count_values={"fixed": 0})
+    )
+    await db_session.commit()
+
+    changed = run_outcome(await load_metadata_from_db(db_session))
+
+    assert changed != shipped
+
+
+async def test_changing_one_rules_count_values_changes_the_run(db_session):
+    """Direction 2, on one rule's lookup table.
+
+    `bottom-up-bond-scout` posts two, four or six scouts depending on a stochastically
+    blurred count of unrelated objects.  Flattening the table to one leaves the rule
+    posting, and leaves the blurred draw in place so the random stream is not
+    displaced — only the number of codelets that draw produces.
+    """
+    shipped = run_outcome(await load_metadata_from_db(db_session))
+
+    await db_session.execute(
+        update(PostingRule)
+        .where(PostingRule.codelet_type == "bottom-up-bond-scout")
+        .values(count_values={"few": 1, "some": 1, "many": 1})
+    )
+    await db_session.commit()
+
+    changed = run_outcome(await load_metadata_from_db(db_session))
+
+    assert changed != shipped
+
+
+async def test_a_group_scout_count_costs_no_draw_before_any_bond_exists(db_session):
+    """Direction 1, on the ordering that the count formula must not disturb.
+
+    `num_ungrouped_objects_based` reads a *stochastically blurred* object tally, which
+    costs a draw from the run's random stream.  The switch this replaces checked for
+    bonds **first** and returned zero without drawing, because grouping cannot start
+    before anything is bonded.  Moving the check after the draw would consume one
+    extra number on every early cycle and send the whole run somewhere else — a
+    reordering with no visible cause, which is the hardest kind of regression to find.
+
+    So the `none` entry in `count_values` is the no-bonds answer, and reaching it must
+    leave the generator untouched.
+    """
+    from server.engine.runner import EngineRunner
+
+    db_meta = await load_metadata_from_db(db_session)
+    runner = EngineRunner(db_meta)
+    runner.init_mcat(*PROBLEM, seed=PROBLEM_SEED)
+
+    workspace = runner.ctx.workspace
+    for string in workspace.all_strings:
+        string.bonds.clear()
+
+    rule = runner.posting_rule_for("group-scout:whole-string")
+    before = runner.ctx.rng.call_count
+
+    assert runner._compute_num_to_post(rule) == 0
+    assert runner.ctx.rng.call_count == before, "the no-bonds path consumed a draw"

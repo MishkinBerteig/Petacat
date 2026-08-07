@@ -24,7 +24,11 @@ from server.engine.coderack import Codelet, Coderack
 from server.engine.ids import IdAllocator, use_allocator
 from server.engine.memory import EpisodicMemory
 from server.engine.metadata import MetadataProvider, PostingRuleSpec
-from server.engine.posting import PostingContext, evaluate_posting_formula
+from server.engine.posting import (
+    PostingContext,
+    evaluate_count_formula,
+    evaluate_posting_formula,
+)
 from server.engine.rng import RNG
 from server.engine.sink import STRUCTURE_BUILT, NullSink, RunSink
 from server.engine.slipnet import Slipnet
@@ -1065,7 +1069,7 @@ class EngineRunner:
                 continue
 
             urgency = self._compute_bottom_up_urgency(codelet_type)
-            num = self._compute_num_to_post(codelet_type)
+            num = self._compute_num_to_post(rule)
 
             for _ in range(num):
                 batch.append(Codelet(codelet_type, urgency, time_stamp=time))
@@ -1094,7 +1098,7 @@ class EngineRunner:
         post_prob = self._compute_posting_probability(thematic_rule)
         if ctx.rng.prob(post_prob):
             urgency = round(ctx.themespace.get_max_positive_theme_activation())
-            num = self._compute_num_to_post(thematic_type)
+            num = self._compute_num_to_post(thematic_rule)
             for _ in range(num):
                 batch.append(
                     Codelet(thematic_type, urgency, time_stamp=ctx.codelet_count)
@@ -1142,73 +1146,24 @@ class EngineRunner:
             rule.posting_formula, rule.codelet_type, PostingContext(ctx)
         )
 
-    def _compute_num_to_post(self, codelet_type: str) -> int:
-        """Compute how many codelets to post.
+    def _compute_num_to_post(self, rule: PostingRuleSpec | None) -> int:
+        """How many codelets *rule* posts.
 
         Scheme: ``num-of-codelets-to-post`` (``coderack.ss:517-550``).
 
-        The three scout families count objects against *stochastically blurred*
-        absolute thresholds (``rough-num-of-objects``), not against fixed ratios
-        of the object population.  Called only after the posting probability has
-        already passed, exactly as the reference's ``stochastic-if*`` orders it,
-        so the extra ``~`` draws land in the same place in the random stream.
+        The count is the rule's own ``count_formula`` and ``count_values``, which were
+        as dead as the posting formula beside them (`PHASE 1 PLAN.md` §0.2(a)): three
+        scout families counted objects against *stochastically blurred* absolute
+        thresholds through a switch on the codelet's name, while the lookup tables
+        stating the same numbers sat unread in the seed data.
+
+        Called only after the posting probability has already passed, exactly as the
+        reference's ``stochastic-if*`` orders it, so the blurred draws land in the same
+        place in the random stream.
         """
-        ctx = self.ctx
-        if ctx is None:
+        if self.ctx is None or rule is None:
             return 1
-
-        ws = ctx.workspace
-
-        if codelet_type in (
-            "bottom-up-bond-scout",
-            "top-down-bond-scout:category",
-            "top-down-bond-scout:direction",
-        ):
-            return {"few": 2, "some": 4, "many": 6}[
-                ws.get_rough_num_of_unrelated_objects(ctx.rng)
-            ]
-
-        if codelet_type in (
-            "top-down-group-scout:category",
-            "top-down-group-scout:direction",
-            "group-scout:whole-string",
-        ):
-            if not any(s.bonds for s in ws.all_strings):
-                return 0
-            return {"few": 1, "some": 2, "many": 3}[
-                ws.get_rough_num_of_ungrouped_objects(ctx.rng)
-            ]
-
-        if codelet_type in ("bottom-up-bridge-scout", "important-object-bridge-scout"):
-            return {"few": 2, "some": 5, "many": 6}[
-                ws.get_rough_num_of_unmapped_objects(ctx.rng)
-            ]
-
-        if codelet_type in ("bottom-up-description-scout", "top-down-description-scout"):
-            return 2
-
-        if codelet_type == "rule-scout":
-            # ``coderack.ss:542``: two scouts per possible rule type, at least one.
-            return max(1, 2 * len(ws.get_possible_rule_types()))
-
-        if codelet_type == "thematic-bridge-scout":
-            # ``coderack.ss:547-549``: ``(round (* 10 (% max-inter-string-unhappiness)))``.
-            # The *mapping* deficit, and no floor — thematic scouts are the vehicle
-            # of clamped-theme pressure, and with the mappings settled the
-            # reference posts none.  Reading intra-string unhappiness instead
-            # posted one scout where the reference posts up to ten, precisely
-            # during a clamp episode: a snag response leaves the strings
-            # well-bonded and the mappings in ruins.
-            return round(10 * ws.get_max_inter_string_unhappiness() / 100.0)
-
-        if codelet_type == "progress-watcher":
-            return 2
-
-        if codelet_type == "jootser":
-            return 2 if not ctx.justify_mode else 1
-
-        # answer-finder, answer-justifier, breaker: 1
-        return 1
+        return evaluate_count_formula(rule, PostingContext(self.ctx))
 
     def _compute_bottom_up_urgency(self, codelet_type: str) -> int:
         """Compute urgency for bottom-up codelets.
@@ -1276,7 +1231,7 @@ class EngineRunner:
                 if not ctx.rng.prob(post_prob):
                     continue
 
-                num = self._compute_num_to_post(rule.codelet_type)
+                num = self._compute_num_to_post(rule)
                 for _ in range(num):
                     batch.append(
                         Codelet(
