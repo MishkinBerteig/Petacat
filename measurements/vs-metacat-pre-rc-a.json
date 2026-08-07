@@ -2,7 +2,6 @@
   "tries_per_problem": 100,
   "runs_per_episode": 8,
   "max_steps": 20000,
-  "reference_max_steps": 100000,
   "backend": "numpy",
   "start_seed": 900000,
   "reference": "../Metacat/oracle/derived",
@@ -22,8 +21,7 @@
       "reference_p50": [
         "b",
         "z"
-      ],
-      "resolved_at_reference_cap": []
+      ]
     },
     {
       "problem": "fig5.7",
@@ -46,8 +44,7 @@
       "reference_p50": [
         "ijll",
         "ijkl"
-      ],
-      "resolved_at_reference_cap": []
+      ]
     },
     {
       "problem": "misc3",
@@ -56,143 +53,26 @@
       "missing_p50": [],
       "novel": [],
       "produced": {
-        "kkkjjjiii": 40,
+        "kkkjjjiii": 31,
+        "*CAP*": 22,
         "kji": 17,
-        "kkjjii": 16,
-        "kkkjjii": 4,
-        "*CAP*": 3,
+        "kkjjii": 13,
         "*NONE*": 2,
         "kkjjiii": 2,
-        "kkkjjiii": 2,
+        "kkkjjjiihhh": 2,
         "kjiii": 2,
-        "kkjjji": 1,
-        "kkkjjjii": 1,
+        "kkkjjiihh": 2,
         "kkkjjji": 1,
         "kjjjiii": 1,
         "kkjjjjii": 1,
         "kkkjjjjiii": 1,
         "kkjjiiiii": 1,
-        "kkkkkjjii": 1,
-        "aabbcc": 1,
         "kkjjiiiiii": 1,
-        "kkkjjiihh": 1,
         "kkjjjii": 1
       },
       "reference_p50": [
         "kkjjii",
         "kkkjjjiii"
-      ],
-      "resolved_at_reference_cap": [
-        {
-          "seed": 900005,
-          "codelets": 85644,
-          "state": "kkkjjjiii"
-        },
-        {
-          "seed": 900020,
-          "codelets": 49710,
-          "state": "kkkjjiii"
-        },
-        {
-          "seed": 900021,
-          "codelets": 35000,
-          "state": "kkkjjjiii"
-        },
-        {
-          "seed": 900022,
-          "codelets": 27265,
-          "state": "kkkjjjiii"
-        },
-        {
-          "seed": 900024,
-          "codelets": 23069,
-          "state": "kkkjjjiii"
-        },
-        {
-          "seed": 900029,
-          "codelets": 22276,
-          "state": "kkjjji"
-        },
-        {
-          "seed": 900034,
-          "codelets": 21385,
-          "state": "kkkjjjii"
-        },
-        {
-          "seed": 900039,
-          "codelets": 44188,
-          "state": "kkkjjii"
-        },
-        {
-          "seed": 900041,
-          "codelets": 34844,
-          "state": "kkkjjii"
-        },
-        {
-          "seed": 900044,
-          "codelets": 57731,
-          "state": "kkkjjjiii"
-        },
-        {
-          "seed": 900046,
-          "codelets": 22095,
-          "state": "kkjjii"
-        },
-        {
-          "seed": 900064,
-          "codelets": 36938,
-          "state": "kkkjjjiii"
-        },
-        {
-          "seed": 900066,
-          "codelets": 100000,
-          "state": "*CAP*"
-        },
-        {
-          "seed": 900069,
-          "codelets": 99876,
-          "state": "kkjjii"
-        },
-        {
-          "seed": 900073,
-          "codelets": 84982,
-          "state": "kkkjjii"
-        },
-        {
-          "seed": 900075,
-          "codelets": 30127,
-          "state": "kkkjjjiii"
-        },
-        {
-          "seed": 900080,
-          "codelets": 50406,
-          "state": "kkkjjii"
-        },
-        {
-          "seed": 900088,
-          "codelets": 31148,
-          "state": "aabbcc"
-        },
-        {
-          "seed": 900090,
-          "codelets": 100000,
-          "state": "*CAP*"
-        },
-        {
-          "seed": 900092,
-          "codelets": 79953,
-          "state": "kkjjii"
-        },
-        {
-          "seed": 900093,
-          "codelets": 100000,
-          "state": "*CAP*"
-        },
-        {
-          "seed": 900099,
-          "codelets": 40462,
-          "state": "kkkjjjiii"
-        }
       ]
     },
     {
@@ -214,8 +94,7 @@
         "gld",
         "hlz",
         "glz"
-      ],
-      "resolved_at_reference_cap": []
+      ]
     },
     {
       "problem": "misc2",
@@ -230,34 +109,32 @@
       },
       "reference_p50": [
         "ijl"
-      ],
-      "resolved_at_reference_cap": []
+      ]
     },
     {
       "problem": "run1",
       "n": 100,
       "reference_f1_over_n": 0.0,
       "missing_p50": [],
-      "novel": [],
+      "novel": [
+        {
+          "member": "*CAP*",
+          "count": 1
+        }
+      ],
       "produced": {
         "mrrkkk": 64,
         "mrrjjk": 23,
         "mrrjjj": 4,
         "mrrjkk": 3,
         "mrrjjd": 2,
-        "abd": 2,
+        "*CAP*": 1,
         "mrrjjjj": 1,
-        "mrrddd": 1
+        "mrrddd": 1,
+        "abd": 1
       },
       "reference_p50": [
         "mrrkkk"
-      ],
-      "resolved_at_reference_cap": [
-        {
-          "seed": 900038,
-          "codelets": 36815,
-          "state": "abd"
-        }
       ]
     },
     {
@@ -278,8 +155,7 @@
       "reference_p50": [
         "xyd",
         "wyz"
-      ],
-      "resolved_at_reference_cap": []
+      ]
     },
     {
       "problem": "misc1",
@@ -298,8 +174,7 @@
       },
       "reference_p50": [
         "jjjrrm"
-      ],
-      "resolved_at_reference_cap": []
+      ]
     },
     {
       "problem": "fig5.4-top",
@@ -319,36 +194,45 @@
       "reference_p50": [
         "qeeq",
         "ixxi"
-      ],
-      "resolved_at_reference_cap": []
+      ]
     },
     {
       "problem": "eqe-baaab",
       "n": 100,
       "reference_f1_over_n": 0.000255,
       "missing_p50": [],
-      "novel": [],
+      "novel": [
+        {
+          "member": "abbbb",
+          "count": 1
+        }
+      ],
       "produced": {
-        "baaab": 56,
+        "baaab": 55,
         "qeeeq": 24,
         "baaaq": 5,
         "abbba": 5,
         "qbbbq": 4,
         "qbbba": 2,
         "qeq": 2,
-        "qaaab": 2
+        "qaaab": 2,
+        "abbbb": 1
       },
       "reference_p50": [
         "baaab"
-      ],
-      "resolved_at_reference_cap": []
+      ]
     },
     {
       "problem": "run6",
       "n": 100,
       "reference_f1_over_n": 8.4e-05,
       "missing_p50": [],
-      "novel": [],
+      "novel": [
+        {
+          "member": "cdddb",
+          "count": 1
+        }
+      ],
       "produced": {
         "qeeeq": 49,
         "*NONE*": 9,
@@ -360,14 +244,13 @@
         "cddda": 2,
         "baaab": 2,
         "abbbq": 1,
-        "qbbpq": 1,
-        "bcccb": 1,
+        "qbbqr": 1,
+        "cdddb": 1,
         "qeeqr": 1
       },
       "reference_p50": [
         "qeeeq"
-      ],
-      "resolved_at_reference_cap": []
+      ]
     },
     {
       "problem": "run3",
@@ -386,8 +269,7 @@
       "reference_p50": [
         "xyu",
         "wyz"
-      ],
-      "resolved_at_reference_cap": []
+      ]
     },
     {
       "problem": "run2",
@@ -404,23 +286,27 @@
       },
       "reference_p50": [
         "mrrkkk"
-      ],
-      "resolved_at_reference_cap": []
+      ]
     },
     {
       "problem": "copy1",
       "n": 100,
       "reference_f1_over_n": 0.0,
       "missing_p50": [],
-      "novel": [],
+      "novel": [
+        {
+          "member": "*NONE*",
+          "count": 1
+        }
+      ],
       "produced": {
-        "c": 94,
-        "ab": 6
+        "c": 93,
+        "ab": 6,
+        "*NONE*": 1
       },
       "reference_p50": [
         "c"
-      ],
-      "resolved_at_reference_cap": []
+      ]
     },
     {
       "problem": "copy2",
@@ -433,8 +319,7 @@
       },
       "reference_p50": [
         "d"
-      ],
-      "resolved_at_reference_cap": []
+      ]
     },
     {
       "problem": "copy3",
@@ -447,8 +332,7 @@
       },
       "reference_p50": [
         "z"
-      ],
-      "resolved_at_reference_cap": []
+      ]
     },
     {
       "problem": "copy4",
@@ -462,8 +346,7 @@
       },
       "reference_p50": [
         "x"
-      ],
-      "resolved_at_reference_cap": []
+      ]
     },
     {
       "problem": "copy5",
@@ -473,8 +356,7 @@
       "novel": [
         {
           "member": "aac",
-          "count": 1,
-          "also_last_cycle": true
+          "count": 1
         }
       ],
       "produced": {
@@ -485,8 +367,7 @@
       },
       "reference_p50": [
         "cc"
-      ],
-      "resolved_at_reference_cap": []
+      ]
     },
     {
       "problem": "copy6",
@@ -495,13 +376,13 @@
       "missing_p50": [],
       "novel": [],
       "produced": {
-        "d": 92,
-        "abc": 8
+        "d": 88,
+        "abc": 8,
+        "*NONE*": 4
       },
       "reference_p50": [
         "d"
-      ],
-      "resolved_at_reference_cap": []
+      ]
     }
   ],
   "episodic": [
@@ -2559,21 +2440,15 @@
       "novel": [
         {
           "member": "kkjiii",
-          "count": 1,
-          "in_single_run_set": true,
-          "also_last_cycle": true
+          "count": 1
         },
         {
           "member": "kkjjiiiii",
-          "count": 1,
-          "in_single_run_set": true,
-          "also_last_cycle": true
+          "count": 1
         },
         {
           "member": "kkjjjjii",
-          "count": 1,
-          "in_single_run_set": true,
-          "also_last_cycle": true
+          "count": 1
         }
       ],
       "produced": {
@@ -2633,7 +2508,7 @@
         ],
         [
           "*CAP*",
-          "kkkjjiii",
+          "kkkjjjiihhh",
           "kkjjii",
           "kkkjjjiii",
           "kkjjii",
@@ -2706,7 +2581,7 @@
           "kkkjjjiii",
           "kkkjjjiii",
           "kji",
-          "kkkkkjjii",
+          "kkkjjiihh",
           "*CAP*",
           "*NONE*",
           "kji"
@@ -2724,7 +2599,7 @@
         [
           "kkjjjii",
           "kkjjii",
-          "kkkjjjiii",
+          "kkkjjjiihhh",
           "*CAP*",
           "kkjjii",
           "kkjjii",
@@ -3437,7 +3312,7 @@
           "*CAP*",
           "*CAP*",
           "*CAP*",
-          "kkkkkjjii",
+          "kkkjjiihh",
           "kkjjiiiii",
           "*CAP*"
         ],
@@ -4634,9 +4509,7 @@
       "novel": [
         {
           "member": "ajd",
-          "count": 1,
-          "in_single_run_set": false,
-          "also_last_cycle": true
+          "count": 1
         }
       ],
       "produced": {
@@ -7708,21 +7581,15 @@
       "novel": [
         {
           "member": "crraaa",
-          "count": 2,
-          "in_single_run_set": true,
-          "also_last_cycle": true
+          "count": 2
         },
         {
           "member": "jjjrmr",
-          "count": 1,
-          "in_single_run_set": true,
-          "also_last_cycle": true
+          "count": 1
         },
         {
           "member": "mrraaa",
-          "count": 1,
-          "in_single_run_set": true,
-          "also_last_cycle": true
+          "count": 1
         }
       ],
       "produced": {
@@ -8754,21 +8621,15 @@
       "novel": [
         {
           "member": "iixxi",
-          "count": 1,
-          "in_single_run_set": true,
-          "also_last_cycle": true
+          "count": 1
         },
         {
           "member": "qexq",
-          "count": 1,
-          "in_single_run_set": true,
-          "also_last_cycle": true
+          "count": 1
         },
         {
           "member": "qiiq",
-          "count": 1,
-          "in_single_run_set": true,
-          "also_last_cycle": true
+          "count": 1
         }
       ],
       "produced": {
@@ -9795,32 +9656,38 @@
       "missing_p50": [],
       "novel": [
         {
+          "member": "abbbb",
+          "count": 7
+        },
+        {
           "member": "aqqqp",
-          "count": 1,
-          "in_single_run_set": true,
-          "also_last_cycle": true
+          "count": 1
+        },
+        {
+          "member": "baaba",
+          "count": 1
         },
         {
           "member": "qrrbq",
-          "count": 1,
-          "in_single_run_set": false,
-          "also_last_cycle": true
+          "count": 1
         }
       ],
       "produced": {
-        "abbba": 20,
-        "qaaab": 19,
-        "qbbbq": 15,
-        "qeq": 13,
+        "abbba": 19,
+        "qaaab": 17,
+        "qeq": 14,
+        "qbbbq": 12,
         "baaaq": 11,
         "baaab": 8,
-        "qbbba": 4,
+        "abbbb": 7,
         "abbbq": 3,
-        "pqqqq": 2,
-        "qrrrq": 2,
-        "baacb": 1,
+        "qbbba": 2,
+        "qqqqp": 2,
+        "baaba": 1,
+        "qrrrq": 1,
         "qrrbq": 1,
-        "aqqqp": 1
+        "aqqqp": 1,
+        "qrbbq": 1
       },
       "reference_p50": [
         "abbba",
@@ -9866,7 +9733,7 @@
           "baaab",
           "qbbbq",
           "qaaab",
-          "qeq"
+          "abbbb"
         ],
         [
           "baaab",
@@ -9899,8 +9766,8 @@
           "baaab"
         ],
         [
+          "abbbb",
           "baaab",
-          "qbbbq",
           "qeeeq",
           "abbba",
           "qeeeq",
@@ -9933,7 +9800,7 @@
           "baaaq",
           "qeq",
           "qeeeq",
-          "abbba",
+          "abbbq",
           "qbbbq",
           "*CAP*",
           "qaaab"
@@ -9956,7 +9823,7 @@
           "qeq",
           "baaab",
           "abbba",
-          "baacb"
+          "baaba"
         ],
         [
           "baaab",
@@ -9975,7 +9842,7 @@
           "qbbbq",
           "baaaq",
           "qaaab",
-          "abbba",
+          "abbbq",
           "qeq"
         ],
         [
@@ -9996,14 +9863,14 @@
           "qeq",
           "abbba",
           "qbbba",
-          "*CAP*"
+          "abbbb"
         ],
         [
           "baaab",
           "qeeeq",
           "qeq",
           "baaaq",
-          "*CAP*",
+          "abbbb",
           "qbbbq",
           "*CAP*",
           "qaaab"
@@ -10064,8 +9931,8 @@
           "qeq",
           "baaaq",
           "qaaab",
+          "abbbb",
           "abbba",
-          "qbbbq",
           "baaab"
         ],
         [
@@ -10086,7 +9953,7 @@
           "baaaq",
           "qaaab",
           "abbbq",
-          "abbba"
+          "qeq"
         ],
         [
           "baaab",
@@ -10094,7 +9961,7 @@
           "qaaab",
           "qbbbq",
           "qeq",
-          "*CAP*",
+          "abbbb",
           "qbbba",
           "baaaq"
         ],
@@ -10123,7 +9990,7 @@
           "baaab",
           "abbba",
           "qaaab",
-          "qbbbq",
+          "abbbb",
           "baaaq",
           "baaab",
           "abbba"
@@ -10164,9 +10031,9 @@
           "baaab",
           "qbbbq",
           "qbbbq",
-          "abbba",
+          "qaaab",
           "baaaq",
-          "qaaab"
+          "qeq"
         ],
         [
           "baaab",
@@ -10215,7 +10082,7 @@
           "qeeeq",
           "qeq",
           "abbba",
-          "abbba",
+          "abbbb",
           "baaaq"
         ],
         [
@@ -10231,7 +10098,7 @@
         [
           "baaab",
           "qeeeq",
-          "abbba",
+          "qeq",
           "qaaab",
           "baaab",
           "qbbbq",
@@ -10256,7 +10123,7 @@
           "abbba",
           "qaaab",
           "qeq",
-          "abbba"
+          "*NONE*"
         ],
         [
           "qeeeq",
@@ -10280,12 +10147,12 @@
         ],
         [
           "baaab",
-          "qeeeq",
+          "abbbb",
           "qbbbq",
           "baaab",
+          "qeeeq",
+          "abbbq",
           "qaaab",
-          "*NONE*",
-          "qeq",
           "baaaq"
         ],
         [
@@ -10336,7 +10203,7 @@
           "qbbbq",
           "baaab",
           "qeq",
-          "pqqqq"
+          "qrrrq"
         ],
         [
           "qbbbq",
@@ -10353,8 +10220,8 @@
           "baaab",
           "qeeeq",
           "qeq",
-          "abbba",
           "*CAP*",
+          "abbba",
           "qaaab",
           "*NONE*"
         ],
@@ -10364,17 +10231,17 @@
           "baaab",
           "qeeeq",
           "baaab",
-          "qeq",
+          "abbbb",
           "qaaab",
-          "*CAP*"
+          "qeq"
         ],
         [
           "baaab",
           "qbbbq",
           "baaab",
           "qeeeq",
+          "abbbb",
           "qaaab",
-          "*CAP*",
           "qbbbq",
           "qeq"
         ],
@@ -10426,15 +10293,15 @@
           "qaaab",
           "qeq",
           "abbba",
-          "qbbba"
+          "abbbb"
         ],
         [
           "qeeeq",
           "baaab",
           "qaaab",
-          "abbba",
+          "qqqqp",
           "qbbbq",
-          "baaaq",
+          "abbbb",
           "abbba",
           "qbbbq"
         ],
@@ -10463,17 +10330,17 @@
           "qeeeq",
           "qaaab",
           "baaaq",
-          "abbba",
-          "arrrq",
           "qeq",
-          "*CAP*"
+          "*CAP*",
+          "abbbb",
+          "qbbbq"
         ],
         [
           "baaab",
           "baaaq",
           "qeeeq",
           "qeq",
-          "pqeeq",
+          "abaab",
           "qeeeq",
           "qaaab",
           "*CAP*"
@@ -10512,21 +10379,21 @@
           "baaab",
           "qeeeq",
           "baaaq",
-          "abbba",
-          "baaab",
           "qeq",
+          "baaab",
+          "*CAP*",
           "qaaab",
-          "qbbbq"
+          "qqqqp"
         ],
         [
           "baaab",
           "qeeeq",
           "abbba",
           "qaaab",
-          "abbba",
+          "*NONE*",
           "qeq",
           "*CAP*",
-          "qbbbq"
+          "abbba"
         ],
         [
           "qeeeq",
@@ -10566,13 +10433,13 @@
           "baaab",
           "qbbbq",
           "qeeeq",
-          "pqqqq"
+          "abbbb"
         ],
         [
           "qbbbq",
           "baaab",
           "baaab",
-          "abbba",
+          "baaaq",
           "qeeeq",
           "qbbbq",
           "qaaab",
@@ -10614,7 +10481,7 @@
           "baaab",
           "qaaab",
           "baaaq",
-          "abbba",
+          "abbbb",
           "*CAP*",
           "*CAP*"
         ],
@@ -10626,7 +10493,7 @@
           "baaab",
           "abbba",
           "qaaab",
-          "qrrrq"
+          "qqqqp"
         ],
         [
           "qeeeq",
@@ -10646,7 +10513,7 @@
           "qeeeq",
           "qeq",
           "*CAP*",
-          "abbba"
+          "qrbbq"
         ],
         [
           "baaab",
@@ -10655,7 +10522,7 @@
           "qeq",
           "qaaab",
           "*NONE*",
-          "abbba",
+          "baaaq",
           "qbbbq"
         ],
         [
@@ -10674,7 +10541,7 @@
           "abbba",
           "baaab",
           "qeeeq",
-          "qrrrq",
+          "qqqqp",
           "qaaab",
           "abbba"
         ],
@@ -10705,8 +10572,8 @@
           "qaaab",
           "qeq",
           "baaaq",
-          "abbba",
-          "qbbbq"
+          "*CAP*",
+          "abbba"
         ],
         [
           "baaaq",
@@ -10714,7 +10581,7 @@
           "qeeeq",
           "baaab",
           "qeq",
-          "abbba",
+          "*CAP*",
           "qrbbq",
           "qaaab"
         ],
@@ -10746,7 +10613,7 @@
           "qeq",
           "qbbba",
           "qbbbq",
-          "*CAP*"
+          "abbbb"
         ],
         [
           "baaab",
@@ -10755,7 +10622,7 @@
           "baaaq",
           "qaaab",
           "qeq",
-          "*CAP*",
+          "abbbb",
           "*CAP*"
         ],
         [
@@ -10776,7 +10643,7 @@
           "baaaq",
           "qeq",
           "abbba",
-          "qrrrq"
+          "*NONE*"
         ],
         [
           "baaab",
@@ -10835,22 +10702,31 @@
       "n": 100,
       "reference_f1_over_n": 0.016,
       "missing_p50": [],
-      "novel": [],
+      "novel": [
+        {
+          "member": "cddbc",
+          "count": 1
+        },
+        {
+          "member": "cdddb",
+          "count": 5
+        }
+      ],
       "produced": {
-        "baaaq": 21,
         "qeeeq": 21,
+        "baaaq": 20,
         "qbbbq": 16,
         "qcccb": 14,
         "cbbba": 6,
         "baaab": 6,
-        "bcccb": 4,
+        "cdddb": 5,
         "qbbbc": 3,
         "cddda": 3,
         "qeq": 2,
-        "pqqeq": 1,
+        "qrreq": 1,
         "bcaab": 1,
-        "pqqqq": 1,
-        "bccab": 1
+        "qrrrq": 1,
+        "cddbc": 1
       },
       "reference_p50": [
         "baaaq",
@@ -10872,11 +10748,11 @@
         ],
         [
           "qeeeq",
-          "bcccb",
+          "cdddb",
           "abbbq",
           "qbbbq",
           "qeq",
-          "qbbpq",
+          "qbbqr",
           "cbbba",
           "qcccb"
         ],
@@ -10897,7 +10773,7 @@
           "baaaq",
           "qeq",
           "cddda",
-          "bcccb",
+          "cdddb",
           "*NONE*"
         ],
         [
@@ -10918,7 +10794,7 @@
           "*NONE*",
           "cbbba",
           "qeeeq",
-          "pqqeq"
+          "qrreq"
         ],
         [
           "qcccb",
@@ -10933,7 +10809,7 @@
         [
           "baaaq",
           "qcccb",
-          "bcccb",
+          "cdddb",
           "qeeeq",
           "*NONE*",
           "*NONE*",
@@ -10942,8 +10818,8 @@
         ],
         [
           "qeeeq",
-          "qcccb",
-          "bcccb",
+          "caaab",
+          "cdddb",
           "qeeeq",
           "baaaq",
           "*NONE*",
@@ -11014,10 +10890,10 @@
           "qeeeq",
           "baaab",
           "qeeeq",
-          "cddda",
+          "caaab",
           "*NONE*",
           "baaaq",
-          "bcccb",
+          "cdddb",
           "cbbba"
         ],
         [
@@ -11046,7 +10922,7 @@
           "qcccb",
           "qeeeq",
           "qeq",
-          "bcccb",
+          "cdddb",
           "baaab",
           "*NONE*"
         ],
@@ -11124,7 +11000,7 @@
           "*NONE*",
           "qcccb",
           "qeeeq",
-          "qbbpq",
+          "qbbqr",
           "qeeeq",
           "*NONE*",
           "cbbba",
@@ -11145,7 +11021,7 @@
           "qeeeq",
           "qeq",
           "*NONE*",
-          "qeepq",
+          "qeeqr",
           "qbbbq",
           "qbbbq",
           "*NONE*"
@@ -11223,11 +11099,11 @@
         [
           "baaaq",
           "qeq",
-          "qeeeq",
+          "caaab",
           "qeeeq",
           "*NONE*",
           "baaaq",
-          "*NONE*",
+          "qeeeq",
           "*NONE*"
         ],
         [
@@ -11243,7 +11119,7 @@
         [
           "qbbbq",
           "qeeeq",
-          "bcccb",
+          "caaab",
           "qeeeq",
           "qeeeq",
           "*NONE*",
@@ -11257,7 +11133,7 @@
           "baaab",
           "qeeeq",
           "qeq",
-          "bcccb",
+          "cdddb",
           "qbbbq"
         ],
         [
@@ -11381,7 +11257,7 @@
           "qeeeq"
         ],
         [
-          "bcccb",
+          "cdddb",
           "qbbbq",
           "qeeeq",
           "qeeeq",
@@ -11393,7 +11269,7 @@
         [
           "qeeeq",
           "*NONE*",
-          "qpppq",
+          "caaab",
           "baaaq",
           "qbbbq",
           "*NONE*",
@@ -11412,18 +11288,18 @@
         ],
         [
           "qbbbq",
+          "caaab",
           "qeeeq",
           "*NONE*",
-          "*NONE*",
           "qeeeq",
-          "bcccb",
+          "cdddb",
           "*NONE*",
           "*NONE*"
         ],
         [
           "qeeeq",
           "cddda",
-          "pqqeq",
+          "qrreq",
           "qbbbq",
           "cbbba",
           "*NONE*",
@@ -11438,7 +11314,7 @@
           "qeeeq",
           "*NONE*",
           "qeq",
-          "pqqqq"
+          "qrrrq"
         ],
         [
           "qbbbq",
@@ -11448,7 +11324,7 @@
           "*NONE*",
           "qcccb",
           "baaaq",
-          "bccab"
+          "cddbc"
         ],
         [
           "qeeeq",
@@ -11495,7 +11371,7 @@
           "cbbba",
           "*NONE*",
           "*NONE*",
-          "bccab",
+          "cddbc",
           "*NONE*",
           "qcccb",
           "qbbbq"
@@ -11578,7 +11454,7 @@
           "qeeeq",
           "qbbbq",
           "*NONE*",
-          "bcccb"
+          "cdddb"
         ],
         [
           "qeeeq",
@@ -11612,7 +11488,7 @@
         ],
         [
           "baaaq",
-          "bcccb",
+          "cdccb",
           "qcccb",
           "qbbbq",
           "qeeeq",
@@ -11633,7 +11509,7 @@
         [
           "qcccb",
           "baaaq",
-          "bcccb",
+          "cdddb",
           "qeeeq",
           "qcccb",
           "qeeeq",
@@ -11665,7 +11541,7 @@
           "qcccb",
           "qbbbq",
           "baaab",
-          "bcccb",
+          "cdddb",
           "*NONE*",
           "*NONE*",
           "*NONE*"
@@ -11673,12 +11549,12 @@
         [
           "qeeeq",
           "qeeeq",
-          "bcccb",
+          "cddcb",
           "qeebq",
           "qcccb",
           "qeeeq",
           "*NONE*",
-          "*NONE*"
+          "cdddb"
         ],
         [
           "qeq",
@@ -11706,7 +11582,7 @@
           "baaaq",
           "*NONE*",
           "*NONE*",
-          "bcccb",
+          "cdddb",
           "cddda",
           "qeeeq"
         ],
@@ -11776,7 +11652,7 @@
           "qcccb",
           "qbbbq",
           "cbbba",
-          "bcccb",
+          "cdddb",
           "*NONE*",
           "qcccb"
         ],
@@ -11784,7 +11660,7 @@
           "qeeeq",
           "qbbbq",
           "qeeeq",
-          "*NONE*",
+          "caaab",
           "baaaq",
           "*NONE*",
           "qeeeq",
@@ -11813,7 +11689,7 @@
         [
           "qcccb",
           "qeeeq",
-          "pqeeq",
+          "qreeq",
           "qeeeq",
           "qbbbq",
           "*NONE*",
@@ -11823,7 +11699,7 @@
         [
           "qeeeq",
           "*NONE*",
-          "bcccb",
+          "cdddb",
           "qcccb",
           "*NONE*",
           "qeeeq",
@@ -13912,8 +13788,8 @@
       "missing_p50": [],
       "novel": [],
       "produced": {
-        "c": 70,
-        "ab": 30
+        "c": 66,
+        "ab": 34
       },
       "reference_p50": [
         "c"
@@ -13925,286 +13801,6 @@
           "c",
           "c",
           "*NONE*",
-          "c",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "c",
-          "c",
-          "*NONE*",
-          "c",
-          "*CAP*",
-          "c",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "ab",
-          "c",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "c",
-          "*NONE*",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "c",
-          "c",
-          "ab",
-          "c",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*",
-          "c"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "c",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*",
-          "ab",
-          "*NONE*"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "c",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*",
-          "ab"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "*NONE*",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "*NONE*",
-          "*CAP*",
-          "ab",
-          "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "c",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "*CAP*",
-          "c",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "ab"
-        ],
-        [
-          "c",
-          "c",
-          "ab",
-          "c",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "c",
-          "ab",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "c",
-          "*CAP*",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "c",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "c",
-          "*NONE*",
-          "*CAP*",
-          "ab",
-          "*CAP*"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "ab",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "c",
-          "c",
-          "ab",
-          "c",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "c"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "c",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "ab"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "c",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "ab",
-          "c",
-          "c",
-          "c",
-          "c",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "c",
-          "c",
-          "ab",
-          "c",
-          "c",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "ab",
-          "c",
-          "c",
-          "c",
-          "c",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*",
-          "ab"
-        ],
-        [
-          "c",
-          "c",
-          "ab",
-          "c",
-          "c",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "c",
           "*NONE*",
           "*NONE*",
           "*NONE*",
@@ -14214,19 +13810,9 @@
           "c",
           "c",
           "*NONE*",
+          "*NONE*",
+          "*NONE*",
           "c",
-          "c",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "c",
-          "*CAP*",
-          "ab",
           "*NONE*",
           "*CAP*"
         ],
@@ -14234,138 +13820,28 @@
           "c",
           "c",
           "c",
-          "c",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "c",
-          "c",
           "ab",
-          "c",
-          "c",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "c",
-          "*CAP*",
           "*NONE*",
           "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "ab"
-        ],
-        [
-          "c",
-          "c",
           "*NONE*",
-          "c",
-          "c",
-          "ab",
-          "*CAP*",
           "*CAP*"
         ],
         [
           "c",
           "c",
           "c",
-          "ab",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "c",
-          "c",
-          "c",
           "*NONE*",
-          "ab",
-          "c",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "c",
           "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "c",
-          "c",
-          "ab",
-          "c",
-          "c",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "*CAP*",
           "*NONE*",
-          "*CAP*",
-          "c",
-          "*CAP*"
-        ],
-        [
-          "c",
-          "c",
-          "ab",
-          "c",
-          "c",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "c",
-          "ab",
-          "*CAP*",
           "*NONE*",
           "*NONE*"
         ],
         [
           "c",
-          "c",
-          "c",
+          "*NONE*",
           "ab",
           "c",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "c",
-          "c",
-          "ab",
-          "c",
-          "*CAP*",
+          "*NONE*",
           "*NONE*",
           "*NONE*",
           "c"
@@ -14374,200 +13850,150 @@
           "c",
           "c",
           "c",
+          "*NONE*",
+          "*CAP*",
+          "*NONE*",
+          "*NONE*",
+          "*CAP*"
+        ],
+        [
+          "c",
+          "*NONE*",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
           "ab",
-          "*NONE*",
-          "*CAP*",
-          "c",
           "*NONE*"
         ],
         [
           "c",
           "c",
           "c",
-          "c",
-          "ab",
           "*NONE*",
           "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "c",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
           "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "c",
-          "*NONE*",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "c",
-          "*NONE*",
-          "c",
-          "c",
-          "c",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "ab",
-          "c",
-          "c",
-          "c",
-          "*NONE*",
-          "*NONE*",
-          "c",
-          "*CAP*"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "c",
-          "*CAP*",
-          "*CAP*",
           "*NONE*",
           "ab"
         ],
         [
           "c",
           "c",
-          "c",
           "*NONE*",
           "*NONE*",
-          "ab",
-          "c",
-          "*CAP*"
-        ],
-        [
-          "ab",
-          "c",
-          "c",
-          "c",
-          "c",
-          "*CAP*",
           "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
+          "*NONE*",
           "*NONE*",
           "*NONE*"
         ],
         [
-          "ab",
-          "c",
-          "c",
-          "c",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "ab",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "ab",
-          "c",
-          "c",
           "c",
           "c",
           "*NONE*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "c",
-          "ab",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "c",
+          "*NONE*",
           "*NONE*",
           "ab",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "c",
           "*NONE*",
-          "ab",
-          "*CAP*",
-          "*CAP*"
+          "*NONE*"
         ],
         [
-          "c",
-          "c",
           "c",
           "*NONE*",
           "c",
-          "*CAP*",
-          "*CAP*",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
           "*NONE*"
         ],
         [
           "c",
           "c",
-          "ab",
+          "*NONE*",
+          "*NONE*",
           "c",
           "*NONE*",
-          "*CAP*",
-          "*CAP*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "c",
+          "*NONE*",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "ab"
+        ],
+        [
+          "c",
+          "c",
+          "ab",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "c",
+          "c",
+          "c",
+          "*NONE*",
+          "ab",
+          "*NONE*",
+          "*NONE*",
+          "*CAP*"
+        ],
+        [
+          "c",
+          "c",
+          "*NONE*",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "c",
+          "c",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "c",
+          "*NONE*",
+          "c",
+          "*NONE*",
+          "c",
+          "*NONE*",
+          "ab",
+          "*CAP*"
+        ],
+        [
+          "c",
+          "c",
+          "*NONE*",
+          "ab",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "c",
+          "c",
+          "ab",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
           "c"
         ],
         [
@@ -14575,8 +14001,638 @@
           "c",
           "c",
           "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "ab"
+        ],
+        [
+          "c",
+          "c",
+          "*NONE*",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "ab",
+          "c",
+          "c",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "c",
+          "c",
+          "ab",
+          "*NONE*",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "ab",
+          "c",
+          "c",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "c",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "ab"
+        ],
+        [
+          "c",
+          "c",
+          "ab",
+          "*NONE*",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "c",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "c",
+          "c",
+          "*NONE*",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "c",
+          "c",
+          "*NONE*",
+          "c",
+          "*NONE*",
+          "*NONE*",
           "*CAP*",
+          "*NONE*"
+        ],
+        [
+          "c",
+          "c",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "ab",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "c",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "c",
+          "c",
+          "ab",
+          "c",
           "*CAP*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "c",
+          "c",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "c",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "ab"
+        ],
+        [
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "c",
+          "c",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "c",
+          "*NONE*",
+          "c",
+          "ab",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "c",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "ab",
+          "c",
+          "*CAP*",
+          "*CAP*"
+        ],
+        [
+          "c",
+          "c",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "c",
+          "c",
+          "ab",
+          "*CAP*",
+          "*NONE*",
+          "*CAP*",
+          "c",
+          "*NONE*"
+        ],
+        [
+          "c",
+          "*NONE*",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "c",
+          "*NONE*"
+        ],
+        [
+          "c",
+          "*NONE*",
+          "ab",
+          "c",
+          "c",
+          "*CAP*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "c",
+          "c",
+          "*NONE*",
+          "c",
+          "ab",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "c",
+          "c",
+          "c",
+          "ab",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "c",
+          "c",
+          "ab",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "c"
+        ],
+        [
+          "c",
+          "*NONE*",
+          "c",
+          "ab",
+          "*NONE*",
+          "*NONE*",
+          "c",
+          "*NONE*"
+        ],
+        [
+          "c",
+          "c",
+          "c",
+          "*NONE*",
+          "ab",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "c",
+          "c",
+          "*NONE*",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "c",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "c",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "c",
+          "c",
+          "*NONE*",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "c",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "ab",
+          "c",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "c",
+          "*NONE*"
+        ],
+        [
+          "c",
+          "c",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "ab"
+        ],
+        [
+          "c",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "ab",
+          "c",
+          "*NONE*"
+        ],
+        [
+          "ab",
+          "c",
+          "c",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*CAP*"
+        ],
+        [
+          "c",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "ab",
+          "c",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "c",
+          "*NONE*",
+          "c",
+          "ab",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "ab",
+          "c",
+          "c",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "c",
+          "*NONE*",
+          "c",
+          "c",
+          "ab",
+          "*CAP*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "c",
+          "c",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "ab",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "c",
+          "c",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "ab",
+          "*NONE*",
+          "*CAP*"
+        ],
+        [
+          "c",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "c",
+          "*NONE*",
+          "ab",
+          "*NONE*",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "c"
+        ],
+        [
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "ab"
+        ],
+        [
+          "c",
+          "*NONE*",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "ab"
+        ],
+        [
+          "c",
+          "c",
+          "*NONE*",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "c",
+          "c",
+          "*NONE*",
+          "c",
+          "ab",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "c",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "ab",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "c",
+          "c",
+          "*NONE*",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "c",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "c",
+          "*NONE*",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "c",
+          "*NONE*",
+          "c",
+          "*NONE*",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "c",
+          "c",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*CAP*",
+          "*NONE*"
+        ],
+        [
+          "*NONE*",
+          "c",
+          "c",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "c",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "c",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "c",
+          "*NONE*",
+          "c",
+          "*NONE*",
+          "c",
+          "ab",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "c",
+          "c",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "c",
+          "c",
+          "c",
+          "ab",
+          "*NONE*",
+          "*NONE*",
+          "*CAP*",
+          "*NONE*"
+        ],
+        [
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "ab",
+          "c",
+          "*NONE*",
+          "c",
+          "*NONE*"
+        ],
+        [
+          "ab",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "c",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "c",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "c",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "c",
+          "*NONE*",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "c",
           "*NONE*",
           "ab"
         ],
@@ -14584,188 +14640,8 @@
           "c",
           "c",
           "c",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*",
-          "*NONE*",
-          "ab"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "c",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "c",
-          "*CAP*",
           "*NONE*",
           "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "*CAP*",
-          "*CAP*",
-          "ab",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "c",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "*CAP*",
-          "c",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "*NONE*",
-          "c",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "c",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "*CAP*",
-          "*CAP*",
-          "c",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "*NONE*",
-          "c",
-          "ab",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "c",
-          "*CAP*",
-          "*NONE*",
-          "ab",
-          "*NONE*"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "ab",
-          "*NONE*",
-          "c",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "ab",
-          "c",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "ab",
-          "c",
-          "c",
-          "c",
-          "*CAP*",
-          "c",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "c",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "*NONE*",
-          "*CAP*",
-          "c",
-          "*NONE*",
-          "ab"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "c",
-          "*CAP*",
           "*NONE*",
           "ab",
           "*NONE*"
@@ -14774,18 +14650,18 @@
           "ab",
           "c",
           "c",
-          "c",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
           "*NONE*"
         ],
         [
           "c",
-          "c",
-          "c",
-          "*CAP*",
           "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "c",
           "*NONE*",
           "c",
           "*CAP*"
@@ -14793,11 +14669,21 @@
         [
           "c",
           "c",
-          "c",
-          "*CAP*",
+          "*NONE*",
+          "*NONE*",
           "c",
           "*NONE*",
-          "*CAP*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "c",
+          "*NONE*",
+          "c",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
           "*NONE*"
         ],
         [
@@ -14806,16 +14692,6 @@
           "c",
           "*NONE*",
           "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "c",
-          "*CAP*",
           "ab",
           "*CAP*",
           "*CAP*"
@@ -14824,19 +14700,19 @@
           "c",
           "ab",
           "c",
+          "*NONE*",
           "c",
-          "c",
+          "*NONE*",
           "*CAP*",
-          "*CAP*",
-          "*CAP*"
+          "*NONE*"
         ],
         [
           "c",
           "c",
+          "*NONE*",
           "c",
-          "c",
-          "*CAP*",
-          "*CAP*",
+          "*NONE*",
+          "*NONE*",
           "ab",
           "*CAP*"
         ],
@@ -14844,18 +14720,28 @@
           "c",
           "c",
           "c",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
           "c",
-          "*CAP*",
+          "*NONE*",
+          "c",
           "*NONE*",
           "*NONE*",
-          "*CAP*"
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
         ],
         [
           "c",
           "c",
-          "c",
           "*NONE*",
-          "*CAP*",
+          "*NONE*",
+          "*NONE*",
           "*NONE*",
           "*NONE*",
           "*NONE*"
@@ -14865,54 +14751,44 @@
           "c",
           "c",
           "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "c",
-          "c",
-          "c",
-          "c",
-          "*CAP*",
-          "*CAP*",
+          "*NONE*",
+          "*NONE*",
           "*NONE*",
           "*NONE*"
         ],
         [
           "c",
           "c",
-          "c",
+          "*NONE*",
           "c",
           "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
         ],
         [
           "c",
           "ab",
           "c",
-          "c",
+          "*NONE*",
           "*NONE*",
           "c",
-          "*CAP*",
+          "*NONE*",
           "*NONE*"
         ],
         [
           "c",
           "c",
-          "c",
+          "*NONE*",
           "c",
           "*CAP*",
           "*NONE*",
-          "*CAP*",
-          "*CAP*"
+          "ab",
+          "*NONE*"
         ],
         [
           "c",
-          "c",
+          "*NONE*",
           "c",
           "c",
           "*NONE*",
@@ -14938,82 +14814,12 @@
       "sequences": [
         [
           "d",
-          "d",
-          "d",
-          "*NONE*",
-          "*CAP*",
           "*NONE*",
           "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "d",
           "*NONE*",
-          "d",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "*NONE*",
-          "d",
-          "d",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
           "*NONE*",
           "*NONE*",
           "d",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
           "*NONE*"
         ],
         [
@@ -15021,656 +14827,6 @@
           "d",
           "*NONE*",
           "*NONE*",
-          "d",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*NONE*",
-          "*CAP*",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "*NONE*",
-          "*NONE*",
-          "d",
-          "d",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "*NONE*",
-          "d",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "d",
-          "*NONE*",
-          "*NONE*",
-          "d",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "*NONE*",
-          "*NONE*",
-          "d",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "*NONE*",
-          "d",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "d",
-          "*NONE*",
-          "*NONE*",
-          "d",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "d",
-          "d",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "*NONE*",
-          "d",
-          "d",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "*NONE*",
-          "d",
-          "d",
-          "*NONE*",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "*NONE*",
-          "d",
-          "*CAP*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "d",
-          "*NONE*",
-          "d",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "d",
-          "*NONE*",
-          "d",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*NONE*",
-          "*CAP*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "*NONE*",
-          "d",
-          "d",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "d",
-          "*NONE*",
-          "*NONE*",
-          "d",
-          "*CAP*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "*NONE*",
-          "d",
-          "d",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "*NONE*",
-          "d",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "*NONE*",
-          "d",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "d",
-          "*NONE*",
-          "d",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "d",
-          "*NONE*",
-          "d",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "*NONE*",
-          "d",
-          "d",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*CAP*",
           "*NONE*",
           "*NONE*",
           "*NONE*",
@@ -15681,157 +14837,7 @@
           "d",
           "*NONE*",
           "*NONE*",
-          "d",
           "*NONE*",
-          "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "d",
-          "*NONE*",
-          "d",
-          "*CAP*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "*NONE*",
-          "d",
-          "d",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "*NONE*",
-          "d",
-          "d",
-          "*NONE*",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "*NONE*",
-          "d",
-          "d",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*NONE*",
-          "*CAP*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "d",
-          "*NONE*",
-          "d",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "d",
-          "*NONE*",
-          "d",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*NONE*",
-          "*CAP*",
           "*NONE*",
           "*NONE*",
           "*NONE*"
@@ -15840,35 +14846,135 @@
           "d",
           "*NONE*",
           "d",
-          "d",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
         ],
         [
           "d",
-          "d",
-          "d",
           "*NONE*",
-          "*CAP*",
-          "*CAP*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "d",
           "*NONE*",
           "*NONE*"
         ],
         [
           "d",
           "d",
-          "d",
-          "*CAP*",
-          "*CAP*",
           "*NONE*",
-          "*CAP*",
-          "*CAP*"
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
         ],
         [
           "d",
           "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
           "*NONE*",
           "*NONE*",
           "d",
@@ -15883,6 +14989,776 @@
           "*NONE*",
           "*NONE*",
           "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "d",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "*NONE*",
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "d"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "d",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "d",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "*NONE*",
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
           "d",
           "*NONE*"
         ],
@@ -15890,41 +15766,41 @@
           "d",
           "d",
           "*NONE*",
-          "d",
-          "*CAP*",
           "*NONE*",
           "*NONE*",
-          "*CAP*"
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
         ],
         [
           "d",
-          "d",
-          "d",
-          "*CAP*",
           "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
           "d",
-          "d",
-          "d",
-          "*CAP*",
           "*NONE*",
           "*NONE*",
-          "*CAP*",
+          "*NONE*",
+          "*NONE*",
           "*NONE*"
         ],
         [
           "d",
           "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
           "d",
           "*NONE*",
           "*NONE*",
           "*NONE*",
-          "*CAP*",
-          "*CAP*"
+          "*NONE*",
+          "*NONE*"
         ],
         [
           "d",
@@ -15933,7 +15809,7 @@
           "*NONE*",
           "*NONE*",
           "*NONE*",
-          "d",
+          "*NONE*",
           "*NONE*"
         ]
       ]
@@ -15955,9 +15831,9 @@
         [
           "z",
           "z",
-          "z",
           "*NONE*",
-          "*CAP*",
+          "*NONE*",
+          "*NONE*",
           "*NONE*",
           "*NONE*",
           "*NONE*"
@@ -15967,69 +15843,9 @@
           "z",
           "*NONE*",
           "*NONE*",
-          "z",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "z",
-          "z",
-          "z",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "z",
           "*NONE*",
           "*NONE*",
-          "z",
-          "z",
-          "*CAP*",
           "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "z",
-          "z",
-          "z",
-          "*NONE*",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "z",
-          "z",
-          "z",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "z",
-          "z",
-          "z",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "z",
-          "*NONE*",
-          "z",
-          "z",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
           "*NONE*"
         ],
         [
@@ -16037,204 +15853,24 @@
           "z",
           "*NONE*",
           "*NONE*",
-          "z",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "z",
-          "z",
-          "*NONE*",
-          "z",
-          "*CAP*",
           "*NONE*",
           "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "z",
-          "z",
-          "z",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "z",
-          "z",
-          "z",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "z",
-          "z",
-          "*NONE*",
-          "z",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "z",
-          "z",
-          "z",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "z",
-          "z",
-          "z",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "z",
-          "z",
-          "*NONE*",
-          "*NONE*",
-          "z",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "z",
-          "z",
-          "*NONE*",
-          "*NONE*",
-          "z",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "z",
-          "z",
-          "*NONE*",
-          "z",
-          "*NONE*",
-          "*CAP*",
           "*NONE*",
           "*NONE*"
         ],
         [
           "z",
-          "z",
-          "z",
           "*NONE*",
           "*NONE*",
           "*NONE*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "z",
-          "z",
-          "z",
-          "*CAP*",
           "*NONE*",
-          "*CAP*",
-          "*CAP*",
+          "z",
+          "*NONE*",
           "*NONE*"
         ],
         [
           "z",
-          "z",
           "*NONE*",
-          "z",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "z",
-          "z",
-          "z",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "z",
-          "z",
-          "*NONE*",
-          "*NONE*",
-          "z",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "z",
-          "z",
-          "*NONE*",
-          "z",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "z",
-          "z",
-          "z",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "z",
-          "z",
-          "*NONE*",
-          "z",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "z",
-          "z",
-          "z",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "z",
-          "z",
-          "z",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "z",
-          "z",
           "z",
           "*NONE*",
           "*NONE*",
@@ -16245,168 +15881,8 @@
         [
           "z",
           "z",
-          "z",
           "*NONE*",
           "*NONE*",
-          "*CAP*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "z",
-          "z",
-          "z",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "z",
-          "z",
-          "z",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "z",
-          "z",
-          "z",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "z",
-          "z",
-          "*NONE*",
-          "z",
-          "*CAP*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "z",
-          "z",
-          "z",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "z",
-          "z",
-          "z",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "z",
-          "z",
-          "z",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "z",
-          "z",
-          "z",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "z",
-          "*NONE*",
-          "*NONE*",
-          "z",
-          "*NONE*",
-          "z",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "z",
-          "z",
-          "z",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "z",
-          "z",
-          "z",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "z",
-          "z",
-          "z",
-          "*CAP*",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "z",
-          "z",
-          "z",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "z",
-          "z",
-          "z",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "z",
-          "z",
-          "*NONE*",
-          "z",
-          "*CAP*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "z",
-          "z",
-          "*NONE*",
-          "z",
           "*NONE*",
           "*NONE*",
           "*NONE*",
@@ -16414,10 +15890,40 @@
         ],
         [
           "z",
+          "*NONE*",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "*NONE*",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "z",
+          "*NONE*"
+        ],
+        [
           "z",
           "z",
-          "*CAP*",
-          "*CAP*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
           "*NONE*",
           "*NONE*",
           "*NONE*"
@@ -16427,266 +15933,16 @@
           "z",
           "*NONE*",
           "*NONE*",
-          "z",
-          "*CAP*",
           "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "z",
-          "z",
-          "z",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "z",
-          "z",
-          "z",
           "*NONE*",
-          "*CAP*",
-          "*CAP*",
           "*NONE*",
           "*NONE*"
         ],
         [
           "z",
           "z",
-          "z",
           "*NONE*",
           "*NONE*",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "z",
-          "*NONE*",
-          "z",
-          "z",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "z",
-          "z",
-          "z",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "z",
-          "z",
-          "z",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "z",
-          "z",
-          "z",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "z",
-          "z",
-          "z",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "z",
-          "z",
-          "z",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "z",
-          "z",
-          "z",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "z",
-          "z",
-          "z",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "z",
-          "z",
-          "z",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "z",
-          "z",
-          "z",
-          "*CAP*",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "z",
-          "z",
-          "z",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "z",
-          "z",
-          "z",
-          "*CAP*",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "z",
-          "z",
-          "z",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "z",
-          "z",
-          "*NONE*",
-          "z",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "z",
-          "z",
-          "z",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "z",
-          "z",
-          "z",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "z",
-          "*NONE*",
-          "*NONE*",
-          "z",
-          "z",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "z",
-          "z",
-          "*NONE*",
-          "z",
-          "*CAP*",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "z",
-          "z",
-          "z",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "z",
-          "z",
-          "z",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "z",
-          "z",
-          "z",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "z",
-          "z",
-          "z",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "z",
-          "z",
-          "z",
-          "*CAP*",
           "*NONE*",
           "*NONE*",
           "*NONE*",
@@ -16697,49 +15953,9 @@
           "*NONE*",
           "*NONE*",
           "z",
-          "z",
           "*NONE*",
           "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "z",
-          "z",
           "*NONE*",
-          "*NONE*",
-          "z",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "z",
-          "z",
-          "z",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "z",
-          "z",
-          "z",
-          "*CAP*",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "z",
-          "*NONE*",
-          "z",
-          "z",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*",
           "*NONE*"
         ],
         [
@@ -16748,46 +15964,16 @@
           "*NONE*",
           "*NONE*",
           "*NONE*",
-          "z",
           "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "z",
-          "z",
-          "z",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*",
           "*NONE*",
           "*NONE*"
         ],
         [
           "z",
-          "z",
-          "z",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "z",
           "*NONE*",
           "z",
-          "z",
-          "*CAP*",
           "*NONE*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "z",
-          "z",
-          "z",
           "*NONE*",
-          "*CAP*",
           "*NONE*",
           "*NONE*",
           "*NONE*"
@@ -16795,9 +15981,19 @@
         [
           "z",
           "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
           "z",
-          "*CAP*",
-          "*CAP*",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
           "*NONE*",
           "*NONE*",
           "*NONE*"
@@ -16807,29 +16003,9 @@
           "*NONE*",
           "*NONE*",
           "z",
-          "z",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "z",
-          "z",
-          "z",
           "*NONE*",
           "*NONE*",
           "*NONE*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "z",
-          "z",
-          "*NONE*",
-          "z",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*",
           "*NONE*"
         ],
         [
@@ -16838,53 +16014,293 @@
           "*NONE*",
           "*NONE*",
           "*NONE*",
-          "z",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "z",
-          "z",
-          "z",
-          "*NONE*",
-          "*CAP*",
           "*NONE*",
           "*NONE*",
           "*NONE*"
         ],
         [
           "z",
-          "*NONE*",
-          "*NONE*",
-          "z",
-          "z",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "z",
-          "z",
           "z",
           "*NONE*",
-          "*CAP*",
-          "*CAP*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
           "*NONE*",
           "*NONE*"
         ],
         [
           "z",
           "z",
-          "z",
-          "*CAP*",
-          "*CAP*",
           "*NONE*",
-          "*CAP*",
-          "*CAP*"
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
         ],
         [
           "z",
           "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "*NONE*",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "*NONE*",
+          "z",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "*NONE*",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "*NONE*",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "*NONE*",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "*NONE*",
+          "z",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "*NONE*",
           "*NONE*",
           "*NONE*",
           "z",
@@ -16899,48 +16315,38 @@
           "*NONE*",
           "*NONE*",
           "*NONE*",
-          "z",
+          "*NONE*",
           "*NONE*"
         ],
         [
           "z",
           "z",
-          "z",
-          "*NONE*",
-          "*CAP*",
           "*NONE*",
           "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "z",
-          "z",
-          "z",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "z",
-          "z",
-          "*NONE*",
-          "z",
           "*NONE*",
           "*NONE*",
-          "*CAP*",
+          "*NONE*",
           "*NONE*"
         ],
         [
           "z",
           "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "*NONE*",
+          "*NONE*",
           "z",
           "*NONE*",
           "*NONE*",
           "*NONE*",
-          "*CAP*",
-          "*CAP*"
+          "*NONE*"
         ],
         [
           "z",
@@ -16949,7 +16355,477 @@
           "*NONE*",
           "*NONE*",
           "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
           "z",
+          "*NONE*",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "*NONE*",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "*NONE*",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "*NONE*",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "*NONE*",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "*NONE*",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "*NONE*",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "z",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "z",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "*NONE*",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "*NONE*",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "*NONE*",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "z"
+        ],
+        [
+          "z",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "*NONE*",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "*NONE*",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
           "*NONE*"
         ]
       ]
@@ -16961,8 +16837,8 @@
       "missing_p50": [],
       "novel": [],
       "produced": {
-        "x": 73,
-        "zy": 27
+        "x": 71,
+        "zy": 29
       },
       "reference_p50": [
         "x"
@@ -16974,7 +16850,7 @@
           "x",
           "zy",
           "x",
-          "x",
+          "*NONE*",
           "*CAP*",
           "*CAP*",
           "*NONE*"
@@ -16982,9 +16858,9 @@
         [
           "x",
           "x",
-          "x",
           "*NONE*",
-          "*CAP*",
+          "*NONE*",
+          "*NONE*",
           "*NONE*",
           "*NONE*",
           "zy"
@@ -16992,11 +16868,11 @@
         [
           "x",
           "x",
-          "x",
+          "*NONE*",
           "zy",
+          "*NONE*",
           "x",
           "*NONE*",
-          "*CAP*",
           "*NONE*"
         ],
         [
@@ -17004,38 +16880,38 @@
           "x",
           "x",
           "x",
-          "x",
-          "*CAP*",
           "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "x",
-          "x",
-          "zy",
-          "x",
-          "*CAP*",
           "*NONE*",
-          "*CAP*",
+          "*NONE*",
           "*NONE*"
         ],
         [
           "x",
           "x",
+          "zy",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
           "x",
-          "*CAP*",
+          "x",
           "*NONE*",
           "*NONE*",
-          "*CAP*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
           "zy"
         ],
         [
           "x",
           "x",
-          "x",
-          "*CAP*",
           "*NONE*",
-          "*CAP*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
           "zy",
           "*NONE*"
         ],
@@ -17044,8 +16920,8 @@
           "x",
           "x",
           "zy",
-          "x",
-          "*CAP*",
+          "*NONE*",
+          "*NONE*",
           "*CAP*",
           "*NONE*"
         ],
@@ -17053,99 +16929,119 @@
           "x",
           "x",
           "x",
-          "x",
-          "*CAP*",
           "*NONE*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "x",
-          "x",
-          "zy",
-          "x",
-          "x",
-          "*CAP*",
           "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "x",
-          "x",
-          "x",
-          "zy",
-          "*CAP*",
-          "*CAP*",
           "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "x",
-          "x",
-          "x",
-          "x",
-          "zy",
-          "*CAP*",
-          "*CAP*",
+          "*NONE*",
           "*NONE*"
         ],
         [
+          "x",
+          "*NONE*",
           "zy",
           "x",
           "x",
+          "*CAP*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
           "x",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
+          "x",
+          "*NONE*",
+          "zy",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
           "*NONE*"
         ],
         [
           "x",
           "x",
           "x",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
+          "*NONE*",
+          "zy",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "zy",
+          "x",
+          "x",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
         ],
         [
           "x",
           "x",
-          "x",
-          "x",
-          "zy",
-          "*CAP*",
-          "*CAP*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
           "*NONE*"
         ],
         [
           "x",
           "x",
           "x",
+          "*NONE*",
           "zy",
-          "*CAP*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "x",
           "x",
           "*NONE*",
-          "*CAP*"
+          "zy",
+          "*NONE*",
+          "x",
+          "*NONE*",
+          "*NONE*"
         ],
         [
           "x",
           "x",
           "x",
-          "x",
-          "*CAP*",
-          "*CAP*",
           "*NONE*",
-          "*CAP*"
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
         ],
         [
           "x",
           "x",
-          "x",
-          "*CAP*",
           "*NONE*",
-          "*CAP*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "x"
+        ],
+        [
+          "x",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "x",
+          "zy",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "x",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "x",
+          "*NONE*",
           "*NONE*",
           "x"
         ],
@@ -17155,48 +17051,28 @@
           "x",
           "*NONE*",
           "*NONE*",
-          "zy",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "x",
-          "x",
           "*NONE*",
-          "x",
           "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "x"
-        ],
-        [
-          "x",
-          "x",
-          "x",
-          "x",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*",
           "zy"
         ],
         [
           "x",
           "x",
+          "*NONE*",
           "x",
-          "*CAP*",
-          "x",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
         ],
         [
           "zy",
           "x",
           "x",
           "x",
-          "x",
-          "*CAP*",
-          "*CAP*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
           "*NONE*"
         ],
         [
@@ -17204,20 +17080,20 @@
           "x",
           "zy",
           "x",
-          "x",
+          "*NONE*",
           "*NONE*",
           "*CAP*",
-          "*CAP*"
+          "*NONE*"
         ],
         [
           "zy",
           "x",
           "x",
           "x",
-          "x",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
         ],
         [
           "zy",
@@ -17226,31 +17102,31 @@
           "x",
           "*CAP*",
           "*CAP*",
-          "x",
-          "*CAP*"
-        ],
-        [
-          "x",
-          "x",
-          "x",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*",
           "*NONE*",
           "*CAP*"
         ],
         [
           "x",
           "x",
-          "x",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
           "*NONE*",
-          "*CAP*"
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
         ],
         [
           "x",
+          "x",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "*NONE*",
           "x",
           "x",
           "zy",
@@ -17261,50 +17137,10 @@
         ],
         [
           "x",
-          "x",
-          "x",
           "*NONE*",
           "*NONE*",
-          "*CAP*",
-          "zy",
-          "*NONE*"
-        ],
-        [
-          "x",
-          "x",
-          "x",
           "x",
           "*NONE*",
-          "zy",
-          "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "x",
-          "x",
-          "x",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "x",
-          "zy",
-          "x",
-          "x",
-          "x",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "x",
-          "x",
-          "x",
-          "x",
-          "*CAP*",
           "*NONE*",
           "zy",
           "*NONE*"
@@ -17313,30 +17149,40 @@
           "x",
           "x",
           "x",
-          "x",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
+          "*NONE*",
+          "*NONE*",
+          "zy",
+          "*NONE*",
           "*NONE*"
         ],
         [
           "x",
           "x",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
           "x",
-          "*CAP*",
-          "*CAP*",
           "zy",
-          "*CAP*",
+          "x",
+          "*NONE*",
+          "x",
+          "*NONE*",
+          "*NONE*",
           "*CAP*"
         ],
         [
           "x",
           "x",
           "x",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
           "zy",
-          "*CAP*",
-          "x",
-          "*CAP*",
           "*NONE*"
         ],
         [
@@ -17345,7 +17191,37 @@
           "x",
           "*NONE*",
           "*NONE*",
-          "*CAP*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "x",
+          "x",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "zy",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "x",
+          "x",
+          "*NONE*",
+          "zy",
+          "*NONE*",
+          "x",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "x",
+          "*NONE*",
+          "x",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
           "*NONE*",
           "x"
         ],
@@ -17353,30 +17229,10 @@
           "x",
           "zy",
           "x",
+          "*NONE*",
           "x",
-          "x",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "x",
-          "x",
-          "x",
-          "x",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "x",
-          "x",
-          "x",
-          "*CAP*",
-          "zy",
-          "*CAP*",
-          "x",
+          "*NONE*",
+          "*NONE*",
           "*NONE*"
         ],
         [
@@ -17385,45 +17241,65 @@
           "x",
           "*CAP*",
           "*NONE*",
-          "x",
           "*CAP*",
+          "*NONE*",
+          "*CAP*"
+        ],
+        [
+          "x",
+          "*NONE*",
+          "x",
+          "*NONE*",
+          "zy",
+          "*NONE*",
+          "x",
           "*NONE*"
         ],
         [
           "x",
           "x",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "x",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
           "x",
           "x",
+          "*NONE*",
+          "x",
           "*CAP*",
-          "*CAP*",
+          "*NONE*",
           "*NONE*",
           "*CAP*"
         ],
         [
           "x",
           "x",
-          "x",
           "*NONE*",
           "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "zy"
-        ],
-        [
-          "x",
-          "x",
-          "x",
           "*NONE*",
-          "*CAP*",
           "*NONE*",
           "*NONE*",
           "zy"
         ],
         [
+          "*NONE*",
           "x",
           "x",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "zy"
+        ],
+        [
           "x",
-          "*CAP*",
+          "x",
+          "*NONE*",
+          "*NONE*",
           "*NONE*",
           "x",
           "zy",
@@ -17433,7 +17309,7 @@
           "x",
           "x",
           "zy",
-          "x",
+          "*NONE*",
           "*NONE*",
           "*NONE*",
           "*NONE*",
@@ -17444,98 +17320,48 @@
           "x",
           "x",
           "x",
-          "x",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "x",
-          "zy",
-          "x",
-          "x",
-          "x",
-          "*CAP*",
-          "*CAP*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
           "*NONE*"
         ],
         [
           "x",
-          "x",
-          "x",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "x",
-          "x",
           "zy",
-          "x",
-          "x",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "zy",
-          "x",
-          "x",
-          "x",
-          "*CAP*",
-          "*CAP*",
-          "x",
-          "*CAP*"
-        ],
-        [
-          "zy",
-          "x",
-          "x",
           "x",
           "*NONE*",
           "*NONE*",
-          "x",
-          "*CAP*"
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
         ],
         [
           "x",
+          "*NONE*",
           "x",
-          "x",
-          "zy",
-          "x",
-          "*CAP*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
           "*NONE*",
           "*NONE*"
         ],
         [
           "x",
           "x",
-          "x",
-          "*NONE*",
-          "*NONE*",
           "zy",
           "x",
-          "*CAP*"
-        ],
-        [
-          "x",
-          "x",
-          "x",
-          "x",
           "*NONE*",
-          "*CAP*",
+          "*NONE*",
           "*NONE*",
           "*NONE*"
         ],
         [
+          "zy",
           "x",
+          "*NONE*",
           "x",
-          "x",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
+          "*NONE*",
+          "*NONE*",
           "*NONE*",
           "*NONE*"
         ],
@@ -17543,31 +17369,11 @@
           "zy",
           "x",
           "x",
-          "x",
           "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "x",
-          "x",
-          "x",
-          "zy",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "zy",
-          "x",
-          "x",
-          "x",
-          "x",
           "*NONE*",
-          "*CAP*",
-          "*CAP*"
+          "*NONE*",
+          "x",
+          "*NONE*"
         ],
         [
           "x",
@@ -17576,37 +17382,17 @@
           "zy",
           "*NONE*",
           "*NONE*",
-          "*CAP*",
-          "*CAP*"
+          "*NONE*",
+          "*NONE*"
         ],
         [
           "x",
-          "x",
-          "x",
+          "*NONE*",
+          "*NONE*",
           "x",
           "*NONE*",
           "zy",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
           "x",
-          "x",
-          "x",
-          "x",
-          "*NONE*",
-          "zy",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "x",
-          "x",
-          "x",
-          "x",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*",
           "*NONE*"
         ],
         [
@@ -17615,28 +17401,118 @@
           "*NONE*",
           "x",
           "*NONE*",
-          "*CAP*",
-          "*CAP*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "x",
+          "*NONE*",
+          "x",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "zy",
+          "x",
+          "*NONE*",
+          "x",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
           "*NONE*"
         ],
         [
           "x",
           "x",
+          "*NONE*",
+          "zy",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "zy",
+          "x",
+          "x",
+          "*NONE*",
+          "*NONE*",
+          "x",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "x",
+          "x",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "x",
+          "x",
+          "x",
+          "*NONE*",
+          "*NONE*",
+          "zy",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "x",
+          "x",
+          "*NONE*",
+          "x",
+          "*NONE*",
+          "zy",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "x",
+          "x",
+          "x",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "x",
+          "x",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "x",
+          "*NONE*",
           "x",
           "zy",
-          "*CAP*",
-          "*CAP*",
+          "*NONE*",
+          "*NONE*",
           "x",
           "*NONE*"
         ],
         [
           "x",
+          "*NONE*",
           "x",
+          "*NONE*",
           "x",
-          "*CAP*",
-          "x",
-          "*CAP*",
-          "*CAP*",
+          "*NONE*",
+          "*NONE*",
           "zy"
         ],
         [
@@ -17644,119 +17520,119 @@
           "zy",
           "x",
           "x",
-          "x",
-          "*CAP*",
-          "*CAP*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
           "*CAP*"
         ],
         [
           "x",
           "x",
           "zy",
-          "x",
+          "*NONE*",
           "x",
           "*NONE*",
           "*NONE*",
-          "*CAP*"
+          "*NONE*"
         ],
         [
           "x",
           "x",
           "x",
-          "x",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
         ],
         [
           "x",
           "x",
           "x",
-          "x",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
         ],
         [
           "x",
           "zy",
           "x",
-          "x",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "x",
-          "x",
-          "x",
-          "*CAP*",
           "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "x",
-          "x",
-          "x",
-          "*CAP*",
           "*NONE*",
-          "x",
-          "zy",
-          "*CAP*"
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
         ],
         [
           "x",
+          "x",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "x",
+          "x",
+          "*NONE*",
+          "*NONE*",
           "*NONE*",
           "x",
           "zy",
-          "x",
-          "*NONE*",
-          "x",
           "*CAP*"
         ],
         [
           "x",
+          "*NONE*",
           "x",
           "zy",
+          "*NONE*",
+          "*NONE*",
           "x",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
+          "*NONE*"
+        ],
+        [
+          "x",
+          "*NONE*",
+          "zy",
+          "x",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
           "x"
         ],
         [
           "x",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
           "x",
+          "zy",
+          "x"
+        ],
+        [
           "x",
+          "*NONE*",
           "x",
-          "*CAP*",
+          "*NONE*",
           "*NONE*",
           "zy",
-          "*CAP*"
+          "*NONE*",
+          "*NONE*"
         ],
         [
           "x",
           "x",
-          "x",
-          "*NONE*",
-          "*NONE*",
           "zy",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "x",
-          "x",
-          "zy",
-          "x",
-          "*CAP*",
           "*NONE*",
-          "*CAP*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
           "x"
         ],
         [
@@ -17765,56 +17641,56 @@
           "x",
           "*NONE*",
           "*NONE*",
-          "x",
           "*NONE*",
-          "*CAP*"
+          "*NONE*",
+          "*NONE*"
         ],
         [
           "x",
+          "*NONE*",
+          "*NONE*",
           "x",
           "x",
-          "x",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
+          "*NONE*",
+          "*NONE*",
           "*NONE*"
         ],
         [
           "zy",
           "x",
           "x",
-          "x",
-          "*CAP*",
           "*NONE*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "x",
-          "x",
-          "x",
-          "x",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
         ],
         [
           "x",
           "x",
           "x",
           "*NONE*",
+          "*NONE*",
           "*CAP*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "x",
+          "x",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
           "x",
           "*NONE*",
           "zy"
         ],
         [
           "x",
-          "x",
+          "*NONE*",
           "*NONE*",
           "x",
-          "*CAP*",
+          "*NONE*",
           "*NONE*",
           "*NONE*",
           "*NONE*"
@@ -17822,49 +17698,49 @@
         [
           "x",
           "x",
-          "x",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "x",
-          "x",
-          "x",
-          "*CAP*",
-          "x",
           "*NONE*",
           "*NONE*",
-          "*CAP*"
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
         ],
         [
           "x",
           "*NONE*",
-          "x",
+          "*NONE*",
           "x",
           "x",
           "*NONE*",
-          "*CAP*",
+          "*NONE*",
+          "*CAP*"
+        ],
+        [
+          "x",
+          "*NONE*",
+          "x",
+          "*NONE*",
+          "x",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "x",
+          "*NONE*",
+          "x",
+          "x",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
           "*NONE*"
         ],
         [
           "x",
           "x",
-          "x",
+          "*NONE*",
           "x",
           "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "x",
-          "x",
-          "x",
-          "x",
-          "*CAP*",
           "zy",
           "*CAP*",
           "*NONE*"
@@ -17873,19 +17749,9 @@
           "x",
           "x",
           "*NONE*",
-          "x",
-          "*CAP*",
-          "*CAP*",
           "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "x",
-          "x",
-          "x",
-          "x",
-          "*CAP*",
-          "*CAP*",
+          "*NONE*",
+          "*NONE*",
           "*NONE*",
           "*NONE*"
         ],
@@ -17893,75 +17759,85 @@
           "x",
           "x",
           "x",
-          "x",
           "*CAP*",
           "*NONE*",
           "*NONE*",
-          "*CAP*"
+          "*NONE*",
+          "*NONE*"
         ],
         [
           "x",
           "x",
           "x",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
           "x",
-          "*CAP*",
+          "x",
+          "*NONE*",
+          "x",
+          "*NONE*",
           "zy",
           "*NONE*",
           "*NONE*"
         ],
         [
           "x",
-          "x",
+          "*NONE*",
           "x",
           "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "x",
-          "x",
-          "zy",
-          "x",
-          "*CAP*",
-          "*CAP*",
+          "*NONE*",
+          "*NONE*",
           "*NONE*",
           "*NONE*"
         ],
         [
           "x",
           "x",
-          "x",
-          "*CAP*",
+          "zy",
           "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "x",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "x",
+          "*NONE*",
+          "*NONE*"
         ],
         [
           "x",
           "zy",
           "x",
-          "x",
+          "*NONE*",
           "*NONE*",
           "x",
-          "*CAP*",
+          "*NONE*",
           "*CAP*"
         ],
         [
           "x",
+          "*NONE*",
           "x",
-          "x",
           "*NONE*",
           "*NONE*",
           "*NONE*",
-          "*CAP*",
-          "*CAP*"
+          "*NONE*",
+          "*NONE*"
         ],
         [
           "x",
-          "x",
+          "*NONE*",
           "x",
           "x",
           "zy",
@@ -17979,9 +17855,7 @@
       "novel": [
         {
           "member": "cac",
-          "count": 1,
-          "in_single_run_set": true,
-          "also_last_cycle": true
+          "count": 1
         }
       ],
       "produced": {
@@ -19004,9 +18878,8 @@
       "missing_p50": [],
       "novel": [],
       "produced": {
-        "d": 73,
-        "abc": 26,
-        "dc": 1
+        "d": 76,
+        "abc": 24
       },
       "reference_p50": [
         "d"
@@ -19014,50 +18887,50 @@
       "episodes_never_answering": 0,
       "sequences": [
         [
+          "*NONE*",
           "d",
+          "*NONE*",
           "d",
-          "d",
-          "*CAP*",
           "*NONE*",
           "*NONE*",
           "abc",
-          "*CAP*"
+          "*NONE*"
         ],
         [
           "d",
           "d",
-          "d",
-          "*CAP*",
-          "*CAP*",
           "*NONE*",
-          "*CAP*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
           "*NONE*"
         ],
         [
           "d",
           "d",
           "abc",
+          "*NONE*",
           "d",
-          "d",
-          "*CAP*",
-          "*CAP*",
+          "*NONE*",
+          "*NONE*",
           "*CAP*"
         ],
         [
           "d",
           "d",
-          "d",
-          "*CAP*",
           "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
         ],
         [
           "abc",
           "d",
           "d",
-          "d",
+          "*NONE*",
           "d",
           "*CAP*",
           "*NONE*",
@@ -19066,21 +18939,51 @@
         [
           "d",
           "d",
-          "d",
-          "*CAP*",
+          "*NONE*",
+          "*NONE*",
           "abc",
           "*NONE*",
-          "*CAP*",
+          "*NONE*",
           "d"
         ],
         [
           "d",
           "d",
           "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
           "d",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "d",
+          "*CAP*"
+        ],
+        [
+          "abc",
+          "d",
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
           "*NONE*"
         ],
         [
@@ -19088,268 +18991,48 @@
           "d",
           "*NONE*",
           "d",
-          "d",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
+          "*NONE*",
           "abc",
-          "d",
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "abc",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*",
           "*NONE*",
           "*NONE*"
         ],
         [
           "d",
           "d",
-          "d",
-          "*CAP*",
           "*NONE*",
-          "*CAP*",
           "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "abc",
-          "d",
-          "d",
-          "d",
           "*NONE*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
           "*NONE*",
-          "abc",
-          "d",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "abc"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "d",
-          "abc",
           "*NONE*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "abc",
-          "*CAP*",
-          "*CAP*",
           "*NONE*"
         ],
         [
           "d",
           "d",
-          "d",
-          "*CAP*",
-          "d",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "*NONE*",
-          "d",
-          "*CAP*",
-          "d",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "abc",
-          "d",
-          "d",
           "*NONE*",
           "*NONE*",
-          "*CAP*",
-          "d"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "d",
           "*NONE*",
-          "*CAP*",
-          "abc",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "d",
           "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "abc"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "*CAP*",
           "*NONE*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*NONE*",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*",
           "*NONE*"
         ],
         [
           "d",
-          "*NONE*",
-          "d",
-          "d",
-          "*CAP*",
-          "abc",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
           "abc",
           "d",
+          "*NONE*",
           "d",
           "*NONE*",
-          "*CAP*",
           "*NONE*",
           "*CAP*"
         ],
         [
           "d",
           "d",
-          "d",
-          "d",
-          "*CAP*",
-          "abc",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
+          "*NONE*",
+          "*NONE*",
           "abc",
           "d",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "d",
-          "abc",
-          "d",
-          "d",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "*NONE*",
-          "d",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "d",
-          "*NONE*",
-          "*CAP*",
           "*NONE*",
           "*NONE*"
         ],
@@ -19357,38 +19040,8 @@
           "d",
           "d",
           "d",
-          "d",
-          "*CAP*",
-          "abc",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "*CAP*",
-          "abc",
-          "d",
-          "*NONE*"
-        ],
-        [
-          "abc",
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "d",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
           "*NONE*",
-          "d",
-          "d",
-          "d",
+          "*NONE*",
           "*NONE*",
           "*CAP*",
           "abc"
@@ -19398,328 +19051,38 @@
           "d",
           "d",
           "*NONE*",
-          "d",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
           "abc",
-          "d",
-          "d",
           "*NONE*",
-          "d",
-          "*NONE*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "d",
-          "abc",
-          "*CAP*",
-          "d",
-          "*NONE*",
-          "*CAP*",
-          "d"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "d",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "abc",
-          "*CAP*",
-          "*NONE*",
-          "d",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*NONE*",
-          "d",
-          "*CAP*",
-          "abc",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "abc",
-          "d",
-          "d",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*",
           "*NONE*",
           "*NONE*"
         ],
         [
           "d",
           "d",
-          "d",
-          "d",
-          "*NONE*",
-          "abc",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "d",
-          "abc",
-          "d",
-          "d",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*",
-          "abc",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "d",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "abc",
-          "d",
-          "*NONE*",
-          "d",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*NONE*",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "*NONE*",
-          "d",
-          "*CAP*",
-          "abc",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "d",
           "*NONE*",
           "*NONE*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "abc",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "d",
-          "abc",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "abc"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "d",
           "*NONE*",
           "*NONE*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "abc",
-          "*CAP*",
-          "d",
-          "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "abc",
-          "d",
-          "*NONE*",
-          "d",
-          "d",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "abc",
-          "d",
-          "d",
-          "d",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "*NONE*",
-          "abc",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "*CAP*",
-          "abc",
           "*NONE*",
           "*NONE*"
         ],
         [
           "d",
-          "d",
+          "*NONE*",
           "d",
           "*NONE*",
-          "*CAP*",
-          "*CAP*",
           "*NONE*",
-          "abc"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "d",
-          "abc",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "abc",
-          "d",
-          "*CAP*",
           "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*NONE*",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "abc",
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "abc",
-          "d",
-          "d",
-          "d",
-          "*CAP*",
           "*NONE*",
           "*NONE*"
         ],
         [
           "d",
-          "d",
-          "d",
           "*NONE*",
           "*NONE*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
           "*NONE*",
-          "*CAP*",
-          "*CAP*",
+          "abc",
+          "*NONE*",
           "*NONE*",
           "d"
         ],
@@ -19728,150 +19091,130 @@
           "d",
           "*NONE*",
           "*NONE*",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
           "*NONE*",
           "d",
-          "*CAP*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "abc",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "d"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "abc",
+          "*CAP*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
           "abc"
         ],
         [
           "d",
           "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "abc",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "abc",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "d",
+          "d",
+          "*NONE*",
+          "abc",
+          "*CAP*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "d",
+          "abc",
+          "d",
+          "*CAP*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
           "d",
           "d",
           "abc",
-          "*CAP*",
+          "*NONE*",
+          "*NONE*",
+          "d",
           "*NONE*",
           "*NONE*"
         ],
         [
           "d",
           "d",
-          "d",
-          "*NONE*",
-          "d",
-          "*CAP*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*NONE*",
-          "*CAP*",
           "*NONE*",
           "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "abc",
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "abc",
           "*NONE*",
-          "d",
-          "d",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "*CAP*",
+          "*NONE*",
           "*NONE*",
           "*NONE*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "*CAP*",
-          "d",
-          "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "abc",
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "d",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "*NONE*",
-          "d",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
         ],
         [
           "d",
@@ -19887,108 +19230,58 @@
           "d",
           "d",
           "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "*CAP*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "abc",
+          "d",
+          "*NONE*"
+        ],
+        [
+          "abc",
           "d",
           "d",
-          "*CAP*",
-          "*CAP*",
+          "*NONE*",
+          "*NONE*",
+          "d",
+          "*NONE*",
           "*NONE*"
         ],
         [
           "d",
+          "*NONE*",
           "d",
           "d",
-          "*CAP*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "abc"
+        ],
+        [
           "d",
-          "*CAP*",
+          "*NONE*",
+          "*NONE*",
+          "d",
+          "d",
+          "*NONE*",
           "*NONE*",
           "*NONE*"
         ],
         [
-          "d",
-          "d",
           "abc",
           "d",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "d",
-          "abc",
-          "dc",
-          "*NONE*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "abc",
-          "d",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "abc",
-          "d",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "abc",
-          "d",
-          "d",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "abc",
-          "d",
-          "d",
-          "*CAP*",
           "*NONE*",
           "*NONE*",
-          "*CAP*"
-        ],
-        [
           "d",
-          "d",
-          "d",
-          "*CAP*",
-          "*CAP*",
-          "*NONE*",
-          "*NONE*",
-          "*CAP*"
-        ],
-        [
-          "d",
-          "d",
-          "d",
-          "*CAP*",
-          "abc",
           "*NONE*",
           "*NONE*",
           "*NONE*"
@@ -19996,22 +19289,602 @@
         [
           "d",
           "d",
+          "abc",
+          "*CAP*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "d"
+        ],
+        [
           "d",
           "d",
-          "*CAP*",
-          "*CAP*",
-          "*CAP*",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "abc",
+          "*NONE*",
+          "*NONE*",
+          "d",
           "*NONE*"
         ],
         [
           "d",
           "d",
           "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "abc",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "abc",
+          "*NONE*",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "*CAP*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "abc",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "abc",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "abc",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "d",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "abc",
+          "d",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "abc",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "d",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "abc",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "d",
+          "*NONE*",
+          "abc",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "abc"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*CAP*"
+        ],
+        [
+          "d",
+          "d",
           "d",
           "abc",
           "*CAP*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "abc",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "abc",
+          "d",
+          "*NONE*",
+          "d",
+          "*NONE*",
           "*CAP*",
           "*CAP*"
+        ],
+        [
+          "d",
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "abc",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "abc",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "abc"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "d",
+          "*CAP*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "*NONE*",
+          "d",
+          "d",
+          "abc",
+          "d",
+          "*CAP*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "abc",
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*CAP*"
+        ],
+        [
+          "d",
+          "abc",
+          "d",
+          "d",
+          "*CAP*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "d"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "abc"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "abc",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "abc",
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*CAP*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "abc",
+          "*NONE*",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "*CAP*"
+        ],
+        [
+          "d",
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "abc",
+          "d",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "d",
+          "*CAP*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "abc",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*CAP*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "d",
+          "abc",
+          "d",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "d",
+          "abc",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "abc",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "abc",
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "*NONE*",
+          "abc",
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "abc",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "d",
+          "d",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "d",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "d",
+          "*NONE*",
+          "abc",
+          "*NONE*"
         ]
       ]
     }
