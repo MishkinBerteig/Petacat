@@ -325,14 +325,14 @@ async def seed_metadata_from_json(
     # order within each one survive the round trip.
     entry_id = 0
     for pattern_name, entries in posting_data.get("codelet_patterns", {}).items():
-        for codelet_type, urgency in entries:
+        for codelet_type, urgency_level in entries:
             entry_id += 1
             session.add(
                 models.CodeletPatternDef(
                     id=entry_id,
                     pattern_name=pattern_name,
                     codelet_type=codelet_type,
-                    urgency=urgency,
+                    urgency_level=urgency_level,
                 )
             )
 

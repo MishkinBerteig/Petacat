@@ -208,24 +208,21 @@ async def list_codelet_patterns(run_id: int):
     Scheme: ``gui.ss:597-603`` puts these five on the Options menu, and
     ``trace.ss:1597-1668`` says what each one contains.
     """
-    from server.engine.codelet_patterns import (
-        CODELET_PATTERNS,
-        PATTERN_LABELS,
-        pattern_names,
-    )
+    from server.engine.codelet_patterns import clampable_patterns, pattern_entries
 
+    meta = get_run_service().meta
     return {
         "run_id": run_id,
         "patterns": [
             {
                 "name": name,
-                "label": PATTERN_LABELS[name],
+                "label": label,
                 "entries": [
                     {"codelet_type": codelet_type, "urgency_level": level}
-                    for codelet_type, level in CODELET_PATTERNS[name]
+                    for codelet_type, level in pattern_entries(meta, name)
                 ],
             }
-            for name in pattern_names()
+            for name, label in clampable_patterns(meta).items()
         ],
     }
 
@@ -247,7 +244,7 @@ async def clamp_codelet_pattern(run_id: int, req: ClampCodeletPatternRequest):
         raise HTTPException(
             400,
             f"Unknown codelet pattern '{req.pattern}'. "
-            f"Available: {', '.join(pattern_names())}",
+            f"Available: {', '.join(pattern_names(svc.meta))}",
         ) from None
     except ValueError as e:
         raise HTTPException(404, str(e))
@@ -267,7 +264,7 @@ async def unclamp_codelet_pattern(run_id: int, req: ClampCodeletPatternRequest):
         raise HTTPException(
             400,
             f"Unknown codelet pattern '{req.pattern}'. "
-            f"Available: {', '.join(pattern_names())}",
+            f"Available: {', '.join(pattern_names(svc.meta))}",
         ) from None
     except ValueError as e:
         raise HTTPException(404, str(e))

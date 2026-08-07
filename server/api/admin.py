@@ -1398,7 +1398,7 @@ async def export_metadata(session: AsyncSession = Depends(get_session)):
         "codelet_patterns": [
             {
                 "id": r.id, "pattern_name": r.pattern_name,
-                "codelet_type": r.codelet_type, "urgency": r.urgency,
+                "codelet_type": r.codelet_type, "urgency_level": r.urgency_level,
             }
             for r in patterns_result.scalars().all()
         ],

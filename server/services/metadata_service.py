@@ -195,7 +195,7 @@ async def load_metadata_from_db(session: AsyncSession) -> MetadataProvider:
     codelet_patterns: dict[str, list[tuple[str, int]]] = {}
     for row in result.scalars():
         codelet_patterns.setdefault(row.pattern_name, []).append(
-            (row.codelet_type, row.urgency)
+            (row.codelet_type, row.urgency_level)
         )
 
     # Enum values from lookup tables
