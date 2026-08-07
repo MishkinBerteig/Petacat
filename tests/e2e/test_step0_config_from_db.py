@@ -463,3 +463,42 @@ async def test_the_export_carries_the_descriptor_predicates(db_session):
     assert with_predicates["plato-leftmost"] == (
         "not string_spanning_group(obj) and position_in_string(obj, 'leftmost')"
     )
+
+
+# ──────────────────────────────────────────────────────────────────
+# min_shard_capacity
+# ──────────────────────────────────────────────────────────────────
+
+
+async def test_min_shard_capacity_ships_as_twenty_five(db_session):
+    """Direction 1: the value moves into the database without moving.
+
+    `PHASE 1 PLAN.md` §0.5 is explicit that `MIN_SHARD_CAPACITY` "must still be 25
+    when it becomes a row".  It is a cognition measurement, not a tuning knob: at
+    eight shards of twelve on `eqe → qeq; abbba?` the `gave_up` stopping state
+    disappeared entirely — 0 in 60 runs against 23 for the serial engine, on that
+    problem's most frequent outcome.
+    """
+    db_meta = await load_metadata_from_db(db_session)
+
+    assert db_meta.get_param("min_shard_capacity") == 25
+
+
+async def test_min_shard_capacity_bounds_the_shard_count_from_the_database(db_session):
+    """Direction 2 — and the reason this phase needs the value to be a row at all.
+
+    The shard count is `max_coderack_size // min_shard_capacity`, 4 at the shipped rack
+    of 100.  The plan's *Carried forward: parallelism beyond sharding* sweep cannot vary
+    the floor while it is a module constant, so "changing it changes the engine" is the
+    assertion that makes that measurement expressible.
+    """
+    from server.engine.coderack_shards import WorkerShardedCoderack
+
+    db_meta = await load_metadata_from_db(db_session)
+    assert WorkerShardedCoderack(db_meta, 8).num_shards == 4
+
+    coarser = db_meta.with_overrides({"min_shard_capacity": 50})
+    assert WorkerShardedCoderack(coarser, 8).num_shards == 2
+
+    finer = db_meta.with_overrides({"min_shard_capacity": 10})
+    assert WorkerShardedCoderack(finer, 8).num_shards == 8

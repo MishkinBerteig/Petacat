@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// RunParametersPanel — the twenty-five parameters a Run is fixed with
+// RunParametersPanel — the twenty-six parameters a Run is fixed with
 // ---------------------------------------------------------------------------
 //
 // These are inputs, not settings: the engine reads every one of them before or

@@ -28,7 +28,7 @@ license change was authorised by Dr. Marshall directly (see
 > end-to-end. Episodic Memory shapes the runs that inherit it: a run declines an
 > answer already held for the same problem and rules, so repeating a problem
 > within a [Training Session](#persistence-modes-and-training-sessions) explores
-> a different answer each time. It ships with 2,196 test cases covering the engine, the API, and the
+> a different answer each time. It ships with 2,198 test cases covering the engine, the API, and the
 > help/config system, run on both the CPU and the GPU numeric backends. Underneath the seven components sits an execution
 > substrate — three [persistence modes](#persistence-modes-and-training-sessions),
 > a [GPU numeric substrate](#the-numeric-substrate), and
@@ -328,7 +328,7 @@ Petacat has two test suites:
   codelets running), `architecture` (properties of the source tree),
   `integration` (the repository's artifacts agreeing), and `e2e` (full HTTP
   stack against a running database). All six run in a single command against
-  the local Postgres — 2,196 cases, which includes the numeric matrix's second
+  the local Postgres — 2,198 cases, which includes the numeric matrix's second
   pass over the 250 backend-sensitive tests. See
   [TESTING.md](TESTING.md) for the layer breakdown, the numeric backend matrix,
   the session ceiling, the unit-test rules, determinism requirements, test-double
