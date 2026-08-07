@@ -54,13 +54,22 @@ from server.models.metadata import (
 async def load_metadata_from_db(session: AsyncSession) -> MetadataProvider:
     """Load all metadata from Postgres into an immutable MetadataProvider."""
 
-    # Slipnet nodes
+    # Slipnet nodes.
+    #
+    # `descriptor_predicate` is read back here.  It had the column, the startup
+    # reconciliation that adds it to older databases, and the seeder that writes it —
+    # and this loader built the spec from three columns and left the fourth behind, so
+    # every configuration the application loaded from the database had all fourteen
+    # predicates missing.  A node whose predicate is `None` falls back to being read
+    # off the object (`slipnet.py:146`), which is a valid state for the fifty-odd nodes
+    # that ship that way and silently wrong for the fourteen that do not.
     result = await session.execute(select(SlipnetNodeDef))
     node_specs = {
         row.name: SlipnodeSpec(
             name=row.name,
             short_name=row.short_name,
             conceptual_depth=row.conceptual_depth,
+            descriptor_predicate=row.descriptor_predicate,
         )
         for row in result.scalars()
     }

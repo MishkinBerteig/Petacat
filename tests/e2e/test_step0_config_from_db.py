@@ -72,14 +72,15 @@ PROBLEM_SEED = 42
 #:
 #: `abc → abd; xyz` is the standard snagging problem: `z` has no successor, so the run
 #: hits the snag, clamps, and the patterns decide what the clamp pins.  Seed 42 rather
-#: than a cheaper one because it is the seed that separates the configurations on *both*
-#: engines the database can currently be — with the patterns and without them:
+#: than the cheaper seed 7 because it separated the configurations on *both* engines the
+#: database could be while the predicates were still being lost in the loader:
 #:
-#:   with descriptor predicates (the seed data):  answer_found xyz 17284 → gave_up 17283
-#:   without them (what the loader yields today): gave_up 3113        → gave_up 2537
+#:   with descriptor predicates:  answer_found xyz 17284 → gave_up 17283
+#:   without them:                gave_up 3113          → gave_up 2537
 #:
-#: Seed 7 separates them only on the first, so a guard built on it would quietly stop
-#: discriminating the moment the predicates are wired up.
+#: Seed 7 separated them only on the first, so a guard built on it would have stopped
+#: discriminating the moment the predicates were wired up — silently, which is the one
+#: way a guard test fails that nothing reports.
 CLAMP_PROBLEM = ("abc", "abd", "xyz")
 CLAMP_SEED = 42
 
@@ -242,20 +243,27 @@ async def test_database_posting_rules_drive_the_run_identically(db_session, seed
     assert run_outcome(db_meta) == run_outcome(with_seed_rules)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Step 0 in progress: the database still loses codelet_patterns (no table "
-    "exists) and descriptor_predicate (the loader does not select it). This is the "
-    "capstone assertion for §0 — when it passes, the database configuration and the "
-    "seed data are the same engine, and it is strict so it cannot pass unnoticed.",
-)
 async def test_database_configuration_reproduces_the_seed_data_run(
     db_session, seed_meta
 ):
-    """Direction 1, whole: the database configuration *is* the engine the oracle measured."""
+    """Direction 1, whole: the database configuration *is* the engine the oracle measured.
+
+    The capstone for §0's first half.  It was a strict xfail through the two increments
+    that made it true — the database lost `codelet_patterns` to a table that did not
+    exist and `descriptor_predicate` to a loader that did not select it — and strict so
+    that it could not start passing unnoticed.  It passes now, on both problems.
+
+    What it does *not* say is that every value the engine reads comes from the database:
+    the values still hardcoded in Python (`PHASE 1 PLAN.md` §0.2(a) and (b)) are equal
+    on both sides of this comparison precisely because neither side reads them.  This
+    asserts that nothing is lost in transit, which is the half that was broken.
+    """
     db_meta = await load_metadata_from_db(db_session)
 
     assert run_outcome(db_meta) == run_outcome(seed_meta)
+    assert run_outcome(db_meta, CLAMP_PROBLEM, CLAMP_SEED) == run_outcome(
+        seed_meta, CLAMP_PROBLEM, CLAMP_SEED
+    )
 
 
 async def test_removing_the_top_down_posting_rules_changes_the_run(db_session):
@@ -366,3 +374,92 @@ async def test_emptying_the_bottom_up_codelet_pattern_changes_the_run(db_session
     )
 
     assert changed != shipped
+
+
+# ──────────────────────────────────────────────────────────────────
+# descriptor_predicate
+# ──────────────────────────────────────────────────────────────────
+
+
+async def test_the_loader_reads_back_every_descriptor_predicate(db_session, seed_meta):
+    """Direction 1, at the column.
+
+    `slipnet_node_defs.descriptor_predicate` has had a column since the field was
+    added, startup reconciles it onto databases that predate it, and the seeder writes
+    it.  `load_metadata_from_db` built its `SlipnodeSpec` from three columns and never
+    selected the fourth, so all fourteen predicates were dropped on the way back —
+    the plan's §0.3 case exactly, where a value gets the column and the loader and not
+    the thing that reads it.
+    """
+    db_meta = await load_metadata_from_db(db_session)
+
+    assert db_meta.slipnet_node_specs == seed_meta.slipnet_node_specs
+
+
+async def test_database_descriptor_predicates_drive_the_run_identically(
+    db_session, seed_meta
+):
+    """Direction 1, at the run, for this field alone."""
+    from dataclasses import replace
+
+    db_meta = await load_metadata_from_db(db_session)
+    with_seed_nodes = replace(db_meta, slipnet_node_specs=seed_meta.slipnet_node_specs)
+
+    assert run_outcome(db_meta) == run_outcome(with_seed_nodes)
+
+
+async def test_changing_a_descriptor_predicate_changes_the_run(db_session):
+    """Direction 2.
+
+    A predicate decides when a node validly describes an object.  Making
+    `plato-leftmost`'s never hold stops the leftmost object of every string being
+    described as leftmost, without removing a node, a link or a codelet — an edit with
+    nowhere to hide except in behaviour.  It takes `mrrjjj` from 777 codelets to 898.
+
+    `plato-leftmost` rather than a node higher up the list because most of them are
+    *insensitive* on this problem: falsifying `plato-whole`, `plato-letter`,
+    `plato-group`, `plato-single` or `plato-three` each leave the run at exactly 777.
+    A predicate that is never consulted proves nothing about whether predicates are
+    read.
+    """
+    from server.models.metadata import SlipnetNodeDef
+
+    shipped = run_outcome(await load_metadata_from_db(db_session))
+
+    await db_session.execute(
+        update(SlipnetNodeDef)
+        .where(SlipnetNodeDef.name == "plato-leftmost")
+        .values(descriptor_predicate="False")
+    )
+    await db_session.commit()
+
+    changed = run_outcome(await load_metadata_from_db(db_session))
+
+    assert changed != shipped
+
+
+async def test_the_export_carries_the_descriptor_predicates(db_session):
+    """The value has to come *back out* as an editable field, not only go in.
+
+    §0's requirement is bi-directional: a value carried JSON → DB → runtime and back
+    out as something an admin can edit.  The predicate had none of the second half —
+    it appeared in no admin response, no request model and no export, so the one way
+    to change it was to edit the seed file and re-seed, which is the state the whole
+    of Step 0 is moving away from.
+
+    Asserted against the database rather than over HTTP because this module owns its
+    own database; `tests/e2e/test_api_extended.py` covers the export endpoint itself.
+    """
+    from sqlalchemy import select
+
+    from server.models.metadata import SlipnetNodeDef
+
+    result = await db_session.execute(
+        select(SlipnetNodeDef).where(SlipnetNodeDef.descriptor_predicate.isnot(None))
+    )
+    with_predicates = {r.name: r.descriptor_predicate for r in result.scalars()}
+
+    assert len(with_predicates) == 14
+    assert with_predicates["plato-leftmost"] == (
+        "not string_spanning_group(obj) and position_in_string(obj, 'leftmost')"
+    )
