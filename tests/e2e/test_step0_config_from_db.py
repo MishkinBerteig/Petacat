@@ -502,3 +502,55 @@ async def test_min_shard_capacity_bounds_the_shard_count_from_the_database(db_se
 
     finer = db_meta.with_overrides({"min_shard_capacity": 10})
     assert WorkerShardedCoderack(finer, 8).num_shards == 8
+
+
+# ──────────────────────────────────────────────────────────────────
+# bottom_up_types
+# ──────────────────────────────────────────────────────────────────
+
+
+async def test_deleting_a_bottom_up_posting_rule_changes_the_run(db_session):
+    """Direction 2 for the bottom-up half of the posting rules.
+
+    Until now only the five `top_down` rules were live: `_post_bottom_up_codelets`
+    never read `meta.posting_rules` at all, and walked an eleven-string Python list
+    instead (`PHASE 1 PLAN.md` §0.2(b)).  So all eleven `bottom_up` rows were editable,
+    hashed and displayed while the engine ignored every one of them — deleting them all
+    changed nothing.
+
+    `breaker` is the rule to delete because it is posted on every cycle at a probability
+    of `temperature / 100`, so its absence is felt from the first cycle rather than only
+    once some structure exists.
+    """
+    shipped = run_outcome(await load_metadata_from_db(db_session))
+
+    await db_session.execute(
+        delete(PostingRule).where(PostingRule.codelet_type == "breaker")
+    )
+    await db_session.commit()
+
+    changed = run_outcome(await load_metadata_from_db(db_session))
+
+    assert changed != shipped
+
+
+async def test_the_bottom_up_rules_the_engine_posts_are_the_database_rows(db_session):
+    """Direction 1: the eleven types come from the table, in the table's order."""
+    from server.engine.runner import EngineRunner
+
+    db_meta = await load_metadata_from_db(db_session)
+    runner = EngineRunner(db_meta)
+
+    assert runner.bottom_up_codelet_types() == [
+        "bottom-up-bond-scout",
+        "group-scout:whole-string",
+        "bottom-up-bridge-scout",
+        "important-object-bridge-scout",
+        "bottom-up-description-scout",
+        "rule-scout",
+        "answer-finder",
+        "answer-justifier",
+        "progress-watcher",
+        "jootser",
+        "breaker",
+    ]

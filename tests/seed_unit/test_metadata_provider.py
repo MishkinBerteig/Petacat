@@ -157,3 +157,42 @@ def test_enum_values_match_expected_counts(meta):
     assert len(meta.enum_values["posting_directions"]) == 3
     assert len(meta.enum_values["param_value_types"]) == 5
     assert len(meta.enum_values["demo_modes"]) == 2
+
+
+def test_the_bottom_up_posting_rules_are_in_the_order_the_engine_posts_them():
+    """The seed file's order of the bottom-up rules *is* the posting order.
+
+    `_post_bottom_up_codelets` walks these in sequence and each one it reaches draws
+    from the run's random stream — a posting probability, and on success a count and
+    sometimes a blurred object tally.  Two orderings of the same eleven rules therefore
+    send every subsequent decision somewhere else, so the order is part of the
+    configuration and not a detail of how the file happens to be written.
+
+    The list here is the one `runner.py` used to hold as a Python literal, kept
+    verbatim.  `PHASE 1 PLAN.md` §0.5 allows no cognitive change while the switches
+    become data, and this is where that is checked: the seed file was reordered to
+    match the code rather than the code reordered to match the file, because the code
+    was what the oracle in `ORACLE-COMPARISON.md` measured.
+    """
+    import os
+
+    from server.engine.metadata import MetadataProvider
+
+    seed_dir = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
+    meta = MetadataProvider.from_seed_data(seed_dir)
+
+    assert [
+        rule.codelet_type for rule in meta.posting_rules if rule.direction == "bottom_up"
+    ] == [
+        "bottom-up-bond-scout",
+        "group-scout:whole-string",
+        "bottom-up-bridge-scout",
+        "important-object-bridge-scout",
+        "bottom-up-description-scout",
+        "rule-scout",
+        "answer-finder",
+        "answer-justifier",
+        "progress-watcher",
+        "jootser",
+        "breaker",
+    ]

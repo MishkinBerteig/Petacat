@@ -129,15 +129,6 @@
       "condition": "justify_mode_and_supported_rule_exists"
     },
     {
-      "codelet_type": "breaker",
-      "direction": "bottom_up",
-      "urgency_when_posted": 7,
-      "posting_formula": "temperature / 100",
-      "count_formula": "fixed",
-      "count_values": {"fixed": 1},
-      "condition": "always"
-    },
-    {
       "codelet_type": "thematic-bridge-scout",
       "direction": "thematic",
       "urgency_when_posted": null,
@@ -163,6 +154,15 @@
       "count_formula": "fixed",
       "count_values": {"fixed": 2, "justify_mode": 1},
       "condition": "self_watching_enabled"
+    },
+    {
+      "codelet_type": "breaker",
+      "direction": "bottom_up",
+      "urgency_when_posted": 7,
+      "posting_formula": "temperature / 100",
+      "count_formula": "fixed",
+      "count_values": {"fixed": 1},
+      "condition": "always"
     }
   ],
   "initial_codelets": {

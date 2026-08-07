@@ -997,6 +997,28 @@ class EngineRunner:
                     bridge.theme_type, dimension, relation, factor
                 )
 
+    def bottom_up_codelet_types(self) -> list[str]:
+        """The bottom-up codelet types, in posting order (``*bottom-up-codelet-types*``).
+
+        Read from the posting rules rather than held as a list literal, so a new
+        codelet type added as data is actually posted.  `PHASE 1 PLAN.md` §0.6 is
+        explicit that this is what the rest of the phase stands on: today a new type
+        arriving as a row was accepted, hashed and displayed in the admin panel and
+        never posted, because posting walked eleven strings written in Python.
+
+        Order is the seed file's, and it is load-bearing.  Each type reached here draws
+        from the run's random stream — a posting probability, and on success a count —
+        so reordering the rules is not a cosmetic change but a different engine.  The
+        seed file was reordered to match this list rather than the other way round,
+        because the list is what the oracle measured; `breaker` sat ninth in the file
+        and last in the code, and it is last here.
+        """
+        return [
+            rule.codelet_type
+            for rule in self.meta.posting_rules
+            if rule.direction == "bottom_up"
+        ]
+
     def _post_bottom_up_codelets(self, batch: list[Codelet] | None = None) -> None:
         """Collect the cycle's bottom-up codelets into *batch*.
 
@@ -1016,22 +1038,7 @@ class EngineRunner:
 
         time = ctx.codelet_count
 
-        # All bottom-up codelet types (matches original *bottom-up-codelet-types*)
-        bottom_up_types = [
-            "bottom-up-bond-scout",
-            "group-scout:whole-string",
-            "bottom-up-bridge-scout",
-            "important-object-bridge-scout",
-            "bottom-up-description-scout",
-            "rule-scout",
-            "answer-finder",
-            "answer-justifier",
-            "progress-watcher",
-            "jootser",
-            "breaker",
-        ]
-
-        for codelet_type in bottom_up_types:
+        for codelet_type in self.bottom_up_codelet_types():
             # Skip types inappropriate for current mode
             if ctx.justify_mode and codelet_type == "answer-finder":
                 continue
