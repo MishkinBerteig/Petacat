@@ -57,6 +57,11 @@ class SlipnetNodeRequest(BaseModel):
     short_name: str
     conceptual_depth: int
     description: str = ""
+    #: DSL expression over ``obj`` deciding when this node validly describes a
+    #: Workspace object.  Null for the many nodes whose descriptors are read off an
+    #: object rather than tested, which is why it defaults to absent rather than to
+    #: the empty string — an empty expression is not the same as no expression.
+    descriptor_predicate: str | None = None
 
 
 class SlipnetNodeResponse(BaseModel):
@@ -64,6 +69,7 @@ class SlipnetNodeResponse(BaseModel):
     short_name: str
     conceptual_depth: int
     description: str
+    descriptor_predicate: str | None = None
 
 
 class SlipnetLinkRequest(BaseModel):
@@ -181,6 +187,7 @@ async def list_slipnet_nodes(session: AsyncSession = Depends(get_session)):
             short_name=r.short_name,
             conceptual_depth=r.conceptual_depth,
             description=r.description or "",
+            descriptor_predicate=r.descriptor_predicate,
         )
         for r in rows
     ]
@@ -202,6 +209,7 @@ async def create_slipnet_node(
         short_name=req.short_name,
         conceptual_depth=req.conceptual_depth,
         description=req.description,
+        descriptor_predicate=req.descriptor_predicate,
     )
     session.add(node)
     await session.commit()
@@ -210,6 +218,7 @@ async def create_slipnet_node(
         short_name=node.short_name,
         conceptual_depth=node.conceptual_depth,
         description=node.description or "",
+        descriptor_predicate=node.descriptor_predicate,
     )
 
 
@@ -226,12 +235,14 @@ async def update_slipnet_node(
     node.short_name = req.short_name
     node.conceptual_depth = req.conceptual_depth
     node.description = req.description
+    node.descriptor_predicate = req.descriptor_predicate
     await session.commit()
     return SlipnetNodeResponse(
         name=node.name,
         short_name=node.short_name,
         conceptual_depth=node.conceptual_depth,
         description=node.description or "",
+        descriptor_predicate=node.descriptor_predicate,
     )
 
 
@@ -1308,6 +1319,7 @@ async def export_metadata(session: AsyncSession = Depends(get_session)):
                 "short_name": r.short_name,
                 "conceptual_depth": r.conceptual_depth,
                 "description": r.description or "",
+                "descriptor_predicate": r.descriptor_predicate,
             }
             for r in nodes_result.scalars().all()
         ],
