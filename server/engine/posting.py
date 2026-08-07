@@ -1,0 +1,167 @@
+"""The vocabulary a posting rule's formulas are written against.
+
+`seed_data/posting_rules.json` states each rule's posting probability as an
+expression — ``average_intra_string_unhappiness / 100``, ``temperature / 100``,
+``0.4 if within_snag_or_clamp_period else 0.1``.  Those expressions were dead: their
+only occurrences in `server/` were the `PostingRuleSpec` field and the two loaders
+that populate it, and the engine re-derived every one of them from a switch on the
+codelet's *name* (`PHASE 1 PLAN.md` §0.2(a)).  A configuration reading "post nothing,
+ever" ran exactly like the shipped one.
+
+The shape here is the one that already exists at `slipnet.py:113-143` for
+`descriptor_predicate`, which §0.3 names as the missing pattern: a namespace of names
+mapped to callables, a compile step that **raises at load** on a bad expression rather
+than failing silently mid-run, and a call site that invokes the result.
+
+**Names resolve lazily.**  A posting formula names one or two quantities, and the
+workspace metrics behind them — average unhappiness, minimum mapping strength — walk
+every object and every bridge.  Building a dict of all of them for each of the twelve
+rules consulted per cycle would compute a dozen metrics to use one.  `PostingContext`
+is a `Mapping`, which is what `eval` accepts for its locals, so a name costs its
+metric only when the expression actually mentions it, and only once per context.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Mapping
+from functools import lru_cache
+from typing import Any, Callable, Iterator
+
+#: Name -> how to obtain it from a `PostingContext`.
+#:
+#: Every entry is a quantity `seed_data/posting_rules.json` already writes its formulas
+#: against, so the vocabulary is read off the data rather than invented for it.  Adding
+#: a name here is what lets a new rule say something the existing ones cannot.
+_PRODUCERS: dict[str, Callable[["PostingContext"], Any]] = {
+    # -- Workspace unhappiness ------------------------------------------------
+    "average_intra_string_unhappiness": (
+        lambda c: c.workspace.get_average_intra_string_unhappiness()
+    ),
+    "average_unhappiness": lambda c: c.workspace.get_average_unhappiness(),
+    "max_inter_string_unhappiness": (
+        lambda c: c.workspace.get_max_inter_string_unhappiness()
+    ),
+    "min_mapping_strength": lambda c: c.workspace.get_min_mapping_strength(),
+    # -- Rules and answers ----------------------------------------------------
+    "possible_rule_types": lambda c: c.workspace.get_possible_rule_types(),
+    "supported_top_rule_exists": lambda c: c.workspace.has_supported_rule(),
+    # Both halves are asked for, in this order, exactly as the switch this replaced
+    # asked for them — `top = get_supported_rules(True)` then
+    # `bottom = get_supported_rules(False)`, then `if top or bottom`.
+    "supported_rule_exists": lambda c: bool(
+        c.workspace.get_supported_rules(True) or c.workspace.get_supported_rules(False)
+    ),
+    # -- Temperature ----------------------------------------------------------
+    "temperature": lambda c: c.ctx.temperature.value,
+    # -- Self-watching --------------------------------------------------------
+    "max_positive_theme_activation": (
+        lambda c: c.ctx.themespace.get_max_positive_theme_activation()
+    ),
+    "thematic_pressure": lambda c: c.ctx.themespace.has_thematic_pressure(),
+    "within_snag_or_clamp_period": lambda c: (
+        c.ctx.trace.within_snag_period or c.ctx.trace.within_clamp_period
+    ),
+    # -- Mode -----------------------------------------------------------------
+    "justify_mode": lambda c: c.ctx.justify_mode,
+    "self_watching_enabled": lambda c: c.ctx.self_watching_enabled,
+}
+
+#: The names a formula may use.  Exposed so a test can state the vocabulary as a fact
+#: rather than by reading the dict above and agreeing with itself.
+POSTING_FORMULA_NAMES: frozenset[str] = frozenset(_PRODUCERS)
+
+#: No builtins.  A posting formula is configuration written by whoever edits the admin
+#: panel, and arithmetic over the names above is the whole of what it needs.
+_NO_BUILTINS: dict[str, Any] = {"__builtins__": {}}
+
+
+class PostingContext(Mapping):
+    """The names a posting formula may read, resolved on demand and cached.
+
+    One per rule evaluation.  The cache is per-context rather than global because
+    every one of these quantities changes as the run proceeds; what it buys is that an
+    expression naming `temperature` twice measures it once.
+    """
+
+    __slots__ = ("ctx", "node", "_cache")
+
+    def __init__(self, ctx: Any, node: Any = None) -> None:
+        self.ctx = ctx
+        #: The triggering slipnode, for a top-down rule's urgency formula.  `None` for
+        #: the bottom-up and thematic rules, which have no node to be triggered by.
+        self.node = node
+        self._cache: dict[str, Any] = {}
+
+    @property
+    def workspace(self) -> Any:
+        return self.ctx.workspace
+
+    def __getitem__(self, name: str) -> Any:
+        if name in self._cache:
+            return self._cache[name]
+        try:
+            producer = _PRODUCERS[name]
+        except KeyError:
+            raise KeyError(name) from None
+        value = producer(self)
+        self._cache[name] = value
+        return value
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(_PRODUCERS)
+
+    def __len__(self) -> int:
+        return len(_PRODUCERS)
+
+
+@lru_cache(maxsize=256)
+def compile_posting_formula(source: str, rule_name: str) -> Any:
+    """Compile a posting formula, raising on a bad expression rather than at run time.
+
+    Cached on the source text, so the seventeen shipped formulas compile once per
+    process however many runs consult them.  `rule_name` is part of the key only so
+    that it can appear in the error and in the code object's filename; two rules
+    sharing a formula is ordinary and costs one extra entry.
+    """
+    try:
+        return compile(source, f"<posting-formula:{rule_name}>", "eval")
+    except SyntaxError as exc:
+        raise ValueError(
+            f"posting formula for {rule_name} does not compile: {source!r} — {exc}"
+        ) from exc
+
+
+def evaluate_posting_formula(source: str, rule_name: str, context: PostingContext) -> float:
+    """The probability *source* states, under *context*.
+
+    An unknown name raises rather than resolving to zero.  A formula that silently
+    evaluates to "never post" is the failure this whole exercise is about: it is
+    accepted, stored, hashed, displayed — and dead.
+
+    The name lookup surfaces as `NameError`, not as the `KeyError` the mapping raises:
+    `eval` resolves a bare name through locals, then globals, then builtins, so the
+    mapping's miss is the *first* of three and only the last one raises to the caller.
+    Both are caught, because the mapping is reachable directly in a unit test.
+    """
+    code = compile_posting_formula(source, rule_name)
+    try:
+        return float(eval(code, _NO_BUILTINS, context))  # noqa: S307
+    except (NameError, KeyError) as exc:
+        missing = exc.name if isinstance(exc, NameError) else exc.args[0]
+        raise ValueError(
+            f"posting formula for {rule_name} uses unknown name {missing!r}: "
+            f"{source!r}. Known names: {', '.join(sorted(POSTING_FORMULA_NAMES))}"
+        ) from exc
+
+
+def validate_posting_formulas(rules: list[Any]) -> None:
+    """Compile every rule's posting formula, so a bad one fails at load.
+
+    Called from both loaders.  Startup is where an unparseable formula should be
+    found: mid-run it would surface as one codelet type quietly failing to post, which
+    looks like the engine exploring differently rather than like a broken
+    configuration.
+    """
+    for rule in rules:
+        if rule.posting_formula:
+            compile_posting_formula(rule.posting_formula, rule.codelet_type)

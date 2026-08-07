@@ -113,7 +113,7 @@
       "direction": "bottom_up",
       "urgency_when_posted": null,
       "urgency_formula": "100 - temperature",
-      "posting_formula": "(100 - temperature) / 100",
+      "posting_formula": "(100 - temperature) / 100 if supported_top_rule_exists else 0.0",
       "count_formula": "fixed",
       "count_values": {"fixed": 1},
       "condition": "not_justify_mode_and_supported_top_rule_exists"
@@ -123,7 +123,7 @@
       "direction": "bottom_up",
       "urgency_when_posted": null,
       "urgency_formula": "100 - temperature",
-      "posting_formula": "(100 - temperature) / 100",
+      "posting_formula": "(100 - temperature) / 100 if supported_rule_exists else 0.0",
       "count_formula": "fixed",
       "count_values": {"fixed": 1},
       "condition": "justify_mode_and_supported_rule_exists"
