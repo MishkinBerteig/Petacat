@@ -67,7 +67,7 @@ assertions only.
 
 ### B2. Counts the docs get *right* — no action, listed so the audit's coverage is clear
 
-59 slipnet nodes · 202 links · 27 codelet types · 25 run parameters · 7 urgency levels ·
+59 slipnet nodes · 202 links · 27 codelet types · 26 run parameters · 7 urgency levels ·
 34 demo problems · 79 formula coefficients · 43 collected integration tests.
 
 ---

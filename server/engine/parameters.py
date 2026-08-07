@@ -17,7 +17,7 @@ kind with the right bounds and say what the parameter does.
 Fixed and derived
 -----------------
 **Fixed** parameters are inputs: chosen before the first codelet, constant for the whole
-Run.  Those are the twenty-five below.
+Run.  Those are the twenty-six below.
 
 **Derived** values are outputs: the numeric backend that was actually selected, the shard
 count sharding actually settled on, the config and memory hashes, the Training Session.
@@ -55,7 +55,7 @@ KIND_NODE_LIST = "node_list"
 KIND_NODE_MAP = "node_map"
 
 #: Grouping for presentation.  Not semantic — the engine does not care — but a flat list
-#: of twenty-five numbers is unreadable, and these are the divisions the architecture
+#: of twenty-six numbers is unreadable, and these are the divisions the architecture
 #: itself uses.
 GROUP_TEMPERATURE = "Temperature and pacing"
 GROUP_SLIPNET = "Slipnet"
@@ -122,7 +122,7 @@ def _p(name, kind, group, label, description, minimum=None, maximum=None,
     return RunParameter(name, kind, group, label, description, minimum, maximum, departs)
 
 
-#: The twenty-five parameters the engine reads while it runs.  Verified against
+#: The twenty-six parameters the engine reads while it runs.  Verified against
 #: ``get_param`` call sites in ``server/engine/**`` and in the codelet bodies stored in
 #: ``seed_data/codelet_types.json``; a parameter that is only read by the API or the
 #: display is not here.
@@ -180,8 +180,16 @@ RUN_PARAMETERS: tuple[RunParameter, ...] = (
        "tracking the current Workspace instead of drifting: on a typical run the rack "
        "sits at capacity for well over half of all posts, so raising this materially "
        "reduces eviction pressure. Under free-running the capacity is divided across "
-       "shards, and a shard below 25 is too small for the jootsing sequence to "
-       "complete.", 10, 10_000),
+       "shards, and the shard floor below decides how many shards that capacity "
+       "supports.", 10, 10_000),
+    _p("min_shard_capacity", KIND_INT, GROUP_CODERACK, "Minimum shard capacity",
+       "The fewest codelets a shard may hold under free-running, which bounds the shard "
+       "count at capacity divided by this. Not a tuning knob but a cognition "
+       "measurement: at shards of twelve the give-up stopping state vanished from "
+       "`eqe -> qeq; abbba?` entirely — 0 in 60 runs against 23 serial, on that "
+       "problem's most frequent outcome — because giving up is the end of a sequence "
+       "and each step needs its codelets still on the rack when the next one looks.",
+       1, 10_000),
     _p("num_coderack_bins", KIND_INT, GROUP_CODERACK, "Urgency bins",
        "How many urgency levels the rack is divided into. Selection picks a bin with "
        "probability proportional to its count times its urgency weight, then picks "

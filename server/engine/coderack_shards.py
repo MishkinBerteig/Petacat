@@ -182,9 +182,32 @@ class LockedCoderack(ShardedCoderack):
 #: twelve-codelet shard evicts them first, so the run never gets far enough to conclude
 #: it is stuck, and instead answers.  Raising the shard size restores it: 19 at
 #: twenty-five per shard, 27 at fifty, against the serial 23.
-MIN_SHARD_CAPACITY = 25
+#:
+#: The value now lives in ``engine_params`` as ``min_shard_capacity`` and is read
+#: through the ``MetadataProvider``, so it can be varied per Run.  `PHASE 1 PLAN.md`'s
+#: *Carried forward: parallelism beyond sharding* is why: that sweep has to move the
+#: floor, and could not while this was a module constant.  What remains here is the
+#: fallback for a provider that has no such row — a hand-built one in a test, or a
+#: database seeded before the row existed.
+DEFAULT_MIN_SHARD_CAPACITY = 25
 
-#: The shard count follows from it: ``max_coderack_size // MIN_SHARD_CAPACITY``, which is
+#: Retained under its original name because `hardware.py`, `scripts/bench_shards.py` and
+#: `tests/module/test_coderack_shards.py` document the bound by pointing at it.  It is
+#: the default, not the value in force: ask the provider for that.
+MIN_SHARD_CAPACITY = DEFAULT_MIN_SHARD_CAPACITY
+
+
+def min_shard_capacity(meta: MetadataProvider) -> int:
+    """The fewest codelets a shard may hold, under *meta*.
+
+    A floor of at least 1: a capacity of zero would make the shard count expression
+    divide by zero, and a shard that may hold nothing is not a configuration to honour
+    faithfully.
+    """
+    return max(1, int(meta.get_param("min_shard_capacity", DEFAULT_MIN_SHARD_CAPACITY)))
+
+
+#: The shard count follows from it: ``max_coderack_size // min_shard_capacity``, which is
 #: 4 at the default rack of 100.  A machine offering more workers than that runs several
 #: against one shard.  `PHASE 1 PLAN.md` carries the measurement that would decide whether
 #: a larger rack keeps the reachable set, and records that parallelism past this bound may
@@ -200,7 +223,8 @@ class _ShardBase(ShardedCoderack):
         # Shard count is bounded by capacity, not by worker count.  More workers than
         # shards means some share, which costs contention; more shards than the capacity
         # supports costs *cognition*, and that is not a trade worth making.
-        self.num_shards = max(1, min(int(shards), capacity // MIN_SHARD_CAPACITY or 1))
+        floor = min_shard_capacity(meta)
+        self.num_shards = max(1, min(int(shards), capacity // floor or 1))
         # Each shard is a whole Coderack, so within a shard the two-stage
         # urgency-weighted draw is exactly the original. What the candidates differ in is
         # only *which* shard a codelet lands in and which shard a worker draws from —

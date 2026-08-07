@@ -524,7 +524,7 @@ A rule describes the transformation from one string to another, capturing both w
 ### Run Parameters
 
 **Topic key:** `run_parameters`  
-**Summary:** The twenty-five engine settings that are fixed before a run starts and cannot change while it thinks.
+**Summary:** The twenty-six engine settings that are fixed before a run starts and cannot change while it thinks.
 
 Twenty-five entries in the engine's parameter set are read while it thinks: thresholds that decide what reaches the Temporal Trace, the periods governing clamps and settling, the Coderack's capacity and urgency resolution, the Themespace's boost, decay and spread, and the update cadence.
 
