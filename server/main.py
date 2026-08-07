@@ -68,9 +68,27 @@ async def _reconcile_metadata_columns(engine) -> None:
     The models share one ``Base``, so this covers the runtime tables too — which
     matters for a column like ``runs.spreading_threshold`` that existing rows must
     acquire a sensible value for rather than NULL.
+
+    **Stale columns are dropped, on the derived metadata tables only.**  Adding without
+    ever removing meant a renamed column left its predecessor behind, and a leftover
+    ``NOT NULL`` column that the seeder no longer writes makes every insert into that
+    table fail.  The consequence is worse than the cause: ``_ensure_db_ready`` catches
+    everything and logs "DB setup skipped", so the seeding transaction rolls back whole
+    and the application serves stale or empty metadata with nothing saying the
+    configuration it is running is not the one on disk — the exact condition Step 0
+    exists to remove, one level down in the machinery that delivers it.
+
+    A derived table is emptied and rewritten on every re-seed, so a column it no longer
+    declares holds nothing worth keeping.  Runtime tables are left alone: ``runs``,
+    ``trace_events`` and the episodic-memory tables hold a user's actual work, and a
+    column the models have stopped declaring there is a migration to be written by
+    hand, not something startup should delete.
     """
     from sqlalchemy import text
     from server.models.metadata import Base
+    from server.services.seeding import derived_metadata_tables
+
+    rewritten = {t.name for t in derived_metadata_tables()}
 
     async with engine.begin() as conn:
         for table in Base.metadata.sorted_tables:
@@ -123,6 +141,15 @@ async def _reconcile_metadata_columns(engine) -> None:
                         f'ALTER TABLE "{table.name}" '
                         f'ADD COLUMN "{column.name}" {type_sql}{default_sql}'
                     )
+                )
+
+            if table.name not in rewritten:
+                continue
+            declared = {column.name for column in table.columns}
+            for stale in sorted(present - declared):
+                logger.info("Dropping stale column %s.%s", table.name, stale)
+                await conn.execute(
+                    text(f'ALTER TABLE "{table.name}" DROP COLUMN "{stale}"')
                 )
 
 

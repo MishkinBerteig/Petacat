@@ -872,3 +872,97 @@ async def test_changing_the_opening_population_changes_the_run(db_session):
     changed = run_outcome(await load_metadata_from_db(db_session))
 
     assert changed != shipped
+
+
+# ──────────────────────────────────────────────────────────────────
+# Upgrading a database that already exists
+# ──────────────────────────────────────────────────────────────────
+
+
+async def test_seeding_survives_a_column_the_models_no_longer_declare(step0_engine, step0_lock):
+    """A configuration change has to reach a database that already exists.
+
+    Startup reconciles *missing* columns onto an older database, and never removed
+    stale ones.  So renaming a column on a derived metadata table left the old one in
+    place — and a `NOT NULL` column the seeder no longer writes makes every insert into
+    that table fail.
+
+    The failure is silent in the direction that matters. `_ensure_db_ready` catches
+    everything and logs "DB setup skipped (may not be available)", so the seeding
+    transaction rolls back whole and the application starts against **stale or empty**
+    metadata with nothing to say the configuration it is serving is not the
+    configuration on disk. That is the condition the whole of Step 0 exists to remove,
+    reappearing one level down in the machinery that delivers it.
+
+    Derived metadata tables are emptied and rewritten on every re-seed, so dropping a
+    column they no longer declare loses nothing. Runtime tables are never touched.
+    """
+    from sqlalchemy import text as sql_text
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+    from server.main import _reconcile_metadata_columns
+    from server.models.metadata import Base
+    import server.models.run  # noqa: F401
+    from server.services.seeding import seed_metadata_from_json
+
+    async with step0_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+        await conn.run_sync(Base.metadata.create_all)
+        # Stand in for a column that used to exist and has since been renamed away.
+        await conn.execute(
+            sql_text(
+                'ALTER TABLE codelet_pattern_defs '
+                'ADD COLUMN "urgency" INTEGER NOT NULL DEFAULT 0'
+            )
+        )
+        await conn.execute(
+            sql_text('ALTER TABLE codelet_pattern_defs ALTER COLUMN "urgency" DROP DEFAULT')
+        )
+
+    await _reconcile_metadata_columns(step0_engine)
+
+    factory = async_sessionmaker(step0_engine, class_=AsyncSession, expire_on_commit=False)
+    async with factory() as session:
+        await seed_metadata_from_json(session, SEED_DIR)
+        await session.commit()
+
+    async with factory() as session:
+        meta = await load_metadata_from_db(session)
+
+    assert len(meta.codelet_patterns) == 9
+    assert len(meta.posting_rules) == 17
+
+
+async def test_reconciliation_never_drops_a_column_from_a_runtime_table(step0_engine, step0_lock):
+    """Removing stale columns is for the derived tables, and only for those.
+
+    A derived table is emptied and rewritten on every re-seed, so a column it no longer
+    declares holds nothing worth keeping. `runs`, `trace_events` and the episodic-memory
+    tables hold a user's actual work, and a column there that the models have stopped
+    declaring is a migration to be written by hand, not something startup should delete.
+    """
+    from sqlalchemy import text as sql_text
+
+    from server.main import _reconcile_metadata_columns
+    from server.models.metadata import Base
+    import server.models.run  # noqa: F401
+
+    async with step0_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+        await conn.run_sync(Base.metadata.create_all)
+        await conn.execute(
+            sql_text('ALTER TABLE runs ADD COLUMN "retired_column" TEXT')
+        )
+
+    await _reconcile_metadata_columns(step0_engine)
+
+    async with step0_engine.connect() as conn:
+        result = await conn.execute(
+            sql_text(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_name = 'runs'"
+            )
+        )
+        columns = {row[0] for row in result}
+
+    assert "retired_column" in columns, "a runtime table's column was dropped"
