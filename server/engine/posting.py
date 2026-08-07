@@ -291,3 +291,47 @@ def evaluate_urgency(rule: Any, context: PostingContext, default: int) -> int:
     if rule is not None and rule.urgency_when_posted is not None:
         return int(rule.urgency_when_posted)
     return default
+
+
+def evaluate_condition(rule: Any, context: PostingContext) -> bool:
+    """Whether *rule* is eligible to post at all, this cycle.
+
+    Checked **before** the posting probability is drawn for, which is where the mode
+    exclusions this replaces were checked.  The ordering is not a detail: a rule that
+    is skipped must consume nothing from the run's random stream, or every subsequent
+    decision moves.
+
+    `always` and the empty string mean yes.  Anything else is a boolean expression over
+    the same vocabulary the formulas use.
+
+    **What is deliberately not here.**  The seed data used to state conditions that the
+    engine enforced somewhere else entirely, and folding those in would have changed
+    the engine rather than described it:
+
+    * ``supported_top_rule_exists`` / ``supported_rule_exists`` are in the two answer
+      rules' *posting formulas*, which return `0.0` when no rule is supported.  That is
+      exactly equivalent here — `RNG.prob` returns False for `p <= 0` without drawing —
+      so the condition would be redundant, and stating it twice is the duplication
+      §0.2(c) is about.
+    * ``bonds_exist`` is the ``none`` entry of the group scouts' `count_values`, and it
+      has to stay there.  A group scout *does* draw for its posting probability today
+      and then posts zero; moving the check before the draw would skip that draw and
+      shift the whole stream.
+    * ``slipnode_fully_active`` is the ``full_activation_threshold`` parameter applied
+      to the ``top_down_slipnodes`` parameter, both already read from the database.
+
+    So each of the eight original labels is enforced, once, wherever the reference puts
+    it — which is what makes the column a predicate rather than a comment.
+    """
+    condition = getattr(rule, "condition", "") or ""
+    if condition in ("", "always"):
+        return True
+    code = compile_posting_formula(condition, rule.codelet_type)
+    try:
+        return bool(eval(code, _COUNT_BUILTINS, context))  # noqa: S307
+    except (NameError, KeyError) as exc:
+        missing = exc.name if isinstance(exc, NameError) else exc.args[0]
+        raise ValueError(
+            f"condition for {rule.codelet_type} uses unknown name {missing!r}: "
+            f"{condition!r}. Known names: {', '.join(sorted(POSTING_FORMULA_NAMES))}"
+        ) from exc

@@ -28,6 +28,7 @@ from server.engine.posting import (
     PostingContext,
     evaluate_count_formula,
     evaluate_posting_formula,
+    evaluate_condition,
     evaluate_urgency,
 )
 from server.engine.rng import RNG
@@ -1034,6 +1035,18 @@ class EngineRunner:
                 return rule
         return None
 
+    def _rule_condition_holds(self, rule: PostingRuleSpec | None) -> bool:
+        """Is *rule* eligible to post this cycle?
+
+        Evaluated before the posting probability is drawn for, so a rule its condition
+        refuses costs nothing from the run's random stream.
+        """
+        if self.ctx is None:
+            return False
+        if rule is None:
+            return True
+        return evaluate_condition(rule, PostingContext(self.ctx))
+
     def _post_bottom_up_codelets(self, batch: list[Codelet] | None = None) -> None:
         """Collect the cycle's bottom-up codelets into *batch*.
 
@@ -1055,14 +1068,9 @@ class EngineRunner:
 
         for rule in self.bottom_up_posting_rules():
             codelet_type = rule.codelet_type
-            # Skip types inappropriate for current mode
-            if ctx.justify_mode and codelet_type == "answer-finder":
-                continue
-            if not ctx.justify_mode and codelet_type == "answer-justifier":
-                continue
-            if not ctx.self_watching_enabled and codelet_type in (
-                "progress-watcher", "jootser",
-            ):
+            # The rule's own condition decides eligibility, and does so before the
+            # probability is drawn for — three hardcoded mode exclusions used to.
+            if not self._rule_condition_holds(rule):
                 continue
 
             post_prob = self._compute_posting_probability(rule)
@@ -1086,16 +1094,19 @@ class EngineRunner:
         slipnodes, not before either of them, which is where this used to sit.
         """
         ctx = self.ctx
-        if ctx is None or not ctx.self_watching_enabled:
+        if ctx is None:
             return
+
+        thematic_type = "thematic-bridge-scout"
+        thematic_rule = self.posting_rule_for(thematic_type)
+        if thematic_rule is None or not self._rule_condition_holds(thematic_rule):
+            return
+
         if batch is None:
             batch = []
             deferred = True
         else:
             deferred = False
-
-        thematic_type = "thematic-bridge-scout"
-        thematic_rule = self.posting_rule_for(thematic_type)
         post_prob = self._compute_posting_probability(thematic_rule)
         if ctx.rng.prob(post_prob):
             urgency = evaluate_urgency(

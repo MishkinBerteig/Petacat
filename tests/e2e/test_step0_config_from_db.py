@@ -751,3 +751,51 @@ async def test_changing_a_rules_urgency_formula_changes_the_run(db_session):
     changed = run_outcome(await load_metadata_from_db(db_session))
 
     assert changed != shipped
+
+
+# ──────────────────────────────────────────────────────────────────
+# condition
+# ──────────────────────────────────────────────────────────────────
+
+
+async def test_changing_a_rules_condition_changes_the_run(db_session):
+    """Direction 2 for `condition`.
+
+    `breaker` is unconditional; making it fire only while justifying stops it posting
+    at all on a discovery run, without touching its formula, its count or its urgency.
+    """
+    shipped = run_outcome(await load_metadata_from_db(db_session))
+
+    await db_session.execute(
+        update(PostingRule)
+        .where(PostingRule.codelet_type == "breaker")
+        .values(condition="justify_mode")
+    )
+    await db_session.commit()
+
+    changed = run_outcome(await load_metadata_from_db(db_session))
+
+    assert changed != shipped
+
+
+async def test_a_false_condition_costs_no_draw(db_session):
+    """Direction 1, on the ordering — the same property the group-scout count has.
+
+    A condition is checked *before* the posting probability is drawn for, so a rule
+    excluded by mode never reaches the generator.  That is what the hardcoded mode
+    exclusions did, and it has to stay true: a skipped rule that still drew would
+    displace every subsequent decision in the run.
+    """
+    from dataclasses import replace
+
+    from server.engine.runner import EngineRunner
+
+    db_meta = await load_metadata_from_db(db_session)
+    runner = EngineRunner(db_meta)
+    runner.init_mcat(*PROBLEM, seed=PROBLEM_SEED)
+
+    rule = replace(runner.posting_rule_for("breaker"), condition="False")
+    before = runner.ctx.rng.call_count
+
+    assert runner._rule_condition_holds(rule) is False
+    assert runner.ctx.rng.call_count == before, "a refused condition consumed a draw"
