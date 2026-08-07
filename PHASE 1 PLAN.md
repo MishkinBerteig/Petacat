@@ -13,8 +13,11 @@ explicitly **Phase 6** work and must not leak into this phase; if the internal
 mechanism can only be made to work by asking someone, that is a finding to report,
 not a licence to import Phase 6.
 
-**Depends on.** Phase 0 (Fast Run makes the many short experiments here affordable;
-Audit mode is how a single acquisition episode gets explained).
+**Depends on.** Phase 0, now built (Fast Run makes the many short experiments here
+affordable; Audit mode is how a single acquisition episode gets explained). One item of
+Phase 0's is carried forward into this phase rather than closed there — see *Carried
+forward: parallelism beyond sharding* below, which is unimplemented work this phase
+owns.
 
 **Why capitals.** They are the smallest possible expansion of the perceptual space
 that is still a genuine one. Unlike arbitrary bytes (Phase 3), capitals arrive with
@@ -29,7 +32,8 @@ generalises.
 
 ## 1. The concrete starting point
 
-Today's entire perceptual apparatus is four lines, `server/engine/workspace.py:39-43`:
+Today's perceptual apparatus is two short passages. Text becomes objects in five lines,
+`server/engine/workspace.py:116-120`:
 
 ```python
 for i, ch in enumerate(text):
@@ -39,21 +43,46 @@ for i, ch in enumerate(text):
     self.objects.append(letter)
 ```
 
+and those objects acquire their initial descriptions in `_add_initial_descriptions`
+(`server/engine/runner.py:455-520`). The line that decides this phase's starting point
+is the guard at `runner.py:506`:
+
+```python
+if letter_cat_node and letter.letter_category:
+```
+
+A letter whose node is `None` has no `letter_category`, so its letter-category
+description is skipped — silently, by a condition that reads as ordinary defensiveness.
+
 `slipnet.nodes.get("plato-A")` returns `None`. Verified behaviour on
-`abc → abd; XYZ → ?`:
+`abc → abd; XYZ → ?` (numpy backend, no codelet cap, seeds 42 / 7 / 900001):
 
 - Initialisation **succeeds** — no exception.
-- The target string's three objects are created with `node = None`.
-- The run **halts at the step limit with no answer** (800 codelets, none found).
+- The target string's three objects are created with `node = None`, and carry two
+  descriptions each — `object-category: letter` and a string-position — against three
+  for `abc`, which also carries `letter-category: a`.
+- The run **gives up**: status `gave_up`, no answer, after 4,459 / 3,217 / 5,178
+  codelets. `XYZ` ends the run with 0 bonds and 0 groups; temperature never leaves 100.
 
-So the failure mode is **silent degradation, not a crash**: nodeless letters carry no
-letter-category description, so they cannot be bonded by letter-category, cannot be
-bridged by identity or slippage, and cannot be grouped. The workspace looks populated
-and perceives nothing.
+**The degradation is partial, not total, and the boundary is exactly the missing
+description.** Three vertical bridges *are* built between `abc` and `XYZ` — on the two
+descriptions the nodeless letters do carry. Two of them even carry a slippage
+(`leftmost` → `rightmost` under `opposite`). What cannot happen is anything that needs
+letter-category: no letter-category bond, so no successor or predecessor relation
+within `XYZ`, so no group over it, and no letter-category concept-mapping in a bridge,
+so nothing for a rule to describe. The system sees three objects in the right places
+and has nothing to say about what they are.
 
-This is a good starting point precisely because it is quiet. The first deliverable is
-to make the system *notice* — an object it cannot describe should raise a signal, not
-be silently inert.
+**This is the right baseline behaviour, and it should be preserved.** Degrading rather
+than crashing on unfamiliar input is what a perceptual system ought to do — it is the
+property that makes it safe to feed capitals in at all, and every later phase that
+widens the perceptual space depends on it. Nothing in this phase should trade it away.
+
+What is missing is not robustness but **a signal**. The system absorbs the unknown
+symbol and carries on, and no part of it registers that it was unable to describe
+something. So the first deliverable is to make the system *notice* — an object it
+cannot describe should raise a signal while still being handled as gracefully as it is
+today. Noticing is an addition to this behaviour, not a replacement for it.
 
 ## 2. What this phase must produce
 
@@ -67,7 +96,7 @@ Three capabilities, in dependency order:
   successor / predecessor / sameness / correspondence — because a node without links
   cannot participate in bonds, bridges, or rules, and `FUTURE_DIRECTION.md` §0's
   criterion is exactly that a concept must "participate in slippages and bridges and
-  rules the way `successor` does."
+  rules the way `successor` or `leftmost` already do."
 
 **(b) is the hard part, and the point of the phase.** Creating a node is a database
 insert. Wiring it is the research problem, and everything downstream — Phase 3's
@@ -119,9 +148,22 @@ is already cross-run by design and already stores rich structural descriptions o
 answers — including the themes and rules that produced them. Reusing it, rather than
 building a parallel store, keeps the phase honest about building on what exists.
 
+**But it stores answers and snags, and nothing else.** `EpisodicMemory` holds an
+`AnswerDescription` per answer — the two rules with their clause-list signatures, four
+theme patterns, quality, temperature, abstractness — and a `SnagDescription` per snag
+(`server/engine/memory.py:18-140`). It does **not** record which structures a given
+object participated in: no bridge history, no bond history, no per-object record at all.
+So the "participation history" §3 leans on for links is a **store that does not exist
+yet**, not an existing one to be reused. That is the first concrete cost of this phase,
+and it should be stated plainly rather than discovered during implementation: the honest
+version of 3c is that episodic memory supplies the *cross-run persistence mechanism* and
+a precedent for what a rich structural description looks like, while the evidence itself
+has to be accumulated somewhere new.
+
 This is also where Phase 0's work first earns its keep: episodic memory as a **named,
 versioned input** with a recorded `memory-hash` means a growing concept vocabulary
-does not silently break reproducibility.
+does not silently break reproducibility. Whatever holds participation history will need
+the same treatment, and for the same reason.
 
 **[open — the load-bearing decision of this phase]** Which of these carries the
 weight, and specifically **what supplies the links**. Frequency and utility both
@@ -144,24 +186,64 @@ So the measure of success in this phase is **not** "does `plato-A` exist" but "d
 `A` behave like a letter" — can it be bonded, bridged, grouped, and slipped. That
 distinction is what keeps (a) from being mistaken for (b).
 
+**And the measure has to be read on the letter-category dimension specifically**, since
+§1 shows a nodeless letter already gets bridged and already carries slippages on the
+dimensions it does have. A bridge count going up is not evidence of anything. The
+evidence is a successor bond *inside* `XYZ`, a group over it, and a bridge whose
+concept-mappings include a letter-category pair — the three things that are impossible
+today and that a wired node makes possible.
+
 ## 5. Design constraints
 
-- **Do not regress a–z.** The existing curated Slipnet is the reference. The demo
-  suite must continue to pass unchanged; any degradation is a finding, not a cost.
+- **Do not regress a–z.** The existing curated Slipnet — 59 nodes, 202 links — is the
+  reference. The standard is `scripts/compare_to_metacat.py`, which compares Petacat's
+  set of reachable stopping states against **Metacat's own published oracle** over the
+  nineteen demo problems, recorded in `ORACLE-COMPARISON.md` and
+  `measurements/vs-metacat.json`. Petacat's former self-baseline
+  (`tests/fixtures/expected_range.json`) was removed in `cc25a4a` precisely because a
+  baseline sampled from Petacat could detect drift but never divergence; this phase
+  measures against the reference implementation, not against its own past. Any
+  degradation is a finding, not a cost.
+
+- **The capitals half has no oracle, and needs a criterion of its own.** Metacat knows
+  nothing about `A…Z`, so the external standard covers only the a–z half of this phase's
+  work. There is no reference distribution for `abc → abd; XYZ → ?` and there will not
+  be one. The phase's headline result therefore has to be graded against something it
+  defines itself, and §6 states what: the same rule and comparable temperature as the
+  lower-case twin, and transfer to capitals never encountered. Naming this now matters
+  because the a–z oracle will keep passing while the capitals mechanism does nothing at
+  all — a green run against Metacat is evidence of no regression, never evidence of
+  acquisition.
+
+- **Graceful degradation is preserved, not replaced.** An unknown symbol must continue
+  to produce a run that completes, as it does today (§1). The noticing signal is added
+  alongside that behaviour; it must not become an exception, a refusal to initialise, or
+  any other way of turning an unfamiliar input into a failure. A system whose
+  perceptual space is meant to keep widening has to stay resilient to the parts of it
+  it has not learned yet.
+
 - **Learned vs. innate must be distinguishable.** Every node and link gains a
   provenance marker. Phase 2's `not-love` removal, and every later pruning mechanism,
   depends on being able to protect the seed ontology from self-lobotomy. Establishing
   the distinction here is cheap; retrofitting it later is not.
-- **Growth is data, not code.** New nodes and links are new rows — native to the
+
+- **Growth is data, not code.** New nodes and links are new rows in `slipnet_node_defs`
+  and `slipnet_link_defs` (`server/models/metadata.py:126-152`) — native to the
   DB-driven design. No engine changes are needed to *hold* new concepts, only to
-  create and wire them.
+  create and wire them. The two schema additions this phase does need are the
+  provenance marker above, and a decision about `descriptor_predicate`: the node table
+  already carries a DSL expression deciding when a node validly describes an object,
+  and a learned node has to either supply one or fall in the majority that leaves it
+  null.
+
 - **Persistence across runs.** A concept learned in one run must survive into the
   next, or nothing accumulates. This is where the episodic-memory-as-named-input work
   from Phase 0 first earns its keep.
 
 ## 6. Exit criteria
 
-- The system **notices** unrelatable objects rather than degrading silently.
+- The system **notices** unrelatable objects — signalling them while still degrading
+  gracefully, as it does today.
 - Capitals acquire concepts *and* links, with provenance recorded.
 - `abc → abd; XYZ → ?` is solved — and, more tellingly, solved with the same rule and
   comparable temperature as `abc → abd; xyz → ?`.
@@ -172,7 +254,14 @@ distinction is what keeps (a) from being mistaken for (b).
 - The a↔A correspondence is discovered, not hardcoded — visible as a bridge with a
   slippage, not as a seeded link.
 - All of the above **without any external input** beyond the problems themselves.
-- a–z competence unregressed.
+- a–z competence unregressed — `scripts/compare_to_metacat.py` over the nineteen demo
+  problems, with no p50 member of Metacat's set lost. Novel states are adjudicated, not
+  auto-accepted, exactly as in Phase 0.
+
+**Only the last of these is checkable against Metacat**; the rest are the phase's own
+criteria and have no external reference (§5). Read the list with that split in mind —
+satisfying the last while failing all the others is the *silent* failure mode of this
+phase, and it looks exactly like a clean test run.
 
 **A negative result is informative here, and is a live possibility.** The internal
 mechanisms in §3 identify *units* well; whether they can supply *relations* is
@@ -195,36 +284,79 @@ rethinking before being built on top.
    spans runs fits a coderack that does not.
 4. **Conceptual depth of a learned node.** Where does a new concept sit relative to
    the curated depths, and is depth learned or assigned?
-5. **Link typing.** Can the system only create links of *existing* types (category,
-   instance, property, lateral, sliplink), or must it eventually invent new relation
-   types? The latter is Phase 6; this phase stays within existing types and notes
-   where that pinches.
+5. **Link typing.** Can the system only create links of the five *existing* types
+   (`category`, `instance`, `property`, `lateral`, `lateral_sliplink` —
+   `seed_data/enums.json`, the `link_types` table), or must it eventually invent new
+   relation types? The latter is Phase 6; this phase stays within existing types and
+   notes where that pinches. The curated Slipnet gives a concrete target: an interior
+   letter such as `plato-m` carries **six** links — four `lateral` (successor and
+   predecessor, in both directions, to its two neighbours) and the `instance` /
+   `category` pair with `plato-letter-category`. The two ends carry five, trading one
+   lateral for a `property` link to `plato-alphabetic-first` / `plato-alphabetic-last`.
+   That is what "wired" means concretely, and it is a sharper target than "create some
+   links". Note also what is *not* on the list: no `lateral_sliplink` touches an
+   individual letter — the sixteen sliplinks connect concepts like `opposite`, not
+   letters — so `a ↔ A` is not to be seeded as one, which is exactly what §6's
+   discovered-not-hardcoded criterion demands.
 6. **Merge/dedup.** What happens when the same concept is discovered twice.
 
 ### Carried forward: parallelism beyond sharding
 
+**Unimplemented; this phase owns it.** Phase 0 established the bound and the reason for
+it but did not run the measurement that would lift it.
+
 Free-running splits the Coderack into shards, one per worker, with stealing. The shard
-count is bounded by `max_coderack_size // MIN_SHARD_CAPACITY` — 100 // 25 = 4 today. The
-floor of 25 is a cognition measurement: at smaller shards each worker draws from a thin
-population, and the `gave_up:` stopping state leaves the reachable range for
-`eqe→qeq; abbba?`.
+count is bounded by `max_coderack_size // MIN_SHARD_CAPACITY` — 100 // 25 = 4 today
+(`server/engine/coderack_shards.py:185-203`). The floor of 25 is a cognition
+measurement, not a guess: at eight shards of twelve the `gave_up:` stopping state
+disappeared from `eqe→qeq; abbba?` entirely — 0 occurrences in 60 runs against 23 for
+the serial engine, on that problem's *most frequent* outcome. A twelve-codelet shard is
+too small to be a coderack, because giving up is the end of a sequence and each step
+needs its codelets still on the rack when the next one looks.
 
 A machine with more cores than shards therefore runs several workers against one shard.
 Raising the shard count means raising `max_coderack_size`, which changes how long codelets
 survive and what the urgency-weighted selection draws from, so it changes what the engine
 computes.
 
-**The measurement this needs:** run the expected range at 100, 200, 400 and 600 codelets
-and record where the reachable set moves. The result decides whether more shards are
-available within the cognition the model specifies.
+**The measurement this needs:** sweep `max_coderack_size` at 100, 200, 400 and 600 and
+record where the reachable set moves, against Metacat's oracle via
+`scripts/compare_to_metacat.py` — the same standard §5 sets for everything else in this
+phase, and a change from what Phase 0 assumed, since Petacat's own expected-range
+baseline no longer exists. The result decides whether more shards are available within
+the cognition the model specifies. Two things make this cheaper than it was when the
+item was written: `max_coderack_size` is now a **per-Run parameter**, so a sweep is four
+run configurations rather than four global reconfigurations; and a single spot-check at
+300 is already recorded in Phase 0 (`answer_found`, 863 codelets, `mrrjjk`), which is
+one data point but not a set comparison. The one piece of work it does need first:
+`compare_to_metacat.py` takes `--mode`, `--tries`, `--runs`, `--start-seed`, `--backend`
+and `--only`, but has no way to set an engine parameter, so it needs a passthrough
+before it can express this sweep at all.
+
+**Read the sweep as a cognition result, not a capacity result.** A larger rack is
+expected to move the distribution — it is why the parameter is per-Run — so the question
+is not whether anything changes but whether Metacat's p50 states all survive at each
+size. The largest size at which they do is the real bound on shard count.
 
 **Sharding is one approach among several.** Parallelism that scales past the shard bound
 may come from somewhere other than partitioning the Coderack — running whole independent
 runs in parallel (`population.py` already does this), parallelism inside the update cycle,
-or parallelism inside the numeric substrate, which grows in importance as the Slipnet
-grows toward the sizes this phase begins to reach. This phase's Slipnet growth changes the
-balance: the numeric work rises with node and link count, so the arithmetic becomes the
-part worth parallelising.
+or parallelism inside the numeric substrate.
+
+**This phase's Slipnet growth changes which of those matters.** Every constraint above
+is stated at 59 nodes and 202 links. Activation spreading, and the salience and strength
+passes that ride on it, scale with node and link count while the Coderack does not — so
+as capitals are acquired the arithmetic becomes the part worth parallelising and the
+rack becomes proportionally cheaper. Phase 0's GPU substrate was deliberately sized for
+that future, at ~300,000 nodes, but the crossover between "the Coderack is the
+bottleneck" and "the Slipnet is" has never been located. This phase is the first that
+moves the Slipnet at all, and it should record where the balance sits at each new size.
+One alphabet is a 44% growth in nodes — 59 → 85 — and a 51% growth in links: 26
+`instance` + 26 `category`, 50 `lateral` (25 adjacent pairs, a successor and a
+predecessor each) and 2 `property` for the two ends, so 202 → 306. That is exactly what
+a–z contributes today, which is the point: capitals double the letter half of the
+Slipnet and leave the other half alone. Small in absolute terms, and the first real
+data point on a curve every later phase depends on.
 
 ## Glossary
 
@@ -233,6 +365,6 @@ part worth parallelising.
 | **Sub-perceptual accumulator** | A statistical layer beneath the coderack, counting across runs and proposing candidate concepts |
 | **Frequency proposes, utility disposes** | Cheap counting generates candidates; participation in temperature-lowering structures decides which are kept |
 | **Wiring** | Giving a new node links, without which it cannot participate in bonds, bridges, or rules |
-| **Participation history** | The record of which structures a candidate appeared in — the leading internal source of evidence for links |
-| **Provenance** | Marker distinguishing learned nodes/links from the innate seed ontology |
+| **Participation history** | The record of which structures a candidate appeared in — the leading internal source of evidence for links. **Does not exist yet**: episodic memory stores answers and snags, not per-object structural participation (§3c) |
+| **Provenance** | Marker distinguishing learned nodes/links from the innate seed ontology — a column neither `slipnet_node_defs` nor `slipnet_link_defs` has today |
 | **Transfer** | Generalising to untaught instances — the criterion separating learning from memorisation |
