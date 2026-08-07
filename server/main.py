@@ -13,47 +13,26 @@ from fastapi.staticfiles import StaticFiles
 
 from server.config import SEED_DATA_DIR
 from server.engine.metadata import MetadataProvider
+from server.services.seeding import (
+    BULK_SEED_FILES as _BULK_SEED_FILES,
+    HELP_TOPICS_FILENAME,
+    NON_DERIVED_TABLES as _NON_DERIVED_TABLES,
+    SEED_FINGERPRINT_PARAM as _SEED_FINGERPRINT_PARAM,
+    derived_metadata_tables as _derived_metadata_tables,
+    protected_enum_tables as _protected_enum_tables,
+    seed_metadata_from_json,
+    sync_help_topics as _sync_help_topics,
+    tables_referenced_by_runtime as _tables_referenced_by_runtime,
+)
 
 logger = logging.getLogger("petacat")
 
 
-
-
-# Seed files whose contents the DB copy of the bulk metadata mirrors.  Help
-# topics are excluded: they are upserted separately on every startup.
-_BULK_SEED_FILES = (
-    "enums.json",
-    "slipnet_nodes.json",
-    "slipnet_links.json",
-    "slipnet_layout.json",
-    "codelet_types.json",
-    "engine_params.json",
-    "urgency_levels.json",
-    "formula_coefficients.json",
-    "theme_dimensions.json",
-    "demo_problems.json",
-    "commentary_templates.json",
-    "posting_rules.json",
-)
-
-# EngineParam row that records which seed data the DB was last loaded from.
-_SEED_FINGERPRINT_PARAM = "__seed_data_fingerprint__"
-
-
 def _seed_data_fingerprint() -> str:
     """A digest of the checked-in bulk seed files."""
-    import hashlib
+    from server.services.seeding import seed_data_fingerprint
 
-    digest = hashlib.sha256()
-    for filename in _BULK_SEED_FILES:
-        path = os.path.join(SEED_DATA_DIR, filename)
-        digest.update(filename.encode())
-        try:
-            with open(path, "rb") as f:
-                digest.update(f.read())
-        except FileNotFoundError:
-            digest.update(b"<missing>")
-    return digest.hexdigest()
+    return seed_data_fingerprint(SEED_DATA_DIR)
 
 
 async def _stored_seed_fingerprint_safe(engine) -> str | None:
@@ -75,86 +54,6 @@ async def _stored_seed_fingerprint_safe(engine) -> str | None:
             return row[0] if row else None
     except Exception:
         return None
-
-
-# Metadata tables that are *not* derived from the bulk seed files.
-_NON_DERIVED_TABLES = frozenset({"help_topics"})
-
-
-def _derived_metadata_tables() -> list:
-    """Derived metadata tables, in safe deletion order (children first).
-
-    Restricted to classes declared in ``server.models.metadata``: the runtime
-    models in ``server.models.run`` share the same declarative ``Base``, so
-    walking ``Base.metadata`` wholesale would have swept up ``runs``,
-    ``trace_events``, ``cycle_snapshots`` and the episodic-memory tables and
-    deleted a user's saved work.
-
-    Ordering comes from SQLAlchemy's own foreign-key sort rather than a
-    hand-written list — hand-listing meant playing whack-a-mole with dependencies
-    (``posting_rules`` → ``posting_directions``, …) and getting it wrong twice.
-    """
-    import inspect
-
-    from server.models import metadata as metadata_models
-    from server.models.metadata import Base
-
-    derived_names = {
-        cls.__tablename__
-        for _, cls in inspect.getmembers(metadata_models, inspect.isclass)
-        if getattr(cls, "__module__", "") == metadata_models.__name__
-        and hasattr(cls, "__tablename__")
-        and cls.__tablename__ not in _NON_DERIVED_TABLES
-    }
-
-    protected = _tables_referenced_by_runtime(derived_names)
-    ordered = [
-        t
-        for t in Base.metadata.sorted_tables
-        if t.name in derived_names and t.name not in protected
-    ]
-    ordered.reverse()  # children first, so foreign keys stay satisfied
-    return ordered
-
-
-def _tables_referenced_by_runtime(derived_names: set[str]) -> frozenset[str]:
-    """Derived tables that runtime data holds foreign keys into.
-
-    ``runs.status`` points at ``run_statuses`` and ``trace_events.event_type`` at
-    ``event_types``, so clearing those rows while a user's runs exist is refused
-    by the database.  They are stable enum tables, so they get seeded
-    insert-if-missing instead of being cleared.  Computed from the schema rather
-    than hard-coded, so a new runtime foreign key protects itself.
-    """
-    import server.models.run  # noqa: F401 — registers the runtime tables
-
-    from server.models.metadata import Base
-
-    protected: set[str] = set()
-    for table in Base.metadata.sorted_tables:
-        if table.name in derived_names:
-            continue  # only runtime / non-derived tables count as referrers
-        for fk in table.foreign_keys:
-            target = fk.column.table.name
-            if target in derived_names:
-                protected.add(target)
-    return frozenset(protected)
-
-
-def _protected_enum_tables() -> frozenset[str]:
-    """Public wrapper used by the seeding path."""
-    import inspect
-
-    from server.models import metadata as metadata_models
-
-    derived_names = {
-        cls.__tablename__
-        for _, cls in inspect.getmembers(metadata_models, inspect.isclass)
-        if getattr(cls, "__module__", "") == metadata_models.__name__
-        and hasattr(cls, "__tablename__")
-        and cls.__tablename__ not in _NON_DERIVED_TABLES
-    }
-    return _tables_referenced_by_runtime(derived_names)
 
 
 async def _reconcile_metadata_columns(engine) -> None:
@@ -227,61 +126,6 @@ async def _reconcile_metadata_columns(engine) -> None:
                 )
 
 
-#: The help topics ship in one file, which the `en` suffix names.
-HELP_TOPICS_FILENAME = "help_topics.en.json"
-
-
-async def _sync_help_topics(session) -> None:
-    """Upsert all help topics from the topics JSON into the `help_topics` table.
-
-    Unlike the bulk seeding, this is idempotent — it runs on every startup and
-    keeps the DB in sync with the JSON source of truth. Existing rows are
-    updated by `topic_key`; new rows are inserted.
-    """
-    import json
-    from sqlalchemy import select
-    from server.models.metadata import HelpTopic
-
-    help_file = os.path.join(SEED_DATA_DIR, HELP_TOPICS_FILENAME)
-    if not os.path.exists(help_file):
-        logger.warning("Help topics file not found: %s", help_file)
-        return
-
-    with open(help_file) as f:
-        topics = json.load(f)
-
-    # Load existing rows by key
-    result = await session.execute(select(HelpTopic))
-    existing = {t.topic_key: t for t in result.scalars().all()}
-    seen_keys: set[str] = set()
-
-    for t in topics:
-        key = t["topic_key"]
-        seen_keys.add(key)
-        if key in existing:
-            row = existing[key]
-            row.topic_type = t["topic_type"]
-            row.title = t["title"]
-            row.short_desc = t.get("short_desc", "")
-            row.full_desc = t.get("full_desc", "")
-            row.metadata_json = t.get("metadata", {})
-        else:
-            session.add(HelpTopic(
-                topic_type=t["topic_type"],
-                topic_key=key,
-                title=t["title"],
-                short_desc=t.get("short_desc", ""),
-                full_desc=t.get("full_desc", ""),
-                metadata_json=t.get("metadata", {}),
-            ))
-
-    await session.commit()
-    logger.info(
-        "Help topics synced: %d in file, %d pre-existing",
-        len(topics), len(existing),
-    )
-
-
 async def _ensure_db_ready():
     """Create tables and seed metadata if they don't exist yet.
 
@@ -325,7 +169,7 @@ async def _ensure_db_ready():
 
         if stored == fingerprint:
             async with factory() as session:
-                await _sync_help_topics(session)
+                await _sync_help_topics(session, SEED_DATA_DIR)
                 await session.commit()
             await engine.dispose()
             return
@@ -343,113 +187,14 @@ async def _ensure_db_ready():
             await session.commit()
 
         # Seed from JSON files (help topics handled separately by _sync_help_topics)
-        from server.models.metadata import (
-            BridgeOrientationDef, BridgeTypeDef, ClauseTypeDef, CodeletFamilyDef,
-            CodeletPhaseDef, CodeletTypeDef, CommentaryTemplate,
-            DemoModeDef, DemoProblem as DemoProblemRow, EngineParam,
-            EventTypeDef, FormulaCoefficient, LinkTypeDef,
-            ParamValueTypeDef, PostingDirectionDef, ProposalLevelDef,
-            RuleTypeDef, RunStatusDef, SlipnetLayoutPos, SlipnetLinkDef,
-            SlipnetNodeDef, ThemeDimensionDef, ThemeTypeDef, UrgencyLevel,
-        )
-
-        def _load(fn):
-            with open(os.path.join(SEED_DATA_DIR, fn)) as f:
-                return json.load(f)
-
         async with factory() as session:
-            # Seed enum lookup tables first (required by FK constraints)
-            _enum_models = {
-                "run_statuses": RunStatusDef, "event_types": EventTypeDef,
-                "bridge_types": BridgeTypeDef, "bridge_orientations": BridgeOrientationDef,
-                "clause_types": ClauseTypeDef, "rule_types": RuleTypeDef,
-                "theme_types": ThemeTypeDef, "proposal_levels": ProposalLevelDef,
-                "link_types": LinkTypeDef, "codelet_families": CodeletFamilyDef,
-                "codelet_phases": CodeletPhaseDef, "posting_directions": PostingDirectionDef,
-                "param_value_types": ParamValueTypeDef, "demo_modes": DemoModeDef,
-            }
-            enums_data = _load("enums.json")
-            protected_tables = _protected_enum_tables()
-            for table_name, model_cls in _enum_models.items():
-                rows = enums_data.get(table_name, [])
-                if model_cls.__tablename__ in protected_tables:
-                    # Never cleared, so add only what is missing rather than
-                    # colliding on the primary key.
-                    present = set(
-                        (await session.execute(select(model_cls.name))).scalars().all()
-                    )
-                    rows = [r for r in rows if r["name"] not in present]
-                for row in rows:
-                    session.add(model_cls(
-                        name=row["name"], display_label=row["display_label"],
-                        sort_order=row["sort_order"], description=row.get("description", ""),
-                    ))
-            await session.flush()
-
-            for n in _load("slipnet_nodes.json"):
-                session.add(SlipnetNodeDef(name=n["name"], short_name=n["short_name"],
-                                            conceptual_depth=n["conceptual_depth"],
-                                            description=n.get("description", ""),
-                                            descriptor_predicate=n.get("descriptor_predicate")))
-            for lk in _load("slipnet_links.json"):
-                session.add(SlipnetLinkDef(
-                    from_node=lk["from_node"], to_node=lk["to_node"],
-                    link_type=lk["link_type"], label_node=lk.get("label_node"),
-                    link_length=lk.get("link_length"),
-                    fixed_length=lk.get("link_length") is not None if "fixed_length" not in lk else lk["fixed_length"],
-                ))
-            for c in _load("codelet_types.json"):
-                session.add(CodeletTypeDef(
-                    name=c["name"], family=c["family"], phase=c["phase"],
-                    default_urgency=c.get("default_urgency"),
-                    description=c.get("description", ""),
-                    source_file=c.get("source_file", ""),
-                    source_line=c.get("source_line", 0),
-                    execute_body=c.get("execute_body", ""),
-                ))
-            params = _load("engine_params.json")
-            for k, v in params.items():
-                if isinstance(v, (list, dict)):
-                    session.add(EngineParam(name=k, value=json.dumps(v), value_type="json"))
-                elif isinstance(v, bool):
-                    session.add(EngineParam(name=k, value=str(v).lower(), value_type="bool"))
-                elif isinstance(v, int):
-                    session.add(EngineParam(name=k, value=str(v), value_type="int"))
-                elif isinstance(v, float):
-                    session.add(EngineParam(name=k, value=str(v), value_type="float"))
-                else:
-                    session.add(EngineParam(name=k, value=str(v), value_type="string"))
-            session.add(EngineParam(
-                name=_SEED_FINGERPRINT_PARAM, value=fingerprint, value_type="string",
-            ))
-            for k, v in _load("urgency_levels.json").items():
-                session.add(UrgencyLevel(name=k, value=v))
-            for k, v in _load("formula_coefficients.json").items():
-                session.add(FormulaCoefficient(name=k, value=v))
-            for d in _load("demo_problems.json"):
-                session.add(DemoProblemRow(
-                    name=d["name"], section=d.get("section", ""),
-                    initial=d["initial"], modified=d["modified"], target=d["target"],
-                    answer=d.get("answer"), seed=d["seed"], mode=d["mode"],
-                    description=d.get("description", ""),
-                ))
-            themes = _load("theme_dimensions.json")
-            for td in themes.get("dimensions", []):
-                session.add(ThemeDimensionDef(
-                    slipnet_node=td["slipnet_node"],
-                    valid_relations=td["valid_relations"],
-                ))
-            layout = _load("slipnet_layout.json")
-            for name, pos in layout.get("node_positions", {}).items():
-                session.add(SlipnetLayoutPos(node_name=name, grid_row=pos[0], grid_col=pos[1]))
-            commentary = _load("commentary_templates.json")
-            session.add(CommentaryTemplate(template_key="all", template_data=commentary))
+            await seed_metadata_from_json(session, SEED_DATA_DIR, fingerprint=fingerprint)
 
             await session.commit()
             logger.info("Database tables created and seeded")
 
             # Sync help topics from the topics JSON (idempotent upsert)
-            await _sync_help_topics(session)
+            await _sync_help_topics(session, SEED_DATA_DIR)
 
         await engine.dispose()
     except Exception as e:
