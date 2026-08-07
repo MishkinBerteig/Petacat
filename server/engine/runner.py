@@ -28,6 +28,7 @@ from server.engine.posting import (
     PostingContext,
     evaluate_count_formula,
     evaluate_posting_formula,
+    evaluate_urgency,
 )
 from server.engine.rng import RNG
 from server.engine.sink import STRUCTURE_BUILT, NullSink, RunSink
@@ -1068,7 +1069,7 @@ class EngineRunner:
             if not ctx.rng.prob(post_prob):
                 continue
 
-            urgency = self._compute_bottom_up_urgency(codelet_type)
+            urgency = self._compute_bottom_up_urgency(rule)
             num = self._compute_num_to_post(rule)
 
             for _ in range(num):
@@ -1097,7 +1098,11 @@ class EngineRunner:
         thematic_rule = self.posting_rule_for(thematic_type)
         post_prob = self._compute_posting_probability(thematic_rule)
         if ctx.rng.prob(post_prob):
-            urgency = round(ctx.themespace.get_max_positive_theme_activation())
+            urgency = evaluate_urgency(
+                thematic_rule,
+                PostingContext(ctx),
+                default=self.meta.get_urgency("low"),
+            )
             num = self._compute_num_to_post(thematic_rule)
             for _ in range(num):
                 batch.append(
@@ -1165,28 +1170,23 @@ class EngineRunner:
             return 1
         return evaluate_count_formula(rule, PostingContext(self.ctx))
 
-    def _compute_bottom_up_urgency(self, codelet_type: str) -> int:
-        """Compute urgency for bottom-up codelets.
+    def _compute_bottom_up_urgency(self, rule: PostingRuleSpec | None) -> int:
+        """The urgency *rule* posts at.
 
         Scheme: coderack.ss:575-590.
+
+        Was a fourth switch on the codelet's name, reaching for ``get_urgency("low")``,
+        ``("medium")`` and ``("extremely_low")`` while the rules stated 35, 49 and 7 —
+        the same numbers written twice.  A seed-unit test now pins every
+        ``urgency_when_posted`` to a named level, so the two files cannot drift apart
+        silently now that only one of them is read.
         """
         ctx = self.ctx
         if ctx is None:
             return 35
-
-        if codelet_type in ("answer-finder", "answer-justifier"):
-            return max(1, round(100 - ctx.temperature.value))
-
-        if codelet_type == "breaker":
-            return self.meta.get_urgency("extremely_low")
-
-        # ``coderack.ss:581-582``: the two self-watching codelets take *medium*
-        # urgency, not the ``else`` branch's low.
-        if codelet_type in ("progress-watcher", "jootser"):
-            return self.meta.get_urgency("medium")
-
-        # Most bottom-up scouts use low urgency
-        return self.meta.get_urgency("low")
+        return evaluate_urgency(
+            rule, PostingContext(ctx), default=self.meta.get_urgency("low")
+        )
 
     def _post_top_down_codelets(self, batch: list[Codelet] | None = None) -> None:
         """Collect the cycle's top-down codelets into *batch*.
@@ -1216,15 +1216,22 @@ class EngineRunner:
             if node is None or not node.above_threshold(threshold):
                 continue
 
-            # Compute urgency from conceptual depth and activation
-            urgency = round(node.conceptual_depth * node.activation / 100.0)
-
             # Determine which codelets to post for this node
             for rule in self.meta.posting_rules:
                 if rule.direction != "top_down":
                     continue
                 if rule.triggering_slipnodes and node_name not in rule.triggering_slipnodes:
                     continue
+
+                # Each rule states its own urgency against the node that triggered
+                # it, so the context carries the node and the formula is evaluated
+                # per rule rather than once per node.  All five shipped top-down rules
+                # say the same thing — depth times activation — but that is a fact
+                # about the data, not a constraint the engine should impose.
+                context = PostingContext(ctx, node=node)
+                urgency = evaluate_urgency(
+                    rule, context, default=self.meta.get_urgency("low")
+                )
 
                 # Stochastic posting based on workspace state
                 post_prob = self._compute_posting_probability(rule)

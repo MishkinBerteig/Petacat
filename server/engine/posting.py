@@ -66,7 +66,24 @@ _PRODUCERS: dict[str, Callable[["PostingContext"], Any]] = {
     "self_watching_enabled": lambda c: c.ctx.self_watching_enabled,
     # -- Counts ---------------------------------------------------------------
     "num_possible_rule_types": lambda c: len(c.workspace.get_possible_rule_types()),
+    # -- The triggering slipnode, for a top-down rule's urgency ----------------
+    #
+    # Only a `top_down` rule has one.  Reading either of these from a bottom-up or
+    # thematic rule is a mistake in the configuration, and says so rather than
+    # resolving to zero and posting everything at the bottom of the rack.
+    "conceptual_depth": lambda c: _require_node(c, "conceptual_depth").conceptual_depth,
+    "activation": lambda c: _require_node(c, "activation").activation,
 }
+
+
+def _require_node(context: "PostingContext", name: str) -> Any:
+    node = context.node
+    if node is None:
+        raise ValueError(
+            f"{name!r} is only available to a top_down rule, which is triggered by a "
+            "slipnode; this rule was evaluated without one"
+        )
+    return node
 
 #: The builtins a *count* formula may use.  `max(1, 2 * num_possible_rule_types)` and
 #: `round(10 * max_inter_string_unhappiness / 100)` are the two the shipped rules need,
@@ -244,3 +261,33 @@ def evaluate_count_formula(rule: Any, context: PostingContext) -> int:
             f"count formula for {rule.codelet_type} uses unknown name {missing!r}: "
             f"{formula!r}. Known names: {', '.join(sorted(POSTING_FORMULA_NAMES))}"
         ) from exc
+
+
+def evaluate_urgency(rule: Any, context: PostingContext, default: int) -> int:
+    """The urgency *rule* posts its codelets at.
+
+    Scheme: ``coderack.ss:575-590`` for the bottom-up tiers, ``slipnet.ss:212-222``
+    for the top-down ones.
+
+    A rule states its urgency one of two ways, and the seed data uses both: a fixed
+    ``urgency_when_posted`` for the eleven that post at a named tier's value, or an
+    ``urgency_formula`` for the six whose urgency is computed from the run — the
+    triggering node's depth and activation, the temperature, the theme pressure.
+
+    *default* is what a rule stating neither gets, which the caller supplies because it
+    is a *named* level rather than a number: `low`, resolved through `urgency_levels`.
+    """
+    if rule is not None and rule.urgency_formula:
+        code = compile_posting_formula(rule.urgency_formula, rule.codelet_type)
+        try:
+            return int(eval(code, _COUNT_BUILTINS, context))  # noqa: S307
+        except (NameError, KeyError) as exc:
+            missing = exc.name if isinstance(exc, NameError) else exc.args[0]
+            raise ValueError(
+                f"urgency formula for {rule.codelet_type} uses unknown name "
+                f"{missing!r}: {rule.urgency_formula!r}. Known names: "
+                f"{', '.join(sorted(POSTING_FORMULA_NAMES))}"
+            ) from exc
+    if rule is not None and rule.urgency_when_posted is not None:
+        return int(rule.urgency_when_posted)
+    return default

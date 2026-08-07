@@ -704,3 +704,50 @@ async def test_a_group_scout_count_costs_no_draw_before_any_bond_exists(db_sessi
 
     assert runner._compute_num_to_post(rule) == 0
     assert runner.ctx.rng.call_count == before, "the no-bonds path consumed a draw"
+
+
+# ──────────────────────────────────────────────────────────────────
+# urgency_when_posted / urgency_formula
+# ──────────────────────────────────────────────────────────────────
+
+
+async def test_changing_a_rules_posted_urgency_changes_the_run(db_session):
+    """Direction 2 for `urgency_when_posted`.
+
+    Urgency is what the rack's two-stage weighted draw selects on, so raising a scout
+    family from low to extremely-high changes which codelets run and in what order
+    without changing which are posted.
+    """
+    shipped = run_outcome(await load_metadata_from_db(db_session))
+
+    await db_session.execute(
+        update(PostingRule)
+        .where(PostingRule.codelet_type == "bottom-up-bond-scout")
+        .values(urgency_when_posted=91)
+    )
+    await db_session.commit()
+
+    changed = run_outcome(await load_metadata_from_db(db_session))
+
+    assert changed != shipped
+
+
+async def test_changing_a_rules_urgency_formula_changes_the_run(db_session):
+    """Direction 2 for `urgency_formula`, which is the top-down rules' whole urgency.
+
+    A top-down codelet's urgency is its triggering node's conceptual depth times its
+    activation.  Flattening the formula to a constant keeps every rule posting the same
+    codelets and stops depth and activation deciding which of them runs first.
+    """
+    shipped = run_outcome(await load_metadata_from_db(db_session))
+
+    await db_session.execute(
+        update(PostingRule)
+        .where(PostingRule.direction == "top_down")
+        .values(urgency_formula="1")
+    )
+    await db_session.commit()
+
+    changed = run_outcome(await load_metadata_from_db(db_session))
+
+    assert changed != shipped
