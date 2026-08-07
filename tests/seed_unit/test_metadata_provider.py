@@ -228,3 +228,41 @@ def test_every_posting_formula_uses_only_names_the_engine_supplies():
             f"{rule.codelet_type}'s posting formula {rule.posting_formula!r} names "
             f"{sorted(unknown)}, which server/engine/posting.py does not supply"
         )
+
+
+def test_each_posted_urgency_is_one_of_the_named_urgency_levels():
+    """`urgency_when_posted` and `urgency_levels` must not drift apart.
+
+    The engine used to reach these through `meta.get_urgency("low")`, `("medium")` and
+    `("extremely_low")`, while the rules stated 35, 49 and 7 — the same numbers written
+    twice, in two files, with nothing holding them together.  Now that the rules are
+    what the engine reads, editing `urgency_levels.json` would move one and not the
+    other, which is `PHASE 1 PLAN.md` §0.2(c)'s two-definitions problem arriving by the
+    back door.
+
+    Pinning every posted urgency to *some* named level is what makes that visible: it
+    does not stop an admin choosing 42, but it does stop the shipped configuration
+    quietly ceasing to mean what the named levels say.
+    """
+    import os
+
+    from server.engine.metadata import MetadataProvider
+
+    seed_dir = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
+    meta = MetadataProvider.from_seed_data(seed_dir)
+
+    named = set(meta.urgency_levels.values())
+    for rule in meta.posting_rules:
+        if rule.urgency_when_posted is None:
+            continue
+        assert rule.urgency_when_posted in named, (
+            f"{rule.codelet_type} posts at urgency {rule.urgency_when_posted}, which is "
+            f"no named level: {sorted(meta.urgency_levels.items(), key=lambda kv: kv[1])}"
+        )
+
+    # And the three the engine used to name, specifically.
+    by_type = {r.codelet_type: r.urgency_when_posted for r in meta.posting_rules}
+    assert by_type["bottom-up-bond-scout"] == meta.get_urgency("low")
+    assert by_type["progress-watcher"] == meta.get_urgency("medium")
+    assert by_type["jootser"] == meta.get_urgency("medium")
+    assert by_type["breaker"] == meta.get_urgency("extremely_low")
