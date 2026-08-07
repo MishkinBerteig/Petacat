@@ -19,6 +19,7 @@ from server.models.metadata import (
     BridgeTypeDef,
     ClauseTypeDef,
     CodeletFamilyDef,
+    CodeletPatternDef,
     CodeletPhaseDef,
     CodeletTypeDef,
     CommentaryTemplate,
@@ -1289,6 +1290,9 @@ async def export_metadata(session: AsyncSession = Depends(get_session)):
         select(ThemeDimensionDef).order_by(ThemeDimensionDef.id)
     )
     posting_result = await session.execute(select(PostingRule).order_by(PostingRule.id))
+    patterns_result = await session.execute(
+        select(CodeletPatternDef).order_by(CodeletPatternDef.id)
+    )
     commentary_result = await session.execute(
         select(CommentaryTemplate).order_by(CommentaryTemplate.id)
     )
@@ -1379,6 +1383,13 @@ async def export_metadata(session: AsyncSession = Depends(get_session)):
             }
             for r in posting_result.scalars().all()
         ],
+        "codelet_patterns": [
+            {
+                "id": r.id, "pattern_name": r.pattern_name,
+                "codelet_type": r.codelet_type, "urgency": r.urgency,
+            }
+            for r in patterns_result.scalars().all()
+        ],
         "commentary_templates": [
             {"id": r.id, "template_key": r.template_key, "template_data": r.template_data}
             for r in commentary_result.scalars().all()
@@ -1401,7 +1412,7 @@ async def export_metadata(session: AsyncSession = Depends(get_session)):
 #: Every collection ``GET /export`` writes, and where it lands on the way back in:
 #: the model, the primary key a row is matched on, and any payload key whose name
 #: differs from the ORM attribute.  Export and import read this one list, so the two
-#: cover the same twelve collections.
+#: cover the same thirteen collections.
 _IMPORTABLE: tuple[tuple[str, type, str, dict[str, str]], ...] = (
     ("slipnet_nodes", SlipnetNodeDef, "name", {}),
     ("slipnet_links", SlipnetLinkDef, "id", {}),
@@ -1412,6 +1423,7 @@ _IMPORTABLE: tuple[tuple[str, type, str, dict[str, str]], ...] = (
     ("demo_problems", DemoProblem, "id", {}),
     ("theme_dimensions", ThemeDimensionDef, "id", {}),
     ("posting_rules", PostingRule, "id", {}),
+    ("codelet_patterns", CodeletPatternDef, "id", {}),
     ("commentary_templates", CommentaryTemplate, "id", {}),
     ("slipnet_layout", SlipnetLayoutPos, "node_name", {}),
     # ``metadata`` is reserved on a declarative class, so the column is reached
@@ -1486,7 +1498,7 @@ async def import_metadata(
     data: dict,
     session: AsyncSession = Depends(get_session),
 ):
-    """Import metadata from a JSON object — the same twelve collections ``/export`` writes.
+    """Import metadata from a JSON object — the same thirteen collections ``/export`` writes.
 
     Every collection present in the payload is applied; the response names each one and
     how many rows it carried, so what was written is legible from the reply. Rows are

@@ -148,6 +148,50 @@ async def test_the_seeder_refills_every_table_it_empties():
     )
 
 
+def test_the_test_suite_does_not_keep_a_seeder_of_its_own():
+    """One seeder, so the suite cannot measure an engine production cannot build.
+
+    ``tests/e2e/conftest.py`` grew a second copy of the startup seeding, and the two
+    drifted apart in the direction that hides a defect rather than reveals one: the
+    copy here wrote ``posting_rules``, production wrote none, and every e2e test
+    therefore passed against a configuration the application never had.  Nothing
+    contradicted it, because the only place the difference showed was a database
+    neither the suite nor the developer looked at.
+
+    The check is on instantiation rather than on imports: the conftest legitimately
+    *names* the models for its `drop_all`/`create_all` and cleanup, and what must not
+    come back is it constructing rows to insert.
+    """
+    import ast
+    from pathlib import Path
+
+    from server.models import metadata as metadata_models
+
+    model_names = {
+        name
+        for name in dir(metadata_models)
+        if isinstance(getattr(metadata_models, name), type)
+        and hasattr(getattr(metadata_models, name), "__tablename__")
+    }
+
+    conftest = Path(__file__).resolve().parents[1] / "e2e" / "conftest.py"
+    tree = ast.parse(conftest.read_text(encoding="utf-8"))
+
+    constructed = {
+        node.func.id
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id in model_names
+    }
+
+    assert not constructed, (
+        "tests/e2e/conftest.py constructs metadata rows itself: "
+        f"{sorted(constructed)}. Seed through server.services.seeding instead, so the "
+        "suite and the application are seeded by the same code."
+    )
+
+
 def test_the_fingerprint_covers_the_seeder_and_not_only_the_seed_files():
     """A fix to the seeder has to reach databases that already exist.
 

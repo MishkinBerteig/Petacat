@@ -26,6 +26,7 @@ from server.models.metadata import (
     BridgeTypeDef,
     ClauseTypeDef,
     CodeletFamilyDef,
+    CodeletPatternDef,
     CodeletPhaseDef,
     CodeletTypeDef,
     CommentaryTemplate,
@@ -170,9 +171,17 @@ async def load_metadata_from_db(session: AsyncSession) -> MetadataProvider:
         row.node_name: (row.grid_row, row.grid_col) for row in result.scalars()
     }
 
-    # Codelet patterns (from posting_rules JSON — stored inline in seed_data)
-    # For now, load from the posting rules JSON structure if available
+    # Codelet patterns.  Ordered by `id`, which the seeder assigns across every
+    # pattern, so both the order of the patterns and the order within each one come
+    # back as the seed file wrote them.
+    result = await session.execute(
+        select(CodeletPatternDef).order_by(CodeletPatternDef.id)
+    )
     codelet_patterns: dict[str, list[tuple[str, int]]] = {}
+    for row in result.scalars():
+        codelet_patterns.setdefault(row.pattern_name, []).append(
+            (row.codelet_type, row.urgency)
+        )
 
     # Enum values from lookup tables
     enum_table_models = {

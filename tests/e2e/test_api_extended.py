@@ -481,7 +481,7 @@ async def test_admin_export(app_client):
     assert "help_topics" in data
 
 
-#: The twelve collections the configuration is made of.
+#: The thirteen collections the configuration is made of.
 _CONFIG_COLLECTIONS = (
     "slipnet_nodes",
     "slipnet_links",
@@ -492,6 +492,7 @@ _CONFIG_COLLECTIONS = (
     "demo_problems",
     "theme_dimensions",
     "posting_rules",
+    "codelet_patterns",
     "commentary_templates",
     "slipnet_layout",
     "help_topics",
@@ -510,7 +511,7 @@ async def test_export_writes_every_collection(app_client):
 
 @pytest.mark.asyncio
 async def test_import_reports_every_collection_it_was_given(app_client):
-    """Import applies all twelve and names each one with its row count.
+    """Import applies all thirteen and names each one with its row count.
 
     The reply is what a caller reads to know what was written, so it accounts for the
     payload it received.
