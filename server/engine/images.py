@@ -1037,6 +1037,33 @@ class StringImage:
     def _make_image_for(self, obj: Any) -> Image | None:
         """Build a fresh image mirroring *obj*'s current appearance.
 
+        Scheme: the ``make-image`` call in ``new-group`` (``groups.ss:70-98``).
+        The reference builds a group's image once, when the group itself is
+        built; Petacat rebuilds the tree lazily from the string, so this is where
+        that call has to be reproduced.
+
+        **In direction order.**  ``ordered-objects`` (``groups.ss:70-72``) is the
+        group's objects reversed when it goes left, and everything the image is
+        seeded with is read off that order: its start letter, its letter and
+        length relations, its sub-images.  Building it left-to-right instead is
+        invisible in an untouched image — ``generate`` reverses a left-going
+        image's sub-images again (``images.ss:227-231``), so the two reversals
+        cancel — and wrong the moment a rule transforms it.  ``new_start_letter``
+        with a literal letter then enumerates from the wrong end of the group
+        with the inverse relation, ``extend`` and ``shorten`` grow and cut the
+        wrong end, and ``instantiate_as_group`` gives the answer's group the
+        wrong direction.  On ``eqe → qeq ; abbba`` that turned "swap the letter
+        categories" into a no-op over the left-going ``[[a][bbb]]`` and answered
+        ``abbbb`` where MetaCat's own image fails the enumeration and snags.
+
+        The earlier version passed ``plato-right`` unconditionally, and its
+        comment recorded why: seeding a left-going group's image with its own
+        direction made an untouched ``abc`` come out ``acb``.  That is true, and
+        it is what happens when the direction is flipped *without* reversing the
+        sub-image list with it — half of ``groups.ss:70-98`` rather than all of
+        it.  Both are reversed here, so ``generate`` cancels as it does in the
+        reference, and a Direction-reversal change flips the pair together.
+
         Sub-images are cached back onto their objects so the image tree is
         *shared*: a rule that transforms a letter nested inside a group has to
         mutate the very image the enclosing group will generate from, otherwise
@@ -1052,30 +1079,34 @@ class StringImage:
             obj.image = img
             return img
 
+        plato_left = self.slipnet.nodes.get("plato-left")
+        direction = getattr(obj, "direction", None)
+        ordered_objects = (
+            list(reversed(list(sub_objects)))
+            if direction is not None and direction is plato_left
+            else list(sub_objects)
+        )
+
         sub_images = []
-        for o in sub_objects:
+        for o in ordered_objects:
             sub = self._make_image_for(o)
             if sub is None:
                 return None
             o.image = sub
             sub_images.append(sub)
-        first = sub_images[0]
         letter_relation, length_relation = _group_image_relations(
-            obj, list(sub_objects), self.slipnet
+            obj, ordered_objects, self.slipnet
         )
         return make_group_image(
             self.slipnet,
-            first.start_letter,
+            # ``groups.ss:76-77`` — the LettCtgy descriptor of the first object in
+            # direction order.  ``Group._get_initial_letter_category`` is that
+            # method, and it already orders by direction.
+            _initial_letter_category(obj, self.slipnet),
             getattr(obj, "bond_facet", None),
             letter_relation,
             length_relation,
-            # Physical left-to-right order, *not* the group's bonding direction:
-            # ``Group.objects`` is stored left-to-right, so an image seeded with a
-            # left-going group's direction would generate its letters reversed and
-            # an untouched image of "abc" came out as "acb" — making every rule
-            # look broken to ``currently_works``.  A direction-reversal change
-            # flips this to left, which is what produces cba.
-            self.slipnet.nodes.get("plato-right"),
+            direction if direction is not None else self.slipnet.nodes.get("plato-right"),
             sub_images,
         )
 
