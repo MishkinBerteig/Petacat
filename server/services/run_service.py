@@ -1739,7 +1739,7 @@ class RunService:
         if runner is None or runner.ctx is None:
             raise ValueError(f"Run {run_id} not found or not loaded")
 
-        entries = pattern_entries(pattern)  # KeyError names an unknown pattern
+        entries = pattern_entries(self.meta, pattern)  # KeyError names an unknown pattern
         clamped = []
         for codelet_type, level in entries:
             urgency = int(self.meta.get_urgency(level))
@@ -1758,7 +1758,7 @@ class RunService:
         if runner is None or runner.ctx is None:
             raise ValueError(f"Run {run_id} not found or not loaded")
 
-        entries = pattern_entries(pattern)
+        entries = pattern_entries(self.meta, pattern)
         for codelet_type, _level in entries:
             runner.ctx.coderack.unclamp_codelet_type(codelet_type)
         return {

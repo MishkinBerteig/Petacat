@@ -126,7 +126,10 @@ class MetadataProvider:
     demo_problems: list[DemoProblem] = field(default_factory=list)
     theme_dimensions: list[ThemeDimensionSpec] = field(default_factory=list)
     slipnet_layout: dict[str, tuple[int, int]] = field(default_factory=dict)
-    codelet_patterns: dict[str, list[tuple[str, int]]] = field(default_factory=dict)
+    #: Pattern name -> ``[(codelet type, urgency *level name*), ...]``.  The level is
+    #: named rather than numeric, and ``Coderack._pattern_entry`` resolves it against
+    #: ``urgency_levels``; see `server/engine/codelet_patterns.py`.
+    codelet_patterns: dict[str, list[tuple[str, str]]] = field(default_factory=dict)
     # Enum values loaded from DB lookup tables (table_name -> set of valid names)
     enum_values: dict[str, set[str]] = field(default_factory=dict)
 

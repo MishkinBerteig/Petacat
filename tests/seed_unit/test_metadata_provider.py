@@ -90,7 +90,10 @@ def test_loads_codelet_patterns(meta):
     assert "rule-codelet-pattern" in meta.codelet_patterns
     rule_pattern = meta.codelet_patterns["rule-codelet-pattern"]
     assert len(rule_pattern) == 3
-    assert rule_pattern[0] == ("rule-scout", 77)
+    # The tier is named, not numbered: a pattern says *which* level and the run
+    # resolves it against ``urgency_levels``.
+    assert rule_pattern[0] == ("rule-scout", "very_high")
+    assert meta.get_urgency(rule_pattern[0][1]) == 77
 
 
 def test_get_param_default(meta):
@@ -297,3 +300,56 @@ def test_every_condition_is_a_predicate_the_engine_can_evaluate():
             f"{rule.codelet_type}'s condition {rule.condition!r} names {sorted(unknown)}, "
             f"which server/engine/posting.py does not supply"
         )
+
+
+def test_a_codelet_pattern_names_its_urgency_tier_rather_than_a_number():
+    """One definition of a pattern, and it says *which* tier, not what the tier is.
+
+    `server/engine/codelet_patterns.py` held five of the nine patterns a second time,
+    in Python, for the control API — the same concept with two definitions, which is
+    `PHASE 1 PLAN.md` §0.2(c).  Its own docstring stated the intended design: "urgencies
+    are named rather than numeric: the values live in `urgency_levels` seed data, so a
+    pattern says *which* level and the run resolves it."  The seed data stored 77 and
+    91.
+
+    Now that the Python copy is gone and the seed data is the only definition, it is the
+    one that has to say which level.  `Coderack._pattern_entry` resolves a named
+    urgency, so this costs nothing at the call sites and stops the numbers being
+    written down twice.
+    """
+    import os
+
+    from server.engine.metadata import MetadataProvider
+
+    seed_dir = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
+    meta = MetadataProvider.from_seed_data(seed_dir)
+
+    assert meta.codelet_patterns, "no patterns loaded"
+    for name, entries in meta.codelet_patterns.items():
+        assert entries, name
+        for codelet_type, urgency in entries:
+            assert urgency in meta.urgency_levels, (
+                f"{name} pins {codelet_type} at {urgency!r}, which is no named tier"
+            )
+
+
+def test_the_clampable_patterns_are_five_of_the_nine():
+    """`gui.ss:599-603` puts five on the Options menu; `trace.ss` defines nine.
+
+    Which five, and what the menu calls them, is real information that was only in the
+    Python module.  It is a parameter now, and every name in it has to resolve to a
+    pattern that exists.
+    """
+    import os
+
+    from server.engine.metadata import MetadataProvider
+
+    seed_dir = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
+    meta = MetadataProvider.from_seed_data(seed_dir)
+
+    menu = meta.get_param("clampable_codelet_patterns")
+    assert list(menu) == ["top_down", "bottom_up", "rule", "bridge", "group"]
+    for name, label in menu.items():
+        assert label.endswith("codelet pattern"), label
+        key = name.replace("_", "-") + "-codelet-pattern"
+        assert key in meta.codelet_patterns, f"{name} names no pattern"

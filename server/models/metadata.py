@@ -233,7 +233,11 @@ class CodeletPatternDef(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     pattern_name = Column(String(64), nullable=False, index=True)
     codelet_type = Column(String(64), nullable=False)
-    urgency = Column(Integer, nullable=False)
+    #: A *named* tier from ``urgency_levels``, not a number.  A pattern says which
+    #: level and the run resolves it (``Coderack._pattern_entry``), so changing what
+    #: ``very_high`` means moves every pattern that names it instead of leaving 77
+    #: written down in a second place.
+    urgency_level = Column(String(32), nullable=False)
 
 
 class CommentaryTemplate(Base):

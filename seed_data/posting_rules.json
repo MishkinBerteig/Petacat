@@ -167,68 +167,68 @@
   ],
   "codelet_patterns": {
     "top-down-codelet-pattern": [
-      ["top-down-bond-scout:direction", 77],
-      ["top-down-group-scout:direction", 77],
-      ["top-down-bond-scout:category", 77],
-      ["top-down-group-scout:category", 77],
-      ["top-down-description-scout", 77],
-      ["bond-evaluator", 91],
-      ["bond-builder", 91],
-      ["group-evaluator", 91],
-      ["group-builder", 91],
-      ["description-evaluator", 91],
-      ["description-builder", 91]
+      ["top-down-bond-scout:direction", "very_high"],
+      ["top-down-group-scout:direction", "very_high"],
+      ["top-down-bond-scout:category", "very_high"],
+      ["top-down-group-scout:category", "very_high"],
+      ["top-down-description-scout", "very_high"],
+      ["bond-evaluator", "extremely_high"],
+      ["bond-builder", "extremely_high"],
+      ["group-evaluator", "extremely_high"],
+      ["group-builder", "extremely_high"],
+      ["description-evaluator", "extremely_high"],
+      ["description-builder", "extremely_high"]
     ],
     "bottom-up-codelet-pattern": [
-      ["bottom-up-bond-scout", 77],
-      ["bond-evaluator", 91],
-      ["bond-builder", 91],
-      ["group-scout:whole-string", 77],
-      ["group-evaluator", 91],
-      ["group-builder", 91],
-      ["bottom-up-bridge-scout", 77],
-      ["important-object-bridge-scout", 77],
-      ["bridge-evaluator", 91],
-      ["bridge-builder", 91],
-      ["bottom-up-description-scout", 77],
-      ["description-evaluator", 91],
-      ["description-builder", 91],
-      ["rule-scout", 77],
-      ["rule-evaluator", 91],
-      ["rule-builder", 91]
+      ["bottom-up-bond-scout", "very_high"],
+      ["bond-evaluator", "extremely_high"],
+      ["bond-builder", "extremely_high"],
+      ["group-scout:whole-string", "very_high"],
+      ["group-evaluator", "extremely_high"],
+      ["group-builder", "extremely_high"],
+      ["bottom-up-bridge-scout", "very_high"],
+      ["important-object-bridge-scout", "very_high"],
+      ["bridge-evaluator", "extremely_high"],
+      ["bridge-builder", "extremely_high"],
+      ["bottom-up-description-scout", "very_high"],
+      ["description-evaluator", "extremely_high"],
+      ["description-builder", "extremely_high"],
+      ["rule-scout", "very_high"],
+      ["rule-evaluator", "extremely_high"],
+      ["rule-builder", "extremely_high"]
     ],
     "thematic-codelet-pattern": [
-      ["thematic-bridge-scout", 91]
+      ["thematic-bridge-scout", "extremely_high"]
     ],
     "rule-codelet-pattern": [
-      ["rule-scout", 77],
-      ["rule-evaluator", 91],
-      ["rule-builder", 91]
+      ["rule-scout", "very_high"],
+      ["rule-evaluator", "extremely_high"],
+      ["rule-builder", "extremely_high"]
     ],
     "bond-codelet-pattern": [
-      ["bottom-up-bond-scout", 77],
-      ["bond-evaluator", 91],
-      ["bond-builder", 91]
+      ["bottom-up-bond-scout", "very_high"],
+      ["bond-evaluator", "extremely_high"],
+      ["bond-builder", "extremely_high"]
     ],
     "group-codelet-pattern": [
-      ["group-scout:whole-string", 77],
-      ["group-evaluator", 91],
-      ["group-builder", 91]
+      ["group-scout:whole-string", "very_high"],
+      ["group-evaluator", "extremely_high"],
+      ["group-builder", "extremely_high"]
     ],
     "bridge-codelet-pattern": [
-      ["bottom-up-bridge-scout", 77],
-      ["important-object-bridge-scout", 77],
-      ["bridge-evaluator", 91],
-      ["bridge-builder", 91]
+      ["bottom-up-bridge-scout", "very_high"],
+      ["important-object-bridge-scout", "very_high"],
+      ["bridge-evaluator", "extremely_high"],
+      ["bridge-builder", "extremely_high"]
     ],
     "description-codelet-pattern": [
-      ["bottom-up-description-scout", 77],
-      ["description-evaluator", 91],
-      ["description-builder", 91]
+      ["bottom-up-description-scout", "very_high"],
+      ["description-evaluator", "extremely_high"],
+      ["description-builder", "extremely_high"]
     ],
     "answer-codelet-pattern": [
-      ["answer-finder", 91],
-      ["answer-justifier", 91]
+      ["answer-finder", "extremely_high"],
+      ["answer-justifier", "extremely_high"]
     ]
   }
 }

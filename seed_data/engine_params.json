@@ -7,6 +7,13 @@
   "initial_codelet_types": ["bottom-up-bond-scout", "bottom-up-bridge-scout"],
   "initial_codelet_urgency": "very_low",
   "initial_codelet_rounds": "2 * num_workspace_objects",
+  "clampable_codelet_patterns": {
+    "top_down": "Top-down codelet pattern",
+    "bottom_up": "Bottom-up codelet pattern",
+    "rule": "Rule codelet pattern",
+    "bridge": "Bridge codelet pattern",
+    "group": "Group codelet pattern"
+  },
   "num_coderack_bins": 7,
   "max_temperature": 100,
   "initial_temperature": 100,
