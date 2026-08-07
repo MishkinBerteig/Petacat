@@ -54,10 +54,11 @@ reaches a different answer on the GPU than on the CPU. That is right behaviour:
 Petacat is stochastic by design, so a different-but-valid run is a correct run, and
 the same thing happens whenever a new scheduler or a new generator reorders the
 draws. What must hold across the two halves is the **set** of stopping states each
-problem can reach, and that is the expected-range oracle's question
-(`tests/module/test_expected_range.py`), which reports its findings in its own
-terms — a missing p50 state is a regression, a novel state is surfaced for
-adjudication — on whichever configuration it is run.
+problem can reach. That question is no longer asked of Petacat's own past but of
+Metacat's published sets, by `scripts/compare_to_metacat.py` — see
+[Regressions](#regressions-what-replaced-the-expected-range-oracle) — which
+reports a missing p50 member and a novel one in their own terms rather than as a
+pass or a failure.
 
 So the matrix asks each half for what that half can promise. The float64 tests
 assert bit-identity where they assert it, and the float32 pass asserts the
@@ -124,9 +125,9 @@ outside the matrix take it too and the run is entirely what it says it is.
   gpu  mlx      float32    250 tests
   whole suite requested: the full matrix is required of this run
 
-  unit           508 collected    508 run    508 passed      0 failed      0 skipped  complete
+  unit           522 collected    522 run    522 passed      0 failed      0 skipped  complete
   seed_unit      448 collected    448 run    448 passed      0 failed      0 skipped  complete
-  module         945 collected    945 run    945 passed      0 failed      0 skipped  complete
+  module         901 collected    901 run    901 passed      0 failed      0 skipped  complete
   architecture    34 collected     34 run     34 passed      0 failed      0 skipped  complete
   integration     65 collected     65 run     65 passed      0 failed      0 skipped  complete
   e2e            209 collected    209 run    209 passed      0 failed      0 skipped  complete
@@ -177,7 +178,7 @@ A truncated run reports itself as truncated, and the difference from a clean run
 visible three ways:
 
 ```
-  module         945 collected    198 run    198 passed      0 failed      0 skipped  INCOMPLETE
+  module         901 collected    198 run    198 passed      0 failed      0 skipped  INCOMPLETE
 
   RUN TRUNCATED: the 60 min ceiling was reached after 60.4 min. Everything above is
   what the run produced before it stopped; the tests it had not reached never ran.
@@ -201,9 +202,9 @@ that allowance.
 
 | Layer | Directory | Scope | May depend on | Cases |
 |-------|-----------|-------|---------------|-------|
-| **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 508 |
+| **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 522 |
 | **seed unit** | `tests/seed_unit/` | One class or function, measured against the values Petacat ships with | Real `seed_data/*.json`, and the machine the process is running on | 448 |
-| **module** | `tests/module/` | Several real components assembled and driven | Real engine objects and `seed_data/*.json`; no DB, no HTTP | 945 |
+| **module** | `tests/module/` | Several real components assembled and driven | Real engine objects and `seed_data/*.json`; no DB, no HTTP | 901 |
 | **architecture** | `tests/architecture/` | How the source tree is allowed to depend on itself | The repository's source, `seed_data/*.json`, child interpreters | 34 |
 | **integration** | `tests/integration/` | Agreement between the repository's artifacts, and the harness's own rules | Real `seed_data/*.json`, the ORM declarations, the generated client files, the documentation, a real pytest session | 65 |
 | **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 209 |
@@ -231,7 +232,7 @@ first**, then move up toward the API and GUI.
 
 All six layers run in one command — the
 [required command](#the-required-command) — and, since Petacat runs natively, all
-six actually run: **2,209 cases**, every one of them executed. A layer that is
+six actually run: **2,179 cases**, every one of them executed. A layer that is
 normally skipped is not a layer that is normally green, and none of these is.
 
 Wall-clock time depends heavily on the machine and on what else it is doing. The
@@ -321,6 +322,7 @@ the number of endpoints taking `Depends(get_session)`, the size of
 | `test_bridge_types.py` | 2 | The bridge-type and orientation constants |
 | `test_codelet_dsl.py` | 3 | Compiling a codelet body: what the interpreter accepts and refuses |
 | `test_commentary.py` | 23 | The `CommentaryLog`, and the emit helpers whose English is written in Python |
+| `test_compare_harness.py` | 14 | The oracle comparison's decision logic: what gets flagged, and how |
 | `test_concept_mappings.py` | 37 | `ConceptMapping`: identity, slippage, distinguishing descriptors |
 | `test_descriptions.py` | 23 | `Description`: relevance, strength, descriptor predicates |
 | `test_episodic_memory.py` | 13 | `EpisodicMemory`: identifier scoping, theme distance, `answer_present` |
@@ -381,8 +383,8 @@ the number of endpoints taking `Depends(get_session)`, the size of
 | `test_coderack_shards.py` | 13 | The candidate sharded coderacks: fidelity and contention |
 | `test_commentary_writer.py` | 8 | Commentary is an injected writer, and every Run gets a real one |
 | `test_dissertation_parity.py` | 45 | The dissertation's claims, encoded as tests |
-| `test_expected_range.py` | 20 | The expected-range oracle: the reachable stopping states of 13 problems |
 | `test_free_running.py` | 14 | Free-running execution across worker threads |
+| `test_group_image_direction.py` | 6 | A group's image is built in the group's own direction |
 | `test_image_relations.py` | 4 | The relations a group's image is built with, and what happens when they are wrong |
 | `test_justify_and_jootsing.py` | 11 | Justify mode's verdicts and the jootser's justify outcomes |
 | `test_numeric_engine.py` | 7 | The engine computes the same thing with the substrate engaged |
@@ -396,7 +398,6 @@ the number of endpoints taking `Depends(get_session)`, the size of
 | `test_singleton_group_images.py` | 3 | Every object a rule names owns an image, singleton groups included |
 | `test_sink_emission.py` | 9 | The engine emits a complete run record to its sink |
 | `test_snag_response.py` | 7 | The snag response driven end to end through a real run |
-| `test_splittable_rng_range.py` | 3 | The expected range holds under the splittable RNG |
 | `test_staleness.py` | 8 | The staleness probe reads a Workspace that lags the live one |
 | `test_state_graph.py` | 11 | A captured run restores to a state that continues identically |
 | `test_swaps_and_translation.py` | 14 | Extrinsic (swap) rules end to end, the conflict battery, the per-dimension slippage ignore, and the ways a translation fails |
@@ -447,8 +448,7 @@ the number of endpoints taking `Depends(get_session)`, the size of
 | `tests/conftest.py` | The numeric backend matrix, the session ceiling, the per-layer summary |
 | `tests/e2e/conftest.py` | The Postgres fixtures and the session advisory lock |
 | `tests/unit/_fakes.py` | The shared hand-rolled doubles |
-| `tests/support/expected_range.py` | The expected-range checker, pointable at a modified engine |
-| `tests/fixtures/expected_range.json` | The saturated baseline the oracle compares against |
+| `tests/support/expected_range.py` | A sampling pool over the demo problems, pointable at a modified engine through a `run_one` callable |
 
 Almost every file in `tests/module/` is in the
 [numeric backend matrix](#the-numeric-backend-matrix), because driving the engine
@@ -460,88 +460,73 @@ A test that costs seconds to minutes is marked `@pytest.mark.slow`. Marked tests
 still run by default — they are guards, and a guard that has to be remembered is
 not a guard — but a tight edit-test loop can drop them with `-m "not slow"`.
 
-Four functions carry the marker, expanding to 28 cases: the expected-range check
-on the CPU, the same check on Metal, the RNG range guard, and the guard that MLX
-stays optional. The Metal pass is 13 of those cases, and `PETACAT_RANGE_GPU=0`
-narrows the check to the CPU role. The one that matters most is the
-**expected-range check**
-(`tests/module/test_expected_range.py`), which samples each of the 13 distinct
-demo problems 100 times and compares the set of stopping states reached against
-the saturated baseline in `tests/fixtures/expected_range.json`.
+**One function carries the marker**, expanding to one case: the guard that MLX
+stays optional (`tests/seed_unit/test_numeric_backends.py`), which runs the engine
+in a child interpreter with MLX and NumPy made unimportable. It chooses its own
+backend environment, which is why it sits outside the numeric matrix.
 
-That baseline is the project's **regression oracle**, and it is worth
-understanding why it is a *set* rather than a seeded run. Petacat is stochastic
-by design, so a different-but-correct run is right behaviour, and any change
-that reorders random draws — a new scheduler, a different generator, float32
-arithmetic — legitimately changes which answer a given seed produces. What must
-not change is which answers are *reachable*. The baseline was built by
-`scripts/build_expected_range.py`, which samples each problem until the
-Good-Turing missing-mass estimate `f₁/N` says the set is saturated: 13 problems,
-410,000 runs.
+Three others carried it until the expected-range oracle was removed; see below.
 
-Run it whenever the codelet scheduler, the random stream, the numeric backend or
-the order of the update cycle moves. Its checker
-(`tests/support/expected_range.py`) can be pointed at a modified engine through a
-`run_one` callable, which is how the staleness, sharding, free-running and
-numeric-backend work is all verified against the same comparison rather than
-against four hand-rolled ones.
+### Regressions: what replaced the expected-range oracle
 
-The oracle reports two outcomes, and they call for different things.
+This section used to describe `tests/module/test_expected_range.py` and the
+saturated baseline in `tests/fixtures/expected_range.json` as the project's
+regression oracle. **Both are gone**, along with `test_splittable_rng_range.py`,
+and the reason is worth keeping because it is easy to rebuild the same mistake.
 
-A **missing p50 state fails as a regression**. The p50 set is the states that
-account for the top half of a problem's sampled distribution — a healthy run
-reaches them routinely — so one going unreached is a defect, not sampling noise.
+That baseline was 410,000 runs *of Petacat*, so it could detect drift but never
+divergence: an engine that disagreed with MetaCat from the outset agreed with
+itself perfectly, and every one of the reference's own answers arriving for the
+first time was read as an anomaly. The decision and the evidence are in
+`DISCREPANCIES3.md`.
 
-A **novel state is reported for adjudication**. At the baseline's saturation
-level a genuinely novel state shows up about 1% of the time per problem, so the
-report names the problem, the state, the backend, the sample size and the
-re-sample command, and the range is left as it stands. Re-run that problem
-deeply with `PETACAT_RANGE_RUNS=1000`, and if the state proves old-but-rare,
-write it into that problem's `admitted_states` in
-`tests/fixtures/expected_range.json`.
+**The comparison now points at Metacat's published sets instead.**
+`scripts/compare_to_metacat.py` runs 100 tries per problem in each of two modes —
+single runs from a fresh Episodic Memory, and eight-run episodes with memory
+carried forward — against the oracle in `../Metacat/oracle/derived/`, sampled from
+the reference implementation itself. It reports two flags and fails nothing:
 
-`admitted_range` reads `expected_range` and `admitted_states` together, so an
-adjudication takes effect on the next run. `build_expected_range.py` carries
-admitted states through a rebuild, since the range is otherwise reconstructed
-from the saturation counts.
+- **MISSING** — a p50 member of the reference set that Petacat did not produce.
+  Decisive: the false-alarm rate at n=100 is 0.0000 on every problem.
+- **NOVEL** — something Petacat produced that the reference never did. Only as
+  strong as the reference set's saturation, which is why the episodic mode
+  separates members the reference reaches in single runs from members it reaches
+  nowhere.
+
+It is **not part of the test suite**, and that is deliberate: MetaCat is
+stochastic and self-watching with no ground truth, so the comparison says stable
+or changed, never pass or fail. Run it when the codelet scheduler, the random
+stream, the numeric backend or the update cycle moves:
+
+```bash
+.venv/bin/python scripts/compare_to_metacat.py -n 100 -r 8
+```
+
+Its own decision logic *is* under test, in
+`tests/unit/test_compare_harness.py` — a broken comparison does not crash, it
+stops flagging, and a cycle comes back clean because nothing looked.
+
+The protocol is `../Metacat/ORACLE-USAGE.md`; where Petacat currently stands
+against it, and the root causes of every variation found, is `DISCREPANCIES4.md`.
 
 ### The oracle's environment
 
-The expected-range pool runs its workers on the NumPy backend, set before any
-engine object exists, so each worker holds one CPU numeric context.
+`tests/support/expected_range.py` survives the removal above, because
+`test_population.py`, `test_dissertation_parity.py` and `test_numeric_engine.py`
+use its `default_run_one` helper, and `scripts/measure_staleness.py` and
+`scripts/bench_engine.py` drive it. Its pool runs workers on the NumPy backend,
+set before any engine object exists, so each worker holds one CPU numeric context.
 
 | Variable | Effect |
 |---|---|
 | `PETACAT_NUMERIC_BACKEND_WORKERS` | The backend the pool's workers run on |
 | `PETACAT_ORACLE_ALLOW_GPU` | Lets the workers take the default policy |
-| `PETACAT_RANGE_RUNS` | Samples per problem — `1000` is the deep re-sample above |
-| `PETACAT_RANGE_WORKERS` | Pool size |
-| `PETACAT_RANGE_GPU` | `1` runs the check on Metal as well as on the CPU backend |
-| `PETACAT_RANGE_GPU_RUNS` | Samples per problem for that GPU pass |
-| `PETACAT_RANGE_GPU_WORKERS` | Pool size for the GPU pass |
+| `PETACAT_RANGE_RUNS` | Samples per problem |
 | `PETACAT_RANGE_TIMEOUT` | Per-sample deadline in seconds; `0` waits indefinitely |
-| `PETACAT_RNG_RANGE_RUNS` | Samples for the RNG range guard |
 
-Reach for `PETACAT_RANGE_RUNS=1000` when a stopping state falls outside the
-range and you want to know whether it is old-but-rare.
-
-`PETACAT_RANGE_GPU=1` puts the oracle on the same axis the rest of the suite runs:
-the CPU pass in float64 and a Metal pass in float32, on the same 13 problems and
-the same baseline. It is the one place a stopping *set* is compared across
-precisions, which is the claim the float32 half of the matrix rests on. It costs
-what a GPU dispatch costs at 59 nodes: **1,300 runs at 11 workers take 61-74 s on
-NumPy and 316 s on Metal.**
-
-The oracle distinguishes two outcomes, and a reader needs to know which one is on
-screen:
-
-- A **missing p50 state fails as a regression.** The p50 set is the most-frequent
-  states that together make up the top half of the baseline's mass, so their
-  absence from a sample is evidence rather than noise.
-- A **novel state is reported for adjudication.** It names the problem, the state,
-  the seeds and the per-check probability of a spurious one, and it never widens
-  the fixture on its own. Admitting a state to the baseline is a decision taken
-  after re-sampling that problem deeply.
+The `PETACAT_RANGE_GPU*`, `PETACAT_RANGE_WORKERS` and `PETACAT_RNG_RANGE_RUNS`
+variables documented here previously were read only by the deleted tests, and
+nothing consults them now.
 
 ### The client suite
 
@@ -640,7 +625,7 @@ the real value is what is being asserted about.
    `threshold=0`, or "identity" *and* "slippage"), split it.
 3. **Completely mock dependencies.** A unit test isolates one unit; replace
    every collaborator with a deterministic double (see
-   [Test doubles](#test-doubles-tests-unit_fakespy)). If a unit's
+   [Test doubles](#test-doubles-testsunit_fakespy)). If a unit's
    dependencies are so extensive that mocking is impractical, that is a signal
    to **refactor the source** for testability (dependency injection,
    abstraction, polymorphism, parameterization) rather than to write a heavy,
