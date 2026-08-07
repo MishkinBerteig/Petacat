@@ -212,6 +212,30 @@ class PostingRule(Base):
     triggering_slipnodes = Column(JSONB, nullable=True)
 
 
+class CodeletPatternDef(Base):
+    """One entry of a named codelet pattern.
+
+    A pattern is a set of ``(codelet type, urgency)`` pairs clamped together, so that
+    clamping one pins a whole line of work rather than a single codelet type
+    (``trace.ss:1597-1668``).  The engine's clamp sites read the nine of them through
+    ``meta.codelet_patterns`` — the jootser's response to a repeated snag
+    (``jootsing.py:429``), and the whole of justify mode's opening
+    (``justify.py:403``).
+
+    Stored one row per entry rather than one row per pattern, so a pattern's
+    membership is editable a line at a time in the admin panel, the way a posting rule
+    is.  ``id`` carries the order within a pattern and across patterns, assigned from
+    the seed file when the row is written.
+    """
+
+    __tablename__ = "codelet_pattern_defs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    pattern_name = Column(String(64), nullable=False, index=True)
+    codelet_type = Column(String(64), nullable=False)
+    urgency = Column(Integer, nullable=False)
+
+
 class CommentaryTemplate(Base):
     """Commentary template text."""
 

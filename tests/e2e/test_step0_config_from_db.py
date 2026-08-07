@@ -62,6 +62,27 @@ _SCHEMA_LOCK_KEY = 0x57E70
 PROBLEM = ("abc", "abd", "mrrjjj")
 PROBLEM_SEED = 42
 
+#: A second problem, for the values `mrrjjj` cannot see.
+#:
+#: `mrrjjj` at seed 42 reaches its answer without ever snagging, so it never clamps and
+#: is *insensitive* to `codelet_patterns` — measured: identical at 777 codelets with the
+#: patterns present and with them all removed.  A guard test on that problem would have
+#: passed against an engine holding no patterns at all, which is the failure the whole
+#: file exists to detect.
+#:
+#: `abc → abd; xyz` is the standard snagging problem: `z` has no successor, so the run
+#: hits the snag, clamps, and the patterns decide what the clamp pins.  Seed 42 rather
+#: than a cheaper one because it is the seed that separates the configurations on *both*
+#: engines the database can currently be — with the patterns and without them:
+#:
+#:   with descriptor predicates (the seed data):  answer_found xyz 17284 → gave_up 17283
+#:   without them (what the loader yields today): gave_up 3113        → gave_up 2537
+#:
+#: Seed 7 separates them only on the first, so a guard built on it would quietly stop
+#: discriminating the moment the predicates are wired up.
+CLAMP_PROBLEM = ("abc", "abd", "xyz")
+CLAMP_SEED = 42
+
 pytestmark = pytest.mark.skipif(
     not _db_available(),
     reason="Test Postgres not reachable; start it with scripts/dev.sh db",
@@ -147,18 +168,25 @@ def seed_meta():
 # ──────────────────────────────────────────────────────────────────
 
 
-def run_outcome(meta: MetadataProvider) -> tuple[str, str | None, int]:
+def run_outcome(
+    meta: MetadataProvider,
+    problem: tuple[str, str, str] = PROBLEM,
+    seed: int = PROBLEM_SEED,
+) -> tuple[str, str | None, int]:
     """One run's stopping state: `(status, answer, codelets)`.
 
     The triple §0.4 names — "the assertion has to be on the run — status, answer,
     codelet count".  Both configurations run in this process on this session's
     numeric backend, so the comparison is between the two metadata providers and
     nothing else.
+
+    *problem* is a parameter because no single problem is sensitive to every
+    configuration value; each guard has to pick one its value can actually move.
     """
     from server.engine.runner import EngineRunner
 
     runner = EngineRunner(meta)
-    runner.init_mcat(*PROBLEM, seed=PROBLEM_SEED)
+    runner.init_mcat(*problem, seed=seed)
     runner.run_mcat(max_steps=20_000)
     workspace = runner.ctx.workspace
     answer = workspace.answer_string.text if workspace.answer_string else None
@@ -266,5 +294,75 @@ async def test_changing_a_triggering_slipnode_changes_the_run(db_session):
     await db_session.commit()
 
     changed = run_outcome(await load_metadata_from_db(db_session))
+
+    assert changed != shipped
+
+
+# ──────────────────────────────────────────────────────────────────
+# codelet_patterns
+# ──────────────────────────────────────────────────────────────────
+
+
+async def test_production_seeding_writes_every_codelet_pattern(db_session, seed_meta):
+    """Direction 1, at the table.
+
+    The nine named patterns live in `posting_rules.json` beside the rules, and had no
+    table to be written into: `load_metadata_from_db` built `codelet_patterns` as an
+    empty dict with a comment saying the patterns were "stored inline in seed_data".
+    They are the engine's clamps — a jootser's response to a repeated snag, and the
+    whole of justify mode's opening — so an empty dict is not a missing convenience.
+    """
+    db_meta = await load_metadata_from_db(db_session)
+
+    assert db_meta.codelet_patterns == seed_meta.codelet_patterns
+
+
+async def test_codelet_pattern_entries_keep_their_order(db_session, seed_meta):
+    """A pattern is an ordered list of clamps, and it round-trips as one."""
+    db_meta = await load_metadata_from_db(db_session)
+
+    assert list(db_meta.codelet_patterns) == list(seed_meta.codelet_patterns)
+    for name, entries in seed_meta.codelet_patterns.items():
+        assert db_meta.codelet_patterns[name] == entries, name
+
+
+async def test_database_codelet_patterns_drive_the_run_identically(
+    db_session, seed_meta
+):
+    """Direction 1, at the run, for this field alone."""
+    from dataclasses import replace
+
+    db_meta = await load_metadata_from_db(db_session)
+    with_seed_patterns = replace(db_meta, codelet_patterns=seed_meta.codelet_patterns)
+
+    assert run_outcome(db_meta, CLAMP_PROBLEM, CLAMP_SEED) == run_outcome(
+        with_seed_patterns, CLAMP_PROBLEM, CLAMP_SEED
+    )
+
+
+async def test_emptying_the_bottom_up_codelet_pattern_changes_the_run(db_session):
+    """Direction 2.
+
+    `bottom-up-codelet-pattern` is what `jootsing.py:429` clamps when the jootser
+    decides the run is stuck in one way of seeing the problem.  Deleting its entries
+    leaves the pattern named and empty, so the clamp still fires and pins nothing —
+    which is precisely the state an unwired `codelet_patterns` left the engine in.
+    """
+    from server.models.metadata import CodeletPatternDef
+
+    shipped = run_outcome(
+        await load_metadata_from_db(db_session), CLAMP_PROBLEM, CLAMP_SEED
+    )
+
+    await db_session.execute(
+        delete(CodeletPatternDef).where(
+            CodeletPatternDef.pattern_name == "bottom-up-codelet-pattern"
+        )
+    )
+    await db_session.commit()
+
+    changed = run_outcome(
+        await load_metadata_from_db(db_session), CLAMP_PROBLEM, CLAMP_SEED
+    )
 
     assert changed != shipped

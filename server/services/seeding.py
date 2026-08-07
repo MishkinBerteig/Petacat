@@ -320,6 +320,22 @@ async def seed_metadata_from_json(
             )
         )
 
+    # The nine named codelet patterns, which live in the same file as the rules.
+    # `id` is assigned across all patterns so both the order of the patterns and the
+    # order within each one survive the round trip.
+    entry_id = 0
+    for pattern_name, entries in posting_data.get("codelet_patterns", {}).items():
+        for codelet_type, urgency in entries:
+            entry_id += 1
+            session.add(
+                models.CodeletPatternDef(
+                    id=entry_id,
+                    pattern_name=pattern_name,
+                    codelet_type=codelet_type,
+                    urgency=urgency,
+                )
+            )
+
     for td in _load("theme_dimensions.json").get("dimensions", []):
         session.add(
             models.ThemeDimensionDef(

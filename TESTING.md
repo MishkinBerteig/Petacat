@@ -129,8 +129,8 @@ outside the matrix take it too and the run is entirely what it says it is.
   seed_unit      448 collected    448 run    448 passed      0 failed      0 skipped  complete
   module         901 collected    901 run    901 passed      0 failed      0 skipped  complete
   architecture    34 collected     34 run     34 passed      0 failed      0 skipped  complete
-  integration     67 collected     67 run     67 passed      0 failed      0 skipped  complete
-  e2e            215 collected    215 run    215 passed      0 failed      0 skipped  complete
+  integration     68 collected     68 run     68 passed      0 failed      0 skipped  complete
+  e2e            219 collected    219 run    219 passed      0 failed      0 skipped  complete
 
   run complete in 14.2 min against a 60 min ceiling
 ```
@@ -206,8 +206,8 @@ that allowance.
 | **seed unit** | `tests/seed_unit/` | One class or function, measured against the values Petacat ships with | Real `seed_data/*.json`, and the machine the process is running on | 448 |
 | **module** | `tests/module/` | Several real components assembled and driven | Real engine objects and `seed_data/*.json`; no DB, no HTTP | 901 |
 | **architecture** | `tests/architecture/` | How the source tree is allowed to depend on itself | The repository's source, `seed_data/*.json`, child interpreters | 34 |
-| **integration** | `tests/integration/` | Agreement between the repository's artifacts, and the harness's own rules | Real `seed_data/*.json`, the ORM declarations, the generated client files, the documentation, a real pytest session | 67 |
-| **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 215 |
+| **integration** | `tests/integration/` | Agreement between the repository's artifacts, and the harness's own rules | Real `seed_data/*.json`, the ORM declarations, the generated client files, the documentation, a real pytest session | 68 |
+| **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 219 |
 
 Those counts are cases, so they include the second pass the numeric matrix makes
 over the 250 backend-sensitive tests.
@@ -232,7 +232,7 @@ first**, then move up toward the API and GUI.
 
 All six layers run in one command — the
 [required command](#the-required-command) — and, since Petacat runs natively, all
-six actually run: **2,187 cases**, every one of them executed. A layer that is
+six actually run: **2,192 cases**, every one of them executed. A layer that is
 normally skipped is not a layer that is normally green, and none of these is.
 
 Wall-clock time depends heavily on the machine and on what else it is doing. The
@@ -422,7 +422,7 @@ the number of endpoints taking `Depends(get_session)`, the size of
 | `test_help_topics.py` | 13 | The help JSON, the generated TypeScript and the panels that reference them |
 | `test_metadata_seeding.py` | 13 | Every seed file is well-formed, and the `MetadataProvider` round-trip holds |
 | `test_numeric_matrix_harness.py` | 11 | The matrix's own reporting rules and the exit status of a narrowed run |
-| `test_seed_reconciliation.py` | 6 | The DB copy of the metadata tracks the seed files without eating runtime data, and the seeder refills every table it empties |
+| `test_seed_reconciliation.py` | 7 | The DB copy of the metadata tracks the seed files without eating runtime data, and the seeder refills every table it empties |
 
 **`tests/e2e/` — the HTTP API against a real database**
 
@@ -440,7 +440,7 @@ the number of endpoints taking `Depends(get_session)`, the size of
 | `test_run_parameters.py` | 13 | Run parameters are settable per Run, stored, and readable back |
 | `test_run_to_answer.py` | 8 | The Run-to-Answer feature over HTTP |
 | `test_snag_identity.py` | 2 | A snag is the same snag whichever endpoint served it |
-| `test_step0_config_from_db.py` | 6 | Step 0's guard tests: a shipped value reproduces the run and a changed one moves it |
+| `test_step0_config_from_db.py` | 10 | Step 0's guard tests: a shipped value reproduces the run and a changed one moves it |
 
 **Collected by no layer**
 

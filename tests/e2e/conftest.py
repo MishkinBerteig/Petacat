@@ -145,134 +145,25 @@ async def setup_db(test_engine, schema_lock):
 
 
 async def _seed_metadata(session: AsyncSession):
-    """Insert seed_data into the test DB."""
-    import json
+    """Insert seed_data into the test DB — through the production seeder.
+
+    This used to be a second copy of ``server/main.py``'s seeding, and the two drifted:
+    the copy here wrote ``posting_rules`` and production did not, so the suite measured
+    an engine the application could never build and the defect stayed invisible for as
+    long as both were maintained by hand.  `PHASE 1 PLAN.md` §0.2(c) is about exactly
+    that shape — one concept with two definitions — and requires the duplicate resolved
+    rather than re-homed.
+
+    Seeding through the real thing also means a table added to the seeder is seeded
+    here the day it is added, instead of the day someone remembers this file.
+    """
     seed_dir = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
 
-    from server.models.metadata import (
-        BridgeOrientationDef, BridgeTypeDef, ClauseTypeDef, CodeletFamilyDef,
-        CodeletPhaseDef, CodeletTypeDef, CommentaryTemplate,
-        DemoModeDef, DemoProblem as DemoProblemRow, EngineParam,
-        EventTypeDef, FormulaCoefficient, HelpTopic, LinkTypeDef,
-        ParamValueTypeDef, PostingDirectionDef, PostingRule, ProposalLevelDef,
-        RuleTypeDef, RunStatusDef, SlipnetLayoutPos, SlipnetLinkDef,
-        SlipnetNodeDef, ThemeDimensionDef, ThemeTypeDef, UrgencyLevel,
-    )
+    from server.services.seeding import seed_metadata_from_json, sync_help_topics
 
-    def _load(fn):
-        with open(os.path.join(seed_dir, fn)) as f:
-            return json.load(f)
-
-    # Seed enum lookup tables first (required by FK constraints)
-    _enum_models = {
-        "run_statuses": RunStatusDef,
-        "event_types": EventTypeDef,
-        "bridge_types": BridgeTypeDef,
-        "bridge_orientations": BridgeOrientationDef,
-        "clause_types": ClauseTypeDef,
-        "rule_types": RuleTypeDef,
-        "theme_types": ThemeTypeDef,
-        "proposal_levels": ProposalLevelDef,
-        "link_types": LinkTypeDef,
-        "codelet_families": CodeletFamilyDef,
-        "codelet_phases": CodeletPhaseDef,
-        "posting_directions": PostingDirectionDef,
-        "param_value_types": ParamValueTypeDef,
-        "demo_modes": DemoModeDef,
-    }
-    enums_data = _load("enums.json")
-    for table_name, model_cls in _enum_models.items():
-        for row in enums_data.get(table_name, []):
-            session.add(model_cls(
-                name=row["name"],
-                display_label=row["display_label"],
-                sort_order=row["sort_order"],
-                description=row.get("description", ""),
-            ))
-    await session.flush()  # Ensure enum PKs exist before FK references
-
-    for n in _load("slipnet_nodes.json"):
-        session.add(SlipnetNodeDef(name=n["name"], short_name=n["short_name"],
-                                    conceptual_depth=n["conceptual_depth"]))
-    for lk in _load("slipnet_links.json"):
-        session.add(SlipnetLinkDef(
-            from_node=lk["from_node"], to_node=lk["to_node"],
-            link_type=lk["link_type"], label_node=lk.get("label_node"),
-            link_length=lk.get("link_length"),
-            fixed_length=lk.get("link_length") is not None if "fixed_length" not in lk else lk["fixed_length"],
-        ))
-    for c in _load("codelet_types.json"):
-        session.add(CodeletTypeDef(
-            name=c["name"], family=c["family"], phase=c["phase"],
-            default_urgency=c.get("default_urgency"),
-            description=c.get("description", ""),
-            source_file=c.get("source_file", ""),
-            source_line=c.get("source_line", 0),
-            execute_body=c.get("execute_body", ""),
-        ))
-    params = _load("engine_params.json")
-    for k, v in params.items():
-        if isinstance(v, (list, dict)):
-            session.add(EngineParam(name=k, value=json.dumps(v), value_type="json"))
-        elif isinstance(v, bool):
-            session.add(EngineParam(name=k, value=str(v).lower(), value_type="bool"))
-        elif isinstance(v, int):
-            session.add(EngineParam(name=k, value=str(v), value_type="int"))
-        elif isinstance(v, float):
-            session.add(EngineParam(name=k, value=str(v), value_type="float"))
-        else:
-            session.add(EngineParam(name=k, value=str(v), value_type="string"))
-    for k, v in _load("urgency_levels.json").items():
-        session.add(UrgencyLevel(name=k, value=v))
-    for k, v in _load("formula_coefficients.json").items():
-        session.add(FormulaCoefficient(name=k, value=v))
-    for d in _load("demo_problems.json"):
-        session.add(DemoProblemRow(
-            name=d["name"], section=d.get("section", ""),
-            initial=d["initial"], modified=d["modified"], target=d["target"],
-            answer=d.get("answer"), seed=d["seed"], mode=d["mode"],
-            description=d.get("description", ""),
-        ))
-    posting_data = _load("posting_rules.json")
-    for pr in posting_data.get("posting_rules", []):
-        session.add(PostingRule(
-            codelet_type=pr["codelet_type"], direction=pr["direction"],
-            urgency_when_posted=pr.get("urgency_when_posted"),
-            urgency_formula=pr.get("urgency_formula"),
-            posting_formula=pr.get("posting_formula", ""),
-            count_formula=pr.get("count_formula", ""),
-            count_values=pr.get("count_values"),
-            condition=pr.get("condition", "always"),
-            triggering_slipnodes=pr.get("triggering_slipnodes"),
-        ))
-    themes = _load("theme_dimensions.json")
-    for td in themes.get("dimensions", []):
-        session.add(ThemeDimensionDef(
-            slipnet_node=td["slipnet_node"],
-            valid_relations=td["valid_relations"],
-        ))
-    layout = _load("slipnet_layout.json")
-    for name, pos in layout.get("node_positions", {}).items():
-        session.add(SlipnetLayoutPos(node_name=name, grid_row=pos[0], grid_col=pos[1]))
-    commentary = _load("commentary_templates.json")
-    session.add(CommentaryTemplate(template_key="all", template_data=commentary))
-
-    # Matches the production loader in server/main.py::_sync_help_topics.
-    help_filename = (
-        "help_topics.en.json"
-        if os.path.exists(os.path.join(seed_dir, "help_topics.en.json"))
-        else None
-    )
-    if help_filename:
-        for t in _load(help_filename):
-            session.add(HelpTopic(
-                topic_type=t["topic_type"],
-                topic_key=t["topic_key"],
-                title=t["title"],
-                short_desc=t.get("short_desc", ""),
-                full_desc=t.get("full_desc", ""),
-                metadata_json=t.get("metadata", {}),
-            ))
+    await seed_metadata_from_json(session, seed_dir)
+    await session.flush()
+    await sync_help_topics(session, seed_dir)
 
 
 @pytest.fixture(autouse=True)
