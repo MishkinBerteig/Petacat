@@ -166,13 +166,13 @@ def test_thematic_scout_count_follows_the_mapping_deficit(runner):
     ws = runner.ctx.workspace
     ws.update_all_object_values()
     ws.update_average_unhappiness_values()
-    assert runner._compute_num_to_post("thematic-bridge-scout") == 10
+    assert runner._compute_num_to_post(runner.posting_rule_for("thematic-bridge-scout")) == 10
 
     for o in ws.all_objects:
         o.inter_string_unhappiness["horizontal"] = 0.0
         o.inter_string_unhappiness["vertical"] = 0.0
     ws.update_average_unhappiness_values()
-    assert runner._compute_num_to_post("thematic-bridge-scout") == 0
+    assert runner._compute_num_to_post(runner.posting_rule_for("thematic-bridge-scout")) == 0
 
 
 def test_rule_scout_posting_is_gated_on_rule_possibility(runner):
@@ -189,11 +189,11 @@ def test_rule_scout_posting_is_gated_on_rule_possibility(runner):
 
     ws.top_rule_possible = False
     assert runner._compute_posting_probability(rule) == 0.5
-    assert runner._compute_num_to_post("rule-scout") == 1
+    assert runner._compute_num_to_post(runner.posting_rule_for("rule-scout")) == 1
 
     ws.top_rule_possible = True
     assert runner._compute_posting_probability(rule) == 1.0
-    assert runner._compute_num_to_post("rule-scout") == 2
+    assert runner._compute_num_to_post(runner.posting_rule_for("rule-scout")) == 2
 
 
 def test_scout_counts_come_from_blurred_absolute_counts(runner):
@@ -201,10 +201,10 @@ def test_scout_counts_come_from_blurred_absolute_counts(runner):
     workspace — nine unrelated, ungrouped, unmapped objects — always lands in
     ``many``."""
     runner.init_mcat("abc", "abd", "xyz", seed=42)
-    assert runner._compute_num_to_post("bottom-up-bond-scout") == 6
-    assert runner._compute_num_to_post("bottom-up-bridge-scout") == 6
+    assert runner._compute_num_to_post(runner.posting_rule_for("bottom-up-bond-scout")) == 6
+    assert runner._compute_num_to_post(runner.posting_rule_for("bottom-up-bridge-scout")) == 6
     # No bonds anywhere yet, so group scouts are not posted at all.
-    assert runner._compute_num_to_post("group-scout:whole-string") == 0
+    assert runner._compute_num_to_post(runner.posting_rule_for("group-scout:whole-string")) == 0
 
 
 # --- the loop's own order  (run.ss:146-183) --------------------------------

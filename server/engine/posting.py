@@ -64,6 +64,31 @@ _PRODUCERS: dict[str, Callable[["PostingContext"], Any]] = {
     # -- Mode -----------------------------------------------------------------
     "justify_mode": lambda c: c.ctx.justify_mode,
     "self_watching_enabled": lambda c: c.ctx.self_watching_enabled,
+    # -- Counts ---------------------------------------------------------------
+    "num_possible_rule_types": lambda c: len(c.workspace.get_possible_rule_types()),
+}
+
+#: The builtins a *count* formula may use.  `max(1, 2 * num_possible_rule_types)` and
+#: `round(10 * max_inter_string_unhappiness / 100)` are the two the shipped rules need,
+#: and `round` is Python's — banker's rounding, matching the switch this replaced.
+_COUNT_BUILTINS: dict[str, Any] = {
+    "__builtins__": {"max": max, "min": min, "round": round, "int": int, "abs": abs}
+}
+
+#: Count formulas that index ``count_values`` by a *stochastically blurred* object
+#: tally (``rough-num-of-objects``, ``coderack.ss:517-550``) rather than computing a
+#: number.  Each call draws from the run's random stream, so which of these runs and
+#: when is part of the engine's behaviour and not only of its arithmetic.
+_COUNT_BUCKETS: dict[str, Callable[["PostingContext"], str]] = {
+    "num_unrelated_objects_based": (
+        lambda c: c.workspace.get_rough_num_of_unrelated_objects(c.ctx.rng)
+    ),
+    "num_ungrouped_objects_based": (
+        lambda c: c.workspace.get_rough_num_of_ungrouped_objects(c.ctx.rng)
+    ),
+    "num_unmapped_objects_based": (
+        lambda c: c.workspace.get_rough_num_of_unmapped_objects(c.ctx.rng)
+    ),
 }
 
 #: The names a formula may use.  Exposed so a test can state the vocabulary as a fact
@@ -165,3 +190,57 @@ def validate_posting_formulas(rules: list[Any]) -> None:
     for rule in rules:
         if rule.posting_formula:
             compile_posting_formula(rule.posting_formula, rule.codelet_type)
+
+
+def evaluate_count_formula(rule: Any, context: PostingContext) -> int:
+    """How many codelets *rule* posts, this cycle.
+
+    Scheme: ``num-of-codelets-to-post`` (``coderack.ss:517-550``).  Called only once
+    the posting probability has already passed, exactly as the reference's
+    ``stochastic-if*`` orders it, so the blurred tallies below draw at the same point
+    in the random stream.
+
+    Three shapes, all of them already written down in
+    `seed_data/posting_rules.json`:
+
+    * a **bucket** kind — the count is `count_values` indexed by a stochastically
+      blurred object tally;
+    * ``fixed`` — the count is `count_values["fixed"]`, or its ``justify_mode`` entry
+      when the run is justifying, which is how the jootser posts two normally and one
+      while justifying;
+    * anything else is an **expression** over the same vocabulary the posting formulas
+      use, plus arithmetic builtins.
+    """
+    formula = rule.count_formula
+    values: dict[str, Any] = rule.count_values or {}
+
+    if formula == "fixed":
+        if context.ctx.justify_mode and "justify_mode" in values:
+            return int(values["justify_mode"])
+        return int(values.get("fixed", 1))
+
+    bucket_of = _COUNT_BUCKETS.get(formula)
+    if bucket_of is not None:
+        # Grouping cannot start before anything is bonded, and the switch this
+        # replaces answered that case *before* asking for the blurred tally.  The
+        # order matters beyond tidiness: the tally costs a draw, so checking after it
+        # would consume one extra number on every cycle before the first bond and
+        # send the whole run elsewhere, with nothing in the output to say why.
+        if formula == "num_ungrouped_objects_based" and not any(
+            string.bonds for string in context.workspace.all_strings
+        ):
+            return int(values.get("none", 0))
+        return int(values[bucket_of(context)])
+
+    if not formula:
+        return 1
+
+    code = compile_posting_formula(formula, rule.codelet_type)
+    try:
+        return int(eval(code, _COUNT_BUILTINS, context))  # noqa: S307
+    except (NameError, KeyError) as exc:
+        missing = exc.name if isinstance(exc, NameError) else exc.args[0]
+        raise ValueError(
+            f"count formula for {rule.codelet_type} uses unknown name {missing!r}: "
+            f"{formula!r}. Known names: {', '.join(sorted(POSTING_FORMULA_NAMES))}"
+        ) from exc
