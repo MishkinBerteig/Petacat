@@ -28,7 +28,7 @@ license change was authorised by Dr. Marshall directly (see
 > end-to-end. Episodic Memory shapes the runs that inherit it: a run declines an
 > answer already held for the same problem and rules, so repeating a problem
 > within a [Training Session](#persistence-modes-and-training-sessions) explores
-> a different answer each time. It ships with 2,209 test cases covering the engine, the API, and the
+> a different answer each time. It ships with 2,179 test cases covering the engine, the API, and the
 > help/config system, run on both the CPU and the GPU numeric backends. Underneath the seven components sits an execution
 > substrate — three [persistence modes](#persistence-modes-and-training-sessions),
 > a [GPU numeric substrate](#the-numeric-substrate), and
@@ -328,7 +328,7 @@ Petacat has two test suites:
   codelets running), `architecture` (properties of the source tree),
   `integration` (the repository's artifacts agreeing), and `e2e` (full HTTP
   stack against a running database). All six run in a single command against
-  the local Postgres — 2,209 cases, which includes the numeric matrix's second
+  the local Postgres — 2,179 cases, which includes the numeric matrix's second
   pass over the 250 backend-sensitive tests. See
   [TESTING.md](TESTING.md) for the layer breakdown, the numeric backend matrix,
   the session ceiling, the unit-test rules, determinism requirements, test-double
@@ -388,7 +388,7 @@ draws the run consumes and sends every later probabilistic decision elsewhere. S
 a given seed reaches a different answer on the GPU, which is a correct run —
 Petacat is stochastic, and a different-but-valid run is a right answer. What holds
 across both is the **set** of stopping states each problem can reach, which is what
-`tests/module/test_expected_range.py` compares. Every session ends with a
+`scripts/compare_to_metacat.py` compares against Metacat's own oracle. Every session ends with a
 `petacat test matrix` block naming the backends that were exercised, their
 precision and how many tests took each, so "both were run" is something the output
 states rather than something to remember.
