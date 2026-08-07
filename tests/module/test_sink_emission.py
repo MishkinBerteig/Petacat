@@ -199,10 +199,24 @@ def test_descriptions_built_by_codelets_are_reported(meta):
 
 
 def test_an_answer_is_reported_before_the_turn_ends(meta):
+    """An answer reaches the sink, and reaches it while the turn is still open.
+
+    This ran on ``abc -> abd ; xyz`` with a 3,000-codelet budget and skipped
+    itself every time: that seed needs 17,284 codelets there, so the assertions
+    below had never once executed. ``xyz`` is also the wrong problem to ask —
+    it is one of the two where giving up is common in both programs.
+
+    The file's own default answers at 777 codelets on both backends, so it is
+    what this uses, with a budget of twice that. Not answering is now a failure
+    rather than a skip: this test's whole subject is the ordering of an answer
+    against ``turn_end``, and a run without an answer does not exercise it.
+    """
     sink = RecordingSink()
-    runner, result = _run(meta, sink, steps=3000, problem=("abc", "abd", "xyz"))
-    if result.status != "answer_found":
-        pytest.skip("this seed did not answer within the budget")
+    _runner, result = _run(meta, sink, steps=1500)
+    assert result.status == "answer_found", (
+        f"this guard needs a run that answers; got {result.status} in "
+        f"{result.codelet_count} codelets"
+    )
     kinds = sink.kinds()
     assert "answer" in kinds
     assert kinds.index("answer") < kinds.index("turn_end")
