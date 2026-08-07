@@ -83,6 +83,99 @@ def test_every_trace_event_type_the_engine_emits_is_declared():
     assert not missing, f"event types missing from enums.json: {sorted(missing)}"
 
 
+class _RecordingSession:
+    """Enough of an ``AsyncSession`` to record what the seeder writes.
+
+    No database: the question is which tables the seeder *addresses*, and running it
+    against a recorder answers that without a Postgres and without the answer
+    depending on one being seeded a particular way.
+    """
+
+    def __init__(self):
+        self.written: set[str] = set()
+
+    def add(self, row) -> None:
+        self.written.add(type(row).__tablename__)
+
+    async def flush(self) -> None:
+        pass
+
+    async def execute(self, _statement):
+        class _Result:
+            def scalars(self):
+                return self
+
+            def all(self):
+                return []
+
+        return _Result()
+
+
+async def test_the_seeder_refills_every_table_it_empties():
+    """A cleared table that is never refilled is how a whole seed file goes missing.
+
+    ``_derived_metadata_tables`` is the list startup ``DELETE``s before re-seeding, so
+    every name on it is a table the seeder has undertaken to write.  ``posting_rules``
+    was on that list and on ``BULK_SEED_FILES`` — cleared on every seed-data change,
+    counted in the fingerprint, exposed for editing and export through the admin API —
+    and no code path ever inserted a row.  The engine consequently had zero posting
+    rules in production and seventeen everywhere else.
+
+    Stated this way the invariant needs no file-to-table mapping to maintain: it reads
+    both halves off the schema, so a table added later is covered the day it is added.
+    """
+    import os
+
+    from server.services.seeding import (
+        derived_metadata_tables,
+        protected_enum_tables,
+        seed_metadata_from_json,
+    )
+
+    seed_dir = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
+    session = _RecordingSession()
+    await seed_metadata_from_json(session, seed_dir, fingerprint="test")
+
+    emptied = {t.name for t in derived_metadata_tables()}
+    # The protected enum tables are never emptied, but they are seeded
+    # insert-if-missing, so they are written too and belong in the expectation.
+    expected = emptied | protected_enum_tables()
+
+    missing = expected - session.written
+    assert not missing, (
+        "the seeder empties or owns these tables but writes no row into them: "
+        f"{sorted(missing)}"
+    )
+
+
+def test_the_fingerprint_covers_the_seeder_and_not_only_the_seed_files():
+    """A fix to the seeder has to reach databases that already exist.
+
+    Startup re-seeds only when the fingerprint moves.  With the digest taken over the
+    seed files alone, teaching the seeder to write a table it had been skipping
+    changed nothing anywhere: the files were untouched, the fingerprints matched, and
+    every existing database kept its empty table.  Hashing this module's source too
+    is what makes a code fix take effect on the next restart.
+    """
+    import os
+
+    from server.services import seeding
+
+    seed_dir = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
+    before = seeding.seed_data_fingerprint(seed_dir)
+
+    original = seeding.__file__
+    try:
+        # Point the digest at a different file, standing in for an edited seeder.
+        seeding.__file__ = os.path.join(seed_dir, "enums.json")
+        after = seeding.seed_data_fingerprint(seed_dir)
+    finally:
+        seeding.__file__ = original
+
+    assert after != before, "the seeder's own source does not move the fingerprint"
+    assert seeding.seed_data_fingerprint(seed_dir) == before, "digest is not stable"
+
+
 def test_slipnet_node_model_carries_the_descriptor_predicate():
     """The predicate is knowledge about a concept, so the DB mirrors the JSON.
 

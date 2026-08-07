@@ -108,8 +108,11 @@ async def load_metadata_from_db(session: AsyncSession) -> MetadataProvider:
     result = await session.execute(select(FormulaCoefficient))
     formula_coefficients = {row.name: row.value for row in result.scalars()}
 
-    # Posting rules
-    result = await session.execute(select(PostingRule))
+    # Posting rules.  Ordered explicitly: the engine consults these in sequence and
+    # every consultation costs a draw from the run's random stream, so the order is
+    # part of the configuration rather than an incidental of the query.  `id` carries
+    # it, assigned from the seed file's order when the row is written.
+    result = await session.execute(select(PostingRule).order_by(PostingRule.id))
     posting_rules = [
         PostingRuleSpec(
             codelet_type=row.codelet_type,
