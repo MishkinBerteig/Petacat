@@ -131,23 +131,48 @@ def test_a_singleton_successor_group_keeps_its_bond_category(meta):
     assert letter_relation is ctx.slipnet.nodes.get("plato-successor")
 
 
-@pytest.mark.parametrize("seed", [1, 5, 11, 17, 23])
-def test_a_generated_answer_is_made_only_of_letters(meta, seed):
+#: Seeds that reach an answer on this problem within the budget, on both
+#: backends. ``abc->aabbcc; kkjjii`` is the one problem where *not* answering is
+#: ordinary rather than a defect — MetaCat itself caps 10.96% of its 19,000 runs
+#: here and 24.9% of them pass 20,000 codelets — so a seed is chosen for
+#: answering rather than assumed to. Seeds 11 and 23 were in this list and cap;
+#: they contributed nothing but a skip.
+ANSWERING_SEEDS = (1, 5, 7, 17, 29)
+
+
+def test_a_generated_answer_is_made_only_of_letters(meta):
     """The end-to-end guard: whatever a run answers, every generated node is a
     platonic letter.
 
     ``abc->aabbcc; kkjjii`` is the problem that exposed this — it groups, and
     its rule lengthens groups, so it reaches ``extend`` with a group's letter
     relation in hand.
-    """
-    runner = _ctx(meta, "abc", "aabbcc", "kkjjii", seed=seed)
-    runner.run_mcat(max_steps=20000)
-    ctx = runner.ctx
-    answer = ctx.workspace.answer_string
-    if answer is None:
-        pytest.skip("this seed did not reach an answer; nothing to check")
 
-    generated = _generate_image_letters(ctx.workspace.target_string, ctx.slipnet)
-    offenders = [n.name for n in generated if n.name not in LETTERS]
-    assert not offenders, f"non-letter nodes generated: {offenders}"
-    assert answer.text.isalpha() and answer.text.islower(), answer.text
+    One test over the seeds rather than one test per seed, because a seed that
+    stops answering must not be able to take its coverage away quietly. Skipping
+    per seed meant that if every seed stopped answering — which on *this* problem
+    a change to the cap or to grouping could plausibly do — the whole guard would
+    report green while checking nothing. A run that does not answer is still
+    tolerated; a set of runs where none does is a failure.
+    """
+    answered = []
+    for seed in ANSWERING_SEEDS:
+        runner = _ctx(meta, "abc", "aabbcc", "kkjjii", seed=seed)
+        runner.run_mcat(max_steps=20000)
+        ctx = runner.ctx
+        answer = ctx.workspace.answer_string
+        if answer is None:
+            continue
+        answered.append(seed)
+
+        generated = _generate_image_letters(ctx.workspace.target_string, ctx.slipnet)
+        offenders = [n.name for n in generated if n.name not in LETTERS]
+        assert not offenders, f"seed {seed}: non-letter nodes generated: {offenders}"
+        assert answer.text.isalpha() and answer.text.islower(), (
+            f"seed {seed}: {answer.text!r}"
+        )
+
+    assert answered, (
+        f"none of {ANSWERING_SEEDS} reached an answer, so this guard checked "
+        f"nothing — re-pick the seeds rather than leaving it silent"
+    )
