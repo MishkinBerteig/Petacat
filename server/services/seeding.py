@@ -229,9 +229,11 @@ async def seed_metadata_from_json(
             )
     await session.flush()
 
-    for n in _load("slipnet_nodes.json"):
+    # ``sort_order`` carries the Scheme's node order, which the file reproduces.
+    for position, n in enumerate(_load("slipnet_nodes.json")):
         session.add(
             models.SlipnetNodeDef(
+                sort_order=position,
                 name=n["name"],
                 short_name=n["short_name"],
                 conceptual_depth=n["conceptual_depth"],
@@ -240,9 +242,10 @@ async def seed_metadata_from_json(
             )
         )
 
-    for lk in _load("slipnet_links.json"):
+    for position, lk in enumerate(_load("slipnet_links.json"), start=1):
         session.add(
             models.SlipnetLinkDef(
+                id=position,
                 from_node=lk["from_node"],
                 to_node=lk["to_node"],
                 link_type=lk["link_type"],
@@ -254,9 +257,10 @@ async def seed_metadata_from_json(
             )
         )
 
-    for c in _load("codelet_types.json"):
+    for position, c in enumerate(_load("codelet_types.json")):
         session.add(
             models.CodeletTypeDef(
+                sort_order=position,
                 name=c["name"],
                 family=c["family"],
                 phase=c["phase"],
@@ -284,9 +288,10 @@ async def seed_metadata_from_json(
     for k, v in _load("formula_coefficients.json").items():
         session.add(models.FormulaCoefficient(name=k, value=v))
 
-    for d in _load("demo_problems.json"):
+    for position, d in enumerate(_load("demo_problems.json"), start=1):
         session.add(
             models.DemoProblem(
+                id=position,
                 name=d["name"],
                 section=d.get("section", ""),
                 initial=d["initial"],
@@ -336,9 +341,12 @@ async def seed_metadata_from_json(
                 )
             )
 
-    for td in _load("theme_dimensions.json").get("dimensions", []):
+    for position, td in enumerate(
+        _load("theme_dimensions.json").get("dimensions", []), start=1
+    ):
         session.add(
             models.ThemeDimensionDef(
+                id=position,
                 slipnet_node=td["slipnet_node"],
                 valid_relations=td["valid_relations"],
             )

@@ -1283,3 +1283,78 @@ async def test_no_coefficient_is_seeded_twice_under_two_names(db_session):
 
     assert "shrink_factor" not in meta.formula_coefficients
     assert meta.get_param("shrunk_link_length_factor") == 0.4
+
+
+# ──────────────────────────────────────────────────────────────────
+# Ordering: the Slipnet's node order is configuration too
+# ──────────────────────────────────────────────────────────────────
+
+
+async def test_the_database_preserves_the_slipnet_node_order(db_session, seed_meta):
+    """Node order is load-bearing, and the database had no way to record it.
+
+    `Slipnet.update_activations` iterates `self.nodes.values()` for the spread and for
+    the probabilistic jump, so the order fixes two things: the float accumulation order
+    of the activation sum, and which node each `rng.prob` draw is spent on. Two
+    orderings of the same 59 nodes are two different engines.
+
+    `slipnet_node_defs` had `name` as its primary key and no ordinal column at all, and
+    the loader selected without an `ORDER BY` — so the order was Postgres heap order.
+    Measured on the development database, which had been re-seeded five times: the heap
+    began `plato-y, plato-z, plato-one, …` where the seed file begins `plato-a,
+    plato-b, …`, and `abc → abd; xyz` at seed 414347 answered `xyz` in 603 codelets
+    from the seed data and **gave up** after 2722 from the database.
+
+    Alphabetical order is *not* the answer either — `plato-alphabetic-first` sorts
+    between `plato-a` and `plato-b`. The order is the Scheme's own
+    (`slipnet.ss:407-468`), which `seed_data/slipnet_nodes.json` reproduces element for
+    element, so it has to be carried explicitly.
+    """
+    db_meta = await load_metadata_from_db(db_session)
+
+    assert list(db_meta.slipnet_node_specs) == list(seed_meta.slipnet_node_specs)
+
+
+async def test_node_order_survives_the_rows_being_stored_out_of_order(db_session, seed_meta):
+    """The loader must impose the order, not inherit it from the storage layout.
+
+    A freshly seeded database happens to return rows in insertion order, which is why
+    this defect survived: the capstone comparison passed on a clean database while the
+    development one — five re-seeds and 59 dead tuples later — ran a different engine.
+    So the test perturbs the physical order deliberately: rewrite every row, which
+    moves it to the end of the heap, and require the loaded order to be unchanged.
+    """
+    from sqlalchemy import update as sql_update
+
+    from server.models.metadata import SlipnetNodeDef
+
+    # Touch every row in reverse, so heap order ends up reversed.
+    for name in reversed(list(seed_meta.slipnet_node_specs)):
+        await db_session.execute(
+            sql_update(SlipnetNodeDef)
+            .where(SlipnetNodeDef.name == name)
+            .values(description=SlipnetNodeDef.description)
+        )
+    await db_session.commit()
+
+    reloaded = await load_metadata_from_db(db_session)
+
+    assert list(reloaded.slipnet_node_specs) == list(seed_meta.slipnet_node_specs)
+
+
+async def test_the_ordered_collections_all_load_in_seed_file_order(db_session, seed_meta):
+    """Nodes are not the only collection whose order the engine can feel.
+
+    Links decide activation-spread accumulation order; theme dimensions decide cluster
+    order; codelet types and demo problems are order-sensitive in the interface. All
+    five were selected without an `ORDER BY`; they happened to match on this database
+    and were one `UPDATE` away from not matching.
+    """
+    db_meta = await load_metadata_from_db(db_session)
+
+    assert db_meta.slipnet_link_specs == seed_meta.slipnet_link_specs
+    assert list(db_meta.codelet_specs) == list(seed_meta.codelet_specs)
+    assert db_meta.theme_dimensions == seed_meta.theme_dimensions
+    assert [d.name for d in db_meta.demo_problems] == [
+        d.name for d in seed_meta.demo_problems
+    ]
