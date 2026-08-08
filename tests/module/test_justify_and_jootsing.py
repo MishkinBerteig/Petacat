@@ -581,3 +581,97 @@ def test_a_justify_clamp_is_denied_only_inside_the_real_grace_period(engine, met
         temperature_control=engine.ctx.temperature,
     )
     assert granted.clamp_event is not None
+
+
+# --- the snag-jootser's per-entry inclusion weight (jootsing.ss:88-100) -------
+#
+# The weight of a theme-pattern entry is ``(% overlap) * (% average-description-depth)``,
+# and the second factor was wrong in three separate ways at once, all of which pushed it
+# *up* — so the negative theme pattern was built 75.8% of the time against Metacat's
+# 43.8%, roughly doubling the rate at which runs reach the three snag-response clamps
+# that a give-up is made of.
+
+
+class _Depth:
+    """A Slipnet node stand-in that carries only what the weight reads."""
+
+    def __init__(self, name: str, conceptual_depth: float) -> None:
+        self.name = name
+        self.conceptual_depth = conceptual_depth
+
+
+class _Desc:
+    """A Description stand-in: the depth lives on the *descriptor*, as in descriptions.ss:68."""
+
+    def __init__(self, description_type: _Depth, descriptor: _Depth) -> None:
+        self.description_type = description_type
+        self.descriptor = descriptor
+
+
+def test_the_depth_of_a_description_is_its_descriptors_depth():
+    """``(tell descriptor 'get-conceptual-depth)`` — ``descriptions.ss:68``.
+
+    ``Description`` has neither ``conceptual_depth`` nor ``get_conceptual_depth``, so both
+    ``hasattr`` probes missed and every matching description was scored at the hardcoded
+    default of 50 regardless of what it actually described.  On ``abc->abd;xyz`` the two
+    entries that matter describe the snagged ``z`` as ``plato-letter`` (depth 20) and
+    ``plato-rightmost`` (depth 40); scoring both at 50 raised the chance that at least one
+    entry survived the stochastic filter from 0.52 to 0.75.
+    """
+    from server.engine.jootsing import _average_description_depth
+
+    objctgy = _Depth("plato-object-category", 90.0)
+    descriptions = [
+        _Desc(objctgy, _Depth("plato-letter", 20.0)),
+        _Desc(objctgy, _Depth("plato-rightmost", 40.0)),
+    ]
+    depth = _average_description_depth(
+        {"dimension": "plato-object-category"}, descriptions, None
+    )
+    assert depth == 30.0  # (20 + 40) / 2 -- from the descriptors, not from a constant
+
+
+def test_a_dimension_no_description_matches_weighs_nothing():
+    """``(average '())`` is ``0`` — ``utilities.ss:422-425``.
+
+    Returning the *dimension node's own* depth instead gave unmatched entries a weight
+    they have no right to: 80 for group-category, 70 for direction, 60 for length, where
+    the reference gives every one of them 0 and drops it from the pattern outright.
+    """
+    from server.engine.jootsing import _average_description_depth
+
+    class _Slipnet:
+        nodes = {"plato-group-category": _Depth("plato-group-category", 80.0)}
+
+    depth = _average_description_depth(
+        {"dimension": "plato-group-category"},
+        [_Desc(_Depth("plato-object-category", 90.0), _Depth("plato-letter", 20.0))],
+        _Slipnet(),
+    )
+    assert depth == 0.0
+
+
+def test_the_same_description_reached_twice_is_counted_once():
+    """``remq-duplicates`` — ``jootsing.ss:86-88``.
+
+    Snags overlap: two snags naming the same object contribute that object's descriptions
+    twice, and an unweighted mean over the duplicated list is not the mean the reference
+    takes.  ``remq`` is ``eq?``-based, so this is identity, not equality.
+    """
+    from server.engine.jootsing import _collect_snag_descriptions
+
+    objctgy = _Depth("plato-object-category", 90.0)
+    shared = _Desc(objctgy, _Depth("plato-letter", 20.0))
+    other = _Desc(objctgy, _Depth("plato-group", 80.0))
+
+    class _Obj:
+        def __init__(self, descriptions):
+            self.descriptions = descriptions
+
+    # The same object reached through two snags, and a second object repeating one of
+    # its descriptions -- which must survive at its *later* position.
+    first = _Obj([shared, other])
+    second = _Obj([shared])
+    collected = _collect_snag_descriptions([first, second])
+
+    assert [id(d) for d in collected] == [id(other), id(shared)]

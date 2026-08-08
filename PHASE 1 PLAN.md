@@ -143,6 +143,22 @@ rule is added, and `MIN_SHARD_CAPACITY` must still be 25 when it becomes a row. 
 against Metacat's oracle per §5 — a data-driven engine that reaches a different set of
 stopping states is a different engine, not a refactor.
 
+**But know what the oracle does not measure.** `scripts/compare_to_metacat.py` compares
+**set membership**: which stopping states a problem can reach. It says nothing about
+*how often* each is reached. Petacat gave up on `abc→abd;xyz` at 22.5% against Metacat's
+10.9% — a 2× skew, decisive at n=1000 — and the oracle reported "0 missing, 0 novel" the
+whole time, because `gave_up` is in both sets. The root cause was three arithmetic
+divergences inside one function (D-10 in `DISCREPANCIES5.md`).
+
+Two consequences for the work below:
+
+- A green oracle is necessary, not sufficient. Where a change could plausibly move a
+  *rate*, measure the distribution over several hundred seeds and compare it to a real
+  Metacat run, not just the stopping-state set.
+- Two other frequency divergences on this problem are open and unexplained: `xyd` at
+  22.2% against a reference 37.1%, and `xyz` at 24.7% against 15.8%. Those are a
+  different mechanism from the give-up rate, which moved without moving them.
+
 ### 0.6 Why this phase owns it
 
 Because the rest of the phase is unbuildable on top of it. §2's noticing codelet is a new

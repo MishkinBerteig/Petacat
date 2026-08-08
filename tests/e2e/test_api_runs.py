@@ -495,8 +495,13 @@ async def test_a_fast_run_contributes_its_answer_to_the_session(app_client):
     """
     shared_before = len((await app_client.get("/api/memory")).json()["answers"])
 
+    # Its own seed, not the module's.  What this test needs is a run that *found* an
+    # answer, and the shared ``SEED`` no longer produces one on this problem: correcting
+    # the snag-jootser's inclusion weight (D-10 in ``DISCREPANCIES5.md``) shifted the
+    # random stream, and ``xyz``/12345 now gives up at 3790 codelets.  Giving up is a
+    # legitimate outcome, so the seed moves rather than the assertion.
     created = await app_client.post("/api/runs", json={
-        "initial": "abc", "modified": "abd", "target": "xyz", "seed": SEED,
+        "initial": "abc", "modified": "abd", "target": "xyz", "seed": 12346,
         "mode": "fast",
     })
     run_id = created.json()["run_id"]

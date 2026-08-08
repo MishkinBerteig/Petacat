@@ -1044,14 +1044,32 @@ def _collect_snag_objects(snags: list[TraceEvent]) -> list[Any]:
 
 
 def _collect_snag_descriptions(objects: list[Any]) -> list[Any]:
-    """Collect all descriptions from snag objects."""
-    descriptions: list[Any] = []
+    """Collect the snag objects' descriptions, each one once.
+
+    ``jootsing.ss:86-88`` wraps the concatenation in ``remq-duplicates``.  Snags overlap:
+    two snags naming the same object contribute that object's descriptions twice, and the
+    mean taken in :func:`_average_description_depth` is over the deduplicated list, not
+    the concatenated one.  ``remq`` is ``eq?``-based, so this is identity.
+
+    ``remove-duplicates-pred`` (``utilities.ss:914-926``) drops the *first* occurrence
+    when the element recurs later, so it keeps the **last** — the opposite of the obvious
+    ``if seen: continue``.  The mean does not care, but C-2 of ``DISCREPANCIES5.md``
+    records four places that already read this backwards, and there is no reason to make
+    a fifth.
+    """
+    kept: dict[int, Any] = {}
     for obj in objects:
         if hasattr(obj, "descriptions"):
-            descriptions.extend(obj.descriptions)
+            found = obj.descriptions
         elif hasattr(obj, "get_descriptions"):
-            descriptions.extend(obj.get_descriptions())
-    return descriptions
+            found = obj.get_descriptions()
+        else:
+            continue
+        for desc in found:
+            # Re-inserting an existing key leaves it where it was, so drop it first.
+            kept.pop(id(desc), None)
+            kept[id(desc)] = desc
+    return list(kept.values())
 
 
 def _average_description_depth(
@@ -1059,9 +1077,29 @@ def _average_description_depth(
     descriptions: list[Any],
     slipnet: Slipnet | None,
 ) -> float:
-    """Compute average conceptual depth of descriptions matching an entry's dimension.
+    """Mean conceptual depth of the snag descriptions along an entry's dimension.
 
-    Scheme: jootsing.ss lines 95-98.
+    ``jootsing.ss:95-98``::
+
+        (average (tell-all (filter-meth snag-object-descriptions
+                             'description-type? (1st entry))
+                   'get-conceptual-depth))
+
+    This is one of the two factors in an entry's inclusion weight, and it was wrong in
+    both branches — each time in the direction that made the negative theme pattern more
+    likely to be built:
+
+    * A description's depth is its **descriptor's** depth (``descriptions.ss:68``).
+      ``Description`` carries neither ``conceptual_depth`` nor ``get_conceptual_depth``,
+      so both probes below used to miss and every match scored the hardcoded 50.  On
+      ``abc->abd;xyz`` the entries that matter describe the snagged ``z`` as
+      ``plato-letter`` (20) and ``plato-rightmost`` (40).
+    * ``(average '())`` is ``0`` (``utilities.ss:422-425``).  Returning the *dimension
+      node's own* depth instead handed unmatched entries a weight of 80 for
+      group-category, 70 for direction and 60 for length, where the reference drops them.
+
+    Together those raised P(at least one entry survives the stochastic filter) from the
+    reference's 0.52 to 0.75, measured at 43.8% against 75.8% of attempts.
     """
     dim = entry.get("dimension", "")
 
@@ -1076,19 +1114,15 @@ def _average_description_depth(
         if desc_type is not None:
             type_name = getattr(desc_type, "name", str(desc_type))
             if type_name == dim:
-                depth = 50.0
-                if hasattr(desc, "conceptual_depth"):
-                    depth = desc.conceptual_depth
+                descriptor = getattr(desc, "descriptor", None)
+                if descriptor is not None and hasattr(descriptor, "conceptual_depth"):
+                    matching.append(float(descriptor.conceptual_depth))
                 elif hasattr(desc, "get_conceptual_depth"):
-                    depth = desc.get_conceptual_depth()
-                matching.append(depth)
+                    matching.append(float(desc.get_conceptual_depth()))
+                elif hasattr(desc, "conceptual_depth"):
+                    matching.append(float(desc.conceptual_depth))
 
     if not matching:
-        # Default depth when no matching descriptions found
-        if slipnet is not None and isinstance(dim, str):
-            node = slipnet.nodes.get(dim)
-            if node is not None:
-                return node.conceptual_depth
-        return 50.0
+        return 0.0
 
     return sum(matching) / len(matching)
