@@ -125,7 +125,7 @@ outside the matrix take it too and the run is entirely what it says it is.
   gpu  mlx      float32    250 tests
   whole suite requested: the full matrix is required of this run
 
-  unit           522 collected    522 run    522 passed      0 failed      0 skipped  complete
+  unit           525 collected    525 run    525 passed      0 failed      0 skipped  complete
   seed_unit      454 collected    454 run    454 passed      0 failed      0 skipped  complete
   module         901 collected    901 run    901 passed      0 failed      0 skipped  complete
   architecture    34 collected     34 run     34 passed      0 failed      0 skipped  complete
@@ -202,7 +202,7 @@ that allowance.
 
 | Layer | Directory | Scope | May depend on | Cases |
 |-------|-----------|-------|---------------|-------|
-| **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 522 |
+| **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 525 |
 | **seed unit** | `tests/seed_unit/` | One class or function, measured against the values Petacat ships with | Real `seed_data/*.json`, and the machine the process is running on | 454 |
 | **module** | `tests/module/` | Several real components assembled and driven | Real engine objects and `seed_data/*.json`; no DB, no HTTP | 901 |
 | **architecture** | `tests/architecture/` | How the source tree is allowed to depend on itself | The repository's source, `seed_data/*.json`, child interpreters | 34 |
@@ -232,7 +232,7 @@ first**, then move up toward the API and GUI.
 
 All six layers run in one command — the
 [required command](#the-required-command) — and, since Petacat runs natively, all
-six actually run: **2,222 cases**, every one of them executed. A layer that is
+six actually run: **2,225 cases**, every one of them executed. A layer that is
 normally skipped is not a layer that is normally green, and none of these is.
 
 Wall-clock time depends heavily on the machine and on what else it is doing. The
@@ -322,7 +322,7 @@ the number of endpoints taking `Depends(get_session)`, the size of
 | `test_bridge_types.py` | 2 | The bridge-type and orientation constants |
 | `test_codelet_dsl.py` | 3 | Compiling a codelet body: what the interpreter accepts and refuses |
 | `test_commentary.py` | 23 | The `CommentaryLog`, and the emit helpers whose English is written in Python |
-| `test_compare_harness.py` | 14 | The oracle comparison's decision logic: what gets flagged, and how |
+| `test_compare_harness.py` | 17 | The oracle comparison's decision logic: what gets flagged, and how, and its engine-parameter passthrough |
 | `test_concept_mappings.py` | 37 | `ConceptMapping`: identity, slippage, distinguishing descriptors |
 | `test_descriptions.py` | 23 | `Description`: relevance, strength, descriptor predicates |
 | `test_episodic_memory.py` | 13 | `EpisodicMemory`: identifier scoping, theme distance, `answer_present` |

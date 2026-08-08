@@ -84,11 +84,57 @@ _META = None
 _BACKEND = "numpy"
 
 
-def _init(backend: str) -> None:
+def _parse_param(text: str):
+    """``name=value`` -> ``(name, typed value)``.
+
+    The type is read off the shipped value rather than declared on the command line:
+    a parameter that ships as an int stays an int, so ``--param max_coderack_size=200``
+    does not quietly hand the engine the string ``"200"``.  A name the seed data does
+    not carry is refused, because a typo would otherwise be accepted, recorded in the
+    output and change nothing.
+    """
+    import json as _json
+
+    from server.engine.metadata import MetadataProvider
+
+    if "=" not in text:
+        raise argparse.ArgumentTypeError(f"--param wants name=value, got {text!r}")
+    name, _, raw = text.partition("=")
+    name, raw = name.strip(), raw.strip()
+
+    shipped = MetadataProvider.from_seed_data(SEED_DIR).params
+    if name not in shipped:
+        raise argparse.ArgumentTypeError(
+            f"unknown engine parameter {name!r}; "
+            f"seed_data/engine_params.json has no such key"
+        )
+    current = shipped[name]
+    try:
+        if isinstance(current, bool):
+            value = raw.lower() in ("true", "1", "yes")
+        elif isinstance(current, int):
+            value = int(raw)
+        elif isinstance(current, float):
+            value = float(raw)
+        elif isinstance(current, (list, dict)):
+            value = _json.loads(raw)
+        else:
+            value = raw
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(
+            f"{name} ships as {type(current).__name__}; cannot read {raw!r} as one"
+        ) from exc
+    return name, value
+
+
+def _init(backend: str, overrides: dict | None = None) -> None:
     global _META
     os.environ["PETACAT_NUMERIC_BACKEND"] = backend
     from server.engine.metadata import MetadataProvider
-    _META = MetadataProvider.from_seed_data(SEED_DIR)
+    # ``with_overrides`` is the same seam a Run uses for its per-Run parameters, so a
+    # sweep here configures the engine exactly the way the application does rather
+    # than by a mechanism only this script has.
+    _META = MetadataProvider.from_seed_data(SEED_DIR).with_overrides(overrides)
 
 
 def _state(runner, ctx, answered: bool, cap: int = MAX_STEPS) -> str:
@@ -264,6 +310,11 @@ def main():
     ap.add_argument("--start-seed", type=int, default=900_000,
                     help="clear of both Metacat data sets by default")
     ap.add_argument("--backend", default="numpy")
+    ap.add_argument("--param", action="append", type=_parse_param, default=[],
+                    metavar="NAME=VALUE",
+                    help="override an engine parameter, repeatable. The sweep "
+                         "PHASE 1 PLAN.md asks for is "
+                         "--param max_coderack_size=200")
     ap.add_argument("-j", "--jobs", type=int, default=8)
     ap.add_argument("--only")
     ap.add_argument("-o", "--out", default="measurements/vs-metacat.json")
@@ -271,6 +322,11 @@ def main():
 
     s_sets, s_p50 = load("single-run-sets.json"), load("single-run-p50.json")
     c_sets, c_p50 = load("convergence-sets.json"), load("convergence-p50.json")
+
+    overrides = dict(args.param)
+    if overrides:
+        print("engine parameter overrides: "
+              + ", ".join(f"{k}={v!r}" for k, v in overrides.items()))
 
     names = list(s_sets)
     if args.only:
@@ -281,11 +337,15 @@ def main():
            "max_steps": MAX_STEPS,
            "reference_max_steps": REFERENCE_MAX_STEPS,
            "backend": args.backend,
+           # Recorded so a result is attributable to the configuration that produced
+           # it.  A measurement whose configuration is not written down is not a
+           # measurement anyone can compare against.
+           "engine_param_overrides": overrides,
            "start_seed": args.start_seed,
            "reference": os.path.relpath(DERIVED, ROOT)}
 
     with Pool(processes=args.jobs, initializer=_init,
-              initargs=(args.backend,)) as pool:
+              initargs=(args.backend, overrides)) as pool:
         if args.mode in ("single", "both"):
             rows = []
             for name in names:
