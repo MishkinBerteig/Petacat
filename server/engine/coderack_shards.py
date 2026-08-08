@@ -516,13 +516,24 @@ class WorkerShardedCoderack(_ShardBase):
     Contention should be near zero in the common case, because the only shared state a
     worker touches is its own lock.
 
-    **Why posting is round-robin rather than worker-affine.** Worker affinity is the
-    obvious reading, and it fails: codelets are posted overwhelmingly by the *runner* —
-    the bottom-up and top-down posting passes in ``update_everything`` — not by codelets
-    themselves. Under affinity those all land in one rack, and the other shards fill only
-    from ``post_codelet``, which is a minority. The result is one hot shard and several
-    idle ones, with stealing doing all the work. Round-robin posting spreads them evenly
-    and costs one atomic increment.
+    **Posting is worker-affine; batches are dealt round-robin.** The two halves matter
+    separately, and this docstring used to claim only the second and attribute it to the
+    first.
+
+    :meth:`post` routes a single codelet to the posting thread's own shard
+    (:meth:`worker_index`). A shared round-robin cursor was the first draft and was
+    measured and rejected — a lock on *every* post is a global serialisation point, so
+    the sharding bought nothing; see :meth:`worker_index`.
+
+    The hazard affinity carries is real, and it is why :meth:`post_deferred` exists:
+    codelets are posted overwhelmingly by the *runner* — the bottom-up and top-down
+    passes in ``update_everything`` — not by codelets themselves, so a batch routed to
+    one thread's shard overflows a shard holding ``max_coderack_size // shards`` while
+    the others sit empty. :meth:`post_deferred` deals the batch across the shards
+    instead, and every bulk post goes through it, including the opening population
+    (``FreeRunningEngine.prepare``). Posting one at a time from a single thread is what
+    the earlier draft of ``prepare`` did, and it discarded 31 of 56 opening codelets
+    into shard 0 while three workers started empty.
 
     **The fidelity argument.** Because a codelet's shard is independent of its type and of
     its urgency, each shard's bin occupancy is an unbiased sample of the whole rack's. So
