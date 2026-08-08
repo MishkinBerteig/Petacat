@@ -37,7 +37,22 @@ class Group(WorkspaceObject, WorkspaceStructure):
         left = min(o.left_string_pos for o in objects)
         right = max(o.right_string_pos for o in objects)
         WorkspaceObject.__init__(self, string, left, right)
+        object_id = self.id
         WorkspaceStructure.__init__(self)
+        # A Group is the one thing that is both a WorkspaceObject and a
+        # WorkspaceStructure, so both constructors run — and each assigns ``self.id``
+        # from a counter of its own.  ``WorkspaceStructure.__init__`` ran second and
+        # won, which left a Group sitting in ``all_objects`` carrying a *structure*
+        # number beside Letters carrying *object* numbers.  The two counters advance
+        # independently, so they collide: ``abc->abd;mrrjjj`` seed 8 puts
+        # ``Group(samegrp, 3 objects)`` and ``Letter(k, pos=3)`` both at 60.
+        #
+        # ``all_objects`` is the collection ``id`` is read by, so the object identity is
+        # the one it keeps.  The structure number stays reachable under its own name for
+        # the structure namespace, and is still drawn — a Group really is a structure and
+        # skipping the draw would renumber every structure built after the first group.
+        self.structure_id = self.id
+        self.id = object_id
 
         self.group_category = group_category
         self.bond_facet = bond_facet
