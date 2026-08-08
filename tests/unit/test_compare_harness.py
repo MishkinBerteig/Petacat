@@ -188,3 +188,67 @@ def test_the_working_cap_is_below_the_reference_and_both_are_declared(harness):
         "the reference sampled at 100,000; resolving against any other number "
         "compares a run to a budget MetaCat never gave itself"
     )
+
+
+# ──────────────────────────────────────────────────────────────────
+# --param, the engine-parameter passthrough
+# ──────────────────────────────────────────────────────────────────
+
+
+def test_a_parameter_override_keeps_the_type_the_seed_data_ships(harness):
+    """`--param max_coderack_size=200` must hand the engine 200, not `"200"`.
+
+    The type comes off the shipped value rather than from the command line, because a
+    parameter silently arriving as a string is the failure this whole harness exists to
+    catch: `get_param` would return it, arithmetic on it would behave oddly or throw
+    somewhere far away, and the sweep would report a number that describes something
+    else.
+    """
+    assert harness._parse_param("max_coderack_size=200") == ("max_coderack_size", 200)
+    assert harness._parse_param("min_shard_capacity=50") == ("min_shard_capacity", 50)
+
+    name, value = harness._parse_param("verbatim_rule_probability=0.25")
+    assert (name, value) == ("verbatim_rule_probability", 0.25)
+    assert isinstance(value, float)
+
+    name, value = harness._parse_param("justify_mode_default=true")
+    assert (name, value) == ("justify_mode_default", True)
+    assert isinstance(value, bool)
+
+
+def test_a_misspelled_parameter_is_refused_rather_than_ignored(harness):
+    """A typo that is accepted changes nothing and is recorded as though it did.
+
+    The sweep `PHASE 1 PLAN.md` carries forward reads its conclusion off the parameter
+    it thinks it set, so an override that silently does nothing produces a measurement
+    that says the opposite of the truth — that the configuration made no difference.
+    """
+    import argparse
+
+    with pytest.raises(argparse.ArgumentTypeError, match="unknown engine parameter"):
+        harness._parse_param("max_coderak_size=200")
+
+    with pytest.raises(argparse.ArgumentTypeError, match="cannot read"):
+        harness._parse_param("max_coderack_size=big")
+
+    with pytest.raises(argparse.ArgumentTypeError, match="name=value"):
+        harness._parse_param("max_coderack_size")
+
+
+def test_overrides_reach_the_provider_the_runs_are_built_from(harness):
+    """`_init` is the only seam a pool worker has, so the override has to land there.
+
+    Applied through `with_overrides`, which is the same call a Run uses for its per-Run
+    parameters — so a sweep configures the engine the way the application does rather
+    than by a mechanism only this script has.
+    """
+    harness._init("numpy", {"max_coderack_size": 600, "min_shard_capacity": 50})
+    try:
+        assert harness._META.get_param("max_coderack_size") == 600
+        assert harness._META.get_param("min_shard_capacity") == 50
+        # Everything else is still the shipped configuration.
+        assert len(harness._META.posting_rules) == 17
+    finally:
+        harness._init("numpy")
+
+    assert harness._META.get_param("max_coderack_size") == 100
