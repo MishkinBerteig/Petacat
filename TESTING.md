@@ -121,16 +121,16 @@ outside the matrix take it too and the run is entirely what it says it is.
 
 ```
 ============================= petacat test matrix ==============================
-  cpu  numpy    float64    250 tests
-  gpu  mlx      float32    250 tests
+  cpu  numpy    float64    440 tests
+  gpu  mlx      float32    440 tests
   whole suite requested: the full matrix is required of this run
 
   unit           525 collected    525 run    525 passed      0 failed      0 skipped  complete
   seed_unit      456 collected    456 run    456 passed      0 failed      0 skipped  complete
-  module         901 collected    901 run    901 passed      0 failed      0 skipped  complete
+  module         909 collected    909 run    909 passed      0 failed      0 skipped  complete
   architecture    34 collected     34 run     34 passed      0 failed      0 skipped  complete
   integration     68 collected     68 run     68 passed      0 failed      0 skipped  complete
-  e2e            256 collected    256 run    256 passed      0 failed      0 skipped  complete
+  e2e            259 collected    259 run    259 passed      0 failed      0 skipped  complete
 
   run complete in 14.2 min against a 60 min ceiling
 ```
@@ -178,7 +178,7 @@ A truncated run reports itself as truncated, and the difference from a clean run
 visible three ways:
 
 ```
-  module         901 collected    198 run    198 passed      0 failed      0 skipped  INCOMPLETE
+  module         909 collected    198 run    198 passed      0 failed      0 skipped  INCOMPLETE
 
   RUN TRUNCATED: the 60 min ceiling was reached after 60.4 min. Everything above is
   what the run produced before it stopped; the tests it had not reached never ran.
@@ -204,13 +204,13 @@ that allowance.
 |-------|-----------|-------|---------------|-------|
 | **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 525 |
 | **seed unit** | `tests/seed_unit/` | One class or function, measured against the values Petacat ships with | Real `seed_data/*.json`, and the machine the process is running on | 456 |
-| **module** | `tests/module/` | Several real components assembled and driven | Real engine objects and `seed_data/*.json`; no DB, no HTTP | 901 |
+| **module** | `tests/module/` | Several real components assembled and driven | Real engine objects and `seed_data/*.json`; no DB, no HTTP | 909 |
 | **architecture** | `tests/architecture/` | How the source tree is allowed to depend on itself | The repository's source, `seed_data/*.json`, child interpreters | 34 |
 | **integration** | `tests/integration/` | Agreement between the repository's artifacts, and the harness's own rules | Real `seed_data/*.json`, the ORM declarations, the generated client files, the documentation, a real pytest session | 68 |
-| **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 256 |
+| **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 259 |
 
 Those counts are cases, so they include the second pass the numeric matrix makes
-over the 250 backend-sensitive tests.
+over the 440 backend-sensitive tests.
 
 One line decides each layer. Read them as a question about what a new test's
 subject is, and write the test where the answer lands:
@@ -232,7 +232,7 @@ first**, then move up toward the API and GUI.
 
 All six layers run in one command — the
 [required command](#the-required-command) — and, since Petacat runs natively, all
-six actually run: **2,240 cases**, every one of them executed. A layer that is
+six actually run: **2,251 cases**, every one of them executed. A layer that is
 normally skipped is not a layer that is normally green, and none of these is.
 
 Wall-clock time depends heavily on the machine and on what else it is doing. The
@@ -393,10 +393,10 @@ the number of endpoints taking `Depends(get_session)`, the size of
 | `test_coderack_shards.py` | 13 | The candidate sharded coderacks: fidelity and contention |
 | `test_commentary_writer.py` | 8 | Commentary is an injected writer, and every Run gets a real one |
 | `test_dissertation_parity.py` | 45 | The dissertation's claims, encoded as tests |
-| `test_free_running.py` | 14 | Free-running execution across worker threads |
+| `test_free_running.py` | 15 | Free-running execution across worker threads |
 | `test_group_image_direction.py` | 6 | A group's image is built in the group's own direction |
 | `test_image_relations.py` | 4 | The relations a group's image is built with, and what happens when they are wrong |
-| `test_justify_and_jootsing.py` | 11 | Justify mode's verdicts and the jootser's justify outcomes |
+| `test_justify_and_jootsing.py` | 14 | Justify mode's verdicts and the jootser's justify outcomes |
 | `test_numeric_engine.py` | 7 | The engine computes the same thing with the substrate engaged |
 | `test_population.py` | 9 | Population batching: K independent runs together |
 | `test_run_identifiers.py` | 8 | Identifiers depend on the run, not on the process's history |
@@ -450,7 +450,7 @@ the number of endpoints taking `Depends(get_session)`, the size of
 | `test_run_parameters.py` | 13 | Run parameters are settable per Run, stored, and readable back |
 | `test_run_to_answer.py` | 8 | The Run-to-Answer feature over HTTP |
 | `test_snag_identity.py` | 2 | A snag is the same snag whichever endpoint served it |
-| `test_step0_config_from_db.py` | 47 | Step 0's guard tests: a shipped value reproduces the run and a changed one moves it |
+| `test_step0_config_from_db.py` | 50 | Step 0's guard tests: a shipped value reproduces the run and a changed one moves it |
 
 **Collected by no layer**
 

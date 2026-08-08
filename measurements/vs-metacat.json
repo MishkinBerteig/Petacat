@@ -4,6 +4,7 @@
   "max_steps": 20000,
   "reference_max_steps": 100000,
   "backend": "numpy",
+  "engine_param_overrides": {},
   "start_seed": 900000,
   "reference": "../Metacat/oracle/derived",
   "single": [
@@ -14,10 +15,10 @@
       "missing_p50": [],
       "novel": [],
       "produced": {
-        "z": 45,
-        "b": 34,
-        "y": 19,
-        "*NONE*": 2
+        "z": 48,
+        "b": 35,
+        "y": 14,
+        "*NONE*": 3
       },
       "reference_p50": [
         "b",
@@ -202,13 +203,13 @@
       "missing_p50": [],
       "novel": [],
       "produced": {
-        "glz": 26,
-        "hlz": 21,
+        "hlz": 25,
+        "glz": 25,
+        "flz": 21,
         "gld": 20,
-        "*NONE*": 16,
-        "flz": 14,
+        "*NONE*": 5,
         "dlz": 2,
-        "abd": 1
+        "abd": 2
       },
       "reference_p50": [
         "gld",
@@ -267,13 +268,13 @@
       "missing_p50": [],
       "novel": [],
       "produced": {
-        "xyz": 28,
-        "xyd": 26,
-        "*NONE*": 19,
-        "wyz": 15,
-        "yyz": 6,
-        "dyz": 4,
-        "abd": 2
+        "xyz": 30,
+        "xyd": 27,
+        "wyz": 22,
+        "*NONE*": 15,
+        "dyz": 3,
+        "yyz": 2,
+        "abd": 1
       },
       "reference_p50": [
         "xyd",
@@ -350,11 +351,11 @@
       "missing_p50": [],
       "novel": [],
       "produced": {
-        "qeeeq": 49,
-        "*NONE*": 9,
-        "qbbbq": 9,
+        "qeeeq": 50,
+        "*NONE*": 10,
         "qcccb": 9,
-        "baaaq": 7,
+        "qbbbq": 8,
+        "baaaq": 6,
         "cbbba": 5,
         "qeq": 4,
         "cddda": 2,
@@ -376,12 +377,12 @@
       "missing_p50": [],
       "novel": [],
       "produced": {
-        "*NONE*": 38,
-        "xyu": 26,
-        "xyz": 15,
-        "wyz": 13,
-        "rsu": 5,
-        "yyz": 3
+        "wyz": 23,
+        "xyz": 23,
+        "xyu": 23,
+        "*NONE*": 19,
+        "yyz": 7,
+        "rsu": 5
       },
       "reference_p50": [
         "xyu",
@@ -512,9 +513,9 @@
       "missing_p50": [],
       "novel": [],
       "produced": {
-        "b": 76,
-        "z": 14,
-        "y": 10
+        "b": 69,
+        "y": 18,
+        "z": 13
       },
       "reference_p50": [
         "y",
@@ -524,36 +525,6 @@
       "sequences": [
         [
           "z",
-          "b",
-          "b",
-          "*NONE*",
-          "*NONE*",
-          "y",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "z",
-          "b",
-          "y",
-          "*NONE*",
-          "b",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "b",
-          "z",
-          "b",
-          "*NONE*",
-          "y",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "z",
           "y",
           "b",
           "*NONE*",
@@ -573,100 +544,30 @@
           "*NONE*"
         ],
         [
-          "z",
-          "y",
-          "b",
-          "*NONE*",
-          "*NONE*",
-          "b",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
           "b",
           "z",
-          "y",
           "b",
           "*NONE*",
+          "y",
           "*NONE*",
           "*NONE*",
           "*NONE*"
         ],
         [
           "z",
+          "*NONE*",
           "b",
           "y",
+          "*NONE*",
           "b",
-          "*NONE*",
-          "*NONE*",
           "*NONE*",
           "*NONE*"
         ],
         [
           "z",
           "b",
+          "*NONE*",
           "y",
-          "*NONE*",
-          "*NONE*",
-          "b",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "*NONE*",
-          "z",
-          "y",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "y",
-          "b",
-          "*NONE*",
-          "z",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "b"
-        ],
-        [
-          "b",
-          "z",
-          "y",
-          "*NONE*",
-          "b",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "y",
-          "b",
-          "b",
-          "z",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "b",
-          "y",
-          "z",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "b",
-          "y",
-          "*NONE*",
-          "z",
           "b",
           "*NONE*",
           "*NONE*",
@@ -674,11 +575,11 @@
         ],
         [
           "z",
+          "*NONE*",
           "b",
+          "*NONE*",
+          "*NONE*",
           "y",
-          "b",
-          "*NONE*",
-          "*NONE*",
           "*NONE*",
           "*NONE*"
         ],
@@ -693,88 +594,18 @@
           "*NONE*"
         ],
         [
-          "b",
-          "y",
-          "b",
-          "z",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "y",
           "z",
           "b",
+          "*NONE*",
           "b",
           "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "b",
           "y",
-          "z",
-          "*NONE*",
-          "*NONE*",
-          "b",
           "*NONE*",
           "*NONE*"
         ],
         [
           "z",
-          "y",
           "b",
-          "b",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "y",
-          "z",
-          "*NONE*",
-          "*NONE*",
-          "b",
-          "b",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "y",
-          "z",
-          "b",
-          "*NONE*",
-          "*NONE*",
-          "b",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "z",
-          "y",
-          "b",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "b",
-          "*NONE*"
-        ],
-        [
-          "b",
-          "z",
-          "b",
-          "y",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "b",
-          "z",
           "b",
           "y",
           "*NONE*",
@@ -784,9 +615,9 @@
         ],
         [
           "z",
-          "b",
+          "*NONE*",
           "y",
-          "b",
+          "*NONE*",
           "*NONE*",
           "*NONE*",
           "*NONE*",
@@ -803,9 +634,19 @@
           "*NONE*"
         ],
         [
+          "b",
+          "z",
+          "y",
           "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
           "y",
           "b",
+          "*NONE*",
           "z",
           "b",
           "*NONE*",
@@ -813,60 +654,10 @@
           "*NONE*"
         ],
         [
-          "b",
-          "y",
-          "z",
           "*NONE*",
-          "b",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "z",
-          "y",
-          "b",
-          "b",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "z",
-          "b",
-          "b",
-          "y",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "z",
-          "y",
-          "z",
-          "*NONE*",
-          "b",
-          "*NONE*",
-          "b",
-          "*NONE*"
-        ],
-        [
-          "z",
-          "b",
-          "*NONE*",
-          "y",
-          "*NONE*",
-          "b",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
           "b",
           "z",
           "y",
-          "b",
           "*NONE*",
           "*NONE*",
           "*NONE*",
@@ -876,50 +667,10 @@
           "b",
           "y",
           "*NONE*",
-          "*NONE*",
-          "z",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "z",
-          "y",
-          "b",
-          "b",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
           "z",
           "b",
-          "b",
-          "*NONE*",
-          "y",
           "*NONE*",
           "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "z",
-          "b",
-          "y",
-          "b",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "y",
-          "z",
-          "*NONE*",
-          "b",
-          "*NONE*",
-          "*NONE*",
-          "b",
           "*NONE*"
         ],
         [
@@ -934,51 +685,21 @@
         ],
         [
           "b",
-          "*NONE*",
+          "y",
           "z",
           "*NONE*",
-          "y",
           "b",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "b",
-          "b",
-          "y",
-          "*NONE*",
-          "*NONE*",
           "*NONE*",
           "*NONE*",
           "*NONE*"
         ],
         [
           "b",
-          "z",
           "*NONE*",
           "y",
-          "b",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
           "z",
           "*NONE*",
           "b",
-          "y",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "b"
-        ],
-        [
-          "z",
-          "y",
-          "*NONE*",
-          "b",
-          "b",
-          "*NONE*",
           "*NONE*",
           "*NONE*"
         ],
@@ -993,19 +714,9 @@
           "*NONE*"
         ],
         [
+          "b",
           "y",
           "z",
-          "b",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "b",
-          "*NONE*"
-        ],
-        [
-          "y",
-          "z",
-          "b",
           "b",
           "*NONE*",
           "*NONE*",
@@ -1013,50 +724,20 @@
           "*NONE*"
         ],
         [
-          "y",
+          "z",
           "b",
           "*NONE*",
-          "z",
           "*NONE*",
+          "y",
           "b",
           "*NONE*",
           "*NONE*"
         ],
         [
-          "z",
-          "*NONE*",
-          "y",
           "b",
-          "*NONE*",
-          "b",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "z",
-          "b",
-          "y",
-          "b",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "y",
-          "b",
-          "*NONE*",
           "*NONE*",
           "z",
-          "*NONE*",
-          "b",
-          "*NONE*"
-        ],
-        [
-          "b",
-          "z",
           "y",
-          "*NONE*",
           "*NONE*",
           "*NONE*",
           "*NONE*",
@@ -1074,9 +755,329 @@
         ],
         [
           "z",
+          "y",
+          "b",
+          "b",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "y",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "b",
+          "b"
+        ],
+        [
+          "*NONE*",
+          "z",
+          "*NONE*",
+          "b",
+          "y",
+          "*NONE*",
+          "*NONE*",
+          "b"
+        ],
+        [
+          "y",
+          "b",
+          "*NONE*",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "b",
+          "*NONE*"
+        ],
+        [
+          "b",
+          "z",
+          "y",
+          "*NONE*",
+          "b",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "*NONE*",
+          "y",
+          "b",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "b",
+          "y",
+          "z",
+          "*NONE*",
+          "b",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "y",
+          "b",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "b",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "b",
+          "b",
+          "y",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "*NONE*",
+          "z",
+          "*NONE*",
+          "b",
+          "y",
+          "b",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "b",
+          "b",
+          "y",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "b",
+          "z",
+          "y",
+          "*NONE*",
+          "b",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "b",
+          "*NONE*",
+          "b",
+          "y",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "y",
+          "b",
+          "b",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "y",
+          "b",
+          "*NONE*",
+          "*NONE*",
+          "b",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "b",
+          "b",
           "*NONE*",
           "y",
           "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "y",
+          "z",
+          "*NONE*",
+          "b",
+          "b",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "b",
+          "y",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "b",
+          "*NONE*",
+          "z",
+          "*NONE*",
+          "y",
+          "b",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "b",
+          "b",
+          "y",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "b",
+          "z",
+          "*NONE*",
+          "y",
+          "b",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "y",
+          "*NONE*",
+          "b",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "b"
+        ],
+        [
+          "z",
+          "y",
+          "b",
+          "b",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "b",
+          "z",
+          "y",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "b",
+          "*NONE*"
+        ],
+        [
+          "y",
+          "z",
+          "b",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "b",
+          "*NONE*"
+        ],
+        [
+          "y",
+          "z",
+          "*NONE*",
+          "b",
+          "*NONE*",
+          "b",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "y",
+          "b",
+          "*NONE*",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "*NONE*",
+          "y",
+          "b",
+          "b",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "b",
+          "y",
+          "b",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "y",
+          "b",
+          "*NONE*",
+          "b",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "b",
+          "z",
+          "*NONE*",
+          "b",
+          "y",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "y",
+          "z",
+          "b",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "b"
+        ],
+        [
+          "z",
+          "y",
+          "*NONE*",
+          "b",
           "*NONE*",
           "b",
           "*NONE*",
@@ -1096,16 +1097,6 @@
           "z",
           "b",
           "y",
-          "b",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "y",
-          "b",
-          "z",
           "*NONE*",
           "*NONE*",
           "b",
@@ -1113,60 +1104,60 @@
           "*NONE*"
         ],
         [
-          "z",
-          "y",
-          "b",
           "*NONE*",
-          "b",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
           "b",
           "y",
-          "*NONE*",
-          "b",
           "z",
           "*NONE*",
+          "b",
           "*NONE*",
           "*NONE*"
         ],
         [
           "z",
+          "b",
           "y",
           "b",
           "*NONE*",
-          "b",
           "*NONE*",
           "*NONE*",
           "*NONE*"
         ],
         [
-          "y",
           "b",
           "z",
+          "*NONE*",
+          "y",
+          "*NONE*",
           "b",
           "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "y",
           "*NONE*",
+          "*NONE*",
+          "b",
+          "b",
           "*NONE*",
           "*NONE*"
         ],
         [
           "y",
-          "*NONE*",
-          "b",
-          "*NONE*",
           "z",
           "*NONE*",
+          "b",
+          "b",
+          "*NONE*",
           "*NONE*",
           "*NONE*"
         ],
         [
+          "*NONE*",
+          "*NONE*",
           "b",
-          "*NONE*",
           "y",
-          "*NONE*",
           "z",
           "*NONE*",
           "*NONE*",
@@ -1175,6 +1166,86 @@
         [
           "y",
           "b",
+          "*NONE*",
+          "*NONE*",
+          "z",
+          "b",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "y",
+          "b",
+          "*NONE*",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "y",
+          "b",
+          "z",
+          "*NONE*",
+          "b",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "y",
+          "b",
+          "b",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "b",
+          "y",
+          "*NONE*",
+          "b",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "b",
+          "y",
+          "b",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "y",
+          "b",
+          "*NONE*",
+          "*NONE*",
+          "z",
+          "*NONE*",
+          "b",
+          "*NONE*"
+        ],
+        [
+          "b",
+          "*NONE*",
+          "z",
+          "*NONE*",
+          "b",
+          "y",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "y",
+          "b",
           "b",
           "z",
           "*NONE*",
@@ -1196,80 +1267,10 @@
           "y",
           "b",
           "*NONE*",
+          "b",
           "z",
           "*NONE*",
           "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "z",
-          "b",
-          "y",
-          "*NONE*",
-          "b",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "z",
-          "b",
-          "y",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "b",
-          "*NONE*"
-        ],
-        [
-          "y",
-          "b",
-          "b",
-          "*NONE*",
-          "z",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "b",
-          "*NONE*",
-          "y",
-          "z",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "y",
-          "b",
-          "*NONE*",
-          "z",
-          "b",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "b",
-          "*NONE*",
-          "z",
-          "y",
-          "b",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "y",
-          "b",
-          "*NONE*",
-          "*NONE*",
-          "z",
-          "*NONE*",
-          "b",
           "*NONE*"
         ],
         [
@@ -1284,11 +1285,11 @@
         ],
         [
           "b",
-          "*NONE*",
-          "z",
-          "*NONE*",
-          "b",
           "y",
+          "z",
+          "b",
+          "*NONE*",
+          "*NONE*",
           "*NONE*",
           "*NONE*"
         ],
@@ -1297,8 +1298,198 @@
           "z",
           "*NONE*",
           "*NONE*",
+          "b",
+          "*NONE*",
+          "y",
+          "b"
+        ],
+        [
           "y",
           "b",
+          "b",
+          "*NONE*",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "*NONE*",
+          "b",
+          "z",
+          "b",
+          "*NONE*",
+          "*NONE*",
+          "y",
+          "*NONE*"
+        ],
+        [
+          "b",
+          "y",
+          "*NONE*",
+          "*NONE*",
+          "z",
+          "*NONE*",
+          "b",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "b",
+          "*NONE*",
+          "b",
+          "*NONE*",
+          "y",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "b",
+          "y",
+          "*NONE*",
+          "b",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "b",
+          "*NONE*",
+          "y",
+          "z",
+          "b",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "b",
+          "*NONE*",
+          "*NONE*",
+          "y",
+          "b",
+          "z",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "b",
+          "y",
+          "z",
+          "*NONE*",
+          "b",
+          "b",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "y",
+          "b",
+          "b",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "z",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "b",
+          "*NONE*",
+          "y",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "y",
+          "b",
+          "*NONE*",
+          "z",
+          "*NONE*",
+          "b",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "b",
+          "z",
+          "y",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "y",
+          "b",
+          "*NONE*",
+          "z",
+          "b",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "y",
+          "b",
+          "b",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "y",
+          "b",
+          "*NONE*",
+          "b",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "*NONE*",
+          "y",
+          "b",
+          "*NONE*",
+          "b",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "b",
+          "*NONE*",
+          "*NONE*",
+          "y",
+          "b",
+          "z",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "z",
+          "y",
+          "*NONE*",
+          "*NONE*",
+          "b",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "b",
+          "y",
+          "z",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
           "*NONE*",
           "b"
         ],
@@ -1307,159 +1498,9 @@
           "b",
           "*NONE*",
           "*NONE*",
-          "z",
-          "b",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "y",
-          "b",
-          "z",
-          "b",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "b",
-          "y",
-          "*NONE*",
-          "*NONE*",
-          "z",
-          "b",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "z",
-          "y",
-          "b",
           "*NONE*",
           "*NONE*",
           "b",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "z",
-          "b",
-          "y",
-          "*NONE*",
-          "b",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "b",
-          "z",
-          "y",
-          "b",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "b",
-          "y",
-          "z",
-          "*NONE*",
-          "b",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "b",
-          "y",
-          "z",
-          "*NONE*",
-          "*NONE*",
-          "b",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "y",
-          "z",
-          "b",
-          "b",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "z",
-          "b",
-          "b",
-          "y",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "y",
-          "b",
-          "b",
-          "z",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "y",
-          "z",
-          "b",
-          "*NONE*",
-          "b",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "y",
-          "b",
-          "*NONE*",
-          "z",
-          "b",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "*NONE*",
-          "z",
-          "b",
-          "y",
-          "*NONE*",
-          "b",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "z",
-          "y",
-          "b",
-          "*NONE*",
-          "b",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "*NONE*",
-          "*NONE*",
-          "y",
-          "b",
-          "*NONE*",
-          "b",
-          "z",
           "*NONE*"
         ],
         [
@@ -1467,46 +1508,6 @@
           "*NONE*",
           "*NONE*",
           "y",
-          "b",
-          "z",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "z",
-          "y",
-          "b",
-          "*NONE*",
-          "b",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "y",
-          "z",
-          "b",
-          "*NONE*",
-          "b",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "y",
-          "b",
-          "b",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "y",
-          "b",
-          "*NONE*",
-          "*NONE*",
           "z",
           "b",
           "*NONE*",
@@ -1518,7 +1519,7 @@
           "y",
           "z",
           "*NONE*",
-          "b",
+          "*NONE*",
           "*NONE*",
           "*NONE*"
         ]
@@ -3610,12 +3611,12 @@
       "missing_p50": [],
       "novel": [],
       "produced": {
-        "dlz": 34,
-        "glz": 22,
-        "abd": 17,
-        "flz": 15,
-        "gld": 10,
-        "hlz": 2
+        "dlz": 39,
+        "glz": 18,
+        "abd": 18,
+        "flz": 12,
+        "gld": 12,
+        "hlz": 1
       },
       "reference_p50": [
         "dlz",
@@ -3628,38 +3629,38 @@
           "gld",
           "hlz",
           "dlz",
+          "*NONE*",
           "flz",
           "*NONE*",
-          "*NONE*",
           "glz",
-          "abd"
+          "*NONE*"
         ],
         [
           "gld",
-          "hlz",
+          "flz",
           "*NONE*",
           "dlz",
+          "hlz",
+          "glz",
           "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "glz"
+          "*NONE*"
         ],
         [
           "gld",
           "glz",
           "*NONE*",
-          "*NONE*",
-          "flz",
-          "hlz",
           "dlz",
+          "hlz",
+          "flz",
+          "*NONE*",
           "*NONE*"
         ],
         [
           "glz",
-          "hlz",
           "flz",
+          "dlz",
           "gld",
-          "*NONE*",
+          "hlz",
           "*NONE*",
           "abd",
           "*NONE*"
@@ -3667,16 +3668,16 @@
         [
           "gld",
           "hlz",
-          "*NONE*",
-          "flz",
           "dlz",
-          "glz",
           "*NONE*",
+          "*NONE*",
+          "glz",
+          "flz",
           "*NONE*"
         ],
         [
           "flz",
-          "*NONE*",
+          "abd",
           "glz",
           "hlz",
           "dlz",
@@ -3686,11 +3687,11 @@
         ],
         [
           "flz",
-          "*NONE*",
-          "hlz",
           "glz",
+          "hlz",
           "abd",
           "*NONE*",
+          "gld",
           "*NONE*",
           "dlz"
         ],
@@ -3705,71 +3706,71 @@
           "*NONE*"
         ],
         [
+          "flz",
+          "dlz",
+          "hlz",
+          "*NONE*",
+          "glz",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "hlz",
+          "flz",
+          "glz",
+          "gld",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "gld",
+          "*NONE*",
+          "*NONE*",
+          "hlz",
+          "flz",
+          "glz",
+          "*NONE*",
+          "abd"
+        ],
+        [
+          "flz",
+          "gld",
+          "glz",
+          "hlz",
+          "*NONE*",
+          "dlz",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "glz",
+          "gld",
+          "hlz",
+          "flz",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "glz",
+          "*NONE*",
+          "hlz",
+          "flz",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
           "dlz",
           "flz",
           "hlz",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "glz",
-          "*NONE*"
-        ],
-        [
-          "hlz",
-          "*NONE*",
-          "flz",
-          "gld",
-          "glz",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
           "gld",
           "*NONE*",
-          "hlz",
-          "*NONE*",
-          "flz",
-          "glz",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "gld",
-          "hlz",
-          "flz",
-          "glz",
-          "*NONE*",
-          "dlz",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "hlz",
-          "gld",
-          "*NONE*",
-          "flz",
-          "glz",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "glz",
-          "abd",
-          "hlz",
-          "flz",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "*NONE*",
-          "dlz",
-          "hlz",
-          "gld",
-          "flz",
           "*NONE*",
           "*NONE*",
           "glz"
@@ -3780,28 +3781,28 @@
           "flz",
           "hlz",
           "dlz",
-          "abd",
           "*NONE*",
+          "abd",
           "*NONE*"
         ],
         [
           "flz",
+          "gld",
           "glz",
-          "*CAP*",
           "hlz",
           "*NONE*",
           "*NONE*",
           "dlz",
-          "*NONE*"
+          "abd"
         ],
         [
           "gld",
           "hlz",
           "glz",
           "flz",
+          "abd",
+          "*NONE*",
           "dlz",
-          "*NONE*",
-          "*NONE*",
           "*CAP*"
         ],
         [
@@ -3809,8 +3810,8 @@
           "hlz",
           "flz",
           "*NONE*",
-          "abd",
           "*NONE*",
+          "dlz",
           "*NONE*",
           "gld"
         ],
@@ -3839,8 +3840,8 @@
           "abd",
           "gld",
           "glz",
+          "dlz",
           "flz",
-          "*NONE*",
           "*NONE*",
           "*NONE*"
         ],
@@ -3849,8 +3850,8 @@
           "*NONE*",
           "gld",
           "flz",
-          "dlz",
           "*NONE*",
+          "dlz",
           "*NONE*",
           "glz"
         ],
@@ -3858,8 +3859,8 @@
           "flz",
           "hlz",
           "glz",
-          "gld",
           "dlz",
+          "*NONE*",
           "*NONE*",
           "*NONE*",
           "*NONE*"
@@ -3870,7 +3871,47 @@
           "glz",
           "abd",
           "flz",
+          "dlz",
           "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "gld",
+          "hlz",
+          "*NONE*",
+          "flz",
+          "*NONE*",
+          "dlz",
+          "*NONE*",
+          "glz"
+        ],
+        [
+          "flz",
+          "hlz",
+          "glz",
+          "abd",
+          "*NONE*",
+          "dlz",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "abd",
+          "*NONE*",
+          "gld",
+          "flz",
+          "hlz",
+          "glz",
+          "dlz",
+          "*NONE*"
+        ],
+        [
+          "gld",
+          "*NONE*",
+          "abd",
+          "flz",
+          "glz",
+          "hlz",
           "*NONE*",
           "dlz"
         ],
@@ -3878,109 +3919,69 @@
           "gld",
           "hlz",
           "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
+          "dlz",
           "flz",
-          "glz"
-        ],
-        [
-          "flz",
-          "hlz",
           "glz",
           "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "dlz",
-          "*NONE*"
+          "abd"
         ],
         [
+          "hlz",
+          "flz",
+          "glz",
+          "*NONE*",
+          "gld",
           "abd",
-          "hlz",
-          "gld",
           "*NONE*",
-          "flz",
-          "*NONE*",
-          "dlz",
-          "*NONE*"
-        ],
-        [
-          "gld",
-          "hlz",
-          "abd",
-          "flz",
-          "glz",
-          "dlz",
-          "*NONE*",
-          "*NONE*"
+          "dlz"
         ],
         [
           "flz",
-          "hlz",
-          "gld",
-          "dlz",
-          "*NONE*",
-          "glz",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "hlz",
-          "flz",
-          "glz",
-          "*NONE*",
-          "gld",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "*NONE*",
-          "*NONE*",
-          "flz",
           "glz",
           "hlz",
+          "*NONE*",
+          "*NONE*",
           "*NONE*",
           "*NONE*",
           "gld"
         ],
         [
           "hlz",
-          "flz",
           "dlz",
+          "flz",
           "gld",
           "*NONE*",
           "*NONE*",
-          "abd",
+          "*NONE*",
           "*NONE*"
         ],
         [
           "gld",
           "*NONE*",
-          "dlz",
           "*NONE*",
-          "glz",
           "hlz",
+          "glz",
+          "*NONE*",
           "flz",
           "*NONE*"
         ],
         [
-          "*NONE*",
           "hlz",
-          "*NONE*",
-          "*NONE*",
           "flz",
-          "gld",
-          "dlz",
-          "glz"
-        ],
-        [
-          "gld",
           "*NONE*",
-          "flz",
-          "hlz",
           "*NONE*",
           "glz",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "dlz",
+          "glz",
+          "gld",
+          "hlz",
+          "flz",
+          "*NONE*",
           "*NONE*",
           "*NONE*"
         ],
@@ -4005,31 +4006,31 @@
           "*NONE*"
         ],
         [
-          "hlz",
+          "*NONE*",
           "flz",
-          "*NONE*",
-          "glz",
-          "dlz",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "hlz",
-          "glz",
-          "*NONE*",
           "gld",
+          "hlz",
+          "dlz",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "hlz",
+          "glz",
           "flz",
+          "gld",
+          "abd",
           "*NONE*",
           "dlz",
           "*NONE*"
         ],
         [
-          "*NONE*",
-          "glz",
           "hlz",
+          "glz",
           "flz",
-          "abd",
+          "*NONE*",
+          "*NONE*",
           "*NONE*",
           "dlz",
           "gld"
@@ -4046,8 +4047,8 @@
         ],
         [
           "gld",
-          "flz",
           "dlz",
+          "flz",
           "hlz",
           "glz",
           "*NONE*",
@@ -4056,42 +4057,42 @@
         ],
         [
           "flz",
-          "*NONE*",
-          "gld",
           "hlz",
+          "gld",
           "*NONE*",
+          "abd",
           "glz",
-          "*NONE*",
-          "dlz"
+          "dlz",
+          "*NONE*"
         ],
         [
-          "flz",
-          "glz",
           "hlz",
+          "glz",
+          "flz",
+          "*NONE*",
           "abd",
           "*NONE*",
           "*NONE*",
-          "*NONE*",
           "*NONE*"
         ],
         [
           "gld",
           "hlz",
-          "*NONE*",
-          "*NONE*",
+          "flz",
+          "abd",
           "dlz",
           "*NONE*",
-          "flz",
+          "*NONE*",
           "*NONE*"
         ],
         [
           "glz",
           "hlz",
-          "gld",
-          "*NONE*",
           "flz",
           "*NONE*",
-          "dlz",
+          "*NONE*",
+          "*NONE*",
+          "gld",
           "*NONE*"
         ],
         [
@@ -4120,9 +4121,9 @@
           "gld",
           "hlz",
           "*NONE*",
-          "flz",
           "*NONE*",
-          "*NONE*"
+          "flz",
+          "abd"
         ],
         [
           "flz",
@@ -4130,42 +4131,42 @@
           "gld",
           "glz",
           "hlz",
+          "dlz",
           "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "glz",
+          "gld",
+          "hlz",
+          "flz",
+          "dlz",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "flz",
+          "glz",
+          "hlz",
+          "*NONE*",
+          "*NONE*",
+          "dlz",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "hlz",
+          "*NONE*",
+          "glz",
+          "gld",
+          "flz",
+          "dlz",
           "abd",
           "*NONE*"
         ],
         [
           "glz",
-          "gld",
-          "hlz",
-          "flz",
-          "dlz",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "hlz",
-          "glz",
-          "flz",
-          "*NONE*",
-          "dlz",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "flz",
-          "*NONE*",
-          "glz",
-          "gld",
-          "hlz",
-          "dlz",
-          "abd",
-          "*NONE*"
-        ],
-        [
-          "glz",
           "flz",
           "*NONE*",
           "hlz",
@@ -4182,33 +4183,33 @@
           "gld",
           "*NONE*",
           "*NONE*",
-          "*NONE*"
+          "dlz"
         ],
         [
-          "flz",
+          "hlz",
           "glz",
-          "gld",
+          "flz",
           "*CAP*",
           "*NONE*",
-          "hlz",
           "*NONE*",
-          "abd"
+          "abd",
+          "*NONE*"
         ],
         [
-          "abd",
-          "gld",
-          "*NONE*",
-          "hlz",
           "flz",
+          "gld",
+          "dlz",
+          "hlz",
+          "*NONE*",
           "*NONE*",
           "*NONE*",
           "*NONE*"
         ],
         [
-          "hlz",
-          "flz",
-          "*NONE*",
           "glz",
+          "flz",
+          "hlz",
+          "*NONE*",
           "gld",
           "*NONE*",
           "*NONE*",
@@ -4222,75 +4223,75 @@
           "flz",
           "glz",
           "dlz",
-          "*NONE*"
-        ],
-        [
-          "abd",
-          "hlz",
-          "*NONE*",
-          "dlz",
-          "glz",
-          "*NONE*",
-          "flz",
           "*NONE*"
         ],
         [
           "abd",
-          "*NONE*",
           "hlz",
-          "flz",
+          "*NONE*",
+          "dlz",
           "glz",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "glz",
-          "*NONE*",
-          "*NONE*",
-          "gld",
-          "hlz",
           "*NONE*",
           "flz",
           "*NONE*"
         ],
         [
+          "abd",
+          "*NONE*",
+          "hlz",
           "flz",
           "glz",
-          "hlz",
           "dlz",
           "*NONE*",
-          "*NONE*",
-          "*NONE*",
           "*NONE*"
         ],
         [
           "hlz",
+          "*NONE*",
           "glz",
+          "gld",
           "dlz",
           "flz",
-          "gld",
-          "*NONE*",
-          "*NONE*",
+          "abd",
           "*NONE*"
         ],
         [
           "flz",
           "glz",
-          "*NONE*",
           "hlz",
           "*NONE*",
           "*NONE*",
           "dlz",
+          "abd",
+          "*NONE*"
+        ],
+        [
+          "hlz",
+          "glz",
+          "dlz",
+          "flz",
+          "abd",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "flz",
+          "glz",
+          "hlz",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "dlz",
           "*NONE*"
         ],
         [
           "gld",
-          "*NONE*",
-          "glz",
-          "*NONE*",
           "flz",
           "hlz",
+          "glz",
+          "*NONE*",
+          "dlz",
           "*NONE*",
           "*NONE*"
         ],
@@ -4305,8 +4306,8 @@
           "dlz"
         ],
         [
-          "glz",
           "hlz",
+          "glz",
           "flz",
           "*NONE*",
           "*NONE*",
@@ -4315,141 +4316,141 @@
           "*NONE*"
         ],
         [
-          "glz",
-          "hlz",
-          "flz",
-          "dlz",
-          "abd",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "glz",
-          "*NONE*",
-          "hlz",
-          "flz",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "abd"
-        ],
-        [
-          "gld",
-          "hlz",
-          "*NONE*",
           "flz",
           "glz",
-          "dlz",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
           "hlz",
-          "gld",
-          "abd",
-          "flz",
-          "glz",
-          "*NONE*",
-          "dlz",
-          "*NONE*"
-        ],
-        [
-          "glz",
-          "hlz",
-          "flz",
-          "gld",
           "*NONE*",
           "abd",
+          "dlz",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "glz",
+          "flz",
+          "hlz",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "dlz",
+          "*NONE*"
+        ],
+        [
+          "gld",
+          "hlz",
+          "flz",
+          "glz",
+          "abd",
+          "dlz",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "glz",
+          "gld",
+          "hlz",
+          "flz",
+          "*NONE*",
+          "*NONE*",
+          "dlz",
+          "*NONE*"
+        ],
+        [
+          "glz",
+          "*NONE*",
+          "hlz",
+          "*NONE*",
+          "*NONE*",
+          "flz",
           "*CAP*",
-          "dlz"
+          "gld"
         ],
         [
           "gld",
-          "*NONE*",
-          "*NONE*",
           "hlz",
           "flz",
           "*NONE*",
+          "*NONE*",
           "glz",
+          "abd",
           "*NONE*"
         ],
         [
           "glz",
           "gld",
+          "hlz",
+          "flz",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "glz",
+          "flz",
+          "*NONE*",
+          "*NONE*",
+          "hlz",
+          "gld",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
           "flz",
           "hlz",
           "*NONE*",
+          "glz",
+          "abd",
+          "*NONE*",
+          "*NONE*",
+          "dlz"
+        ],
+        [
+          "gld",
+          "abd",
+          "hlz",
+          "glz",
+          "flz",
+          "dlz",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "hlz",
+          "glz",
+          "flz",
+          "*NONE*",
+          "dlz",
           "*NONE*",
           "*NONE*",
           "abd"
         ],
         [
-          "glz",
-          "flz",
-          "*NONE*",
-          "*NONE*",
-          "hlz",
           "gld",
-          "*NONE*",
-          "dlz"
-        ],
-        [
-          "glz",
           "hlz",
-          "*NONE*",
-          "flz",
-          "abd",
-          "*NONE*",
-          "*NONE*",
-          "dlz"
-        ],
-        [
           "dlz",
-          "abd",
-          "gld",
-          "glz",
-          "hlz",
+          "*NONE*",
           "flz",
           "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "hlz",
-          "glz",
-          "flz",
-          "*NONE*",
-          "gld",
-          "dlz",
           "*NONE*",
           "abd"
         ],
         [
           "gld",
           "*NONE*",
-          "dlz",
-          "hlz",
-          "*NONE*",
-          "*NONE*",
           "flz",
-          "abd"
-        ],
-        [
-          "gld",
-          "*NONE*",
+          "hlz",
           "glz",
-          "hlz",
-          "flz",
           "*NONE*",
-          "dlz",
+          "*NONE*",
           "*NONE*"
         ],
         [
           "glz",
           "hlz",
-          "*NONE*",
-          "abd",
           "flz",
+          "*NONE*",
+          "*NONE*",
           "*NONE*",
           "gld",
           "dlz"
@@ -4457,28 +4458,28 @@
         [
           "*NONE*",
           "*NONE*",
-          "glz",
+          "flz",
           "gld",
           "hlz",
-          "flz",
+          "glz",
           "*NONE*",
           "*NONE*"
         ],
         [
           "flz",
-          "*NONE*",
           "hlz",
-          "gld",
-          "*NONE*",
-          "glz",
           "dlz",
+          "*NONE*",
+          "gld",
+          "glz",
+          "*NONE*",
           "*NONE*"
         ],
         [
           "gld",
-          "dlz",
-          "glz",
           "*NONE*",
+          "glz",
+          "abd",
           "hlz",
           "flz",
           "*NONE*",
@@ -4489,7 +4490,7 @@
           "glz",
           "hlz",
           "*NONE*",
-          "*NONE*",
+          "dlz",
           "flz",
           "abd",
           "*NONE*"
@@ -4497,8 +4498,8 @@
         [
           "glz",
           "hlz",
-          "flz",
           "*NONE*",
+          "flz",
           "dlz",
           "gld",
           "*NONE*",
@@ -4527,20 +4528,20 @@
         [
           "gld",
           "flz",
+          "dlz",
+          "hlz",
           "*NONE*",
           "*NONE*",
+          "glz",
+          "*NONE*"
+        ],
+        [
+          "gld",
+          "glz",
           "hlz",
           "dlz",
-          "glz",
-          "*NONE*"
-        ],
-        [
-          "gld",
-          "*NONE*",
-          "hlz",
-          "dlz",
           "flz",
-          "glz",
+          "*NONE*",
           "*NONE*",
           "*NONE*"
         ],
@@ -4548,38 +4549,38 @@
           "glz",
           "flz",
           "*NONE*",
-          "hlz",
-          "gld",
           "*NONE*",
+          "gld",
+          "hlz",
           "dlz",
           "*NONE*"
         ],
         [
           "glz",
           "gld",
-          "*NONE*",
-          "hlz",
-          "*NONE*",
-          "*NONE*",
           "flz",
+          "hlz",
+          "dlz",
+          "*NONE*",
+          "*NONE*",
           "*NONE*"
         ],
         [
           "glz",
+          "flz",
           "gld",
           "hlz",
-          "flz",
           "*NONE*",
-          "*NONE*",
+          "dlz",
           "*NONE*",
           "*NONE*"
         ],
         [
           "hlz",
-          "*NONE*",
+          "dlz",
           "abd",
-          "glz",
           "flz",
+          "glz",
           "*NONE*",
           "*NONE*",
           "*NONE*"
@@ -4587,11 +4588,11 @@
         [
           "glz",
           "hlz",
-          "*NONE*",
-          "flz",
-          "*NONE*",
           "abd",
           "*NONE*",
+          "flz",
+          "*NONE*",
+          "dlz",
           "*NONE*"
         ],
         [
@@ -4608,8 +4609,8 @@
           "gld",
           "flz",
           "glz",
-          "dlz",
           "hlz",
+          "dlz",
           "*NONE*",
           "*NONE*",
           "*NONE*"
@@ -6685,12 +6686,12 @@
       "missing_p50": [],
       "novel": [],
       "produced": {
-        "yyz": 33,
-        "dyz": 20,
-        "xyz": 17,
-        "abd": 11,
-        "wyz": 11,
-        "xyd": 8
+        "yyz": 31,
+        "dyz": 21,
+        "xyz": 15,
+        "abd": 14,
+        "xyd": 11,
+        "wyz": 8
       },
       "reference_p50": [
         "yyz",
@@ -6699,210 +6700,210 @@
       "episodes_never_answering": 0,
       "sequences": [
         [
-          "abd",
-          "xyd",
           "*NONE*",
+          "xyd",
+          "yyz",
           "*NONE*",
           "*NONE*",
           "xyz",
-          "yyz",
+          "wyz",
           "*NONE*"
         ],
         [
           "xyz",
+          "wyz",
+          "*NONE*",
+          "*NONE*",
+          "xyd",
+          "*NONE*",
+          "yyz",
+          "*NONE*"
+        ],
+        [
+          "wyz",
+          "xyd",
+          "yyz",
+          "xyz",
+          "dyz",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "xyd",
+          "dyz",
+          "wyz",
+          "yyz",
+          "xyz",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "xyd",
           "yyz",
           "wyz",
           "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "dyz",
+          "*NONE*"
+        ],
+        [
+          "wyz",
+          "xyz",
+          "*NONE*",
           "xyd",
+          "yyz",
+          "*NONE*",
+          "abd",
+          "*NONE*"
+        ],
+        [
+          "xyd",
+          "xyz",
+          "*NONE*",
+          "*NONE*",
+          "wyz",
+          "yyz",
+          "dyz",
+          "*NONE*"
+        ],
+        [
+          "dyz",
+          "xyz",
+          "*NONE*",
+          "xyd",
+          "yyz",
+          "wyz",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "*NONE*",
+          "xyz",
+          "wyz",
+          "*NONE*",
+          "yyz",
+          "xyd",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "xyd",
+          "wyz",
+          "xyz",
+          "yyz",
+          "*NONE*",
           "*NONE*",
           "*NONE*",
           "abd"
         ],
         [
+          "xyz",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "wyz",
+          "yyz",
+          "xyd"
+        ],
+        [
+          "xyz",
           "wyz",
           "xyd",
+          "dyz",
+          "abd",
+          "yyz",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "dyz",
+          "*NONE*",
           "xyz",
+          "wyz",
           "yyz",
           "*NONE*",
           "*NONE*",
-          "*NONE*",
-          "*NONE*"
+          "xyd"
         ],
         [
           "xyd",
+          "*NONE*",
+          "*NONE*",
           "wyz",
-          "*NONE*",
-          "dyz",
-          "xyz",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "xyd",
           "yyz",
-          "wyz",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
           "dyz",
+          "xyz",
           "*NONE*"
         ],
         [
-          "*NONE*",
-          "wyz",
-          "xyz",
           "xyd",
           "*NONE*",
+          "xyz",
+          "wyz",
           "*NONE*",
+          "abd",
+          "yyz",
+          "*NONE*"
+        ],
+        [
+          "xyz",
+          "*NONE*",
+          "wyz",
+          "*NONE*",
+          "xyd",
+          "abd",
           "*NONE*",
           "yyz"
         ],
         [
+          "*NONE*",
           "xyd",
-          "*NONE*",
-          "*NONE*",
           "wyz",
           "yyz",
-          "xyz",
           "dyz",
-          "*NONE*"
-        ],
-        [
-          "dyz",
+          "*NONE*",
           "xyz",
-          "xyd",
-          "yyz",
-          "wyz",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "abd",
-          "xyz",
-          "*NONE*",
-          "wyz",
-          "*NONE*",
-          "*NONE*",
-          "yyz",
           "*NONE*"
         ],
         [
           "xyd",
-          "wyz",
-          "xyz",
-          "yyz",
-          "abd",
           "*NONE*",
-          "*NONE*",
-          "dyz"
-        ],
-        [
           "xyz",
-          "xyd",
           "*NONE*",
           "wyz",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "dyz"
-        ],
-        [
-          "xyz",
-          "*NONE*",
-          "xyd",
-          "wyz",
-          "*NONE*",
-          "*NONE*",
-          "abd",
-          "yyz"
-        ],
-        [
-          "dyz",
-          "xyz",
           "yyz",
           "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "abd",
           "*NONE*"
         ],
         [
-          "xyd",
-          "*NONE*",
           "yyz",
-          "*NONE*",
           "xyz",
+          "*NONE*",
           "wyz",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "xyd",
-          "wyz",
-          "xyz",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "xyz",
-          "abd",
-          "wyz",
-          "*NONE*",
-          "xyd",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "*NONE*",
-          "xyd",
-          "*NONE*",
-          "yyz",
-          "*NONE*",
-          "abd",
-          "xyz",
-          "*NONE*"
-        ],
-        [
-          "wyz",
-          "xyz",
-          "yyz",
-          "*NONE*",
-          "abd",
-          "xyd",
-          "dyz",
-          "*NONE*"
-        ],
-        [
-          "wyz",
-          "xyz",
-          "*NONE*",
-          "*NONE*",
           "*NONE*",
           "*CAP*",
-          "*NONE*",
+          "dyz",
           "*NONE*"
         ],
         [
           "xyd",
           "abd",
+          "yyz",
+          "wyz",
           "xyz",
           "*NONE*",
-          "wyz",
           "*NONE*",
-          "yyz",
           "*NONE*"
         ],
         [
-          "wyz",
-          "*NONE*",
-          "*NONE*",
           "xyz",
+          "xyd",
+          "*NONE*",
+          "wyz",
           "yyz",
           "*NONE*",
           "*NONE*",
@@ -6915,7 +6916,7 @@
           "yyz",
           "*NONE*",
           "*NONE*",
-          "dyz",
+          "*NONE*",
           "*NONE*"
         ],
         [
@@ -6924,239 +6925,299 @@
           "yyz",
           "wyz",
           "*NONE*",
-          "dyz",
+          "*NONE*",
           "abd",
           "*NONE*"
         ],
         [
           "xyd",
-          "abd",
           "wyz",
+          "yyz",
           "xyz",
           "*NONE*",
           "*NONE*",
+          "dyz",
+          "*NONE*"
+        ],
+        [
+          "wyz",
           "yyz",
+          "xyz",
+          "*NONE*",
+          "xyd",
+          "*NONE*",
+          "abd",
           "*NONE*"
         ],
         [
           "xyz",
-          "*NONE*",
           "wyz",
+          "yyz",
+          "xyd",
           "*NONE*",
+          "abd",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "wyz",
           "xyd",
           "*NONE*",
           "yyz",
+          "dyz",
+          "*NONE*",
+          "*NONE*",
           "abd"
         ],
         [
+          "wyz",
+          "xyd",
+          "yyz",
           "xyz",
+          "dyz",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "dyz",
+          "*NONE*",
+          "xyz",
+          "xyd",
+          "wyz",
+          "*NONE*",
+          "yyz",
+          "*NONE*"
+        ],
+        [
+          "*NONE*",
           "wyz",
           "yyz",
-          "xyd",
           "*NONE*",
-          "abd",
-          "dyz",
+          "xyz",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "xyd",
+          "wyz",
+          "yyz",
+          "xyz",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
           "*NONE*"
         ],
         [
           "wyz",
           "*NONE*",
-          "*NONE*",
           "xyd",
           "*NONE*",
+          "xyz",
           "*NONE*",
-          "*NONE*",
-          "abd"
+          "yyz",
+          "*NONE*"
         ],
         [
+          "xyd",
+          "xyz",
+          "dyz",
           "wyz",
-          "*NONE*",
           "yyz",
           "*NONE*",
           "*NONE*",
+          "*NONE*"
+        ],
+        [
           "*NONE*",
           "xyd",
+          "yyz",
+          "xyz",
+          "wyz",
+          "*NONE*",
+          "*NONE*",
           "dyz"
         ],
         [
-          "xyd",
+          "dez",
+          "*NONE*",
           "xyz",
           "wyz",
           "dyz",
-          "*NONE*",
-          "*NONE*",
+          "abd",
           "yyz",
-          "*NONE*"
+          "xyd"
         ],
         [
+          "yyz",
           "*NONE*",
           "wyz",
           "*NONE*",
           "xyz",
-          "*NONE*",
-          "*NONE*",
+          "xyd",
           "*NONE*",
           "*NONE*"
         ],
         [
+          "xyz",
+          "*NONE*",
           "xyd",
           "wyz",
+          "yyz",
           "*NONE*",
+          "*NONE*",
+          "dyz"
+        ],
+        [
           "xyz",
           "*NONE*",
+          "wyz",
           "dyz",
           "yyz",
+          "abd",
+          "xyd",
+          "*NONE*"
+        ],
+        [
+          "xyd",
+          "yyz",
+          "xyz",
+          "wyz",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "xyd",
+          "wyz",
+          "yyz",
+          "*NONE*",
+          "*NONE*",
+          "xyz",
+          "*NONE*",
           "*NONE*"
         ],
         [
           "wyz",
-          "xyz",
           "yyz",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "xyd",
-          "*NONE*"
-        ],
-        [
-          "xyd",
-          "wxz",
           "dyz",
-          "wyz",
-          "yyz",
+          "abd",
+          "xyd",
           "*NONE*",
           "xyz",
           "*NONE*"
         ],
         [
-          "*NONE*",
+          "xyz",
           "xyd",
           "*NONE*",
-          "wyz",
           "*NONE*",
-          "xyz",
-          "yyz",
-          "*NONE*"
-        ],
-        [
-          "xyd",
-          "xyz",
           "*NONE*",
           "wyz",
-          "*NONE*",
-          "*NONE*",
           "*NONE*",
           "*NONE*"
         ],
         [
+          "yyz",
+          "xyd",
+          "*NONE*",
+          "wyz",
+          "dyz",
+          "*NONE*",
+          "abd",
+          "xyz"
+        ],
+        [
+          "wyz",
+          "*NONE*",
+          "dyz",
+          "*NONE*",
           "xyz",
+          "yyz",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "xyd",
+          "*NONE*",
+          "dyz",
+          "*NONE*",
+          "wyz",
+          "yyz",
+          "xyz",
+          "*NONE*"
+        ],
+        [
+          "*NONE*",
           "*NONE*",
           "xyd",
-          "yyz",
+          "*NONE*",
           "*NONE*",
           "*NONE*",
           "*NONE*",
           "wyz"
         ],
         [
-          "*NONE*",
-          "*NONE*",
-          "xyd",
-          "wyz",
           "xyz",
+          "*NONE*",
+          "*NONE*",
+          "wyz",
+          "xyd",
+          "*NONE*",
           "yyz",
-          "dyz",
-          "abd"
+          "*NONE*"
         ],
         [
           "xyz",
           "*NONE*",
+          "xyd",
           "wyz",
           "*NONE*",
           "yyz",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "xyz",
           "dyz",
+          "wyz",
           "xyd",
+          "yyz",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "xyz",
+          "wyz",
+          "xyd",
+          "dyz",
+          "*NONE*",
+          "yyz",
+          "*NONE*",
           "*NONE*"
         ],
         [
           "xyd",
+          "wyz",
+          "xyz",
           "yyz",
           "*NONE*",
-          "wyz",
           "*NONE*",
           "*NONE*",
-          "*NONE*",
-          "xyz"
+          "*NONE*"
         ],
         [
           "xyd",
           "*NONE*",
           "wyz",
           "yyz",
-          "xyz",
-          "*NONE*",
           "abd",
+          "xyz",
+          "*NONE*",
           "*NONE*"
-        ],
-        [
-          "*NONE*",
-          "wyz",
-          "xyd",
-          "yyz",
-          "*NONE*",
-          "*NONE*",
-          "xyz",
-          "dyz"
-        ],
-        [
-          "xyz",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "yyz",
-          "*NONE*"
-        ],
-        [
-          "*NONE*",
-          "xyd",
-          "xyz",
-          "*NONE*",
-          "wyz",
-          "dyz",
-          "abd",
-          "*NONE*"
-        ],
-        [
-          "wyz",
-          "*NONE*",
-          "dyz",
-          "xyd",
-          "xyz",
-          "*NONE*",
-          "yyz",
-          "*NONE*"
-        ],
-        [
-          "xyd",
-          "wyz",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "yyz",
-          "xyz"
-        ],
-        [
-          "xyd",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "xyz",
-          "yyz",
-          "wyz"
         ],
         [
           "xyz",
@@ -7169,121 +7230,61 @@
           "yyz"
         ],
         [
-          "xyz",
-          "abd",
-          "xyd",
-          "wyz",
           "*NONE*",
-          "*NONE*",
-          "yyz",
-          "*NONE*"
-        ],
-        [
           "xyz",
           "wyz",
           "*NONE*",
           "xyd",
-          "dyz",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "*NONE*",
-          "wyz",
-          "xyd",
-          "*NONE*",
           "*NONE*",
           "yyz",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "xyd",
-          "xyz",
-          "*NONE*",
-          "wyz",
-          "*NONE*",
-          "yyz",
-          "dyz",
-          "*NONE*"
-        ],
-        [
-          "xyd",
-          "*NONE*",
-          "xyz",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "dyz"
-        ],
-        [
-          "*NONE*",
-          "wyz",
-          "xyd",
-          "xyz",
-          "*NONE*",
-          "*NONE*",
-          "yyz",
-          "*NONE*"
-        ],
-        [
-          "wyz",
-          "xyz",
-          "yyz",
-          "*NONE*",
-          "xyd",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "*NONE*",
-          "xyz",
-          "*NONE*",
-          "*NONE*",
-          "yyz",
-          "*NONE*",
-          "wyz",
-          "*NONE*"
-        ],
-        [
-          "wyz",
-          "xyz",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "yyz",
-          "*NONE*"
-        ],
-        [
-          "wyz",
-          "xyd",
-          "yyz",
-          "abd",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
           "dyz"
         ],
         [
           "xyz",
+          "wyz",
+          "*NONE*",
+          "*NONE*",
+          "xyd",
+          "*NONE*",
+          "yyz",
+          "dyz"
+        ],
+        [
+          "yyz",
+          "xyz",
+          "wyz",
+          "xyd",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "wyz",
+          "xyd",
+          "dyz",
+          "abd",
+          "xyz",
+          "yyz",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "xyz",
           "*NONE*",
           "xyd",
           "*NONE*",
           "wyz",
-          "dyz",
+          "*NONE*",
           "yyz",
           "*NONE*"
         ],
         [
           "xyz",
-          "dyz",
+          "wyz",
           "xyd",
           "yyz",
-          "wyz",
+          "dyz",
           "*NONE*",
           "*NONE*",
           "*NONE*"
@@ -7291,158 +7292,158 @@
         [
           "*NONE*",
           "abd",
+          "*NONE*",
           "xyz",
+          "*NONE*",
           "wyz",
-          "*NONE*",
           "yyz",
-          "*NONE*",
           "*NONE*"
         ],
         [
           "xyz",
-          "*NONE*",
-          "*NONE*",
-          "wyz",
-          "xyd",
           "yyz",
+          "xyd",
+          "wyz",
+          "dyz",
+          "*NONE*",
           "*NONE*",
           "abd"
         ],
         [
           "*NONE*",
-          "xyd",
+          "wyz",
           "dyz",
-          "*NONE*",
-          "wyz",
-          "xyz",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "wyz",
-          "xyz",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "xyd",
-          "*NONE*",
-          "wyz",
-          "xyz",
-          "*NONE*",
           "yyz",
+          "xyd",
+          "*NONE*",
           "*NONE*",
           "*NONE*"
         ],
         [
-          "xyd",
-          "*NONE*",
-          "wyz",
-          "*NONE*",
-          "dyz",
-          "*NONE*",
-          "*NONE*",
-          "yyz"
-        ],
-        [
-          "abd",
-          "xyz",
-          "*NONE*",
-          "xyd",
-          "wyz",
-          "*NONE*",
           "yyz",
-          "*NONE*"
-        ],
-        [
-          "*NONE*",
           "xyz",
           "abd",
+          "wyz",
+          "xyd",
           "*NONE*",
           "*NONE*",
+          "dyz"
+        ],
+        [
+          "wyz",
+          "xyd",
+          "yyz",
+          "xyz",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "abd"
+        ],
+        [
+          "dyz",
           "xyd",
           "wyz",
+          "*NONE*",
+          "yyz",
+          "*NONE*",
+          "*NONE*",
           "*NONE*"
         ],
         [
+          "*NONE*",
           "xyz",
           "wyz",
+          "yyz",
+          "*NONE*",
+          "xyd",
           "abd",
-          "yyz",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
           "*NONE*"
         ],
         [
           "xyz",
-          "wyz",
-          "yyz",
-          "xyd",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "xyz",
-          "wyz",
-          "*NONE*",
-          "xyd",
-          "*NONE*",
-          "*NONE*",
-          "yyz",
-          "*NONE*"
-        ],
-        [
-          "xyz",
-          "xyd",
-          "*NONE*",
-          "wyz",
-          "*NONE*",
-          "*NONE*",
-          "yyz",
-          "*NONE*"
-        ],
-        [
-          "xyz",
-          "*NONE*",
-          "wyz",
-          "*NONE*",
-          "xyd",
-          "*NONE*",
-          "dyz",
-          "*NONE*"
-        ],
-        [
-          "wyz",
-          "xyd",
-          "xyz",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "xyd",
-          "dyz",
-          "xyz",
-          "wyz",
           "abd",
           "*NONE*",
+          "yyz",
+          "*NONE*",
+          "*NONE*",
+          "wyz",
+          "*NONE*"
+        ],
+        [
+          "xyz",
+          "wyz",
+          "*NONE*",
+          "yyz",
+          "*NONE*",
+          "*NONE*",
           "*NONE*",
           "*NONE*"
         ],
         [
+          "xyz",
+          "wyz",
+          "yyz",
           "dyz",
+          "xyd",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "yyz",
+          "wyz",
+          "xyz",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "xyz",
+          "xyd",
+          "wyz",
+          "yyz",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "*NONE*",
+          "xyz",
+          "wyz",
+          "yyz",
+          "xyd",
+          "abd",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "wyz",
+          "xyd",
+          "xyz",
+          "yyz",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "dyz"
+        ],
+        [
+          "xyd",
+          "yyz",
+          "xyz",
+          "wyz",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
           "wyz",
           "yyz",
           "xyz",
+          "*NONE*",
           "*NONE*",
           "*NONE*",
           "*NONE*",
@@ -7459,52 +7460,52 @@
           "dyz"
         ],
         [
-          "wyz",
           "*NONE*",
           "*NONE*",
-          "xyz",
-          "xyd",
-          "dyz",
           "yyz",
-          "*NONE*"
-        ],
-        [
-          "*NONE*",
-          "xyz",
-          "xyd",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "xyd",
-          "*NONE*",
           "wyz",
-          "xyz",
-          "*NONE*",
-          "abd",
-          "*NONE*",
-          "yyz"
-        ],
-        [
-          "*NONE*",
-          "wyz",
-          "xyz",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
+          "xyd",
           "dyz",
+          "*NONE*",
+          "xyz"
+        ],
+        [
+          "*NONE*",
+          "xyz",
+          "yyz",
+          "wyz",
+          "xyd",
+          "*NONE*",
+          "*NONE*",
+          "abd"
+        ],
+        [
+          "yyz",
+          "*NONE*",
+          "wyz",
+          "xyz",
+          "xyd",
+          "*NONE*",
+          "*NONE*",
           "*NONE*"
         ],
         [
           "wyz",
-          "xyd",
+          "*NONE*",
+          "xyz",
           "yyz",
           "*NONE*",
           "*NONE*",
           "dyz",
+          "*NONE*"
+        ],
+        [
+          "*NONE*",
+          "xyd",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "wyz",
           "xyz",
           "*NONE*"
         ],
@@ -7520,12 +7521,12 @@
         ],
         [
           "xyd",
-          "*NONE*",
-          "xyz",
-          "yyz",
           "wyz",
+          "xyz",
           "*NONE*",
           "*NONE*",
+          "*NONE*",
+          "yyz",
           "*NONE*"
         ],
         [
@@ -7533,170 +7534,170 @@
           "abd",
           "wyz",
           "*NONE*",
-          "*NONE*",
           "yyz",
+          "*NONE*",
           "*NONE*",
           "*NONE*"
         ],
         [
+          "xyd",
+          "yyz",
+          "*NONE*",
+          "wyz",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "abd",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "xyd",
+          "wyz",
+          "xyz",
+          "yyz"
+        ],
+        [
+          "xyz",
+          "dyz",
+          "yyz",
+          "wyz",
+          "*NONE*",
+          "xyd",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "xyd",
+          "wyz",
           "*NONE*",
           "dyz",
           "*NONE*",
-          "wyz",
-          "*NONE*",
-          "yyz",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "abd",
           "xyz",
           "*NONE*",
-          "wyz",
-          "xyd",
-          "*NONE*",
-          "*CAP*",
           "yyz"
         ],
         [
           "xyz",
           "yyz",
+          "xyd",
           "wyz",
           "*NONE*",
-          "*NONE*",
-          "xyd",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "xyd",
-          "*NONE*",
-          "*NONE*",
-          "wyz",
-          "yyz",
-          "xyz",
+          "dyz",
           "*NONE*",
           "*NONE*"
         ],
         [
           "xyz",
-          "*NONE*",
           "xyd",
           "yyz",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "wyz"
-        ],
-        [
-          "xyz",
           "wyz",
+          "dyz",
           "*NONE*",
-          "*NONE*",
-          "xyd",
-          "yyz",
           "*NONE*",
           "abd"
         ],
         [
           "wyz",
-          "*NONE*",
+          "xyz",
           "xyd",
-          "*NONE*",
-          "*NONE*",
-          "xyz",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "xyz",
-          "*NONE*",
-          "*NONE*",
-          "wyz",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "*NONE*",
-          "dyz",
-          "xyz",
-          "wyz",
           "*NONE*",
           "yyz",
-          "xyd",
+          "*NONE*",
+          "*NONE*",
           "*NONE*"
         ],
         [
-          "wyz",
-          "yyz",
           "xyz",
-          "*NONE*",
-          "xyd",
-          "dyz",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "xyd",
           "wyz",
           "*NONE*",
           "*NONE*",
           "abd",
           "yyz",
-          "dyz",
-          "xyz"
-        ],
-        [
-          "*NONE*",
-          "wyz",
-          "xyz",
-          "*NONE*",
-          "xyd",
-          "yyz",
           "*NONE*",
           "*NONE*"
         ],
         [
-          "wyz",
           "xyd",
-          "*NONE*",
-          "*NONE*",
+          "yyz",
+          "abd",
+          "wyz",
+          "xyz",
           "*NONE*",
           "dyz",
+          "*NONE*"
+        ],
+        [
+          "wyz",
+          "yyz",
+          "xyz",
+          "*NONE*",
+          "xyd",
+          "dyz",
           "*NONE*",
           "*NONE*"
         ],
         [
           "xyd",
-          "xyz",
+          "wyz",
+          "yyz",
+          "dyz",
+          "abd",
           "*NONE*",
           "*NONE*",
+          "*NONE*"
+        ],
+        [
           "*NONE*",
           "wyz",
+          "xyz",
+          "*NONE*",
+          "yyz",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "wyz",
+          "dyz",
+          "xyd",
+          "*NONE*",
+          "yyz",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "wyz",
+          "xyz",
+          "xyd",
+          "*NONE*",
+          "*NONE*",
+          "dyz",
           "yyz",
           "*NONE*"
         ],
         [
           "yyz",
-          "*NONE*",
+          "dyz",
           "xyd",
           "xyz",
+          "wyz",
           "*NONE*",
           "*NONE*",
-          "*NONE*",
-          "*NONE*"
+          "abd"
         ],
         [
           "*NONE*",
           "xyd",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
           "wyz",
+          "yyz",
           "*NONE*",
-          "yyz"
+          "*NONE*",
+          "*NONE*",
+          "dyz"
         ]
       ]
     },
@@ -9808,16 +9809,16 @@
         }
       ],
       "produced": {
-        "abbba": 20,
         "qaaab": 19,
+        "abbba": 19,
         "qbbbq": 15,
-        "qeq": 13,
-        "baaaq": 11,
+        "qeq": 14,
+        "baaaq": 10,
         "baaab": 8,
         "qbbba": 4,
         "abbbq": 3,
+        "qrrrq": 3,
         "pqqqq": 2,
-        "qrrrq": 2,
         "baacb": 1,
         "qrrbq": 1,
         "aqqqp": 1
@@ -9895,7 +9896,7 @@
           "qaaab",
           "baaaq",
           "qbbbq",
-          "*NONE*",
+          "qqqqp",
           "baaab"
         ],
         [
@@ -10206,7 +10207,7 @@
           "qaaab",
           "baaaq",
           "qeq",
-          "abbba"
+          "*NONE*"
         ],
         [
           "qaaab",
@@ -10284,9 +10285,9 @@
           "qbbbq",
           "baaab",
           "qaaab",
-          "*NONE*",
+          "baaaq",
           "qeq",
-          "baaaq"
+          "qrrrq"
         ],
         [
           "baaab",
@@ -10434,7 +10435,7 @@
           "qaaab",
           "abbba",
           "qbbbq",
-          "baaaq",
+          "*NONE*",
           "abbba",
           "qbbbq"
         ],
@@ -10837,16 +10838,16 @@
       "missing_p50": [],
       "novel": [],
       "produced": {
-        "baaaq": 21,
-        "qeeeq": 21,
-        "qbbbq": 16,
-        "qcccb": 14,
-        "cbbba": 6,
-        "baaab": 6,
-        "bcccb": 4,
-        "qbbbc": 3,
-        "cddda": 3,
-        "qeq": 2,
+        "baaaq": 20,
+        "qeeeq": 19,
+        "qbbbq": 17,
+        "qcccb": 10,
+        "cbbba": 8,
+        "baaab": 7,
+        "bcccb": 5,
+        "qeq": 4,
+        "qbbbc": 4,
+        "cddda": 2,
         "pqqeq": 1,
         "bcaab": 1,
         "pqqqq": 1,
@@ -10866,7 +10867,7 @@
           "qeeeq",
           "*NONE*",
           "*NONE*",
-          "qbbbq",
+          "*NONE*",
           "*NONE*",
           "qcccb"
         ],
@@ -10875,9 +10876,9 @@
           "bcccb",
           "abbbq",
           "qbbbq",
-          "qeq",
+          "*NONE*",
           "qbbpq",
-          "cbbba",
+          "qeq",
           "qcccb"
         ],
         [
@@ -10926,8 +10927,8 @@
           "*NONE*",
           "cddda",
           "baaaq",
-          "*NONE*",
           "qeeeq",
+          "*NONE*",
           "*NONE*"
         ],
         [
@@ -10944,11 +10945,11 @@
           "qeeeq",
           "qcccb",
           "bcccb",
+          "*NONE*",
           "qeeeq",
-          "baaaq",
           "*NONE*",
           "qbbbq",
-          "*NONE*"
+          "baaaq"
         ],
         [
           "qeeeq",
@@ -10965,7 +10966,7 @@
           "qeeeq",
           "cbbba",
           "qcccb",
-          "baaaq",
+          "*NONE*",
           "*NONE*",
           "*NONE*",
           "qeq"
@@ -10977,7 +10978,7 @@
           "baaab",
           "bcaab",
           "qeeeq",
-          "*NONE*",
+          "qbbbq",
           "cbbba"
         ],
         [
@@ -10986,7 +10987,7 @@
           "qeeqr",
           "qeeeq",
           "cbbba",
-          "qeeeq",
+          "*NONE*",
           "qbbbq",
           "bcaab"
         ],
@@ -10997,7 +10998,7 @@
           "qeeeq",
           "qbbbq",
           "*NONE*",
-          "cbbba",
+          "*NONE*",
           "*NONE*"
         ],
         [
@@ -11013,9 +11014,9 @@
         [
           "qeeeq",
           "baaab",
-          "qeeeq",
-          "cddda",
           "*NONE*",
+          "cddda",
+          "qeeeq",
           "baaaq",
           "bcccb",
           "cbbba"
@@ -11033,7 +11034,7 @@
         [
           "qeeeq",
           "baaaq",
-          "*NONE*",
+          "qeeeq",
           "*NONE*",
           "*NONE*",
           "qcccb",
@@ -11043,9 +11044,9 @@
         [
           "qeeeq",
           "qbbbq",
-          "qcccb",
           "qeeeq",
           "qeq",
+          "baaaq",
           "bcccb",
           "baaab",
           "*NONE*"
@@ -11056,14 +11057,14 @@
           "abbbq",
           "qeq",
           "qbbbq",
-          "cbbba",
-          "qeeeq",
+          "*NONE*",
+          "baaaq",
           "qcccb"
         ],
         [
           "qeeeq",
           "*NONE*",
-          "qeeeq",
+          "qcccb",
           "baaaq",
           "*NONE*",
           "qcccb",
@@ -11088,7 +11089,7 @@
           "*NONE*",
           "qbbbq",
           "*NONE*",
-          "cddda"
+          "qeeeq"
         ],
         [
           "*NONE*",
@@ -11125,7 +11126,7 @@
           "qcccb",
           "qeeeq",
           "qbbpq",
-          "qeeeq",
+          "*NONE*",
           "*NONE*",
           "cbbba",
           "*NONE*"
@@ -11135,7 +11136,7 @@
           "*NONE*",
           "abbbq",
           "qcccb",
-          "baaaq",
+          "qeq",
           "qeeeq",
           "*NONE*",
           "*NONE*"
@@ -11147,17 +11148,17 @@
           "*NONE*",
           "qeepq",
           "qbbbq",
-          "qbbbq",
+          "*NONE*",
           "*NONE*"
         ],
         [
           "cbbba",
-          "qcccb",
+          "*NONE*",
           "qeeeq",
           "baaaq",
           "*NONE*",
-          "qbbbq",
           "qeeeq",
+          "*NONE*",
           "qbbbq"
         ],
         [
@@ -11167,7 +11168,7 @@
           "qbbbq",
           "*NONE*",
           "*NONE*",
-          "qcccb",
+          "*NONE*",
           "*NONE*"
         ],
         [
@@ -11175,10 +11176,10 @@
           "qbbbq",
           "qcccb",
           "baaab",
+          "qeq",
           "qbbbq",
-          "qeeeq",
           "*NONE*",
-          "baaaq"
+          "*NONE*"
         ],
         [
           "qbbbq",
@@ -11187,24 +11188,24 @@
           "qbbbq",
           "baaaq",
           "cbbba",
-          "qeeeq",
-          "*NONE*"
+          "*NONE*",
+          "qeeeq"
         ],
         [
           "qcccb",
-          "qeq",
-          "qeeeq",
           "baaaq",
           "qeeeq",
-          "qbbbq",
           "*NONE*",
+          "qeeeq",
+          "qbbbq",
+          "bcccb",
           "*NONE*"
         ],
         [
           "qeeeq",
           "qeeeq",
           "*NONE*",
-          "cbbba",
+          "*NONE*",
           "*NONE*",
           "qbbbq",
           "cddda",
@@ -11214,21 +11215,21 @@
           "qeeeq",
           "qcccb",
           "*NONE*",
+          "qbbbq",
+          "qeeeq",
           "*NONE*",
           "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "qbbbq"
+          "*NONE*"
         ],
         [
           "baaaq",
           "qeq",
-          "qeeeq",
+          "*NONE*",
           "qeeeq",
           "*NONE*",
-          "baaaq",
           "*NONE*",
-          "*NONE*"
+          "*NONE*",
+          "qeeeq"
         ],
         [
           "qbbbq",
@@ -11237,13 +11238,13 @@
           "baaaq",
           "qbbbq",
           "qeeeq",
-          "*NONE*",
+          "qcccb",
           "*NONE*"
         ],
         [
           "qbbbq",
           "qeeeq",
-          "bcccb",
+          "pqbbc",
           "qeeeq",
           "qeeeq",
           "*NONE*",
@@ -11274,7 +11275,7 @@
           "qbbbq",
           "qeeeq",
           "qcccb",
-          "qeeeq",
+          "*NONE*",
           "*NONE*",
           "*NONE*",
           "qbbbq",
@@ -11288,13 +11289,13 @@
           "*NONE*",
           "cbbba",
           "qbbbq",
-          "qeeeq"
+          "*NONE*"
         ],
         [
           "qbbbq",
           "qeeeq",
           "cbbba",
-          "qcccb",
+          "*NONE*",
           "baaaq",
           "qeeeq",
           "qbbbq",
@@ -11305,7 +11306,7 @@
           "*NONE*",
           "qcccb",
           "qbbbq",
-          "baaaq",
+          "*NONE*",
           "qeeeq",
           "*NONE*",
           "*NONE*"
@@ -11322,12 +11323,12 @@
         ],
         [
           "qeeeq",
-          "qbbbq",
-          "qeq",
-          "qcccb",
           "baaaq",
           "qeeeq",
+          "qcccb",
           "*NONE*",
+          "*NONE*",
+          "cbbba",
           "*NONE*"
         ],
         [
@@ -11341,10 +11342,10 @@
           "qcccb"
         ],
         [
-          "*NONE*",
           "qeeeq",
           "*NONE*",
-          "*NONE*",
+          "bcccb",
+          "qeeeq",
           "baaaq",
           "qcccb",
           "cbbba",
@@ -11376,7 +11377,7 @@
           "baaab",
           "cbbba",
           "qeq",
-          "qeeeq",
+          "*NONE*",
           "qcccb",
           "qeeeq"
         ],
@@ -11404,7 +11405,7 @@
           "qeeeq",
           "qbbbq",
           "*NONE*",
-          "qeeeq",
+          "*NONE*",
           "*NONE*",
           "cbbba",
           "qbbbq",
@@ -11435,16 +11436,16 @@
           "qbbbq",
           "qeeeq",
           "baaaq",
-          "qeeeq",
           "*NONE*",
-          "qeq",
+          "qbbbq",
+          "*NONE*",
           "pqqqq"
         ],
         [
           "qbbbq",
-          "*NONE*",
+          "qbbbq",
           "qeeeq",
-          "qeq",
+          "qeeeq",
           "*NONE*",
           "qcccb",
           "baaaq",
@@ -11452,10 +11453,10 @@
         ],
         [
           "qeeeq",
+          "qeeeq",
           "*NONE*",
           "qeq",
-          "*NONE*",
-          "*NONE*",
+          "qcccb",
           "*NONE*",
           "qbbbq",
           "*NONE*"
@@ -11473,7 +11474,7 @@
         [
           "qeeeq",
           "qcccb",
-          "*NONE*",
+          "qeeeq",
           "*NONE*",
           "qeq",
           "*NONE*",
@@ -11486,7 +11487,7 @@
           "*NONE*",
           "*NONE*",
           "baaaq",
-          "qeeeq",
+          "bcccb",
           "*NONE*",
           "cbbba"
         ],
@@ -11503,12 +11504,12 @@
         [
           "qeeeq",
           "qcccb",
-          "baaaq",
+          "cbbba",
           "qbbbq",
           "*NONE*",
           "*NONE*",
-          "baaaq",
-          "*NONE*"
+          "*NONE*",
+          "qeeeq"
         ],
         [
           "qeeeq",
@@ -11533,7 +11534,7 @@
         [
           "baaaq",
           "qeeeq",
-          "*NONE*",
+          "qeeeq",
           "baaaq",
           "*NONE*",
           "qbbbq",
@@ -11545,7 +11546,7 @@
           "*NONE*",
           "qcccb",
           "qbbbc",
-          "*NONE*",
+          "qeeeq",
           "*NONE*",
           "*NONE*",
           "baaaq"
@@ -11553,10 +11554,10 @@
         [
           "qeeeq",
           "abbbq",
-          "qeeeq",
+          "qbbbq",
           "*NONE*",
           "abbbq",
-          "qbbbq",
+          "*NONE*",
           "*NONE*",
           "qbbbc"
         ],
@@ -11571,12 +11572,12 @@
           "cddda"
         ],
         [
+          "qeeeq",
+          "qcccb",
+          "qeeeq",
+          "baaaq",
           "*NONE*",
           "baaaq",
-          "qeeeq",
-          "*NONE*",
-          "qeeeq",
-          "qbbbq",
           "*NONE*",
           "bcccb"
         ],
@@ -11584,7 +11585,7 @@
           "qeeeq",
           "*NONE*",
           "*NONE*",
-          "qeq",
+          "*NONE*",
           "*NONE*",
           "*NONE*",
           "baaaq",
@@ -11604,20 +11605,20 @@
           "qeeeq",
           "baaaq",
           "qeq",
-          "qcccb",
+          "*NONE*",
           "qcccb",
           "*NONE*",
-          "qeeeq",
+          "*NONE*",
           "*NONE*"
         ],
         [
           "baaaq",
           "bcccb",
-          "qcccb",
+          "abbbq",
           "qbbbq",
+          "*NONE*",
+          "*NONE*",
           "qeeeq",
-          "qeq",
-          "qcccb",
           "*NONE*"
         ],
         [
@@ -11641,12 +11642,12 @@
           "qbbbq"
         ],
         [
-          "qeeeq",
+          "qcccb",
           "qeq",
           "qeeeq",
+          "cddda",
           "*NONE*",
-          "qcccb",
-          "*NONE*",
+          "baaaq",
           "*NONE*",
           "*NONE*"
         ],
@@ -11657,8 +11658,8 @@
           "qbbbq",
           "*NONE*",
           "*NONE*",
-          "qeq",
-          "qcccb"
+          "qcccb",
+          "cbbba"
         ],
         [
           "qeeeq",
@@ -11668,7 +11669,7 @@
           "bcccb",
           "*NONE*",
           "*NONE*",
-          "*NONE*"
+          "qeq"
         ],
         [
           "qeeeq",
@@ -11682,19 +11683,19 @@
         ],
         [
           "qeq",
-          "qeeeq",
+          "qcccb",
           "qbbbq",
-          "*NONE*",
           "qeeeq",
-          "abbbq",
           "*NONE*",
+          "abbbq",
+          "qeeeq",
           "baaaq"
         ],
         [
           "qeeeq",
           "*NONE*",
           "qeeeq",
-          "*NONE*",
+          "qcccb",
           "*NONE*",
           "baaaq",
           "qcccb",
@@ -11705,10 +11706,10 @@
           "*NONE*",
           "baaaq",
           "*NONE*",
-          "*NONE*",
+          "qeeeq",
           "bcccb",
-          "cddda",
-          "qeeeq"
+          "*NONE*",
+          "*NONE*"
         ],
         [
           "qeeeq",
@@ -11728,12 +11729,12 @@
           "qrccb",
           "qeq",
           "qeeeq",
-          "baaaq"
+          "qbbbq"
         ],
         [
-          "qeeeq",
-          "qeqqr",
           "*NONE*",
+          "qeqqr",
+          "qeeeq",
           "*NONE*",
           "*NONE*",
           "*NONE*",
@@ -11742,12 +11743,12 @@
         ],
         [
           "qbbbq",
-          "qeeeq",
+          "*NONE*",
           "cbbba",
           "baaaq",
           "qeq",
           "qeeeq",
-          "*NONE*",
+          "baaab",
           "*NONE*"
         ],
         [
@@ -11761,10 +11762,10 @@
           "baaab"
         ],
         [
-          "qeeeq",
+          "*NONE*",
           "qbbbq",
           "qeeeq",
-          "baaaq",
+          "qeeeq",
           "*NONE*",
           "*NONE*",
           "*NONE*",
@@ -11772,42 +11773,42 @@
         ],
         [
           "qeeeq",
-          "qeeeq",
           "qcccb",
-          "qbbbq",
-          "cbbba",
           "bcccb",
-          "*NONE*",
-          "qcccb"
-        ],
-        [
-          "qeeeq",
           "qbbbq",
-          "qeeeq",
+          "cbbba",
           "*NONE*",
-          "baaaq",
           "*NONE*",
-          "qeeeq",
           "*NONE*"
         ],
         [
+          "qeeeq",
           "qbbbq",
           "qeeeq",
-          "qeq",
+          "*NONE*",
+          "baaaq",
+          "*NONE*",
+          "qeeeq",
+          "qbbbc"
+        ],
+        [
+          "qbbbq",
+          "qeeeq",
+          "*NONE*",
           "qeeeq",
           "qeeeq",
           "baaaq",
-          "qcccb",
+          "*NONE*",
           "*NONE*"
         ],
         [
           "cbbba",
-          "*NONE*",
           "qeeeq",
+          "baaaq",
           "*NONE*",
-          "qeeeq",
           "*NONE*",
-          "qeq",
+          "*NONE*",
+          "*NONE*",
           "qbbbq"
         ],
         [
@@ -11818,17 +11819,17 @@
           "qbbbq",
           "*NONE*",
           "*NONE*",
-          "*NONE*"
+          "baaaq"
         ],
         [
           "qeeeq",
           "*NONE*",
-          "bcccb",
+          "*NONE*",
           "qcccb",
           "*NONE*",
-          "qeeeq",
           "*NONE*",
-          "*NONE*"
+          "*NONE*",
+          "qeeeq"
         ],
         [
           "qeeeq",
@@ -11837,7 +11838,7 @@
           "*NONE*",
           "*NONE*",
           "cbbba",
-          "qeeeq",
+          "qeq",
           "*NONE*"
         ],
         [
@@ -11846,7 +11847,7 @@
           "qeq",
           "*NONE*",
           "qcccb",
-          "*NONE*",
+          "baaaq",
           "baaaq",
           "*NONE*"
         ],
@@ -11854,10 +11855,10 @@
           "qeeeq",
           "cbbba",
           "*NONE*",
-          "qeeeq",
-          "qbbbq",
           "*NONE*",
-          "baaaq",
+          "qbbbq",
+          "bcaab",
+          "*NONE*",
           "qcccb"
         ]
       ]
@@ -11869,12 +11870,13 @@
       "missing_p50": [],
       "novel": [],
       "produced": {
-        "yyz": 22,
-        "wyz": 20,
-        "xyu": 18,
-        "xyz": 17,
-        "uyz": 12,
-        "rsu": 11
+        "yyz": 30,
+        "uyz": 17,
+        "xyz": 15,
+        "xyu": 15,
+        "rsu": 12,
+        "wyz": 10,
+        "wxz": 1
       },
       "reference_p50": [
         "yyz",
@@ -11883,41 +11885,21 @@
       "episodes_never_answering": 0,
       "sequences": [
         [
-          "*NONE*",
-          "*NONE*",
-          "wyz",
           "rsu",
           "*NONE*",
+          "wyz",
           "xyz",
+          "yyz",
+          "*NONE*",
           "*NONE*",
           "*NONE*"
         ],
         [
           "wyz",
-          "*NONE*",
-          "xyu",
-          "yyz",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "xyz"
-        ],
-        [
-          "xyu",
-          "wyz",
-          "*NONE*",
-          "yyz",
-          "*NONE*",
-          "*NONE*",
           "xyz",
-          "*NONE*"
-        ],
-        [
           "xyu",
-          "*NONE*",
           "yyz",
-          "xyz",
-          "wyz",
+          "*NONE*",
           "*NONE*",
           "*NONE*",
           "*NONE*"
@@ -11926,18 +11908,38 @@
           "xyu",
           "*NONE*",
           "*NONE*",
+          "yyz",
           "*NONE*",
           "wyz",
-          "*NONE*",
+          "xyz",
+          "*NONE*"
+        ],
+        [
+          "xyu",
+          "yyz",
+          "wyz",
+          "xyz",
           "uyz",
+          "*NONE*",
+          "*NONE*",
           "*NONE*"
         ],
         [
-          "*NONE*",
           "xyu",
           "*NONE*",
           "*NONE*",
           "*NONE*",
+          "wyz",
+          "uyz",
+          "yyz",
+          "rsu"
+        ],
+        [
+          "*NONE*",
+          "*NONE*",
+          "yyz",
+          "xyu",
+          "wyz",
           "*NONE*",
           "rsu",
           "*NONE*"
@@ -11945,347 +11947,347 @@
         [
           "xyz",
           "wyz",
-          "*NONE*",
-          "*NONE*",
           "yyz",
+          "*NONE*",
+          "*NONE*",
           "*NONE*",
           "xyu",
           "*NONE*"
         ],
         [
           "*NONE*",
+          "xyz",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "xyu",
+          "wyz",
+          "*NONE*"
+        ],
+        [
+          "xyz",
+          "*NONE*",
+          "*NONE*",
+          "rsu",
+          "*NONE*",
+          "wyz",
+          "yyz",
+          "*NONE*"
+        ],
+        [
+          "xyz",
+          "rsu",
+          "wyz",
+          "*NONE*",
+          "yyz",
+          "*NONE*",
+          "xyu",
+          "uyz"
+        ],
+        [
+          "yyz",
+          "*NONE*",
+          "xyu",
+          "wyz",
+          "*NONE*",
+          "*NONE*",
+          "xyz",
+          "*NONE*"
+        ],
+        [
+          "wyz",
+          "xyu",
+          "yyz",
+          "rsu",
+          "*NONE*",
+          "xyz",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "wyz",
+          "xyz",
+          "*NONE*",
           "*NONE*",
           "xyu",
           "*NONE*",
-          "xyz",
-          "wyz",
           "*NONE*",
           "yyz"
         ],
         [
-          "xyz",
           "*NONE*",
           "*NONE*",
           "*NONE*",
           "xyu",
+          "xyz",
           "wyz",
-          "yyz",
+          "uyz",
           "*NONE*"
         ],
         [
+          "*NONE*",
+          "wyz",
+          "*NONE*",
+          "yyz",
+          "xyu",
           "*NONE*",
           "rsu",
-          "yyz",
-          "*NONE*",
-          "wyz",
+          "*NONE*"
+        ],
+        [
           "xyu",
+          "xyz",
+          "yyz",
+          "wyz",
+          "*NONE*",
+          "*NONE*",
           "*NONE*",
           "*NONE*"
         ],
         [
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "xyu",
           "wyz",
-          "xyz"
-        ],
-        [
           "*NONE*",
-          "xyu",
-          "wyz",
           "rsu",
-          "*NONE*",
-          "yyz",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "xyz",
-          "xyu",
-          "*NONE*",
-          "wyz",
-          "*NONE*"
-        ],
-        [
-          "xyu",
-          "wyz",
-          "*NONE*",
-          "*NONE*",
           "xyz",
           "*NONE*",
           "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "yyz",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "xyu",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "wyz",
-          "xyz",
-          "xyu",
-          "yyz",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "xyu",
-          "*NONE*",
-          "wyz",
-          "*NONE*",
-          "yyz",
-          "xyz",
-          "*NONE*",
-          "*NONE*"
+          "uyz",
+          "xyu"
         ],
         [
           "yyz",
           "xyu",
-          "wyz",
+          "*NONE*",
           "*NONE*",
           "xyz",
           "uyz",
+          "*NONE*",
+          "wyz"
+        ],
+        [
+          "rsu",
+          "xyz",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "wyz",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "xyu",
+          "xyz",
+          "*NONE*",
+          "wyz",
+          "uyz",
+          "rsu",
+          "yyz",
+          "*NONE*"
+        ],
+        [
+          "xyu",
+          "wyz",
+          "*NONE*",
+          "*NONE*",
+          "yyz",
+          "xyz",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "xyz",
+          "wyz",
+          "yyz",
+          "xyu",
+          "*NONE*",
+          "*NONE*",
+          "rsu",
+          "*NONE*"
+        ],
+        [
+          "rsu",
+          "wyz",
+          "xyz",
+          "yyz",
+          "xyu",
+          "*NONE*",
+          "*NONE*",
+          "uyz"
+        ],
+        [
+          "xyu",
+          "xyz",
+          "yyz",
+          "wyz",
+          "*NONE*",
+          "*NONE*",
+          "uyz",
+          "*NONE*"
+        ],
+        [
+          "xyz",
+          "wyz",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "yyz",
+          "*NONE*"
+        ],
+        [
+          "rsu",
+          "*NONE*",
+          "wyz",
+          "xyz",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "*NONE*",
+          "*NONE*",
+          "wyz",
+          "xyz",
+          "*NONE*",
+          "*NONE*",
+          "yyz",
+          "*NONE*"
+        ],
+        [
+          "wyz",
+          "xyz",
+          "xyu",
+          "yyz",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "wyz",
+          "*NONE*",
+          "uyz",
+          "xyz",
+          "yyz",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "wyz",
+          "uyz",
+          "xyu",
+          "xyz",
+          "yyz",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "*NONE*",
+          "xyu",
+          "wyz",
+          "yyz",
+          "uyz",
+          "rsu",
+          "xyz",
+          "*NONE*"
+        ],
+        [
+          "rsu",
+          "xyu",
+          "wyz",
+          "xyz",
+          "yyz",
+          "uyz",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "*NONE*",
+          "xyu",
+          "rsu",
+          "xyz",
+          "yyz",
+          "*NONE*",
+          "wyz",
+          "uyz"
+        ],
+        [
+          "wyz",
+          "xyz",
+          "*NONE*",
+          "*NONE*",
+          "yyz",
+          "*NONE*",
+          "xyu",
+          "*NONE*"
+        ],
+        [
+          "xyz",
+          "yyz",
+          "*NONE*",
+          "*NONE*",
+          "wyz",
+          "*NONE*",
           "*NONE*",
           "rsu"
         ],
         [
-          "rsu",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
           "xyz",
-          "*NONE*",
-          "wyz"
-        ],
-        [
           "xyu",
-          "xyz",
           "*NONE*",
-          "*NONE*",
+          "wyz",
+          "yyz",
           "*NONE*",
           "rsu",
-          "*NONE*",
-          "wyz"
+          "uyz"
         ],
         [
           "xyu",
           "wyz",
           "*NONE*",
-          "*NONE*",
           "yyz",
+          "*NONE*",
           "xyz",
           "*NONE*",
           "*NONE*"
         ],
         [
+          "*NONE*",
+          "wyz",
+          "*NONE*",
           "xyz",
           "*NONE*",
           "yyz",
-          "xyu",
-          "wyz",
           "*NONE*",
+          "xyu"
+        ],
+        [
           "rsu",
-          "*NONE*"
-        ],
-        [
-          "*NONE*",
-          "yyz",
-          "*NONE*",
-          "xyz",
-          "wyz",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "xyu",
           "xyz",
           "wyz",
           "yyz",
           "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "xyz",
-          "wyz",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "yyz",
           "uyz",
-          "*NONE*"
-        ],
-        [
-          "xyu",
-          "yyz",
-          "wyz",
-          "xyz",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "yyz",
-          "*NONE*",
-          "wyz",
-          "xyz",
-          "*NONE*",
-          "xyu",
-          "rsu",
-          "*NONE*"
-        ],
-        [
-          "xyz",
-          "*NONE*",
-          "xyu",
-          "wyz",
-          "rsu",
-          "yyz",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "*NONE*",
-          "xyu",
-          "wyz",
-          "xyz",
-          "*NONE*",
-          "yyz",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "wyz",
-          "*NONE*",
-          "xyu",
-          "xyz",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "*NONE*",
-          "xyu",
-          "*NONE*",
-          "*NONE*",
-          "wyz",
-          "uyz",
-          "xyz",
-          "*NONE*"
-        ],
-        [
-          "rsu",
-          "xyu",
-          "wyz",
-          "xyz",
-          "yyz",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "wyz",
-          "xyu",
-          "rsu",
-          "xyz",
-          "yyz",
-          "*NONE*",
-          "*NONE*",
-          "uyz"
-        ],
-        [
-          "*NONE*",
-          "xyz",
-          "wyz",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "xyu",
-          "*NONE*"
-        ],
-        [
-          "xyz",
-          "*NONE*",
-          "yyz",
-          "*NONE*",
-          "wyz",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "xyz",
-          "xyu",
-          "*NONE*",
-          "wyz",
-          "*NONE*",
-          "*NONE*",
-          "rsu",
-          "uyz"
-        ],
-        [
-          "yyz",
-          "xyz",
-          "wyz",
-          "xyu",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "*NONE*",
-          "*NONE*",
-          "xyu",
-          "yyz",
-          "*NONE*",
-          "wyz",
-          "rsu",
-          "uyz"
-        ],
-        [
-          "rsu",
-          "wyz",
-          "yyz",
-          "xyz",
-          "*NONE*",
-          "*NONE*",
           "*NONE*",
           "xyu"
         ],
         [
           "yyz",
-          "rsu",
-          "xyz",
           "*NONE*",
+          "xyz",
+          "uyz",
           "*NONE*",
           "wyz",
           "*NONE*",
-          "*NONE*"
+          "xyu"
         ],
         [
           "*NONE*",
-          "xyz",
           "wyz",
+          "*NONE*",
           "yyz",
           "*NONE*",
           "*NONE*",
@@ -12293,53 +12295,53 @@
           "*NONE*"
         ],
         [
-          "*NONE*",
+          "wyz",
           "*NONE*",
           "xyu",
           "*NONE*",
+          "xyz",
+          "yyz",
+          "*NONE*",
+          "uyz"
+        ],
+        [
+          "xyz",
+          "xyu",
+          "yyz",
+          "*NONE*",
+          "wyz",
+          "*NONE*",
+          "*NONE*",
+          "uyz"
+        ],
+        [
           "wyz",
           "*NONE*",
           "xyz",
+          "rsu",
+          "xyu",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "*NONE*",
+          "xyz",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "rsu",
+          "wyz",
           "yyz"
         ],
         [
-          "xyz",
-          "*NONE*",
-          "rsu",
           "*NONE*",
           "*NONE*",
-          "xyu",
-          "*NONE*",
-          "wyz"
-        ],
-        [
-          "wyz",
-          "*NONE*",
-          "xyz",
-          "rsu",
-          "xyu",
-          "*NONE*",
-          "yyz",
-          "*NONE*"
-        ],
-        [
-          "*NONE*",
-          "xyz",
-          "*NONE*",
-          "xyu",
-          "*NONE*",
-          "rsu",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "*NONE*",
-          "yyz",
           "wyz",
           "rsu",
           "*NONE*",
           "xyz",
-          "*NONE*",
+          "yyz",
           "xyu"
         ],
         [
@@ -12353,21 +12355,21 @@
           "*NONE*"
         ],
         [
-          "wyz",
+          "*NONE*",
           "xyz",
           "xyu",
           "*NONE*",
           "rsu",
-          "*NONE*",
-          "*NONE*",
+          "wyz",
+          "yyz",
           "*NONE*"
         ],
         [
           "*NONE*",
           "xyu",
           "*NONE*",
+          "*NONE*",
           "wyz",
-          "yyz",
           "xyz",
           "*NONE*",
           "uyz"
@@ -12375,58 +12377,48 @@
         [
           "yyz",
           "*NONE*",
-          "wyz",
           "xyz",
+          "wyz",
           "*NONE*",
           "*NONE*",
           "xyu",
-          "*NONE*"
+          "rsu"
         ],
         [
           "xyu",
           "wyz",
-          "yyz",
+          "*NONE*",
           "xyz",
+          "uyz",
           "*NONE*",
           "*NONE*",
-          "rsu",
-          "*NONE*"
-        ],
-        [
-          "xyz",
-          "rsu",
-          "*NONE*",
-          "wyz",
-          "*NONE*",
-          "*NONE*",
-          "xyu",
           "*NONE*"
         ],
         [
           "xyz",
           "*NONE*",
           "*NONE*",
+          "wyz",
           "*NONE*",
+          "*NONE*",
+          "xyu",
+          "*NONE*"
+        ],
+        [
+          "xyz",
+          "wyz",
           "*NONE*",
           "*NONE*",
           "uyz",
+          "*NONE*",
+          "*NONE*",
           "*NONE*"
         ],
         [
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "rsu",
-          "xyz",
-          "wyz"
-        ],
-        [
-          "xyz",
           "wyz",
-          "xyu",
+          "xyz",
           "*NONE*",
+          "uyz",
           "rsu",
           "*NONE*",
           "*NONE*",
@@ -12434,47 +12426,17 @@
         ],
         [
           "xyz",
-          "*NONE*",
           "xyu",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
           "wyz",
-          "*NONE*"
-        ],
-        [
-          "xyz",
-          "*NONE*",
-          "wyz",
-          "*NONE*",
           "yyz",
+          "rsu",
           "*NONE*",
-          "xyu",
+          "*NONE*",
           "*NONE*"
         ],
         [
           "xyz",
-          "xyu",
           "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "wyz",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "xyu",
-          "xyz",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "wyz",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "*NONE*",
-          "xyz",
           "*NONE*",
           "wyz",
           "xyu",
@@ -12484,31 +12446,71 @@
         ],
         [
           "xyz",
-          "*NONE*",
+          "yyz",
           "wyz",
+          "*NONE*",
+          "uyz",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "xyz",
+          "wyz",
+          "*NONE*",
           "xyu",
           "*NONE*",
           "yyz",
           "*NONE*",
-          "uyz"
+          "*NONE*"
+        ],
+        [
+          "wyz",
+          "xyz",
+          "xyu",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "yyz",
+          "*NONE*"
         ],
         [
           "*NONE*",
+          "xyz",
+          "*NONE*",
+          "wyz",
+          "xyu",
+          "yyz",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "xyz",
+          "xyu",
           "wyz",
           "yyz",
           "*NONE*",
-          "xyu",
           "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "*NONE*",
+          "*NONE*",
+          "wyz",
+          "xyz",
+          "yyz",
+          "xyu",
           "rsu",
           "*NONE*"
         ],
         [
-          "yyz",
-          "wyz",
-          "*NONE*",
-          "*NONE*",
           "*NONE*",
           "xyz",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
           "*NONE*",
           "*NONE*"
         ],
@@ -12516,207 +12518,117 @@
           "rsu",
           "xyu",
           "wyz",
-          "xyz",
           "yyz",
           "*NONE*",
+          "xyz",
           "*NONE*",
           "*NONE*"
         ],
         [
-          "*NONE*",
-          "xyu",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "xyz",
-          "yyz"
-        ],
-        [
+          "wyz",
           "xyu",
           "rsu",
+          "uyz",
           "*NONE*",
           "*NONE*",
-          "*NONE*",
+          "xyz",
+          "*NONE*"
+        ],
+        [
+          "xyu",
+          "yyz",
           "wyz",
+          "uyz",
           "*NONE*",
-          "uyz"
+          "*NONE*",
+          "xyz",
+          "*NONE*"
         ],
         [
           "*NONE*",
           "xyz",
-          "*NONE*",
+          "wyz",
           "*NONE*",
           "*CAP*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "xyz",
-          "xyu",
-          "wyz",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "*NONE*",
-          "*NONE*",
-          "xyz",
-          "xyu",
-          "rsu",
-          "*NONE*",
-          "yyz",
-          "*NONE*"
-        ],
-        [
-          "yyz",
-          "xyz",
-          "*NONE*",
-          "*NONE*",
-          "xyu",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "xyz",
-          "wyz"
-        ],
-        [
-          "xyz",
-          "xyu",
-          "wyz",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "yyz",
-          "*NONE*"
-        ],
-        [
-          "wyz",
-          "*NONE*",
-          "xyz",
-          "*NONE*",
-          "xyu",
-          "*NONE*",
-          "rsu",
-          "*NONE*"
-        ],
-        [
-          "xyz",
-          "*NONE*",
-          "wyz",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "xyu",
-          "*NONE*"
-        ],
-        [
-          "xyz",
-          "yyz",
-          "*NONE*",
-          "*NONE*",
-          "wyz",
           "uyz",
           "*NONE*",
           "*NONE*"
         ],
         [
-          "xyu",
-          "*NONE*",
-          "wyz",
-          "xyz",
-          "*NONE*",
-          "yyz",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
           "xyz",
           "xyu",
           "*NONE*",
           "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "yyz",
-          "wyz"
-        ],
-        [
-          "xyu",
           "*NONE*",
           "wyz",
           "*NONE*",
-          "xyz",
+          "wxz"
+        ],
+        [
+          "yyz",
+          "wyz",
+          "*NONE*",
+          "xyu",
           "uyz",
-          "yyz",
+          "*NONE*",
+          "xyz",
           "*NONE*"
         ],
         [
-          "yyz",
+          "*NONE*",
           "xyz",
+          "*NONE*",
+          "xyu",
+          "yyz",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
           "*NONE*",
           "xyu",
           "wyz",
+          "yyz",
           "*NONE*",
           "*NONE*",
+          "xyz",
           "*NONE*"
         ],
         [
           "xyz",
+          "xyu",
+          "wyz",
+          "uyz",
           "*NONE*",
           "*NONE*",
           "yyz",
-          "xyu",
-          "*NONE*",
-          "*NONE*",
-          "wyz"
+          "*NONE*"
         ],
         [
+          "xyu",
+          "*NONE*",
+          "xyz",
+          "yyz",
           "*NONE*",
           "wyz",
           "rsu",
-          "xyu",
-          "*NONE*",
-          "xyz",
-          "*NONE*",
           "*NONE*"
         ],
         [
           "xyz",
-          "wyz",
           "xyu",
           "*NONE*",
           "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "xyz",
-          "*NONE*",
+          "uyz",
           "wyz",
           "*NONE*",
-          "xyu",
-          "*NONE*",
-          "rsu",
           "yyz"
         ],
         [
           "yyz",
-          "*NONE*",
-          "xyz",
           "wyz",
+          "xyu",
+          "xyz",
           "*NONE*",
           "uyz",
           "*NONE*",
@@ -12724,162 +12636,252 @@
         ],
         [
           "*NONE*",
-          "*NONE*",
+          "yyz",
+          "wyz",
           "xyz",
           "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "xyu"
+        ],
+        [
+          "xyz",
+          "*NONE*",
+          "wyz",
+          "yyz",
           "xyu",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "*NONE*",
+          "*NONE*",
+          "yyz",
+          "xyu",
+          "xyz",
+          "wyz",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "yyz",
+          "xyz",
+          "rsu",
+          "xyu",
+          "wyz",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "xyz",
+          "*NONE*",
+          "wyz",
+          "rsu",
+          "xyu",
+          "yyz",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "wyz",
+          "xyz",
+          "rsu",
+          "yyz",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "xyz",
+          "wyz",
+          "*NONE*",
+          "*NONE*",
+          "xyu",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "xyz",
+          "xyu",
+          "wyz",
+          "*NONE*",
+          "yyz",
+          "*NONE*",
+          "rsu",
+          "*NONE*"
+        ],
+        [
+          "yyz",
+          "xyz",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*",
+          "wyz",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "xyu",
+          "*NONE*",
+          "xyz",
+          "yyz",
+          "uyz",
           "*NONE*",
           "rsu",
           "*NONE*"
         ],
         [
           "xyu",
-          "xyz",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "*NONE*",
-          "*NONE*",
-          "yyz",
-          "*NONE*",
           "*NONE*",
           "xyz",
-          "xyu",
-          "*NONE*"
-        ],
-        [
-          "xyz",
-          "yyz",
           "*NONE*",
           "wyz",
+          "uyz",
+          "yyz",
+          "*NONE*"
+        ],
+        [
           "xyu",
+          "*NONE*",
+          "wyz",
+          "xyz",
+          "*NONE*",
+          "*NONE*",
+          "yyz",
+          "*NONE*"
+        ],
+        [
+          "xyz",
+          "xyu",
+          "*NONE*",
+          "*NONE*",
+          "wyz",
+          "rsu",
+          "yyz",
+          "*NONE*"
+        ],
+        [
+          "*NONE*",
+          "*NONE*",
+          "yyz",
+          "wyz",
+          "uyz",
+          "xyz",
+          "xyu",
+          "*NONE*"
+        ],
+        [
+          "xyu",
+          "wyz",
+          "xyz",
           "rsu",
           "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "*NONE*",
-          "*NONE*",
-          "xyz",
-          "wyz",
-          "uyz",
-          "yyz",
-          "xyu",
-          "*NONE*"
-        ],
-        [
-          "xyu",
-          "wyz",
-          "xyz",
-          "yyz",
-          "uyz",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "xyu",
-          "xyz",
-          "yyz",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*",
-          "wyz",
-          "*NONE*"
-        ],
-        [
-          "xyz",
-          "wyz",
-          "xyu",
-          "uyz",
-          "rsu",
           "*NONE*",
           "*NONE*",
           "yyz"
         ],
         [
-          "*NONE*",
           "xyu",
-          "wyz",
-          "*NONE*",
-          "*NONE*",
           "xyz",
           "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "xyz",
-          "xyu",
-          "*NONE*",
-          "*NONE*",
-          "yyz",
-          "*NONE*",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "*NONE*",
-          "xyu",
-          "wyz",
-          "*NONE*",
-          "*NONE*",
-          "xyz",
-          "yyz",
-          "*NONE*"
-        ],
-        [
-          "*NONE*",
-          "*NONE*",
-          "xyu",
-          "yyz",
-          "wyz",
-          "xyz",
-          "*NONE*",
-          "*NONE*"
-        ],
-        [
-          "yyz",
-          "xyu",
           "*NONE*",
           "wyz",
           "*NONE*",
-          "*NONE*",
-          "xyz",
-          "*NONE*"
-        ],
-        [
-          "*NONE*",
-          "xyz",
-          "wyz",
           "uyz",
-          "yyz",
-          "rsu",
-          "xyu",
           "*NONE*"
         ],
         [
+          "*NONE*",
+          "xyz",
           "xyu",
+          "*NONE*",
+          "*NONE*",
+          "yyz",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "wyz",
+          "xyu",
+          "*NONE*",
+          "yyz",
           "*NONE*",
           "xyz",
           "*NONE*",
+          "*NONE*"
+        ],
+        [
           "*NONE*",
           "uyz",
           "*NONE*",
-          "wyz"
+          "*NONE*",
+          "xyz",
+          "*NONE*",
+          "xyu",
+          "rsu"
+        ],
+        [
+          "wyz",
+          "*NONE*",
+          "xyu",
+          "*NONE*",
+          "rsu",
+          "yyz",
+          "xyz",
+          "*NONE*"
+        ],
+        [
+          "wyz",
+          "uyz",
+          "xyu",
+          "*NONE*",
+          "*NONE*",
+          "xyz",
+          "*NONE*",
+          "yyz"
+        ],
+        [
+          "*NONE*",
+          "xyu",
+          "yyz",
+          "*NONE*",
+          "wyz",
+          "*NONE*",
+          "*NONE*",
+          "*NONE*"
+        ],
+        [
+          "*NONE*",
+          "xyz",
+          "wyz",
+          "xyu",
+          "*NONE*",
+          "*NONE*",
+          "yyz",
+          "*NONE*"
+        ],
+        [
+          "wyz",
+          "xyu",
+          "*NONE*",
+          "*NONE*",
+          "xyz",
+          "*NONE*",
+          "*NONE*",
+          "yyz"
         ],
         [
           "xyu",
           "rsu",
           "*NONE*",
+          "*NONE*",
+          "*NONE*",
           "xyz",
           "wyz",
-          "*NONE*",
-          "yyz",
           "*NONE*"
         ]
       ]
