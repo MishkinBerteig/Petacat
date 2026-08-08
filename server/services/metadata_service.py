@@ -64,7 +64,16 @@ async def load_metadata_from_db(session: AsyncSession) -> MetadataProvider:
     # predicates missing.  A node whose predicate is `None` falls back to being read
     # off the object (`slipnet.py:146`), which is a valid state for the fifty-odd nodes
     # that ship that way and silently wrong for the fourteen that do not.
-    result = await session.execute(select(SlipnetNodeDef))
+    # Ordered explicitly.  ``select()`` promises nothing, and the node order is
+    # load-bearing: ``Slipnet.update_activations`` walks the nodes for the activation
+    # spread and for the probabilistic jump, so the order fixes both the float
+    # accumulation order and which node each ``rng.prob`` draw is spent on.  Left
+    # unordered this was Postgres heap order, which drifts with every re-seed — the
+    # development database returned ``plato-y, plato-z, plato-one, …`` and ran a
+    # measurably different engine from the seed data.
+    result = await session.execute(
+        select(SlipnetNodeDef).order_by(SlipnetNodeDef.sort_order)
+    )
     node_specs = {
         row.name: SlipnodeSpec(
             name=row.name,
@@ -76,7 +85,7 @@ async def load_metadata_from_db(session: AsyncSession) -> MetadataProvider:
     }
 
     # Slipnet links
-    result = await session.execute(select(SlipnetLinkDef))
+    result = await session.execute(select(SlipnetLinkDef).order_by(SlipnetLinkDef.id))
     link_specs = [
         SlipnetLinkSpec(
             from_node=row.from_node,
@@ -90,7 +99,9 @@ async def load_metadata_from_db(session: AsyncSession) -> MetadataProvider:
     ]
 
     # Codelet types
-    result = await session.execute(select(CodeletTypeDef))
+    result = await session.execute(
+        select(CodeletTypeDef).order_by(CodeletTypeDef.sort_order)
+    )
     codelet_specs = {
         row.name: CodeletSpec(
             name=row.name,
@@ -154,7 +165,7 @@ async def load_metadata_from_db(session: AsyncSession) -> MetadataProvider:
             commentary_templates[row.template_key] = row.template_data
 
     # Demo problems
-    result = await session.execute(select(DemoProblemRow))
+    result = await session.execute(select(DemoProblemRow).order_by(DemoProblemRow.id))
     demo_problems = [
         DemoProblem(
             name=row.name,
@@ -171,7 +182,9 @@ async def load_metadata_from_db(session: AsyncSession) -> MetadataProvider:
     ]
 
     # Theme dimensions
-    result = await session.execute(select(ThemeDimensionDef))
+    result = await session.execute(
+        select(ThemeDimensionDef).order_by(ThemeDimensionDef.id)
+    )
     theme_dimensions = [
         ThemeDimensionSpec(
             slipnet_node=row.slipnet_node,

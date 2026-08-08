@@ -129,6 +129,17 @@ class SlipnetNodeDef(Base):
     __tablename__ = "slipnet_node_defs"
 
     name = Column(String(64), primary_key=True)
+    #: The Scheme's own definition order (``slipnet.ss:407-468``), which
+    #: ``seed_data/slipnet_nodes.json`` reproduces element for element.
+    #:
+    #: Load-bearing, and it had nowhere to live: ``name`` is the primary key and there
+    #: was no ordinal, so the loader returned Postgres *heap* order.
+    #: ``Slipnet.update_activations`` iterates the nodes for the spread and for the
+    #: probabilistic jump, so the order fixes the float accumulation order of the
+    #: activation sum and which node each ``rng.prob`` draw is spent on.  Sorting by
+    #: ``name`` is not a substitute: ``plato-alphabetic-first`` falls between
+    #: ``plato-a`` and ``plato-b``.
+    sort_order = Column(Integer, nullable=False, default=0, index=True)
     short_name = Column(String(16), nullable=False)
     conceptual_depth = Column(Integer, nullable=False)
     description = Column(Text, default="")
@@ -158,6 +169,9 @@ class CodeletTypeDef(Base):
     __tablename__ = "codelet_type_defs"
 
     name = Column(String(64), primary_key=True)
+    #: Seed-file order.  Same reason as ``SlipnetNodeDef.sort_order`` — the primary key
+    #: is a name, so without this the order is the storage layout's.
+    sort_order = Column(Integer, nullable=False, default=0, index=True)
     family = Column(String(32), ForeignKey("codelet_families.name"), nullable=False)
     phase = Column(String(32), ForeignKey("codelet_phases.name"), nullable=False)
     default_urgency = Column(Integer, nullable=True)
