@@ -524,9 +524,9 @@ A rule describes the transformation from one string to another, capturing both w
 ### Run Parameters
 
 **Topic key:** `run_parameters`  
-**Summary:** The twenty-seven engine settings that are fixed before a run starts and cannot change while it thinks.
+**Summary:** The twenty-eight engine settings that are fixed before a run starts and cannot change while it thinks.
 
-Twenty-seven entries in the engine's parameter set are read while it thinks: thresholds that decide what reaches the Temporal Trace, the periods governing clamps and settling, the Coderack's capacity and urgency resolution, the Themespace's boost, decay and spread, and the update cadence.
+Twenty-eight entries in the engine's parameter set are read while it thinks: thresholds that decide what reaches the Temporal Trace, the periods governing clamps and settling, the Coderack's capacity and urgency resolution, the Themespace's boost, decay and spread, and the update cadence.
 
 Each can be set for one run. Omitted parameters keep the global default, and an unknown name or an out-of-range value is refused rather than ignored — ignoring a typo would give you a run at the default while the record said otherwise. Because they are fixed at creation, changing one starts a new run rather than altering the loaded one.
 

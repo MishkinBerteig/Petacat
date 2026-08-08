@@ -17,7 +17,7 @@ kind with the right bounds and say what the parameter does.
 Fixed and derived
 -----------------
 **Fixed** parameters are inputs: chosen before the first codelet, constant for the whole
-Run.  Those are the twenty-seven below.
+Run.  Those are the twenty-eight below.
 
 **Derived** values are outputs: the numeric backend that was actually selected, the shard
 count sharding actually settled on, the config and memory hashes, the Training Session.
@@ -27,7 +27,7 @@ be would be a lie about how the engine works.
 
 What is deliberately *not* here
 -------------------------------
-Twenty-two further entries in ``engine_params.json`` are not run parameters and are not
+Twenty further entries in ``engine_params.json`` are not run parameters and are not
 offered.  They fall into three groups, and the distinction matters:
 
 * **Structural.**  ``initial_codelet_types``, ``initial_codelet_urgency``,
@@ -42,9 +42,13 @@ offered.  They fall into three groups, and the distinction matters:
   overtaken by the run request, which carries both.
 * **Read nowhere at all.**  ``max_temperature`` (no consumer and no Scheme
   counterpart), ``maximum_rule_line_length`` (``rules.ss:1717``, a transcription
-  width the port does not wrap to) and ``shrunk_link_lengths`` (derived at
-  ``slipnet.py`` as 40% of the intrinsic length, exactly as ``slipnet.ss:191``
-  derives it, so the seeded map informs nothing).
+  width the port does not wrap to).
+
+``shrunk_link_lengths`` used to sit in that last group: a seeded table of lengths
+that nothing read, because the engine derives them from the intrinsic lengths exactly
+as ``slipnet.ss:191`` does.  A stored table would have been a second place for the
+same fact, so the table is gone and the *factor* it is derived by —
+``shrunk_link_length_factor`` — is the parameter instead.
 
 That last group used also to name ``expiration_period``, ``max_theme_activation``,
 ``workspace_activation``, ``num_youngest_structures`` and ``distance_threshold``.  Each
@@ -76,7 +80,7 @@ KIND_NODE_LIST = "node_list"
 KIND_NODE_MAP = "node_map"
 
 #: Grouping for presentation.  Not semantic — the engine does not care — but a flat list
-#: of twenty-seven numbers is unreadable, and these are the divisions the architecture
+#: of twenty-eight numbers is unreadable, and these are the divisions the architecture
 #: itself uses.
 GROUP_TEMPERATURE = "Temperature and pacing"
 GROUP_SLIPNET = "Slipnet"
@@ -143,7 +147,7 @@ def _p(name, kind, group, label, description, minimum=None, maximum=None,
     return RunParameter(name, kind, group, label, description, minimum, maximum, departs)
 
 
-#: The twenty-seven parameters the engine reads while it runs.  Verified against
+#: The twenty-eight parameters the engine reads while it runs.  Verified against
 #: ``get_param`` call sites in ``server/engine/**`` and in the codelet bodies stored in
 #: ``seed_data/codelet_types.json``; a parameter that is only read by the API or the
 #: display is not here.
@@ -195,6 +199,12 @@ RUN_PARAMETERS: tuple[RunParameter, ...] = (
     _p("top_down_slipnodes", KIND_NODE_LIST, GROUP_SLIPNET, "Top-down nodes",
        "Which concepts may post codelets of their own once fully active. This is the "
        "channel by which the Slipnet directs perception rather than only recording it."),
+    _p("shrunk_link_length_factor", KIND_FLOAT, GROUP_SLIPNET, "Shrunk link factor",
+       "What fraction of its intrinsic length a labelled link shrinks to once its "
+       "label concept is fully active. Shorter means a slippage between the two "
+       "concepts it labels is cheaper, so an active concept makes its own relation "
+       "easier to use — which is how the Slipnet's state changes what the Workspace "
+       "can see.", 0.0, 1.0),
     _p("intrinsic_link_lengths", KIND_NODE_MAP, GROUP_SLIPNET, "Intrinsic link lengths",
        "The conceptual distance of each labelled link. Shorter means the two concepts "
        "are closer, so activation spreads more readily and a slippage between them is "

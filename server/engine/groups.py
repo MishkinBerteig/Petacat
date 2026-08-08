@@ -516,7 +516,21 @@ class Group(WorkspaceObject, WorkspaceStructure):
         return f"Group({cat}, {objs} objects, strength={self.strength:.0f})"
 
 
-_PLATONIC_LENGTH_NAMES = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five"}
+#: Group length -> the Slipnet node that names it.
+#:
+#: Scheme: ``*slipnet-numbers*`` (``slipnet.ss:476``), five long — there is no
+#: ``plato-six``, so a group of six has no Length descriptor and that is faithful.
+#:
+#: The one definition.  ``codelet_dsl/builtins.py`` held a second copy of the same
+#: five entries, spelled with the ``plato-`` prefix instead of adding it at the use
+#: site; it imports this now.
+PLATONIC_LENGTH_NODES = {
+    1: "plato-one",
+    2: "plato-two",
+    3: "plato-three",
+    4: "plato-four",
+    5: "plato-five",
+}
 
 
 def attach_length_description(group: Group) -> bool:
@@ -532,12 +546,12 @@ def attach_length_description(group: Group) -> bool:
     builder's two consolidation branches (groups.ss:732-733, 771).
     """
     length_type = group._node("plato-length")
-    descriptor_name = _PLATONIC_LENGTH_NAMES.get(group.length)
-    if length_type is None or descriptor_name is None:
+    descriptor_node = PLATONIC_LENGTH_NODES.get(group.length)
+    if length_type is None or descriptor_node is None:
         return False
     if group.description_type_present(length_type):
         return False
-    descriptor = group._node(f"plato-{descriptor_name}")
+    descriptor = group._node(descriptor_node)
     if descriptor is None:
         return False
 
