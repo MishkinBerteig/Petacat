@@ -14,6 +14,10 @@ import math
 from typing import TYPE_CHECKING, Any, Callable
 
 from server.engine.numeric.backend import select_backend
+#: ``(40% ...)`` at ``slipnet.ss:191``.  The fallback for a node built without a
+#: ``MetadataProvider``; the value in force comes from ``shrunk_link_length_factor``.
+DEFAULT_SHRUNK_LINK_FACTOR = 0.4
+
 from server.engine.numeric.layout import (
     DEFAULT_ACTIVATION,
     FULL_ACTIVATION_THRESHOLD,
@@ -185,6 +189,7 @@ class SlipnetNode:
         "_max_activation",
         "_workspace_activation",
         "_full_activation_threshold",
+        "_shrunk_link_factor",
     )
 
     def __init__(
@@ -219,6 +224,11 @@ class SlipnetNode:
         self._full_activation_threshold: float = (
             activation_params.full_activation_threshold
         )
+        #: ``(40% new-value)`` from ``slipnet.ss:191``.  A parameter rather than a
+        #: literal, and *derived* rather than seeded: the reference computes the
+        #: shrunk length from the intrinsic one, so a stored table of shrunk lengths
+        #: would be a second place for the same fact to be written.
+        self._shrunk_link_factor: float = DEFAULT_SHRUNK_LINK_FACTOR
 
     def compute_rate_of_decay(self, update_cycle_length: int) -> None:
         """The per-cycle decay rate, held as a *percentage* rather than a fraction.
@@ -423,10 +433,10 @@ class SlipnetNode:
         return bool(self.get_possible_descriptors(obj))
 
     def shrunk_link_length(self) -> int | None:
-        """40% of intrinsic link length. Scheme: slipnet.ss:191."""
+        """A fraction of the intrinsic link length. Scheme: slipnet.ss:191."""
         if self.intrinsic_link_length is None:
             return None
-        return round(0.4 * self.intrinsic_link_length)
+        return round(self._shrunk_link_factor * self.intrinsic_link_length)
 
     def degree_of_assoc(self) -> float:
         """How strongly this *label* concept associates the things it labels.
@@ -842,6 +852,12 @@ class Slipnet:
             slipnet.nodes[spec.name] = node
 
         # Set intrinsic link lengths from engine params
+        shrunk_factor = float(
+            meta.get_param("shrunk_link_length_factor", DEFAULT_SHRUNK_LINK_FACTOR)
+        )
+        for node in slipnet.nodes.values():
+            node._shrunk_link_factor = shrunk_factor
+
         intrinsic_lengths = meta.get_param("intrinsic_link_lengths", {})
         for node_name, length in intrinsic_lengths.items():
             if node_name in slipnet.nodes:

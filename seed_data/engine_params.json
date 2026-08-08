@@ -65,11 +65,5 @@
     "plato-identity": 0,
     "plato-opposite": 80
   },
-  "shrunk_link_lengths": {
-    "plato-predecessor": 24,
-    "plato-successor": 24,
-    "plato-sameness": 0,
-    "plato-identity": 0,
-    "plato-opposite": 32
-  }
+  "shrunk_link_length_factor": 0.4
 }

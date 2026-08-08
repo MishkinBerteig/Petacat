@@ -1208,3 +1208,28 @@ async def test_changing_the_full_activation_threshold_changes_the_run(db_session
     await _set_param(db_session, "full_activation_threshold", "90")
 
     assert run_outcome(await load_metadata_from_db(db_session)) != shipped
+
+
+async def test_the_shrunk_link_factor_comes_from_the_database(db_session):
+    """Direction 1 and 2 for a value that was seeded as its own *result*.
+
+    `engine_params` used to carry `shrunk_link_lengths`, a table of five lengths that
+    nothing read: the engine derives them from the intrinsic lengths, exactly as
+    `slipnet.ss:191` derives them, so the table was a second place for the same fact
+    and the `0.4` doing the deriving was a Python literal. The table is gone and the
+    factor is the parameter.
+    """
+    from server.engine.slipnet import Slipnet
+
+    meta = await load_metadata_from_db(db_session)
+    assert "shrunk_link_lengths" not in meta.params
+
+    shipped = Slipnet.from_metadata(meta)
+    # The lengths the removed table used to state, derived.
+    assert shipped.nodes["plato-opposite"].shrunk_link_length() == 32
+    assert shipped.nodes["plato-successor"].shrunk_link_length() == 24
+
+    await _set_param(db_session, "shrunk_link_length_factor", "0.8")
+    doubled = Slipnet.from_metadata(await load_metadata_from_db(db_session))
+
+    assert doubled.nodes["plato-opposite"].shrunk_link_length() == 64

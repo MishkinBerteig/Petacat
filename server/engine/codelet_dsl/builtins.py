@@ -1123,13 +1123,10 @@ def _consolidate_group(ctx: EngineContext, group: Group) -> Group | None:
     return group
 
 
-_PLATONIC_LENGTH = {
-    1: "plato-one",
-    2: "plato-two",
-    3: "plato-three",
-    4: "plato-four",
-    5: "plato-five",
-}
+#: One definition, in ``groups.py`` — this used to be a second copy of the same five
+#: entries.  Imported rather than re-stated, because two mappings that must agree and
+#: are written down twice is `PHASE 1 PLAN.md` §0.2(c) in miniature.
+from server.engine.groups import PLATONIC_LENGTH_NODES as _PLATONIC_LENGTH
 
 
 def _adjacent_bonds(
