@@ -17,6 +17,14 @@ node_modules/
 *.swp
 *.swo
 
+# Per-developer agent tooling.  Machine-local by construction — the profile points
+# at a loopback endpoint and names whichever model that developer runs — and the
+# `.local.json` suffix is the usual marker for "not shared".  A shared openclaude
+# config, if one is ever wanted, would be `.openclaude/settings.json` and is not
+# ignored here.
+.openclaude-profile.json
+.openclaude/settings.local.json
+
 # Environment
 .env
 .env.local
