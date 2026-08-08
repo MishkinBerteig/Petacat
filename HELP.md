@@ -62,17 +62,17 @@ The commentary accumulates as new events happen: bonds built, groups formed, bri
 ### Configuration
 
 **Topic key:** `configuration`  
-**Summary:** The twelve collections that make up Petacat's domain knowledge, each on its own tab, each editable: create, update and delete rows and the next run created uses them.
+**Summary:** The thirteen collections that make up Petacat's domain knowledge, each on its own tab, each editable: create, update and delete rows and the next run created uses them.
 
-The Configuration view is reached from the hamburger menu. Petacat keeps its domain knowledge in the database rather than in code -- the Slipnet's concepts and links, the codelet types and their Python bodies, the engine's parameters and formula coefficients, the theme dimensions, the posting rules, the commentary templates, the demo problems, the Slipnet grid layout and the help topics -- and this screen is where that knowledge is edited.
+The Configuration view is reached from the hamburger menu. Petacat keeps its domain knowledge in the database rather than in code -- the Slipnet's concepts and links, the codelet types and their Python bodies, the engine's parameters and formula coefficients, the theme dimensions, the posting rules, the codelet patterns, the commentary templates, the demo problems, the Slipnet grid layout and the help topics -- and this screen is where that knowledge is edited.
 
-Twelve collections, one tab each, and every tab writes. The table-shaped ones -- slipnet nodes, slipnet links, urgency levels, formula coefficients, engine parameters, theme dimensions, posting rules, slipnet layout, demo problems and the enum tables -- edit in place: double-click a cell to change it, '+ Add' to create a row, and the cross at the end of a row to delete it, with a confirmation. A column holding a list or an object takes JSON, and a value that is not valid JSON is reported rather than sent. The two collections made of long text -- codelet types and help topics -- and the commentary templates each get a list beside an editor, so a codelet's execute_body, a topic's full description and a template's JSON have room to be worked on.
+Thirteen collections, and every tab writes. Codelet patterns is the one without a tab of its own -- it is configured through the API and the seed file. The table-shaped ones -- slipnet nodes, slipnet links, urgency levels, formula coefficients, engine parameters, theme dimensions, posting rules, slipnet layout, demo problems and the enum tables -- edit in place: double-click a cell to change it, '+ Add' to create a row, and the cross at the end of a row to delete it, with a confirmation. A column holding a list or an object takes JSON, and a value that is not valid JSON is reported rather than sent. The two collections made of long text -- codelet types and help topics -- and the commentary templates each get a list beside an editor, so a codelet's execute_body, a topic's full description and a template's JSON have room to be worked on.
 
 A refusal is reported where it happened and says what kind of problem it is: a name already taken, a value out of range, a row that is gone. A collection that fails to load says so and offers to try again, which reads differently from a collection that is empty.
 
 A saved change is picked up by the next run created. The run in progress keeps the configuration it started with, so an edit made mid-run takes effect on the run after it.
 
-Two collection-wide operations sit alongside the tabs. 'Export Current Settings to Seed Data' writes the database's configuration back out to seed_data/*.json, which is how a configuration arrived at in the app becomes the project's starting point; each replaced file is copied first, under a timestamp, into seed_data/.backups/. The API's export and import routes carry the same twelve collections as one JSON object, ordered by primary key, which makes a configuration backup diffable and restorable in a single transaction.
+Two collection-wide operations sit alongside the tabs. 'Export Current Settings to Seed Data' writes the database's configuration back out to seed_data/*.json, which is how a configuration arrived at in the app becomes the project's starting point; each replaced file is copied first, under a timestamp, into seed_data/.backups/. The API's export and import routes carry the same thirteen collections as one JSON object, ordered by primary key, which makes a configuration backup diffable and restorable in a single transaction.
 
 **Related concepts:** `slipnet`, `coderack`, `themespace`, `commentary`, `problem_input`
 
@@ -524,9 +524,9 @@ A rule describes the transformation from one string to another, capturing both w
 ### Run Parameters
 
 **Topic key:** `run_parameters`  
-**Summary:** The twenty-six engine settings that are fixed before a run starts and cannot change while it thinks.
+**Summary:** The twenty-seven engine settings that are fixed before a run starts and cannot change while it thinks.
 
-Twenty-five entries in the engine's parameter set are read while it thinks: thresholds that decide what reaches the Temporal Trace, the periods governing clamps and settling, the Coderack's capacity and urgency resolution, the Themespace's boost, decay and spread, and the update cadence.
+Twenty-seven entries in the engine's parameter set are read while it thinks: thresholds that decide what reaches the Temporal Trace, the periods governing clamps and settling, the Coderack's capacity and urgency resolution, the Themespace's boost, decay and spread, and the update cadence.
 
 Each can be set for one run. Omitted parameters keep the global default, and an unknown name or an out-of-range value is refused rather than ignored — ignoring a typo would give you a run at the default while the record said otherwise. Because they are fixed at creation, changing one starts a new run rather than altering the loaded one.
 

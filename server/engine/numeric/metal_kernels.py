@@ -145,9 +145,15 @@ def max_in_degree(indptr: Sequence[int]) -> int:
 
 #: The fused decay → spread → flush kernel.
 #:
-#: ``params`` carries ``[threshold, scale, n_nodes, lanes]`` as floats rather than
-#: as four scalar inputs, because every input becomes a buffer binding and four
-#: bindings for four numbers is worse than one.
+#: ``params`` carries ``[threshold, scale, n_nodes, lanes, max_activation]`` as
+#: floats rather than as five scalar inputs, because every input becomes a buffer
+#: binding and five bindings for five numbers is worse than one.
+#:
+#: ``max_activation`` is here rather than as a literal ``100.0f`` because it is an
+#: engine parameter.  This kernel is the eighth and last place the ceiling was
+#: written down, and the one where a stale copy would be silent: the fused path only
+#: runs on Metal above the vectorise threshold, so the default 59-node Slipnet never
+#: reaches it and a green suite would say nothing.
 SLIPNET_UPDATE_SOURCE = """
     uint lanes = (uint) params[3];
     uint gid = thread_position_in_grid.x;
@@ -157,6 +163,7 @@ SLIPNET_UPDATE_SOURCE = """
     float threshold = params[0];
     float scale = params[1];
     uint n_nodes = (uint) params[2];
+    float max_activation = params[4];
 
     // Whole lane groups fall out together, because `row` is uniform across a
     // group: the shuffles below require every lane of the group to reach them.
@@ -204,7 +211,7 @@ SLIPNET_UPDATE_SOURCE = """
             b += partial;
         }
         float updated = a_d + b;
-        out[row] = metal::min(100.0f, metal::max(0.0f, updated));
+        out[row] = metal::min(max_activation, metal::max(0.0f, updated));
     }
 """
 

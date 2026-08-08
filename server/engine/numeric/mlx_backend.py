@@ -69,8 +69,6 @@ import numpy as np
 from server.engine.numeric import metal_kernels
 from server.engine.numeric.backend import Backend, SlipnetSession
 from server.engine.numeric.layout import (
-    FULL_ACTIVATION_THRESHOLD,
-    MAX_ACTIVATION,
     STRING_ANSWER,
     STRING_INITIAL,
     STRING_MODIFIED,
@@ -107,6 +105,7 @@ class MlxSlipnetSession(SlipnetSession):
         "topology", "device", "dtype", "use_kernel", "n", "lanes",
         "activation", "buffer", "frozen", "clamp_remaining",
         "decay_percent", "indptr", "source", "dest", "weight", "_zero",
+        "_max_activation", "_full_activation_threshold",
     )
 
     def __init__(
@@ -117,6 +116,10 @@ class MlxSlipnetSession(SlipnetSession):
         use_kernel: bool,
     ) -> None:
         self.topology = topology
+        # The run's activation constants, read once off the topology.  The hot
+        # loops below see a slot load rather than a two-hop attribute chain.
+        self._max_activation = topology.activation.max_activation
+        self._full_activation_threshold = topology.activation.full_activation_threshold
         self.device = device
         self.dtype = dtype
         self.use_kernel = use_kernel
@@ -185,7 +188,14 @@ class MlxSlipnetSession(SlipnetSession):
     def _update_fused(self, threshold: float, scale: float) -> None:
         kernel = metal_kernels.slipnet_update_kernel()
         params = mx.array(
-            [threshold, scale, float(self.n), float(self.lanes)], dtype=self.dtype
+            [
+                threshold,
+                scale,
+                float(self.n),
+                float(self.lanes),
+                float(self._max_activation),
+            ],
+            dtype=self.dtype,
         )
         outputs = kernel(
             inputs=[
@@ -235,7 +245,7 @@ class MlxSlipnetSession(SlipnetSession):
             # ``increment-activation-buffer`` (``slipnet.ss:157-160``) refuses while
             # the destination is frozen: a clamped node receives no spreading.
             buf = mx.where(self.frozen != 0, mx.zeros_like(gathered), gathered) + buf
-        self.activation = mx.clip(act + buf, 0.0, 100.0)
+        self.activation = mx.clip(act + buf, 0.0, self._max_activation)
 
     # -- the probabilistic jump --------------------------------------------
 
@@ -251,9 +261,11 @@ class MlxSlipnetSession(SlipnetSession):
         """
         mx.eval(self.activation)
         act = np.array(self.activation, copy=False).astype(np.float64)
-        p = (act / MAX_ACTIVATION) ** 3
+        p = (act / self._max_activation) ** 3
         # ``partially-active?`` (slipnet.ss:402-404): [50, 100).
-        partial = (act >= FULL_ACTIVATION_THRESHOLD) & (act < MAX_ACTIVATION)
+        partial = (act >= self._full_activation_threshold) & (
+            act < self._max_activation
+        )
         eligible = partial & (p > 0.0) & (p < 1.0)
         idx = np.flatnonzero(eligible)
         return idx.tolist(), p[idx].tolist()
@@ -263,7 +275,7 @@ class MlxSlipnetSession(SlipnetSession):
             return
         with mx.stream(self.device):
             self.activation[mx.array(list(indices), dtype=mx.int32)] = mx.array(
-                100.0, dtype=self.dtype
+                self._max_activation, dtype=self.dtype
             )
 
 
@@ -379,10 +391,11 @@ class MlxBackend(Backend):
                 # ``activation-function`` (``themes.ss:456-459``) branches on the
                 # theme's own sign and clips to its own half of the range.
                 target_neg = snapshot[:, t] < 0.0
+                ceiling = params.max_activation
                 updated = mx.where(
                     target_neg,
-                    mx.clip(act[:, t] - effect, -100.0, 0.0),
-                    mx.clip(act[:, t] + effect, 0.0, 100.0),
+                    mx.clip(act[:, t] - effect, -ceiling, 0.0),
+                    mx.clip(act[:, t] + effect, 0.0, ceiling),
                 )
                 new_act[:, t] = mx.where(live, updated, snapshot[:, t])
             act = new_act

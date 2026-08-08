@@ -39,6 +39,7 @@ from server.engine.temperature import Temperature
 from server.engine.themes import Themespace
 from server.engine.trace import (
     CONCEPT_ACTIVATION,
+    MAX_CLAMP_PERIOD_DEFAULT,
     TemporalTrace,
     TraceEvent,
     concept_activation_importance,
@@ -477,7 +478,10 @@ class EngineRunner:
         middle_node = slipnet.nodes.get("plato-middle")
         single_node = slipnet.nodes.get("plato-single")
 
-        max_act = self.meta.get_param("max_activation", 100)
+        # From the Slipnet the descriptors belong to, not a second read of the
+        # parameter: the node already carries the run's ceiling, and two reads of
+        # one value is how they come to disagree.
+        max_act = slipnet.activation_params.max_activation
 
         # ``run.ss:221-226``: a problem containing any single-letter string starts
         # with the *concept* of object-category fully active.  A one-letter string
@@ -913,7 +917,17 @@ class EngineRunner:
                 )
 
         # 5. Clamp-period expiration check (Scheme: run.ss:303-304)
-        if ctx.trace.clamp_period_expired(ctx.codelet_count):
+        #
+        # The bound comes from the parameter, not from ``trace``'s module default.
+        # ``max_clamp_period`` was read in one place only — the progress-watcher's
+        # judgement at ``jootsing.py:132`` — while *this* call, the one that actually
+        # ends a clamp, took the literal 750. Changing the parameter shortened the
+        # jootser's patience and left the clamp itself running to the old bound, which
+        # is a worse failure than not reading it at all: half of the mechanism moved.
+        if ctx.trace.clamp_period_expired(
+            ctx.codelet_count,
+            self.meta.get_param("max_clamp_period", MAX_CLAMP_PERIOD_DEFAULT),
+        ):
             ctx.trace.undo_last_clamp(
                 ctx.themespace, ctx.slipnet, ctx.codelet_count, ctx.coderack,
             )
@@ -1252,7 +1266,6 @@ class EngineRunner:
             deferred = False
 
         top_down_nodes = self.meta.get_param("top_down_slipnodes", [])
-        threshold = self.meta.get_param("full_activation_threshold", 50)
 
         for node_name in top_down_nodes:
             node = ctx.slipnet.nodes.get(node_name)
@@ -1260,7 +1273,7 @@ class EngineRunner:
             # Top-down posting is the *only* consumer of the weaker predicate in
             # the reference (slipnet.ss:212-213); everything else asks for
             # saturation.
-            if node is None or not node.above_threshold(threshold):
+            if node is None or not node.above_threshold():
                 continue
 
             # Determine which codelets to post for this node

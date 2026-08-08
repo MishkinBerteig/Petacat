@@ -15,8 +15,10 @@ from typing import TYPE_CHECKING, Any, Callable
 
 from server.engine.numeric.backend import select_backend
 from server.engine.numeric.layout import (
+    DEFAULT_ACTIVATION,
     FULL_ACTIVATION_THRESHOLD,
     MAX_ACTIVATION,
+    ActivationParams,
     SlipnetState,
     SlipnetTopology,
 )
@@ -180,9 +182,18 @@ class SlipnetNode:
         "incoming_links",
         "intrinsic_link_length",
         "_decay_percent",
+        "_max_activation",
+        "_workspace_activation",
+        "_full_activation_threshold",
     )
 
-    def __init__(self, name: str, short_name: str, conceptual_depth: int) -> None:
+    def __init__(
+        self,
+        name: str,
+        short_name: str,
+        conceptual_depth: int,
+        activation_params: ActivationParams = DEFAULT_ACTIVATION,
+    ) -> None:
         self.name = name
         self.short_name = short_name
         self.conceptual_depth = conceptual_depth
@@ -199,6 +210,15 @@ class SlipnetNode:
         self.intrinsic_link_length: int | None = None
         self._decay_percent: float = 0.0
         self.descriptor_predicate: Callable[..., bool] | None = None
+        # Flat scalars rather than a reference to the params object: these are read on
+        # the engine's hottest paths, and one attribute load is cheaper than two.
+        # Written only here, from a single ``ActivationParams``, so the three cannot
+        # drift from one another.
+        self._max_activation: float = activation_params.max_activation
+        self._workspace_activation: float = activation_params.workspace_activation
+        self._full_activation_threshold: float = (
+            activation_params.full_activation_threshold
+        )
 
     def compute_rate_of_decay(self, update_cycle_length: int) -> None:
         """The per-cycle decay rate, held as a *percentage* rather than a fraction.
@@ -237,7 +257,7 @@ class SlipnetNode:
                 1.0 - (self.conceptual_depth / 100.0) ** exponent
             )
 
-    def fully_active(self, threshold: float = MAX_ACTIVATION) -> bool:
+    def fully_active(self, threshold: float | None = None) -> bool:
         """Is this concept at *full* activation?
 
         Scheme: ``fully-active?`` (slipnet.ss:392-394) —
@@ -247,6 +267,10 @@ class SlipnetNode:
         by ``spread_activation``'s flush, by ``clamp`` and by the jump, so the
         two forms agree on every value the engine can produce.
 
+        The ceiling comes from the node's own ``%max-activation%``, resolved from
+        metadata when the Slipnet was built.  ``threshold`` stays in the signature for
+        a caller that wants to ask a different question.
+
         This is the predicate behind link shrinking and degree of association
         (slipnet.ss:90-91, 334-339), concept-mapping relevance
         (concept-mappings.ss:107-109) and description relevance
@@ -254,11 +278,11 @@ class SlipnetNode:
         codelet posting — that one is ``above_threshold``, and conflating the
         two makes the whole 50-99 band behave as though it were saturated.
         """
+        if threshold is None:
+            threshold = self._max_activation
         return self.activation >= threshold
 
-    def above_threshold(
-        self, threshold: float = FULL_ACTIVATION_THRESHOLD
-    ) -> bool:
+    def above_threshold(self, threshold: float | None = None) -> bool:
         """Is this concept active enough to exert top-down pressure?
 
         Scheme: ``above-threshold?`` (slipnet.ss:397-399) —
@@ -266,6 +290,8 @@ class SlipnetNode:
         Its sole consumer in the reference is
         ``attempt-to-post-top-down-codelets`` (slipnet.ss:212-213).
         """
+        if threshold is None:
+            threshold = self._full_activation_threshold
         return self.activation >= threshold
 
     def partially_active(self) -> bool:
@@ -274,8 +300,8 @@ class SlipnetNode:
         Scheme: ``partially-active?`` (slipnet.ss:402-404).
         """
         return (
-            self.activation >= FULL_ACTIVATION_THRESHOLD
-            and self.activation < MAX_ACTIVATION
+            self.activation >= self._full_activation_threshold
+            and self.activation < self._max_activation
         )
 
     def activate_from_workspace(self) -> None:
@@ -292,7 +318,7 @@ class SlipnetNode:
         """
         if self.frozen:
             return
-        self.activation_buffer += 100.0
+        self.activation_buffer += self._workspace_activation
 
     def decay(self) -> None:
         """Lose a *whole number* of activation units. Frozen nodes don't decay.
@@ -526,9 +552,9 @@ class SlipnetNode:
         """
         if not self.partially_active():
             return
-        prob = (self.activation / MAX_ACTIVATION) ** 3
+        prob = (self.activation / self._max_activation) ** 3
         if rng.prob(prob):
-            self.activation = MAX_ACTIVATION
+            self.activation = self._max_activation
 
     @property
     def category(self) -> SlipnetNode | None:
@@ -785,6 +811,11 @@ class Slipnet:
 
     def __init__(self) -> None:
         self.nodes: dict[str, SlipnetNode] = {}
+        #: The run's activation constants.  Replaced in ``from_metadata``; the shipped
+        #: defaults stand for a bare ``Slipnet()``, which only ``from_metadata``
+        #: constructs.  Read by ``SlipnetTopology.from_slipnet``, so a backend
+        #: session and the object graph cannot disagree about the ceiling.
+        self.activation_params: ActivationParams = DEFAULT_ACTIVATION
         # Resolved on first use rather than here, because ``from_metadata``
         # computes the decay rates *after* constructing the Slipnet and the
         # numeric layout needs them.
@@ -794,10 +825,16 @@ class Slipnet:
     def from_metadata(cls, meta: MetadataProvider) -> Slipnet:
         """Construct full graph from DB-loaded specs."""
         slipnet = cls()
+        slipnet.activation_params = ActivationParams.from_metadata(meta)
 
         # Create nodes
         for spec in meta.slipnet_node_specs.values():
-            node = SlipnetNode(spec.name, spec.short_name, spec.conceptual_depth)
+            node = SlipnetNode(
+                spec.name,
+                spec.short_name,
+                spec.conceptual_depth,
+                activation_params=slipnet.activation_params,
+            )
             if spec.descriptor_predicate:
                 node.descriptor_predicate = compile_descriptor_predicate(
                     spec.descriptor_predicate, spec.name
@@ -883,8 +920,11 @@ class Slipnet:
                 node.spread_activation_to_neighbors(update_cycle_length)
 
         # Apply buffers
+        ceiling = self.activation_params.max_activation
         for node in self.nodes.values():
-            node.activation = max(0.0, min(100.0, node.activation + node.activation_buffer))
+            node.activation = max(
+                0.0, min(ceiling, node.activation + node.activation_buffer)
+            )
             node.activation_buffer = 0.0
 
     # ------------------------------------------------------------------

@@ -39,8 +39,6 @@ import numpy as np
 
 from server.engine.numeric.backend import Backend, SlipnetSession
 from server.engine.numeric.layout import (
-    FULL_ACTIVATION_THRESHOLD,
-    MAX_ACTIVATION,
     STRING_ANSWER,
     STRING_INITIAL,
     STRING_MODIFIED,
@@ -60,10 +58,15 @@ class NumpySlipnetSession(SlipnetSession):
     __slots__ = (
         "topology", "n", "activation", "buffer", "frozen", "clamp_remaining",
         "decay_percent", "src", "dst", "weight", "_scaled_weight", "_scaled_for",
+        "_max_activation", "_full_activation_threshold",
     )
 
     def __init__(self, topology: SlipnetTopology) -> None:
         self.topology = topology
+        # The run's activation constants, read once off the topology.  The hot
+        # loops below see a slot load rather than a two-hop attribute chain.
+        self._max_activation = topology.activation.max_activation
+        self._full_activation_threshold = topology.activation.full_activation_threshold
         n = topology.n_nodes
         self.n = n
         self.activation = np.zeros(n, dtype=np.float64)
@@ -130,21 +133,23 @@ class NumpySlipnetSession(SlipnetSession):
             )
 
         np.add(act, buf, out=act)
-        np.clip(act, 0.0, 100.0, out=act)
+        np.clip(act, 0.0, self._max_activation, out=act)
         buf.fill(0.0)
 
     def jump_candidates(self) -> tuple[list[int], list[float]]:
         act = self.activation
-        p = (act / MAX_ACTIVATION) ** 3
+        p = (act / self._max_activation) ** 3
         # ``partially-active?`` (slipnet.ss:402-404): [50, 100).
-        partial = (act >= FULL_ACTIVATION_THRESHOLD) & (act < MAX_ACTIVATION)
+        partial = (act >= self._full_activation_threshold) & (
+            act < self._max_activation
+        )
         eligible = partial & (p > 0.0) & (p < 1.0)
         idx = np.flatnonzero(eligible)
         return idx.tolist(), p[idx].tolist()
 
     def apply_jumps(self, indices: Sequence[int]) -> None:
         if len(indices):
-            self.activation[np.asarray(indices, dtype=np.int64)] = 100.0
+            self.activation[np.asarray(indices, dtype=np.int64)] = self._max_activation
 
 
 class NumpyBackend(Backend):
@@ -237,8 +242,8 @@ class NumpyBackend(Backend):
             target_neg = snapshot[:, t] < 0.0
             updated = np.where(
                 target_neg,
-                np.clip(act[:, t] - effect, -100.0, 0.0),
-                np.clip(act[:, t] + effect, 0.0, 100.0),
+                np.clip(act[:, t] - effect, -params.max_activation, 0.0),
+                np.clip(act[:, t] + effect, 0.0, params.max_activation),
             )
             act[:, t] = np.where(live, updated, act[:, t])
 

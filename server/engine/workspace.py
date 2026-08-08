@@ -1461,24 +1461,43 @@ class Workspace:
     # Workspace activity
     # ------------------------------------------------------------------
 
+    #: ``%expiration-period%`` (``workspace.ss:30``) and
+    #: ``%num-youngest-structures%`` (``workspace.ss:31``).
+    #:
+    #: Fallbacks, not the values in force.  Both are engine parameters and
+    #: ``get_activity`` takes them from the caller's ``MetadataProvider``; these stand
+    #: in for a Workspace driven without one, which is a unit test rather than a run.
     EXPIRATION_PERIOD = 500
     NUM_YOUNGEST_STRUCTURES = 3
 
-    def get_activity(self, codelet_count: int = 0) -> float:
+    def get_activity(self, codelet_count: int = 0, meta: Any = None) -> float:
         """Measure of how much structure has been built recently.
 
         Scheme: workspace.ss:179-182.
         Based on the average age of the youngest structures.
         100 = very active (structures built recently), 0 = inactive.
-        """
-        avg_age = self._get_youngest_structures_average_age(codelet_count)
-        return round(100.0 - 100.0 * min(1.0, avg_age / self.EXPIRATION_PERIOD))
 
-    def _get_youngest_structures_average_age(self, codelet_count: int) -> float:
+        The Workspace holds no ``MetadataProvider`` of its own — it is constructed
+        from three strings and a Slipnet — so the two parameters arrive from the
+        caller, which is the progress-watcher and has one.
+        """
+        expiration = self.EXPIRATION_PERIOD
+        youngest = self.NUM_YOUNGEST_STRUCTURES
+        if meta is not None:
+            expiration = meta.get_param("expiration_period", expiration)
+            youngest = meta.get_param("num_youngest_structures", youngest)
+        avg_age = self._get_youngest_structures_average_age(codelet_count, youngest)
+        return round(100.0 - 100.0 * min(1.0, avg_age / expiration))
+
+    def _get_youngest_structures_average_age(
+        self, codelet_count: int, num_youngest: int | None = None
+    ) -> float:
         """Average age of the N youngest structures.
 
         Scheme: workspace.ss:183-192.
         """
+        if num_youngest is None:
+            num_youngest = self.NUM_YOUNGEST_STRUCTURES
         structures = self.all_structures
         if not structures:
             return 0.0
@@ -1488,7 +1507,7 @@ class Workspace:
             max(0, codelet_count - getattr(s, "time_stamp", 0))
             for s in structures
         )
-        n = min(len(ages), self.NUM_YOUNGEST_STRUCTURES)
+        n = min(len(ages), num_youngest)
         youngest_ages = ages[:n]
         if not youngest_ages:
             return 0.0

@@ -966,3 +966,245 @@ async def test_reconciliation_never_drops_a_column_from_a_runtime_table(step0_en
         columns = {row[0] for row in result}
 
     assert "retired_column" in columns, "a runtime table's column was dropped"
+
+
+# ──────────────────────────────────────────────────────────────────
+# Parameters that existed in the table and that nothing read
+# ──────────────────────────────────────────────────────────────────
+#
+# Each of these shipped in `engine_params` with a value identical to a Python
+# literal the engine used instead, so an admin could edit it, see the config hash
+# move, see the new value listed back — and change nothing. They are the same
+# condition as the posting formulas, found by auditing what the engine reads rather
+# than what the plan happened to list.
+
+
+async def _set_param(session, name: str, value: str) -> None:
+    from sqlalchemy import update as sql_update
+
+    from server.models.metadata import EngineParam
+
+    await session.execute(
+        sql_update(EngineParam).where(EngineParam.name == name).values(value=value)
+    )
+    await session.commit()
+
+
+async def test_changing_max_clamp_period_changes_the_run(db_session):
+    """Direction 2 — and this one was half-wired, which is worse than not at all.
+
+    `max_clamp_period` was read at `jootsing.py:132` for the progress-watcher's
+    judgement, and *not* at `runner.py`'s clamp-expiry check, which is the call that
+    actually ends a clamp. Shortening the parameter shortened the jootser's patience
+    and left the clamp running to the old literal 750: half the mechanism moved.
+
+    `xyz` is the probe because it is the problem that snags, and a clamp is the snag
+    response.
+    """
+    shipped = run_outcome(
+        await load_metadata_from_db(db_session), CLAMP_PROBLEM, CLAMP_SEED
+    )
+
+    await _set_param(db_session, "max_clamp_period", "100")
+
+    changed = run_outcome(
+        await load_metadata_from_db(db_session), CLAMP_PROBLEM, CLAMP_SEED
+    )
+
+    assert changed != shipped
+
+
+async def test_changing_the_expiration_period_changes_the_run(db_session):
+    """Direction 2. `%expiration-period%` (`workspace.ss:30`) scales the activity
+    measure the progress-watcher reads, so it moves every problem."""
+    shipped = run_outcome(await load_metadata_from_db(db_session))
+
+    await _set_param(db_session, "expiration_period", "50")
+
+    changed = run_outcome(await load_metadata_from_db(db_session))
+
+    assert changed != shipped
+
+
+async def test_the_theme_activation_ceiling_comes_from_the_database(db_session):
+    """Direction 2, at the mechanism rather than the whole run.
+
+    `max_theme_activation` is the clip both poles of a theme's activation use
+    (`themes.ss:34-38`). No run in the sample is sensitive to it — themes rarely
+    press against the ceiling on these problems — so asserting on a run would be
+    hunting for a seed that happens to notice, which is a guard that stops guarding
+    the day the seed changes. Saturation is what the parameter *means*, so that is
+    what this asserts.
+    """
+    from server.engine.themes import Themespace
+
+    async def saturation() -> float:
+        meta = await load_metadata_from_db(db_session)
+        themespace = Themespace(meta)
+        cluster = themespace.clusters[0]
+        theme = cluster.themes[0]
+        theme.activation = 0
+        for _ in range(40):
+            themespace.boost_theme(
+                cluster.theme_type, cluster.dimension, theme.relation, 100.0
+            )
+        return theme.activation
+
+    assert await saturation() == 100
+
+    await _set_param(db_session, "max_theme_activation", "40")
+
+    assert await saturation() == 40
+
+
+async def test_the_activity_measure_reads_both_of_its_parameters(db_session):
+    """Direction 2, at the mechanism, for the two constants `get_activity` used.
+
+    `%expiration-period%` and `%num-youngest-structures%` (`workspace.ss:30-31`) are
+    the whole of the activity calculation, and the second does not move any sampled
+    run on its own — the progress-watcher only asks whether activity is above zero,
+    which stays true either way. The number it computes is the observable, so the
+    guard is on that.
+    """
+    from server.engine.runner import EngineRunner
+
+    meta = await load_metadata_from_db(db_session)
+    runner = EngineRunner(meta)
+    runner.init_mcat(*PROBLEM, seed=PROBLEM_SEED)
+    runner.run_mcat(max_steps=600)
+    workspace = runner.ctx.workspace
+    at = runner.ctx.codelet_count
+
+    shipped = workspace.get_activity(at, meta)
+
+    await _set_param(db_session, "num_youngest_structures", "50")
+    widened = await load_metadata_from_db(db_session)
+    assert workspace.get_activity(at, widened) != shipped
+
+    await _set_param(db_session, "num_youngest_structures", "3")
+    await _set_param(db_session, "expiration_period", "5000")
+    stretched = await load_metadata_from_db(db_session)
+    assert workspace.get_activity(at, stretched) != shipped
+
+
+async def test_the_reminding_threshold_reaches_the_memory_from_the_database(db_session):
+    """Direction 1 and 2 for `distance_threshold`, at the seam that was broken.
+
+    `EpisodicMemory.find_remindings` has always taken a threshold and
+    `tests/seed_unit/test_episodic_memory.py` already covers what different values do
+    to it. What no test covered is the *caller*: the reminding site in the
+    `report_answer` builtin invoked it with no threshold at all, so the memory fell
+    back to its own literal 5.0 and `%distance-threshold%` (`memory.ss:488`) was
+    unreachable however the database was edited.
+
+    So the observable is the argument, not the outcome — recording what the engine
+    hands the memory is what distinguishes "the parameter is wired" from "the memory
+    has a sensible default".
+    """
+    from server.engine.runner import EngineRunner
+
+    async def threshold_used() -> float | None:
+        meta = await load_metadata_from_db(db_session)
+        runner = EngineRunner(meta)
+        runner.init_mcat(*PROBLEM, seed=PROBLEM_SEED)
+
+        seen: list[float] = []
+        original = runner.ctx.memory.find_remindings
+
+        def recording(new_desc, distance_threshold=5.0, meta=None):
+            seen.append(distance_threshold)
+            return original(new_desc, distance_threshold, meta=meta)
+
+        runner.ctx.memory.find_remindings = recording
+        runner.run_mcat(max_steps=20_000)
+        return seen[0] if seen else None
+
+    assert await threshold_used() == 5.0
+
+    await _set_param(db_session, "distance_threshold", "40")
+
+    assert await threshold_used() == 40
+
+
+async def test_the_activation_ceiling_binds_everywhere_it_is_written(db_session):
+    """Direction 2 for `max_activation`, plus the check that catches a half-wiring.
+
+    The ceiling was written down in eight places — the object graph's flush, the jump
+    target, and the flush and jump in each of the three backends — while
+    `max_activation` was read at exactly one site that only set initial descriptions.
+
+    Asserting only "the run changed" would have passed with most of those still at
+    100: moving the jump window alone changes a run. So the guard also asserts that no
+    node finishes above the ceiling, which is what the parameter *means* and what a
+    surviving literal violates.
+    """
+    from server.engine.runner import EngineRunner
+
+    db_meta = await load_metadata_from_db(db_session)
+    shipped = run_outcome(db_meta)
+
+    await _set_param(db_session, "max_activation", "80")
+    lowered = await load_metadata_from_db(db_session)
+
+    runner = EngineRunner(lowered)
+    runner.init_mcat(*PROBLEM, seed=PROBLEM_SEED)
+    runner.run_mcat(max_steps=20_000)
+    workspace = runner.ctx.workspace
+    changed = (
+        runner.status,
+        workspace.answer_string.text if workspace.answer_string else None,
+        runner.ctx.codelet_count,
+    )
+
+    assert changed != shipped
+    peak = max(node.activation for node in runner.ctx.slipnet.nodes.values())
+    assert peak <= 80, f"a node reached {peak} under a ceiling of 80"
+
+
+async def test_activations_stay_floats_whatever_the_parameter_says(db_session):
+    """The parameters load as `int`; a node's activation is annotated `float`.
+
+    `ActivationParams.from_metadata` coerces, and this is where that is held. An `int`
+    reaching `self.activation = max_activation` would make a node's activation an int
+    — which is invisible in arithmetic, since `100 == 100.0`, and visible in a
+    state-graph snapshot and in what MLX does with a weak-typed scalar.
+    """
+    from server.engine.runner import EngineRunner
+
+    await _set_param(db_session, "max_activation", "80")
+    meta = await load_metadata_from_db(db_session)
+
+    runner = EngineRunner(meta)
+    runner.init_mcat(*PROBLEM, seed=PROBLEM_SEED)
+    runner.run_mcat(max_steps=2_000)
+
+    kinds = {type(n.activation).__name__ for n in runner.ctx.slipnet.nodes.values()}
+    assert kinds == {"float"}, kinds
+
+
+async def test_changing_the_workspace_jolt_changes_the_run(db_session):
+    """Direction 2 for `workspace_activation`.
+
+    The jolt a codelet pours into a concept it touches is what holds the relevant
+    concepts up against decay, and it was a bare `100.0` on the engine's hottest
+    activation path with the parameter read nowhere at all.
+    """
+    shipped = run_outcome(await load_metadata_from_db(db_session))
+
+    await _set_param(db_session, "workspace_activation", "40")
+
+    assert run_outcome(await load_metadata_from_db(db_session)) != shipped
+
+
+async def test_changing_the_full_activation_threshold_changes_the_run(db_session):
+    """Direction 2 for `full_activation_threshold`.
+
+    It gates top-down posting and bounds the probabilistic jump's window. The
+    parameter was read at one site — the top-down posting loop — while the jump window
+    in the object graph and all three backends used the literal 50.
+    """
+    shipped = run_outcome(await load_metadata_from_db(db_session))
+
+    await _set_param(db_session, "full_activation_threshold", "90")
+
+    assert run_outcome(await load_metadata_from_db(db_session)) != shipped
