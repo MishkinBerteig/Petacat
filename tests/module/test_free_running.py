@@ -370,3 +370,30 @@ def test_a_free_run_stores_exactly_one_answer_like_the_serial_loop(meta):
         )
         # And the run's own answer list agrees with what memory holds.
         assert len(runner._answers) == stored
+
+
+def test_a_group_and_a_letter_never_share_an_identifier(meta):
+    """A Group is the one thing that is both a WorkspaceObject and a WorkspaceStructure.
+
+    Both base constructors run, and both assign ``self.id`` — from *different* counters.
+    ``WorkspaceStructure.__init__`` ran second and won, so a Group sitting in
+    ``all_objects`` carried a **structure** number while every Letter beside it carried an
+    **object** number, and the two counters collide freely.  Observed serially on
+    ``abc->abd;mrrjjj`` seed 8: ``Group(samegrp, 3 objects)`` and ``Letter(k, pos=3)``
+    both at 60.
+
+    This is not a threading defect — it reproduces under ``run_mcat`` — but the free-run
+    identifier test is where it surfaced, because eight workers explore more of the seed
+    space per run than one does.
+    """
+    from server.engine.runner import EngineRunner
+
+    collisions = []
+    for seed in range(30):
+        runner = EngineRunner(meta)
+        runner.init_mcat(*PROBLEM, seed=seed)
+        runner.run_mcat(max_steps=1500)
+        ids = [o.id for o in runner.ctx.workspace.all_objects]
+        if len(ids) != len(set(ids)):
+            collisions.append(seed)
+    assert collisions == []
