@@ -127,6 +127,21 @@ class FreeRunningEngine:
         self._commit_lock = threading.RLock()
         self._count_lock = threading.Lock()
         self._stop = threading.Event()
+        #: Held shut until every worker thread exists.
+        #:
+        #: Without it the pool is built *while the first worker is already executing*.
+        #: ``Thread.start()`` ends in ``self._started.wait()``, and a worker running
+        #: interpreted codelet bodies makes no call that releases the GIL, so the main
+        #: thread can lose that handoff for the whole run and threads 2..N are never
+        #: constructed.  Measured: one ``start()`` call taking 466 ms of a 465 ms run,
+        #: reported as ``[4001, 0, 0, 0]`` because ``_per_worker`` is preallocated to
+        #: the requested width and therefore describes workers that never existed.
+        #:
+        #: ``Event.wait`` releases the GIL, which is exactly what lets the main thread
+        #: finish its ``start()`` loop.  Same discipline as
+        #: ``scripts/bench_shards.py::measure_contention``'s barrier, as an Event set
+        #: by the owner rather than a ``Barrier`` a dying worker could break.
+        self._all_started = threading.Event()
         self._conflicts = 0
         self._update_cycles = 0
         self._per_worker: list[int] = []
@@ -147,9 +162,22 @@ class FreeRunningEngine:
         sharded = WorkerShardedCoderack(ctx.meta, self.shards)
         sharded.rng = ctx.rng
         sharded.current_time = ctx.coderack.current_time
-        for b in ctx.coderack.bins:
-            for codelet in list(b.codelets):
-                sharded.post(codelet, ctx.coderack.current_time, ctx.rng)
+        # As a *batch*, not one at a time.  ``post`` routes to the posting thread's own
+        # shard, and this runs on the main thread, so posting them individually put the
+        # entire opening population into shard 0 — where a shard holds
+        # ``max_coderack_size // shards`` and the rest were evicted on the way in.
+        # Measured before this: 56 codelets in, ``[25, 0, 0, 0]`` out, 31 discarded,
+        # and three of the four workers starting with nothing to draw.
+        #
+        # ``post_deferred`` deals round-robin across the shards and its own docstring
+        # names this hazard — "keeps a 36-codelet opening batch from overflowing one
+        # 25-codelet shard while the others sit empty".  It is also the right call on
+        # its own terms: these are one batch, and ``post-initial-codelets``
+        # (``run.ss:275-283``) lands them through ``post-deferred-codelets``.
+        carried = [
+            codelet for b in ctx.coderack.bins for codelet in list(b.codelets)
+        ]
+        sharded.post_deferred(carried, ctx.coderack.current_time, ctx.rng)
         ctx.coderack = sharded
 
         # The commit lock is read by the mutating builtins through the context, so the
@@ -171,13 +199,22 @@ class FreeRunningEngine:
         self._update_cycles = 0
         self._per_worker = [0] * self.workers
 
-        started = time.perf_counter()
+        self._all_started.clear()
         threads = [
             threading.Thread(target=self._worker, args=(index, max_steps), daemon=True)
             for index in range(self.workers)
         ]
-        for t in threads:
-            t.start()
+        try:
+            for t in threads:
+                t.start()
+        finally:
+            # Unconditional, and before any ``join``: a thread that failed to start
+            # must not leave the ones that did waiting for it.
+            #
+            # The clock starts with the pool, so ``seconds`` measures execution rather
+            # than thread construction.
+            started = time.perf_counter()
+            self._all_started.set()
         for t in threads:
             t.join()
         elapsed = time.perf_counter() - started
@@ -202,6 +239,11 @@ class FreeRunningEngine:
         runner = self.runner
         ctx = runner.ctx
         update_cycle = ctx.meta.get_param("update_cycle_length", 15)
+
+        # Wait for the rest of the pool before touching the rack.  See
+        # ``_all_started``: without this the first worker starves the main thread of
+        # the GIL and the remaining workers are never created.
+        self._all_started.wait()
 
         # Each worker binds the run's identifier allocator for itself.  The binding is a
         # ContextVar, so a thread that did not set it would silently allocate from the

@@ -260,13 +260,23 @@ What `-m "not slow"` drops is the expected-range check, which is ~1,300 engine r
 across a process pool. Reach for the tight loop when you want a fast loop rather
 than a number to compare, and for the required command when you want the number.
 
-> **If `tests/module/test_free_running.py` fails, check the numeric backend
-> first.** That file is the one place the suite runs *codelets* concurrently —
+> **If `tests/module/test_free_running.py` fails, read
+> `server/engine/coderack_shards.py` before reaching for `--numeric-backends`.**
+> That file is the one place the suite runs *codelets* concurrently —
 > `test_coderack_shards`, `test_access_sets`, `test_run_identifiers` and
-> `test_splittable_rng` thread over engine state without executing codelets — and
-> it can be sensitive to which numeric backend is in force. It is currently green
-> under every backend, `mlx` included; an earlier note here recorded it as red
-> under `=mlx` and `=mlx-cpu`, and that was wrong.
+> `test_splittable_rng` thread over engine state without executing codelets — so
+> a red here is a concurrency result first and a backend result second.
+>
+> This callout used to say the opposite, and said the file was "currently green
+> under every backend". It was not: `test_every_worker_does_some_work` failed
+> about 40% of the time on `[numpy]`, bimodally — either an even split across the
+> four workers or `[4001, 0, 0, 0]`, nothing in between. The cause was a thread
+> startup race, not the substrate, and the advice to check the backend first sent
+> a reader looking at float32 for a defect that was not there. `mlx` never failed
+> for the revealing reason that it is ~4× slower, so the main thread always won
+> the race eventually. The defect is fixed
+> (`FreeRunningEngine._all_started`); the lesson kept here is that a red in this
+> file is about scheduling until proven otherwise.
 >
 > The reason a backend can matter at all is that the default `mlx` path forks a
 > run's random stream: float32 flushes the Slipnet's decayed subnormal

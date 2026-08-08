@@ -61,20 +61,29 @@ def test_a_free_run_completes_at_every_worker_count(meta, workers):
 def test_every_worker_does_some_work(meta):
     """A configuration where one worker does everything is not parallel.
 
-    That is the failure mode of thread-affine sharding done wrong: posts pile into one
-    shard, the others start empty, and stealing never gets going.
+    The failure this catches is real and was live: the pool used to be built *while
+    the first worker was already executing*, and ``Thread.start()`` ends in
+    ``self._started.wait()``.  A worker running interpreted codelet bodies makes no
+    call that releases the GIL, so the main thread could lose that handoff for the
+    whole run — one ``start()`` measured at 466 ms of a 465 ms run — and threads 2..N
+    were never constructed at all.  ``_per_worker`` is preallocated to the requested
+    width, so the telemetry read ``[4001, 0, 0, 0]``: three workers reported as idle
+    that had never existed.  It failed about 40% of the time, bimodally — either an
+    even split or a total monopoly, nothing in between.
 
-    Measured on a problem that runs to the step cap rather than one that answers early.
-    On a short run an idle worker is not evidence of anything — the last thread started
-    can legitimately never be scheduled before the stop flag is set, and this test
-    initially failed with ``[248, 129, 76, 0]`` for exactly that reason. A run long
-    enough for every worker to be scheduled is what actually tests the distribution.
+    ``FreeRunningEngine._all_started`` now gates the workers until the pool is built,
+    which is also what removes this test's old precondition.  It used to require
+    ``codelet_count > 2000`` before judging the distribution, because "the last thread
+    started can legitimately never be scheduled before the stop flag is set" — true
+    when the threads started at different times, and no longer true when they all wait
+    for the same Event.  Keeping it would have made the test fail on exactly the runs
+    the fix improved: four workers genuinely running answer this problem before 2,000
+    codelets more often than one worker did.
     """
     runner = EngineRunner(meta)
     runner.init_mcat("eeqee", "qeeq", "xxixx", seed=42)
     result = run_free(runner, workers=4, max_steps=4000)
 
-    assert result.codelet_count > 2000, "the run was too short to test distribution"
     assert len(result.per_worker) == 4
     assert all(count > 0 for count in result.per_worker), result.per_worker
     # And no single worker monopolised it.
