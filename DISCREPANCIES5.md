@@ -565,25 +565,56 @@ settling test and can zero the justify-clamp jootsing factor.
 
 **Confidence: certain** that the two differ; **narrow** in reach.
 
-## D-10. Jootser: three divergences in the snag-theme pipeline
+## D-10. Jootser: four divergences in the snag-theme pipeline — **three now fixed, and they were the give-up divergence**
 
-| | Petacat | Metacat |
+| | Petacat | Metacat | |
+|---|---|---|---|
+| Depth of a *matching* description | `jootsing.py` scored every match at a hardcoded `50.0` | `jootsing.ss:95-98` → `descriptions.ss:68` — a description's depth is its **descriptor's** depth | **fixed** |
+| No matching snag description | substituted the dimension's conceptual depth (30–90) and drew | `average` of the empty list is **0** (`utilities.ss:422-425`), so the weight is 0 | **fixed** |
+| Snag-object descriptions | kept the multiset | `jootsing.ss:86-88` wraps it in `remq-duplicates` (last occurrence — see C-2) | **fixed** |
+| Negated entries | clamped twice — once by `clamp_event.activate`, again by the codelet body at a hard −100 | `jootsing.ss:113-118` — one clamp event, activated once | open |
+
+The first row was not in the original survey and is the largest of the four. `Description`
+carries neither `conceptual_depth` nor `get_conceptual_depth` — the depth lives on
+`desc.descriptor` — so both `hasattr` probes missed and the `50.0` default survived every
+time. All three fixed rows pushed the inclusion weight the *same* way, up.
+
+Measured per-entry weights on `abc→abd;xyz`, against a real Metacat trace:
+
+| dimension | Metacat overlap / avg-dd / weight | Petacat, before |
 |---|---|---|
-| No matching snag description | `jootsing.py:1086-1094` substitutes the dimension's conceptual depth (30–90) and draws | `jootsing.ss:93-99` — `average` of the empty list is **0** (`utilities.ss:422-428`), so the inclusion probability is 0 and `prob?` short-circuits without drawing |
-| Snag-object descriptions | `jootsing.py:1046-1054` keeps the multiset | `jootsing.ss:83-86` wraps it in `remq-duplicates` |
-| Negated entries | clamped twice — once by `clamp_event.activate`, again by the codelet body at a hard −100 | `jootsing.ss:113-118` — one clamp event, activated once |
+| objectctgy | 100 / **20** / **0.20** | 100 / 50 / **0.50** |
+| stringpos | 100 / **40** / **0.40** | 100 / 50 / **0.50** |
+| groupctgy | 20–33 / **0** / **0.00** | 20–33 / 80 / 0.16–0.27 |
+| direction | 20–33 / **0** / **0.00** | 20–33 / 70 / 0.14–0.23 |
 
-The first is the consequential one: the snag theme pattern falls back to *every* vertical
-concept-mapping in the workspace when the snag objects have no vertical bridge
-(`trace.ss:1062-1064`), which is exactly what a repeated snag produces. Petacat then
-negates and clamps a dimension the impasse has nothing to do with, at up to 0.9
-probability.
+Metacat's 20 and 40 are exactly `plato-letter` and `plato-rightmost`, the descriptors of
+the snagged `z`. P(at least one entry survives the stochastic filter) is `1 − 0.8·0.6 =
+0.52` in the reference against `1 − 0.5·0.5 = 0.75` in Petacat; measured across whole
+runs, 43.8% of attempts built a negative theme pattern against Petacat's 75.8%.
 
-The third is currently a no-op — `negate-theme-pattern-entry` yields −100 for the
+**Why it mattered.** A give-up is exactly three mutually-equivalent snag-response clamps,
+and 51 of 51 give-ups traced came from `joots_from_snag_response_clamps`. Doubling the
+rate at which a pattern is built doubles the rate at which runs reach three clamps:
+
+| `abc→abd;xyz`, 1000 seeds | before | after | Metacat |
+|---|---:|---:|---:|
+| clamps per 1000 codelets | 0.79 | 0.68 | 0.62 |
+| runs reaching ≥3 clamps | 37.8% | 28.7% | 20.4% |
+| **gave up** | **22.5%** | **17.5%** | **10.9%** |
+| yyz | 3.9% | 7.0% | 6.4% |
+| xyd | 22.9% | 22.2% | 37.1% |
+
+−5.0 points against a difference-SE of ~1.8, so ~2.8σ. This closes roughly 40% of the
+give-up excess and corrects `yyz`; it does not move `xyd`, which is a separate mechanism
+still open. Note that the project's own oracle check passes in *both* columns — it tests
+set membership, not frequency, and is blind to a 2× skew in how often a run gives up.
+
+The fourth row is currently a no-op — `negate-theme-pattern-entry` yields −100 for the
 two-element entries `get_snag_theme_pattern` returns — and is recorded under the standard
 at the top of this document rather than closed.
 
-**Confidence: certain** on all three code differences.
+**Confidence: certain** on all four code differences.
 
 ## D-11. Smaller items
 

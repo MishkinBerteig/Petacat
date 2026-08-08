@@ -225,7 +225,12 @@ async def test_a_reset_normal_run_starts_before_the_answer_it_found(app_client, 
     tells them apart.  A reset returns the Run to codelet 0, which is before its answer
     existed, so the reset Run has none — in the response, in the engine and in the row.
     """
-    run = await _create(app_client, MODE_NORMAL)
+    # Its own seed, not the module's.  This test needs a run that *found* an answer, and
+    # the shared ``SEED`` no longer produces one on this problem: correcting the
+    # snag-jootser's inclusion weight (D-10 in ``DISCREPANCIES5.md``) shifted the random
+    # stream, and ``xyz``/12345 now gives up at 3790 codelets.  Giving up is a legitimate
+    # outcome, so the seed moves rather than the assertion.
+    run = await _create(app_client, MODE_NORMAL, seed=12346)
     run_id = run["run_id"]
     finished = (
         await app_client.post(f"/api/runs/{run_id}/run", json={"max_steps": 2000})
