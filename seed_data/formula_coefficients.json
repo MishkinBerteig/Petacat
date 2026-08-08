@@ -8,7 +8,6 @@
   "low_prob_threshold": 0.5,
   "low_prob_sqrt_base": 100.0,
   "low_prob_scale_factor": 10.0,
-  "shrink_factor": 0.4,
   "slipnet_decay_exponent_divisor": 15.0,
   "slipnet_spread_scale_divisor": 15.0,
   "probabilistic_activation_exponent": 3.0,

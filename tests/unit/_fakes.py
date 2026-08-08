@@ -34,6 +34,7 @@ class FakeNode:
         fully_active: bool = False,
         intrinsic_link_length: int = 0,
         related: dict[str, FakeNode] | None = None,
+        max_activation: float = 100.0,
     ) -> None:
         self.name = name
         #: Relation name -> neighbour, for ``get_related_node``.  A Group derives
@@ -46,6 +47,10 @@ class FakeNode:
         self.activation = activation
         self.activation_buffer: float = 0.0
         self.intrinsic_link_length = intrinsic_link_length
+        #: ``%max-activation%``.  A real node resolves this from the run's metadata
+        #: (``ActivationParams``); a fake takes the shipped value unless a test says
+        #: otherwise.  Read by ``ConceptMapping.build_concept_pattern``.
+        self.max_activation = max_activation
         self._fully_active = fully_active
         # Link collections consulted by ConceptMapping._find_slipnet_link.
         self.lateral_links: list[FakeLink] = []
@@ -73,9 +78,14 @@ class FakeNode:
         return self.related.get(name)
 
     def activate_from_workspace(self) -> None:
-        """Mirror ``SlipnetNode.activate_from_workspace`` (+100 into the buffer)."""
+        """Mirror ``SlipnetNode.activate_from_workspace``.
+
+        The jolt is ``%workspace-activation%``, which a real node takes from the run's
+        metadata.  A fake has none, so it uses its own ceiling — the two share the
+        shipped value of 100 — rather than writing a fifth copy of the number.
+        """
         if not self.frozen:
-            self.activation_buffer += 100.0
+            self.activation_buffer += self.max_activation
 
     def __repr__(self) -> str:  # pragma: no cover - debugging aid
         return f"FakeNode({self.name})"

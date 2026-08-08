@@ -17,7 +17,7 @@ kind with the right bounds and say what the parameter does.
 Fixed and derived
 -----------------
 **Fixed** parameters are inputs: chosen before the first codelet, constant for the whole
-Run.  Those are the twenty-eight below.
+Run.  Those are the ones below.
 
 **Derived** values are outputs: the numeric backend that was actually selected, the shard
 count sharding actually settled on, the config and memory hashes, the Training Session.
@@ -27,39 +27,30 @@ be would be a lie about how the engine works.
 
 What is deliberately *not* here
 -------------------------------
-Twenty further entries in ``engine_params.json`` are not run parameters and are not
-offered.  They fall into three groups, and the distinction matters:
+The rest of ``engine_params.json`` is not offered, for three different reasons, and
+the difference matters more than the count:
 
-* **Structural.**  ``initial_codelet_types``, ``initial_codelet_urgency``,
-  ``initial_codelet_rounds`` and ``clampable_codelet_patterns`` are read by the engine
-  every run, but they name codelet types and urgency tiers rather than taking a number
-  in a range, and there is no control kind here that can render one.  They are edited
-  through the Admin panel's engine-parameter table.
-* **Not the engine's.**  Display timings (``codelet_highlight_pause``,
-  ``initial_speed``, ``text_scroll_pause``, the flash settings) belong to the
-  interface; ``garbage_collect_cycles`` and ``step_cycles`` are Scheme-era
-  implementation details; ``eliza_mode_default`` and ``justify_mode_default`` are
-  overtaken by the run request, which carries both.
-* **Read nowhere at all.**  ``max_temperature`` (no consumer and no Scheme
-  counterpart), ``maximum_rule_line_length`` (``rules.ss:1717``, a transcription
-  width the port does not wrap to).
+* **Read by the engine, but not a number in a range.**  ``initial_codelet_types``,
+  ``initial_codelet_urgency`` and ``initial_codelet_rounds`` name codelet types, an
+  urgency tier and a formula; ``expiration_period``, ``num_youngest_structures``,
+  ``max_theme_activation``, ``distance_threshold`` and
+  ``slippage_ignore_probability`` are numbers and could be offered — they are simply
+  not yet.  All of them are wired.
+* **Read by another layer.**  ``clampable_codelet_patterns`` is consulted by the
+  control API, not by the engine; a run reads it zero times.
+* **Read by nothing at all.**  ``max_temperature``, ``maximum_rule_line_length``,
+  ``garbage_collect_cycles``, ``step_cycles``, ``eliza_mode_default``,
+  ``justify_mode_default`` and the display timings.  Some are Scheme-era, some are
+  features the port does not have, some are overtaken by the run request.
 
-``shrunk_link_lengths`` used to sit in that last group: a seeded table of lengths
-that nothing read, because the engine derives them from the intrinsic lengths exactly
-as ``slipnet.ss:191`` does.  A stored table would have been a second place for the
-same fact, so the table is gone and the *factor* it is derived by —
-``shrunk_link_length_factor`` — is the parameter instead.
+**No count is written here on purpose.**  Every prose enumeration of this in the
+repository had drifted from the source it claimed to be verified against by the time
+anyone checked.  ``tests/seed_unit/test_metadata_provider.py`` derives the
+classification from the source instead, and fails when a parameter moves between
+groups — which is the only version of this paragraph that stays true.
 
-That last group used also to name ``expiration_period``, ``max_theme_activation``,
-``workspace_activation``, ``num_youngest_structures`` and ``distance_threshold``.  Each
-of those was declared here, shipped with a value, displayed in the Admin panel — and
-duplicated as a Python literal the engine read instead.  They are wired now, which is
-what makes the list above short enough to enumerate rather than trail off in "and
-others".
-
-Offering a control that changes nothing is worse than offering none, so membership here
-is decided by *what the engine actually reads*, verified against the source rather than
-assumed.
+Offering a control that changes nothing is worse than offering none, so membership
+here is decided by *what the engine actually reads*.
 
 Formula coefficients and urgency levels stay global.  They are the model's constants
 rather than a run's settings — there are fifty-odd of them, they are already editable in
@@ -80,7 +71,7 @@ KIND_NODE_LIST = "node_list"
 KIND_NODE_MAP = "node_map"
 
 #: Grouping for presentation.  Not semantic — the engine does not care — but a flat list
-#: of twenty-eight numbers is unreadable, and these are the divisions the architecture
+#: of that many numbers is unreadable, and these are the divisions the architecture
 #: itself uses.
 GROUP_TEMPERATURE = "Temperature and pacing"
 GROUP_SLIPNET = "Slipnet"
@@ -147,7 +138,7 @@ def _p(name, kind, group, label, description, minimum=None, maximum=None,
     return RunParameter(name, kind, group, label, description, minimum, maximum, departs)
 
 
-#: The twenty-eight parameters the engine reads while it runs.  Verified against
+#: The parameters the engine reads while it runs, offered per Run.  Verified against
 #: ``get_param`` call sites in ``server/engine/**`` and in the codelet bodies stored in
 #: ``seed_data/codelet_types.json``; a parameter that is only read by the API or the
 #: display is not here.

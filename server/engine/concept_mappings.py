@@ -365,7 +365,11 @@ class ConceptMapping:
         Returns a list of (node, max_activation) pairs for the description type,
         both descriptors, and the label (if any).
         """
-        max_activation = 100.0
+        # ``%max-activation%`` from the node itself, which carries the run's value.
+        # It was a literal here, so a lowered ceiling left the concept pattern
+        # clamping at 100 while every node topped out lower — the pattern and the
+        # Slipnet disagreeing about what "fully active" is.
+        max_activation = self.description_type1.max_activation
         pattern: list[tuple[SlipnetNode, float]] = [
             (self.description_type1, max_activation),
             (self.descriptor1, max_activation),
