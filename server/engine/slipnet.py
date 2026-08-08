@@ -267,6 +267,16 @@ class SlipnetNode:
                 1.0 - (self.conceptual_depth / 100.0) ** exponent
             )
 
+    @property
+    def max_activation(self) -> float:
+        """``%max-activation%`` as this run resolved it.
+
+        Public because two other modules build clamp patterns against the ceiling —
+        ``concept_mappings.build_concept_pattern`` and ``rules`` — and reaching into a
+        private slot from outside is how the next copy of the number gets written.
+        """
+        return self._max_activation
+
     def fully_active(self, threshold: float | None = None) -> bool:
         """Is this concept at *full* activation?
 
@@ -826,6 +836,9 @@ class Slipnet:
         #: constructs.  Read by ``SlipnetTopology.from_slipnet``, so a backend
         #: session and the object graph cannot disagree about the ceiling.
         self.activation_params: ActivationParams = DEFAULT_ACTIVATION
+        #: ``%update-cycle-length%`` (``run.ss:20``).  Replaced in ``from_metadata``;
+        #: the reference cadence stands for a bare ``Slipnet()``.
+        self.update_cycle_length: int = 15
         # Resolved on first use rather than here, because ``from_metadata``
         # computes the decay rates *after* constructing the Slipnet and the
         # numeric layout needs them.
@@ -896,8 +909,11 @@ class Slipnet:
 
             to_node.incoming_links.append(link)
 
-        # Compute decay rates
-        ucl = meta.get_param("update_cycle_length", 15)
+        # Compute decay rates.  Held on the Slipnet as well, because the *spread*
+        # scale is computed from the same cycle length once per update and had no
+        # other way to reach it.
+        ucl = int(meta.get_param("update_cycle_length", 15))
+        slipnet.update_cycle_length = ucl
         for node in slipnet.nodes.values():
             node.compute_rate_of_decay(ucl)
 
@@ -993,7 +1009,14 @@ class Slipnet:
         order, same count as the reference — which is what keeps a seeded run
         comparable across the change.
         """
-        ucl = 15  # Will be parameterized later
+        # The cycle length the *spread scale* is computed against.  This was
+        # ``ucl = 15  # Will be parameterized later``, which made the scale exactly
+        # 1.0 whatever the parameter said — while ``compute_rate_of_decay`` read the
+        # parameter and the cadence in ``runner.py`` read it too.  So two thirds of
+        # ``update_cycle_length`` moved and the third did not: the same half-wiring as
+        # the clamp period, and equally invisible, because a run *does* change when
+        # the parameter changes and a guard test on the run would pass.
+        ucl = self.update_cycle_length
         session = self._numeric_session()
         if session is None:
             self.spread_activation(ucl, threshold=threshold)

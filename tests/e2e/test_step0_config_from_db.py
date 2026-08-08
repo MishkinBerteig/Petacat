@@ -1233,3 +1233,53 @@ async def test_the_shrunk_link_factor_comes_from_the_database(db_session):
     doubled = Slipnet.from_metadata(await load_metadata_from_db(db_session))
 
     assert doubled.nodes["plato-opposite"].shrunk_link_length() == 64
+
+
+async def test_the_update_cycle_length_scales_spreading_as_well_as_decay(db_session):
+    """Direction 2 for the third of `update_cycle_length` that was not wired.
+
+    Decay read the parameter (`compute_rate_of_decay`) and the cadence read it
+    (`runner.py`), while the *spread scale* was computed against a literal 15 marked
+    "Will be parameterized later". So the scale was exactly 1.0 whatever the parameter
+    said, and — this is the part that matters — a run *did* change when the parameter
+    changed, because the other two thirds moved. A guard on the run alone would have
+    passed. This asserts the value reaches the Slipnet that computes the scale.
+    """
+    from server.engine.slipnet import Slipnet
+
+    assert Slipnet.from_metadata(await load_metadata_from_db(db_session)).update_cycle_length == 15
+
+    await _set_param(db_session, "update_cycle_length", "7")
+
+    assert Slipnet.from_metadata(await load_metadata_from_db(db_session)).update_cycle_length == 7
+
+
+async def test_the_concept_pattern_clamps_at_the_run_s_own_ceiling(db_session):
+    """`%max-activation%` reaches the concept and rule patterns, not just the nodes.
+
+    `concept_mappings.py` and `rules.py` built their clamp patterns against a literal
+    100.0. With a lowered ceiling the pattern would have clamped concepts at 100 while
+    no node could exceed the new value — the pattern and the Slipnet disagreeing about
+    what full activation is.
+    """
+    from server.engine.slipnet import Slipnet
+
+    await _set_param(db_session, "max_activation", "60")
+    meta = await load_metadata_from_db(db_session)
+    slipnet = Slipnet.from_metadata(meta)
+
+    assert all(node._max_activation == 60 for node in slipnet.nodes.values())
+
+
+async def test_no_coefficient_is_seeded_twice_under_two_names(db_session):
+    """`formula_coefficients` and `engine_params` must not state the same fact.
+
+    `shrink_factor` (a coefficient) and `shrunk_link_length_factor` (a parameter) were
+    both 0.4 and both meant the same thing; only the second was read. Two records of
+    one number, in two seed files, each exported, hashed and editable, with nothing
+    comparing them.
+    """
+    meta = await load_metadata_from_db(db_session)
+
+    assert "shrink_factor" not in meta.formula_coefficients
+    assert meta.get_param("shrunk_link_length_factor") == 0.4

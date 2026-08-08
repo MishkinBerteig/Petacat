@@ -28,7 +28,7 @@ license change was authorised by Dr. Marshall directly (see
 > end-to-end. Episodic Memory shapes the runs that inherit it: a run declines an
 > answer already held for the same problem and rules, so repeating a problem
 > within a [Training Session](#persistence-modes-and-training-sessions) explores
-> a different answer each time. It ships with 2,235 test cases covering the engine, the API, and the
+> a different answer each time. It ships with 2,240 test cases covering the engine, the API, and the
 > help/config system, run on both the CPU and the GPU numeric backends. Underneath the seven components sits an execution
 > substrate — three [persistence modes](#persistence-modes-and-training-sessions),
 > a [GPU numeric substrate](#the-numeric-substrate), and
@@ -330,7 +330,7 @@ Petacat has two test suites:
   codelets running), `architecture` (properties of the source tree),
   `integration` (the repository's artifacts agreeing), and `e2e` (full HTTP
   stack against a running database). All six run in a single command against
-  the local Postgres — 2,235 cases, which includes the numeric matrix's second
+  the local Postgres — 2,240 cases, which includes the numeric matrix's second
   pass over the 250 backend-sensitive tests. See
   [TESTING.md](TESTING.md) for the layer breakdown, the numeric backend matrix,
   the session ceiling, the unit-test rules, determinism requirements, test-double
@@ -722,8 +722,8 @@ The tables below cover the routes a user drives.
 | GET | `/api/runs/{id}/trace` | Event log |
 | GET | `/api/runs/{id}/commentary` | Natural-language summary |
 | GET | `/api/runs/{id}/identity` | Mode, seed, spreading threshold, config hash, memory hash, session |
-| GET | `/api/runs/parameters/catalogue` | The 28 settable run parameters: kind, bounds, default, what each does |
-| GET | `/api/runs/{id}/parameters` | What a Run was: `fixed` (all 28, resolved), `overridden`, `defaults`, `derived` |
+| GET | `/api/runs/parameters/catalogue` | The settable run parameters: kind, bounds, default, what each does |
+| GET | `/api/runs/{id}/parameters` | What a Run was: `fixed` (all of them, resolved), `overridden`, `defaults`, `derived` |
 | GET | `/api/runs/{id}/telemetry` | Free-running telemetry: worker split, conflict rate, throughput |
 | GET | `/api/review/runs/{id}` | One Run's review projection, for linking straight to it |
 | PUT | `/api/review/sessions/{id}/note` | Set a Training Session's note |
@@ -761,7 +761,7 @@ they live in their own router rather than in `runs.py`.
 
 ## Run parameters
 
-Twenty-eight entries in `seed_data/engine_params.json` are read by the engine *while it
+Most entries in `seed_data/engine_params.json` are read by the engine *while it
 thinks* — thresholds, periods, capacities, the update cadence. Each can be set per Run,
 is stored with the Run, and is shown read-back in the interface.
 
@@ -777,7 +777,7 @@ Omitted parameters keep the global default. An unknown name, an out-of-range val
 wrongly-typed one is a **400**, checked before anything is created — ignoring a typo
 would produce a Run at the default whose record claimed the override was applied.
 
-**The other 20 entries are deliberately not offered.** Display timings
+**The remaining entries are deliberately not offered.** Display timings
 (`initial_speed`, `text_scroll_pause`, the flash settings), Scheme-era implementation
 details (`garbage_collect_cycles`, `step_cycles`), and several the port reads nowhere at
 all (`expiration_period`, `max_theme_activation`, `workspace_activation`). Membership is
@@ -795,7 +795,7 @@ on, the config and memory hashes, the free-running telemetry — are equally par
 Run was, and are shown beside them read-only. Presenting a derived value as settable
 would misrepresent how the engine works.
 
-**The resolved set is stored, not the overrides.** `runs.parameters` holds all 28 values,
+**The resolved set is stored, not the overrides.** `runs.parameters` holds every value,
 because storing overrides alone would mean reading them against whatever the defaults are
 at the time of reading — so a Run's record would quietly change meaning whenever the
 configuration did.

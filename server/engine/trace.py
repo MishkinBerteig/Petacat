@@ -57,6 +57,21 @@ COGNITIVE_EVENT_TYPES = (
     CLAMP_START,
 )
 
+#: ``answer_quality_rule_weight`` / ``answer_quality_temperature_weight``, the
+#: shipped 60/40.  The fallback for an event asked for its quality without a
+#: ``MetadataProvider``; the coefficients are the value in force.
+DEFAULT_ANSWER_QUALITY_WEIGHTS = (60.0, 40.0)
+
+
+def _answer_quality_weights(meta: Any) -> list[float]:
+    if meta is None:
+        return list(DEFAULT_ANSWER_QUALITY_WEIGHTS)
+    return [
+        meta.get_formula_coeff("answer_quality_rule_weight"),
+        meta.get_formula_coeff("answer_quality_temperature_weight"),
+    ]
+
+
 # Default grace period (codelets after unclamping before allowing a new clamp).
 # Matches Scheme constant %grace-period% in jootsing.ss:252.
 GRACE_PERIOD_DEFAULT = 100
@@ -204,35 +219,41 @@ class AnswerEvent(TraceEvent):
     # Quality metrics  (Scheme: trace.ss make-answer-event)
     # ------------------------------------------------------------------
 
-    def get_absolute_quality(self) -> float:
+    def get_absolute_quality(self, meta: Any = None) -> float:
         """Scheme: ``get-absolute-quality``.
 
         ``weighted-average([top-rule-quality, 100-temperature], [60, 40])``
+
+        The weights are ``answer_quality_rule_weight`` and
+        ``answer_quality_temperature_weight``, which ``answers.compute_answer_quality``
+        reads for the engine's own copy of this formula.  They were written here as
+        ``[60.0, 40.0]`` — a third record of the same two numbers.  *meta* is optional
+        because this path is the event's own reporting rather than cognition, and its
+        callers are ``__repr__`` and the summary line; without it the shipped weights
+        stand in and are named rather than typed as a bare pair.
         """
         rule_quality = _rule_quality(self.top_rule)
         return round(
             weighted_average(
                 [rule_quality, 100.0 - self.temperature],
-                [60.0, 40.0],
+                _answer_quality_weights(meta),
             )
         )
 
-    def get_relative_quality(self) -> float:
-        """Scheme: ``get-relative-quality``.
-
-        ``weighted-average([top-rule-relative-quality, 100-temperature], [60, 40])``
-        """
+    def get_relative_quality(self, meta: Any = None) -> float:
+        """Scheme: ``get-relative-quality``.  Weights as in
+        :meth:`get_absolute_quality`."""
         rel_quality = _rule_relative_quality(self.top_rule)
         return round(
             weighted_average(
                 [rel_quality, 100.0 - self.temperature],
-                [60.0, 40.0],
+                _answer_quality_weights(meta),
             )
         )
 
-    def get_quality(self) -> float:
+    def get_quality(self, meta: Any = None) -> float:
         """Alias for ``get_absolute_quality`` (matches Scheme ``get-quality``)."""
-        return self.get_absolute_quality()
+        return self.get_absolute_quality(meta)
 
     def get_strength(self) -> float:
         """Override — answer strength is its quality."""

@@ -1108,7 +1108,9 @@ class Rule(WorkspaceStructure):
             if nid not in seen:
                 seen.add(nid)
                 unique.append(n)
-        return [(n, 100.0) for n in unique]
+        # ``%max-activation%`` off the nodes rather than written here; see
+        # ``rules.ss:268``, which maps ``%max-activation%`` over exactly this list.
+        return [(n, n.max_activation) for n in unique]
 
     def compute_quality(self, meta: MetadataProvider) -> None:
         """Compute rule quality from uniformity, abstractness, succinctness.

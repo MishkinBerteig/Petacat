@@ -353,3 +353,94 @@ def test_the_clampable_patterns_are_five_of_the_nine():
         assert label.endswith("codelet pattern"), label
         key = name.replace("_", "-") + "-codelet-pattern"
         assert key in meta.codelet_patterns, f"{name} names no pattern"
+
+
+#: Engine parameters that are read by something other than the engine's own run loop,
+#: or by nothing at all.  Every other key in ``engine_params.json`` must be a run
+#: parameter.  Keeping the classification here rather than in prose is deliberate:
+#: every written-out count of this in the repository had drifted from the source it
+#: claimed to describe, in one case by five.
+_READ_BY_THE_ENGINE_BUT_NOT_OFFERED = {
+    # Named things rather than numbers in a range — no control kind renders them.
+    "initial_codelet_types",
+    "initial_codelet_urgency",
+    "initial_codelet_rounds",
+    # Numbers that could be offered and are not yet.
+    "expiration_period",
+    "num_youngest_structures",
+    "max_theme_activation",
+    "distance_threshold",
+    "slippage_ignore_probability",
+}
+
+#: Read by the control API, never by a run.
+_READ_BY_ANOTHER_LAYER = {"clampable_codelet_patterns"}
+
+#: Read by nothing: Scheme-era, unported, superseded by the run request, or display.
+_READ_BY_NOTHING = {
+    "max_temperature",
+    "maximum_rule_line_length",
+    "garbage_collect_cycles",
+    "step_cycles",
+    "eliza_mode_default",
+    "justify_mode_default",
+    "initial_speed",
+    "max_num_of_flashes",
+    "max_flash_pause",
+    "max_snag_pause",
+    "text_scroll_pause",
+    "codelet_highlight_pause",
+}
+
+
+def test_every_engine_parameter_is_classified():
+    """No parameter may be silently neither offered nor accounted for.
+
+    A key that is in `engine_params.json`, absent from `RUN_PARAMETERS`, and absent
+    from the three sets above is one nobody has decided about — and the way this
+    codebase's configuration defects have all begun is a value that is shipped,
+    hashed and displayed while nobody has said what reads it.
+    """
+    import json
+    import os
+
+    from server.engine.parameters import RUN_PARAMETERS
+
+    seed_dir = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
+    with open(os.path.join(seed_dir, "engine_params.json")) as f:
+        keys = set(json.load(f))
+
+    offered = {p.name for p in RUN_PARAMETERS}
+    classified = (
+        offered
+        | _READ_BY_THE_ENGINE_BUT_NOT_OFFERED
+        | _READ_BY_ANOTHER_LAYER
+        | _READ_BY_NOTHING
+    )
+
+    unclassified = keys - classified
+    assert not unclassified, (
+        "engine parameters that are neither offered per Run nor accounted for: "
+        f"{sorted(unclassified)}. Decide what reads each one and put it in the right "
+        "set in this file."
+    )
+    stale = classified - keys - offered
+    assert not stale, f"classified names that are not in engine_params.json: {sorted(stale)}"
+
+
+def test_a_parameter_is_not_both_offered_and_excused():
+    """The four groups partition; nothing sits in two of them."""
+    from server.engine.parameters import RUN_PARAMETERS
+
+    offered = {p.name for p in RUN_PARAMETERS}
+    groups = {
+        "offered": offered,
+        "engine, not offered": _READ_BY_THE_ENGINE_BUT_NOT_OFFERED,
+        "another layer": _READ_BY_ANOTHER_LAYER,
+        "nothing": _READ_BY_NOTHING,
+    }
+    names = list(groups)
+    for i, left in enumerate(names):
+        for right in names[i + 1 :]:
+            overlap = groups[left] & groups[right]
+            assert not overlap, f"{left} and {right} both claim {sorted(overlap)}"
