@@ -2636,7 +2636,14 @@ def _report_answer_locked(
         )
 
     # Check for remindings (Scheme: memory.ss:214-229)
-    remindings = ctx.memory.find_remindings(answer_desc)
+    # ``%distance-threshold%`` (``memory.ss:488``) comes from the parameter.  Omitting
+    # it here left ``find_remindings`` on its own literal 5.0, so the one knob that
+    # decides how readily a past answer comes to mind was unreachable.
+    remindings = ctx.memory.find_remindings(
+        answer_desc,
+        ctx.meta.get_param("distance_threshold", 5.0),
+        meta=ctx.meta,
+    )
     for past_answer in remindings:
         problem_text = (
             f"{past_answer.problem[0]} -> {past_answer.problem[1]}; "

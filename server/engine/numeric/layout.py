@@ -73,12 +73,52 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 # exactly how the backends would drift apart.
 # ---------------------------------------------------------------------------
 
-#: ``%max-activation%``: the ceiling, and what "fully active" means exactly.
-MAX_ACTIVATION = 100.0
+@dataclass(frozen=True)
+class ActivationParams:
+    """The three activation constants, resolved once per run from metadata.
 
-#: ``%full-activation-threshold%``: the floor of ``above-threshold?``, and hence
-#: of ``partially-active?`` (slipnet.ss:397-404).
-FULL_ACTIVATION_THRESHOLD = 50.0
+    Scheme: ``%max-activation%`` (slipnet.ss:20), ``%workspace-activation%``
+    (slipnet.ss:21), ``%full-activation-threshold%`` (slipnet.ss:22).
+
+    One object rather than three module globals, for the reason the comment above
+    gives: the jump's eligibility window is stated in four places and the ceiling in
+    eight, and the only thing keeping them from drifting is that there is exactly one
+    place the numbers are *produced*.  That place is ``from_metadata``; everything
+    else reads a field.
+
+    **Every value is coerced to ``float`` here and nowhere else.**  Both loaders hand
+    these back as Python ``int`` — ``metadata_service._parse_param`` with
+    ``value_type="int"``, and ``json.load`` on the seed path — and an ``int`` reaching
+    ``self.activation = max_activation`` would make a node's activation an int, which
+    shows up in a state-graph snapshot; an ``int`` reaching ``mx.clip`` would be a
+    weak-typed scalar of a different kind on the Metal path.  A plain Python ``float``
+    is what every consumer here has always been given.
+    """
+
+    max_activation: float = 100.0
+    workspace_activation: float = 100.0
+    full_activation_threshold: float = 50.0
+
+    @classmethod
+    def from_metadata(cls, meta: Any) -> ActivationParams:
+        return cls(
+            max_activation=float(meta.get_param("max_activation", 100)),
+            workspace_activation=float(meta.get_param("workspace_activation", 100)),
+            full_activation_threshold=float(
+                meta.get_param("full_activation_threshold", 50)
+            ),
+        )
+
+
+#: The shipped values, and the fallback for a topology or a node built without a
+#: ``MetadataProvider`` — ``synthetic.py``, and the ``SlipnetNode``s that unit tests
+#: construct directly.
+DEFAULT_ACTIVATION = ActivationParams()
+
+#: The *defaults*, not the values in force.  Retained because they are imported by
+#: name; anything holding a topology or a node reads those instead.
+MAX_ACTIVATION = DEFAULT_ACTIVATION.max_activation
+FULL_ACTIVATION_THRESHOLD = DEFAULT_ACTIVATION.full_activation_threshold
 
 
 # ---------------------------------------------------------------------------
@@ -127,6 +167,12 @@ class SlipnetTopology:
     #: Redundant with ``in_indptr`` but lets a backend that reduces with a
     #: bincount-style primitive skip reconstructing it every cycle.
     in_dest: tuple[int, ...]
+
+    #: The run's activation constants.  A field rather than a module global because
+    #: they are per-run, and on the *topology* because that is the object a backend
+    #: uploads once and never touches again — the same lifecycle these have.
+    #: Defaulted so ``synthetic.py`` and tests that build a topology need no metadata.
+    activation: ActivationParams = DEFAULT_ACTIVATION
 
     @property
     def n_nodes(self) -> int:
@@ -180,6 +226,7 @@ class SlipnetTopology:
             in_source=tuple(source),
             in_weight=tuple(weight),
             in_dest=tuple(dest),
+            activation=slipnet.activation_params,
         )
 
 
@@ -335,6 +382,10 @@ class ThemeParams:
     self_weight: float
     spread_amount: float
     sensitivity: float
+    #: ``%max-theme-activation%`` — the clip both poles use.  Here rather than read
+    #: per theme for the same reason the coefficients are: it cannot change during a
+    #: run, and the clips run twice per theme per cycle.
+    max_activation: float
 
     @classmethod
     def from_metadata(cls, meta: Any) -> ThemeParams:
@@ -347,6 +398,7 @@ class ThemeParams:
             self_weight=meta.get_formula_coeff("theme_intra_cluster_self_weight"),
             spread_amount=meta.get_param("theme_spread_amount", 20),
             sensitivity=meta.get_formula_coeff("theme_net_effect_default_sensitivity"),
+            max_activation=meta.get_param("max_theme_activation", 100),
         )
 
 

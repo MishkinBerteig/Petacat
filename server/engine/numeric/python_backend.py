@@ -19,8 +19,6 @@ from typing import Sequence
 
 from server.engine.numeric.backend import Backend, SlipnetSession
 from server.engine.numeric.layout import (
-    FULL_ACTIVATION_THRESHOLD,
-    MAX_ACTIVATION,
     STRING_ANSWER,
     STRING_INITIAL,
     STRING_MODIFIED,
@@ -37,7 +35,10 @@ from server.engine.numeric.layout import (
 class PythonSlipnetSession(SlipnetSession):
     """Holds the state as plain lists — ``load``/``store`` are shallow copies."""
 
-    __slots__ = ("topology", "state", "_scaled_weight", "_scaled_for")
+    __slots__ = (
+        "topology", "state", "_scaled_weight", "_scaled_for",
+        "_max_activation", "_full_activation_threshold",
+    )
 
     def __init__(self, topology: SlipnetTopology) -> None:
         self.topology = topology
@@ -49,6 +50,10 @@ class PythonSlipnetSession(SlipnetSession):
         )
         self._scaled_weight: list[float] = list(topology.in_weight)
         self._scaled_for = 1.0
+        # The run's activation constants, read once off the topology.  The hot
+        # loops below see a slot load rather than a two-hop attribute chain.
+        self._max_activation = topology.activation.max_activation
+        self._full_activation_threshold = topology.activation.full_activation_threshold
 
     def load(self, state: SlipnetState) -> None:
         self.state = SlipnetState(
@@ -107,9 +112,10 @@ class PythonSlipnetSession(SlipnetSession):
         # node including frozen ones, exactly as the reference's does — and it is a
         # no-op for a frozen node, because nothing was allowed into its buffer:
         # neither decay above nor spreading below nor a Workspace jolt touches one.
+        ceiling = self._max_activation
         for i in range(top.n_nodes):
             a = act[i] + buf[i]
-            act[i] = 0.0 if a < 0.0 else (100.0 if a > 100.0 else a)
+            act[i] = 0.0 if a < 0.0 else (ceiling if a > ceiling else a)
             buf[i] = 0.0
 
     def _spread(self, threshold: float, scale: float) -> None:
@@ -191,9 +197,9 @@ class PythonSlipnetSession(SlipnetSession):
         for i, a in enumerate(act):
             # ``partially-active?`` (slipnet.ss:402-404): the reference filters
             # the jump's candidates to [50, 100) before drawing at all.
-            if not (FULL_ACTIVATION_THRESHOLD <= a < MAX_ACTIVATION):
+            if not (self._full_activation_threshold <= a < self._max_activation):
                 continue
-            p = (a / MAX_ACTIVATION) ** 3
+            p = (a / self._max_activation) ** 3
             # ``RNG.prob`` short-circuits at both ends without touching the
             # stream.  The window above already excludes p == 1 and p == 0, but
             # the guard is kept so this list is defined by the property that
@@ -206,7 +212,7 @@ class PythonSlipnetSession(SlipnetSession):
     def apply_jumps(self, indices: Sequence[int]) -> None:
         act = self.state.activation
         for i in indices:
-            act[i] = 100.0
+            act[i] = self._max_activation
 
 
 class PythonBackend(Backend):
@@ -299,12 +305,13 @@ class PythonBackend(Backend):
                 # ``activation-function`` (``themes.ss:456-459``): a positive theme is
                 # pushed toward +100 by excitation and toward 0 by inhibition; a
                 # negative theme is pushed toward -100 and toward 0 respectively.
+                ceiling = params.max_activation
                 if snapshot[t] >= 0:
                     a = act[ti] + net_effect
-                    act[ti] = 0.0 if a < 0.0 else (100.0 if a > 100.0 else a)
+                    act[ti] = 0.0 if a < 0.0 else (ceiling if a > ceiling else a)
                 else:
                     a = act[ti] - net_effect
-                    act[ti] = -100.0 if a < -100.0 else (0.0 if a > 0.0 else a)
+                    act[ti] = -ceiling if a < -ceiling else (0.0 if a > 0.0 else a)
 
     # -- Workspace object values -------------------------------------------
 

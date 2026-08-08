@@ -18,18 +18,26 @@ if TYPE_CHECKING:
     from server.engine.metadata import MetadataProvider
     from server.engine.slipnet import SlipnetNode
 
-#: ``%max-theme-activation%`` — a theme's activation lives in [-100, +100] (§4.2).
-MAX_THEME_ACTIVATION = 100.0
+#: ``%max-theme-activation%`` (``themes.ss:20``) — a theme's activation lives in
+#: [-100, +100] (§4.2).
+#:
+#: The fallback, not the value in force.  ``max_theme_activation`` is an engine
+#: parameter and both clips take it from there; this stands in only for a caller that
+#: has no ``MetadataProvider``, which is a hand-built test object rather than a run.
+DEFAULT_MAX_THEME_ACTIVATION = 100.0
+
+#: Retained under the original name for anything that imports it.
+MAX_THEME_ACTIVATION = DEFAULT_MAX_THEME_ACTIVATION
 
 
-def _clip_positive(value: float) -> float:
-    """Scheme: ``clip-positive`` (``themes.ss:34-35``) — clip to [0, +100]."""
-    return max(0.0, min(MAX_THEME_ACTIVATION, value))
+def _clip_positive(value: float, ceiling: float = DEFAULT_MAX_THEME_ACTIVATION) -> float:
+    """Scheme: ``clip-positive`` (``themes.ss:34-35``) — clip to [0, +ceiling]."""
+    return max(0.0, min(ceiling, value))
 
 
-def _clip_negative(value: float) -> float:
-    """Scheme: ``clip-negative`` (``themes.ss:37-38``) — clip to [-100, 0]."""
-    return max(-MAX_THEME_ACTIVATION, min(0.0, value))
+def _clip_negative(value: float, ceiling: float = DEFAULT_MAX_THEME_ACTIVATION) -> float:
+    """Scheme: ``clip-negative`` (``themes.ss:37-38``) — clip to [-ceiling, 0]."""
+    return max(-ceiling, min(0.0, value))
 
 
 # Theme type string constants (values live in DB theme_types table)
@@ -142,7 +150,12 @@ class Theme:
     def is_negative(self) -> bool:
         return self.activation < 0
 
-    def boost(self, factor: float, boost_amount: float = 7.0) -> None:
+    def boost(
+        self,
+        factor: float,
+        boost_amount: float = 7.0,
+        max_activation: float = DEFAULT_MAX_THEME_ACTIVATION,
+    ) -> None:
         """Boost activation by a factor.
 
         Scheme: themes.ss theme-boost-amount = 7.
@@ -162,7 +175,7 @@ class Theme:
         if self.frozen:
             return
         self.activation = _clip_positive(
-            round(self.activation + factor / 100.0 * boost_amount)
+            round(self.activation + factor / 100.0 * boost_amount), max_activation
         )
 
     def clear_net_input_buffer(self) -> None:
@@ -278,6 +291,9 @@ class ThemeCluster:
         pp_weight = meta.get_formula_coeff("theme_intra_cluster_pos_to_pos_weight")
         self_weight = meta.get_formula_coeff("theme_intra_cluster_self_weight")
         spread_amount = meta.get_param("theme_spread_amount", 20)
+        max_activation = meta.get_param(
+            "max_theme_activation", DEFAULT_MAX_THEME_ACTIVATION
+        )
 
         n_relations = max(1, len(self.themes))
         sensitivity = meta.get_formula_coeff("theme_net_effect_default_sensitivity")
@@ -346,9 +362,13 @@ class ThemeCluster:
             # this is a Jacobi step — every theme updates from the same pre-step state.
             net_effect = round(spread_amount * math.tanh(alpha * target._net_input_buffer))
             if snapshot[index] >= 0:
-                target.activation = _clip_positive(target.activation + net_effect)
+                target.activation = _clip_positive(
+                    target.activation + net_effect, max_activation
+                )
             else:
-                target.activation = _clip_negative(target.activation - net_effect)
+                target.activation = _clip_negative(
+                    target.activation - net_effect, max_activation
+                )
             target._net_input_buffer = 0.0
 
     def __repr__(self) -> str:
@@ -663,7 +683,13 @@ class Themespace:
                 theme = cluster.get_theme(relation)
                 if theme:
                     boost_amt = self.meta.get_param("theme_boost_amount", 7)
-                    theme.boost(factor, boost_amt)
+                    theme.boost(
+                        factor,
+                        boost_amt,
+                        self.meta.get_param(
+                            "max_theme_activation", DEFAULT_MAX_THEME_ACTIVATION
+                        ),
+                    )
                 return
 
     def clamp_negative_pattern(
@@ -697,7 +723,11 @@ class Themespace:
         (probability = (|activation|/100)^3) and its relation node
         (probability = (activation/100)^3).
         """
-        workspace_activation = 100  # %workspace-activation%
+        # ``%workspace-activation%`` (``slipnet.ss:21``), applied at
+        # ``slipnet.ss:171-172``.  Read from the parameter rather than written here:
+        # this was one of two places the value was a literal, and the two could have
+        # drifted apart with nothing to notice.
+        workspace_activation = self.meta.get_param("workspace_activation", 100)
 
         for cluster in self.clusters:
             if cluster.theme_type not in self.active_theme_types:

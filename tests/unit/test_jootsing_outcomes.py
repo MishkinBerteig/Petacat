@@ -64,7 +64,10 @@ class _FakeWorkspace:
         self.top_rules = [_quality_rule(q) for q in top_qualities]
         self.bottom_rules = [_quality_rule(q) for q in bottom_qualities]
 
-    def get_activity(self, codelet_count):
+    def get_activity(self, codelet_count, meta=None):
+        # ``meta`` carries ``expiration_period`` and ``num_youngest_structures``,
+        # which the real Workspace reads from it; this fake reports a quiet
+        # workspace regardless, which is what these cases are about.
         return 0
 
 

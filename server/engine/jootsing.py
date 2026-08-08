@@ -172,7 +172,7 @@ def check_progress(
         )
 
     # ── Outside clamp period: check current activity ──
-    activity = workspace.get_activity(codelet_count)
+    activity = workspace.get_activity(codelet_count, meta)
 
     if activity > 0:
         # Things are still happening, nothing to worry about

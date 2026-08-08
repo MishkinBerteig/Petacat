@@ -1,6 +1,6 @@
 """The run parameters: what may be set before a Run, and what is derived from it.
 
-A Run's behaviour is fixed by more than its problem and its seed.  Twenty-five entries in
+A Run's behaviour is fixed by more than its problem and its seed.  Most entries in
 ``engine_params.json`` are read by the engine while it thinks — thresholds, periods,
 capacities, the update cadence — and until now every one of them was global: editable
 only in the Admin panel, applying to every Run at once, and recorded in a Run's row only
@@ -17,7 +17,7 @@ kind with the right bounds and say what the parameter does.
 Fixed and derived
 -----------------
 **Fixed** parameters are inputs: chosen before the first codelet, constant for the whole
-Run.  Those are the twenty-six below.
+Run.  Those are the twenty-seven below.
 
 **Derived** values are outputs: the numeric backend that was actually selected, the shard
 count sharding actually settled on, the config and memory hashes, the Training Session.
@@ -27,14 +27,35 @@ be would be a lie about how the engine works.
 
 What is deliberately *not* here
 -------------------------------
-Eighteen further entries in ``engine_params.json`` are not run parameters and are not
-offered: display timings (``codelet_highlight_pause``, ``initial_speed``,
-``text_scroll_pause``, the flash settings), Scheme-era implementation details
-(``garbage_collect_cycles``, ``step_cycles``), and a handful the port reads nowhere at
-all (``expiration_period``, ``max_theme_activation``, ``workspace_activation``,
-``shrunk_link_lengths``, and others).  Offering a control that changes nothing is worse
-than offering none, so membership here is decided by *what the engine actually reads*,
-verified against the source rather than assumed.
+Twenty-two further entries in ``engine_params.json`` are not run parameters and are not
+offered.  They fall into three groups, and the distinction matters:
+
+* **Structural.**  ``initial_codelet_types``, ``initial_codelet_urgency``,
+  ``initial_codelet_rounds`` and ``clampable_codelet_patterns`` are read by the engine
+  every run, but they name codelet types and urgency tiers rather than taking a number
+  in a range, and there is no control kind here that can render one.  They are edited
+  through the Admin panel's engine-parameter table.
+* **Not the engine's.**  Display timings (``codelet_highlight_pause``,
+  ``initial_speed``, ``text_scroll_pause``, the flash settings) belong to the
+  interface; ``garbage_collect_cycles`` and ``step_cycles`` are Scheme-era
+  implementation details; ``eliza_mode_default`` and ``justify_mode_default`` are
+  overtaken by the run request, which carries both.
+* **Read nowhere at all.**  ``max_temperature`` (no consumer and no Scheme
+  counterpart), ``maximum_rule_line_length`` (``rules.ss:1717``, a transcription
+  width the port does not wrap to) and ``shrunk_link_lengths`` (derived at
+  ``slipnet.py`` as 40% of the intrinsic length, exactly as ``slipnet.ss:191``
+  derives it, so the seeded map informs nothing).
+
+That last group used also to name ``expiration_period``, ``max_theme_activation``,
+``workspace_activation``, ``num_youngest_structures`` and ``distance_threshold``.  Each
+of those was declared here, shipped with a value, displayed in the Admin panel — and
+duplicated as a Python literal the engine read instead.  They are wired now, which is
+what makes the list above short enough to enumerate rather than trail off in "and
+others".
+
+Offering a control that changes nothing is worse than offering none, so membership here
+is decided by *what the engine actually reads*, verified against the source rather than
+assumed.
 
 Formula coefficients and urgency levels stay global.  They are the model's constants
 rather than a run's settings — there are fifty-odd of them, they are already editable in
@@ -55,7 +76,7 @@ KIND_NODE_LIST = "node_list"
 KIND_NODE_MAP = "node_map"
 
 #: Grouping for presentation.  Not semantic — the engine does not care — but a flat list
-#: of twenty-six numbers is unreadable, and these are the divisions the architecture
+#: of twenty-seven numbers is unreadable, and these are the divisions the architecture
 #: itself uses.
 GROUP_TEMPERATURE = "Temperature and pacing"
 GROUP_SLIPNET = "Slipnet"
@@ -122,7 +143,7 @@ def _p(name, kind, group, label, description, minimum=None, maximum=None,
     return RunParameter(name, kind, group, label, description, minimum, maximum, departs)
 
 
-#: The twenty-six parameters the engine reads while it runs.  Verified against
+#: The twenty-seven parameters the engine reads while it runs.  Verified against
 #: ``get_param`` call sites in ``server/engine/**`` and in the codelet bodies stored in
 #: ``seed_data/codelet_types.json``; a parameter that is only read by the API or the
 #: display is not here.
@@ -157,6 +178,11 @@ RUN_PARAMETERS: tuple[RunParameter, ...] = (
        "same as being *fully* active: that is exactly 100, and it is what shrinks a "
        "concept's links and makes its descriptions and concept-mappings count as "
        "relevant.", 0, 100),
+    _p("workspace_activation", KIND_INT, GROUP_SLIPNET, "Workspace activation jolt",
+       "How much activation a codelet pours into a concept it touches. This is what "
+       "holds the relevant concepts up against decay: letter-category loses 70% of its "
+       "activation per update cycle, and only the constant stream of scouts, "
+       "evaluators and builders re-activating it keeps the concept present.", 0, 1000),
     _p("initial_slipnode_clamp_cycles", KIND_INT, GROUP_SLIPNET,
        "Initial clamp duration (cycles)",
        "How long the initially-relevant nodes are held at full activation at the start "
