@@ -847,6 +847,243 @@ describe('RunControlsPanel — a refused request reaches the error channel', () 
   })
 })
 
+// ---------------------------------------------------------------------------
+// A finished run is not continued — it is followed
+// ---------------------------------------------------------------------------
+//
+// Repeating a problem is the whole point of a Training Session: Episodic Memory
+// carries the first run's answer into the second, which declines to give it again
+// and goes somewhere else. Pressing Run twice on an unchanged problem used to
+// re-enter the finished run instead -- the backend puts its status back to
+// `running` and steps it on past its own answer, in the same row -- so the second
+// run of a session could not be started from this panel at all, and the only
+// workaround was to change the seed, which makes it a different experiment.
+//
+// Halted and paused are not terminal and must keep continuing, or Stop-then-Run
+// would silently abandon the run it was meant to resume.
+
+describe('RunControlsPanel — a finished run is followed by a new one', () => {
+  let createRun: ReturnType<typeof vi.fn>
+  let runToAnswer: ReturnType<typeof vi.fn>
+
+  const SAME_PROBLEM = {
+    runId: 12,
+    runParams: { initial: 'abc', modified: 'abd', target: 'xyz', seed: 7 },
+    workspace: workspaceFor('abc', 'abd', 'xyz'),
+    formInputs: { initial: 'abc', modified: 'abd', target: 'xyz', answer: '', seed: '7' },
+  }
+
+  beforeEach(() => {
+    createRun = vi.fn().mockResolvedValue(undefined)
+    runToAnswer = vi.fn().mockResolvedValue(undefined)
+  })
+
+  it('starts a NEW run when the loaded one has found its answer', async () => {
+    setup({ ...SAME_PROBLEM, status: 'answer_found', createRun, runToAnswer })
+
+    render(<RunControlsPanel />)
+    fireEvent.click(screen.getByRole('button', { name: /run to answer/i }))
+
+    await waitFor(() => expect(runToAnswer).toHaveBeenCalled())
+    expect(createRun).toHaveBeenCalledWith({
+      initial: 'abc',
+      modified: 'abd',
+      target: 'xyz',
+      answer: undefined,
+      seed: 7,
+    })
+  })
+
+  it('starts a NEW run when the loaded one gave up', async () => {
+    setup({ ...SAME_PROBLEM, status: 'gave_up', createRun, runToAnswer })
+
+    render(<RunControlsPanel />)
+    fireEvent.click(screen.getByRole('button', { name: /run to answer/i }))
+
+    await waitFor(() => expect(createRun).toHaveBeenCalled())
+  })
+
+  it('continues a paused run rather than abandoning it', async () => {
+    setup({ ...SAME_PROBLEM, status: 'paused', createRun, runToAnswer })
+
+    render(<RunControlsPanel />)
+    fireEvent.click(screen.getByRole('button', { name: /run to answer/i }))
+
+    await waitFor(() => expect(runToAnswer).toHaveBeenCalled())
+    expect(createRun).not.toHaveBeenCalled()
+  })
+
+  it('continues a halted run — the step limit is not an outcome', async () => {
+    setup({ ...SAME_PROBLEM, status: 'halted', createRun, runToAnswer })
+
+    render(<RunControlsPanel />)
+    fireEvent.click(screen.getByRole('button', { name: /run to answer/i }))
+
+    await waitFor(() => expect(runToAnswer).toHaveBeenCalled())
+    expect(createRun).not.toHaveBeenCalled()
+  })
+
+  it('says the next press begins the next run of the session', () => {
+    setup({ ...SAME_PROBLEM, status: 'answer_found', createRun, runToAnswer })
+
+    render(<RunControlsPanel />)
+    expect(
+      screen.getByText(/starts the next run of this Training Session/i),
+    ).toBeTruthy()
+    // And not the caption that reads as "this is what you are looking at".
+    expect(screen.queryByText(/Showing run #12/)).toBeNull()
+  })
+
+  it('steps into a new run too, rather than stepping a finished one on', async () => {
+    const step = vi.fn().mockResolvedValue(undefined)
+    setup({ ...SAME_PROBLEM, status: 'answer_found', createRun, runToAnswer, step })
+
+    render(<RunControlsPanel />)
+    fireEvent.click(screen.getByRole('button', { name: /step 1/i }))
+
+    await waitFor(() => expect(step).toHaveBeenCalledWith(1))
+    expect(createRun).toHaveBeenCalled()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Nothing starts a second run while one is under way
+// ---------------------------------------------------------------------------
+//
+// `status === 'running'` alone does not cover it. Creating a run is a round trip,
+// and inside that window nothing in the store says a run was asked for -- so a
+// second click starts a second run and orphans the first. Stop is the one control
+// that has to stay live throughout, and it was the one that did not: it was gated
+// on `isProcessing`, which run-to-answer holds for the whole of a batch run.
+
+describe('RunControlsPanel — while a run is under way', () => {
+  const LOADED = {
+    runId: 12,
+    runParams: { initial: 'abc', modified: 'abd', target: 'xyz', seed: 7 },
+    workspace: workspaceFor('abc', 'abd', 'xyz'),
+    formInputs: { initial: 'abc', modified: 'abd', target: 'xyz', answer: '', seed: '7' },
+  }
+
+  it('disables Run while the engine reports itself running', () => {
+    setup({ ...LOADED, status: 'running' })
+
+    render(<RunControlsPanel />)
+    expect(screen.getByRole('button', { name: /run to answer/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /step 1/i })).toBeDisabled()
+  })
+
+  it('disables Run from the press, before the run exists to report itself', async () => {
+    // The gap the status flag cannot cover: createRun is in flight.
+    const createRun = vi.fn().mockReturnValue(new Promise(() => {}))
+    const runToAnswer = vi.fn().mockResolvedValue(undefined)
+    setup({
+      runId: null,
+      formInputs: { initial: 'abc', modified: 'abd', target: 'xyz', answer: '', seed: '7' },
+      createRun,
+      runToAnswer,
+    })
+
+    render(<RunControlsPanel />)
+    const button = screen.getByRole('button', { name: /run to answer/i })
+    fireEvent.click(button)
+
+    await waitFor(() => expect(button).toBeDisabled())
+    fireEvent.click(button)
+    expect(createRun).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps Stop available through a batch run, which is when it is needed', () => {
+    // run-to-answer holds `isProcessing` for the whole run, so gating Stop on it
+    // disabled the only way out from the moment the run started.
+    setup({ ...LOADED, status: 'running', isProcessing: true })
+
+    render(<RunControlsPanel />)
+    expect(screen.getByRole('button', { name: /^stop$/i })).not.toBeDisabled()
+  })
+
+  it('leaves Stop disabled when nothing is running', () => {
+    setup({ ...LOADED, status: 'answer_found' })
+
+    render(<RunControlsPanel />)
+    expect(screen.getByRole('button', { name: /^stop$/i })).toBeDisabled()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Starting the next Training Session
+// ---------------------------------------------------------------------------
+//
+// A session is the unit runs accumulate into, and its boundary was reachable only
+// from the Admin view under a name that says what it removes ("Clear Episodic
+// Memory") rather than what it ends. So the unit could be read about in Review and
+// never started from the panel whose Run button builds it.
+
+describe('RunControlsPanel — Training Session', () => {
+  const LOADED = {
+    runId: 12,
+    runParams: { initial: 'abc', modified: 'abd', target: 'xyz', seed: 7 },
+    workspace: workspaceFor('abc', 'abd', 'xyz'),
+    formInputs: { initial: 'abc', modified: 'abd', target: 'xyz', answer: '', seed: '7' },
+  }
+
+  it('names the session the loaded run belongs to', async () => {
+    setup(LOADED)
+    render(<RunControlsPanel />)
+    // Exact, because the run card further down says "Training Session 3" as well.
+    await waitFor(() => expect(screen.getByText('session 3')).toBeTruthy())
+  })
+
+  it('ends the session on confirmation, since that is what the boundary is', async () => {
+    const startNewTrainingSession = vi.fn().mockResolvedValue(undefined)
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    setup({ ...LOADED, startNewTrainingSession })
+
+    render(<RunControlsPanel />)
+    fireEvent.click(screen.getByRole('button', { name: /start a new training session/i }))
+
+    await waitFor(() => expect(startNewTrainingSession).toHaveBeenCalled())
+    expect(
+      await screen.findByText(/the next run opens a new one/i),
+    ).toBeTruthy()
+  })
+
+  it('does nothing when the confirmation is declined', () => {
+    const startNewTrainingSession = vi.fn().mockResolvedValue(undefined)
+    vi.spyOn(window, 'confirm').mockReturnValue(false)
+    setup({ ...LOADED, startNewTrainingSession })
+
+    render(<RunControlsPanel />)
+    fireEvent.click(screen.getByRole('button', { name: /start a new training session/i }))
+
+    expect(startNewTrainingSession).not.toHaveBeenCalled()
+  })
+
+  it('does not claim a new session when the clear was refused', async () => {
+    // The store reports the failure on the channel the header renders; claiming a
+    // boundary here as well would contradict it — and the old session is still open.
+    const startNewTrainingSession = vi
+      .fn()
+      .mockRejectedValue(new ApiError(503, 'Service Unavailable', ''))
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    setup({ ...LOADED, startNewTrainingSession })
+
+    render(<RunControlsPanel />)
+    fireEvent.click(screen.getByRole('button', { name: /start a new training session/i }))
+
+    await waitFor(() => expect(startNewTrainingSession).toHaveBeenCalled())
+    expect(screen.queryByText(/the next run opens a new one/i)).toBeNull()
+  })
+
+  it('refuses to draw a session boundary in the middle of a run', () => {
+    setup({ ...LOADED, status: 'running' })
+
+    render(<RunControlsPanel />)
+    expect(
+      screen.getByRole('button', { name: /start a new training session/i }),
+    ).toBeDisabled()
+  })
+})
+
 describe('RunControlsPanel — reaching the record of the run on screen', () => {
   it('offers a route from the dashboard into the Review browser', async () => {
     setup({

@@ -24,17 +24,23 @@
 // nothing else.
 //
 // Group 1: Run — how to execute + workers + go/stop + the chosen strategy's pacing
-// Group 2: Recording — the persistence mode the next run is created with
-// Group 3: Engine parameters — the 25 the run is fixed with (collapsed)
-// Group 4: What this run is — the derived, read-only half (collapsed)
-// Group 5: Manual stepping — step size + Step N (orthogonal to both)
-// Group 6: Settings — spreading threshold, Eliza toggle, breakpoint, status
+// Group 2: Training Session — the sequence of runs the next one joins, and its end
+// Group 3: Recording — the persistence mode the next run is created with
+// Group 4: Engine parameters — the 25 the run is fixed with (collapsed)
+// Group 5: What this run is — the derived, read-only half (collapsed)
+// Group 6: Manual stepping — step size + Step N (orthogonal to both)
+// Group 7: Settings — spreading threshold, Eliza toggle, breakpoint, status
 //
-// Groups 1-3 are all *fixed at creation*: the execution strategy is not, but the
-// worker count, the persistence mode and every engine parameter are read before the
-// first codelet and cannot change afterwards. They therefore share one rule, which
+// Groups 1, 3 and 4 are all *fixed at creation*: the execution strategy is not, but
+// the worker count, the persistence mode and every engine parameter are read before
+// the first codelet and cannot change afterwards. They therefore share one rule, which
 // `inputsMatchLoadedRun` below implements once for all of them: changing any of them
 // means the next press of Run starts a new run rather than continuing this one.
+//
+// `loadedRunIsFinished` is the second half of that rule, and the one that makes a
+// Training Session usable from this panel at all: a run that has produced its outcome
+// is never continued, so pressing Run again on an unchanged problem starts the *next*
+// run rather than re-entering the last one.
 //
 // Reset lives in the Problem Input panel: it re-runs the problem defined there,
 // so it belongs with that definition rather than among the run controls.
@@ -166,6 +172,25 @@ export function RunControlsPanel() {
     && parametersMatchLoadedRun;
 
   /**
+   * The loaded run has already produced its outcome, so there is nothing to continue.
+   *
+   * Answer-found and gave-up are terminal — the engine has said what it has to say —
+   * and re-entering such a run is not a run: the backend puts its status back to
+   * `running` and steps it on past its own answer, in the same row, over the same
+   * record. So pressing Run a second time on an unchanged problem produced no second
+   * run at all, which is precisely the sequence a Training Session exists to hold:
+   * repeat a problem and watch Episodic Memory push the next run somewhere else.
+   *
+   * Halted and paused are deliberately not terminal. A run stopped by hand or by the
+   * step limit is one somebody meant to carry on with, and Run carries it on.
+   */
+  const loadedRunIsFinished =
+    store.status === 'answer_found' || store.status === 'gave_up';
+
+  /** Whether the next press of Run continues the loaded run or begins a new one. */
+  const continuesLoadedRun = inputsMatchLoadedRun && !loadedRunIsFinished;
+
+  /**
    * Parameters the server would reject, refused here rather than at the API.
    *
    * The same three checks `RunParameter.validate` makes, run against the catalogue's
@@ -181,37 +206,58 @@ export function RunControlsPanel() {
   const hasInvalidParameters = invalidNames.length > 0;
 
   const ensureRunMatchesInputs = useCallback(async () => {
-    if (!inputsMatchLoadedRun) {
+    if (!continuesLoadedRun) {
       await store.createRun(pendingParams);
     }
-  }, [store, inputsMatchLoadedRun, pendingParams]);
+  }, [store, continuesLoadedRun, pendingParams]);
+
+  /**
+   * A press of Run or Step is in flight.
+   *
+   * `status` is not enough on its own. Creating a run is a round trip, and until it
+   * comes back the engine is not running and nothing in the store says a run was
+   * asked for — so a second click inside that window starts a second run, and the
+   * first one is orphaned. This closes the window: the buttons are unavailable from
+   * the press until whatever it started has ended.
+   */
+  const [busy, setBusy] = useState(false);
 
   // A run that cannot be created is reported by the store, on the channel the header
   // renders, so the button stops quietly here: pressing Run twice would otherwise
   // stack an unhandled rejection on top of a message that already says what happened.
   const handleRun = useCallback(async () => {
+    setBusy(true);
     try {
-      await ensureRunMatchesInputs();
-    } catch {
-      return;
-    }
-    if (strategy === 'live') {
-      // run() branches on this flag; set it from the strategy rather than relying
-      // on the store default so the selector is the single source of truth.
-      store.setLiveUpdate(true);
-      await store.run();
-    } else {
-      await store.runToAnswer();
+      try {
+        await ensureRunMatchesInputs();
+      } catch {
+        return;
+      }
+      if (strategy === 'live') {
+        // run() branches on this flag; set it from the strategy rather than relying
+        // on the store default so the selector is the single source of truth.
+        store.setLiveUpdate(true);
+        await store.run();
+      } else {
+        await store.runToAnswer();
+      }
+    } finally {
+      setBusy(false);
     }
   }, [store, ensureRunMatchesInputs, strategy]);
 
   const handleStep = useCallback(async () => {
+    setBusy(true);
     try {
-      await ensureRunMatchesInputs();
-    } catch {
-      return;
+      try {
+        await ensureRunMatchesInputs();
+      } catch {
+        return;
+      }
+      await store.step(stepSize);
+    } finally {
+      setBusy(false);
     }
-    await store.step(stepSize);
   }, [store, ensureRunMatchesInputs, stepSize]);
 
   // The breakpoint buttons speak through the same channel as the run buttons: a
@@ -239,6 +285,13 @@ export function RunControlsPanel() {
 
 
   const isRunning = store.status === 'running';
+  /**
+   * A run is under way, by any of the three things that mean so: the engine reports
+   * itself running, the store is driving a run-to-answer loop, or a press of Run has
+   * not got that far yet. Everything that starts or reconfigures a run is unavailable
+   * while this holds — Stop is the one control that has to stay live.
+   */
+  const runInProgress = isRunning || busy || store.isProcessing;
   const hasRun = store.runId !== null;
   const hasInputs = !!(formInputs.initial && formInputs.modified && formInputs.target);
 
@@ -264,6 +317,46 @@ export function RunControlsPanel() {
     };
   }, [store.runId, store.epoch]);
 
+  /** The session the loaded run belongs to, when it is one that was recorded. */
+  const sessionId = identity?.session_id ?? null;
+
+  /**
+   * A session has been closed and nothing has opened the next one yet.
+   *
+   * Worth saying out loud for exactly as long as it is true: a closed session leaves
+   * no visible trace on this panel — the run on screen still reports the session it
+   * ran in, because that is still the session it ran in — so without this the button
+   * looks as though it did nothing.
+   */
+  const [sessionEnded, setSessionEnded] = useState(false);
+  useEffect(() => {
+    setSessionEnded(false);
+  }, [store.runId]);
+
+  const handleNewSession = useCallback(async () => {
+    if (
+      !window.confirm(
+        'Start a new Training Session?\n\n'
+          + 'This clears Episodic Memory, which is what a session boundary is: the '
+          + 'answers and snags from the runs so far are the only thing carried from '
+          + 'one run to the next, so the runs after this point start from nothing.\n\n'
+          + 'Recorded runs are not deleted — they stay in Run History and in Review, '
+          + 'grouped under the session being closed.\n\n'
+          + 'This cannot be undone.',
+      )
+    ) {
+      return;
+    }
+    try {
+      await store.startNewTrainingSession();
+    } catch {
+      // Said once, on the store's channel, which the header renders. Claiming a new
+      // session here as well would contradict it.
+      return;
+    }
+    setSessionEnded(true);
+  }, [store]);
+
   return (
     <div className="flex-col gap-2" style={{ fontSize: 13 }}>
       {/* ------------------------------------------------------------ */}
@@ -282,7 +375,7 @@ export function RunControlsPanel() {
             value={strategy}
             onChange={(e) => setStrategy(e.target.value as ExecutionStrategy)}
             style={{ width: '100%' }}
-            disabled={isRunning}
+            disabled={runInProgress}
           >
             <option value="batch">Run to answer — full speed</option>
             <option value="live">Live updates — codelet by codelet</option>
@@ -309,7 +402,7 @@ export function RunControlsPanel() {
             max={machineWorkers ?? undefined}
             value={effectiveWorkers}
             onChange={(e) => store.setWorkers(parseInt(e.target.value, 10) || 1)}
-            disabled={isRunning || store.persistenceMode === 'audit'}
+            disabled={runInProgress || store.persistenceMode === 'audit'}
             style={{ width: 70 }}
           />
           <span className="text-xs text-muted">
@@ -339,21 +432,27 @@ export function RunControlsPanel() {
           <button
             className="primary"
             onClick={handleRun}
-            disabled={isRunning || !hasInputs || hasInvalidParameters}
+            disabled={runInProgress || !hasInputs || hasInvalidParameters}
             title={
-              hasInvalidParameters
-                ? `Out of the range the server accepts: ${invalidNames.join(', ')}`
-                : strategy === 'batch'
-                  ? 'Run the engine at full speed on the backend until an answer is found. The UI refreshes at the sampling interval.'
-                  : 'Run the engine one codelet at a time, refreshing all panels after every step.'
+              runInProgress
+                ? 'A run is under way. Stop it, or wait for it to finish, before starting another.'
+                : hasInvalidParameters
+                  ? `Out of the range the server accepts: ${invalidNames.join(', ')}`
+                  : strategy === 'batch'
+                    ? 'Run the engine at full speed on the backend until an answer is found. The UI refreshes at the sampling interval.'
+                    : 'Run the engine one codelet at a time, refreshing all panels after every step.'
             }
             style={{ flex: 1 }}
           >
             {strategy === 'batch' ? 'Run to Answer' : 'Run with Live Updates'}
           </button>
+          {/* Enabled for the whole of a run, including a batch one. `isProcessing` is
+              set for as long as run-to-answer's polling loop lives, so gating Stop on
+              it too left the only way out of a batch run disabled from the moment it
+              started until the moment it no longer needed stopping. */}
           <button
             onClick={() => store.stop()}
-            disabled={!isRunning || store.isProcessing}
+            disabled={!isRunning && !store.isProcessing}
             title="Stop the running loop."
           >
             Stop
@@ -387,6 +486,16 @@ export function RunControlsPanel() {
         <div className="text-xs text-muted" style={{ marginTop: 6 }}>
           {store.runId === null ? (
             hasInputs ? 'Starts a new run.' : 'Enter a problem above to begin.'
+          ) : inputsMatchLoadedRun && loadedRunIsFinished ? (
+            /* The same problem again is not a repeat of run #N — it is the next run
+               of this Training Session, and the one whose answer Episodic Memory can
+               already tell it not to give twice. Saying so here is what makes the
+               session visible from the button that builds it. */
+            <span style={{ color: 'var(--text-accent)' }}>
+              Run #{store.runId} {store.status === 'gave_up' ? 'gave up' : 'found its answer'}
+              {' '}&mdash; running starts the next run of this Training Session, on the
+              same problem, against the Episodic Memory this one leaves behind.
+            </span>
           ) : inputsMatchLoadedRun ? (
             <>
               Showing run #{store.runId}: {store.workspace?.initial ?? '?'}&nbsp;&rarr;&nbsp;
@@ -454,7 +563,58 @@ export function RunControlsPanel() {
       </div>
 
       {/* ------------------------------------------------------------ */}
-      {/* GROUP 2: Recording — the persistence mode (Phase 0 §A2)       */}
+      {/* GROUP 2: Training Session — what the runs accumulate into     */}
+      {/*                                                              */}
+      {/* Directly under the Run button because that button is what     */}
+      {/* builds a session: each press adds a run to the open one, and  */}
+      {/* Episodic Memory is what carries between them. The boundary    */}
+      {/* was reachable only from the Admin view, under a name          */}
+      {/* ("Clear Episodic Memory") that says what it removes rather    */}
+      {/* than what it ends — so the unit the runs belong to could be   */}
+      {/* read about in Review and never started from here.             */}
+      {/* ------------------------------------------------------------ */}
+      <div style={groupStyle}>
+        <div style={groupLabelStyle}>Training Session</div>
+
+        <div className="text-xs text-muted">
+          A sequence of runs sharing one Episodic Memory — the only thing that
+          crosses a run boundary. Every run joins the open session automatically;
+          there is nothing to start.
+          {sessionId !== null && (
+            <>
+              {' '}This run is in <strong>session {sessionId}</strong>.
+            </>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }}>
+          <button
+            onClick={handleNewSession}
+            disabled={runInProgress}
+            title={
+              runInProgress
+                ? 'A run is under way. A session boundary drawn mid-run would put the run and the memory it is thinking against on opposite sides of it.'
+                : 'End this Training Session by clearing Episodic Memory. The next run starts a new session and inherits nothing.'
+            }
+          >
+            Start a new Training Session
+          </button>
+          {sessionEnded && (
+            <span className="text-xs" style={{ color: 'var(--success)' }}>
+              Session closed — the next run opens a new one.
+            </span>
+          )}
+        </div>
+
+        <div className="text-xs text-muted" style={{ marginTop: 6 }}>
+          Ending a session means clearing Episodic Memory, because that is the whole
+          of what one run hands the next. Runs already recorded stay in Run History
+          and in Review, grouped under the session being closed.
+        </div>
+      </div>
+
+      {/* ------------------------------------------------------------ */}
+      {/* GROUP 3: Recording — the persistence mode (Phase 0 §A2)       */}
       {/*                                                              */}
       {/* Its own group, immediately below the execution strategy       */}
       {/* rather than tucked into Settings, because the two are the     */}
@@ -475,7 +635,7 @@ export function RunControlsPanel() {
               store.setPersistenceMode(e.target.value as PersistenceMode)
             }
             style={{ width: '100%' }}
-            disabled={isRunning}
+            disabled={runInProgress}
           >
             <option value="normal">Normal — state at start and end</option>
             <option value="audit">Audit — every action, step-through</option>
@@ -515,7 +675,7 @@ export function RunControlsPanel() {
       </div>
 
       {/* ------------------------------------------------------------ */}
-      {/* GROUP 3: Engine parameters — the settable half                */}
+      {/* GROUP 4: Engine parameters — the settable half                */}
       {/*                                                              */}
       {/* Directly below Recording because they are the same kind of    */}
       {/* thing: chosen before the run, unchangeable during it, and     */}
@@ -525,7 +685,7 @@ export function RunControlsPanel() {
       <RunParametersPanel />
 
       {/* ------------------------------------------------------------ */}
-      {/* GROUP 4: What this run is — the derived half                  */}
+      {/* GROUP 5: What this run is — the derived half                  */}
       {/*                                                              */}
       {/* Immediately after the settable half and visibly different     */}
       {/* from it (dashed border, "read-only" in the header), because   */}
@@ -535,7 +695,7 @@ export function RunControlsPanel() {
       <RunDerivedPanel />
 
       {/* ------------------------------------------------------------ */}
-      {/* GROUP 5: Manual stepping — independent of both selectors      */}
+      {/* GROUP 6: Manual stepping — independent of both selectors      */}
       {/* ------------------------------------------------------------ */}
       <div style={groupStyle}>
         <div style={groupLabelStyle}>Manual stepping</div>
@@ -552,12 +712,12 @@ export function RunControlsPanel() {
                 setStepSize(Math.max(1, parseInt(e.target.value, 10) || 1))
               }
               style={{ width: 70 }}
-              disabled={isRunning}
+              disabled={runInProgress}
             />
           </div>
           <button
             onClick={handleStep}
-            disabled={isRunning || !hasInputs}
+            disabled={runInProgress || !hasInputs}
             title={`Execute ${stepSize} codelet(s), then stop.`}
             style={{ flex: 1 }}
           >
@@ -571,7 +731,7 @@ export function RunControlsPanel() {
       </div>
 
       {/* ------------------------------------------------------------ */}
-      {/* GROUP 6: Settings                                            */}
+      {/* GROUP 7: Settings                                            */}
       {/* ------------------------------------------------------------ */}
       <div style={groupStyle}>
         <div style={groupLabelStyle}>Settings</div>

@@ -636,3 +636,57 @@ describe('runStore — which Episodic Memory the panel reads', () => {
     expect(store.getState().memory.scope).toBe('live')
   })
 })
+
+// ---------------------------------------------------------------------------
+// Ending a Training Session
+// ---------------------------------------------------------------------------
+//
+// A session is not created and cannot be: it opens when a run needs one. What can
+// be done is end it, and ending it *is* clearing Episodic Memory -- that memory is
+// the only thing one run hands the next, so after the clear the runs on either
+// side share nothing and do not belong together. The run on screen is deliberately
+// left alone: it ran in the session that has just closed, and that stays true.
+
+describe('runStore — ending a Training Session', () => {
+  it('clears Episodic Memory, which is what the boundary is', async () => {
+    const store = await freshStore()
+    store.setState({ runId: 7 })
+
+    await store.getState().startNewTrainingSession()
+
+    expect(clearMemory).toHaveBeenCalled()
+    expect(store.getState().memory.answers).toEqual([])
+  })
+
+  it('bumps the epoch so the panels re-read across the boundary', async () => {
+    const store = await freshStore()
+    const before = store.getState().epoch
+
+    await store.getState().startNewTrainingSession()
+
+    expect(store.getState().epoch).toBe(before + 1)
+  })
+
+  it('leaves the loaded run alone — it belongs to the session just closed', async () => {
+    const store = await freshStore()
+    store.setState({ runId: 7, codeletCount: 842, status: 'answer_found' })
+
+    await store.getState().startNewTrainingSession()
+
+    expect(store.getState().runId).toBe(7)
+    expect(store.getState().codeletCount).toBe(842)
+  })
+
+  it('raises and says so when the clear was refused, since the session is still open', async () => {
+    const { ApiError } = await import('@/api/client')
+    const store = await freshStore()
+    clearMemory.mockRejectedValueOnce(new ApiError(503, 'Service Unavailable', ''))
+
+    await expect(store.getState().startNewTrainingSession()).rejects.toBeTruthy()
+
+    expect(store.getState().lastError).toContain('start a new Training Session')
+    // Nothing was discarded locally either: the memory on screen is still the
+    // session's, because the session is still open.
+    expect(store.getState().epoch).toBe(0)
+  })
+})
