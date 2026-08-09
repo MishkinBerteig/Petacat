@@ -498,7 +498,12 @@ async def test_a_mid_session_normal_run_records_the_memory_it_inherited(
     answers, and its start-state capture has to contain them — otherwise "re-execute
     from the recorded start state" would silently start from a different memory.
     """
-    first = await _create(app_client, MODE_NORMAL, seed=SEED)
+    # The first Run needs to find something for the second to inherit, and the module's
+    # ``SEED`` no longer does on this problem — see
+    # ``test_a_reset_normal_run_starts_before_the_answer_it_found``.  The ``pytest.skip``
+    # below is the safety net for a run that happens not to converge; with 12345 it had
+    # become the only path, so this test was asserting nothing at all.
+    first = await _create(app_client, MODE_NORMAL, seed=12346)
     await app_client.post(f"/api/runs/{first['run_id']}/run", json={"max_steps": 2500})
 
     second = await _create(app_client, MODE_NORMAL, seed=SEED + 1)
