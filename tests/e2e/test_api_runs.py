@@ -251,8 +251,14 @@ async def test_answer_appears_in_workspace(app_client):
     """
     # Use run_to_completion with a generous step limit.
     # If no answer is found in time, the test is inconclusive (not failed).
+    #
+    # Its own seed, not the module's, for the reason given in
+    # ``test_a_fast_run_contributes_its_answer_to_the_session``: ``xyz``/12345 now gives
+    # up. The ``pytest.skip`` below is meant to be the rare safety net for a run that
+    # happens not to converge, not the branch every run takes — a test that always skips
+    # asserts nothing, and this one had gone quiet.
     resp = await app_client.post("/api/runs", json={
-        "initial": "abc", "modified": "abd", "target": "xyz", "seed": SEED,
+        "initial": "abc", "modified": "abd", "target": "xyz", "seed": 12346,
     })
     run_id = resp.json()["run_id"]
 
