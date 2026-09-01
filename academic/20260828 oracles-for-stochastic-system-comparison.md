@@ -7,36 +7,6 @@ Petacat Project · August 2026
 
 ---
 
-## ## Key Points for Review
-
-1. Is the story of how I got there told? Outline:
-   
-   1. Automated porting with AI, many iterations to do basic static porting using both Metacat code and Marshall's PhD dissertation to ensure consistency.
-   
-   2. When I got to the point of doing manual testing on Petacat, I felt like the system was producing results that didn't jibe with my understanding of Metacat and the dissertation.
-   
-   3. That led me to getting Metacat running on my local machine and with extremely small sample sizes intuitively verifying that I was, indeed, getting poor results.
-   
-   4. But intuition is not sufficient for this sort of porting effort.
-   
-   5. So, I started thinking about how to get good oracle data.
-   
-   6. At first, I thought that a sufficient amount of data with probabilities of each outcome and comparing between Metacat and Petacat would be good, but I quickly ran into the problem that even on good computer equipment, running enough times to get good sample sizes was not easy AND it was even hard to tell what a "good sample" size would be.
-   
-   7. With a bit of research I discovered Good-Turing as a perfect fit for my use case to figure out good sample sizes.
-   
-   8. Then after trying to figure out a method of comparing output distributions, I realized that that wasn't necessary, nor was it going to be much better for testing duration.
-   
-   9. The idea of using the support set instead of the full probability distribution was an insight that came from trying to figure out if I was getting bad outputs that "didn't make sense" or if I was just getting extremely rare outputs that were compatible with Metacat.
-   
-   10. The idea of using the p50 set came from realizing that it would be just as much a problem if Petacat failed to produce key results.
-   
-   11. The problems were chosen from the dissertation, at first. Then an additional set of "simple" problems were added to benchmark the behaviour further.
-   
-   12. Running the Metacat system under a harness to get results ended up showing some legitimate bugs in that code.
-   
-   13. Then using the oracle data and the Good-Turning / p50 support set, quite a few discrepancies in the Petacat implementation were discovered, mostly that depended on run-time behaviour that was difficult to discover with a static porting analysis.
-
 ## Abstract
 
 Porting or re-implementing a stochastic program raises a verification problem that conventional regression testing does not address. There is no ground truth to check against, no seeded run of the original that the port can reproduce step for step, and no single output that is "the" correct answer. What exists is a *distribution* over outcomes, and the practical question is not "is the port correct" but "does the port behave the same, and if not, where."
@@ -48,6 +18,40 @@ We do not claim the ingredients are new. Good–Turing estimation dates to 1953;
 of the test quantitative, and an account of applying it in practice.
 
 The reference oracle cost 374,500 runs of Metacat. A routine comparison cycle costs 1,900 runs of Petacat — 100 per problem, roughly 197× fewer per problem — and carries a computed false-negative probability below 4 × 10⁻¹⁰ on the head test and an expected 0.17 spurious flags per cycle on the tail test. Across the 19 benchmark problems the oracle located a single defect in the port responsible for three of its five flagged variations, closed one harness artefact, and left one finding open, while never once firing the head test.
+
+---
+
+## 0. Background
+
+The method of the following sections is a composition of well-known ingredients; §2 is explicit about this. What is specific to this project is the path by which the composition was reached and the composition itself. Two of the design decisions that carry the paper's weight — the saturation of the reference by the Good–Turing missing-mass estimate rather than by a fixed run count, and the comparison of outcome *supports* rather than of outcome *distributions* — were reached by elimination, under constraints that became visible only as the work proceeded. This section records that path.
+
+### 0.1 The port, and where static comparison runs out
+
+Petacat was produced by an iterative, model-assisted static porting effort: across many passes, large language models translated the reference implementation's Chez Scheme source into Python, holding the two sources against each other for consistency, with Marshall's dissertation [21] — which describes the architecture in prose the code does not always make explicit — as a second reference throughout. The process produced a functionally complete implementation, and it was the natural first phase of the work. It also exhausted its own evidence at the point where it stopped: a static comparison can only report that the two sources agree, and for a stochastic system, source agreement is not behavioural agreement.
+
+### 0.2 The suspicion
+
+The first manual exercises of the port produced behaviour that did not match, to the developer's own understanding of the architecture, what the reference and its documentation describe. The immediate response was to bring the reference itself into the local environment and to run both systems side by side. Even at extremely small sample sizes the mismatch was visible to inspection. But inspection at small sample sizes is the weakest evidence available for a system of this kind: a run is a single draw from a potentially heavy-tailed distribution as hinted by the samples from Marshall's dissertation, and a handful of draws from two such distributions, compared by eye, can neither confirm nor refute a behavioural divergence. The suspicion was worth acting on, but could not be the basis of a verdict.
+
+### 0.3 The stopping problem
+
+The requirement that followed was for reference data with a quantified completeness. The first naive design sketched for it was the direct one: sample the reference until no new outcomes are discovered after a fixed number of times for each problem (the author tried n=1000). The intention was to sample enough times to estimate the probability of each outcome on each problem, and compare the implementations' outcome probabilities. That design ran into two issues at the trial stage. The practical issue: for a system whose outcome space is large and long-tailed, the run count for both systems needed to estimate the tail to useful precision is large, and on capable hardware the one-off reference characterisation remained a major burden, particularly with a preference for fast iterative test and fix cycles. The conceptual issue, which is the decisive one: the stopping criterion was clearly arbitrary and for some problems obviously insufficient. A sample of a distribution whose support is unknown does not report when it is large enough or when all reachable outcomes are exhausted.
+
+A short discussion with Gemini and a review of some options on Wikipedia dissolved the second issue. The Good–Turing missing-mass estimate, f₁/n computed on the reference system, estimates exactly the quantity a reference characterisation must be able to state for itself: how much probability mass the sample has not yet seen. Sampling the reference to a small target for f₁/n is therefore both a sufficient procedure and a self-certifying one. The saturation criterion of §3.3 is that idea adopted, together with the small-sample guard the same literature forces.
+
+### 0.4 From distributions to supports
+
+With a stopping rule in hand, the design still had to choose what the check compares. The obvious object was the outcome distribution itself — a divergence, a goodness-of-fit test, or a per-outcome comparison of estimated probabilities. Pursuing those routes showed them to be unnecessary, and still very expensive: resolving two multinomials over a support of this size to useful power requires tens or hundreds of thousands of runs per problem per check. But that would be several hours per check instead of the desired handful of minutes for an impatient human and AI agents. Remember: the original suspicion was that the port produced outputs that were simply wrong. The only rival hypothesis was that it produced rare but legitimate outputs — outcomes in the reference's support at probabilities too small to be visible in a small sample. Those two hypotheses are separated by a single question: *is the outcome in the reference's support?* Frequency is irrelevant to the question; membership suffices. Support comparison is therefore not a simplification adopted for convenience but the resolution of an ambiguity that distributional comparison could not resolve — and, for the reasons of §3.2, it is the comparison that is invariant to the legitimate engine changes (scheduler, random stream, numeric backend, concurrency) the project routinely makes.
+
+Support membership is, by itself, one-sided: observing an outcome proves reachability; absence in a small check sample proves nothing. The second component of the method addresses the question of missing outcomes. The reference set is partitioned into a head — the p50 set, the smallest subset of outcomes whose combined reference share reaches one half of the mass — and a tail. A head member is frequent enough that its *absence* from a small check sample is itself evidence, with a per-member, computable false-negative rate; the tail is policed by the reference's own missing-mass figure, which bounds the false-alarm rate of a novelty flag. The head was added because the mirror image of the original suspicion is equally damaging: a port that silently ceases to produce a common reference outcome is as far from the reference as one that produces nonsense, and the support test alone cannot see it.
+
+### 0.4 The benchmark, and what the reference harness found
+
+The problem set was drawn, at first, from the analogy problems worked through in the dissertation [21]; a small number of near-trivial problems were added later to extend the benchmark, where the expected behaviour is obvious and a flag therefore carries exceptional weight. Building the reference had a secondary effect the plan did not anticipate: running the reference implementation under the sampling harness surfaced defects in that original code — genuine bugs in the Metacat source, which were subsequently corrected locally but which have not yet been corrected upstream. A reference is only as good as the build that is sampled, and the disposition rule of §3.5 — novel outcomes are never auto-admitted, and a human decides whether the set was incomplete or the reference itself defective — exists because of this experience.
+
+### 0.5 The findings
+
+With the reference sets, their saturation figures, and the two-sided decision rule in place, the comparison ran continuously over the remaining development of the port. It located a number of discrepancies, most of them defects of runtime behaviour — direction-sensitivity in rule application, a transformation cancelled by a later one at render time, scheduling and random-stream effects — the class of defect the static porting analysis cannot surface, because on paper the two sources agree. The oracle's central contribution in this project was therefore not a confirmation of the port's correctness but a change of epistemic status: it converted an exercise that had run out of static evidence into an empirical one, in which every flag carries a computed error rate, names the outcome at issue and allows for trace analysis to discover the appropriate remediation.
 
 ---
 
