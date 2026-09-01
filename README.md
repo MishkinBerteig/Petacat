@@ -996,6 +996,15 @@ That document is an invitation to a conversation, not a roadmap. If any of
 it resonates — or breaks, or sparks a different direction — please reach
 out.
 
+## The verification paper
+
+How Petacat is checked against its reference is written up in
+[Support-Set Oracles for Comparing Stochastic Systems](academic/20260828%20oracles-for-stochastic-system-comparison.md):
+the Good–Turing-saturated support sets, the two-sided membership comparison
+that `scripts/compare_to_metacat.py` runs on every change, and the
+discrepancies it located. Its Background section (§0) records the path by
+which the method was reached.
+
 ## Community
 
 **[Join our Discord](https://discord.gg/WwwBF9urx)** — questions about the
