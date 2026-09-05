@@ -1,0 +1,53 @@
+{
+  "study_id": "support-v1",
+  "schema_version": 1,
+  "mode": "single-run-fresh-memory",
+  "max_codelets": 100000,
+  "backend": "numpy",
+  "workers": 12,
+  "chunk_size": 250,
+  "chunk_timeout_seconds": 14400,
+  "seed_stride": 100000,
+  "phases": [
+    {"name": "construction", "engine": "metacat", "runs_per_problem": 20000, "seed_base": 10000000},
+    {"name": "validation", "engine": "metacat", "runs_per_problem": 30000, "seed_base": 20000000},
+    {"name": "port", "engine": "petacat", "runs_per_problem": 1000, "seed_base": 30000000}
+  ],
+  "pilot_phases": [
+    {"name": "pilot-reference", "engine": "metacat", "runs_per_problem": 25, "seed_base": 40000000},
+    {"name": "pilot-port", "engine": "petacat", "runs_per_problem": 5, "seed_base": 50000000}
+  ],
+  "analysis": {
+    "check_batch_size": 100,
+    "fixed_prefixes": [1000, 5000, 10000, 20000],
+    "heuristic_checkpoint_interval": 500,
+    "heuristic_min_runs": 3000,
+    "zero_singleton_floor": 10000,
+    "singleton_threshold": 0.0001,
+    "no_discovery_gap": 1000,
+    "alpha": 0.05,
+    "frequency_permutations": 999,
+    "frequency_rng_seed": 61000000
+  },
+  "problems": [
+    {"name": "misc4", "strings": ["a", "b", "z"]},
+    {"name": "fig5.7", "strings": ["aabc", "aabd", "ijkk"]},
+    {"name": "misc3", "strings": ["abc", "aabbcc", "kkjjii"]},
+    {"name": "misc5", "strings": ["abc", "abd", "glz"]},
+    {"name": "misc2", "strings": ["abc", "abd", "ijk"]},
+    {"name": "run1", "strings": ["abc", "abd", "mrrjjj"]},
+    {"name": "run4", "strings": ["abc", "abd", "xyz"]},
+    {"name": "misc1", "strings": ["abc", "cba", "mrrjjj"]},
+    {"name": "fig5.4-top", "strings": ["eeqee", "qeeq", "xxixx"]},
+    {"name": "eqe-baaab", "strings": ["eqe", "qeq", "abbba"]},
+    {"name": "run6", "strings": ["eqe", "qeq", "abbbc"]},
+    {"name": "run3", "strings": ["rst", "rsu", "xyz"]},
+    {"name": "run2", "strings": ["xqc", "xqd", "mrrjjj"]},
+    {"name": "copy1", "strings": ["ab", "c", "ab"]},
+    {"name": "copy2", "strings": ["bc", "d", "bc"]},
+    {"name": "copy3", "strings": ["xy", "z", "xy"]},
+    {"name": "copy4", "strings": ["zy", "x", "zy"]},
+    {"name": "copy5", "strings": ["aabb", "cc", "aabb"]},
+    {"name": "copy6", "strings": ["abc", "d", "abc"]}
+  ]
+}
