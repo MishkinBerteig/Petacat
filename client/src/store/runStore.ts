@@ -198,6 +198,15 @@ export interface RunStore {
   reset: () => Promise<void>;
   deleteRun: () => Promise<void>;
   fullReset: () => Promise<void>;
+  /**
+   * End the open Training Session and let the next run open a new one.
+   *
+   * Clearing Episodic Memory *is* the session boundary — it discards the only thing
+   * that crosses a run — so there is no separate "new session" call to make and none
+   * is needed: a session is opened by the first run that needs one. Raises if the
+   * clear was refused, so a caller does not report a boundary that was not drawn.
+   */
+  startNewTrainingSession: () => Promise<void>;
 
   // State refresh
   refreshAll: () => Promise<void>;
@@ -778,6 +787,26 @@ export const useRunStore = create<RunStore>((set, get) => ({
       // As above: nothing is loaded, so the display returns to the default.
       spreadingThreshold: get().defaultSpreadingThreshold,
     });
+  },
+
+  startNewTrainingSession: async (): Promise<void> => {
+    beginAction();
+    try {
+      await apiClearMemory();
+    } catch (err) {
+      // Raised as well as reported: the caller says on screen that a new session has
+      // begun, and a refused clear means the old one is still open with everything
+      // still in it.
+      reportFailure(err, 'start a new Training Session');
+      throw err;
+    }
+    // The run on screen is left where it is — it belongs to the session just closed
+    // and its record does not change. What changes is what the *next* run inherits,
+    // which is nothing. The epoch bump is what makes the panels keyed to memory and
+    // to run identity read that boundary rather than keep showing the closed
+    // session's answers.
+    set({ memory: freshMemory(), epoch: get().epoch + 1 });
+    await get().refreshMemory();
   },
 
   // ---- State refresh -----------------------------------------------------

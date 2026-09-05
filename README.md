@@ -241,7 +241,7 @@ view. The two left-hand panels split along *what* versus *how*:
 Modified, Target, and optionally Answer — supplying an Answer switches the
 engine into justification mode), the **Seed**, and the demo dropdown.
 
-**Run Controls** (below it) decides how that problem executes, in six groups: Run, Recording, Engine parameters, What this run is, Manual stepping, and Settings.
+**Run Controls** (below it) decides how that problem executes, in seven groups: Run, Training Session, Recording, Engine parameters, What this run is, Manual stepping, and Settings.
 
 **Run** picks between the two mutually exclusive execution strategies, and the
 action button and pacing control follow the choice:
@@ -255,6 +255,14 @@ action button and pacing control follow the choice:
   time, refreshing every panel after each. **Delay per codelet** inserts a pause
   after each one — raise it to follow the run by eye. Much slower, but every
   structure-build is visible as it happens.
+
+**Training Session** names the sequence the next run joins, and offers the one
+control that ends it: **Start a new Training Session**, which clears Episodic
+Memory. That clear *is* the boundary — Episodic Memory is the only thing a run
+hands to the next — so there is nothing to start, only something to end. Runs
+already recorded stay in Run History and in Review, grouped under the session
+being closed. (The same action lives in the Admin view as **Clear Episodic
+Memory**, named for what it removes rather than for what it ends.)
 
 **Recording** picks the run's **persistence mode** — Normal, Audit or Fast — and
 that is a different question entirely: the execution strategy is about how this
@@ -277,16 +285,23 @@ help popover; the same content is also available statically in
 
 ### Running the same problem again, vs. running a different one
 
-These are two different intentions, and two separate controls:
+Three different intentions, and the control for each:
 
 - **A different problem.** Edit any field or pick another demo, then press Run.
   That starts a *new* run, leaving the previous one in the run history. The line
   under the Run button names the run currently on screen and warns you when your
   inputs have drifted away from it.
-- **The same problem again.** **Reset to codelet 0**, at the bottom of the
-  Problem Input panel, clears the current run's workspace back to bare strings
-  while keeping the same problem and seed. It does not start running — press Run
-  afterwards.
+- **The same problem again, as the next run of the session.** Just press Run
+  again. Once a run has found its answer or given up, there is nothing left to
+  continue, so Run starts the next run rather than re-entering the finished one —
+  and that next run inherits the Episodic Memory the last one left behind, which
+  is what makes it explore a different answer rather than repeat itself. This is
+  what a Training Session is for. (A run you stopped by hand, or one that hit a
+  step limit, is *not* finished: pressing Run carries it on.)
+- **The same run over again, from codelet 0.** **Reset to codelet 0**, at the
+  bottom of the Problem Input panel, re-initializes the current run with the same
+  problem and seed and discards what it had recorded. It does not start running —
+  press Run afterwards. Use it to re-watch a run, not to add one to the session.
 
 ### 5. Explore and edit configuration
 
@@ -425,9 +440,16 @@ temperature, the random stream) is rebuilt for each Run, exactly as in the
 original Metacat.
 
 Sessions are not something you create. One opens by itself when a Run needs it,
-and every Run afterwards joins it. Clearing episodic memory from the Admin view
-is what a session boundary means — after a clear, no Run inherits anything from
-the Runs before it.
+and every Run afterwards joins it. Clearing episodic memory is what a session
+boundary means — after a clear, no Run inherits anything from the Runs before it.
+Two controls do it, and they are the same action under two names: **Start a new
+Training Session** in the Run Controls panel, and **Clear Episodic Memory** in
+the Admin view.
+
+A Fast Run takes part in a session exactly as the other two modes do: it inherits
+the shared Episodic Memory and contributes its answers to it. What it does not do
+is write a row, so it carries no recorded session number and does not appear
+among the session's Runs in Review.
 
 ### The three modes
 
@@ -973,6 +995,15 @@ answer is itself an analogy problem solved by the same machinery.
 That document is an invitation to a conversation, not a roadmap. If any of
 it resonates — or breaks, or sparks a different direction — please reach
 out.
+
+## The verification paper
+
+How Petacat is checked against its reference is written up in
+[Support-Set Oracles for Comparing Stochastic Systems](academic/20260828%20oracles-for-stochastic-system-comparison.md):
+the Good–Turing-saturated support sets, the two-sided membership comparison
+that `scripts/compare_to_metacat.py` runs on every change, and the
+discrepancies it located. Its Background section (§0) records the path by
+which the method was reached.
 
 ## Community
 
