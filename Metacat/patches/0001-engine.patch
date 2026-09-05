@@ -1,0 +1,687 @@
+--- a/constants.ss
++++ b/constants.ss
+@@ -72,11 +72,16 @@
+ 
+ (define swl-color
+   (lambda (name)
+-    (let* ((entry (assoc name *color-names*))
+-	   (r (cadr entry))
+-	   (g (caddr entry))
+-	   (b (cadddr entry)))
+-      (make <rgb> r g b))))
++    ;; In performance mode there is no Tk, so <rgb> does not exist. A colour is
++    ;; then just its own name: engine code only ever passes colours through to
++    ;; drawing calls, which are stubbed out. GUI mode is unchanged.
++    (if (not %gui-mode%)
++      name
++      (let* ((entry (assoc name *color-names*))
++	     (r (cadr entry))
++	     (g (caddr entry))
++	     (b (cadddr entry)))
++	(make <rgb> r g b)))))
+ 
+ (define *color-names*
+   '(("snow" 255 250 250)
+@@ -957,7 +962,9 @@
+ 
+ ;; Mcat logo:
+ (define %logo-background-color% (swl-color "light sky blue"))
+-(define %logo-font% (swl-font sans-serif 18 'bold 'italic))
++(define %logo-font%
++  ;; swl-font lives in fonts.ss, which performance mode does not load.
++  (if %gui-mode% (swl-font sans-serif 18 'bold 'italic) 'headless-font))
+ 
+ ;; incomplete
+ (define b/w-mode
+--- /dev/null
++++ b/headless.ss
+@@ -0,0 +1,313 @@
++;;=============================================================================
++;; Headless (performance mode) support for Metacat.
++;;
++;; Not part of James B. Marshall's original distribution.
++;;
++;; Metacat has exactly two modes:
++;;
++;;   %gui-mode% #t   load metacat.ss          the original program, unchanged
++;;   %gui-mode% #f   load metacat-headless.ss engine only, no SWL, no Tk, no X
++;;
++;; In performance mode none of the sixteen GUI files are loaded and (setup) is
++;; never called, so no window, font, colour or canvas object is ever created.
++;; Everything the engine reaches for is supplied here instead: a null object
++;; that swallows every message, stubs for the handful of drawing procedures the
++;; engine calls directly, and plain values for the fonts, colours and layout
++;; tables it reads.
++;;
++;; This file must be loaded AFTER utilities.ss (it uses tell) and BEFORE
++;; constants.ss (which calls swl-font at load time). Call install-headless!
++;; once every engine file is loaded; it points the window globals at the null
++;; object.
++;;
++;; Why a null object rather than the %...-graphics% flags: the flags only guard
++;; part of the tree. themes.ss has no graphics guard at all, and trace.ss,
++;; memory.ss and answers.ss all draw unconditionally. Leaving one real window
++;; behind is also what caused Metacat to slow to a crawl over a few hundred
++;; runs -- its windows retag canvas items as garbage and rely on a later
++;; 'garbage-collect that run-mcat only ever sends to two of them.
++;;=============================================================================
++
++;;-----------------------------------------------------------------------------
++;; The null window.
++;;
++;; Answers 'done to anything by default. The handful of messages whose return
++;; value an engine file actually consumes get a value of the right shape; all
++;; of them sit behind %workspace-graphics% or a GUI click handler, so the
++;; values are never used for anything in performance mode -- they exist so that
++;; arithmetic does not meet 'done if some path is reached unexpectedly.
++
++(define make-null-window
++  (lambda ()
++    (lambda msg
++      (let ((message (2nd msg)))
++	(case message
++	  ;; setup.ss:61-63 stores these; nothing reads them
++	  ((get-window) (make-null-window))
++	  ;; setup.ss:152,158 verbose-on/verbose-off
++	  ((verbose-mode?) %verbose%)
++	  ;; trace.ss:514,1252 -- reachable only by clicking an event icon
++	  ((get-cached-pexp) '(let-sgl ()))
++	  ;; groups.ss:170-192, bridges.ss:516-520 -- behind %workspace-graphics%
++	  ((get-character-width get-character-height get-string-height
++	    get-string-width get-visible-w get-visible-h get-width get-height
++	    get-spanning-vertical-bridge-right-x get-spanning-cm-list-offset)
++	   0)
++	  ((get-character-bounding-box) '((0 0) (0 0)))
++	  ((get-cm-list-coord) '(0 0))
++	  ((object-type) 'null-window)
++	  (else 'done))))))
++
++(define *null-window* (make-null-window))
++
++;;-----------------------------------------------------------------------------
++;; The null MEMORY window.
++;;
++;; The plain null window is not enough here, and the difference only shows up
++;; once Episodic Memory is non-empty -- which no single-run harness ever does,
++;; because it clears memory before every run.
++;;
++;; An answer-description holds `get-normal-icon-pexp' as a local variable
++;; containing a PROCEDURE of one argument, initialised to #f (memory.ss:131) and
++;; installed only by 'set-graphics-info, which only the real memory window's
++;; 'add-memory-icon ever sends (memory-graphics.ss:115-116). Leave it #f and
++;; three methods apply it:
++;;
++;;   update-activation   memory.ss:201-206   (get-normal-icon-pexp new-value)
++;;   get-normal-icon-pexp memory.ss:232      (get-normal-icon-pexp activation)
++;;   unhighlight         memory.ss:260-264   (get-normal-icon-pexp activation)
++;;
++;; so the run dies with "attempt to apply non-procedure #f". It is reached on
++;; the *second* run of any session whose first run produced an answer:
++;; add-answer-description sets the new answer's activation to 100
++;; (memory.ss:100), and the next init-mcat sends 'clear-activations
++;; (run.ss:212), which sends 'update-activation 0 to it -- a changed value, so
++;; the draw fires. Within a single run it is reached as soon as a second answer
++;; is stored, because add-answer-description 'compare's it against each answer
++;; already held (memory.ss:102-103) and compare updates their activations.
++;;
++;; Snag descriptions are unaffected: theirs is a plain value that is only ever
++;; passed to 'draw, never applied (memory.ss:344, 371, 376).
++;;
++;; So this window answers 'add-memory-icon by installing a pexp procedure of the
++;; right shape that draws nothing. Marshall's files are untouched; supplying a
++;; GUI dependency as a no-op is what this file is for.
++
++(define make-null-memory-window
++  (lambda ()
++    (lambda msg
++      (let ((message (2nd msg)))
++	(case message
++	  ((add-memory-icon)
++	   (let ((answer (3rd msg)))
++	     ;; Same two arguments the real window supplies: a procedure taking an
++	     ;; activation and returning a pexp, and a highlight pexp. Both are
++	     ;; only ever drawn, and drawing here is a no-op.
++	     (tell answer 'set-graphics-info
++	       (lambda (activation) '(let-sgl ()))
++	       '(let-sgl ()))
++	     (tell answer 'set-bounding-box 0 0 0 0)
++	     'done))
++	  ((object-type) 'memory-window)
++	  (else 'done))))))
++
++(define *null-memory-window* (make-null-memory-window))
++
++(define install-headless!
++  (lambda ()
++    (set! *workspace-window* *null-window*)
++    (set! *slipnet-window* *null-window*)
++    (set! *coderack-window* *null-window*)
++    (set! *themespace-window* *null-window*)
++    (set! *top-themes-window* *null-window*)
++    (set! *bottom-themes-window* *null-window*)
++    (set! *vertical-themes-window* *null-window*)
++    ;; Not *null-window*: see make-null-memory-window above. Episodic Memory is
++    ;; the one thing that survives init-mcat, so a session of several runs over
++    ;; the same problem reaches code the single-run harnesses never do.
++    (set! *memory-window* *null-memory-window*)
++    (set! *comment-window* *null-window*)
++    (set! *trace-window* *null-window*)
++    (set! *temperature-window* *null-window*)
++    (set! *EEG-window* *null-window*)
++    (set! *control-panel* *null-window*)
++    ;; The EEG recorder itself is pure Scheme (a ring buffer of thunk values),
++    ;; but it is defined in eeg-graphics.ss, which is not loaded.
++    (set! *EEG* *null-window*)
++    ;; Drawing is off. These are Metacat's own flags; the engine consults them
++    ;; in about sixty places to decide whether to build graphics at all, and
++    ;; leaving them on would mean constructing picture-expressions to hand to a
++    ;; window that discards them.
++    (set! %workspace-graphics% #f)
++    (set! %slipnet-graphics% #f)
++    (set! %coderack-graphics% #f)
++    (set! %codelet-count-graphics% #f)
++    (set! %highlight-last-codelet% #f)
++    (set! %nice-graphics% #f)
++    (set! %verbose% #f)
++    ;; Each codelet type captures its window in a LOCAL (coderack.ss:81),
++    ;; which only coderack-graphics.ss ever sets. That local is not behind any
++    ;; graphics flag: coderack.ss:222 sends 'set-last-codelet-type to it on
++    ;; every codelet run, so left at #f the first codelet dies with "attempt to
++    ;; apply non-procedure #f". Give every codelet type the null window and
++    ;; harmless values for the rest.
++    ;; Argument order is coderack.ss:132
++    ;;   (g pexp get-urgency-pexp get-highlight-pexp coord x1 y1 y2 bar-proc)
++    (for-each
++      (lambda (codelet-type)
++	(tell codelet-type 'set-graphics-parameters
++	  *null-window*                  ;; g
++	  '(let-sgl ())                  ;; slot-pexp
++	  (lambda (urgency) '(let-sgl ()))
++	  (lambda (color) '(let-sgl ()))
++	  '(0 0)                         ;; codelet-count-coord
++	  0 0 0                          ;; bar-left, bar-bottom, bar-top
++	  (lambda (prob) 0)))            ;; bar-proc
++      *codelet-types*)
++    'done))
++
++;;-----------------------------------------------------------------------------
++;; SWL primitives the engine touches. Performance mode runs under plain Chez,
++;; where none of these exist.
++
++;; utilities.ss:926 pause -> thread-sleep. Nothing should be waiting for
++;; anything in performance mode, so time does not pass.
++(define thread-sleep (lambda (ms) 'done))
++(define thread-self (lambda () 'headless-thread))
++(define thread-kill (lambda args (exit 1)))
++(define thread-break (lambda (thread ignore thunk) (thunk)))
++(define swl:sync-display (lambda () 'done))
++(define swl:version "headless")
++(define swl:screen-width (lambda () 1280))
++(define swl:screen-height (lambda () 1024))
++(define swl:font-families (lambda () '()))
++(define swl:tcl-eval (lambda args 'done))
++
++;; run.ss:83 evaluates (waiter-prompt-and-read) at load time.
++(define waiter-prompt-and-read (lambda args 'done))
++(define waiter-prompt-string (lambda args 'done))
++
++;;-----------------------------------------------------------------------------
++;; Fonts and colours. constants.ss calls swl-font at load time; several engine
++;; files read font and colour values defined in the GUI files. Nothing in
++;; performance mode inspects them -- they are passed to drawing calls that go
++;; nowhere -- so a symbol is a sufficient value.
++
++(define swl-font (lambda (face size . style) 'headless-font))
++(define serif 'headless-serif)
++(define sans-serif 'headless-sans-serif)
++(define fancy 'headless-fancy)
++
++;; general-graphics.ss:24,28
++(define %default-fg-color% 'headless-black)
++(define *fg-color* %default-fg-color%)
++
++;; workspace-graphics.ss:41-44, read by groups.ss:171-205
++(define %group-letter-category-font% 'headless-font)
++(define %relevant-group-length-font% 'headless-font)
++;; coderack-graphics.ss:33, read by coderack.ss:123
++(define %coderack-codelet-count-font% 'headless-font)
++;; group-graphics.ss:21-22, read by groups.ss:223
++(define %small-group-arrowhead-length% 0)
++(define %group-arrowhead-angle% 0)
++
++;; gui.ss:410-411. The Speed slider is what normally creates these, and three
++;; more (%flash-pause%, %snag-pause%, %num-of-flashes%) have no define anywhere
++;; in the tree -- they spring into existence when speed-slider-action first
++;; fires. In performance mode nobody pauses for anything.
++(define %text-scroll-pause% 0)
++(define %codelet-highlight-pause% 0)
++(define %flash-pause% 0)
++(define %snag-pause% 0)
++(define %num-of-flashes% 0)
++
++;; slipnet-graphics.ss:164, theme-graphics.ss:25 -- read by setup.ss only
++(define *13x5-layout-table* '())
++(define *themespace-window-layout* '())
++
++;;-----------------------------------------------------------------------------
++;; Drawing procedures the engine calls directly rather than through a window.
++;; All of these sit behind %workspace-graphics%, which install-headless! turns
++;; off, so they are unreachable; they exist so that loading cannot fail on an
++;; unbound variable.
++
++(define group-graphics (lambda args 'done))
++(define bridge-graphics (lambda args 'done))
++(define draw-bridge-grope (lambda args 'done))
++(define draw-group-grope (lambda args 'done))
++(define make-group-pexp (lambda args '(let-sgl ())))
++(define make-bridge-pexp (lambda args '(let-sgl ())))
++(define new-bridge-label-number (lambda args 0))
++(define initialize-rule-graphics (lambda args 'done))
++(define outline-box (lambda args '(let-sgl ())))
++(define solid-box (lambda args '(let-sgl ())))
++(define arrowhead (lambda args '(let-sgl ())))
++(define restore-current-state (lambda args 'done))
++(define start-resize-listener (lambda args 'done))
++(define create-mcat-logo (lambda args 'done))
++
++;; setup.ss:56-69 calls these eleven constructors. Performance mode never calls
++;; (setup), so they are unreachable -- but an unbound free variable is one
++;; stray (setup) away, and returning the null window makes that harmless.
++(define make-workspace-window   (lambda args *null-window*))
++(define make-slipnet-window     (lambda args *null-window*))
++(define make-coderack-window    (lambda args *null-window*))
++(define make-themespace-window  (lambda args *null-window*))
++(define make-memory-window      (lambda args *null-memory-window*))
++(define make-comment-window     (lambda args *null-window*))
++(define make-trace-window       (lambda args *null-window*))
++(define make-temperature-window (lambda args *null-window*))
++(define make-EEG-window         (lambda args *null-window*))
++(define make-control-panel      (lambda args *null-window*))
++
++;; eeg-graphics.ss:235. install-headless! set!s this too; defining it here means
++;; it does not rely on Chez's create-on-top-level-set! behaviour.
++(define *EEG* *null-window*)
++
++;;-----------------------------------------------------------------------------
++;; Three "graphics" procedures that are not graphics at all -- pure functions
++;; that engine files call unguarded. Copied verbatim so behaviour is identical.
++
++;; theme-graphics.ss:741, called from trace.ss:1490 (print-pattern), which is
++;; reached from five places in trace.ss whenever a themespace pattern is
++;; printed. Returns a string used in a printf ~a, so it must be real.
++;; The plato-* nodes are slipnet objects defined later; referencing them inside
++;; the lambda body rather than at load time is what makes that safe.
++(define relation-name
++  (lambda (relation)
++    (cond
++      ((eq? relation #f) "diff")
++      ((eq? relation plato-identity) "iden")
++      ((eq? relation plato-opposite) "opp")
++      ((eq? relation plato-successor) "succ")
++      ((eq? relation plato-predecessor) "pred")
++      (else #f))))
++
++;; general-graphics.ss:549, called from rules.ss:1739
++(define find-next-space-position
++  (lambda (s i)
++    (cond
++      ((>= i (string-length s)) (string-length s))
++      ((char=? (string-ref s i) #\space) i)
++      (else (find-next-space-position s (+ i 1))))))
++
++;; trace-graphics.ss:322, called from trace.ss:841
++(define group-event-pexp-text-string
++  (lambda (group)
++    (let* ((bond-facet (tell group 'get-bond-facet))
++	   (constituent-objects (tell group 'get-constituent-objects))
++	   (descriptors (tell-all constituent-objects 'get-descriptor-for bond-facet))
++	   (descriptor-strings
++	     (map (lambda (object descriptor)
++		    (cond
++		      ((platonic-number? descriptor)
++		       (format "~a" (platonic-number->number descriptor)))
++		      ((letter? object) (tell descriptor 'get-lowercase-name))
++		      ((group? object) (tell descriptor 'get-uppercase-name))))
++	       constituent-objects
++	       descriptors)))
++      (apply string-append
++	(cons (1st descriptor-strings)
++	  (adjacency-map
++	    (lambda (x y) (format "-~a" y))
++	    descriptor-strings))))))
+--- /dev/null
++++ b/metacat-headless.ss
+@@ -0,0 +1,68 @@
++;;=============================================================================
++;; Metacat loader, performance mode.
++;;
++;; Not part of James B. Marshall's original distribution. metacat.ss is the
++;; other loader and remains the original program.
++;;
++;;   scheme --script run-a-problem.ss     (plain Chez -- no swl, no DISPLAY)
++;;
++;; Loads the engine and nothing else: none of the sixteen GUI files, no SWL
++;; imports, and no (setup). headless.ss supplies every GUI dependency as a
++;; no-op. See headless.ss for the reasoning.
++;;
++;; Set *metacat-directory* before loading this file if the source is not in the
++;; current directory.
++;;=============================================================================
++
++;; define-top-level-value, not define: a define is not valid in an expression
++;; context, and this has to be conditional so a caller can point us elsewhere.
++(if (not (top-level-bound? '*metacat-directory*))
++  (define-top-level-value '*metacat-directory*
++    (string-append (current-directory) "/")))
++
++(define *platform* 'linux)
++(define *file-dialog-directory* *metacat-directory*)
++(define *tcl/tk-version* 8.6)
++(define *tcl/tk-version-8_3?* #t)
++
++;; The mode switch. constants.ss reads it at load time; setup.ss and run.ss
++;; read it to skip everything Tk-shaped.
++(define %gui-mode% #f)
++
++(current-directory *metacat-directory*)
++
++(load "syntactic-sugar.ss")
++(load "utilities.ss")
++;; Before constants.ss: it calls swl-font at load time, and swl-font lives in
++;; fonts.ss, which is a GUI file.
++(load "headless.ss")
++(load "constants.ss")
++(load "setup.ss")
++(load "coderack.ss")
++(load "descriptions.ss")
++(load "bonds.ss")
++(load "groups.ss")
++(load "bridges.ss")
++(load "breakers.ss")
++(load "workspace.ss")
++(load "workspace-objects.ss")
++(load "workspace-structures.ss")
++(load "workspace-strings.ss")
++(load "concept-mappings.ss")
++(load "workspace-structure-formulas.ss")
++(load "run.ss")
++(load "formulas.ss")
++(load "slipnet.ss")
++(load "images.ss")
++(load "rules.ss")
++(load "answers.ss")
++(load "themes.ss")
++(load "justify.ss")
++(load "trace.ss")
++(load "jootsing.ss")
++(load "memory.ss")
++(load "demos.ss")
++
++;; setup.ss defines the window globals as #f; point them at the null object now
++;; that every engine file is loaded.
++(install-headless!)
+--- a/metacat.ss
++++ b/metacat.ss
+@@ -25,17 +25,17 @@
+ 
+ ;; Uncomment one of the following lines:
+-;; (define *platform* 'linux)
++(define *platform* 'linux)
+ ;; (define *platform* 'macintosh)
+ ;; (define *platform* 'windows)
+ 
+ ;; Pathname of the directory containing the Metacat source code files
+ ;; Uncomment and edit one of the following lines:
+-;; (define *metacat-directory* "~/Desktop/Metacat/") ;; Linux or Mac OS X
++(define *metacat-directory* (string-append (current-directory) "/")) ;; Run from the source directory
+ ;; (define *metacat-directory* "C:\\Documents and Settings\\Your Username\\Desktop\\Metacat") ;; Windows
+ 
+ ;; Default directory used by the "Save commentary to file" menu option
+ ;; Uncomment and edit one of the following lines:
+-;; (define *file-dialog-directory* "~/Desktop/") ;; Linux or Mac OS X
++(define *file-dialog-directory* *metacat-directory*)
+ ;; (define *file-dialog-directory* "C:\\Documents and Settings\\Your Username\\Desktop") ;; Windows
+ 
+ ;; Version number of Tcl/Tk installed on your system
+@@ -78,6 +78,10 @@
+   (thread-kill))
+ 
+ (define *tcl/tk-version-8_3?* (>= *tcl/tk-version* 8.3))
++
++;; This is the GUI loader, so GUI mode. metacat-headless.ss is the other one.
++;; Read by constants.ss, setup.ss and run.ss to skip everything Tk-shaped.
++(define %gui-mode% #t)
+ 
+ (current-directory *metacat-directory*)
+ 
+@@ -126,4 +130,4 @@
+ (load "demos.ss")
+ (load "gui.ss")
+ 
+-(printf "Metacat loaded.~%Type (setup) at the > prompt in the repl window to begin.~%")
++(printf "Metacat loaded.~%Type (setup) at the > prompt to begin.~%")
+--- a/rules.ss
++++ b/rules.ss
+@@ -1425,7 +1425,11 @@
+ 		    (denoted-objects
+ 		      (if (= (length (2nd rule-clause)) 1)
+ 			(apply append
+-			  (tell-all reference-objects 'get-constituent-objects))
++			  ;; constituent-objects-of, not tell-all: a reference
++			  ;; object can be a letter when the rule names a group
++			  ;; the target string does not have, and letters do not
++			  ;; answer 'get-constituent-objects. See utilities.ss.
++			  (map constituent-objects-of reference-objects))
+ 			reference-objects))
+ 		    (dimensions (3rd rule-clause)))
+ 	       (cond
+@@ -1531,7 +1535,9 @@
+ 		 (cross-product ref-objects self-transforms)
+ 		 (let ((all-subobjects
+ 			 (apply append
+-			   (tell-all ref-objects 'get-constituent-objects))))
++			   ;; See the note at the other call site: ref-objects
++			   ;; may contain letters.
++			   (map constituent-objects-of ref-objects))))
+ 		   (append
+ 		     (cross-product ref-objects self-transforms)
+ 		     (cross-product all-subobjects subobject-transforms))))))
+--- a/run.ss
++++ b/run.ss
+@@ -165,7 +165,15 @@
+ 	  (break))
+ 	(if* (= 0 (modulo *codelet-count* %garbage-collect-cycles%))
+ 	  (tell *themespace-window* 'garbage-collect)
+-	  (tell *workspace-window* 'garbage-collect))))))
++	  ;; Guarded like the other ~60 workspace-drawing sites. Without this,
++	  ;; running with %workspace-graphics% #f dies here at codelet 100:
++	  ;; draw-problem never ran, so every letter still has graphics-pexp #f
++	  ;; (workspace-objects.ss:40), and garbage-collect -> refresh-graphics
++	  ;; -> repair-all-graphics -> draw-string-letters hands that #f to
++	  ;; draw-exp, which does (car #f). The uncaught error resets into SWL's
++	  ;; waiter, which blocks on console input and looks exactly like a hang.
++	  (if* %workspace-graphics%
++	    (tell *workspace-window* 'garbage-collect)))))))
+ 
+ (define step-mcat
+   (lambda ()
+--- a/utilities.ss
++++ b/utilities.ss
+@@ -45,7 +45,10 @@
+       (object-type () 'base-object)
+       (else 'invalid-message-indicator))))
+ 
+-(define tell
++;; The procedure form of tell, for the few places that need tell as a value
++;; (see tell-all below). Ordinary (tell obj 'msg ...) call sites go through the
++;; macro defined just below, which is roughly 3x cheaper.
++(define tell-proc
+   (lambda args
+     (let ((object (1st args))
+ 	  (message args))
+@@ -57,6 +60,29 @@
+ 	  (report-error-and-halt message object)
+ 	  result)))))
+ 
++;; tell as a macro rather than a procedure.
++;;
++;; A run of abc->abd;xyz at seed 42 makes 1,309,245 message sends -- 959 per
++;; codelet -- and the procedure form cost 199ns per send against 67ns for a
++;; direct closure application, because (lambda args ...) conses a rest list on
++;; every send and then applies the object to it. That overhead measured 32% of
++;; total runtime. Expanding to a direct call removes both the allocation and
++;; the apply.
++;;
++;; Semantics are identical: obj is still evaluated once, arguments still left
++;; to right, and an unhandled message still lands in report-error-and-halt with
++;; the same (object message ...) list it used to receive -- now built only on
++;; the error path. %tell-o% / %tell-r% are spelled that way because Chez's
++;; extend-syntax is not hygienic and there are 4,037 call sites; neither name
++;; appears anywhere else in the tree.
++(extend-syntax (tell)
++  ((tell obj m arg ...)
++   (let* ((%tell-o% obj)
++	  (%tell-r% (%tell-o% %tell-o% m arg ...)))
++     (if (eq? %tell-r% 'invalid-message-indicator)
++       (report-error-and-halt (list %tell-o% m arg ...) %tell-o%)
++       %tell-r%))))
++
+ (define report-error-and-halt
+   (lambda (message object)
+     (printf "Ooops: bad message \"~a\" sent to object of type ~a~%"
+@@ -64,9 +90,51 @@
+       (tell object 'object-type))
+     (reset)))
+ 
++;; A workspace object's constituent objects, tolerating letters.
++;;
++;; Letters do not answer 'get-constituent-objects (groups.ss). Rule translation
++;; asks for the constituents of a rule's reference objects, and a reference
++;; object is a letter whenever the rule names a group that the target string
++;; does not actually have -- "change all objects in the rightmost group to
++;; letters" applied to a target whose rightmost object is a bare letter. That
++;; sent 'get-constituent-objects to a letter, which reaches
++;; report-error-and-halt and (reset)s the run.
++;;
++;; Under SWL that was invisible: the "Ooops" line goes to the GUI console and
++;; the reset silently abandons the run. It is reproducible at
++;; aabc -> aabd; ijkk seed 35 and is not related to headless mode.
++;;
++;; A letter has no constituents, so '() -- the clause then denotes fewer than
++;; two objects and yields nothing, i.e. the rule simply does not apply here,
++;; which is the outcome the surrounding code already handles.
++;;
++;; The test is on letter?, NOT on group?. Groups are not the only objects that
++;; answer this message: a *workspace-string* answers it with its top-level
++;; objects, and workspace-strings.ss:386-388 says why, in Marshall's own words
++;; and directly above the method --
++;;
++;;     ;; The following methods allow workspace-strings to behave as spanning
++;;     ;; groups, so that a workspace-string can be used as the reference-object
++;;     ;; of an intrinsic change-description or rule-clause-template:
++;;
++;; A rule clause naming the whole string is exactly that case, and there are two
++;; of them: a swap marked as a subobjects swap, whose enclosing object is the
++;; string when its objects have no enclosing group (rules.ss:987-991, 793-809);
++;; and Marshall's own abc->aaa example at workspace-strings.ss:455-460,
++;; "CHANGE (string <StrPos> <whole>) (subobjs <LetCat> <a>)". Testing group?
++;; made both denote nothing, so they yielded no transforms, failed
++;; currently-works? (rules.ss:223-235) and were never built. That is a
++;; regression this procedure introduced in 130314d, over and above the letter
++;; crash it was written for, and it is what the Petacat port measured as RC-5.
++(define constituent-objects-of
++  (lambda (object)
++    (if (letter? object)
++      '()
++      (tell object 'get-constituent-objects))))
++
+ (define tell-all
+   (lambda (objects . message)
+-    (map (lambda (x) (apply tell (cons x message))) objects)))
++    (map (lambda (x) (apply tell-proc (cons x message))) objects)))
+ 
+ (define delegate
+   (lambda args
+@@ -675,7 +743,7 @@
+ (define make-list-method-procedure
+   (lambda (proc)
+     (lambda (l . message)
+-      (proc (lambda (x) (apply tell (cons x message))) l))))
++      (proc (lambda (x) (apply tell-proc (cons x message))) l))))
+ 
+ (define select-meth (make-list-method-procedure select))
+ (define filter-meth (make-list-method-procedure filter))
+--- a/workspace-strings.ss
++++ b/workspace-strings.ss
+@@ -387,6 +387,71 @@
+ 	    ;; groups, so that a workspace-string can be used as the reference-object
+ 	    ;; of an intrinsic change-description or rule-clause-template:
+ 	    (get-bridge (bridge-type) #f)
++	    ;; A string used as a reference object is its own string. Without this,
++	    ;; a snag whose failing object is the whole string kills the run:
++	    ;; make-snag-event's explanation asks the failing object which string it
++	    ;; sits in, to phrase "... is not possible in xy" (trace.ss:1104, 1111,
++	    ;; 1114). That reached report-error-and-halt and (reset). Reproducible
++	    ;; at xy -> z; xy seed 5, and it is what stopped four of the copy*
++	    ;; problems early in the first full oracle run.
++	    (get-string () self)
++	    ;; Which string a string is in is itself, so its own string-type --
++	    ;; the same answer workspace-objects.ss:150 computes for a letter or a
++	    ;; group by asking the string it sits in. Without this, two snag events
++	    ;; cannot be compared when either one's snag objects include the whole
++	    ;; string: a snag event's 'equal? sends its object set through
++	    ;; equivalent-workspace-objects? (trace.ss:1152-1153), which asks each
++	    ;; object 'which-string (trace.ss:920). That reached
++	    ;; report-error-and-halt and (reset) the run.
++	    ;;
++	    ;; It takes two snags in one run to reach, so it is rare enough that the
++	    ;; single-run oracle never hit it in 374,500 runs. Episodes reach it
++	    ;; easily: once Episodic Memory has suppressed a problem's answers, runs
++	    ;; go on to the codelet ceiling and accumulate far more snags. It killed
++	    ;; shards on copy1, copy2 and copy4 -- the same structurally unusual
++	    ;; family as the four methods above.
++	    (which-string () string-type)
++	    ;; equivalent-workspace-objects? treats anything that is not a letter as
++	    ;; a group, and asks it for category, direction, length and constituents
++	    ;; before recursing on the constituents (trace.ss:923-930). A string
++	    ;; already answers the last of those. The first three are what a string
++	    ;; has none of, or has by analogy with the spanning group it stands in
++	    ;; for:
++	    ;;
++	    ;;   category and direction  a string is not a group and has neither, so
++	    ;;     #f -- and #f = #f under same-group-category? (groups.ss:1035-1037)
++	    ;;     and same-group-direction? (groups.ss:1040-1042), so two strings
++	    ;;     compare equal on both, which is the wanted answer.
++	    ;;   length  (length objects) for a group (groups.ss:80), so the count of
++	    ;;     top-level objects here -- the same objects 'get-constituent-objects
++	    ;;     returns just below, which is what the recursion then walks.
++	    ;;
++	    ;; Found by enumeration, not one at a time: report-error-and-halt was
++	    ;; temporarily replaced with a recorder returning #f so a run would limp
++	    ;; on and reveal every remaining missing message in one sweep of all 19
++	    ;; problems, rather than one re-run per message.
++	    (get-group-category () #f)
++	    (get-direction () #f)
++	    (get-group-length () (length (tell self 'get-top-level-objects)))
++	    ;; Salience is an object notion; a string has none. The snag event
++	    ;; clamps the salience of each snag object while it is displayed and
++	    ;; unclamps it after (trace.ss:1160, 1167), and a snag object can be
++	    ;; the whole string. On a real object these set a flag read only by
++	    ;; that object's own salience calculation (workspace-objects.ss:526,
++	    ;; 534), so for a string there is nothing to do.
++	    (clamp-salience () 'done)
++	    (unclamp-salience () 'done)
++	    ;; Descriptions are attached to letters and groups, not to strings
++	    ;; (workspace-objects.ss:215). The snag concept pattern asks every
++	    ;; snag object for its descriptors (trace.ss:1048), and a snag object
++	    ;; can be the whole string, which contributes none of its own.
++	    (get-all-descriptors () '())
++	    ;; Same reason, one level up: the descriptions themselves, not their
++	    ;; descriptors. The jootser gathers the descriptions of every snag
++	    ;; object to choose which theme entries to work on
++	    ;; (jootsing.ss:86-88), and a snag object can be the whole string,
++	    ;; which contributes none. Without this the append there met #f.
++	    (get-descriptions () '())
+ 	    (get-constituent-objects ()
+ 	      (sort-by-method 'get-left-string-pos <
+ 		(tell self 'get-top-level-objects)))

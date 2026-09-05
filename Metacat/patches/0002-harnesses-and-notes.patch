@@ -1,0 +1,3573 @@
+--- /dev/null
++++ b/.gitignore
+@@ -0,0 +1,27 @@
++# Output from docker/batch.py (results.tsv, report.csv, results.jsonl, batch.ss)
++batch-out/
++
++# macOS
++.DS_Store
++
++# Editor leftovers of the kind already present upstream (Makefile~, etc.)
++*~
++*.swp
++
++__pycache__/
++*.pyc
++
++# ---------------------------------------------------------------------------
++# oracle/ -- measured reference data. See ORACLE-USAGE.md.
++#
++#   raw/      what the reference implementation emitted. Kept: expensive to
++#             regenerate (374,500 single runs, 76,000 episode runs) and every
++#             comparison is measured against it. episodes.json is 60M, so only
++#             the gzip is kept.
++#   derived/  recomputed from raw/ in seconds by docker/make_derived_sets.py.
++#             Kept anyway: these are the files a comparison run loads, and
++#             having them in the repo means a reader can see the reference sets
++#             without running anything.
++#   work/     per-problem shard files. Reproducible, bulky, ignored.
++oracle/work/
++oracle/raw/episodes.json
+--- /dev/null
++++ b/CODE-FIXES.md
+@@ -0,0 +1,138 @@
++# Changes from baseline Metacat 1.2
++
++Every difference between this tree and James Marshall's Metacat 1.2, which is
++the initial commit `5bb07c9`.
++
++The rules this list follows:
++
++- **GUI mode is untouched.** Loading `metacat.ss` gives the original program.
++  Everything below is either behind `%gui-mode%`, in a new file, or a bug fix.
++- **No change alters what the architecture does.** There is no new codelet, no
++  altered formula, no Slipnet change, no adjusted constant. The engine is
++  Marshall's; the fixes let it run headless and stop it aborting runs.
++
++Three kinds, in order of how much they matter to anyone comparing against this
++program's behaviour.
++
++---
++
++## 1. Bug fixes — these change measured behaviour
++
++Each was a message sent to an object that could not answer it. That reaches
++`report-error-and-halt` (`utilities.ss`), which prints `Ooops: bad message ...`
++and `(reset)`s — silently abandoning the run. Under SWL the line went to the GUI
++console and the run just vanished, which is why none of these were noticed
++before the program was sampled at scale.
++
++### 1.1 `constituent-objects-of` excluded workspace-strings — `bf06847`
++
++`utilities.ss`, and its two call sites `rules.ss:1432` and `rules.ss:1540`.
++
++The original code sent `'get-constituent-objects` to every reference object,
++which halts when one is a *letter* — as happens when a rule names a group the
++target string does not have. `130314d` routed both sites through a new
++`constituent-objects-of` that tested `group?`. Excluding letters was right;
++testing `group?` was wider than the bug and also excluded **workspace-strings**,
++which do answer that message, with their top-level objects.
++
++That broke every rule clause naming the whole string — a swap marked as a
++subobjects swap, and Marshall's own `abc → aaa` example at
++`workspace-strings.ss:455-460`. Such clauses denoted nothing, produced no
++transforms, failed `currently-works?` and were never built. Now tests `letter?`.
++
++**Effect on behaviour: large, on five problems.** Re-running the whole oracle,
++`eqe-baaab` moved 0.335 TVD (`baaab` 24.9% → 58.2%), `fig5.4-top` 0.236
++(`ixxi` 4.4% → 27.5%), `run6` 0.124, `misc3` 0.053, `copy5` 0.020. The other
++fourteen moved ≤0.006, i.e. sampling noise.
++
++### 1.2 Nine methods a workspace-string needs as a snag object — `5cb8afc`, `ca8f7e0`
++
++`workspace-strings.ss`, added to the block Marshall had already started with the
++comment *"The following methods allow workspace-strings to behave as spanning
++groups"*.
++
++A snag object can be the whole string, and code then sends it messages only
++letters and groups answer:
++
++| method | reached from |
++|---|---|
++| `get-string` | snag explanation phrasing (`trace.ss:1104,1111,1114`) |
++| `clamp-salience`, `unclamp-salience` | snag display (`trace.ss:1160,1167`) |
++| `get-all-descriptors` | snag concept pattern (`trace.ss:1048`) |
++| `which-string` | snag-event `equal?` → `equivalent-workspace-objects?` (`trace.ss:1152,920`) |
++| `get-group-category`, `get-direction`, `get-group-length` | same, group branch (`trace.ss:923-930`) |
++| `get-descriptions` | jootser gathering snag-object descriptions (`jootsing.ss:86-88`) |
++
++The first four were found during the first oracle run, where they killed four
++`copy*` problems early. The last five need *two* snags in one run, so 374,500
++single runs never hit them; episodes reach them easily, because once Episodic
++Memory suppresses a problem's answers the later runs grind to the codelet
++ceiling and pile up snags.
++
++Found by enumeration rather than one at a time: `report-error-and-halt` was
++temporarily replaced with a recorder returning `#f`, so a run limps on and
++reveals the next missing message. It took three sweeps — returning `#f` corrupts
++the computation, so a run usually dies of a downstream type error before
++reaching the next genuine bad send.
++
++**Effect on behaviour: none where they do not fire.** A problem that records no
++bad message is unaffected; these only convert an abandoned run into a completed
++one.
++
++---
++
++## 2. Headless mode — new files, GUI untouched
++
++Metacat needs SWL, Tcl/Tk and an X display even with the GUI unused. Performance
++mode removes that: no GUI files, no `(setup)`, no display.
++
++| file | |
++|---|---|
++| `metacat-headless.ss` | **new.** The performance-mode loader. Loads the engine and nothing else — none of the sixteen GUI files. |
++| `headless.ss` | **new.** Supplies every GUI dependency as a no-op: thirteen window globals, the drawing procedures the engine calls unguarded, fonts, layout tables, pause variables, SWL primitives. |
++| `metacat.ss` | `%gui-mode% #t`. This is the GUI loader; the flag is what the two modes branch on. |
++| `constants.ss` | Two load-time calls guarded on `%gui-mode%`: `swl-color` needs `<rgb>`, `%logo-font%` needs `swl-font` from `fonts.ss`. Both no-ops in GUI mode. |
++| `run.ss` | One `'garbage-collect` send guarded on `%workspace-graphics%`, like the ~60 other workspace-drawing sites. Unguarded it dies at codelet 100 when graphics are off. |
++
++Three procedures that live in graphics files but are **not** graphics are copied
++verbatim into `headless.ss` rather than stubbed, because engine code calls them
++and uses their results: `find-next-space-position`,
++`group-event-pexp-text-string`, `relation-name`.
++
++`headless.ss` also carries a purpose-built **null memory window** (`ca8f7e0`).
++The generic null window is not enough: an answer-description holds
++`get-normal-icon-pexp` as a *procedure*, initialised to `#f` and installed only
++by the real memory window, and three methods apply it. Leave it `#f` and the
++second run of any session whose first run answered dies with *"attempt to apply
++non-procedure #f"*. Only a session-based harness reaches this, since every
++single-run harness clears memory between runs.
++
++**Measured: 26 → ~2,500 codelets/sec, and no decay.** 100 consecutive runs hold
++5,861 → 5,702 c/s flat; with the GUI loaded the same sequence fell 1,792 → 1,454
++and then off a cliff, because Metacat's windows retag canvas items as garbage and
++rely on a `'garbage-collect` that `run-mcat` only ever sends to two of them.
++
++---
++
++## 3. Performance — no behavioural change
++
++### `tell` as a macro — `17b4683`
++
++`utilities.ss`. `tell` was a procedure taking a rest-argument list; it is now
++`extend-syntax` expanding to a direct call, with the old procedure kept as
++`tell-proc` for the handful of sites that apply it dynamically (`tell-all` and
++friends). Same dispatch, same semantics, no consing per send.
++
++**~2,400 → ~2,900 codelets/sec.**
++
++---
++
++## What is *not* changed
++
++No codelet added, removed or reweighted. No formula, temperature rule, or
++Slipnet node, link or depth altered. No constant tuned. `%distance-threshold%`,
++`%verbatim-rule-probability%`, the abstraction probabilities and every other
++parameter are Marshall's.
++
++The one place a fix changed which rules the program can build is §1.1, and that
++restored a path Marshall's own comments describe rather than adding a new one.
+--- /dev/null
++++ b/ORACLE-USAGE.md
+@@ -0,0 +1,185 @@
++# Using the oracle data
++
++See also [`README.md`](README.md) for the repository layout and
++[`CODE-FIXES.md`](CODE-FIXES.md) for how this tree differs from Metacat 1.2.
++
++Metacat carries two measured reference data sets. Both exist to answer one
++question about another program — currently the Petacat port — and it is not
++"is it correct":
++
++> **Has its behaviour changed, and where?**
++
++Metacat is a stochastic, self-watching architecture with no ground truth to
++check against. There is no right answer to `abc → cba ; mrrjjj`. What there is,
++is a *distribution* the reference implementation produces, measured densely
++enough to be stable. A comparison against it says stable or changed. It never
++says pass or fail.
++
++That distinction governs everything below. **Every check flags; no check
++fails.** A flag is an invitation to look, and during parameter and Slipnet
++experiments a flag is frequently the result being sought rather than a defect.
++
++## The two data sets
++
++| file | what it samples | scale |
++|---|---|---|
++| `oracle/raw/single-runs.json` | one run, fresh Episodic Memory each time | 374,500 runs |
++| `oracle/raw/episodes.json.gz` | one *episode* — eight runs in a session, memory carried forward | 9,500 episodes (76,000 runs) |
++
++Those two are the **raw** data — what the reference emitted, never edited. From
++them `docker/make_derived_sets.py` recomputes the four files a comparison run
++actually loads:
++
++| file | |
++|---|---|
++| `oracle/derived/single-run-sets.json` | every stopping state, with shares and `f1_over_n` |
++| `oracle/derived/single-run-p50.json` | the p50 subset, with absence probabilities at n=100 |
++| `oracle/derived/convergence-sets.json` | every episodic convergence answer |
++| `oracle/derived/convergence-p50.json` | its p50 subset |
++
++Both are produced by the reference running headless (`metacat-headless.ss`,
++plain Chez, no SWL, no display) with a 100,000-codelet cap per run.
++
++## How a comparison run works
++
++The program under test runs **100 tries per problem** in each mode. That number
++is deliberate: it is cheap enough to run often, and the checks below are chosen
++so that 100 is enough for them to mean something.
++
++### Single runs — 100 runs per problem, against `single-run-sets.json` / `single-run-p50.json`
++
++1. **Did every p50 state appear?** The p50 set is the fewest most-frequent
++   states whose combined share reaches 50%. Each entry carries
++   `absence_probability_at_n100`, and across all 19 problems that probability is
++   **0.0000** — p50 states hold at least 13% share, so missing one in 100 runs is
++   roughly a one-in-a-million event. A missing p50 state is therefore a real
++   signal, not sampling luck. **Flag it.**
++
++2. **Did any state appear that the oracle never produced?** Sampling continued
++   until the Good-Turing missing-mass estimate `f1/n` fell to 1e-4 or below,
++   meaning the next reference run had about a 1-in-10,000 chance of producing
++   something new, so a state outside the set is very unlikely to be
++   undersampling. **Flag it.**
++
++   Three problems stopped short of that and say so in their `stop_reason`:
++   `fig5.4-top` (0.00037) and `eqe-baaab` (0.00025) hit the 50,000-run
++   `checkpoint` with their state sets still growing, and `misc3` (0.00021) was
++   stopped by hand at `shards_exited`. Even there the cost is under 0.04
++   spurious flags per 100 runs, but a novelty flag on those three carries
++   marginally less weight than on the other sixteen.
++   `docker/check_saturation.py` reports the current figure for every problem.
++
++### Episodes — 100 episodes of 8 runs per problem, against `convergence-sets.json` / `convergence-p50.json`
++
++An episode's **convergence answer** is the last run in it that actually produced
++an answer. Runs that gave up (`*NONE*`) or hit the codelet ceiling (`*CAP*`) are
++skipped when looking backwards for it — they are not answers. An episode that
++never answered contributes nothing; that happens once in 9,500 episodes.
++
++Collect the convergence answers of the 100 episodes into a set, and run the same
++two checks:
++
++1. **Did every p50 convergence answer appear?** These sets are small — one to
++   four answers — and, as with single runs, every member's absence probability at
++   100 episodes is **0.0000**. **Flag a missing one.**
++
++2. **Did any convergence answer appear that is not in the oracle's set?**
++   **Flag it** — with the caveat in the next section.
++
++## What `f1/n` means here, and why the convergence set is not saturated
++
++`f1/n` is the Good-Turing missing-mass estimate: `f1` is the number of outcomes
++seen exactly once, `n` the sample size, and the ratio estimates the chance the
++next sample produces something never seen before.
++
++The single-run oracle was sampled until `f1/n ≤ 1e-4`. The convergence set was
++**not**, and this is a deliberate choice rather than an oversight:
++
++| | single-run `f1/n` | convergence `f1/n` | unseen answers expected per 100 episodes |
++|---|---:|---:|---:|
++| `run6` | 0.00008 | 0.0160 | 1.6 |
++| `fig5.4-top` | 0.00037 | 0.0140 | 1.4 |
++| `misc3`, `misc2`, `eqe-baaab` | ~0.0002 | 0.0080 | 0.8 |
++| eight problems incl. all of `copy1`–`copy4` | 0.00000 | 0.0000 | 0.0 |
++
++So a 100-episode comparison across all 19 problems will surface **roughly eight
++convergence answers the oracle never sampled, even when nothing has changed.**
++
++That is accepted. Novel convergence answers are a signal the research programme
++wants to see — they are what a changed parameter, a new Slipnet structure or a
++new codelet is expected to produce. Driving `f1/n` to 1e-4 here would cost
++enormously more sampling and would suppress the very thing being looked for. The
++number is published per problem so a reader can weigh a flag against it: a novel
++answer on `copy2` (`f1/n` = 0.0000) is far more interesting than one on `run6`
++(0.0160).
++
++**Read the two flags together.** A missing p50 answer is a strong signal on every
++problem. A novel answer is a strong signal on the eight saturated problems and a
++weak one on `run6` and `fig5.4-top`.
++
++## What carries forward inside an episode, and what does not
++
++Only the contents of Episodic Memory. `init-mcat` (`run.ss:185-238`) reseeds the
++RNG, re-initialises the coderack, temperature, trace and themespace, rebuilds the
++workspace, and sends `reset` to every Slipnet node. Of memory it sends only
++`clear-activations` and `unhighlight-all-answers`, never `clear`.
++
++Memory changes a run at three sites, all keyed on the current problem's own
++strings, so it only bites when the same problem recurs — which is what an episode
++is:
++
++- `answers.ss:982` — the answer-finder fizzles if `answer-present?` says this
++  exact (answer, top rule, bottom rule) is already stored, so a result cannot be
++  reported twice in one episode;
++- `answers.ss:1162` — a snag is recorded only if new;
++- `answers.ss:290,304` — an answer is linked to a remembered snag.
++
++**`answer-present?` includes the rules** (`memory.ss:90-96`). The same answer
++string reached by a *different* rule is not suppressed, so it can and does recur
++within an episode — `fig5.4-top` produces `qeeq` several times in one episode for
++this reason. The episode data records answers only, not rules, so such a
++recurrence is indistinguishable from a plain repeat. This is self-consistent as
++long as the program under test is measured the same way; it would need the rule
++recorded to mean "the engine found something it considered new".
++
++## Seeds
++
++The two data sets use disjoint seed ranges, so no episode run repeats a single
++run already in the oracle:
++
++| | seeds |
++|---|---|
++| single runs | 1 … 51,000 (per problem) |
++| episodes | from 100,000; episode *e* run *i* uses `100000 + e*8 + i` |
++
++Episode index fully determines its seeds, so any episode is reproducible on its
++own, and any single run inside one is reproducible in isolation.
++
++## Regenerating
++
++```sh
++# single-run oracle -- hours
++docker compose exec metacat /metacat/docker/oracle.py
++
++# episodes -- about two hours at 20 concurrent shards
++docker compose exec metacat /metacat/docker/episodes.py
++
++# the four derived sets -- seconds, pure post-processing
++docker/make_derived_sets.py
++```
++
++`episodes.py` fixes its shard count at launch, so a problem whose tail outlives
++the others leaves cores idle. Re-partitioning the remaining episodes across more
++processes is safe and was done for `misc3` — episode index determines the seeds,
++and only episodes with their completion marker are ever read, so an episode
++interrupted mid-flight is redone rather than half-counted. A `--resume` mode
++along those lines is worth adding.
++
++## Provenance
++
++Both data sets were produced after `bf06847`, which repaired
++`constituent-objects-of`. Twelve problems' episode data predates `ca8f7e0`,
++which added five workspace-string methods a snag object needs; those twelve
++recorded zero bad message sends across 48,000 runs, so the repaired path never
++fired for them. Each result in `oracle/raw/episodes.json.gz` carries a `build` field saying
++which side of that fix it came from.
+--- /dev/null
++++ b/README.md
+@@ -0,0 +1,93 @@
++# Metacat
++
++James Marshall's Metacat 1.2, with a working toolchain, a headless mode, and a
++measured reference data set.
++
++Metacat is a self-watching analogy-making architecture — Copycat plus an
++Episodic Memory, a Temporal Trace and a themespace, so that it can notice and
++comment on its own behaviour. See
++<http://science.slc.edu/~jmarshall/metacat> and Marshall's `README.txt`.
++
++This repository exists to serve a port, [Petacat](../Petacat). Its job is to say
++what the reference implementation actually *does*, densely enough that another
++program's behaviour can be compared against it.
++
++## Documents
++
++| | |
++|---|---|
++| [`ORACLE-USAGE.md`](ORACLE-USAGE.md) | What the reference data sets are, and the protocol for comparing another program against them. **Start here** if you are testing a port. |
++| [`CODE-FIXES.md`](CODE-FIXES.md) | Every difference between this tree and Marshall's 1.2, and which of them change measured behaviour. **Start here** if you are wondering whether this is still Metacat. |
++| [`CLAUDE.md`](CLAUDE.md) | Working notes and conventions for this repository. |
++| `README.txt` | Marshall's original, unchanged. |
++
++## Running it
++
++**With the GUI**, as originally distributed — Chez Scheme + SWL + Tcl/Tk, all of
++it containerised:
++
++```sh
++docker compose up --build          # first run, ~10 min
++open http://localhost:6080/vnc.html?autoconnect=1&resize=scale
++```
++
++**Headless**, for measurement — plain Chez, no SWL, no display, ~100× faster:
++
++```sh
++scheme -q --script metacat-headless.ss    # loads the engine and nothing else
++docker/solve.sh abc abd xyz --seed 42     # one problem, one run
++```
++
++Both modes load the same engine. See [`CODE-FIXES.md`](CODE-FIXES.md) §2 for how
++the split works.
++
++## The reference data
++
++```
++oracle/
++  raw/        what the reference emitted -- never edited
++    single-runs.json      374,500 runs, every stopping state
++    episodes.json.gz      9,500 episodes x 8 runs, every run
++  derived/    recomputed from raw/ by docker/make_derived_sets.py
++    single-run-sets.json      the state set per problem
++    single-run-p50.json       its p50 subset, with absence probabilities
++    convergence-sets.json     the episodic final-answer set per problem
++    convergence-p50.json      its p50 subset
++  work/       per-problem shard files -- reproducible, not committed
++```
++
++**Single runs** sample one run from a fresh Episodic Memory, to Good-Turing
++saturation. **Episodes** sample a *session*: eight runs over one problem with
++memory carried forward, so the program remembers what it has already answered.
++The convergence set is the distribution of what those sessions settled on.
++
++A comparison run does 100 tries per problem in each mode and asks two questions
++of each: did every p50 member appear, and did anything appear the reference never
++produced. Both **flag** rather than fail — Metacat is stochastic with no ground
++truth, so the data says *stable or changed*, never *pass or fail*.
++[`ORACLE-USAGE.md`](ORACLE-USAGE.md) has the details, including why the
++convergence set is deliberately left unsaturated.
++
++## Regenerating
++
++```sh
++docker compose exec metacat /metacat/docker/oracle.py      # hours
++docker compose exec metacat /metacat/docker/episodes.py    # ~2 hours
++docker/make_derived_sets.py                                # seconds
++```
++
++## Harness scripts
++
++| | |
++|---|---|
++| `docker/oracle.py` | single-run benchmark, sharded, Good-Turing stop rule |
++| `docker/episodes.py` | episode benchmark, sharded across episodes |
++| `docker/make_derived_sets.py` | the four derived sets, from `oracle/raw/` |
++| `docker/check_messages.py` | no object is sent a message it cannot answer — run after any engine change |
++| `docker/check_saturation.py` | how complete the reference sets are, and the spurious-flag rate that follows |
++| `docker/episodes_finish.py` | fill an episode run's gaps across more processes; rebuild `episodes.json` |
++| `docker/make_oracle_report.py` | human-readable single-run report |
++| `docker/episode_report.py` | human-readable episode report |
++| `docker/solve.sh` | one problem, one run, no GUI |
++| `docker/batch.py` | ad-hoc batches |
++| `docker/profile_messages.py` | message-frequency profile |
+--- /dev/null
++++ b/docker-compose.yml
+@@ -0,0 +1,38 @@
++# Metacat 1.2, running in its original Chez Scheme + SWL + Tcl/Tk toolchain.
++#
++#   docker compose up --build      first run (the build takes ~10 min)
++#   docker compose up -d           afterwards
++#   open http://localhost:6080/vnc.html?autoconnect=1&resize=scale
++#   docker compose down            stop
++#
++# The source directory is bind-mounted, so edits to the .ss files on the host
++# take effect on the next `docker compose restart` -- no rebuild needed.
++
++services:
++  metacat:
++    build:
++      context: ./docker
++      dockerfile: Dockerfile
++    image: metacat:1.2
++    container_name: metacat
++    # SWL only has x86 machine types and Chez 9.5.4 ships no arm64 boot file,
++    # so this is amd64 everywhere. On Apple Silicon it runs under Rosetta.
++    platform: linux/amd64
++    volumes:
++      # The Metacat source. Read-write so "Save commentary to file" works.
++      - .:/metacat
++    ports:
++      # Bound to loopback: the VNC server runs without a password, so it must
++      # not be reachable from the network.
++      - "127.0.0.1:6080:6080"   # noVNC in the browser
++      # 5901, not 5900: macOS Screen Sharing already owns 5900 on the host.
++      - "127.0.0.1:5901:5900"   # plain VNC, for a native client
++    environment:
++      SCREEN: 2880x1620x24
++    # Tk on a display this size wants more than the default 64MB of shared memory.
++    shm_size: "512m"
++    stdin_open: true
++    tty: true
++    # Deliberately not "unless-stopped": closing Metacat's Control Panel calls
++    # (exit), and an auto-restart would just bring it straight back.
++    restart: "no"
+--- /dev/null
++++ b/docker/Dockerfile
+@@ -0,0 +1,77 @@
++# Metacat 1.2 — Chez Scheme 9.5.4 + SWL 1.3 + Tcl/Tk 8.6 on Debian, with the
++# GUI exported over VNC/noVNC.
++#
++# Why linux/amd64: SWL's configure.ss only has cases for x86 machine types
++# (a6le, i3le, ...) and Chez 9.5.4 ships no arm64 boot file, so there is no
++# arm64 target to build. On Apple Silicon this runs under Rosetta and is fast.
++#
++# Chez 9.5.4 and the patched SWL are the exact pair the Metacat author
++# distributes; SWL 1.3 was patched by Frank Sinapsi to build against modern
++# Chez. Stock SWL 1.3 does not compile here.
++
++########################  builder  ########################
++FROM debian:bookworm-slim AS builder
++
++ARG CHEZ_URL=https://science.slc.edu/jmarshall/metacat/ChezScheme-9.5.4.tgz
++ARG SWL_URL=https://science.slc.edu/jmarshall/metacat/swl1.3-src-patched-linux.tgz
++
++RUN apt-get update && apt-get install -y --no-install-recommends \
++        build-essential ca-certificates curl \
++        libncurses-dev libx11-dev uuid-dev \
++        tcl8.6 tcl8.6-dev tk8.6 tk8.6-dev \
++    && rm -rf /var/lib/apt/lists/*
++
++# SWL's configure.ss expects the Tcl/Tk script libraries at /usr/lib/tcl8.6 and
++# /usr/lib/tk8.6; Debian ships them under /usr/share/tcltk. It also shells out
++# to a bare `tclsh` to discover the Tcl version.
++RUN ln -sfn /usr/share/tcltk/tcl8.6 /usr/lib/tcl8.6 \
++ && ln -sfn /usr/share/tcltk/tk8.6  /usr/lib/tk8.6 \
++ && ln -sfn /usr/bin/tclsh8.6       /usr/bin/tclsh
++
++WORKDIR /src
++
++# Chez Scheme 9.5.4. Machine type a6le (64-bit Linux, non-threaded) is what
++# SWL's configure.ss knows and what SWL's own thread system expects.
++RUN curl -fsSL "$CHEZ_URL" | tar xz \
++ && cd ChezScheme \
++ && ./configure --machine=a6le --installprefix=/usr/local \
++ && make \
++ && make install
++
++# SWL 1.3. `make` must run under full Chez (`scheme`), not Petite — the
++# top-level Makefile refuses to rebuild the libraries with Petite.
++RUN curl -fsSL "$SWL_URL" | tar xz \
++ && cd swl1.3 \
++ && make \
++ && make install
++
++########################  runtime  ########################
++FROM debian:bookworm-slim
++
++RUN apt-get update && apt-get install -y --no-install-recommends \
++        tcl8.6 tk8.6 libncurses6 libuuid1 \
++        xvfb x11vnc websockify novnc fluxbox wmctrl xdotool \
++        x11-utils x11-xserver-utils procps \
++        xfonts-base xfonts-75dpi xfonts-100dpi xfonts-scalable fonts-urw-base35 \
++    && rm -rf /var/lib/apt/lists/*
++
++# The swl launcher script bakes in TCL_LIBRARY=/usr/lib/tcl8.6 and
++# TK_LIBRARY=/usr/lib/tk8.6, so the runtime stage needs the same symlinks.
++RUN ln -sfn /usr/share/tcltk/tcl8.6 /usr/lib/tcl8.6 \
++ && ln -sfn /usr/share/tcltk/tk8.6  /usr/lib/tk8.6
++
++COPY --from=builder /usr/local /usr/local
++
++COPY entrypoint.sh /usr/local/bin/metacat-entrypoint
++RUN chmod +x /usr/local/bin/metacat-entrypoint
++
++ENV DISPLAY=:99 \
++    SCREEN=2880x1620x24 \
++    VNC_PORT=5900 \
++    NOVNC_PORT=6080 \
++    METACAT_DIR=/metacat \
++    TCLTK_VERSION=8.6
++
++EXPOSE 5900 6080
++WORKDIR /metacat
++ENTRYPOINT ["/usr/local/bin/metacat-entrypoint"]
+--- /dev/null
++++ b/docker/batch-example.json
+@@ -0,0 +1,26 @@
++{
++  "max_codelets": 8000,
++  "sessions": [
++    {
++      "name": "memory-effect",
++      "runs": [
++        {"initial": "abc", "modified": "abd", "target": "xyz", "seed": 42},
++        {"initial": "abc", "modified": "abd", "target": "xyz", "seed": 42},
++        {"initial": "abc", "modified": "abd", "target": "xyz", "seed": 42}
++      ]
++    },
++    {
++      "name": "after-reset",
++      "runs": [
++        {"initial": "abc", "modified": "abd", "target": "xyz", "seed": 42}
++      ]
++    },
++    {
++      "name": "mrrjjj",
++      "runs": [
++        {"initial": "abc", "modified": "abd", "target": "mrrjjj", "seed": 42},
++        {"initial": "abc", "modified": "abd", "target": "mrrjjj", "seed": 42}
++      ]
++    }
++  ]
++}
+--- /dev/null
++++ b/docker/batch.py
+@@ -0,0 +1,387 @@
++#!/usr/bin/env python3
++"""
++Run many Metacat problems in one warmed-up process, grouped into sessions that
++share an Episodic Memory.
++
++    docker compose exec metacat /metacat/docker/batch.py spec.json -o /metacat/out
++
++Metacat costs ~45s to load and (setup). This pays that once and then runs every
++problem in the batch, so a thousand runs cost the startup once rather than a
++thousand times.
++
++A *session* is a run of problems that share one Episodic Memory. Memory is
++cleared at the start of each session and persists between runs inside it. That
++distinction is the point of the tool: Metacat will not re-find an answer it
++already holds in memory (help.txt:29), so the second run of a problem inside a
++session explores differently from the first, while the first run of every
++session reproduces exactly.
++
++Input JSON, either explicit:
++
++    {
++      "max_codelets": 8000,
++      "sessions": [
++        {"name": "xyz baseline",
++         "runs": [
++           {"initial": "abc", "modified": "abd", "target": "xyz", "seed": 42},
++           {"initial": "abc", "modified": "abd", "target": "xyz", "seed": 42}
++         ]}
++      ]
++    }
++
++or generated, for scale:
++
++    {
++      "max_codelets": 8000,
++      "generate": {
++        "sessions": 500,
++        "runs_per_session": 3,
++        "problems": [{"initial": "abc", "modified": "abd", "target": "xyz"},
++                     {"initial": "abc", "modified": "abd", "target": "mrrjjj"}],
++        "seed_start": 1000,
++        "seed_step": 1
++      }
++    }
++
++Problems are cycled across the runs of a session. Seeds advance across the whole
++batch, so every run gets a distinct one. A run may carry "answer" for justify
++mode and its own "max_codelets".
++
++Outputs, in the directory given by -o:
++    results.tsv    raw, written and flushed as each run finishes
++    report.csv     session, run, seed, problem, codelets, final temp, result
++    results.jsonl  the same rows as JSON objects
++"""
++
++import argparse
++import csv
++import json
++import os
++import re
++import shutil
++import subprocess
++import sys
++import time
++
++# The TSV schema, in the order emit-row writes them.
++FIELDS = [
++    "session", "session_name", "run", "seed",
++    "initial", "modified", "target", "given_answer",
++    "codelets", "final_temp", "outcome", "result", "quality",
++]
++
++# report.csv adds a rendered "problem" column in front of the raw parts.
++CSV_FIELDS = (
++    FIELDS[:4] + ["problem"] + FIELDS[4:]
++)
++
++# Letter-strings become Scheme symbols and session names become Scheme strings;
++# neither may carry anything that would end the token early.
++SYMBOL_RE = re.compile(r"^[a-z]+$")
++
++
++def clean_name(name):
++    return re.sub(r'[\t\r\n"\\]', " ", str(name)).strip() or "session"
++
++
++def check_string(value, field):
++    value = str(value).lower()
++    if not SYMBOL_RE.match(value):
++        sys.exit(f"error: {field} must be lowercase letters only, got {value!r}")
++    return value
++
++
++def build_runs(spec):
++    """Flatten the spec into (session_index, session_name, run_index, run) rows."""
++    default_max = int(spec.get("max_codelets", 8000))
++    rows = []
++
++    if "generate" in spec and "sessions" in spec:
++        sys.exit('error: give either "sessions" or "generate", not both')
++
++    if "generate" in spec:
++        g = spec["generate"]
++        problems = g["problems"]
++        if not problems:
++            sys.exit('error: generate.problems is empty')
++        n_sessions = int(g["sessions"])
++        per_session = int(g.get("runs_per_session", 1))
++        seed = int(g.get("seed_start", 1))
++        step = int(g.get("seed_step", 1))
++        for s in range(n_sessions):
++            for r in range(per_session):
++                p = dict(problems[r % len(problems)])
++                p.setdefault("seed", seed)
++                seed += step
++                rows.append((s, g.get("name_prefix", "session") + f"-{s}", r, p))
++    else:
++        for s, session in enumerate(spec.get("sessions", [])):
++            name = clean_name(session.get("name", f"session-{s}"))
++            for r, run in enumerate(session.get("runs", [])):
++                rows.append((s, name, r, dict(run)))
++
++    if not rows:
++        sys.exit("error: batch contains no runs")
++
++    out = []
++    for s, name, r, run in rows:
++        initial = check_string(run["initial"], "initial")
++        modified = check_string(run["modified"], "modified")
++        target = check_string(run["target"], "target")
++        answer = run.get("answer")
++        answer = check_string(answer, "answer") if answer else None
++        seed = int(run.get("seed", 1))
++        if not 1 <= seed <= 4294967295:
++            sys.exit(f"error: seed {seed} out of range 1..4294967295")
++        out.append({
++            "session": s, "session_name": clean_name(name), "run": r,
++            "initial": initial, "modified": modified, "target": target,
++            "answer": answer, "seed": seed,
++            "max_codelets": int(run.get("max_codelets", default_max)),
++        })
++    return out
++
++
++def generate_scheme(rows, results_path):
++    """One Scheme program: load once, then walk the batch."""
++    literals = []
++    for x in rows:
++        literals.append(
++            "({s} \"{name}\" {r} {i} {m} {t} {a} {seed} {maxc})".format(
++                s=x["session"], name=x["session_name"], r=x["run"],
++                i=x["initial"], m=x["modified"], t=x["target"],
++                # Bare, not quoted: the whole *batch* list is already quoted, so
++                # a leading ' here would read as the list (quote sqrp).
++                a=x["answer"] if x["answer"] else "#f",
++                seed=x["seed"], maxc=x["max_codelets"],
++            )
++        )
++    batch_literals = "\n".join("      " + line for line in literals)
++    return f"""
++(load "/tmp/metacat-linux.ss")
++(setup)
++
++;; ---- speed: 26 -> ~2500 codelets/sec, same answers -------------------------
++;; All of this MUST follow (setup). %flash-pause%, %snag-pause% and
++;; %num-of-flashes% have no define anywhere in the tree: they spring into
++;; existence when make-control-panel builds the Speed slider and fires
++;; speed-slider-action (gui.ss:413-426). Before (setup) they are unbound.
++;;
++;; 1. Pauses. The slider cannot reach these values -- its non-100 branch floors
++;;    at (max 2), (max 10), (max 250). Zeroing %flash-pause% short-circuits the
++;;    whole flash animation at general-graphics.ss:289. 26 -> 298 c/s alone.
++(set! %flash-pause% 0)
++(set! %num-of-flashes% 0)
++(set! %snag-pause% 0)              ;; a 2500ms wall on every snag by default
++(set! %text-scroll-pause% 0)
++(set! %codelet-highlight-pause% 0)
++(set! %highlight-last-codelet% #f)
++(set! %verbose% #f)
++
++;; 2. Drawing. 298 -> 960 c/s for the first two; the third needs the guard
++;;    added at run.ss:166-176, without which the run dies at codelet 100.
++;;    960 -> ~1990 c/s.
++(set! %slipnet-graphics% #f)
++(set! %coderack-graphics% #f)
++(set! %workspace-graphics% #f)
++
++;; 3. Null windows. themes.ss, trace.ss, memory.ss and answers.ss talk to these
++;;    unconditionally -- no %...-graphics% flag guards them -- and themes.ss
++;;    redraws all 75 themes every update cycle. No engine code reads what they
++;;    return. ~1990 -> ~2500 c/s.
++;;    Cost: the commentary is discarded. Nothing here captures it anyway.
++;;
++;;    *memory-window* is deliberately NOT stubbed. Episodic Memory descriptions
++;;    get their icon geometry from memory-graphics.ss via 'add-memory-icon; stub
++;;    that out and the geometry stays #f, and the next init-mcat dies in
++;;    'clear-activations / 'unhighlight-all-answers (run.ss:204-205) the moment
++;;    memory is non-empty -- i.e. on the second run of any session. It is
++;;    touched only when an answer or snag is stored, so it costs almost nothing.
++(let ((null-window (lambda msg 'done)))
++  (set! *themespace-window* null-window)
++  (set! *comment-window* null-window)
++  (set! *trace-window* null-window)
++  (set! *temperature-window* null-window)
++  (set! *EEG-window* null-window)
++  (set! *workspace-window* null-window))
++
++;; Cognition is unchanged, checked against the unaccelerated settings:
++;; abc->abd;xyz seed 42 -> dyz, 1364 codelets, temperature 17
++;; abc->abd;mrrjjj seed 42 -> mrrkkk, 964, 32
++;; abc->abd;ijk seed 958012227 -> ijl, 439, 16
++;; ---------------------------------------------------------------------------
++
++;; Everything below lives inside one with-output-to-file and one letrec, on
++;; purpose: top-level (define ...)s after (setup) writing to an explicitly
++;; opened port hang the run. Bisected against an otherwise identical script.
++;; The mechanism is not understood; this shape works, so do not "tidy" it.
++
++(with-output-to-file "{results_path}"
++  (lambda ()
++    (letrec
++      ((emit-row
++         (lambda fields
++           (let loop ((f fields) (first? #t))
++             (if (null? f)
++                 ;; (write-char #\\newline), never (newline): Metacat rebinds
++                 ;; BOTH printf and newline to the port captured when
++                 ;; syntactic-sugar.ss loaded (lines 27 and 32), so (newline)
++                 ;; silently writes to SWL's console and every row here would
++                 ;; land on one enormous line.
++                 (begin (write-char #\\newline)
++                        (flush-output-port (current-output-port)))
++                 (begin
++                   (if (not first?) (write-char #\\tab))
++                   ;; display, not printf, for the same reason.
++                   (display (car f))
++                   (loop (cdr f) #f))))))
++       (run-one
++         (lambda (sidx sname ridx initial modified target answer seed maxc)
++           (set! %justify-mode% (if answer #t #f))
++           (init-mcat initial modified target answer seed)
++           (set! *break-time* maxc)
++           (let* ((n-before (length (tell *memory* 'get-answers)))
++                  ;; Reuse run-mcat; its exits, (suspend) on an answer and
++                  ;; (break) on the codelet cap, normally drop into the REPL.
++                  ;; Rebound per run: each needs its own escape continuation.
++                  (outcome (call/cc (lambda (k)
++                                      (set! suspend (lambda () (k 'answered)))
++                                      (set! break   (lambda () (k 'hit-max)))
++                                      (run-mcat))))
++                  (answers (tell *memory* 'get-answers))
++                  ;; add-answer-description conses onto the front
++                  ;; (memory.ss:104), so a longer list means this run's answer
++                  ;; is at the head. Equal length means the run answered with
++                  ;; something memory already held.
++                  (found (if (> (length answers) n-before) (car answers) #f)))
++             (emit-row sidx sname ridx seed
++                       initial modified target (if answer answer "")
++                       *codelet-count* *temperature* outcome
++                       (if found (tell found 'get-answer-print-name) "")
++                       (if found (tell found 'get-quality) "")))))
++       (batch
++         '(
++{batch_literals}
++          ))
++       (walk
++         (lambda (rows current)
++           (if (not (null? rows))
++               (let* ((row (car rows)) (sidx (car row)))
++                 ;; Memory is cleared when the session index changes, never
++                 ;; inside a session.
++                 (if (not (= sidx current)) (tell *memory* 'clear))
++                 (apply run-one row)
++                 (walk (cdr rows) sidx))))))
++      (walk batch -1)))
++  'truncate)
++(exit)
++"""
++
++
++def ensure_display(display):
++    env = dict(os.environ, DISPLAY=display)
++    if subprocess.run(["xdpyinfo"], env=env, capture_output=True).returncode == 0:
++        return env
++    lock = f"/tmp/.X{display.lstrip(':')}-lock"
++    if os.path.exists(lock):
++        os.remove(lock)
++    subprocess.Popen(
++        ["Xvfb", display, "-screen", "0", "1280x1024x24", "-nolisten", "tcp"],
++        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
++    )
++    for _ in range(40):
++        if subprocess.run(["xdpyinfo"], env=env, capture_output=True).returncode == 0:
++            return env
++        time.sleep(0.5)
++    sys.exit(f"error: Xvfb never came up on {display}")
++
++
++def main():
++    ap = argparse.ArgumentParser(description=__doc__,
++                                 formatter_class=argparse.RawDescriptionHelpFormatter)
++    ap.add_argument("spec", help="batch JSON file")
++    ap.add_argument("-o", "--out", default="/metacat/batch-out", help="output directory")
++    ap.add_argument("--display", default=os.environ.get("SOLVE_DISPLAY", ":98"))
++    args = ap.parse_args()
++
++    with open(args.spec) as fh:
++        spec = json.load(fh)
++    rows = build_runs(spec)
++    n_sessions = len({r["session"] for r in rows})
++
++    os.makedirs(args.out, exist_ok=True)
++    results_path = os.path.join(args.out, "results.tsv")
++    script_path = os.path.join(args.out, "batch.ss")
++
++    with open(script_path, "w") as fh:
++        fh.write(generate_scheme(rows, results_path))
++
++    print(f"{len(rows)} runs across {n_sessions} sessions "
++          f"({n_sessions} memory resets)", flush=True)
++    print(f"loading Metacat (~45s), then running; progress in {results_path}",
++          flush=True)
++
++    env = ensure_display(args.display)
++    started = time.time()
++    # SWL's installer writes /usr/local/bin/swl without a shebang, so it is only
++    # executable via a shell -- exec() on it fails with "Exec format error".
++    swl = shutil.which("swl") or "/usr/local/bin/swl"
++    proc = subprocess.run(["sh", swl, script_path],
++                          env=env, capture_output=True, text=True)
++    elapsed = time.time() - started
++
++    parsed, malformed = [], 0
++    if os.path.exists(results_path):
++        with open(results_path) as fh:
++            for line in fh:
++                line = line.rstrip("\n")
++                if not line:
++                    continue
++                parts = line.split("\t")
++                if len(parts) == len(FIELDS):
++                    parsed.append(dict(zip(FIELDS, parts)))
++                else:
++                    malformed += 1
++    if malformed:
++        print(f"WARNING: {malformed} malformed result line(s) "
++              f"(expected {len(FIELDS)} tab-separated fields)", file=sys.stderr)
++
++    if len(parsed) < len(rows):
++        print(f"WARNING: {len(parsed)} of {len(rows)} runs completed. "
++              f"swl exit {proc.returncode}.", file=sys.stderr)
++        tail = (proc.stdout or "").strip().splitlines()[-15:]
++        if tail:
++            print("--- swl output ---", file=sys.stderr)
++            print("\n".join(tail), file=sys.stderr)
++
++    for row in parsed:
++        row["problem"] = f"{row['initial']}->{row['modified']}; {row['target']}"
++
++    with open(os.path.join(args.out, "report.csv"), "w", newline="") as fh:
++        w = csv.DictWriter(fh, fieldnames=CSV_FIELDS)
++        w.writeheader()
++        w.writerows(parsed)
++    with open(os.path.join(args.out, "results.jsonl"), "w") as fh:
++        for row in parsed:
++            fh.write(json.dumps(row) + "\n")
++
++    print(f"\n{len(parsed)} runs in {elapsed:.0f}s "
++          f"({elapsed / max(len(parsed), 1):.1f}s per run)\n")
++    header = f"{'sess':>4} {'run':>4} {'seed':>11} {'problem':<26} " \
++             f"{'codelets':>9} {'temp':>5} {'result':<10}"
++    print(header)
++    print("-" * len(header))
++    for row in parsed[:40]:
++        problem = f"{row['initial']}->{row['modified']}; {row['target']}"
++        result = row["result"] or f"({row['outcome']})"
++        print(f"{row['session']:>4} {row['run']:>4} {row['seed']:>11} "
++              f"{problem:<26} {row['codelets']:>9} {row['final_temp']:>5} "
++              f"{result:<10}")
++    if len(parsed) > 40:
++        print(f"... {len(parsed) - 40} more rows in {args.out}/report.csv")
++
++    sys.exit(0 if len(parsed) == len(rows) else 1)
++
++
++if __name__ == "__main__":
++    main()
+--- /dev/null
++++ b/docker/check_messages.py
+@@ -0,0 +1,188 @@
++#!/usr/bin/env python3
++"""
++Check that no object is sent a message it cannot answer.
++
++    docker compose exec metacat /metacat/docker/check_messages.py
++    docker compose exec metacat /metacat/docker/check_messages.py --enumerate
++
++`tell` on an unanswerable message reaches report-error-and-halt
++(utilities.ss), which prints `Ooops: bad message ...` and (reset)s -- silently
++abandoning the run. Under SWL that line went to the GUI console and the run just
++vanished, which is why several of these survived for years. Run this after any
++change to the engine, and after any change to how it is driven.
++
++TWO MODES
++
++  --verify (default)   Run every problem with the real reporter. Any Ooops, or
++                       any run that fails to complete, is a failure. This is the
++                       regression check.
++
++  --enumerate          Replace report-error-and-halt with a recorder that
++                       returns #f, so a run limps on instead of dying and
++                       reveals further bad messages in the same pass. Use this
++                       when --verify has found one and you want to see what else
++                       is behind it.
++
++                       Returning #f corrupts the computation, so a run usually
++                       dies of a downstream type error ("append: #f is not a
++                       proper list") before reaching the next genuine bad send.
++                       Expect to fix, re-run, and repeat: finding the nine
++                       workspace-string methods in CODE-FIXES.md took three
++                       passes. Answers produced in this mode are meaningless.
++
++EPISODES, NOT JUST RUNS. Both modes run sessions with Episodic Memory carried
++forward, because that is where the interesting failures are. Five of the nine
++methods in CODE-FIXES.md need two snags in one run, which 374,500 single runs
++never produced but episodes reach easily -- once memory suppresses a problem's
++answers, later runs grind to the codelet ceiling and pile up snags.
++"""
++
++import argparse
++import os
++import subprocess
++import sys
++from collections import Counter
++from concurrent.futures import ThreadPoolExecutor
++
++sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
++from episodes import PROBLEMS  # noqa: E402  the one definition of the 19 problems
++
++RECORDER = """
++;; Record and carry on, instead of print-and-(reset).
++(set! report-error-and-halt
++  (lambda (message object)
++    (printf "BADMSG\\t~a\\t~a~n" (2nd message) (tell object 'object-type))
++    #f))
++"""
++
++SCRIPT = """
++(define *metacat-directory* "/metacat/")
++(load "/metacat/metacat-headless.ss")
++{recorder}
++(let loop ((ep 0))
++  (if (< ep {episodes})
++    (begin
++      ;; A fresh session per episode; memory persists WITHIN one.
++      (tell *memory* 'clear)
++      (let inner ((i 0))
++        (if (< i {runs})
++          (begin
++            (init-mcat '{initial} '{modified} '{target} #f
++              (+ {start_seed} (* ep {runs}) i))
++            (set! *break-time* {max_steps})
++            (call/cc (lambda (k)
++                       (set! suspend (lambda () (k 'answered)))
++                       (set! break   (lambda () (k 'capped)))
++                       (run-mcat)))
++            (printf "RUN~n")
++            (inner (+ i 1)))))
++      (loop (+ ep 1)))))
++(printf "SWEEPDONE~n")
++(exit)
++"""
++
++
++def run(job):
++    name, initial, modified, target, cfg = job
++    path = os.path.join(cfg["workdir"], f"check_{name}.ss")
++    with open(path, "w") as fh:
++        fh.write(SCRIPT.format(
++            recorder=RECORDER if cfg["enumerate"] else "",
++            initial=initial, modified=modified, target=target,
++            episodes=cfg["episodes"], runs=cfg["runs"],
++            start_seed=cfg["start_seed"], max_steps=cfg["max_steps"]))
++    env = dict(os.environ)
++    env.pop("DISPLAY", None)  # plain Chez; nothing may reach for an X server
++    proc = subprocess.run(["scheme", "-q", path], env=env,
++                          capture_output=True, text=True)
++    blob = proc.stdout + proc.stderr
++    bad = Counter()
++    for ln in blob.splitlines():
++        if ln.startswith("BADMSG"):
++            p = ln.split("\t")
++            if len(p) >= 3:
++                bad[(p[1], p[2])] += 1
++    return {
++        "name": name,
++        "runs": sum(1 for ln in proc.stdout.splitlines() if ln == "RUN"),
++        "expected": cfg["episodes"] * cfg["runs"],
++        "finished": "SWEEPDONE" in proc.stdout,
++        "oops": [ln for ln in blob.splitlines() if "Ooops" in ln],
++        "bad": bad,
++        "tail": blob[-400:],
++    }
++
++
++def main():
++    ap = argparse.ArgumentParser()
++    ap.add_argument("--enumerate", action="store_true",
++                    help="record bad sends and carry on, instead of dying")
++    ap.add_argument("-e", "--episodes", type=int, default=30)
++    ap.add_argument("-r", "--runs", type=int, default=8)
++    ap.add_argument("--start-seed", type=int, default=200_000,
++                    help="clear of both committed data sets by default")
++    ap.add_argument("--max-steps", type=int, default=100_000)
++    ap.add_argument("-j", "--jobs", type=int, default=10)
++    ap.add_argument("-w", "--workdir", default="/metacat/oracle/work/check")
++    ap.add_argument("--only")
++    args = ap.parse_args()
++
++    os.makedirs(args.workdir, exist_ok=True)
++    problems = PROBLEMS
++    if args.only:
++        wanted = set(args.only.split(","))
++        problems = [p for p in PROBLEMS if p[0] in wanted]
++
++    cfg = dict(episodes=args.episodes, runs=args.runs, max_steps=args.max_steps,
++               start_seed=args.start_seed, workdir=args.workdir,
++               enumerate=args.enumerate)
++    mode = "enumerate" if args.enumerate else "verify"
++    total = len(problems) * args.episodes * args.runs
++    print(f"{mode}: {len(problems)} problems x {args.episodes} episodes x "
++          f"{args.runs} runs = {total} runs, max_steps={args.max_steps}\n",
++          flush=True)
++
++    results, all_bad = [], Counter()
++    with ThreadPoolExecutor(max_workers=args.jobs) as pool:
++        for res in pool.map(run, [(*p, cfg) for p in problems]):
++            results.append(res)
++            all_bad.update(res["bad"])
++            ok = res["finished"] and res["runs"] == res["expected"] and not res["oops"]
++            flag = ""
++            if res["oops"]:
++                flag = f"  {len(res['oops'])} Ooops"
++            elif res["bad"]:
++                flag = f"  {sum(res['bad'].values())} bad sends"
++            elif not res["finished"]:
++                flag = "  DID NOT FINISH"
++            print(f"  {'ok  ' if ok else 'FAIL'} {res['name']:<12} "
++                  f"{res['runs']}/{res['expected']} runs{flag}", flush=True)
++
++    if args.enumerate:
++        print("\n=== every message an object could not answer ===")
++        for (msg, otype), n in all_bad.most_common():
++            print(f"  {n:>7}  {msg:<28} -> {otype}")
++        if not all_bad:
++            print("  none")
++        # Enumerate mode always corrupts state, so a non-zero exit here would be
++        # meaningless. It reports; it does not judge.
++        return 0
++
++    broken = [r for r in results
++              if r["oops"] or not r["finished"] or r["runs"] != r["expected"]]
++    if broken:
++        print(f"\n{len(broken)} problem(s) failed:")
++        for r in broken:
++            print(f"--- {r['name']}")
++            for o in r["oops"][:3]:
++                print(f"    {o}")
++            if not r["oops"]:
++                print(f"    {r['tail'].strip()[-300:]}")
++        print("\nRe-run with --enumerate to see everything behind the first failure.")
++        return 1
++    print(f"\nall {len(results)} problems clean: no bad messages, every run completed")
++    return 0
++
++
++if __name__ == "__main__":
++    sys.exit(main())
+--- /dev/null
++++ b/docker/check_saturation.py
+@@ -0,0 +1,149 @@
++#!/usr/bin/env python3
++"""
++How complete are the reference sets, and how many spurious flags follow?
++
++    docker/check_saturation.py
++
++Pure post-processing of oracle/raw/ -- no Chez, no runs. Run it after
++re-sampling either data set, to see whether "the program under test produced
++something the reference never did" still means what ORACLE-USAGE.md says it
++means.
++
++THE NUMBER THAT MATTERS. f1/n is the Good-Turing missing-mass estimate: f1 is
++the number of members seen exactly once, n the sample size, and the ratio
++estimates the chance the next sample produces something never seen before.
++Multiply by the 100 tries a comparison run uses and you get the expected number
++of "novel" results per problem that are really just reference undersampling.
++
++The two sets are deliberately held to different standards:
++
++  single-run set    sampled by oracle.py until f1/n <= 1e-4, so a novel state is
++                    almost certainly a real change.
++  convergence set   NOT driven down. Novel convergence answers are a signal the
++                    research programme wants, and suppressing them would cost
++                    enormously more sampling. See ORACLE-USAGE.md.
++
++So a rising convergence f1/n is not a defect. It is the number to quote when
++weighing a flag, and this script keeps it honest.
++
++The trend columns show f1/n over growing subsamples, which says whether more
++sampling would still buy anything or whether the tail is simply long.
++"""
++
++import argparse
++import gzip
++import json
++import os
++import random
++from collections import Counter
++
++ANSWERLESS = {"*NONE*", "*CAP*"}
++N_TEST = 100
++HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
++RAW = os.path.join(HERE, "oracle", "raw")
++
++
++def gt_ratio(counts):
++    n = sum(counts.values())
++    f1 = sum(1 for v in counts.values() if v == 1)
++    return (f1 / n) if n else 0.0
++
++
++def convergence_answer(runs):
++    for r in reversed(runs):
++        if r["state"] not in ANSWERLESS:
++            return r["state"]
++    return None
++
++
++def load_episodes():
++    p = os.path.join(RAW, "episodes.json")
++    if os.path.exists(p):
++        return json.load(open(p))
++    with gzip.open(p + ".gz", "rt") as fh:
++        return json.load(fh)
++
++
++def trend(members, sizes, trials, rng):
++    """f1/n over growing subsamples of an observation list."""
++    out = []
++    for s in sizes:
++        if s > len(members):
++            out.append(None)
++            continue
++        vals = [gt_ratio(Counter(rng.sample(members, s))) for _ in range(trials)]
++        out.append(sum(vals) / trials)
++    return out
++
++
++def main():
++    ap = argparse.ArgumentParser()
++    ap.add_argument("--trials", type=int, default=40)
++    args = ap.parse_args()
++    rng = random.Random(20260806)
++
++    single = json.load(open(os.path.join(RAW, "single-runs.json")))
++    episodes = load_episodes()
++
++    print("SINGLE-RUN SETS -- oracle.py's stop rule is f1/n <= 1e-4\n")
++    print(f"{'problem':12s} {'n':>7} {'distinct':>9} {'f1/n':>9} "
++          f"{'stop reason':>14} {'spurious/100':>13}")
++    # Three problems stopped before the target and say so in stop_reason:
++    # checkpoint (hit the run ceiling with the set still growing) and
++    # shards_exited (stopped by hand). Those are recorded decisions, not faults.
++    # A problem claiming `saturated` while sitting above the target would be a
++    # real inconsistency, and is the only thing worth failing on.
++    inconsistent, stopped_early = [], []
++    for r in single["results"]:
++        ratio = r["f1"] / r["n"]
++        mark = ""
++        if ratio > 1e-4:
++            if r["stop_reason"] == "saturated":
++                inconsistent.append(r["name"])
++                mark = "   INCONSISTENT"
++            else:
++                stopped_early.append(r["name"])
++                mark = "   above target, stopped early by design"
++        print(f"{r['name']:12s} {r['n']:>7} {r['distinct_states']:>9} "
++              f"{ratio:9.5f} {r['stop_reason']:>14} {ratio * N_TEST:13.2f}{mark}")
++
++    print("\n\nCONVERGENCE SETS -- deliberately not driven to 1e-4\n")
++    sizes = [100, 200, 300, 400, 500]
++    print(f"{'problem':12s} {'episodes':>8} {'distinct':>9} "
++          + " ".join(f"{s:>7}" for s in sizes) + f" {'spurious/100':>13}")
++    total = 0.0
++    for r in episodes["results"]:
++        finals = []
++        for s in r["sequences"]:
++            a = convergence_answer(s["runs"])
++            if a is not None:
++                finals.append(a)
++        counts = Counter(finals)
++        ratio = gt_ratio(counts)
++        total += ratio * N_TEST
++        row = trend(finals, sizes, args.trials, rng)
++        cells = " ".join("      -" if v is None else f"{v:7.4f}" for v in row)
++        print(f"{r['name']:12s} {len(r['sequences']):>8} {len(counts):>9} "
++              f"{cells} {ratio * N_TEST:13.2f}")
++
++    print(f"\nExpected spurious novelty flags across all "
++          f"{len(episodes['results'])} problems per {N_TEST}-episode "
++          f"comparison: {total:.1f}")
++    print("A falling trend means more episodes would still shrink the tail; a "
++          "flat one\nmeans the tail is long and sampling will not close it "
++          "cheaply.")
++    if stopped_early:
++        print(f"\nAbove the 1e-4 target but stopped early on purpose: "
++              f"{', '.join(stopped_early)}.\nStill worth 0.04 or fewer spurious "
++              "flags per 100 runs. Extend with oracle.py --resume\nif a novelty "
++              "flag on one of them ever needs to carry more weight.")
++    if inconsistent:
++        print(f"\nWARNING: {', '.join(inconsistent)} claim `saturated` yet sit "
++              "above 1e-4.\nThat should not happen -- oracle.py's stop rule and "
++              "this check disagree.")
++        return 1
++    return 0
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+--- /dev/null
++++ b/docker/entrypoint.sh
+@@ -0,0 +1,187 @@
++#!/bin/bash
++#
++# Metacat container entrypoint.
++#
++# Ordering here is deliberate and load-bearing:
++#
++#     Xvfb  ->  Metacat  ->  wait for (setup)  ->  window manager  ->  layout
++#
++# Metacat creates fifteen toplevel windows in one synchronous burst inside
++# (setup), and it deadlocks partway through if a reparenting window manager is
++# already running -- openbox, fluxbox and twm were each tried and each hung it
++# after two windows. With no WM present, (setup) completes in about 30 seconds.
++#
++# Starting the WM afterwards is safe: it adopts the already-mapped windows.
++# The layout then has to be applied by hand, because Metacat sets window
++# *sizes* only and leaves placement entirely to the WM (constants.ss:43,
++# set-window-size-defaults) -- without this every window sits at the origin.
++
++set -euo pipefail
++
++DISPLAY="${DISPLAY:-:99}"
++SCREEN="${SCREEN:-2880x1620x24}"
++VNC_PORT="${VNC_PORT:-5900}"
++NOVNC_PORT="${NOVNC_PORT:-6080}"
++METACAT_DIR="${METACAT_DIR:-/metacat}"
++TCLTK_VERSION="${TCLTK_VERSION:-8.6}"
++export DISPLAY
++
++say() { printf '[metacat] %s\n' "$*"; }
++
++if [ ! -f "${METACAT_DIR}/metacat.ss" ]; then
++    say "ERROR: no metacat.ss under ${METACAT_DIR}."
++    say "Mount the Metacat source there (docker-compose.yml does this already)."
++    exit 1
++fi
++
++# ---------------------------------------------------------------- X server ---
++# A container that is restarted rather than recreated keeps /tmp, and a stale
++# lock makes Xvfb refuse to start.
++rm -f "/tmp/.X${DISPLAY#:}-lock"
++rm -rf /tmp/.X11-unix
++
++say "starting Xvfb on ${DISPLAY} at ${SCREEN}"
++Xvfb "$DISPLAY" -screen 0 "$SCREEN" -nolisten tcp >/tmp/xvfb.log 2>&1 &
++
++for _ in $(seq 1 40); do
++    xdpyinfo >/dev/null 2>&1 && break
++    sleep 0.5
++done
++xdpyinfo >/dev/null 2>&1 || { say "ERROR: Xvfb never came up"; cat /tmp/xvfb.log; exit 1; }
++xsetroot -solid grey25 2>/dev/null || true
++
++# ------------------------------------------------------------------- remote ---
++say "starting x11vnc on :${VNC_PORT} and noVNC on :${NOVNC_PORT}"
++x11vnc -display "$DISPLAY" -forever -shared -nopw -quiet \
++       -rfbport "$VNC_PORT" >/tmp/x11vnc.log 2>&1 &
++websockify --web /usr/share/novnc "$NOVNC_PORT" "localhost:${VNC_PORT}" \
++       >/tmp/websockify.log 2>&1 &
++
++# ------------------------------------------------- Linux-flavoured metacat.ss ---
++# The checked-in metacat.ss is configured for the macOS host. Rather than make
++# the repository file container-specific, derive a Linux copy at start-up. It
++# only overrides the four configuration lines; everything else, including the
++# load order, comes from the mounted file. *metacat-directory* still points at
++# the mount, so all 43 other .ss files load from there.
++GEN=/tmp/metacat-linux.ss
++sed -e "s|^(define \*platform\* .*|(define *platform* 'linux)|" \
++    -e "s|^(define \*metacat-directory\* .*|(define *metacat-directory* \"${METACAT_DIR}/\")|" \
++    -e "s|^(define \*file-dialog-directory\* .*|(define *file-dialog-directory* \"${METACAT_DIR}/\")|" \
++    -e "s|^(define \*tcl/tk-version\* .*|(define *tcl/tk-version* ${TCLTK_VERSION})|" \
++    "${METACAT_DIR}/metacat.ss" > "$GEN"
++
++cat > /tmp/metacat-start.ss <<EOF
++(load "${GEN}")
++(setup)
++EOF
++
++# Loaded by swl purely so that it reaches (new-repl 'default) and opens the GUI
++# repl window; the real work is typed into that repl below. See the comment on
++# drive_repl for why Metacat cannot simply be loaded here.
++printf ';; intentionally empty -- see docker/entrypoint.sh\n' > /tmp/metacat-boot.ss
++
++# ------------------------------------------- window manager + layout, deferred ---
++# Titles are exactly as Metacat sets them, so wmctrl -F (exact match) is safe.
++# Coordinates are frame positions on a 2880x1620 screen; fluxbox adds a ~20px
++# titlebar, which the vertical gaps below already allow for.
++#
++# EEG and Logo are in the table but will not move: Metacat leaves both unmapped
++# at start-up, so no window manager adopts them. They get placed by fluxbox if
++# and when you show the EEG from the Control Panel's Windows menu.
++layout() {
++    while read -r x y title; do
++        wmctrl -F -r "$title" -e "0,${x},${y},-1,-1" 2>/dev/null || true
++    done <<'LAYOUT'
++0 0 Workspace
++810 0 Slipnet
++810 380 Top Themes
++810 570 Bottom Themes
++1470 0 Vertical Themes
++1640 0 Coderack
++1880 0 Temperature
++1960 0 Episodic Memory
++2240 0 Commentary
++0 660 Temporal Trace
++0 800 EEG
++0 990 Metacat Control Panel
++500 990 Logo
++1030 800 Interaction window
++1900 660 repl
++LAYOUT
++}
++
++# Metacat must be loaded by *typing into SWL's repl window*, not by passing it
++# to swl on the command line. (setup) records the thread it runs on as
++# *repl-thread* (setup.ss:70), and every Control Panel action injects the run
++# into that thread with (thread-break *repl-thread* ...) (gui.ss:762,772).
++# Loaded as a script argument, (setup) runs on the script-loading thread rather
++# than the repl thread, and clicking Go dies with
++#     Exception: attempt to apply non-procedure #f
++# So drive the repl the way a human would, which is also what README.txt says.
++drive_repl() {
++    local win=""
++    for _ in $(seq 1 120); do
++        win=$(xdotool search --name '^repl$' 2>/dev/null | head -1)
++        [ -n "$win" ] && break
++        sleep 1
++    done
++    if [ -z "$win" ]; then
++        say "ERROR: SWL's repl window never appeared"
++        return 1
++    fi
++
++    # No WM is running yet, so put the window somewhere known and click into
++    # its text area -- synthetic focus alone is not reliable with Tk.
++    xdotool windowmove "$win" 100 100
++    xdotool windowraise "$win"
++    sleep 2
++    xdotool mousemove 400 300 click 1
++    sleep 1
++    say "loading Metacat into the repl (this takes ~45s)"
++    xdotool type --delay 40 '(load "/tmp/metacat-start.ss")'
++    xdotool key Return
++}
++
++(
++    drive_repl || true
++
++    # The Control Panel is the last window (setup) creates, so its appearance
++    # means the burst is over and a WM can safely be introduced.
++    for _ in $(seq 1 120); do
++        if xwininfo -root -children 2>/dev/null | grep -q "Metacat Control Panel"; then
++            break
++        fi
++        sleep 2
++    done
++
++    if ! xwininfo -root -children 2>/dev/null | grep -q "Metacat Control Panel"; then
++        say "WARNING: Control Panel never appeared; starting the WM anyway"
++    else
++        say "(setup) finished; starting fluxbox"
++    fi
++
++    mkdir -p /root/.fluxbox
++    # Without this fluxbox's style calls fbsetbg, which finds no wallpaper
++    # setter installed and pops a modal xmessage over the Temporal Trace.
++    printf 'background: none\n' > /root/.fluxbox/overlay
++    printf 'session.screen0.rootCommand: xsetroot -solid grey25\n' \
++        > /root/.fluxbox/init
++
++    fluxbox >/tmp/fluxbox.log 2>&1 &
++
++    sleep 6
++    layout
++    # Belt and braces: fbsetbg is invoked from the style, so kill the dialog if
++    # it appeared anyway.
++    pkill -x xmessage 2>/dev/null || true
++    say "window layout applied -- open http://localhost:${NOVNC_PORT}/vnc.html"
++) &
++
++# ------------------------------------------------------------------- Metacat ---
++# swl loads its arguments and then calls (new-repl 'default), which is what
++# opens the GUI repl window. It needs at least one file argument to take that
++# path, hence the empty metacat-boot.ss; the background job above then types
++# the real load into the repl it opens.
++say "starting SWL"
++cd "$METACAT_DIR"
++exec swl /tmp/metacat-boot.ss </dev/null
+--- /dev/null
++++ b/docker/episode_report.py
+@@ -0,0 +1,135 @@
++#!/usr/bin/env python3
++"""
++Render episodes.json for manual inspection.
++
++    docker/episode_report.py episode-out/episodes.json [problem ...]
++
++This deliberately does NOT commit to a statistic. The point of the pilot is to
++look at the sequences and decide afterwards what analysis the full run deserves,
++so this prints the raw progressions first and only then a few candidate
++descriptive measures, each labelled with what would undermine it.
++"""
++
++import json
++import sys
++from collections import Counter
++
++
++def episode_line(runs):
++    """One episode as a readable arrow sequence."""
++    return " -> ".join(r["state"] for r in runs)
++
++
++def novelty_curve(sequences):
++    """Fraction of episodes whose run i produced a state not seen earlier in it."""
++    if not sequences:
++        return []
++    width = max(len(s["runs"]) for s in sequences)
++    out = []
++    for i in range(width):
++        seen_new, total = 0, 0
++        for s in sequences:
++            if i >= len(s["runs"]):
++                continue
++            total += 1
++            earlier = {r["state"] for r in s["runs"][:i]}
++            if s["runs"][i]["state"] not in earlier:
++                seen_new += 1
++        out.append(seen_new / total if total else 0.0)
++    return out
++
++
++def mean_by_index(sequences, key, skip_missing=None):
++    width = max((len(s["runs"]) for s in sequences), default=0)
++    out = []
++    for i in range(width):
++        vals = [s["runs"][i][key] for s in sequences
++                if i < len(s["runs"])
++                and (skip_missing is None or s["runs"][i][key] != skip_missing)]
++        out.append(sum(vals) / len(vals) if vals else None)
++    return out
++
++
++def fmt(xs, spec="{:.2f}"):
++    return " ".join("  --  " if x is None else spec.format(x) for x in xs)
++
++
++def main():
++    path = sys.argv[1]
++    wanted = set(sys.argv[2:])
++    data = json.load(open(path))
++    p = data["params"]
++    print(f"episodes={p['episodes']} runs/episode={p['runs']} "
++          f"start_seed={p['start_seed']} max_steps={p['max_steps']}\n")
++
++    for res in data["results"]:
++        if wanted and res["name"] not in wanted:
++            continue
++        seqs = res["sequences"]
++        _, initial, modified, target = res["problem"]
++        print("=" * 78)
++        print(f"{res['name']}   {initial} -> {modified} ; {target} -> ?   "
++              f"{res['episodes_complete']}/{res['episodes_requested']} episodes"
++              f"{'   ERRORS: ' + str(len(res['errors'])) if res['errors'] else ''}")
++        print("=" * 78)
++        if res["errors"]:
++            for e in res["errors"][:5]:
++                print(f"  ! {e}")
++
++        print("\n-- sequences (the thing to actually look at) --")
++        for s in seqs:
++            print(f"  ep{s['episode']:<3} seed {s['start_seed']:<6} "
++                  f"{episode_line(s['runs'])}")
++
++        if not seqs:
++            continue
++
++        print("\n-- distinct states per episode --")
++        counts = [len({r['state'] for r in s['runs']}) for s in seqs]
++        print(f"  {counts}   mean {sum(counts)/len(counts):.2f} "
++              f"of {p['runs']} runs")
++
++        print("\n-- by run index (position within the episode) --")
++        idx = range(max(len(s["runs"]) for s in seqs))
++        print("  index      " + " ".join(f"{i:^6}" for i in idx))
++        print("  novel      " + fmt(novelty_curve(seqs)))
++        print("  codelets   " + fmt(mean_by_index(seqs, "codelets"), "{:6.0f}"))
++        print("  quality    " + fmt(mean_by_index(seqs, "quality", -1.0), "{:6.1f}"))
++        print("  temp       " + fmt(mean_by_index(seqs, "temperature"), "{:6.1f}"))
++        print("  #answers   " + fmt(mean_by_index(seqs, "memory_answers"), "{:6.2f}"))
++        print("  #snags     " + fmt(mean_by_index(seqs, "memory_snags"), "{:6.2f}"))
++
++        print("\n  novel = share of episodes whose run at this index produced a")
++        print("  state not already seen in that episode. It must fall by")
++        print("  construction -- answers.ss:982 refuses to report an answer")
++        print("  already in memory -- so the question is not whether it falls but")
++        print("  whether it falls faster than sampling without replacement from")
++        print("  the single-run distribution would predict. That comparison needs")
++        print("  the single-run oracle, and is deliberately not made here.")
++
++        print("\n-- state frequency, first run vs last run --")
++        first = Counter(s["runs"][0]["state"] for s in seqs)
++        last = Counter(s["runs"][-1]["state"] for s in seqs)
++        for st in sorted(set(first) | set(last),
++                         key=lambda k: -(first[k] + last[k])):
++            print(f"  {st:<14} first {first[st]:>4}   last {last[st]:>4}")
++
++        print("\n-- remindings (activation of a stored answer after a later run) --")
++        strong = [(s["episode"], r["i"], a["answer"], a["activation"])
++                  for s in seqs for r in s["runs"]
++                  for a in r["activations"]
++                  if 0 < a["activation"] < 100]
++        if not strong:
++            print("  none: no stored answer was ever activated by a later one.")
++            print("  With %distance-threshold% = 5 (memory.ss:486) that means")
++            print("  every pair of answers was at distance >= 5.")
++        else:
++            for ep, i, ans, act in strong[:25]:
++                print(f"  ep{ep:<3} run{i:<3} {ans:<12} activation {act:.0f}")
++            if len(strong) > 25:
++                print(f"  ... {len(strong) - 25} more")
++        print()
++
++
++if __name__ == "__main__":
++    main()
+--- /dev/null
++++ b/docker/episodes.py
+@@ -0,0 +1,381 @@
++#!/usr/bin/env python3
++"""
++Episode benchmark: sample sessions rather than runs, to look for learning.
++
++    docker compose exec metacat /metacat/docker/episodes.py
++
++An EPISODE is a sequence of runs over the SAME problem in ONE session, with
++Episodic Memory carried forward from each run to the next. The single-run oracle
++(oracle.py) clears memory before every run precisely so that runs are
++independent; this harness does the opposite, and records the ordered sequence of
++results so the progression can be analysed.
++
++WHAT ACTUALLY CARRIES FORWARD. Only the contents of Episodic Memory. init-mcat
++(run.ss:185-238) resets everything else on every run -- it reseeds the RNG,
++re-initialises the coderack, temperature, trace and themespace, rebuilds the
++workspace, and sends 'reset to every Slipnet node (run.ss:202-203). Of memory it
++sends only 'clear-activations and 'unhighlight-all-answers (run.ss:212-213), NOT
++'clear. So `answer-descriptions' and `snag-descriptions' accumulate across an
++episode and nothing else does.
++
++HOW MEMORY FEEDS BACK INTO A RUN. Three sites, and all three key on the current
++problem's own strings, so memory only bites when the same problem recurs -- which
++is what an episode is:
++
++  answers.ss:982    the answer-finder fizzles if 'answer-present? says this exact
++                    (answer-letters, top rule, bottom rule) is already stored, so
++                    a result cannot be reported twice in one episode;
++  answers.ss:1162   a snag is only recorded if 'snag-present? says it is new;
++  answers.ss:290,304  'get-equivalent-snag links an answer to a remembered snag.
++
++Note what 'answer-present? compares (memory.ss:90-96): the same answer STRING
++reached by a DIFFERENT rule is not suppressed. So the rule matters, and this
++harness records enough to tell the two cases apart.
++
++Reminding is the fourth channel and the only one that is purely observational
++here: 'add-answer-description 'compare's each new answer against every answer
++already stored (memory.ss:102-103) and sets their activations by distance
++(memory.ss:209-227, %distance-threshold% = 5). In GUI mode that produces
++commentary. Nothing in the engine reads those activations back, and init-mcat
++zeroes them, so they are captured at the end of each run instead.
++
++SEEDS. init-mcat calls (random-seed seed) unconditionally, so every run must be
++given one and no run inherits the previous run's RNG state. Episode e of a
++problem uses seeds S, S+1, ... S+R-1 where S = start-seed + e*R, matching
++oracle.py's own use of consecutive seeds. Two consequences worth holding on to:
++every individual run is independently reproducible from its own seed, and the
++ONLY thing distinguishing run i of an episode from a lone single run with the
++same seed is the memory it inherited. That is what isolates the learning effect.
++
++SHARDING. Runs inside an episode are strictly sequential and cannot be split.
++Episodes are independent, so shard s takes episodes s, s+K, s+2K, ...
++"""
++
++import argparse
++import json
++import os
++import shutil
++import subprocess
++import sys
++import time
++from concurrent.futures import ThreadPoolExecutor, as_completed
++
++EPISODES = 500       # episodes per problem
++RUNS = 8             # runs per episode
++MAX_STEPS = 100_000  # per-run codelet cap, same as oracle.py
++
++# Clear of the single-run oracle, which seeds every problem from 1 and reached
++# 51,000 runs on its longest (fig5.4-top, eqe-baaab). Starting here keeps every
++# episode run on a seed the oracle never used, so no run in this sample is a
++# repeat of one already in oracle.json.
++START_SEED = 100_000
++
++PROBLEMS = [
++    ("misc4",       "a",     "b",       "z"),
++    ("fig5.7",      "aabc",  "aabd",    "ijkk"),
++    ("misc3",       "abc",   "aabbcc",  "kkjjii"),
++    ("misc5",       "abc",   "abd",     "glz"),
++    ("misc2",       "abc",   "abd",     "ijk"),
++    ("run1",        "abc",   "abd",     "mrrjjj"),
++    ("run4",        "abc",   "abd",     "xyz"),
++    ("misc1",       "abc",   "cba",     "mrrjjj"),
++    ("fig5.4-top",  "eeqee", "qeeq",    "xxixx"),
++    ("eqe-baaab",   "eqe",   "qeq",     "abbba"),
++    ("run6",        "eqe",   "qeq",     "abbbc"),
++    ("run3",        "rst",   "rsu",     "xyz"),
++    ("run2",        "xqc",   "xqd",     "mrrjjj"),
++    ("copy1",       "ab",    "c",       "ab"),
++    ("copy2",       "bc",    "d",       "bc"),
++    ("copy3",       "xy",    "z",       "xy"),
++    ("copy4",       "zy",    "x",       "zy"),
++    ("copy5",       "aabb",  "cc",      "aabb"),
++    ("copy6",       "abc",   "d",       "abc"),
++]
++
++# Field separator for the per-run records. Chosen because no answer print name,
++# rule phrase or state token can contain it.
++SEP = "\\t"
++
++
++def shard_scheme(initial, modified, target, out_path, done_path,
++                 shard, nshards, episodes, runs, start_seed, max_steps):
++    """One shard: its slice of the episode list, each episode run start to end.
++
++    Emits one RUN line per run and one EP line per completed episode. A shard
++    writes continuously and flushes per line, so a killed shard still leaves
++    every episode it had finished.
++    """
++    return f"""
++;; Performance mode: plain Chez, no SWL, no Tk, no X display, no (setup).
++(define *metacat-directory* "/metacat/")
++(load "/metacat/metacat-headless.ss")
++
++(with-output-to-file "{out_path}"
++  (lambda ()
++    (letrec
++      ((emit (lambda args
++               (display (apply format args))
++               ;; write-char, not (newline): Metacat rebinds newline to the port
++               ;; captured at load time (syntactic-sugar.ss:32).
++               (write-char #\\newline)
++               (flush-output-port (current-output-port))))
++       ;; "a:87,b:0" -- every answer currently in memory with its activation.
++       ;; Captured after the run, before the next init-mcat zeroes them
++       ;; (run.ss:212). The newest answer sits at 100; the others carry the
++       ;; reminding strength that answer produced in them (memory.ss:209-227).
++       (activation-list
++         (lambda ()
++           (let loop ((a (tell *memory* 'get-answers)) (acc ""))
++             (if (null? a)
++                 acc
++                 (loop (cdr a)
++                       (string-append acc (if (string=? acc "") "" ",")
++                                      (tell (car a) 'get-answer-print-name) ":"
++                                      (number->string
++                                        (exact->inexact
++                                          (tell (car a) 'get-activation)))))))))
++       (snag-list
++         (lambda ()
++           (let loop ((s (tell *memory* 'get-snags)) (acc ""))
++             (if (null? s)
++                 acc
++                 (loop (cdr s)
++                       (string-append acc (if (string=? acc "") "" ",")
++                                      (tell (car s) 'print-name)))))))
++       ;; One run inside an episode. Memory is NOT cleared -- that is the point.
++       ;;
++       ;; The stopping state CANNOT be read the way oracle.py reads it. There,
++       ;; memory is empty at the start of every run, so "memory holds an answer"
++       ;; means "this run answered". Here memory is non-empty from run 1 onward.
++       ;; Nor is the continuation enough on its own: give-up calls (suspend) too
++       ;; (answers.ss:86-92), so 'answered covers both outcomes. What separates
++       ;; them is whether the run ADDED an answer -- abstract-answer-description
++       ;; stores it immediately before (suspend) at answers.ss:80-81 -- so the
++       ;; answer count is compared across the run.
++       (one-run
++         (lambda (ep i seed)
++           (let ((n-before (length (tell *memory* 'get-answers))))
++             (init-mcat '{initial} '{modified} '{target} #f seed)
++             (set! *break-time* {max_steps})
++             (let* ((outcome (call/cc (lambda (k)
++                                        (set! suspend (lambda () (k 'answered)))
++                                        (set! break   (lambda () (k 'capped)))
++                                        (run-mcat))))
++                    (answers (tell *memory* 'get-answers))
++                    (answered? (> (length answers) n-before))
++                    (newest (if answered? (car answers) #f)))
++               ;; episode, run index, seed, state, codelets, final temperature,
++               ;; answer quality, answer temperature, #answers, #snags,
++               ;; activations, snags.
++               ;;
++               ;; exact->inexact on every number: Metacat computes quality and
++               ;; temperature with exact arithmetic, so these can be rationals,
++               ;; and ~a would print one as "173/2" -- which no numeric parser on
++               ;; the other side accepts.
++               (emit "RUN{SEP}~a{SEP}~a{SEP}~a{SEP}~a{SEP}~a{SEP}~a{SEP}~a{SEP}~a{SEP}~a{SEP}~a{SEP}~a{SEP}~a"
++                 ep i seed
++                 (cond
++                   (answered? (tell newest 'get-answer-print-name))
++                   ((eq? outcome 'capped) "*CAP*")
++                   (else "*NONE*"))
++                 *codelet-count*
++                 (exact->inexact *temperature*)
++                 (if answered? (exact->inexact (tell newest 'get-quality)) -1.0)
++                 (if answered? (exact->inexact (tell newest 'get-temperature)) -1.0)
++                 (length answers)
++                 (length (tell *memory* 'get-snags))
++                 (activation-list)
++                 (snag-list))))))
++       (one-episode
++         (lambda (ep)
++           ;; A fresh session: this is the only 'clear in the harness.
++           (tell *memory* 'clear)
++           (let ((start (+ {start_seed} (* ep {runs}))))
++             (let loop ((i 0))
++               (if (< i {runs})
++                   (begin (one-run ep i (+ start i)) (loop (+ i 1))))))
++           (emit "EP{SEP}~a" ep))))
++
++      ;; Shard s takes episodes s, s+K, s+2K, ...
++      (let loop ((ep {shard}))
++        (if (< ep {episodes})
++            (begin (one-episode ep) (loop (+ ep {nshards})))))
++      (emit "SHARDDONE")))
++  'truncate)
++(with-output-to-file "{done_path}" (lambda () (display "done")) 'truncate)
++(exit)
++"""
++
++
++def read_shard(path):
++    """Parse a shard's TSV into {episode: [run-record, ...]} plus a done flag."""
++    episodes, complete, done = {}, set(), False
++    if not os.path.exists(path):
++        return episodes, complete, done
++    with open(path) as fh:
++        for line in fh:
++            parts = line.rstrip("\n").split("\t")
++            if parts[0] == "RUN" and len(parts) == 13:
++                (_, ep, i, seed, state, codelets, temperature, quality,
++                 answer_temperature, n_answers, n_snags, activations,
++                 snags) = parts
++                episodes.setdefault(int(ep), []).append({
++                    "i": int(i),
++                    "seed": int(seed),
++                    "state": state,
++                    "codelets": int(codelets),
++                    "temperature": float(temperature),
++                    # float, not int: the emitter sends these through
++                    # exact->inexact because Metacat computes quality with exact
++                    # arithmetic and ~a would otherwise print a rational.
++                    "quality": float(quality),
++                    "answer_temperature": float(answer_temperature),
++                    "memory_answers": int(n_answers),
++                    "memory_snags": int(n_snags),
++                    "activations": [
++                        {"answer": a.rsplit(":", 1)[0],
++                         "activation": float(a.rsplit(":", 1)[1])}
++                        for a in activations.split(",") if a
++                    ],
++                    "snags": [s for s in snags.split(",") if s],
++                })
++            elif parts[0] == "EP":
++                complete.add(int(parts[1]))
++            elif parts[0] == "SHARDDONE":
++                done = True
++    return episodes, complete, done
++
++
++def run_problem(job):
++    idx, problem, outdir, cfg = job
++    name, initial, modified, target = problem
++    workdir = os.path.join(outdir, name)
++    shutil.rmtree(workdir, ignore_errors=True)
++    os.makedirs(workdir, exist_ok=True)
++
++    k = min(cfg["shards"], cfg["episodes"])
++    procs = []
++    for s in range(k):
++        script = os.path.join(workdir, f"shard{s}.ss")
++        out = os.path.join(workdir, f"shard{s}.tsv")
++        done = os.path.join(workdir, f"shard{s}.done")
++        with open(script, "w") as fh:
++            fh.write(shard_scheme(initial, modified, target, out, done,
++                                  s, k, cfg["episodes"], cfg["runs"],
++                                  cfg["start_seed"], cfg["max_steps"]))
++        # Plain Chez: no swl, no display. DISPLAY is cleared so nothing can
++        # quietly reach for an X server.
++        env = dict(os.environ)
++        env.pop("DISPLAY", None)
++        # Captured rather than discarded: a bad message send prints "Ooops" and
++        # (reset)s, which kills a shard silently.
++        log = open(os.path.join(workdir, f"shard{s}.log"), "w")
++        procs.append(subprocess.Popen(["scheme", "-q", script],
++                                      env=env, stdout=log, stderr=log))
++
++    started = time.time()
++    for p in procs:
++        p.wait()
++
++    episodes, complete, shards_done = {}, set(), 0
++    for s in range(k):
++        eps, done_eps, done = read_shard(os.path.join(workdir, f"shard{s}.tsv"))
++        episodes.update(eps)
++        complete |= done_eps
++        shards_done += 1 if done else 0
++
++    # An episode is only reported if its shard wrote its EP marker, so a
++    # truncated tail is dropped rather than silently analysed as a short episode.
++    kept = sorted(complete)
++    oops = []
++    for s in range(k):
++        logpath = os.path.join(workdir, f"shard{s}.log")
++        if os.path.exists(logpath):
++            oops += [ln.rstrip("\n") for ln in open(logpath)
++                     if "Ooops" in ln or "Exception" in ln]
++
++    return {
++        "name": name,
++        "problem": [name, initial, modified, target],
++        "episodes_requested": cfg["episodes"],
++        "episodes_complete": len(kept),
++        "runs_per_episode": cfg["runs"],
++        "shards": k,
++        "shards_finished": shards_done,
++        "errors": oops[:20],
++        "wall_s": round(time.time() - started, 1),
++        "sequences": [
++            {"episode": ep,
++             "start_seed": cfg["start_seed"] + ep * cfg["runs"],
++             "runs": sorted(episodes[ep], key=lambda r: r["i"])}
++            for ep in kept
++        ],
++    }
++
++
++def main():
++    ap = argparse.ArgumentParser()
++    ap.add_argument("-o", "--out", default="/metacat/oracle/work/episodes",
++                    help="shard working directory")
++    ap.add_argument("--json", default="/metacat/oracle/raw/episodes.json",
++                    help="where the summary lands (raw data)")
++    ap.add_argument("-j", "--jobs", type=int, default=1,
++                    help="problems in flight at once (each uses --shards cores)")
++    ap.add_argument("-k", "--shards", type=int, default=10,
++                    help="episodes in flight per problem; capped at --episodes")
++    ap.add_argument("-e", "--episodes", type=int, default=EPISODES)
++    ap.add_argument("-r", "--runs", type=int, default=RUNS)
++    ap.add_argument("--start-seed", type=int, default=START_SEED)
++    ap.add_argument("--max-steps", type=int, default=MAX_STEPS)
++    ap.add_argument("--only")
++    args = ap.parse_args()
++
++    os.makedirs(args.out, exist_ok=True)
++    os.makedirs(os.path.dirname(args.json), exist_ok=True)
++    cfg = dict(shards=args.shards, episodes=args.episodes, runs=args.runs,
++               start_seed=args.start_seed, max_steps=args.max_steps)
++
++    problems = PROBLEMS
++    if args.only:
++        wanted = set(args.only.split(","))
++        problems = [p for p in PROBLEMS if p[0] in wanted]
++
++    total = len(problems) * args.episodes * args.runs
++    print(f"{len(problems)} problems x {args.episodes} episodes x {args.runs} "
++          f"runs = {total} runs, {min(args.shards, args.episodes)} shards each, "
++          f"{args.jobs} in flight, max_steps={args.max_steps}", flush=True)
++
++    jobs = [(i, p, args.out, cfg) for i, p in enumerate(problems)]
++    started = time.time()
++    done = []
++    # as_completed, not pool.map: map yields in submission order, so one slow
++    # problem hides the completion of every problem behind it and holds up the
++    # incremental episodes.json with it. That happened on the oracle run, where
++    # misc3 sat at index 2 and masked sixteen finished problems for hours.
++    # Reported as they land; written to disk in problem order.
++    with ThreadPoolExecutor(max_workers=args.jobs) as pool:
++        futures = {pool.submit(run_problem, j): j[0] for j in jobs}
++        for fut in as_completed(futures):
++            res = fut.result()
++            done.append((futures[fut], res))
++            flag = "" if not res["errors"] else f"  {len(res['errors'])} ERRORS"
++            print(f"  DONE {res['name']:<12} "
++                  f"episodes={res['episodes_complete']}/{res['episodes_requested']} "
++                  f"({res['wall_s']}s){flag}   [{len(done)}/{len(jobs)}]",
++                  flush=True)
++            ordered = [r for _, r in sorted(done, key=lambda t: t[0])]
++            with open(args.json, "w") as fh:
++                json.dump({"params": cfg, "results": ordered,
++                           "wall_s": round(time.time() - started, 1)}, fh, indent=2)
++
++    results = [r for _, r in sorted(done, key=lambda t: t[0])]
++    bad = [r["name"] for r in results
++           if r["errors"] or r["episodes_complete"] != r["episodes_requested"]]
++    print(f"\ntotal {time.time() - started:.0f}s -> {args.json}")
++    if bad:
++        print(f"INCOMPLETE OR ERRORED: {', '.join(bad)}")
++        sys.exit(1)
++
++
++if __name__ == "__main__":
++    main()
+--- /dev/null
++++ b/docker/episodes_finish.py
+@@ -0,0 +1,219 @@
++#!/usr/bin/env python3
++"""
++Fill in an episode run's gaps, and rebuild episodes.json from the shard files.
++
++    docker compose exec metacat /metacat/docker/episodes_finish.py            # both
++    docker compose exec metacat /metacat/docker/episodes_finish.py --rebuild-only
++
++WHY THIS EXISTS. episodes.py fixes a problem's shard count when it launches, and
++shard s takes episodes s, s+K, s+2K... Once most episodes are done the survivors
++are stuck on those K processes, so a slow problem trickles out on 3 cores while
++21 sit idle. It is also how a killed or crashed run leaves a partial sample.
++
++This re-partitions whatever is still missing over as many processes as you like,
++then rebuilds the summary from every shard file present.
++
++WHY IT IS SAFE. An episode's index fully determines its seeds -- episode e run i
++uses start_seed + e*runs + i -- so an episode is identical whichever process runs
++it, and re-running one is a no-op rather than a distortion. Only episodes whose
++shard wrote their EP completion marker are ever read, so an episode interrupted
++mid-flight is redone rather than counted short. New work is written to
++shard_extra*.tsv alongside the originals; nothing existing is touched.
++
++Per-problem keys in an existing episodes.json that this script does not itself
++compute -- `build`, for instance, which records which side of a source fix a
++problem's data came from -- are carried forward rather than dropped.
++"""
++
++import argparse
++import glob
++import gzip
++import json
++import os
++import subprocess
++import sys
++from concurrent.futures import ThreadPoolExecutor
++
++sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
++from episodes import PROBLEMS, shard_scheme  # noqa: E402
++
++HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
++DEFAULT_WORK = "/metacat/oracle/work/episodes"
++DEFAULT_JSON = "/metacat/oracle/raw/episodes.json"
++
++RUN_FIELDS = 13
++
++
++def read_shards(workdir):
++    """{episode: {run_index: record}} and the set of EP-completed episodes."""
++    episodes, complete = {}, set()
++    for path in sorted(glob.glob(os.path.join(workdir, "shard*.tsv"))):
++        for line in open(path):
++            parts = line.rstrip("\n").split("\t")
++            if parts[0] == "RUN" and len(parts) == RUN_FIELDS:
++                (_, ep, i, seed, state, codelets, temperature, quality,
++                 atemp, na, ns, acts, snags) = parts
++                episodes.setdefault(int(ep), {})[int(i)] = {
++                    "i": int(i), "seed": int(seed), "state": state,
++                    "codelets": int(codelets), "temperature": float(temperature),
++                    "quality": float(quality), "answer_temperature": float(atemp),
++                    "memory_answers": int(na), "memory_snags": int(ns),
++                    "activations": [
++                        {"answer": a.rsplit(":", 1)[0],
++                         "activation": float(a.rsplit(":", 1)[1])}
++                        for a in acts.split(",") if a],
++                    "snags": [s for s in snags.split(",") if s],
++                }
++            elif parts[0] == "EP":
++                complete.add(int(parts[1]))
++    return episodes, complete
++
++
++def missing(workdir, total, runs):
++    episodes, complete = read_shards(workdir)
++    done = {ep for ep in complete if len(episodes.get(ep, {})) == runs}
++    return sorted(set(range(total)) - done)
++
++
++# The generated shard walks a list of episode indices instead of a stride, which
++# is the only thing episodes.py's own shard cannot do.
++EXPLICIT_TAIL = """
++      (for-each one-episode '({episode_list}))
++      (emit "SHARDDONE")))
++  'truncate)
++(with-output-to-file "{done_path}" (lambda () (display "done")) 'truncate)
++(exit)
++"""
++
++
++def explicit_shard(problem, out_path, done_path, eps, cfg):
++    """episodes.py's shard, with its stride loop swapped for an explicit list."""
++    _, initial, modified, target = problem
++    base = shard_scheme(initial, modified, target, out_path, done_path,
++                        0, 1, 0, cfg["runs"], cfg["start_seed"], cfg["max_steps"])
++    head, sep, _ = base.partition("      ;; Shard s takes episodes")
++    if not sep:  # episodes.py changed shape; fail loudly rather than silently
++        raise RuntimeError("cannot splice shard_scheme -- its loop comment moved")
++    return head + EXPLICIT_TAIL.format(
++        episode_list=" ".join(str(e) for e in eps), done_path=done_path)
++
++
++def fill(job):
++    problem, workdir, eps, idx, cfg = job
++    name = problem[0]
++    script = os.path.join(workdir, f"shard_extra{idx}.ss")
++    out = os.path.join(workdir, f"shard_extra{idx}.tsv")
++    done = os.path.join(workdir, f"shard_extra{idx}.done")
++    with open(script, "w") as fh:
++        fh.write(explicit_shard(problem, out, done, eps, cfg))
++    env = dict(os.environ)
++    env.pop("DISPLAY", None)
++    log = open(os.path.join(workdir, f"shard_extra{idx}.log"), "w")
++    subprocess.run(["scheme", "-q", script], env=env, stdout=log, stderr=log)
++    return name, idx, len(eps)
++
++
++def main():
++    ap = argparse.ArgumentParser()
++    ap.add_argument("-w", "--work", default=DEFAULT_WORK)
++    ap.add_argument("--json", default=DEFAULT_JSON)
++    ap.add_argument("--carry-from", default=DEFAULT_JSON,
++                    help="file to carry unrecomputed per-problem keys from, "
++                         "such as `build`; independent of --json")
++    ap.add_argument("-e", "--episodes", type=int, default=500)
++    ap.add_argument("-r", "--runs", type=int, default=8)
++    ap.add_argument("--start-seed", type=int, default=100_000)
++    ap.add_argument("--max-steps", type=int, default=100_000)
++    ap.add_argument("-p", "--procs", type=int, default=20,
++                    help="processes to spread the missing episodes over")
++    ap.add_argument("--only")
++    ap.add_argument("--rebuild-only", action="store_true",
++                    help="skip filling gaps; just rebuild the summary")
++    args = ap.parse_args()
++
++    cfg = dict(runs=args.runs, start_seed=args.start_seed,
++               max_steps=args.max_steps)
++    problems = PROBLEMS
++    if args.only:
++        wanted = set(args.only.split(","))
++        problems = [p for p in PROBLEMS if p[0] in wanted]
++
++    # ---- fill gaps -------------------------------------------------------
++    if not args.rebuild_only:
++        jobs = []
++        for p in problems:
++            wd = os.path.join(args.work, p[0])
++            if not os.path.isdir(wd):
++                print(f"  {p[0]:<12} no shard directory, skipping")
++                continue
++            miss = missing(wd, args.episodes, args.runs)
++            if not miss:
++                continue
++            print(f"  {p[0]:<12} {len(miss)} missing -> "
++                  f"{min(args.procs, len(miss))} processes", flush=True)
++            chunks = [miss[i::args.procs] for i in range(args.procs)]
++            jobs += [(p, wd, c, i, cfg) for i, c in enumerate(chunks) if c]
++        if jobs:
++            with ThreadPoolExecutor(max_workers=len(jobs)) as pool:
++                for name, idx, n in pool.map(fill, jobs):
++                    print(f"    {name} extra{idx}: {n} episodes", flush=True)
++        else:
++            print("  nothing missing")
++
++    # ---- rebuild ---------------------------------------------------------
++    # Carried from the canonical file by default, NOT from --json: writing the
++    # rebuild somewhere else must not silently drop provenance.
++    prior = {}
++    for cand in (args.carry_from, args.carry_from + ".gz"):
++        if os.path.exists(cand):
++            opener = gzip.open if cand.endswith(".gz") else open
++            with opener(cand, "rt") as fh:
++                prior = {r["name"]: r for r in json.load(fh)["results"]}
++            break
++
++    results, short = [], []
++    for p in problems:
++        name = p[0]
++        wd = os.path.join(args.work, name)
++        if not os.path.isdir(wd):
++            continue
++        episodes, complete = read_shards(wd)
++        kept = sorted(ep for ep in complete
++                      if len(episodes.get(ep, {})) == args.runs)
++        if len(kept) != args.episodes:
++            short.append(f"{name} {len(kept)}/{args.episodes}")
++        entry = {
++            "name": name, "problem": list(p),
++            "episodes_complete": len(kept),
++            "runs_per_episode": args.runs,
++            "sequences": [
++                {"episode": ep,
++                 "start_seed": args.start_seed + ep * args.runs,
++                 "runs": [episodes[ep][i] for i in range(args.runs)]}
++                for ep in kept],
++        }
++        # Carry forward anything the prior file recorded that we do not compute.
++        for k, v in prior.get(name, {}).items():
++            entry.setdefault(k, v)
++        results.append(entry)
++
++    os.makedirs(os.path.dirname(args.json), exist_ok=True)
++    with open(args.json, "w") as fh:
++        json.dump({"params": {"episodes": args.episodes, "runs": args.runs,
++                              "start_seed": args.start_seed,
++                              "max_steps": args.max_steps},
++                   "results": results}, fh, indent=2)
++
++    runs = sum(len(s["runs"]) for r in results for s in r["sequences"])
++    print(f"\n{len(results)} problems, {runs} runs -> {args.json}")
++    print("gzip it and regenerate the derived sets:")
++    print(f"  gzip -9 -c {args.json} > {args.json}.gz && rm {args.json}")
++    print("  docker/make_derived_sets.py")
++    if short:
++        print(f"\nSTILL SHORT: {', '.join(short)}")
++        return 1
++    return 0
++
++
++if __name__ == "__main__":
++    sys.exit(main())
+--- /dev/null
++++ b/docker/make_derived_sets.py
+@@ -0,0 +1,178 @@
++#!/usr/bin/env python3
++"""
++Derive the four comparison sets from the raw oracle data.
++
++    docker/make_derived_sets.py
++
++Reads   oracle/raw/single-runs.json     every stopping state of 374,500 single runs
++        oracle/raw/episodes.json.gz     every run of 9,500 eight-run episodes
++
++Writes  oracle/derived/single-run-sets.json
++        oracle/derived/single-run-p50.json
++        oracle/derived/convergence-sets.json
++        oracle/derived/convergence-p50.json
++
++Raw data is what the reference implementation emitted and is never edited.
++Everything here is recomputable from it, and these four files are what a
++comparison run actually loads. See ORACLE-USAGE.md for the protocol.
++
++THE TWO KINDS OF SET
++
++  single-run set   the stopping state of one run started from a fresh Episodic
++                   Memory -- the answer, or *NONE* (gave up) or *CAP* (hit the
++                   codelet ceiling).
++
++  convergence set  the CONVERGENCE ANSWER of one episode: the last of its eight
++                   runs that actually produced an answer. *NONE* and *CAP* runs
++                   are skipped looking backwards, since they are not answers.
++                   An episode that never answered contributes nothing and is
++                   counted separately; that happens once in 9,500 episodes.
++
++A p50 set is the fewest most-frequent members whose shares reach 50%, the same
++construction oracle.py uses. Each member carries the probability it is absent
++from a 100-try sample by chance alone, which is the false-alarm rate of the
++"a p50 member went missing" check.
++"""
++
++import argparse
++import gzip
++import json
++import os
++
++ANSWERLESS = {"*NONE*", "*CAP*"}
++N_TEST = 100  # tries per problem in a comparison run
++
++HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
++RAW = os.path.join(HERE, "oracle", "raw")
++DERIVED = os.path.join(HERE, "oracle", "derived")
++
++
++def p50_set(counts, total):
++    chosen, cum = [], 0
++    for member, c in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0])):
++        share = c / total
++        chosen.append({
++            "member": member,
++            "count": c,
++            "share": round(share, 6),
++            f"absence_probability_at_n{N_TEST}": round((1 - share) ** N_TEST, 12),
++        })
++        cum += c
++        if cum / total >= 0.5:
++            break
++    return chosen
++
++
++def as_set(counts, total):
++    return {m: {"count": c, "share": round(c / total, 6)}
++            for m, c in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))}
++
++
++def gt(counts, total):
++    f1 = sum(1 for v in counts.values() if v == 1)
++    return f1, (round(f1 / total, 6) if total else None)
++
++
++def convergence_answer(runs):
++    for r in reversed(runs):
++        if r["state"] not in ANSWERLESS:
++            return r["state"]
++    return None
++
++
++def load_episodes():
++    path = os.path.join(RAW, "episodes.json")
++    if os.path.exists(path):
++        return json.load(open(path))
++    with gzip.open(path + ".gz", "rt") as fh:
++        return json.load(fh)
++
++
++def write(name, payload):
++    out = os.path.join(DERIVED, name)
++    with open(out, "w") as fh:
++        json.dump(payload, fh, indent=2)
++    return out
++
++
++def main():
++    ap = argparse.ArgumentParser()
++    ap.add_argument("--quiet", action="store_true")
++    args = ap.parse_args()
++    os.makedirs(DERIVED, exist_ok=True)
++
++    single = json.load(open(os.path.join(RAW, "single-runs.json")))
++    episodes = load_episodes()
++
++    # ---- single runs -----------------------------------------------------
++    s_sets, s_p50 = [], []
++    for r in single["results"]:
++        counts, n = r["states"], r["n"]
++        f1, ratio = gt(counts, n)
++        common = {"name": r["name"], "problem": r["problem"], "n": n}
++        s_sets.append({**common, "stop_reason": r["stop_reason"],
++                       "distinct": len(counts), "f1": f1, "f1_over_n": ratio,
++                       "set": as_set(counts, n)})
++        s_p50.append({**common, "p50": p50_set(counts, n)})
++
++    # ---- episodes --------------------------------------------------------
++    c_sets, c_p50 = [], []
++    for r in episodes["results"]:
++        counts, never = {}, 0
++        for s in r["sequences"]:
++            a = convergence_answer(s["runs"])
++            if a is None:
++                never += 1
++            else:
++                counts[a] = counts.get(a, 0) + 1
++        n = sum(counts.values())
++        f1, ratio = gt(counts, n)
++        common = {"name": r["name"], "problem": r["problem"],
++                  "episodes": len(r["sequences"]),
++                  "episodes_with_an_answer": n,
++                  "episodes_never_answering": never,
++                  "runs_per_episode": r["runs_per_episode"]}
++        c_sets.append({**common, "distinct": len(counts), "f1": f1,
++                       "f1_over_n": ratio, "set": as_set(counts, n)})
++        c_p50.append({**common, "p50": p50_set(counts, n)})
++
++    note_single = ("A run's stopping state, from a fresh Episodic Memory. "
++                   "Sampled to Good-Turing saturation (f1_over_n <= 1e-4), so a "
++                   "member outside this set is very unlikely to be undersampling.")
++    note_conv = ("An episode's convergence answer: its last run that produced an "
++                 "answer, skipping *NONE* and *CAP*. Shares and f1_over_n are "
++                 "over episodes that answered. DELIBERATELY NOT saturated -- see "
++                 "ORACLE-USAGE.md.")
++
++    paths = [
++        write("single-run-sets.json",
++              {"source": "oracle/raw/single-runs.json", "definition": note_single,
++               "results": s_sets}),
++        write("single-run-p50.json",
++              {"source": "oracle/raw/single-runs.json", "definition": note_single,
++               "tries_per_problem": N_TEST, "results": s_p50}),
++        write("convergence-sets.json",
++              {"source": "oracle/raw/episodes.json.gz", "definition": note_conv,
++               "results": c_sets}),
++        write("convergence-p50.json",
++              {"source": "oracle/raw/episodes.json.gz", "definition": note_conv,
++               "tries_per_problem": N_TEST, "results": c_p50}),
++    ]
++
++    if args.quiet:
++        return
++    for p in paths:
++        print(f"  wrote {os.path.relpath(p, HERE)}")
++    print(f"\n{'problem':12s} | {'single runs':>22s} | {'episodes':>30s}")
++    print(f"{'':12s} | {'distinct  f1/n  p50':>22s} | "
++          f"{'distinct  f1/n  p50':>30s}")
++    print("-" * 72)
++    for a, b, ap_, bp in zip(s_sets, c_sets, s_p50, c_p50):
++        print(f"{a['name']:12s} | {a['distinct']:8d} {a['f1_over_n']:7.5f} "
++              f"{len(ap_['p50']):4d}  | {b['distinct']:8d} {b['f1_over_n']:7.4f} "
++              f"{len(bp['p50']):4d}   "
++              + ", ".join(e["member"] for e in bp["p50"]))
++
++
++if __name__ == "__main__":
++    main()
+--- /dev/null
++++ b/docker/make_oracle_report.py
+@@ -0,0 +1,280 @@
++#!/usr/bin/env python3
++"""Render the oracle benchmark results as markdown.
++
++    docker compose exec metacat /metacat/docker/make_oracle_report.py \
++        -o /metacat/ORACLE-BENCHMARK.md
++
++Reads oracle-out/oracle.json plus any per-problem override file (misc3 was
++paused and accepted by hand, so it carries its own record). Emits the whole
++report so the numbers cannot drift in transcription.
++"""
++
++import argparse
++import json
++import os
++
++ORDER = ["misc4", "fig5.7", "misc3", "misc5", "misc2", "run1", "run4", "misc1",
++         "fig5.4-top", "eqe-baaab", "run6", "run3", "run2",
++         "copy1", "copy2", "copy3", "copy4", "copy5", "copy6"]
++
++TRIPLE = {
++    "misc4": ("a", "b", "z"), "fig5.7": ("aabc", "aabd", "ijkk"),
++    "misc3": ("abc", "aabbcc", "kkjjii"), "misc5": ("abc", "abd", "glz"),
++    "misc2": ("abc", "abd", "ijk"), "run1": ("abc", "abd", "mrrjjj"),
++    "run4": ("abc", "abd", "xyz"), "misc1": ("abc", "cba", "mrrjjj"),
++    "fig5.4-top": ("eeqee", "qeeq", "xxixx"), "eqe-baaab": ("eqe", "qeq", "abbba"),
++    "run6": ("eqe", "qeq", "abbbc"), "run3": ("rst", "rsu", "xyz"),
++    "run2": ("xqc", "xqd", "mrrjjj"), "copy1": ("ab", "c", "ab"),
++    "copy2": ("bc", "d", "bc"), "copy3": ("xy", "z", "xy"),
++    "copy4": ("zy", "x", "zy"), "copy5": ("aabb", "cc", "aabb"),
++    "copy6": ("abc", "d", "abc"),
++}
++
++# Empty since 5cb8afc: copy1-copy4 and copy6 were resampled after the
++# workspace-string snag-object bugs were fixed.
++INVALID = set()
++
++VERDICT = {
++    "saturated": "**saturated**",
++    "no_singletons": "no-singleton floor",
++    "checkpoint": "50k checkpoint, accepted",
++    "accepted_by_operator": "accepted, not saturated",
++    "shards_exited": "**INVALID**",
++}
++
++
++def fmt(n):
++    return format(n, ",")
++
++
++def main():
++    ap = argparse.ArgumentParser()
++    ap.add_argument("-o", "--out", required=True)
++    ap.add_argument("--json", default="/metacat/oracle-out/oracle.json")
++    ap.add_argument("--override", action="append", default=[],
++                    help="per-problem record files that supersede oracle.json")
++    args = ap.parse_args()
++
++    d = json.load(open(args.json))
++    res = {r["name"]: r for r in d["results"]}
++    extra_wall = 0.0
++    for path in args.override:
++        if os.path.exists(path):
++            o = json.load(open(path))
++            extra_wall += o.get("wall_s") or 0.0
++            for r in o["results"]:
++                res[r["name"]] = r
++
++    valid = [n for n in ORDER if n not in INVALID]
++    L = []
++    w = L.append
++
++    w("# Metacat oracle benchmark — Episodic Memory OFF")
++    w("")
++    w("Saturation sample of the reachable stopping states of each analogy")
++    w("problem, for oracle testing of Metacat engine variants.")
++    w("")
++    w("| | |")
++    w("|---|---|")
++    w("| Date | 2026-08-04 |")
++    w("| Engine | Metacat 1.2 at `5cb8afc`, headless mode |")
++    w("| Runtime | plain Chez Scheme 9.5.4 — no SWL, no Tk, no X display |")
++    w("| Episodic Memory | **cleared before every run** — each run is its own session |")
++    w("| Problems | 19 distinct `(initial, modified, target)` triples |")
++    w("| Wall clock | %.1f hours main sample, plus %.1f h resampling copy1-4,6 |"
++      % (d["wall_s"] / 3600, extra_wall / 3600))
++    w("| Runs | %s |" % fmt(sum(r["n"] for r in res.values())))
++    w("| Codelets | %s |"
++      % fmt(sum(r["codelet_stats"]["total_codelets"] for r in res.values())))
++    w("")
++    w("**All 19 problems produced usable results.**")
++    w("")
++
++    w("## Method")
++    w("")
++    w("Each problem is sampled until the Good-Turing missing-mass estimate")
++    w("`f1/N` enters the target band, where `f1` is the number of stopping")
++    w("states seen exactly once and `N` is the number of runs. `f1/N` estimates")
++    w("the probability that the next run reaches a state never seen before —")
++    w("i.e. how complete the observed reachable set is.")
++    w("")
++    w("```")
++    w("0.00006 < f1/N <= 0.0001")
++    w("```")
++    w("")
++    w("The upper bound is the stop signal. The lower bound is not enforced:")
++    w("undershooting costs runs but not correctness, so it is reported rather")
++    w("than acted on. Saturation is checked every `BATCH` runs, so overshoot is")
++    w("expected.")
++    w("")
++    p = d["params"]
++    w("| Constant | Value | Purpose |")
++    w("|---|---:|---|")
++    w("| `BATCH` | %s | runs between saturation checks |" % fmt(p["batch"]))
++    w("| `MIN_RUNS` | %s | floor before any stop is allowed |" % fmt(p["min_runs"]))
++    w("| `MIN_RUNS_IF_NO_SINGLETONS` | 10,000 | `f1 == 0` reads as 0 and cannot distinguish complete from under-sampled |")
++    w("| `MAX_RUNS` | %s | backstop for a problem that never saturates |" % fmt(p["max_runs"]))
++    w("| `MAX_STEPS` | %s | per-run codelet cap |" % fmt(p["max_steps"]))
++    w("| `CHECKPOINT` | %s | stop and report rather than grind to `MAX_RUNS` |" % fmt(p["checkpoint"]))
++    w("")
++    w("Two stopping states are not answers. **`*CAP*`** means the run hit the")
++    w("100,000-codelet cap; **`*NONE*`** means Metacat gave up. Both are recorded")
++    w("as states in their own right and count toward saturation, because from the")
++    w("oracle's point of view they are reachable outcomes like any other.")
++    w("")
++    w("Each problem also records a **p50 set**: the smallest group of")
++    w("most-frequent states whose combined share reaches 50%. Those states are")
++    w("common enough that their *absence* from a small downstream check is real")
++    w("evidence; rarer states are ignored in both directions.")
++    w("")
++    w("Runs are independent — memory is cleared before each, so a seed always")
++    w("reproduces its own answer — which is what lets a problem be split across")
++    w("six worker processes over disjoint interleaved seed ranges. `f1` is a")
++    w("global statistic, so the coordinator merges the shards' tallies and")
++    w("decides; the shards never decide for themselves.")
++    w("")
++
++    w("## Summary")
++    w("")
++    w("| # | Problem | Triple | Runs | States | f1 | f1/N | Verdict |")
++    w("|---|---|---|---:|---:|---:|---|---|")
++    for i, n in enumerate(ORDER, 1):
++        r, t = res[n], TRIPLE[n]
++        w("| %d | `%s` | `%s -> %s; %s ?` | %s | %d | %d | %.2e | %s |"
++          % (i, n, t[0], t[1], t[2], fmt(r["n"]), r["distinct_states"],
++             r["f1"], r["ratio"] or 0.0, VERDICT.get(r["stop_reason"], r["stop_reason"])))
++    w("")
++    sat = [n for n in valid if res[n]["stop_reason"] == "saturated"]
++    flo = [n for n in valid if res[n]["stop_reason"] == "no_singletons"]
++    chk = [n for n in valid if res[n]["stop_reason"] == "checkpoint"]
++    acc = [n for n in valid if res[n]["stop_reason"] == "accepted_by_operator"]
++    w("- **Saturated (%d):** %s" % (len(sat), ", ".join("`%s`" % x for x in sat)))
++    w("- **No-singleton floor (%d):** %s — `f1` reached 0 and held to 10,000 runs."
++      % (len(flo), ", ".join("`%s`" % x for x in flo)))
++    w("- **50k checkpoint (%d):** %s — did not saturate; accepted as good enough."
++      % (len(chk), ", ".join("`%s`" % x for x in chk)))
++    w("- **Accepted by hand (%d):** %s" % (len(acc), ", ".join("`%s`" % x for x in acc)))
++    w("")
++
++    w("## Codelet cost")
++    w("")
++    w("| Problem | min | p50 | p90 | p99 | max | mean | total |")
++    w("|---|---:|---:|---:|---:|---:|---:|---:|")
++    for n in valid:
++        c = res[n]["codelet_stats"]
++        w("| `%s` | %s | %s | %s | %s | %s | %s | %s |"
++          % (n, fmt(c["min"]), fmt(c["p50"]), fmt(c["p90"]), fmt(c["p99"]),
++             fmt(c["max"]), fmt(int(c["mean"])), fmt(c["total_codelets"])))
++    w("")
++    w("`p90 = 100,000` means at least a tenth of that problem's runs never")
++    w("terminate. Only `misc3` is in that state.")
++    w("")
++
++    w("## Per-problem results")
++    w("")
++    for n in ORDER:
++        r, t = res[n], TRIPLE[n]
++        w("### `%s` — `%s -> %s; %s ?`" % (n, t[0], t[1], t[2]))
++        w("")
++        if n in INVALID:
++            w("> **INVALID — do not use.** The shards crashed partway through")
++            w("> (see [Invalid results](#invalid-results)); `n = %s` is where they" % fmt(r["n"]))
++            w("> died, not a sampling decision.")
++            w("")
++        if r.get("note"):
++            w("> %s" % r["note"])
++            w("")
++        c = r["codelet_stats"]
++        w("`n = %s` · `states = %d` · `f1 = %d` · `f1/N = %.2e` · `%s`"
++          % (fmt(r["n"]), r["distinct_states"], r["f1"], r["ratio"] or 0.0,
++             r["stop_reason"]))
++        w("")
++        w("Codelets: min %s · p50 %s · p90 %s · p99 %s · max %s · mean %s"
++          % (fmt(c["min"]), fmt(c["p50"]), fmt(c["p90"]), fmt(c["p99"]),
++             fmt(c["max"]), fmt(int(c["mean"]))))
++        w("")
++        w("**p50 set** — %s:" % (", ".join("`%s` %.2f%%" % (x["state"], 100 * x["share"])
++                                           for x in r["p50"])))
++        w("")
++        w("| State | Count | Share |")
++        w("|---|---:|---:|")
++        for state, count in r["states"].items():
++            w("| `%s` | %s | %.3f%% |" % (state, fmt(count), 100 * count / r["n"]))
++        w("")
++
++    w("## Engine bugs found by this run")
++    w("")
++    w("The first full sample stopped five problems early: `copy1`–`copy4` and")
++    w("`copy6` ended between 664 and 3,154 runs with `f1 = 0`, where the")
++    w("criterion requires 10,000. Their worker processes were crashing.")
++    w("")
++    w("These five are structurally unusual — `initial -> modified` collapses to a")
++    w("single letter and `target == initial` — which makes a **whole string** the")
++    w("object a rule fails against. `make-snag-event` then sends that string")
++    w("messages only letters and groups answer, each reaching")
++    w("`report-error-and-halt` and `(reset)`, abandoning the run.")
++    w("")
++    w("| Message | Site | Resolution |")
++    w("|---|---|---|")
++    w("| `get-string` | `trace.ss:1104, 1111, 1114` | `(get-string () self)` |")
++    w("| `clamp-salience` | `trace.ss:1160` | `(clamp-salience () \'done)` |")
++    w("| `unclamp-salience` | `trace.ss:1167` | `(unclamp-salience () \'done)` |")
++    w("| `get-all-descriptors` | `trace.ss:1048` | `(get-all-descriptors () \'())` |")
++    w("")
++    w("All four went into the block `workspace-strings.ss:385` already had, under")
++    w("Marshall's own comment that these methods exist *so that a")
++    w("workspace-string can be used as the reference-object*. The situation was")
++    w("anticipated; the block was incomplete.")
++    w("")
++    w("A separate one, same shape, different receiver: `rules.ss:1428,1534` sent")
++    w("`get-constituent-objects` to a **letter** when a rule names a group the")
++    w("target string does not have. Routed through `constituent-objects-of`")
++    w("(`utilities.ss`).")
++    w("")
++    w("Under the original SWL build every one of these was invisible — the")
++    w("diagnostic goes to the GUI console and the reset silently abandons the")
++    w("run. Headless mode surfaces them. Verified after the fixes: 200 seeds x")
++    w("all 19 problems, 3,800 runs, zero crashes and no bad-message signatures.")
++    w("")
++    w("## Caveats")
++    w("")
++    w("1. **This baseline is not comparable to anything recorded before it.**")
++    w("   Five engine fixes landed alongside headless mode, and all of them")
++    w("   change the reachable set: runs that previously died silently now")
++    w("   complete and produce a stopping state. See the section above.")
++    w("2. **Two engine states are represented.** The 14 non-`copy` problems were")
++    w("   sampled at `130314d`; `copy1`–`copy4` and `copy6` were resampled at")
++    w("   `5cb8afc`, after the workspace-string fixes. The 14 are unaffected by")
++    w("   those fixes: a bad message send calls `(reset)`, which ends the worker")
++    w("   process, and none of their workers exited early — so none of them ever")
++    w("   reached that path.")
++    w("3. **`misc3` is an operator decision, not a saturation result** — `f1/N =")
++    w("   4.22e-03` is ~42x the threshold.")
++    w("4. **The three checkpoint problems did not saturate.** `fig5.4-top`,")
++    w("   `eqe-baaab` and `run6` stopped at 50,000 runs with `f1/N` between")
++    w("   1.76e-04 and 2.54e-04 — within ~2.5x of the threshold, and accepted as")
++    w("   good enough rather than resumed.")
++    w("5. **`f1/N` predicts downstream false alarms.** At `1e-4`, a 100-run check")
++    w("   has roughly a 1% chance per problem of surfacing a state that was always")
++    w("   reachable but had not yet been seen. The checkpoint problems sit ~2.5x")
++    w("   above that, so budget accordingly.")
++    w("")
++
++    w("## Reproducing")
++    w("")
++    w("```bash")
++    w("docker compose exec metacat /metacat/docker/oracle.py -o /metacat/oracle-out -j 2 -k 6")
++    w("```")
++    w("")
++    w("Raw data: `oracle-out/oracle.json` (all records, full codelet histograms),")
++    w("`oracle-out/<problem>/shard*.snap` (per-shard snapshots, resumable).")
++    w("Resume a problem with `--resume <record.json> --only <problem>`.")
++    w("")
++
++    with open(args.out, "w") as fh:
++        fh.write("\n".join(L) + "\n")
++    print("wrote %s (%d lines)" % (args.out, len(L)))
++
++
++if __name__ == "__main__":
++    main()
+--- /dev/null
++++ b/docker/oracle.py
+@@ -0,0 +1,428 @@
++#!/usr/bin/env python3
++"""
++Oracle benchmark: sample every problem to Good-Turing saturation.
++
++    docker compose exec metacat /metacat/docker/oracle.py
++
++For each of the 19 distinct problems, run until the Good-Turing missing-mass
++estimate f1/N falls in the target band, where f1 is the number of stopping
++states seen exactly once and N is the number of runs. f1/N estimates the
++probability that the next run reaches a state never seen before.
++
++    0.00006 < f1/N <= 0.0001
++
++The upper bound is the stop signal. The lower bound is not a stop condition --
++undershooting it is harmless to correctness, just wasted runs, so it is
++reported rather than enforced.
++
++Every run is its own session: Episodic Memory is cleared before each one, so
++runs are independent, a seed always reproduces its own answer, and the runs of
++a problem can therefore be split across processes with no interaction.
++
++SHARDING. Each problem is split across K worker processes covering disjoint,
++interleaved seed ranges (shard s takes indices s, s+K, s+2K, ...). f1 is a
++global statistic, so the shards cannot decide when to stop: each writes its
++per-state tallies after every chunk, and the coordinator merges them, evaluates
++the criterion, and signals the shards to finish by creating a stop file. A
++problem's wall clock is therefore its run count divided by K, not by 1.
++
++CHECKPOINT. A problem that reaches --checkpoint runs (default 50,000) without
++saturating stops there and reports rather than grinding on to MAX_RUNS. Resume
++it later with --resume, which carries the accumulated tallies forward and
++continues the seed sequence where it stopped, so nothing is recomputed.
++
++Recorded per problem: the frequency of every stopping state, the frequency of
++every codelet count reached at a stopping state, and the p50 set -- the
++smallest group of most-frequent states whose combined share reaches 50%.
++"""
++
++import argparse
++import json
++import os
++import shutil
++import subprocess
++import sys
++import time
++from collections import Counter
++from concurrent.futures import ThreadPoolExecutor
++
++# ---- Good-Turing criterion --------------------------------------------------
++BATCH = 1_000                       # runs between saturation checks
++MIN_RUNS = 3_000                    # floor before any stop is allowed
++MIN_RUNS_IF_NO_SINGLETONS = 10_000  # 1/TARGET_UPPER; f1==0 cannot distinguish
++MAX_RUNS = 200_000                  # backstop for a problem that never saturates
++MAX_STEPS = 100_000                 # per-run codelet cap
++TARGET_UPPER = 1e-4
++TARGET_LOWER = 6e-5
++CHECKPOINT = 50_000                 # stop and report rather than grind to MAX_RUNS
++
++PROBLEMS = [
++    ("misc4",       "a",     "b",       "z"),
++    ("fig5.7",      "aabc",  "aabd",    "ijkk"),
++    ("misc3",       "abc",   "aabbcc",  "kkjjii"),
++    ("misc5",       "abc",   "abd",     "glz"),
++    ("misc2",       "abc",   "abd",     "ijk"),
++    ("run1",        "abc",   "abd",     "mrrjjj"),
++    ("run4",        "abc",   "abd",     "xyz"),
++    ("misc1",       "abc",   "cba",     "mrrjjj"),
++    ("fig5.4-top",  "eeqee", "qeeq",    "xxixx"),
++    ("eqe-baaab",   "eqe",   "qeq",     "abbba"),
++    ("run6",        "eqe",   "qeq",     "abbbc"),
++    ("run3",        "rst",   "rsu",     "xyz"),
++    ("run2",        "xqc",   "xqd",     "mrrjjj"),
++    ("copy1",       "ab",    "c",       "ab"),
++    ("copy2",       "bc",    "d",       "bc"),
++    ("copy3",       "xy",    "z",       "xy"),
++    ("copy4",       "zy",    "x",       "zy"),
++    ("copy5",       "aabb",  "cc",      "aabb"),
++    ("copy6",       "abc",   "d",       "abc"),
++]
++
++SPEED = """
++(set! %flash-pause% 0) (set! %num-of-flashes% 0) (set! %snag-pause% 0)
++(set! %text-scroll-pause% 0) (set! %codelet-highlight-pause% 0)
++(set! %highlight-last-codelet% #f) (set! %verbose% #f)
++(set! %slipnet-graphics% #f) (set! %coderack-graphics% #f)
++(set! %workspace-graphics% #f)
++;; *memory-window* stays real: it supplies Episodic Memory icon geometry and
++;; init-mcat dies without it once memory is non-empty.
++(let ((null-window (lambda msg 'done)))
++  (set! *themespace-window* null-window)
++  (set! *comment-window* null-window)
++  (set! *trace-window* null-window)
++  (set! *temperature-window* null-window)
++  (set! *EEG-window* null-window)
++  (set! *workspace-window* null-window))
++"""
++
++
++def shard_scheme(initial, modified, target, out_path, snap_path, stop_path,
++                 shard, nshards, start_index, chunk, max_steps):
++    """One shard: run its slice of the seed sequence until told to stop.
++
++    Emits a TICK line per chunk with its per-state tallies (few tens of states,
++    so this is cheap) and, once stopped, the full codelet histogram.
++    """
++    return f"""
++;; Performance mode: plain Chez, no SWL, no Tk, no X display, no (setup).
++;; headless.ss supplies every GUI dependency as a no-op, so there is nothing
++;; here to switch off and no window to leak canvas items.
++(define *metacat-directory* "/metacat/")
++(load "/metacat/metacat-headless.ss")
++(with-output-to-file "{out_path}"
++  (lambda ()
++    (letrec
++      ((emit (lambda args
++               (display (apply format args))
++               ;; write-char, not (newline): Metacat rebinds newline to the port
++               ;; captured at load time (syntactic-sugar.ss:32).
++               (write-char #\\newline)
++               (flush-output-port (current-output-port))))
++       (states '())                       ;; alist (state . count)
++       (hist (make-eqv-hashtable))        ;; codelet count -> frequency
++       (runs 0)
++       (bump (lambda (state)
++               (let ((hit (assoc state states)))
++                 (if hit
++                     (set-cdr! hit (+ (cdr hit) 1))
++                     (set! states (cons (cons state 1) states))))))
++       (one-run
++         (lambda (seed)
++           ;; Every run is its own session -- no Episodic Memory carries over.
++           (tell *memory* 'clear)
++           (init-mcat '{initial} '{modified} '{target} #f seed)
++           (set! *break-time* {max_steps})
++           (let* ((outcome (call/cc (lambda (k)
++                                      (set! suspend (lambda () (k 'answered)))
++                                      (set! break   (lambda () (k 'capped)))
++                                      (run-mcat))))
++                  (answers (tell *memory* 'get-answers)))
++             (hashtable-update! hist *codelet-count* (lambda (v) (+ v 1)) 0)
++             (set! runs (+ runs 1))
++             (bump (cond
++                     ((not (null? answers))
++                      (tell (car answers) 'get-answer-print-name))
++                     ((eq? outcome 'capped) "*CAP*")
++                     (else "*NONE*"))))))
++       (tally (lambda ()
++                (let loop ((s states) (acc ""))
++                  (if (null? s)
++                      acc
++                      (loop (cdr s)
++                            (string-append acc (if (string=? acc "") "" ",")
++                                           (caar s) ":"
++                                           (number->string (cdar s))))))))
++       (snapshot
++         (lambda ()
++           (let ((p (open-output-file "{snap_path}" 'truncate)))
++             (display (format "RUNS\\t~a" runs) p) (write-char #\\newline p)
++             (display (format "TICK\\t~a\\t~a" runs (tally)) p)
++             (write-char #\\newline p)
++             (let-values (((ks vs) (hashtable-entries hist)))
++               (vector-for-each
++                 (lambda (k v)
++                   (display (format "HIST\\t~a\\t~a" k v) p)
++                   (write-char #\\newline p))
++                 ks vs))
++             (close-output-port p)))))
++
++      (let loop ()
++        (let inner ((i 0))
++          (if (< i {chunk})
++              (begin
++                ;; seed = start + shard + runs*nshards + 1. runs is this
++                ;; shard's completed count, so the shards interleave over the
++                ;; global seed sequence and never collide.
++                (one-run (+ {start_index} {shard} (* runs {nshards}) 1))
++                (inner (+ i 1)))))
++        (emit "TICK\\t~a\\t~a" runs (tally))
++        ;; Rewrite the full snapshot every chunk. A shard can be killed at any
++        ;; point -- by the coordinator's grace timer or by hand -- and a
++        ;; histogram written only at exit would be lost, which silently biases
++        ;; the codelet distribution by dropping exactly the slowest shards.
++        (snapshot)
++        (if (not (file-exists? "{stop_path}"))
++            (loop)))
++
++      (snapshot)
++      (emit "DONE\\t~a" runs)))
++  'truncate)
++(exit)
++"""
++
++
++def ensure_display(display):
++    env = dict(os.environ, DISPLAY=display)
++    if subprocess.run(["xdpyinfo"], env=env, capture_output=True).returncode == 0:
++        return env
++    lock = f"/tmp/.X{display.lstrip(':')}-lock"
++    if os.path.exists(lock):
++        try:
++            os.remove(lock)
++        except OSError:
++            pass
++    subprocess.Popen(["Xvfb", display, "-screen", "0", "640x480x8", "-nolisten", "tcp"],
++                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
++    for _ in range(60):
++        if subprocess.run(["xdpyinfo"], env=env, capture_output=True).returncode == 0:
++            return env
++        time.sleep(0.5)
++    raise RuntimeError(f"Xvfb never came up on {display}")
++
++
++def read_shard(path):
++    """Latest TICK tallies, plus histogram and completion once the shard exits."""
++    states, hist, runs, done = Counter(), Counter(), 0, False
++    if not os.path.exists(path):
++        return states, hist, runs, done
++    try:
++        with open(path) as fh:
++            for line in fh:
++                parts = line.rstrip("\n").split("\t")
++                if parts[0] == "TICK" and len(parts) == 3:
++                    runs = int(parts[1])
++                    states = Counter()
++                    if parts[2]:
++                        for item in parts[2].split(","):
++                            state, _, count = item.rpartition(":")
++                            states[state] = int(count)
++                elif parts[0] == "HIST" and len(parts) == 3:
++                    hist[int(parts[1])] += int(parts[2])
++                elif parts[0] == "DONE":
++                    done = True
++    except (OSError, ValueError):
++        pass
++    return states, hist, runs, done
++
++
++def decide(n, f1, min_runs, checkpoint, max_runs):
++    """The stopping rule, in exact integer arithmetic (f1/n <= 1e-4)."""
++    if f1 > 0 and n >= min_runs and f1 * 10_000 <= n:
++        return "saturated"
++    if f1 == 0 and n >= MIN_RUNS_IF_NO_SINGLETONS:
++        return "no_singletons"
++    if n >= max_runs:
++        return "max_runs"
++    if n >= checkpoint:
++        return "checkpoint"
++    return None
++
++
++def run_problem(job):
++    idx, problem, outdir, cfg, prior = job
++    name, initial, modified, target = problem
++    workdir = os.path.join(outdir, name)
++    shutil.rmtree(workdir, ignore_errors=True)
++    os.makedirs(workdir, exist_ok=True)
++    stop_path = os.path.join(workdir, "STOP")
++
++    k = cfg["shards"]
++    chunk = max(1, cfg["batch"] // k)
++    start_index = prior.get("n", 0)
++
++    procs, envs = [], []
++    for s in range(k):
++        script = os.path.join(workdir, f"shard{s}.ss")
++        out = os.path.join(workdir, f"shard{s}.tsv")
++        with open(script, "w") as fh:
++            snap = os.path.join(workdir, f"shard{s}.snap")
++            fh.write(shard_scheme(initial, modified, target, out, snap, stop_path,
++                                  s, k, start_index, chunk, cfg["max_steps"]))
++        # Plain Chez: no swl (so no shebang problem) and no display. DISPLAY is
++        # cleared so nothing can quietly reach for an X server.
++        env = dict(os.environ)
++        env.pop("DISPLAY", None)
++        envs.append(env)
++        # Capture rather than discard: Metacat reports a bad message send with
++        # a printf and then (reset)s, which kills the shard silently. Sending
++        # that to DEVNULL is how five copy* problems ended early in the first
++        # full run with nothing to show for it.
++        log = open(os.path.join(workdir, f"shard{s}.log"), "w")
++        procs.append(subprocess.Popen(["scheme", "-q", script],
++                                      env=env, stdout=log, stderr=log))
++
++    started = time.time()
++    reason, last_report, stopped_at = None, 0, None
++    prior_states = Counter(prior.get("states", {}))
++    while True:
++        time.sleep(2)
++        merged = Counter(prior_states)
++        n = start_index
++        for s in range(k):
++            st, _, runs, _ = read_shard(os.path.join(workdir, f"shard{s}.tsv"))
++            merged.update(st)
++            n += runs
++        f1 = sum(1 for v in merged.values() if v == 1)
++        if reason is None:
++            reason = decide(n, f1, cfg["min_runs"], cfg["checkpoint"], cfg["max_runs"])
++            if reason:
++                open(stop_path, "w").close()
++                stopped_at = time.time()
++        if n - last_report >= 5000:
++            last_report = n
++            print(f"    {name:<12} n={n:<7} f1={f1:<4} states={len(merged)}",
++                  flush=True)
++        if all(p.poll() is not None for p in procs):
++            break
++        # Shards check the stop file once per chunk, so they should exit within
++        # a chunk. This only covers a shard that has wedged.
++        if stopped_at and time.time() - stopped_at > 900:
++            for p in procs:
++                p.kill()
++            break
++
++    # int(k): the histogram is keyed by codelet count, but JSON object keys are
++    # always strings, so a --resume brings them back as str and every later
++    # arithmetic on them (codelet_stats, sorted()) breaks.
++    prior_hist = Counter({int(k): v for k, v in prior.get("hist", {}).items()})
++    states, hist, n = Counter(prior_states), prior_hist, start_index
++    for s in range(k):
++        # .snap, not .tsv: rewritten every chunk, so it survives a killed shard
++        st, hi, runs, _ = read_shard(os.path.join(workdir, f"shard{s}.snap"))
++        states.update(st)
++        hist.update(hi)
++        n += runs
++    f1 = sum(1 for v in states.values() if v == 1)
++    reason = reason or decide(n, f1, cfg["min_runs"], cfg["checkpoint"],
++                              cfg["max_runs"]) or "shards_exited"
++
++    return {
++        "name": name, "problem": list(problem), "n": n, "f1": f1,
++        "ratio": (f1 / n) if n else None,
++        "overshot": bool(n and f1 / n <= TARGET_LOWER),
++        "stop_reason": reason, "wall_s": round(time.time() - started, 1),
++        "shards": k, "distinct_states": len(states),
++        "states": dict(states.most_common()),
++        "hist": {str(kk): vv for kk, vv in sorted(hist.items())},
++        "codelet_stats": codelet_stats(hist),
++        "p50": p50_set(states, n),
++    }
++
++
++def codelet_stats(hist):
++    if not hist:
++        return {}
++    values = sorted(hist.items())
++    total = sum(hist.values())
++    out, acc = {}, 0
++    marks = {0.5: "p50", 0.9: "p90", 0.99: "p99"}
++    for codelets, count in values:
++        acc += count
++        for q, label in list(marks.items()):
++            if acc >= total * q:
++                out.setdefault(label, codelets)
++    out["min"] = values[0][0]
++    out["max"] = values[-1][0]
++    out["mean"] = round(sum(c * n for c, n in values) / total, 1)
++    out["total_codelets"] = sum(c * n for c, n in values)
++    return out
++
++
++def p50_set(states, n):
++    acc, chosen = 0, []
++    for state, count in states.most_common():
++        chosen.append({"state": state, "count": count, "share": count / n})
++        acc += count
++        if acc >= n / 2:
++            break
++    return chosen
++
++
++def main():
++    ap = argparse.ArgumentParser()
++    ap.add_argument("-o", "--out", default="/metacat/oracle/work/single-runs",
++                    help="shard working directory")
++    ap.add_argument("--json", default="/metacat/oracle/raw/single-runs.json",
++                    help="where the summary lands (raw data)")
++    ap.add_argument("-j", "--jobs", type=int, default=1,
++                    help="problems in flight at once (each uses --shards cores)")
++    ap.add_argument("-k", "--shards", type=int, default=10)
++    ap.add_argument("--batch", type=int, default=BATCH)
++    ap.add_argument("--min-runs", type=int, default=MIN_RUNS)
++    ap.add_argument("--max-runs", type=int, default=MAX_RUNS)
++    ap.add_argument("--checkpoint", type=int, default=CHECKPOINT)
++    ap.add_argument("--max-steps", type=int, default=MAX_STEPS)
++    ap.add_argument("--only")
++    ap.add_argument("--resume", help="prior oracle.json to carry forward")
++    args = ap.parse_args()
++
++    os.makedirs(args.out, exist_ok=True)
++    os.makedirs(os.path.dirname(args.json), exist_ok=True)
++    cfg = dict(shards=args.shards, batch=args.batch, min_runs=args.min_runs,
++               max_runs=args.max_runs, checkpoint=args.checkpoint,
++               max_steps=args.max_steps)
++
++    prior_by_name = {}
++    if args.resume and os.path.exists(args.resume):
++        for r in json.load(open(args.resume))["results"]:
++            prior_by_name[r["name"]] = r
++
++    problems = PROBLEMS
++    if args.only:
++        wanted = set(args.only.split(","))
++        problems = [p for p in PROBLEMS if p[0] in wanted]
++
++    print(f"{len(problems)} problems, {args.shards} shards each, "
++          f"{args.jobs} in flight, batch={args.batch} min_runs={args.min_runs} "
++          f"checkpoint={args.checkpoint} max_runs={args.max_runs} "
++          f"max_steps={args.max_steps}", flush=True)
++
++    jobs = [(i, p, args.out, cfg, prior_by_name.get(p[0], {}))
++            for i, p in enumerate(problems)]
++    started = time.time()
++    results = []
++    with ThreadPoolExecutor(max_workers=args.jobs) as pool:
++        for res in pool.map(run_problem, jobs):
++            results.append(res)
++            print(f"  DONE {res['name']:<12} n={res['n']:<7} f1={res['f1']:<4} "
++                  f"states={res['distinct_states']:<3} {res['stop_reason']} "
++                  f"({res['wall_s']}s)", flush=True)
++            with open(args.json, "w") as fh:
++                json.dump({"params": cfg, "results": results,
++                           "wall_s": round(time.time() - started, 1)}, fh, indent=2)
++
++    print(f"\ntotal {time.time() - started:.0f}s -> {args.json}")
++
++
++if __name__ == "__main__":
++    main()
+--- /dev/null
++++ b/docker/profile_messages.py
+@@ -0,0 +1,249 @@
++#!/usr/bin/env python3
++"""
++Message-frequency profile, for the two dispatch optimizations.
++
++    docker compose exec metacat /metacat/docker/profile_messages.py -o /metacat/oracle-out
++
++Collects the data needed to decide:
++
++  #1  reorder record-case clauses hot-first. record-case compiles to a linear
++      eq? chain, so a message answered by the 92nd clause costs ~6.7x one
++      answered by the first. Needs: how often each message symbol is sent.
++
++  #2  replace (lambda msg ...) dispatchers with case-lambda. Objects still cons
++      a rest list on every send even though tell is now a macro. Needs: the
++      distribution of argument counts, to know which fixed arities to provide.
++
++tell is a macro (utilities.ss), so it cannot be wrapped at runtime. This copies
++the whole tree to a scratch directory, patches the macro there to count sends,
++and runs the sample against that copy. The repository is not touched, and the
++instrumented build is never used for the oracle numbers -- counting costs
++roughly 25%.
++"""
++
++import argparse
++import json
++import os
++import re
++import shutil
++import subprocess
++import sys
++import time
++
++sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
++from oracle import PROBLEMS, SPEED, ensure_display  # noqa: E402
++
++INSTR_DIR = "/tmp/instr"
++
++ORIGINAL_MACRO = """(extend-syntax (tell)
++  ((tell obj m arg ...)
++   (let* ((%tell-o% obj)
++	  (%tell-r% (%tell-o% %tell-o% m arg ...)))
++     (if (eq? %tell-r% 'invalid-message-indicator)
++       (report-error-and-halt (list %tell-o% m arg ...) %tell-o%)
++       %tell-r%))))"""
++
++COUNTING_MACRO = """(define *msg-counts* (make-eq-hashtable))
++(define *arity-counts* (make-eq-hashtable))
++(extend-syntax (tell)
++  ((tell obj m arg ...)
++   (let* ((%tell-o% obj)
++	  (%tell-r%
++	    (begin
++	      (hashtable-update! *msg-counts* m (lambda (v) (+ v 1)) 0)
++	      (hashtable-update! *arity-counts* (length '(arg ...))
++				 (lambda (v) (+ v 1)) 0)
++	      (%tell-o% %tell-o% m arg ...))))
++     (if (eq? %tell-r% 'invalid-message-indicator)
++       (report-error-and-halt (list %tell-o% m arg ...) %tell-o%)
++       %tell-r%))))"""
++
++
++def build_instrumented_tree(src_dir):
++    if os.path.exists(INSTR_DIR):
++        shutil.rmtree(INSTR_DIR)
++    os.makedirs(INSTR_DIR)
++    for fn in os.listdir(src_dir):
++        if fn.endswith(".ss") or fn.endswith(".txt"):
++            shutil.copy(os.path.join(src_dir, fn), os.path.join(INSTR_DIR, fn))
++
++    util = os.path.join(INSTR_DIR, "utilities.ss")
++    with open(util) as fh:
++        text = fh.read()
++    if ORIGINAL_MACRO not in text:
++        sys.exit("error: tell macro in utilities.ss does not match the expected "
++                 "text; update ORIGINAL_MACRO in this script")
++    with open(util, "w") as fh:
++        fh.write(text.replace(ORIGINAL_MACRO, COUNTING_MACRO))
++
++    # Loader pointing at the instrumented copy.
++    with open("/tmp/metacat-linux.ss") as fh:
++        loader = fh.read()
++    loader = re.sub(r'^\(define \*metacat-directory\* .*$',
++                    f'(define *metacat-directory* "{INSTR_DIR}/")',
++                    loader, flags=re.M)
++    path = "/tmp/instr-metacat.ss"
++    with open(path, "w") as fh:
++        fh.write(loader)
++    return path
++
++
++def worker_scheme(loader, results_path, runs_each, max_steps):
++    problems = "\n".join(
++        f"        (list '{i} '{m} '{t} \"{name}\")"
++        for name, i, m, t in PROBLEMS)
++    return f"""
++(load "{loader}")
++(setup)
++{SPEED}
++(with-output-to-file "{results_path}"
++  (lambda ()
++    (letrec
++      ((emit (lambda args (display (apply format args)) (write-char #\\newline)
++                     (flush-output-port (current-output-port))))
++       (problems (list
++{problems}))
++       (one-run
++         (lambda (p seed)
++           (tell *memory* 'clear)
++           (init-mcat (car p) (cadr p) (caddr p) #f seed)
++           (set! *break-time* {max_steps})
++           (call/cc (lambda (k)
++                      (set! suspend (lambda () (k 'answered)))
++                      (set! break   (lambda () (k 'capped)))
++                      (run-mcat))))))
++
++      ;; Discard everything counted during load and setup.
++      (hashtable-clear! *msg-counts*)
++      (hashtable-clear! *arity-counts*)
++
++      (let ((codelets 0) (runs 0) (t0 (real-time)))
++        (for-each
++          (lambda (p)
++            (let inner ((i 1))
++              (if (<= i {runs_each})
++                  (begin (one-run p i)
++                         (set! codelets (+ codelets *codelet-count*))
++                         (set! runs (+ runs 1))
++                         (inner (+ i 1))))))
++          problems)
++        (emit "META\\t~a\\t~a\\t~a" runs codelets (- (real-time) t0)))
++
++      (let-values (((keys vals) (hashtable-entries *msg-counts*)))
++        (vector-for-each (lambda (k v) (emit "MSG\\t~a\\t~a" k v)) keys vals))
++      (let-values (((keys vals) (hashtable-entries *arity-counts*)))
++        (vector-for-each (lambda (k v) (emit "ARITY\\t~a\\t~a" k v)) keys vals))))
++  'truncate)
++(exit)
++"""
++
++
++def count_clauses(src_dir):
++    """Clause count and clause order for each record-case dispatcher.
++
++    Parsed by paren depth rather than regex: a clause is a form at depth 1
++    inside (record-case ...), and its head is the message symbol.
++    """
++    out = {}
++    for fn in sorted(os.listdir(src_dir)):
++        if not fn.endswith(".ss"):
++            continue
++        text = open(os.path.join(src_dir, fn)).read()
++        for m in re.finditer(r"\(record-case\s", text):
++            i, depth, n = m.end(), 0, 0
++            clauses, buf, in_str, comment = [], "", False, False
++            while i < len(text):
++                c = text[i]
++                if comment:
++                    if c == "\n":
++                        comment = False
++                elif in_str:
++                    if c == '"' and text[i - 1] != "\\":
++                        in_str = False
++                elif c == ";":
++                    comment = True
++                elif c == '"':
++                    in_str = True
++                elif c == "(":
++                    depth += 1
++                    if depth == 1:
++                        buf = ""
++                elif c == ")":
++                    depth -= 1
++                    if depth == 0:
++                        head = buf.strip().split()[0] if buf.strip() else "?"
++                        clauses.append(head.strip("()"))
++                        n += 1
++                    elif depth < 0:
++                        break
++                elif depth == 1:
++                    buf += c
++                i += 1
++            if n > 20:
++                out.setdefault(fn, []).append(clauses)
++    return out
++
++
++def main():
++    ap = argparse.ArgumentParser()
++    ap.add_argument("-o", "--out", default="/metacat/oracle-out")
++    ap.add_argument("--runs-each", type=int, default=8)
++    ap.add_argument("--max-steps", type=int, default=100_000)
++    ap.add_argument("--src", default="/metacat")
++    args = ap.parse_args()
++
++    os.makedirs(args.out, exist_ok=True)
++    print("building instrumented copy of the tree...", flush=True)
++    loader = build_instrumented_tree(args.src)
++
++    results = os.path.join(args.out, "messages.tsv")
++    script = os.path.join(args.out, "messages.ss")
++    with open(script, "w") as fh:
++        fh.write(worker_scheme(loader, results, args.runs_each, args.max_steps))
++
++    env = ensure_display(":250")
++    print(f"profiling {args.runs_each} runs x {len(PROBLEMS)} problems...", flush=True)
++    started = time.time()
++    proc = subprocess.run(["sh", "/usr/local/bin/swl", script],
++                          env=env, capture_output=True, text=True)
++
++    msgs, arity, meta = {}, {}, {}
++    if os.path.exists(results):
++        for line in open(results):
++            parts = line.rstrip("\n").split("\t")
++            if parts[0] == "MSG" and len(parts) == 3:
++                msgs[parts[1]] = int(parts[2])
++            elif parts[0] == "ARITY" and len(parts) == 3:
++                arity[int(parts[1])] = int(parts[2])
++            elif parts[0] == "META" and len(parts) == 4:
++                meta = {"runs": int(parts[1]), "codelets": int(parts[2]),
++                        "ms": int(parts[3])}
++    if not msgs:
++        print(f"FAILED: swl exit {proc.returncode}", file=sys.stderr)
++        print("\n".join((proc.stdout or "").splitlines()[-15:]), file=sys.stderr)
++        sys.exit(1)
++
++    total = sum(msgs.values())
++    payload = {
++        "meta": meta, "elapsed_s": round(time.time() - started, 1),
++        "total_sends": total,
++        "sends_per_codelet": round(total / max(meta.get("codelets", 1), 1), 1),
++        "messages": dict(sorted(msgs.items(), key=lambda kv: -kv[1])),
++        "arity": dict(sorted(arity.items())),
++        "dispatchers": count_clauses(args.src),
++    }
++    with open(os.path.join(args.out, "messages.json"), "w") as fh:
++        json.dump(payload, fh, indent=2)
++
++    print(f"\n{total:,} sends over {meta.get('codelets', 0):,} codelets "
++          f"({payload['sends_per_codelet']}/codelet)")
++    print("\ntop 20 messages:")
++    for k, v in list(payload["messages"].items())[:20]:
++        print(f"  {v:>10,}  {100*v/total:5.2f}%  {k}")
++    print("\nargument-count distribution:")
++    for k, v in payload["arity"].items():
++        print(f"  {k} args: {v:>10,}  ({100*v/total:5.2f}%)")
++
++
++if __name__ == "__main__":
++    main()
+--- /dev/null
++++ b/docker/solve.sh
+@@ -0,0 +1,151 @@
++#!/bin/bash
++#
++# Run one Metacat problem without the GUI.
++#
++#   solve.sh <initial> <modified> <target> [--seed N] [--max N] [--answer STR]
++#
++#   docker compose exec metacat /metacat/docker/solve.sh abc abd xyz
++#   docker compose exec metacat /metacat/docker/solve.sh abc abd xyz --seed 42
++#   docker compose exec metacat /metacat/docker/solve.sh abc abd mrrjjj --seed 42
++#   docker compose exec metacat /metacat/docker/solve.sh abc cba pqrs --answer sqrp
++#
++# Each invocation is a fresh Metacat process with an empty Episodic Memory, so
++# runs are independent. Expect ~60s: Metacat takes ~45s to load and (setup)
++# before a single codelet runs.
++#
++# Metacat cannot run without an X display even with the GUI unused --
++# answers.ss talks to *comment-window* unconditionally and constants.ss builds
++# Tk fonts at load time -- so this uses its own Xvfb, separate from the one the
++# GUI is on.
++
++set -euo pipefail
++
++SOLVE_DISPLAY="${SOLVE_DISPLAY:-:98}"
++MAX_CODELETS=8000
++SEED=""
++ANSWER=""
++
++usage() {
++    sed -n '3,18p' "$0" | sed 's/^# \?//'
++    exit "${1:-0}"
++}
++
++[ $# -lt 3 ] && usage 1
++INITIAL="$1"; MODIFIED="$2"; TARGET="$3"; shift 3
++
++while [ $# -gt 0 ]; do
++    case "$1" in
++        --seed)   SEED="$2";        shift 2 ;;
++        --max)    MAX_CODELETS="$2"; shift 2 ;;
++        --answer) ANSWER="$2";      shift 2 ;;
++        -h|--help) usage 0 ;;
++        *) echo "unknown option: $1" >&2; usage 1 ;;
++    esac
++done
++
++# Chez's random-seed wants a positive integer below 2^32.
++if [ -z "$SEED" ]; then
++    SEED=$(( $(od -An -N4 -tu4 /dev/urandom | tr -d ' ') % 4294967294 + 1 ))
++fi
++
++if [ -n "$ANSWER" ]; then
++    JUSTIFY="#t"; ANSWER_SYM="'${ANSWER}"; SHOWN="${ANSWER}   (justify mode)"
++else
++    JUSTIFY="#f"; ANSWER_SYM="#f";         SHOWN="?"
++fi
++
++# Its own X display, started once and reused across calls.
++if ! DISPLAY="$SOLVE_DISPLAY" xdpyinfo >/dev/null 2>&1; then
++    rm -f "/tmp/.X${SOLVE_DISPLAY#:}-lock"
++    Xvfb "$SOLVE_DISPLAY" -screen 0 1280x1024x24 -nolisten tcp >/dev/null 2>&1 &
++    for _ in $(seq 1 40); do
++        DISPLAY="$SOLVE_DISPLAY" xdpyinfo >/dev/null 2>&1 && break
++        sleep 0.5
++    done
++fi
++
++RUN=$(mktemp /tmp/metacat-solve-XXXXXX.ss)
++OUT=$(mktemp /tmp/metacat-solve-XXXXXX.txt)
++LOG=$(mktemp /tmp/metacat-solve-XXXXXX.log)
++trap 'rm -f "$RUN" "$OUT" "$LOG"' EXIT
++
++cat > "$RUN" <<EOF
++(load "/tmp/metacat-linux.ss")
++(setup)
++;; Speed: 26 -> ~2500 codelets/sec, same answers. Must follow (setup) --
++;; %flash-pause%, %snag-pause% and %num-of-flashes% have no define anywhere and
++;; only exist once the Speed slider is built (gui.ss:413-426). Zeroing
++;; %flash-pause% short-circuits the flash animation at general-graphics.ss:289.
++;; %workspace-graphics% #f depends on the guard added at run.ss:166-176.
++;; The null windows cover themes.ss/trace.ss/memory.ss/answers.ss, which draw
++;; unconditionally; no engine code reads what they return.
++(set! %flash-pause% 0)
++(set! %num-of-flashes% 0)
++(set! %snag-pause% 0)
++(set! %text-scroll-pause% 0)
++(set! %codelet-highlight-pause% 0)
++(set! %highlight-last-codelet% #f)
++(set! %verbose% #f)
++(set! %slipnet-graphics% #f)
++(set! %coderack-graphics% #f)
++(set! %workspace-graphics% #f)
++;; *memory-window* is deliberately NOT stubbed: it is what gives Episodic Memory
++;; descriptions their icon geometry, and without it the next init-mcat dies once
++;; memory is non-empty (run.ss:204-205). It costs almost nothing.
++(let ((null-window (lambda msg 'done)))
++  (set! *themespace-window* null-window)
++  (set! *comment-window* null-window)
++  (set! *trace-window* null-window)
++  (set! *temperature-window* null-window)
++  (set! *EEG-window* null-window)
++  (set! *workspace-window* null-window))
++(set! %justify-mode% ${JUSTIFY})
++(with-output-to-file "${OUT}"
++  (lambda ()
++    ;; NOT printf: Metacat rebinds printf to the output port captured when
++    ;; syntactic-sugar.ss loaded (syntactic-sugar.ss:27), so it ignores
++    ;; with-output-to-file and would write to the real stdout instead.
++    (let ((emit (lambda args (display (apply format args)))))
++      (guard (e (#t (emit "error: ~a ~a~%"
++                          (condition-message e) (condition-irritants e))))
++        (init-mcat '${INITIAL} '${MODIFIED} '${TARGET} ${ANSWER_SYM} ${SEED})
++        ;; run-mcat stops by calling (break) once *codelet-count* reaches this.
++        (set! *break-time* ${MAX_CODELETS})
++        ;; Reuse run-mcat itself rather than reimplementing its loop -- it does
++        ;; more per step than step-mcat (slipnode unclamping, coderack refill),
++        ;; and skipping any of it changes what Metacat concludes.
++        ;; Its two exits, (suspend) on an answer and (break) on the cap,
++        ;; normally drop into the REPL; send them here instead.
++        (let ((outcome (call/cc (lambda (k)
++                                  (set! suspend (lambda () (k 'answered)))
++                                  (set! break   (lambda () (k 'hit-max)))
++                                  (run-mcat)))))
++          (emit "problem:   ~a -> ~a; ~a -> ${SHOWN}~%"
++                '${INITIAL} '${MODIFIED} '${TARGET})
++          (emit "seed:      ~a~%" ${SEED})
++          (emit "codelets:  ~a~%" *codelet-count*)
++          (emit "outcome:   ~a~%" outcome))
++        (for-each
++          (lambda (a)
++            (emit "answer:    ~a   (quality ~a, temperature ~a)~%"
++              (tell a 'get-answer-print-name)
++              (tell a 'get-quality)
++              (tell a 'get-temperature)))
++          (tell *memory* 'get-answers))
++        (for-each
++          (lambda (s) (emit "snag:      ~a~%" (tell s 'print-name)))
++          (tell *memory* 'get-snags)))))
++  'truncate)
++(exit)
++EOF
++
++DISPLAY="$SOLVE_DISPLAY" swl "$RUN" >"$LOG" 2>&1 || true
++cat "$OUT"
++
++# Metacat's own printf goes to the real stdout, so a bad `tell` prints its
++# "Ooops: bad message" there rather than into the result file.
++if [ ! -s "$OUT" ] || grep -q '^error:' "$OUT"; then
++    echo "--- swl output ---" >&2
++    tail -20 "$LOG" >&2
++    exit 1
++fi

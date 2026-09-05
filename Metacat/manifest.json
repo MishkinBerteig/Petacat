@@ -1,0 +1,654 @@
+{
+  "format_version": 1,
+  "upstream": {
+    "url": "https://science.slc.edu/jmarshall/metacat/Metacat-1.2.tgz",
+    "archive_root": "Metacat",
+    "sha256": "ec73bdc18b4e91f5a9f38fcc5af06028b8d7fe0c4bcfdbcc50e6b3c239971f4d",
+    "files": {
+      "LICENSE": {
+        "sha256": "984fbdeb215a0fdf59bbc0b0d7626f4000125c7b3134aeb527267693bac5c17c",
+        "bytes": 18004,
+        "executable": false
+      },
+      "README.txt": {
+        "sha256": "dd276ec9554f1fc381a73f1a9dce575c7a55ca9fb77b8c240b8d266696568bae",
+        "bytes": 150,
+        "executable": false
+      },
+      "answers.ss": {
+        "sha256": "c68a265353945a6191465b2de0d9f3d3834566acc4b966c0cd32e143b3f34834",
+        "bytes": 60332,
+        "executable": false
+      },
+      "bonds.ss": {
+        "sha256": "517475236018db44dc977195b3ef50980e27cdef8d24d4770abc61cb79aa257f",
+        "bytes": 21635,
+        "executable": false
+      },
+      "breakers.ss": {
+        "sha256": "d8ede9fc51642c40ea134422c1b45fd43dd30a8c130b7a03ac0c36564804379a",
+        "bytes": 1879,
+        "executable": false
+      },
+      "bridge-graphics.ss": {
+        "sha256": "77a53525364a13113cc42372e4d404de3a75d5b440e4fd4bc19d342bc674daa3",
+        "bytes": 12602,
+        "executable": false
+      },
+      "bridges.ss": {
+        "sha256": "2298c820639905e6f9b939094ce3302955cc7a5a524b651070b9ab12bd5d7b83",
+        "bytes": 68876,
+        "executable": false
+      },
+      "coderack-graphics.ss": {
+        "sha256": "0435ab607404b8c292c34943f66d7b4ab10d608e608480f0d418547d54303e50",
+        "bytes": 14520,
+        "executable": false
+      },
+      "coderack.ss": {
+        "sha256": "6e0539289ca8f47a81f9b025137e85c209a50f02ea8b72698cf5b65cf5f3f915",
+        "bytes": 24671,
+        "executable": false
+      },
+      "commentary-graphics.ss": {
+        "sha256": "d9d5913f1330900d270a8b1cfd2d91ff39363eca42db0df34a5c1b8ce67e5fd5",
+        "bytes": 4095,
+        "executable": false
+      },
+      "concept-mappings.ss": {
+        "sha256": "1955f58485ed3ab8cd390e8005e003a700a701c89b6c0e966e8eb00e41ced34d",
+        "bytes": 7227,
+        "executable": false
+      },
+      "constants.ss": {
+        "sha256": "dd23945340da35287dadc6f030a2573b42716e2444bdea5cc244dfb79388a465",
+        "bytes": 34995,
+        "executable": false
+      },
+      "demos.ss": {
+        "sha256": "dbe5da58ee6d1bc1cf9172c02390bbe6448a7abb504521b95075e44b7d8cc2e2",
+        "bytes": 4646,
+        "executable": false
+      },
+      "descriptions.ss": {
+        "sha256": "58170759b0c576b37c73313696e8d9d11573fefdf2289f793546ebaab1f72139",
+        "bytes": 8221,
+        "executable": false
+      },
+      "eeg-graphics.ss": {
+        "sha256": "b81a87be7cf395c28838f5abb06b3f881842e3bf8239b4a757740a0c94d62865",
+        "bytes": 8808,
+        "executable": false
+      },
+      "fonts.ss": {
+        "sha256": "ed7cb54a1b5b658c3bd8a53c3c0f16153053f27e52b26172d15b9bddd16a29d4",
+        "bytes": 6573,
+        "executable": false
+      },
+      "formulas.ss": {
+        "sha256": "3970eef4c0d8823e226b60b4fc207920ab53225dc9df430c5089e55d17c3b620",
+        "bytes": 3066,
+        "executable": false
+      },
+      "general-graphics.ss": {
+        "sha256": "7b6ad740dcff7b7afa1d16cb002fca2321fc3e5d8007265f51114b89e1fbec29",
+        "bytes": 41811,
+        "executable": false
+      },
+      "group-graphics.ss": {
+        "sha256": "8cf1c651680b1d85d3ed3a8610582e4e628bd31f35b731196724e937de9237b5",
+        "bytes": 5587,
+        "executable": false
+      },
+      "groups.ss": {
+        "sha256": "b72fb1d141797339a521c49ef487c44f628cf64b9bb54a5c5490ce3e2e60a15e",
+        "bytes": 43053,
+        "executable": false
+      },
+      "gui.ss": {
+        "sha256": "4fbc0227eeb52490d76d148b959ec1767bbb426a957dfc3491fad63fa75c79b4",
+        "bytes": 47141,
+        "executable": false
+      },
+      "help.txt": {
+        "sha256": "e622a190f780a5c7673fa438ee75712d49e8d572a2c7bd9e93293720b6bf9217",
+        "bytes": 9500,
+        "executable": false
+      },
+      "images.ss": {
+        "sha256": "15fc542360b2a6c1b360a28b587978cd019bb8253172926f7727c6008671ab65",
+        "bytes": 14572,
+        "executable": false
+      },
+      "jootsing.ss": {
+        "sha256": "fc38a4481c8ee2026291a61fbe4a15d474473243b09f35af846c994f0318e5a0",
+        "bytes": 13914,
+        "executable": false
+      },
+      "justify.ss": {
+        "sha256": "57f326effe748b8b5f7e3de3da6c8bd965ba35c7df3f719b6098daceac7fc437",
+        "bytes": 13312,
+        "executable": false
+      },
+      "memory-graphics.ss": {
+        "sha256": "ff98f6886d955fd4bf3edbce60fca215093cc3ff968973091195c5737e579f95",
+        "bytes": 9115,
+        "executable": false
+      },
+      "memory.ss": {
+        "sha256": "3aa0a1999ef0fcdfa27c896fd5d80197dd43f6cfdf233d07d31b3a28fb179c2d",
+        "bytes": 22806,
+        "executable": false
+      },
+      "metacat.ss": {
+        "sha256": "d073fc4d64ae59292b310942b433767490a7e0ae31b99c4411c8ce434aa882c7",
+        "bytes": 4425,
+        "executable": false
+      },
+      "rule-graphics.ss": {
+        "sha256": "e19005187f431684fc623fd22e6f0101e2d0da0afef355a6447a94b3e02ff8fa",
+        "bytes": 5369,
+        "executable": false
+      },
+      "rules.ss": {
+        "sha256": "99ab41031a9c8f9c1159b56196efacfb6e85b93a16c9668d21f063b81f273ee1",
+        "bytes": 83555,
+        "executable": false
+      },
+      "run.ss": {
+        "sha256": "42546c9b9f5e613c39d1cc46257994fee4dd1f03caa3cfa7ca36f3d53c1eb281",
+        "bytes": 12880,
+        "executable": false
+      },
+      "setup.ss": {
+        "sha256": "945301be44aa963dfec78dcbfb51f9673ddeb77af528c9ef5fdacd5eb5339eca",
+        "bytes": 5563,
+        "executable": false
+      },
+      "sgl-interpreter.ss": {
+        "sha256": "0fadc2a38e206e81e980db92107cce403ef313d98193c334f334c8f655a36bc1",
+        "bytes": 18704,
+        "executable": false
+      },
+      "slipnet-graphics.ss": {
+        "sha256": "df633e9eb65b0ccdba5a5d52312f5e93f000959c634439231ec9ff3e720acecb",
+        "bytes": 8935,
+        "executable": false
+      },
+      "slipnet.ss": {
+        "sha256": "c67b7ae971718f5a11964dbcfecbe21e4a6e5f354ed83c18d18d4bfa40e7e826",
+        "bytes": 31165,
+        "executable": false
+      },
+      "syntactic-sugar.ss": {
+        "sha256": "aa04e7526c6f7948f4f8238f5de8b90467b570b8e5e961a83521d96ae6d1ccba",
+        "bytes": 9513,
+        "executable": false
+      },
+      "temperature-graphics.ss": {
+        "sha256": "d876619f675006d8f6f9d6c84c5eec310dff43b7db7605b9c2ec0fc29a9d0289",
+        "bytes": 7637,
+        "executable": false
+      },
+      "theme-graphics.ss": {
+        "sha256": "388c405cd9d6db4fb8cbe8eeffa298d06a4178102f7fe427cb0d88ec8158130e",
+        "bytes": 31966,
+        "executable": false
+      },
+      "themes.ss": {
+        "sha256": "a3a02d8ee3d2a4a83511c73a2c04f1592ff0b04477a993107282d4212b6a54c0",
+        "bytes": 47989,
+        "executable": false
+      },
+      "trace-graphics.ss": {
+        "sha256": "00f20de79568d18549efa42f834b75df117c3ba9b2f047d0318bf665d53308a7",
+        "bytes": 17800,
+        "executable": false
+      },
+      "trace.ss": {
+        "sha256": "db9416c7a22ac93cdb1c7346634639a19a1cc10e275e3c04375e2369c251da56",
+        "bytes": 65300,
+        "executable": false
+      },
+      "utilities.ss": {
+        "sha256": "b9f9af0f465ac1d414e0349fc7b48fe310d91af953cbdc6f73a0b7b9349d5775",
+        "bytes": 24659,
+        "executable": false
+      },
+      "workspace-graphics.ss": {
+        "sha256": "42bded226d2a2586a659f3ae299468839917ac4b311d69bdb7f3ec13a90f2dea",
+        "bytes": 33157,
+        "executable": false
+      },
+      "workspace-objects.ss": {
+        "sha256": "dab5594afcaa39163195f0664575868a932372fc8dabb120d83e6afbda939d78",
+        "bytes": 23692,
+        "executable": false
+      },
+      "workspace-strings.ss": {
+        "sha256": "771119ca1a615cd16cbde9bd2f506c4d36e5c3bc0f1e0ac4bcb2d2265ee3b9ea",
+        "bytes": 21923,
+        "executable": false
+      },
+      "workspace-structure-formulas.ss": {
+        "sha256": "2f34218c5dcac3504d5de0bd542f0017b002e16b3ed2a9decdd96b3b0e3f08ed",
+        "bytes": 2289,
+        "executable": false
+      },
+      "workspace-structures.ss": {
+        "sha256": "d9a2e7ac95dac8999c28d904e33bbf725139518ee54cd9a35f95494aef325f1a",
+        "bytes": 3458,
+        "executable": false
+      },
+      "workspace.ss": {
+        "sha256": "3eb789dda93277cd73eee656a1a44fcddfebb54b1680db60bb6097a03422b916",
+        "bytes": 26817,
+        "executable": false
+      }
+    }
+  },
+  "patches": [
+    {
+      "path": "patches/0001-engine.patch",
+      "sha256": "7b996652373d341eb0ee5e11662adee426dca0d0bd381a1b3ceff11d65cc8691",
+      "files": [
+        "constants.ss",
+        "headless.ss",
+        "metacat-headless.ss",
+        "metacat.ss",
+        "rules.ss",
+        "run.ss",
+        "utilities.ss",
+        "workspace-strings.ss"
+      ]
+    },
+    {
+      "path": "patches/0002-harnesses-and-notes.patch",
+      "sha256": "c8bad3d0f79f746235f5dfae3e9465f2b96bc9020cab3f76647004a6ed202746",
+      "files": [
+        ".gitignore",
+        "CODE-FIXES.md",
+        "ORACLE-USAGE.md",
+        "README.md",
+        "docker-compose.yml",
+        "docker/Dockerfile",
+        "docker/batch-example.json",
+        "docker/batch.py",
+        "docker/check_messages.py",
+        "docker/check_saturation.py",
+        "docker/entrypoint.sh",
+        "docker/episode_report.py",
+        "docker/episodes.py",
+        "docker/episodes_finish.py",
+        "docker/make_derived_sets.py",
+        "docker/make_oracle_report.py",
+        "docker/oracle.py",
+        "docker/profile_messages.py",
+        "docker/solve.sh"
+      ]
+    }
+  ],
+  "reconstructed_files": {
+    ".gitignore": {
+      "sha256": "7ac7cc42d93e41dff326cad28ca7e5c2ab0f5d47a327a407f89d3618701c2c9d",
+      "bytes": 1000,
+      "executable": false
+    },
+    "CODE-FIXES.md": {
+      "sha256": "4245527054d255855ba891cebc10bac8a45f1c82a39adb5ae1a7c1daad383540",
+      "bytes": 6966,
+      "executable": false
+    },
+    "LICENSE": {
+      "sha256": "984fbdeb215a0fdf59bbc0b0d7626f4000125c7b3134aeb527267693bac5c17c",
+      "bytes": 18004,
+      "executable": false
+    },
+    "ORACLE-USAGE.md": {
+      "sha256": "c875b66f70802ddc5e1ec13d915467a4e42e14355d1f8f6504220e124191dbac",
+      "bytes": 8966,
+      "executable": false
+    },
+    "README.md": {
+      "sha256": "40d2ebfbd8cad4f57a96ea5eae83bca4876bbe191184f6f2466da759460ff56e",
+      "bytes": 4178,
+      "executable": false
+    },
+    "README.txt": {
+      "sha256": "dd276ec9554f1fc381a73f1a9dce575c7a55ca9fb77b8c240b8d266696568bae",
+      "bytes": 150,
+      "executable": false
+    },
+    "answers.ss": {
+      "sha256": "c68a265353945a6191465b2de0d9f3d3834566acc4b966c0cd32e143b3f34834",
+      "bytes": 60332,
+      "executable": false
+    },
+    "bonds.ss": {
+      "sha256": "517475236018db44dc977195b3ef50980e27cdef8d24d4770abc61cb79aa257f",
+      "bytes": 21635,
+      "executable": false
+    },
+    "breakers.ss": {
+      "sha256": "d8ede9fc51642c40ea134422c1b45fd43dd30a8c130b7a03ac0c36564804379a",
+      "bytes": 1879,
+      "executable": false
+    },
+    "bridge-graphics.ss": {
+      "sha256": "77a53525364a13113cc42372e4d404de3a75d5b440e4fd4bc19d342bc674daa3",
+      "bytes": 12602,
+      "executable": false
+    },
+    "bridges.ss": {
+      "sha256": "2298c820639905e6f9b939094ce3302955cc7a5a524b651070b9ab12bd5d7b83",
+      "bytes": 68876,
+      "executable": false
+    },
+    "coderack-graphics.ss": {
+      "sha256": "0435ab607404b8c292c34943f66d7b4ab10d608e608480f0d418547d54303e50",
+      "bytes": 14520,
+      "executable": false
+    },
+    "coderack.ss": {
+      "sha256": "6e0539289ca8f47a81f9b025137e85c209a50f02ea8b72698cf5b65cf5f3f915",
+      "bytes": 24671,
+      "executable": false
+    },
+    "commentary-graphics.ss": {
+      "sha256": "d9d5913f1330900d270a8b1cfd2d91ff39363eca42db0df34a5c1b8ce67e5fd5",
+      "bytes": 4095,
+      "executable": false
+    },
+    "concept-mappings.ss": {
+      "sha256": "1955f58485ed3ab8cd390e8005e003a700a701c89b6c0e966e8eb00e41ced34d",
+      "bytes": 7227,
+      "executable": false
+    },
+    "constants.ss": {
+      "sha256": "7b5187cd32b4e865c23bae92c9bab160ab821cdf8f5512fce5769eebc23f8743",
+      "bytes": 35366,
+      "executable": false
+    },
+    "demos.ss": {
+      "sha256": "dbe5da58ee6d1bc1cf9172c02390bbe6448a7abb504521b95075e44b7d8cc2e2",
+      "bytes": 4646,
+      "executable": false
+    },
+    "descriptions.ss": {
+      "sha256": "58170759b0c576b37c73313696e8d9d11573fefdf2289f793546ebaab1f72139",
+      "bytes": 8221,
+      "executable": false
+    },
+    "docker-compose.yml": {
+      "sha256": "11ad87583155bb5678ac99cf95057fc959cbbabc39aeb6e3b44c3e8dbad211be",
+      "bytes": 1556,
+      "executable": false
+    },
+    "docker/Dockerfile": {
+      "sha256": "03c150a761f83f549087f1dc28cf1e18b82cf26e20ec5a0622ed33ca680e66a2",
+      "bytes": 2964,
+      "executable": false
+    },
+    "docker/batch-example.json": {
+      "sha256": "df686b338917d0cd8f74c9577ca1cd8237d8d228f1cfa51a197534fae2471982",
+      "bytes": 701,
+      "executable": false
+    },
+    "docker/batch.py": {
+      "sha256": "43c7a8907c4ee89f6ebec6e084729eb19751724499b0633931363f8036b731cc",
+      "bytes": 15701,
+      "executable": true
+    },
+    "docker/check_messages.py": {
+      "sha256": "63dfd8203c67fbb47665ef1f61853ae01de034fb89be4e5fa29616f0a7ef6b6c",
+      "bytes": 7658,
+      "executable": true
+    },
+    "docker/check_saturation.py": {
+      "sha256": "b6d562a5a1edbae69b30656ce9dd8cefecbab3597b118569136a6f8b78cc8576",
+      "bytes": 5738,
+      "executable": true
+    },
+    "docker/entrypoint.sh": {
+      "sha256": "845fa906336307ca1f38bb1f903251007dc761de82da751c0ec33672f2c95376",
+      "bytes": 7326,
+      "executable": false
+    },
+    "docker/episode_report.py": {
+      "sha256": "af50fda16b0dc48b6bea1e63da38d882165410bffb51d6289cc60d4710adb53e",
+      "bytes": 5505,
+      "executable": true
+    },
+    "docker/episodes.py": {
+      "sha256": "6dd6a206811d3371481b239262efbbbf5fdb136fdf593e1edcdd948b12e23cc5",
+      "bytes": 17666,
+      "executable": true
+    },
+    "docker/episodes_finish.py": {
+      "sha256": "7d87b01360f790f51d5facffd66688c524d36b0d7e2023b7d41517cc5faf6a7b",
+      "bytes": 9442,
+      "executable": true
+    },
+    "docker/make_derived_sets.py": {
+      "sha256": "b95870cf128858adebf81ce03f8c3b6f8ec0171a576548bf2ba609f746a1aef8",
+      "bytes": 6719,
+      "executable": true
+    },
+    "docker/make_oracle_report.py": {
+      "sha256": "6590c8e30669b214da7fd083e8d03ea7e1f34aebe6d487e7f177e09482077638",
+      "bytes": 13106,
+      "executable": true
+    },
+    "docker/oracle.py": {
+      "sha256": "de2b76902579a6073817f1251a9a4abf0d11a1ac316da000427b689ccde599b6",
+      "bytes": 18076,
+      "executable": true
+    },
+    "docker/profile_messages.py": {
+      "sha256": "e6dc739c90d77f0081a202c137f3850e4e163ce1710c669dc0033d753b296c29",
+      "bytes": 9221,
+      "executable": true
+    },
+    "docker/solve.sh": {
+      "sha256": "2a4bca81c929163b871efc2b65bbfa636dd438aef3c70df33a7beecbd2eea078",
+      "bytes": 5918,
+      "executable": true
+    },
+    "eeg-graphics.ss": {
+      "sha256": "b81a87be7cf395c28838f5abb06b3f881842e3bf8239b4a757740a0c94d62865",
+      "bytes": 8808,
+      "executable": false
+    },
+    "fonts.ss": {
+      "sha256": "ed7cb54a1b5b658c3bd8a53c3c0f16153053f27e52b26172d15b9bddd16a29d4",
+      "bytes": 6573,
+      "executable": false
+    },
+    "formulas.ss": {
+      "sha256": "3970eef4c0d8823e226b60b4fc207920ab53225dc9df430c5089e55d17c3b620",
+      "bytes": 3066,
+      "executable": false
+    },
+    "general-graphics.ss": {
+      "sha256": "7b6ad740dcff7b7afa1d16cb002fca2321fc3e5d8007265f51114b89e1fbec29",
+      "bytes": 41811,
+      "executable": false
+    },
+    "group-graphics.ss": {
+      "sha256": "8cf1c651680b1d85d3ed3a8610582e4e628bd31f35b731196724e937de9237b5",
+      "bytes": 5587,
+      "executable": false
+    },
+    "groups.ss": {
+      "sha256": "b72fb1d141797339a521c49ef487c44f628cf64b9bb54a5c5490ce3e2e60a15e",
+      "bytes": 43053,
+      "executable": false
+    },
+    "gui.ss": {
+      "sha256": "4fbc0227eeb52490d76d148b959ec1767bbb426a957dfc3491fad63fa75c79b4",
+      "bytes": 47141,
+      "executable": false
+    },
+    "headless.ss": {
+      "sha256": "928c0d65794934373952053a639cc7a64b032ce188d798968d9d20ce0fd91d22",
+      "bytes": 14475,
+      "executable": false
+    },
+    "help.txt": {
+      "sha256": "e622a190f780a5c7673fa438ee75712d49e8d572a2c7bd9e93293720b6bf9217",
+      "bytes": 9500,
+      "executable": false
+    },
+    "images.ss": {
+      "sha256": "15fc542360b2a6c1b360a28b587978cd019bb8253172926f7727c6008671ab65",
+      "bytes": 14572,
+      "executable": false
+    },
+    "jootsing.ss": {
+      "sha256": "fc38a4481c8ee2026291a61fbe4a15d474473243b09f35af846c994f0318e5a0",
+      "bytes": 13914,
+      "executable": false
+    },
+    "justify.ss": {
+      "sha256": "57f326effe748b8b5f7e3de3da6c8bd965ba35c7df3f719b6098daceac7fc437",
+      "bytes": 13312,
+      "executable": false
+    },
+    "memory-graphics.ss": {
+      "sha256": "ff98f6886d955fd4bf3edbce60fca215093cc3ff968973091195c5737e579f95",
+      "bytes": 9115,
+      "executable": false
+    },
+    "memory.ss": {
+      "sha256": "3aa0a1999ef0fcdfa27c896fd5d80197dd43f6cfdf233d07d31b3a28fb179c2d",
+      "bytes": 22806,
+      "executable": false
+    },
+    "metacat-headless.ss": {
+      "sha256": "ac60f5dce3623672310d4cb277f9dd164b5e0393fff110da94690b97097c3d80",
+      "bytes": 2238,
+      "executable": false
+    },
+    "metacat.ss": {
+      "sha256": "550664517a667edeff9c36a21f2d7b110edcc4b38957dab05a5f6f3b9d1973ae",
+      "bytes": 4591,
+      "executable": false
+    },
+    "rule-graphics.ss": {
+      "sha256": "e19005187f431684fc623fd22e6f0101e2d0da0afef355a6447a94b3e02ff8fa",
+      "bytes": 5369,
+      "executable": false
+    },
+    "rules.ss": {
+      "sha256": "1534e2a6dbf42f16b8c26ed3db600b5312bfe1fdc8290f183fe1189895f1a510",
+      "bytes": 83865,
+      "executable": false
+    },
+    "run.ss": {
+      "sha256": "9dbac734bc889af96e84d252bdeb812a79fa1bfb2cafe9ce22937dd055c9d84a",
+      "bytes": 13417,
+      "executable": false
+    },
+    "setup.ss": {
+      "sha256": "945301be44aa963dfec78dcbfb51f9673ddeb77af528c9ef5fdacd5eb5339eca",
+      "bytes": 5563,
+      "executable": false
+    },
+    "sgl-interpreter.ss": {
+      "sha256": "0fadc2a38e206e81e980db92107cce403ef313d98193c334f334c8f655a36bc1",
+      "bytes": 18704,
+      "executable": false
+    },
+    "slipnet-graphics.ss": {
+      "sha256": "df633e9eb65b0ccdba5a5d52312f5e93f000959c634439231ec9ff3e720acecb",
+      "bytes": 8935,
+      "executable": false
+    },
+    "slipnet.ss": {
+      "sha256": "c67b7ae971718f5a11964dbcfecbe21e4a6e5f354ed83c18d18d4bfa40e7e826",
+      "bytes": 31165,
+      "executable": false
+    },
+    "syntactic-sugar.ss": {
+      "sha256": "aa04e7526c6f7948f4f8238f5de8b90467b570b8e5e961a83521d96ae6d1ccba",
+      "bytes": 9513,
+      "executable": false
+    },
+    "temperature-graphics.ss": {
+      "sha256": "d876619f675006d8f6f9d6c84c5eec310dff43b7db7605b9c2ec0fc29a9d0289",
+      "bytes": 7637,
+      "executable": false
+    },
+    "theme-graphics.ss": {
+      "sha256": "388c405cd9d6db4fb8cbe8eeffa298d06a4178102f7fe427cb0d88ec8158130e",
+      "bytes": 31966,
+      "executable": false
+    },
+    "themes.ss": {
+      "sha256": "a3a02d8ee3d2a4a83511c73a2c04f1592ff0b04477a993107282d4212b6a54c0",
+      "bytes": 47989,
+      "executable": false
+    },
+    "trace-graphics.ss": {
+      "sha256": "00f20de79568d18549efa42f834b75df117c3ba9b2f047d0318bf665d53308a7",
+      "bytes": 17800,
+      "executable": false
+    },
+    "trace.ss": {
+      "sha256": "db9416c7a22ac93cdb1c7346634639a19a1cc10e275e3c04375e2369c251da56",
+      "bytes": 65300,
+      "executable": false
+    },
+    "utilities.ss": {
+      "sha256": "e2210b072430c451c5f550a8878742b62d86ae2ec7a595b32a7123b9c2cdce88",
+      "bytes": 28336,
+      "executable": false
+    },
+    "workspace-graphics.ss": {
+      "sha256": "42bded226d2a2586a659f3ae299468839917ac4b311d69bdb7f3ec13a90f2dea",
+      "bytes": 33157,
+      "executable": false
+    },
+    "workspace-objects.ss": {
+      "sha256": "dab5594afcaa39163195f0664575868a932372fc8dabb120d83e6afbda939d78",
+      "bytes": 23692,
+      "executable": false
+    },
+    "workspace-strings.ss": {
+      "sha256": "4a24270cf318272fb35480d44d8c164fa6c8f3bb977880900ad2e32bd5efa6a8",
+      "bytes": 26009,
+      "executable": false
+    },
+    "workspace-structure-formulas.ss": {
+      "sha256": "2f34218c5dcac3504d5de0bd542f0017b002e16b3ed2a9decdd96b3b0e3f08ed",
+      "bytes": 2289,
+      "executable": false
+    },
+    "workspace-structures.ss": {
+      "sha256": "d9a2e7ac95dac8999c28d904e33bbf725139518ee54cd9a35f95494aef325f1a",
+      "bytes": 3458,
+      "executable": false
+    },
+    "workspace.ss": {
+      "sha256": "3eb789dda93277cd73eee656a1a44fcddfebb54b1680db60bb6097a03422b916",
+      "bytes": 26817,
+      "executable": false
+    }
+  },
+  "excluded_files": {
+    "CLAUDE.md": "Repository-specific agent instructions.",
+    "oracle/derived/convergence-p50.json": "Measured data are not part of this source reconstruction bundle.",
+    "oracle/derived/convergence-sets.json": "Measured data are not part of this source reconstruction bundle.",
+    "oracle/derived/single-run-p50.json": "Measured data are not part of this source reconstruction bundle.",
+    "oracle/derived/single-run-sets.json": "Measured data are not part of this source reconstruction bundle.",
+    "oracle/raw/episodes.json.gz": "Measured data are not part of this source reconstruction bundle.",
+    "oracle/raw/single-runs.json": "Measured data are not part of this source reconstruction bundle."
+  },
+  "chez_scheme": {
+    "version": "9.5.4",
+    "url": "https://science.slc.edu/jmarshall/metacat/ChezScheme-9.5.4.tgz",
+    "sha256": "110219fdef069c4c503c3f12c4d257ef52196e18669f026b1eb72aae05ee3a9e"
+  },
+  "packaged_date": "2026-09-05",
+  "portable_configuration": "GUI loader defaults to Linux and derives source/save paths from the current directory. Engine algorithms and headless loader are unchanged."
+}
