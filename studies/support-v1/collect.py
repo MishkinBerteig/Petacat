@@ -437,6 +437,7 @@ def status(out):
                                    if (chunk_dir(out, task) / "complete.json").exists())
     print(json.dumps({"receipted_runs_not_rehashed": counts,
                       "progress": read_json(out / "progress.json") if (out / "progress.json").exists() else None,
+                      "analysis": read_json(out / "analysis-status.json") if (out / "analysis-status.json").exists() else None,
                       "completion_marker": (out / "COMPLETE.json").exists()}, indent=2))
 
 
@@ -444,7 +445,7 @@ def launch(args):
     out = args.out.resolve()
     if not (out / "manifest.json").exists():
         raise ValueError("Prepare the study first")
-    command = [sys.executable, str(HERE / "collect.py"), "run", "--out", str(out)]
+    command = [sys.executable, str(HERE / "collect.py"), "supervise", "--out", str(out)]
     if platform.system() == "Darwin":
         command = ["/usr/bin/caffeinate", "-i", *command]
     with (out / "supervisor.log").open("a") as log:
@@ -454,10 +455,24 @@ def launch(args):
     print(f"Launched supervisor PID {child.pid}; inspect status and supervisor.log for actual progress.")
 
 
+def supervise(args):
+    run_study(args)
+    out = args.out.resolve()
+    if (out / "COMPLETE.json").exists() and not read_json(out / "manifest.json")["pilot"]:
+        write_json(out / "analysis-status.json", {"state": "running", "started_utc": now()})
+        try:
+            subprocess.run([sys.executable, str(HERE / "analyze.py"), str(out)], check=True)
+        except subprocess.CalledProcessError:
+            write_json(out / "analysis-status.json", {"state": "failed", "finished_utc": now()})
+            raise
+        write_json(out / "analysis-status.json", {"state": "complete", "finished_utc": now(),
+                   "analysis_sha256": sha(out / "analysis.json"), "report_sha256": sha(out / "RESULTS.md")})
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
-    for name in ("prepare", "run", "launch", "status"):
+    for name in ("prepare", "run", "launch", "status", "supervise"):
         p = sub.add_parser(name)
         p.add_argument("--out", type=Path, required=True)
         if name == "prepare":
@@ -472,7 +487,7 @@ def main():
     elif args.command == "status":
         status(args.out.resolve())
     else:
-        {"prepare": prepare, "run": run_study, "launch": launch}[args.command](args)
+        {"prepare": prepare, "run": run_study, "launch": launch, "supervise": supervise}[args.command](args)
 
 
 if __name__ == "__main__":

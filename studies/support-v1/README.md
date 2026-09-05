@@ -133,7 +133,12 @@ terminal, or use the supplied detached launcher:
 ```
 
 The launcher writes a supervisor log and invokes `caffeinate -i` on macOS.
-`status` reports validated chunks and the last coordinator heartbeat. A launch
+After all main-study chunks pass verification, it automatically runs the
+analysis and records success or failure in `analysis-status.json`. A failed
+analysis does not invalidate completed raw records; inspect the log and rerun
+the documented analysis command after diagnosing the problem.
+`status` reports receipted chunk counts without rehashing, the last coordinator
+heartbeat, and analysis status. A launch
 message is not proof of completion: only `COMPLETE.json` plus a successful
 analysis establishes that every assigned run was collected and checked.
 

@@ -2,12 +2,16 @@ from collections import Counter
 import copy
 import json
 from pathlib import Path
+import subprocess
 import tempfile
+from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 
-from analyze import flags, frequency_test, head, stopping_prefixes, upper_limit
+from analyze import flags, frequency_test, head, load_study, stopping_prefixes, upper_limit
 from collect import (HERE, chunk_dir, load_completed, read_json, row_identity,
                      scheme_script, sha, tasks_for, validate_protocol, validate_rows, write_json)
+from collect import supervise
 
 
 class ProtocolTests(unittest.TestCase):
@@ -74,6 +78,41 @@ class ProtocolTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 load_completed(directory, task)
 
+    def test_complete_inventory_loads_and_incomplete_total_fails(self):
+        p = copy.deepcopy(self.p)
+        p["problems"] = p["problems"][:1]
+        p["chunk_size"] = 2
+        for phase in p["phases"]:
+            phase["runs_per_problem"] = 5
+        with tempfile.TemporaryDirectory() as temporary:
+            out = Path(temporary)
+            write_json(out / "protocol.json", p)
+            write_json(out / "manifest.json", {"pilot": False,
+                       "protocol_sha256": sha(out / "protocol.json")})
+            receipts = {}
+            for phase in p["phases"]:
+                for task in tasks_for(p, phase):
+                    directory = chunk_dir(out, task)
+                    attempt = directory / "attempt-001"
+                    attempt.mkdir(parents=True)
+                    rows = [{**row_identity(task, i), "state": "a", "codelets": 10,
+                             "elapsed_seconds": 0.1} for i in range(task["count"])]
+                    data = attempt / "runs.jsonl"
+                    data.write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+                    write_json(attempt / "attempt.json", {"exit_status": 0})
+                    write_json(directory / "complete.json", {"task": task, "attempt": "attempt-001",
+                               "sha256": sha(data), "artifacts": {"runs.jsonl": sha(data)}})
+                    receipts[str(directory.relative_to(out) / "complete.json")] = sha(directory / "complete.json")
+            complete = {"manifest_sha256": sha(out / "manifest.json"), "receipts": receipts, "total_runs": 15}
+            write_json(out / "COMPLETE.json", complete)
+            _, _, data, attempts = load_study(out)
+            self.assertEqual(len(data["construction"][p["problems"][0]["name"]]), 5)
+            self.assertEqual(len(attempts), 9)
+            complete["total_runs"] = 14
+            write_json(out / "COMPLETE.json", complete)
+            with self.assertRaises(ValueError):
+                load_study(out)
+
 
 class AnalysisTests(unittest.TestCase):
     def test_head_boundary_ties_and_nonanswers(self):
@@ -114,6 +153,39 @@ class AnalysisTests(unittest.TestCase):
     def test_frequency_reproducible(self):
         args = (Counter(a=8, b=2), Counter(a=5, b=5), 999, 99)
         self.assertEqual(frequency_test(*args), frequency_test(*args))
+
+
+class SupervisorTests(unittest.TestCase):
+    def test_stopped_collection_does_not_analyze(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            with patch("collect.run_study"), patch("collect.subprocess.run") as command:
+                supervise(SimpleNamespace(out=Path(temporary)))
+                command.assert_not_called()
+
+    def test_completed_collection_analyzes_and_records_hashes(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            out = Path(temporary)
+            write_json(out / "COMPLETE.json", {})
+            write_json(out / "manifest.json", {"pilot": False})
+            def analysis(*args, **kwargs):
+                write_json(out / "analysis.json", {"checked": True})
+                (out / "RESULTS.md").write_text("checked\n")
+            with patch("collect.run_study"), patch("collect.subprocess.run", side_effect=analysis):
+                supervise(SimpleNamespace(out=out))
+            status = read_json(out / "analysis-status.json")
+            self.assertEqual(status["state"], "complete")
+            self.assertEqual(status["analysis_sha256"], sha(out / "analysis.json"))
+
+    def test_analysis_failure_is_recorded(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            out = Path(temporary)
+            write_json(out / "COMPLETE.json", {})
+            write_json(out / "manifest.json", {"pilot": False})
+            failure = subprocess.CalledProcessError(1, ["analysis"])
+            with patch("collect.run_study"), patch("collect.subprocess.run", side_effect=failure):
+                with self.assertRaises(subprocess.CalledProcessError):
+                    supervise(SimpleNamespace(out=out))
+            self.assertEqual(read_json(out / "analysis-status.json")["state"], "failed")
 
 
 if __name__ == "__main__":
