@@ -6,6 +6,12 @@ The original Metacat and Petacat engines, runtime, inputs, assigned seeds,
 100,000-codelet limit, 12 workers, and 969,000-observation budget are unchanged.
 No engine repair is included. This study still uses fresh memory, not episodes.
 
+The completed [full scientific-data release](data/README.md) includes all
+969,000 main observations, the interrupted parent, the excluded pilot, and
+both preflight attempts. It can be verified and reanalyzed without running
+Metacat. The [failure investigation note](../../Metacat/KNOWN-FAILURES.md)
+records standalone reproducers for the three reference errors.
+
 ## Why an Amendment Is Necessary
 
 The parent study stopped after a reproducible Metacat exception on `misc1`:
@@ -137,11 +143,13 @@ Completion requires `COMPLETE.json`, all verified receipts, and successful
 
 ## Publication
 
-Outputs remain ignored by Git. A later audited release must remove private
-`local.json`, operational paths in logs, PID/lock files, and other machine
-identifiers. Preserve scientific provenance, failure evidence, seed identities,
-all admitted observations, exclusions, and checksums. The original upstream
-source must not be added to this patch-only repository.
+Operational outputs remain ignored by Git. The [published archives](data/README.md)
+omit private configuration, launcher/lock files, and supervisor logs while
+preserving all scientific files byte-for-byte, including per-attempt logs and
+original checksums. Archive ownership metadata is normalized. Clean-room
+extraction and reanalysis reproduce the original results. Future exports must
+retain this privacy and integrity boundary; the original upstream source must
+not be added to this patch-only repository.
 
 For the paper, describe the failure as a reference-qualification case study:
 expensive exploration yielded a reproducible reference defect and a cheap

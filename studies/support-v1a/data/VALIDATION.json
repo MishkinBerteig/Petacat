@@ -1,0 +1,21 @@
+{
+  "admitted_main_observations": {
+    "construction": 380000,
+    "port": 19000,
+    "validation": 570000
+  },
+  "export_tool_sha256": "e2664c3aae0f383c9e849240054568623240aeccdc236ca08361990491270e6f",
+  "full_analysis_reproduced": {
+    "RESULTS.md": "c8ea18ba97410dcfea430607ffc81f813577be187cf7a32839b9051a2f1959c3",
+    "analysis.json": "26ff98e0ca39eeddb8eec2b85186bd235682048625bb07cd8bf4a8bb65fd8128"
+  },
+  "main_engine_errors": 3,
+  "parent_scientific_inventory_unchanged": true,
+  "privacy_scan_passed": true,
+  "release_sha256": "de6b9c20df0e711dc538404d285a00a80c7eb33a02ec88bb9340932a8fda21b7",
+  "separately_preserved_observations_not_added_to_main": {
+    "aborted-preflight": 643250,
+    "parent": 643250,
+    "pilot": 570
+  }
+}

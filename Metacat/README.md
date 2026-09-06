@@ -46,6 +46,13 @@ The host-installation instructions below have not all been exercised on fresh
 Mac, Windows, and Linux installations. See [VALIDATION.md](VALIDATION.md) for
 what was actually tested.
 
+Three reproducible reference-engine failures were subsequently found during
+the versioned support study. They are **not fixed by these patches**. See
+[KNOWN-FAILURES.md](KNOWN-FAILURES.md) for the exact inputs and seeds,
+recorded exceptions, investigation starting points, and a small standalone
+reproducer. The [full study data](../studies/support-v1a/data/README.md) is
+published separately from this source-reconstruction bundle.
+
 ## 1. Install the Prerequisites
 
 These are the tools needed **on your computer**. Follow only your operating
