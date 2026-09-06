@@ -63,6 +63,8 @@ class ProtocolTests(unittest.TestCase):
         self.assertIn("(exit 86)", script)
         self.assertNotIn("$first_seed", script)
         self.assertEqual(script.count("(run-mcat)"), 1)
+        self.assertNotIn("(newline ", script)
+        self.assertIn("(write-char #\\newline output)", script)
 
 
 class RowTests(unittest.TestCase):

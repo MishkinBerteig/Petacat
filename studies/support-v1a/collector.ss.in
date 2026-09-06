@@ -13,14 +13,14 @@
                  'who (if (who-condition? c) (condition-who c) #f)
                  'message (if (message-condition? c) (condition-message c) #f)
                  'irritants (if (irritants-condition? c) (condition-irritants c) '())) details)
-    (newline details)
+    (write-char #\newline details)
     (close-output-port details))
   (let ((marker (open-output-file "/out/engine-error.tsv" 'error)))
     (display (format "~a\t~a\t~a\t~a\t~a"
                      i seed study-stage
                      (if (eq? study-stage 'run) *codelet-count* "unknown")
                      (- (real-time) started)) marker)
-    (newline marker)
+    (write-char #\newline marker)
     (close-output-port marker))
   (flush-output-port output)
   (exit 86))
@@ -51,7 +51,7 @@
         (display (format "~a\t~a\t~a\t~a\t~a\t~a"
                          i seed (list-ref result 0) (list-ref result 1)
                          (list-ref result 2) (list-ref result 3)) output)
-        (newline output)
+        (write-char #\newline output)
         (flush-output-port output)))
     (loop (+ i 1))))
 (close-output-port output)
