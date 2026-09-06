@@ -1,0 +1,30 @@
+{
+  "study_id": "support-v1a",
+  "schema_version": 2,
+  "parent_study_id": "support-v1",
+  "parent_commit": "1d7f9f19f2e28b634e9c40c5b04b24cdb71baf26",
+  "parent_manifest_sha256": "8c497eeb7d9425bce436f22bc9c5fdb95fcbba779048af95daa87625d4e4b820",
+  "parent_protocol_sha256": "8358d32c1fb85029f458631ac8bb0498e34da272753470f61f042fc32f42505c",
+  "reason": "Post-failure continuation; the original collection halted on a reproducible Scheme exception during validation.",
+  "engine_changes": false,
+  "error_outcome": "*ERROR*",
+  "error_policy": "Record in-engine assertion/error conditions, excluding I/O and implementation-resource conditions. Restart the process after every engine error. Unclassified exits, startup failures, malformed records, and infrastructure failures stop collection.",
+  "inheritance": "Rehash and copy complete parent chunks without changing their receipts. Preserve incomplete attempts separately. Replay incomplete chunks, verify their successful prefixes, and admit one observation per assigned seed.",
+  "analysis_status": "Amended after observing a failure; not an unchanged prospective experiment. The original budgets, seeds, reference freeze, and comparators are retained.",
+  "known_failure": {
+    "phase": "validation",
+    "problem": "misc1",
+    "index": 13988,
+    "seed": 20713988,
+    "chunk_offset": 13750,
+    "successful_prefix_rows": 238,
+    "exception": "attempt to apply non-procedure #f"
+  },
+  "preflight": {
+    "construction_first_chunk_prefix_per_input": 3,
+    "construction_first_chunk_interior_offset": 3,
+    "construction_first_chunk_interior_count": 3,
+    "replay_known_failed_chunk": true,
+    "excluded_from_main_observations": true
+  }
+}
