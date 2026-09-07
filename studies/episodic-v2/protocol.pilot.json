@@ -1,0 +1,25 @@
+{
+  "schema_version": 2,
+  "study_id": "episodic-v2-answer-discovery-pilot",
+  "study_kind": "reference-discovery-pilot",
+  "population": "individual-best-answer-conditional-on-answered-episode",
+  "definitions": {"best_a": "quality", "best_b": "preference"},
+  "tie_policy": "earliest-winning-occurrence-v1",
+  "episode_runs": 8,
+  "episodes_per_problem": 1000,
+  "checkpoint_every": 100,
+  "singleton_threshold": 0.0001,
+  "stop_at_threshold": false,
+  "max_codelets": 100000,
+  "workers": 12,
+  "episode_timeout_seconds": 300,
+  "invocation_timeout_seconds": 14400,
+  "seed_base": 90000000,
+  "seed_stride": 100000,
+  "problems": [
+    {"name": "misc4", "strings": ["a", "b", "z"]},
+    {"name": "run4", "strings": ["abc", "abd", "xyz"]},
+    {"name": "run1", "strings": ["abc", "abd", "mrrjjj"]},
+    {"name": "fig5.4-top", "strings": ["eeqee", "qeeq", "xxixx"]}
+  ]
+}

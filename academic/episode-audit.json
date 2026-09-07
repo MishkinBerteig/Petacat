@@ -1,0 +1,5983 @@
+{
+  "description": "Archived-data arithmetic audit, not a new engine experiment.",
+  "reference_single_runs_sha256": "a3d422aae0b3aabe3bd8e9fad749e150c1710c998d57fba2a4a595191768ceeb",
+  "limitations": [
+    "Historical episodic reference counts and sampled builds are not verified by this audit.",
+    "Novel lists are checked for internal count consistency, not independently derived from an episodic reference.",
+    "Single-run support membership does not establish validity in an episode context.",
+    "Last answer in a fixed horizon is not evidence of convergence or beneficial learning.",
+    "Archived caps differ and same-seed before/after cycles are paired, not independent replications."
+  ],
+  "cycles": [
+    {
+      "file": "data/vs-metacat-pre-rc-a.json",
+      "sha256": "3ff86eeebf8204abc45e4119cf2d63578e1ea4d2648380abb21640667f0e4d18",
+      "backend": "numpy",
+      "episode_horizon": 8,
+      "start_seed": 900000,
+      "seed_source": "stored",
+      "working_cap": 20000,
+      "reference_cap": null,
+      "totals": {
+        "episodes": 1900,
+        "runs": 15200,
+        "stored_novel_pairs": 17,
+        "stored_novel_episodes": 28,
+        "stored_novel_outside_single_pairs": 6,
+        "stored_novel_outside_single_episodes": 16,
+        "missing_head_members": 0,
+        "episodes_never_answering": 4,
+        "capped_runs": 1311,
+        "episodes_with_cap": 628,
+        "episodes_last_run_capped": 361
+      },
+      "results": [
+        {
+          "problem": "misc4",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 0,
+          "stored_novel_episodes": 0,
+          "stored_novel_outside_single_pairs": 0,
+          "stored_novel_outside_single_episodes": 0,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 0,
+          "episodes_with_cap": 0,
+          "episodes_last_run_capped": 0,
+          "position_counts": [
+            {
+              "*NONE*": 4,
+              "b": 29,
+              "y": 30,
+              "z": 37
+            },
+            {
+              "*NONE*": 12,
+              "b": 39,
+              "y": 26,
+              "z": 23
+            },
+            {
+              "*NONE*": 21,
+              "b": 38,
+              "y": 27,
+              "z": 14
+            },
+            {
+              "*NONE*": 52,
+              "b": 24,
+              "y": 11,
+              "z": 13
+            },
+            {
+              "*NONE*": 56,
+              "b": 29,
+              "y": 4,
+              "z": 11
+            },
+            {
+              "*NONE*": 77,
+              "b": 20,
+              "y": 2,
+              "z": 1
+            },
+            {
+              "*NONE*": 91,
+              "b": 8,
+              "z": 1
+            },
+            {
+              "*NONE*": 95,
+              "b": 5
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "b": 76,
+            "y": 10,
+            "z": 14,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.0,
+          "novelties": []
+        },
+        {
+          "problem": "fig5.7",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 0,
+          "stored_novel_episodes": 0,
+          "stored_novel_outside_single_pairs": 0,
+          "stored_novel_outside_single_episodes": 0,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 27,
+          "episodes_with_cap": 26,
+          "episodes_last_run_capped": 7,
+          "position_counts": [
+            {
+              "aabd": 1,
+              "djkk": 1,
+              "hjkk": 4,
+              "ijdd": 2,
+              "ijkd": 2,
+              "ijkk": 5,
+              "ijkl": 31,
+              "ijl": 8,
+              "ijll": 44,
+              "jjkk": 2
+            },
+            {
+              "*CAP*": 2,
+              "aabd": 1,
+              "hjkk": 1,
+              "ijdd": 1,
+              "ijkd": 3,
+              "ijkk": 10,
+              "ijkl": 29,
+              "ijl": 10,
+              "ijll": 37,
+              "jjkk": 6
+            },
+            {
+              "aabd": 1,
+              "hjkk": 1,
+              "ijd": 3,
+              "ijdd": 6,
+              "ijkd": 3,
+              "ijkk": 18,
+              "ijkl": 37,
+              "ijl": 7,
+              "ijll": 21,
+              "jjkk": 3
+            },
+            {
+              "*CAP*": 1,
+              "aabd": 1,
+              "djkk": 1,
+              "hjkk": 1,
+              "ijd": 1,
+              "ijdd": 6,
+              "ijkd": 1,
+              "ijkk": 10,
+              "ijkl": 26,
+              "ijl": 15,
+              "ijll": 33,
+              "jjkk": 4
+            },
+            {
+              "*CAP*": 5,
+              "aabd": 1,
+              "djkk": 1,
+              "hjkk": 3,
+              "ijd": 1,
+              "ijdd": 6,
+              "ijkd": 2,
+              "ijkk": 7,
+              "ijkl": 27,
+              "ijl": 13,
+              "ijll": 32,
+              "jjkk": 2
+            },
+            {
+              "*CAP*": 6,
+              "aabd": 5,
+              "ijd": 3,
+              "ijdd": 8,
+              "ijkd": 2,
+              "ijkk": 11,
+              "ijkl": 24,
+              "ijl": 9,
+              "ijll": 29,
+              "jjkk": 3
+            },
+            {
+              "*CAP*": 6,
+              "aabd": 5,
+              "ajkd": 1,
+              "hjkk": 5,
+              "ijdd": 10,
+              "ijkd": 2,
+              "ijkk": 26,
+              "ijkl": 15,
+              "ijl": 9,
+              "ijll": 14,
+              "jjkk": 7
+            },
+            {
+              "*CAP*": 7,
+              "aabd": 3,
+              "hjkk": 1,
+              "ijd": 2,
+              "ijdd": 12,
+              "ijkd": 6,
+              "ijkk": 17,
+              "ijkl": 12,
+              "ijl": 11,
+              "ijll": 28,
+              "jjkk": 1
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "aabd": 3,
+            "hjkk": 1,
+            "ijd": 2,
+            "ijdd": 13,
+            "ijkd": 6,
+            "ijkk": 18,
+            "ijkl": 14,
+            "ijl": 13,
+            "ijll": 29,
+            "jjkk": 1,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.0,
+          "novelties": []
+        },
+        {
+          "problem": "misc3",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 3,
+          "stored_novel_episodes": 3,
+          "stored_novel_outside_single_pairs": 0,
+          "stored_novel_outside_single_episodes": 0,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 188,
+          "episodes_with_cap": 91,
+          "episodes_last_run_capped": 23,
+          "position_counts": [
+            {
+              "*CAP*": 31,
+              "*NONE*": 1,
+              "kji": 12,
+              "kjji": 1,
+              "kjjiii": 1,
+              "kkjjii": 12,
+              "kkjjjii": 1,
+              "kkkji": 1,
+              "kkkjiii": 1,
+              "kkkjjii": 3,
+              "kkkjjiii": 1,
+              "kkkjjjiii": 35
+            },
+            {
+              "*CAP*": 20,
+              "kji": 14,
+              "kjiii": 1,
+              "kjji": 1,
+              "kjjiii": 2,
+              "kjjjiii": 2,
+              "kkjjii": 8,
+              "kkjjiii": 2,
+              "kkjjiiiii": 1,
+              "kkjjji": 1,
+              "kkjjjiii": 2,
+              "kkjjjiiiii": 1,
+              "kkkji": 1,
+              "kkkjiii": 4,
+              "kkkjjiii": 1,
+              "kkkjjjiihhh": 1,
+              "kkkjjjiii": 38
+            },
+            {
+              "*CAP*": 15,
+              "*NONE*": 2,
+              "kji": 17,
+              "kjiii": 1,
+              "kjjji": 1,
+              "kjjjiii": 1,
+              "kkjji": 1,
+              "kkjjii": 18,
+              "kkjjiii": 1,
+              "kkjjiiiii": 1,
+              "kkjjjii": 1,
+              "kkkji": 1,
+              "kkkjiii": 1,
+              "kkkjjii": 1,
+              "kkkjjiii": 2,
+              "kkkjjji": 1,
+              "kkkjjjiihhh": 1,
+              "kkkjjjiii": 34
+            },
+            {
+              "*CAP*": 30,
+              "*NONE*": 1,
+              "kji": 15,
+              "kjjjiii": 1,
+              "kkjjii": 10,
+              "kkjjiiiii": 1,
+              "kkjjiiiiii": 1,
+              "kkjjjiii": 2,
+              "kkjjjjii": 1,
+              "kkkji": 3,
+              "kkkjji": 1,
+              "kkkjjiihh": 1,
+              "kkkjjiii": 1,
+              "kkkjjji": 1,
+              "kkkjjjii": 1,
+              "kkkjjjiii": 30
+            },
+            {
+              "*CAP*": 23,
+              "kji": 11,
+              "kjiii": 2,
+              "kjjjiii": 3,
+              "kkjjii": 10,
+              "kkjjiii": 1,
+              "kkjjiiiii": 1,
+              "kkjjjiii": 2,
+              "kkkji": 1,
+              "kkkjiii": 1,
+              "kkkjjii": 1,
+              "kkkjjiihh": 3,
+              "kkkjjiii": 1,
+              "kkkjjji": 1,
+              "kkkjjjiii": 38,
+              "kkkkjjjiii": 1
+            },
+            {
+              "*CAP*": 27,
+              "*NONE*": 3,
+              "aabbcc": 1,
+              "kji": 12,
+              "kjiii": 2,
+              "kjjji": 1,
+              "kkjjii": 15,
+              "kkjjiiiii": 2,
+              "kkjjji": 1,
+              "kkjjjii": 1,
+              "kkjjjiihhh": 1,
+              "kkkji": 1,
+              "kkkjiii": 1,
+              "kkkjjiihh": 1,
+              "kkkjjiii": 2,
+              "kkkjjji": 1,
+              "kkkjjjii": 3,
+              "kkkjjjiii": 25
+            },
+            {
+              "*CAP*": 19,
+              "*NONE*": 2,
+              "kji": 16,
+              "kjiii": 1,
+              "kkjiii": 1,
+              "kkjji": 1,
+              "kkjjii": 17,
+              "kkjjiiiii": 2,
+              "kkjjjiii": 1,
+              "kkjjjjii": 1,
+              "kkkji": 1,
+              "kkkjiii": 2,
+              "kkkjjii": 1,
+              "kkkjjiihh": 1,
+              "kkkjjiii": 2,
+              "kkkjjjiii": 31,
+              "kkkjjjjiii": 1
+            },
+            {
+              "*CAP*": 23,
+              "*NONE*": 1,
+              "kji": 14,
+              "kjiii": 1,
+              "kjjji": 2,
+              "kjjjiii": 1,
+              "kkjiii": 1,
+              "kkjjii": 20,
+              "kkjjiii": 1,
+              "kkjjjii": 3,
+              "kkjjjjii": 1,
+              "kkkjjiihh": 1,
+              "kkkjjiii": 3,
+              "kkkjjji": 1,
+              "kkkjjjiii": 26,
+              "kkkjjjjiii": 1
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "kji": 20,
+            "kjiii": 1,
+            "kjjji": 2,
+            "kjjjiii": 1,
+            "kkjiii": 1,
+            "kkjjii": 25,
+            "kkjjiii": 1,
+            "kkjjiiiii": 1,
+            "kkjjjii": 3,
+            "kkjjjjii": 1,
+            "kkkji": 1,
+            "kkkjiii": 1,
+            "kkkjjiihh": 1,
+            "kkkjjiii": 3,
+            "kkkjjji": 1,
+            "kkkjjjiii": 35,
+            "kkkjjjjiii": 2,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.008,
+          "novelties": [
+            {
+              "member": "kkjiii",
+              "count": 1,
+              "in_single_run_set": true
+            },
+            {
+              "member": "kkjjiiiii",
+              "count": 1,
+              "in_single_run_set": true
+            },
+            {
+              "member": "kkjjjjii",
+              "count": 1,
+              "in_single_run_set": true
+            }
+          ]
+        },
+        {
+          "problem": "misc5",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 0,
+          "stored_novel_episodes": 0,
+          "stored_novel_outside_single_pairs": 0,
+          "stored_novel_outside_single_episodes": 0,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 8,
+          "episodes_with_cap": 8,
+          "episodes_last_run_capped": 2,
+          "position_counts": [
+            {
+              "*NONE*": 5,
+              "abd": 4,
+              "dlz": 3,
+              "flz": 17,
+              "gld": 28,
+              "glz": 23,
+              "hlz": 20
+            },
+            {
+              "*CAP*": 2,
+              "*NONE*": 22,
+              "abd": 4,
+              "dlz": 3,
+              "flz": 12,
+              "gld": 9,
+              "glz": 15,
+              "hlz": 33
+            },
+            {
+              "*CAP*": 1,
+              "*NONE*": 25,
+              "abd": 3,
+              "dlz": 6,
+              "flz": 19,
+              "gld": 16,
+              "glz": 14,
+              "hlz": 16
+            },
+            {
+              "*CAP*": 1,
+              "*NONE*": 27,
+              "abd": 4,
+              "dlz": 7,
+              "flz": 21,
+              "gld": 12,
+              "glz": 11,
+              "hlz": 17
+            },
+            {
+              "*NONE*": 33,
+              "abd": 6,
+              "dlz": 14,
+              "flz": 18,
+              "gld": 8,
+              "glz": 11,
+              "hlz": 10
+            },
+            {
+              "*NONE*": 65,
+              "abd": 3,
+              "dlz": 9,
+              "flz": 5,
+              "gld": 4,
+              "glz": 10,
+              "hlz": 4
+            },
+            {
+              "*CAP*": 2,
+              "*NONE*": 62,
+              "abd": 6,
+              "dlz": 16,
+              "flz": 7,
+              "gld": 2,
+              "glz": 5
+            },
+            {
+              "*CAP*": 2,
+              "*NONE*": 75,
+              "abd": 6,
+              "dlz": 8,
+              "gld": 3,
+              "glz": 6
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "abd": 17,
+            "dlz": 34,
+            "flz": 15,
+            "gld": 10,
+            "glz": 22,
+            "hlz": 2,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.0,
+          "novelties": []
+        },
+        {
+          "problem": "misc2",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 1,
+          "stored_novel_episodes": 1,
+          "stored_novel_outside_single_pairs": 1,
+          "stored_novel_outside_single_episodes": 1,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 411,
+          "episodes_with_cap": 100,
+          "episodes_last_run_capped": 95,
+          "position_counts": [
+            {
+              "ijd": 2,
+              "ijk": 1,
+              "ijl": 97
+            },
+            {
+              "*CAP*": 1,
+              "abd": 14,
+              "ijd": 21,
+              "ijk": 61,
+              "ijl": 3
+            },
+            {
+              "*CAP*": 14,
+              "abd": 43,
+              "ijd": 21,
+              "ijk": 22
+            },
+            {
+              "*CAP*": 60,
+              "abd": 21,
+              "ijd": 11,
+              "ijk": 8
+            },
+            {
+              "*CAP*": 67,
+              "abd": 13,
+              "ajd": 1,
+              "ijd": 12,
+              "ijk": 7
+            },
+            {
+              "*CAP*": 85,
+              "abd": 7,
+              "ijd": 8
+            },
+            {
+              "*CAP*": 89,
+              "abd": 2,
+              "ijd": 8,
+              "ijk": 1
+            },
+            {
+              "*CAP*": 95,
+              "ijd": 5
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "abd": 46,
+            "ajd": 1,
+            "ijd": 40,
+            "ijk": 13,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.008,
+          "novelties": [
+            {
+              "member": "ajd",
+              "count": 1,
+              "in_single_run_set": false
+            }
+          ]
+        },
+        {
+          "problem": "run1",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 0,
+          "stored_novel_episodes": 0,
+          "stored_novel_outside_single_pairs": 0,
+          "stored_novel_outside_single_episodes": 0,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 180,
+          "episodes_with_cap": 96,
+          "episodes_last_run_capped": 51,
+          "position_counts": [
+            {
+              "abd": 2,
+              "mrrddd": 3,
+              "mrrjjj": 4,
+              "mrrjjjj": 3,
+              "mrrjjk": 22,
+              "mrrjkk": 2,
+              "mrrkkk": 64
+            },
+            {
+              "*CAP*": 3,
+              "abd": 4,
+              "mrrddd": 6,
+              "mrrjjd": 1,
+              "mrrjjj": 26,
+              "mrrjjjj": 12,
+              "mrrjjk": 20,
+              "mrrjkk": 5,
+              "mrrkkk": 23
+            },
+            {
+              "*CAP*": 8,
+              "abd": 8,
+              "mrrddd": 15,
+              "mrrjjj": 29,
+              "mrrjjjj": 19,
+              "mrrjjk": 9,
+              "mrrjkk": 3,
+              "mrrkkk": 9
+            },
+            {
+              "*CAP*": 12,
+              "abd": 15,
+              "mrrddd": 9,
+              "mrrjjd": 2,
+              "mrrjjj": 20,
+              "mrrjjjj": 21,
+              "mrrjjk": 13,
+              "mrrjkk": 4,
+              "mrrkkk": 4
+            },
+            {
+              "*CAP*": 25,
+              "abd": 19,
+              "mrrddd": 11,
+              "mrrjjd": 4,
+              "mrrjjj": 11,
+              "mrrjjjj": 19,
+              "mrrjjk": 8,
+              "mrrjkk": 2,
+              "msskkk": 1
+            },
+            {
+              "*CAP*": 37,
+              "abd": 12,
+              "mrrddd": 7,
+              "mrrjjd": 2,
+              "mrrjjj": 13,
+              "mrrjjjj": 14,
+              "mrrjjk": 9,
+              "mrrjkk": 2,
+              "msskkk": 4
+            },
+            {
+              "*CAP*": 44,
+              "abd": 10,
+              "mrrddd": 10,
+              "mrrjjd": 3,
+              "mrrjjj": 12,
+              "mrrjjjj": 6,
+              "mrrjjk": 9,
+              "mrrjkk": 3,
+              "msskkk": 3
+            },
+            {
+              "*CAP*": 51,
+              "abd": 9,
+              "mrrddd": 10,
+              "mrrjjd": 2,
+              "mrrjjj": 9,
+              "mrrjjjj": 5,
+              "mrrjjk": 5,
+              "mrrjkk": 3,
+              "msskkk": 5,
+              "nrrjjj": 1
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "abd": 20,
+            "mrrddd": 16,
+            "mrrjjd": 4,
+            "mrrjjj": 18,
+            "mrrjjjj": 12,
+            "mrrjjk": 16,
+            "mrrjkk": 5,
+            "msskkk": 8,
+            "nrrjjj": 1,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.004,
+          "novelties": []
+        },
+        {
+          "problem": "run4",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 0,
+          "stored_novel_episodes": 0,
+          "stored_novel_outside_single_pairs": 0,
+          "stored_novel_outside_single_episodes": 0,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 3,
+          "episodes_with_cap": 3,
+          "episodes_last_run_capped": 1,
+          "position_counts": [
+            {
+              "*NONE*": 19,
+              "abd": 4,
+              "dyz": 3,
+              "wyz": 20,
+              "xyd": 28,
+              "xyz": 25,
+              "yyz": 1
+            },
+            {
+              "*NONE*": 30,
+              "abd": 6,
+              "dyz": 4,
+              "wxz": 1,
+              "wyz": 21,
+              "xyd": 13,
+              "xyz": 20,
+              "yyz": 5
+            },
+            {
+              "*NONE*": 37,
+              "abd": 2,
+              "dyz": 3,
+              "wyz": 14,
+              "xyd": 16,
+              "xyz": 15,
+              "yyz": 13
+            },
+            {
+              "*NONE*": 43,
+              "abd": 1,
+              "dyz": 2,
+              "wyz": 22,
+              "xyd": 9,
+              "xyz": 10,
+              "yyz": 13
+            },
+            {
+              "*NONE*": 61,
+              "abd": 4,
+              "dyz": 3,
+              "wyz": 8,
+              "xyd": 12,
+              "xyz": 6,
+              "yyz": 6
+            },
+            {
+              "*CAP*": 1,
+              "*NONE*": 62,
+              "abd": 3,
+              "dyz": 9,
+              "wyz": 3,
+              "xyd": 3,
+              "xyz": 7,
+              "yyz": 12
+            },
+            {
+              "*CAP*": 1,
+              "*NONE*": 52,
+              "abd": 6,
+              "dyz": 10,
+              "wyz": 2,
+              "xyd": 4,
+              "xyz": 4,
+              "yyz": 21
+            },
+            {
+              "*CAP*": 1,
+              "*NONE*": 72,
+              "abd": 6,
+              "dyz": 8,
+              "wyz": 3,
+              "xyz": 3,
+              "yyz": 7
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "abd": 11,
+            "dyz": 20,
+            "wyz": 11,
+            "xyd": 8,
+            "xyz": 17,
+            "yyz": 33,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.002,
+          "novelties": []
+        },
+        {
+          "problem": "misc1",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 3,
+          "stored_novel_episodes": 4,
+          "stored_novel_outside_single_pairs": 0,
+          "stored_novel_outside_single_episodes": 0,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 184,
+          "episodes_with_cap": 91,
+          "episodes_last_run_capped": 53,
+          "position_counts": [
+            {
+              "crraaa": 2,
+              "jjjrrm": 88,
+              "jjrrjm": 1,
+              "jrrjjm": 4,
+              "jrrmmm": 2,
+              "mrrjjj": 3
+            },
+            {
+              "cba": 3,
+              "jjjrrm": 71,
+              "jjrrjm": 1,
+              "jrrjjm": 10,
+              "jrrmmm": 1,
+              "mmmrrj": 1,
+              "mrrjjj": 13
+            },
+            {
+              "*CAP*": 2,
+              "cba": 16,
+              "jjjrrm": 55,
+              "jjrrjm": 1,
+              "jrrjjm": 9,
+              "jrrmmm": 3,
+              "mrrjjj": 11,
+              "rrjjjm": 3
+            },
+            {
+              "*CAP*": 8,
+              "cba": 36,
+              "jjjrrm": 31,
+              "jjrrjm": 2,
+              "jrrjjm": 7,
+              "mrrjjj": 12,
+              "rrjjjm": 4
+            },
+            {
+              "*CAP*": 24,
+              "cba": 19,
+              "crraaa": 3,
+              "jjjmrr": 1,
+              "jjjrmr": 1,
+              "jjjrrm": 23,
+              "jrrjjm": 11,
+              "mrrjjj": 10,
+              "rrjjjm": 8
+            },
+            {
+              "*CAP*": 45,
+              "cba": 14,
+              "jjjrrm": 17,
+              "jjrrjm": 1,
+              "jrrjjm": 8,
+              "jrrmmm": 2,
+              "mrrjjj": 4,
+              "rrjjjm": 9
+            },
+            {
+              "*CAP*": 52,
+              "cba": 8,
+              "crraaa": 1,
+              "jjjmrr": 1,
+              "jjjrmr": 1,
+              "jjjrrm": 7,
+              "jrrjjm": 7,
+              "jrrmmm": 1,
+              "mmmrrj": 1,
+              "mrraaa": 2,
+              "mrrjjj": 14,
+              "rrjjjm": 5
+            },
+            {
+              "*CAP*": 53,
+              "cba": 3,
+              "crraaa": 1,
+              "jjjrrm": 4,
+              "jjrrjm": 1,
+              "jrrjjm": 9,
+              "jrrmmm": 3,
+              "mmmrrj": 3,
+              "mrrjjj": 9,
+              "rrjjjm": 14
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "cba": 22,
+            "crraaa": 2,
+            "jjjmrr": 2,
+            "jjjrmr": 1,
+            "jjjrrm": 17,
+            "jjrrjm": 1,
+            "jrrjjm": 13,
+            "jrrmmm": 4,
+            "mmmrrj": 4,
+            "mrraaa": 1,
+            "mrrjjj": 13,
+            "rrjjjm": 20,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.006,
+          "novelties": [
+            {
+              "member": "crraaa",
+              "count": 2,
+              "in_single_run_set": true
+            },
+            {
+              "member": "jjjrmr",
+              "count": 1,
+              "in_single_run_set": true
+            },
+            {
+              "member": "mrraaa",
+              "count": 1,
+              "in_single_run_set": true
+            }
+          ]
+        },
+        {
+          "problem": "fig5.4-top",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 3,
+          "stored_novel_episodes": 3,
+          "stored_novel_outside_single_pairs": 0,
+          "stored_novel_outside_single_episodes": 0,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 11,
+          "episodes_with_cap": 10,
+          "episodes_last_run_capped": 0,
+          "position_counts": [
+            {
+              "*NONE*": 16,
+              "ixi": 1,
+              "ixxi": 29,
+              "ixxq": 3,
+              "qeeq": 49,
+              "qxeq": 1,
+              "qxxi": 1
+            },
+            {
+              "*NONE*": 21,
+              "ixxi": 15,
+              "ixxq": 5,
+              "ixxxq": 1,
+              "qeeq": 55,
+              "qiq": 1,
+              "qxxi": 2
+            },
+            {
+              "*CAP*": 1,
+              "*NONE*": 19,
+              "iixxxi": 1,
+              "ixxi": 17,
+              "ixxq": 8,
+              "qeeq": 47,
+              "qexq": 1,
+              "qiq": 2,
+              "qxxi": 4
+            },
+            {
+              "*NONE*": 16,
+              "ixxi": 18,
+              "ixxq": 3,
+              "qeeq": 54,
+              "qiq": 1,
+              "qixx": 1,
+              "qxeeq": 1,
+              "qxxi": 5,
+              "xix": 1
+            },
+            {
+              "*CAP*": 1,
+              "*NONE*": 20,
+              "ixxi": 14,
+              "ixxq": 4,
+              "qeeq": 53,
+              "qeqq": 1,
+              "qiq": 1,
+              "qxxi": 6
+            },
+            {
+              "*CAP*": 4,
+              "*NONE*": 16,
+              "ixxi": 10,
+              "ixxq": 11,
+              "qeeq": 51,
+              "qiq": 2,
+              "qxxi": 6
+            },
+            {
+              "*CAP*": 5,
+              "*NONE*": 24,
+              "ixxi": 10,
+              "ixxq": 7,
+              "qeeq": 47,
+              "qxeeq": 1,
+              "qxxi": 5,
+              "xxiq": 1
+            },
+            {
+              "*NONE*": 22,
+              "iixxi": 1,
+              "ixxi": 10,
+              "ixxq": 8,
+              "qeeq": 46,
+              "qexq": 1,
+              "qiiq": 1,
+              "qiq": 3,
+              "qxxi": 8
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "iixxi": 1,
+            "ixxi": 12,
+            "ixxq": 10,
+            "qeeq": 63,
+            "qexq": 1,
+            "qiiq": 1,
+            "qiq": 3,
+            "qxxi": 9,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.014,
+          "novelties": [
+            {
+              "member": "iixxi",
+              "count": 1,
+              "in_single_run_set": true
+            },
+            {
+              "member": "qexq",
+              "count": 1,
+              "in_single_run_set": true
+            },
+            {
+              "member": "qiiq",
+              "count": 1,
+              "in_single_run_set": true
+            }
+          ]
+        },
+        {
+          "problem": "eqe-baaab",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 4,
+          "stored_novel_episodes": 10,
+          "stored_novel_outside_single_pairs": 3,
+          "stored_novel_outside_single_episodes": 9,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 55,
+          "episodes_with_cap": 43,
+          "episodes_last_run_capped": 25,
+          "position_counts": [
+            {
+              "abbba": 1,
+              "abbbb": 1,
+              "baaab": 47,
+              "baaaq": 5,
+              "qaaab": 4,
+              "qbbba": 2,
+              "qbbbq": 8,
+              "qeeeq": 29,
+              "qeq": 3
+            },
+            {
+              "*NONE*": 1,
+              "abbba": 2,
+              "abbbb": 1,
+              "baaab": 42,
+              "baaaq": 4,
+              "qaaab": 2,
+              "qbbbq": 6,
+              "qeeeq": 38,
+              "qeq": 4
+            },
+            {
+              "*NONE*": 1,
+              "abbba": 4,
+              "baaab": 28,
+              "baaaq": 11,
+              "bcaab": 1,
+              "qaaab": 14,
+              "qbbba": 1,
+              "qbbbq": 8,
+              "qeeeq": 20,
+              "qeq": 12
+            },
+            {
+              "*NONE*": 2,
+              "abbba": 7,
+              "abbbq": 1,
+              "baaab": 14,
+              "baaaq": 19,
+              "qaaab": 19,
+              "qbbba": 1,
+              "qbbbq": 8,
+              "qbebq": 1,
+              "qeeeq": 8,
+              "qeq": 19,
+              "qqqqp": 1
+            },
+            {
+              "*CAP*": 5,
+              "*NONE*": 1,
+              "abaab": 1,
+              "abbba": 8,
+              "abbbb": 3,
+              "abbbq": 2,
+              "baaab": 19,
+              "baaaq": 14,
+              "qaaab": 13,
+              "qbbba": 1,
+              "qbbbq": 5,
+              "qeeeq": 6,
+              "qeq": 22
+            },
+            {
+              "*CAP*": 10,
+              "*NONE*": 1,
+              "abbba": 15,
+              "abbbb": 5,
+              "abbbq": 1,
+              "baaab": 9,
+              "baaaq": 17,
+              "qaaab": 10,
+              "qbbba": 2,
+              "qbbbq": 13,
+              "qeeeq": 2,
+              "qeq": 13,
+              "qqqqp": 1,
+              "qrrrq": 1
+            },
+            {
+              "*CAP*": 15,
+              "*NONE*": 2,
+              "abbba": 16,
+              "abbbb": 3,
+              "abbbq": 4,
+              "baaab": 9,
+              "baaaq": 7,
+              "qaaab": 20,
+              "qbbba": 4,
+              "qbbbq": 10,
+              "qeeeq": 1,
+              "qeq": 8,
+              "qrbbq": 1
+            },
+            {
+              "*CAP*": 25,
+              "*NONE*": 4,
+              "abbba": 14,
+              "abbbb": 5,
+              "abbbq": 3,
+              "aqqqp": 1,
+              "baaab": 4,
+              "baaaq": 10,
+              "baaba": 1,
+              "qaaab": 9,
+              "qbbba": 1,
+              "qbbbq": 9,
+              "qeq": 9,
+              "qqqqp": 2,
+              "qrbbq": 1,
+              "qrrbq": 1,
+              "qrrrq": 1
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "abbba": 19,
+            "abbbb": 7,
+            "abbbq": 3,
+            "aqqqp": 1,
+            "baaab": 8,
+            "baaaq": 11,
+            "baaba": 1,
+            "qaaab": 17,
+            "qbbba": 2,
+            "qbbbq": 12,
+            "qeq": 14,
+            "qqqqp": 2,
+            "qrbbq": 1,
+            "qrrbq": 1,
+            "qrrrq": 1,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.008,
+          "novelties": [
+            {
+              "member": "abbbb",
+              "count": 7,
+              "in_single_run_set": false
+            },
+            {
+              "member": "aqqqp",
+              "count": 1,
+              "in_single_run_set": true
+            },
+            {
+              "member": "baaba",
+              "count": 1,
+              "in_single_run_set": false
+            },
+            {
+              "member": "qrrbq",
+              "count": 1,
+              "in_single_run_set": false
+            }
+          ]
+        },
+        {
+          "problem": "run6",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 2,
+          "stored_novel_episodes": 6,
+          "stored_novel_outside_single_pairs": 2,
+          "stored_novel_outside_single_episodes": 6,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 0,
+          "episodes_with_cap": 0,
+          "episodes_last_run_capped": 0,
+          "position_counts": [
+            {
+              "*NONE*": 9,
+              "abbbq": 1,
+              "baaaq": 5,
+              "bcaab": 1,
+              "cbbba": 6,
+              "cdddb": 1,
+              "qbbbq": 9,
+              "qcccb": 9,
+              "qeeeq": 57,
+              "qeq": 2
+            },
+            {
+              "*NONE*": 25,
+              "abbbq": 2,
+              "baaab": 1,
+              "baaaq": 7,
+              "caaab": 2,
+              "cbbba": 3,
+              "cdccb": 1,
+              "cddda": 1,
+              "cdddb": 1,
+              "qbbbc": 1,
+              "qbbbq": 12,
+              "qbbeq": 1,
+              "qcccb": 8,
+              "qeeeq": 29,
+              "qeq": 5,
+              "qeqqr": 1
+            },
+            {
+              "*NONE*": 22,
+              "abbbq": 4,
+              "baaab": 1,
+              "baaaq": 5,
+              "caaab": 3,
+              "cbbba": 5,
+              "cddcb": 1,
+              "cddda": 1,
+              "cdddb": 4,
+              "qbbbq": 5,
+              "qcccb": 15,
+              "qeeeq": 25,
+              "qeeqr": 1,
+              "qeq": 6,
+              "qreeq": 1,
+              "qrreq": 1
+            },
+            {
+              "*NONE*": 28,
+              "baaab": 4,
+              "baaaq": 13,
+              "caaab": 2,
+              "cbbba": 2,
+              "cddda": 4,
+              "qbbbc": 1,
+              "qbbbq": 14,
+              "qbbqr": 1,
+              "qcccb": 9,
+              "qeebq": 1,
+              "qeeeq": 17,
+              "qeq": 4
+            },
+            {
+              "*NONE*": 39,
+              "abbbq": 1,
+              "baaaq": 14,
+              "bcaab": 2,
+              "cbbba": 3,
+              "cddbc": 1,
+              "cdddb": 1,
+              "qbbbc": 1,
+              "qbbbq": 10,
+              "qcccb": 6,
+              "qeeeq": 11,
+              "qeeqr": 1,
+              "qeq": 8,
+              "qrccb": 1,
+              "qrqqr": 1
+            },
+            {
+              "*NONE*": 40,
+              "abbbq": 1,
+              "baaaq": 5,
+              "cbbba": 7,
+              "cddda": 1,
+              "cdddb": 4,
+              "qbbbq": 15,
+              "qbbqr": 1,
+              "qcccb": 4,
+              "qeeeq": 17,
+              "qeq": 5
+            },
+            {
+              "*NONE*": 32,
+              "baaab": 4,
+              "baaaq": 12,
+              "baqqr": 1,
+              "bcaab": 1,
+              "cbbba": 6,
+              "cddda": 3,
+              "cdddb": 3,
+              "qbbbc": 1,
+              "qbbbq": 12,
+              "qcccb": 11,
+              "qeeeq": 11,
+              "qeq": 3
+            },
+            {
+              "*NONE*": 46,
+              "baaab": 3,
+              "baaaq": 11,
+              "bcaab": 1,
+              "cbbba": 3,
+              "cddbc": 1,
+              "cddda": 2,
+              "cdddb": 2,
+              "qbbbc": 2,
+              "qbbbq": 8,
+              "qcccb": 9,
+              "qeeeq": 8,
+              "qeq": 2,
+              "qrreq": 1,
+              "qrrrq": 1
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "baaab": 6,
+            "baaaq": 20,
+            "bcaab": 1,
+            "cbbba": 6,
+            "cddbc": 1,
+            "cddda": 3,
+            "cdddb": 5,
+            "qbbbc": 3,
+            "qbbbq": 16,
+            "qcccb": 14,
+            "qeeeq": 21,
+            "qeq": 2,
+            "qrreq": 1,
+            "qrrrq": 1,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.016,
+          "novelties": [
+            {
+              "member": "cddbc",
+              "count": 1,
+              "in_single_run_set": false
+            },
+            {
+              "member": "cdddb",
+              "count": 5,
+              "in_single_run_set": false
+            }
+          ]
+        },
+        {
+          "problem": "run3",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 0,
+          "stored_novel_episodes": 0,
+          "stored_novel_outside_single_pairs": 0,
+          "stored_novel_outside_single_episodes": 0,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 1,
+          "episodes_with_cap": 1,
+          "episodes_last_run_capped": 0,
+          "position_counts": [
+            {
+              "*NONE*": 32,
+              "rsu": 4,
+              "wyz": 7,
+              "xyu": 19,
+              "xyz": 26,
+              "yyz": 12
+            },
+            {
+              "*NONE*": 40,
+              "rsu": 5,
+              "wyz": 14,
+              "xyu": 19,
+              "xyz": 17,
+              "yyz": 5
+            },
+            {
+              "*NONE*": 39,
+              "rsu": 3,
+              "wyz": 26,
+              "xyu": 14,
+              "xyz": 9,
+              "yyz": 9
+            },
+            {
+              "*NONE*": 53,
+              "rsu": 4,
+              "uyz": 2,
+              "wyz": 10,
+              "xyu": 7,
+              "xyz": 15,
+              "yyz": 9
+            },
+            {
+              "*CAP*": 1,
+              "*NONE*": 54,
+              "rsu": 5,
+              "uyz": 2,
+              "wyz": 12,
+              "xyu": 12,
+              "xyz": 4,
+              "yyz": 10
+            },
+            {
+              "*NONE*": 59,
+              "rsu": 5,
+              "uyz": 6,
+              "wyz": 7,
+              "xyu": 4,
+              "xyz": 12,
+              "yyz": 7
+            },
+            {
+              "*NONE*": 58,
+              "rsu": 10,
+              "uyz": 3,
+              "wyz": 4,
+              "xyu": 10,
+              "xyz": 7,
+              "yyz": 8
+            },
+            {
+              "*NONE*": 75,
+              "rsu": 1,
+              "uyz": 6,
+              "wyz": 8,
+              "xyu": 2,
+              "xyz": 2,
+              "yyz": 6
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "rsu": 11,
+            "uyz": 12,
+            "wyz": 20,
+            "xyu": 18,
+            "xyz": 17,
+            "yyz": 22,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.004,
+          "novelties": []
+        },
+        {
+          "problem": "run2",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 0,
+          "stored_novel_episodes": 0,
+          "stored_novel_outside_single_pairs": 0,
+          "stored_novel_outside_single_episodes": 0,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 170,
+          "episodes_with_cap": 98,
+          "episodes_last_run_capped": 71,
+          "position_counts": [
+            {
+              "mrrddd": 1,
+              "mrrjjj": 5,
+              "mrrjjk": 24,
+              "mrrjkk": 3,
+              "mrrkkk": 67
+            },
+            {
+              "mrrddd": 20,
+              "mrrjjd": 1,
+              "mrrjjj": 13,
+              "mrrjjk": 36,
+              "mrrjkk": 1,
+              "mrrkkk": 26,
+              "xqd": 3
+            },
+            {
+              "mrrddd": 42,
+              "mrrjjd": 4,
+              "mrrjjj": 9,
+              "mrrjjk": 24,
+              "mrrjkk": 4,
+              "mrrkkk": 7,
+              "xqd": 10
+            },
+            {
+              "mrrddd": 25,
+              "mrrjjd": 31,
+              "mrrjjj": 12,
+              "mrrjjk": 11,
+              "mrrjkk": 3,
+              "xqd": 18
+            },
+            {
+              "*CAP*": 6,
+              "mrrddd": 8,
+              "mrrjjd": 28,
+              "mrrjjj": 18,
+              "mrrjjk": 4,
+              "mrrjkk": 6,
+              "xqd": 30
+            },
+            {
+              "*CAP*": 29,
+              "mrrddd": 3,
+              "mrrjjd": 24,
+              "mrrjjj": 12,
+              "mrrjjk": 1,
+              "mrrjkk": 3,
+              "xqd": 28
+            },
+            {
+              "*CAP*": 64,
+              "mrrddd": 1,
+              "mrrjdd": 1,
+              "mrrjjd": 7,
+              "mrrjjj": 15,
+              "mrrjkk": 4,
+              "xqd": 8
+            },
+            {
+              "*CAP*": 71,
+              "mrrjdd": 1,
+              "mrrjjd": 4,
+              "mrrjjj": 18,
+              "mrrjkk": 4,
+              "xqd": 2
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "mrrddd": 2,
+            "mrrjdd": 2,
+            "mrrjjd": 34,
+            "mrrjjj": 31,
+            "mrrjkk": 9,
+            "xqd": 22,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.0,
+          "novelties": []
+        },
+        {
+          "problem": "copy1",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 0,
+          "stored_novel_episodes": 0,
+          "stored_novel_outside_single_pairs": 0,
+          "stored_novel_outside_single_episodes": 0,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 25,
+          "episodes_with_cap": 21,
+          "episodes_last_run_capped": 12,
+          "position_counts": [
+            {
+              "*NONE*": 1,
+              "ab": 8,
+              "c": 91
+            },
+            {
+              "*NONE*": 25,
+              "ab": 2,
+              "c": 73
+            },
+            {
+              "*NONE*": 40,
+              "ab": 10,
+              "c": 50
+            },
+            {
+              "*CAP*": 1,
+              "*NONE*": 66,
+              "ab": 8,
+              "c": 25
+            },
+            {
+              "*CAP*": 3,
+              "*NONE*": 74,
+              "ab": 6,
+              "c": 17
+            },
+            {
+              "*CAP*": 3,
+              "*NONE*": 81,
+              "ab": 8,
+              "c": 8
+            },
+            {
+              "*CAP*": 6,
+              "*NONE*": 81,
+              "ab": 6,
+              "c": 7
+            },
+            {
+              "*CAP*": 12,
+              "*NONE*": 75,
+              "ab": 9,
+              "c": 4
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "ab": 34,
+            "c": 66,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.0,
+          "novelties": []
+        },
+        {
+          "problem": "copy2",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 0,
+          "stored_novel_episodes": 0,
+          "stored_novel_outside_single_pairs": 0,
+          "stored_novel_outside_single_episodes": 0,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 0,
+          "episodes_with_cap": 0,
+          "episodes_last_run_capped": 0,
+          "position_counts": [
+            {
+              "*NONE*": 3,
+              "d": 97
+            },
+            {
+              "*NONE*": 43,
+              "d": 57
+            },
+            {
+              "*NONE*": 76,
+              "d": 24
+            },
+            {
+              "*NONE*": 94,
+              "d": 6
+            },
+            {
+              "*NONE*": 93,
+              "d": 7
+            },
+            {
+              "*NONE*": 97,
+              "d": 3
+            },
+            {
+              "*NONE*": 95,
+              "d": 5
+            },
+            {
+              "*NONE*": 99,
+              "d": 1
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "d": 100,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.0,
+          "novelties": []
+        },
+        {
+          "problem": "copy3",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 0,
+          "stored_novel_episodes": 0,
+          "stored_novel_outside_single_pairs": 0,
+          "stored_novel_outside_single_episodes": 0,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 0,
+          "episodes_with_cap": 0,
+          "episodes_last_run_capped": 0,
+          "position_counts": [
+            {
+              "*NONE*": 2,
+              "z": 98
+            },
+            {
+              "*NONE*": 40,
+              "z": 60
+            },
+            {
+              "*NONE*": 78,
+              "z": 22
+            },
+            {
+              "*NONE*": 90,
+              "z": 10
+            },
+            {
+              "*NONE*": 97,
+              "z": 3
+            },
+            {
+              "*NONE*": 97,
+              "z": 3
+            },
+            {
+              "*NONE*": 99,
+              "z": 1
+            },
+            {
+              "*NONE*": 99,
+              "z": 1
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "z": 100,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.0,
+          "novelties": []
+        },
+        {
+          "problem": "copy4",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 0,
+          "stored_novel_episodes": 0,
+          "stored_novel_outside_single_pairs": 0,
+          "stored_novel_outside_single_episodes": 0,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 24,
+          "episodes_with_cap": 18,
+          "episodes_last_run_capped": 9,
+          "position_counts": [
+            {
+              "*NONE*": 2,
+              "x": 86,
+              "zy": 12
+            },
+            {
+              "*NONE*": 24,
+              "x": 70,
+              "zy": 6
+            },
+            {
+              "*NONE*": 41,
+              "x": 49,
+              "zy": 10
+            },
+            {
+              "*CAP*": 2,
+              "*NONE*": 62,
+              "x": 26,
+              "zy": 10
+            },
+            {
+              "*CAP*": 2,
+              "*NONE*": 83,
+              "x": 11,
+              "zy": 4
+            },
+            {
+              "*CAP*": 6,
+              "*NONE*": 74,
+              "x": 11,
+              "zy": 9
+            },
+            {
+              "*CAP*": 5,
+              "*NONE*": 84,
+              "x": 5,
+              "zy": 6
+            },
+            {
+              "*CAP*": 9,
+              "*NONE*": 77,
+              "x": 7,
+              "zy": 7
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "x": 71,
+            "zy": 29,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.0,
+          "novelties": []
+        },
+        {
+          "problem": "copy5",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 1,
+          "stored_novel_episodes": 1,
+          "stored_novel_outside_single_pairs": 0,
+          "stored_novel_outside_single_episodes": 0,
+          "missing_head_members": 0,
+          "episodes_never_answering": 4,
+          "capped_runs": 0,
+          "episodes_with_cap": 0,
+          "episodes_last_run_capped": 0,
+          "position_counts": [
+            {
+              "*NONE*": 71,
+              "aac": 1,
+              "cac": 1,
+              "cc": 27
+            },
+            {
+              "*NONE*": 74,
+              "cc": 26
+            },
+            {
+              "*NONE*": 71,
+              "aac": 1,
+              "cc": 28
+            },
+            {
+              "*NONE*": 64,
+              "aac": 2,
+              "cac": 2,
+              "cc": 32
+            },
+            {
+              "*NONE*": 70,
+              "aac": 1,
+              "cc": 29
+            },
+            {
+              "*NONE*": 76,
+              "aac": 1,
+              "acc": 1,
+              "cc": 22
+            },
+            {
+              "*NONE*": 79,
+              "cbc": 1,
+              "cc": 20
+            },
+            {
+              "*NONE*": 80,
+              "aac": 1,
+              "cbc": 1,
+              "cc": 18
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "aac": 1,
+            "cac": 1,
+            "cbc": 1,
+            "cc": 93,
+            "*NO_ANSWER*": 4
+          },
+          "stored_reference_f1_over_n": 0.004008,
+          "novelties": [
+            {
+              "member": "cac",
+              "count": 1,
+              "in_single_run_set": true
+            }
+          ]
+        },
+        {
+          "problem": "copy6",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 0,
+          "stored_novel_episodes": 0,
+          "stored_novel_outside_single_pairs": 0,
+          "stored_novel_outside_single_episodes": 0,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 24,
+          "episodes_with_cap": 22,
+          "episodes_last_run_capped": 12,
+          "position_counts": [
+            {
+              "*NONE*": 3,
+              "abc": 7,
+              "d": 90
+            },
+            {
+              "*NONE*": 28,
+              "abc": 7,
+              "d": 65
+            },
+            {
+              "*NONE*": 50,
+              "abc": 10,
+              "d": 40
+            },
+            {
+              "*CAP*": 1,
+              "*NONE*": 72,
+              "abc": 5,
+              "d": 22
+            },
+            {
+              "*CAP*": 2,
+              "*NONE*": 71,
+              "abc": 7,
+              "d": 20
+            },
+            {
+              "*CAP*": 4,
+              "*NONE*": 77,
+              "abc": 8,
+              "d": 11
+            },
+            {
+              "*CAP*": 5,
+              "*NONE*": 82,
+              "abc": 7,
+              "d": 6
+            },
+            {
+              "*CAP*": 12,
+              "*NONE*": 77,
+              "abc": 6,
+              "d": 5
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "abc": 24,
+            "d": 76,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.004,
+          "novelties": []
+        }
+      ]
+    },
+    {
+      "file": "data/vs-metacat.json",
+      "sha256": "9f984e3b70ae0b75405d52bea1dd505d4fc32d9bd708f5fee9444da2de7c14d4",
+      "backend": "numpy",
+      "episode_horizon": 8,
+      "start_seed": 900000,
+      "seed_source": "stored",
+      "working_cap": 20000,
+      "reference_cap": 100000,
+      "totals": {
+        "episodes": 1900,
+        "runs": 15200,
+        "stored_novel_pairs": 13,
+        "stored_novel_episodes": 14,
+        "stored_novel_outside_single_pairs": 2,
+        "stored_novel_outside_single_episodes": 2,
+        "missing_head_members": 0,
+        "episodes_never_answering": 4,
+        "capped_runs": 2404,
+        "episodes_with_cap": 1052,
+        "episodes_last_run_capped": 591
+      },
+      "results": [
+        {
+          "problem": "misc4",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 0,
+          "stored_novel_episodes": 0,
+          "stored_novel_outside_single_pairs": 0,
+          "stored_novel_outside_single_episodes": 0,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 0,
+          "episodes_with_cap": 0,
+          "episodes_last_run_capped": 0,
+          "position_counts": [
+            {
+              "*NONE*": 6,
+              "b": 29,
+              "y": 25,
+              "z": 40
+            },
+            {
+              "*NONE*": 17,
+              "b": 41,
+              "y": 23,
+              "z": 19
+            },
+            {
+              "*NONE*": 34,
+              "b": 28,
+              "y": 23,
+              "z": 15
+            },
+            {
+              "*NONE*": 45,
+              "b": 24,
+              "y": 15,
+              "z": 16
+            },
+            {
+              "*NONE*": 53,
+              "b": 32,
+              "y": 7,
+              "z": 8
+            },
+            {
+              "*NONE*": 77,
+              "b": 16,
+              "y": 5,
+              "z": 2
+            },
+            {
+              "*NONE*": 87,
+              "b": 10,
+              "y": 2,
+              "z": 1
+            },
+            {
+              "*NONE*": 92,
+              "b": 8
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "b": 69,
+            "y": 18,
+            "z": 13,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.0,
+          "novelties": []
+        },
+        {
+          "problem": "fig5.7",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 0,
+          "stored_novel_episodes": 0,
+          "stored_novel_outside_single_pairs": 0,
+          "stored_novel_outside_single_episodes": 0,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 27,
+          "episodes_with_cap": 26,
+          "episodes_last_run_capped": 7,
+          "position_counts": [
+            {
+              "aabd": 1,
+              "djkk": 1,
+              "hjkk": 4,
+              "ijdd": 2,
+              "ijkd": 2,
+              "ijkk": 5,
+              "ijkl": 31,
+              "ijl": 8,
+              "ijll": 44,
+              "jjkk": 2
+            },
+            {
+              "*CAP*": 2,
+              "aabd": 1,
+              "hjkk": 1,
+              "ijdd": 1,
+              "ijkd": 3,
+              "ijkk": 10,
+              "ijkl": 29,
+              "ijl": 10,
+              "ijll": 37,
+              "jjkk": 6
+            },
+            {
+              "aabd": 1,
+              "hjkk": 1,
+              "ijd": 3,
+              "ijdd": 6,
+              "ijkd": 3,
+              "ijkk": 18,
+              "ijkl": 37,
+              "ijl": 7,
+              "ijll": 21,
+              "jjkk": 3
+            },
+            {
+              "*CAP*": 1,
+              "aabd": 1,
+              "djkk": 1,
+              "hjkk": 1,
+              "ijd": 1,
+              "ijdd": 6,
+              "ijkd": 1,
+              "ijkk": 10,
+              "ijkl": 26,
+              "ijl": 15,
+              "ijll": 33,
+              "jjkk": 4
+            },
+            {
+              "*CAP*": 5,
+              "aabd": 1,
+              "djkk": 1,
+              "hjkk": 3,
+              "ijd": 1,
+              "ijdd": 6,
+              "ijkd": 2,
+              "ijkk": 7,
+              "ijkl": 27,
+              "ijl": 13,
+              "ijll": 32,
+              "jjkk": 2
+            },
+            {
+              "*CAP*": 6,
+              "aabd": 5,
+              "ijd": 3,
+              "ijdd": 8,
+              "ijkd": 2,
+              "ijkk": 11,
+              "ijkl": 24,
+              "ijl": 9,
+              "ijll": 29,
+              "jjkk": 3
+            },
+            {
+              "*CAP*": 6,
+              "aabd": 5,
+              "ajkd": 1,
+              "hjkk": 5,
+              "ijdd": 10,
+              "ijkd": 2,
+              "ijkk": 26,
+              "ijkl": 15,
+              "ijl": 9,
+              "ijll": 14,
+              "jjkk": 7
+            },
+            {
+              "*CAP*": 7,
+              "aabd": 3,
+              "hjkk": 1,
+              "ijd": 2,
+              "ijdd": 12,
+              "ijkd": 6,
+              "ijkk": 17,
+              "ijkl": 12,
+              "ijl": 11,
+              "ijll": 28,
+              "jjkk": 1
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "aabd": 3,
+            "hjkk": 1,
+            "ijd": 2,
+            "ijdd": 13,
+            "ijkd": 6,
+            "ijkk": 18,
+            "ijkl": 14,
+            "ijl": 13,
+            "ijll": 29,
+            "jjkk": 1,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.0,
+          "novelties": []
+        },
+        {
+          "problem": "misc3",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 3,
+          "stored_novel_episodes": 3,
+          "stored_novel_outside_single_pairs": 0,
+          "stored_novel_outside_single_episodes": 0,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 188,
+          "episodes_with_cap": 91,
+          "episodes_last_run_capped": 23,
+          "position_counts": [
+            {
+              "*CAP*": 31,
+              "*NONE*": 1,
+              "kji": 12,
+              "kjji": 1,
+              "kjjiii": 1,
+              "kkjjii": 12,
+              "kkjjjii": 1,
+              "kkkji": 1,
+              "kkkjiii": 1,
+              "kkkjjii": 3,
+              "kkkjjiii": 1,
+              "kkkjjjiii": 35
+            },
+            {
+              "*CAP*": 20,
+              "kji": 14,
+              "kjiii": 1,
+              "kjji": 1,
+              "kjjiii": 2,
+              "kjjjiii": 2,
+              "kkjjii": 8,
+              "kkjjiii": 2,
+              "kkjjiiiii": 1,
+              "kkjjji": 1,
+              "kkjjjiii": 2,
+              "kkjjjiiiii": 1,
+              "kkkji": 1,
+              "kkkjiii": 4,
+              "kkkjjiii": 2,
+              "kkkjjjiii": 38
+            },
+            {
+              "*CAP*": 15,
+              "*NONE*": 2,
+              "kji": 17,
+              "kjiii": 1,
+              "kjjji": 1,
+              "kjjjiii": 1,
+              "kkjji": 1,
+              "kkjjii": 18,
+              "kkjjiii": 1,
+              "kkjjiiiii": 1,
+              "kkjjjii": 1,
+              "kkkji": 1,
+              "kkkjiii": 1,
+              "kkkjjii": 1,
+              "kkkjjiii": 2,
+              "kkkjjji": 1,
+              "kkkjjjiii": 35
+            },
+            {
+              "*CAP*": 30,
+              "*NONE*": 1,
+              "kji": 15,
+              "kjjjiii": 1,
+              "kkjjii": 10,
+              "kkjjiiiii": 1,
+              "kkjjiiiiii": 1,
+              "kkjjjiii": 2,
+              "kkjjjjii": 1,
+              "kkkji": 3,
+              "kkkjji": 1,
+              "kkkjjiihh": 1,
+              "kkkjjiii": 1,
+              "kkkjjji": 1,
+              "kkkjjjii": 1,
+              "kkkjjjiii": 30
+            },
+            {
+              "*CAP*": 23,
+              "kji": 11,
+              "kjiii": 2,
+              "kjjjiii": 3,
+              "kkjjii": 10,
+              "kkjjiii": 1,
+              "kkjjiiiii": 1,
+              "kkjjjiii": 2,
+              "kkkji": 1,
+              "kkkjiii": 1,
+              "kkkjjii": 1,
+              "kkkjjiihh": 2,
+              "kkkjjiii": 1,
+              "kkkjjji": 1,
+              "kkkjjjiii": 38,
+              "kkkkjjjiii": 1,
+              "kkkkkjjii": 1
+            },
+            {
+              "*CAP*": 27,
+              "*NONE*": 3,
+              "aabbcc": 1,
+              "kji": 12,
+              "kjiii": 2,
+              "kjjji": 1,
+              "kkjjii": 15,
+              "kkjjiiiii": 2,
+              "kkjjji": 1,
+              "kkjjjii": 1,
+              "kkjjjiihhh": 1,
+              "kkkji": 1,
+              "kkkjiii": 1,
+              "kkkjjiii": 2,
+              "kkkjjji": 1,
+              "kkkjjjii": 3,
+              "kkkjjjiii": 25,
+              "kkkkkjjii": 1
+            },
+            {
+              "*CAP*": 19,
+              "*NONE*": 2,
+              "kji": 16,
+              "kjiii": 1,
+              "kkjiii": 1,
+              "kkjji": 1,
+              "kkjjii": 17,
+              "kkjjiiiii": 2,
+              "kkjjjiii": 1,
+              "kkjjjjii": 1,
+              "kkkji": 1,
+              "kkkjiii": 2,
+              "kkkjjii": 1,
+              "kkkjjiihh": 1,
+              "kkkjjiii": 2,
+              "kkkjjjiii": 31,
+              "kkkjjjjiii": 1
+            },
+            {
+              "*CAP*": 23,
+              "*NONE*": 1,
+              "kji": 14,
+              "kjiii": 1,
+              "kjjji": 2,
+              "kjjjiii": 1,
+              "kkjiii": 1,
+              "kkjjii": 20,
+              "kkjjiii": 1,
+              "kkjjjii": 3,
+              "kkjjjjii": 1,
+              "kkkjjiihh": 1,
+              "kkkjjiii": 3,
+              "kkkjjji": 1,
+              "kkkjjjiii": 26,
+              "kkkjjjjiii": 1
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "kji": 20,
+            "kjiii": 1,
+            "kjjji": 2,
+            "kjjjiii": 1,
+            "kkjiii": 1,
+            "kkjjii": 25,
+            "kkjjiii": 1,
+            "kkjjiiiii": 1,
+            "kkjjjii": 3,
+            "kkjjjjii": 1,
+            "kkkji": 1,
+            "kkkjiii": 1,
+            "kkkjjiihh": 1,
+            "kkkjjiii": 3,
+            "kkkjjji": 1,
+            "kkkjjjiii": 35,
+            "kkkjjjjiii": 2,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.008,
+          "novelties": [
+            {
+              "member": "kkjiii",
+              "count": 1,
+              "in_single_run_set": true
+            },
+            {
+              "member": "kkjjiiiii",
+              "count": 1,
+              "in_single_run_set": true
+            },
+            {
+              "member": "kkjjjjii",
+              "count": 1,
+              "in_single_run_set": true
+            }
+          ]
+        },
+        {
+          "problem": "misc5",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 0,
+          "stored_novel_episodes": 0,
+          "stored_novel_outside_single_pairs": 0,
+          "stored_novel_outside_single_episodes": 0,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 7,
+          "episodes_with_cap": 7,
+          "episodes_last_run_capped": 2,
+          "position_counts": [
+            {
+              "*NONE*": 2,
+              "abd": 3,
+              "dlz": 3,
+              "flz": 20,
+              "gld": 28,
+              "glz": 22,
+              "hlz": 22
+            },
+            {
+              "*CAP*": 2,
+              "*NONE*": 14,
+              "abd": 4,
+              "dlz": 5,
+              "flz": 17,
+              "gld": 10,
+              "glz": 20,
+              "hlz": 28
+            },
+            {
+              "*NONE*": 14,
+              "abd": 3,
+              "dlz": 8,
+              "flz": 23,
+              "gld": 15,
+              "glz": 15,
+              "hlz": 22
+            },
+            {
+              "*CAP*": 1,
+              "*NONE*": 34,
+              "abd": 6,
+              "dlz": 6,
+              "flz": 18,
+              "gld": 9,
+              "glz": 8,
+              "hlz": 18
+            },
+            {
+              "*NONE*": 38,
+              "abd": 9,
+              "dlz": 15,
+              "flz": 12,
+              "gld": 7,
+              "glz": 11,
+              "hlz": 8
+            },
+            {
+              "*NONE*": 56,
+              "abd": 1,
+              "dlz": 19,
+              "flz": 6,
+              "gld": 4,
+              "glz": 12,
+              "hlz": 2
+            },
+            {
+              "*CAP*": 2,
+              "*NONE*": 65,
+              "abd": 9,
+              "dlz": 14,
+              "flz": 4,
+              "gld": 3,
+              "glz": 3
+            },
+            {
+              "*CAP*": 2,
+              "*NONE*": 77,
+              "abd": 6,
+              "dlz": 7,
+              "gld": 4,
+              "glz": 4
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "abd": 18,
+            "dlz": 39,
+            "flz": 12,
+            "gld": 12,
+            "glz": 18,
+            "hlz": 1,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.0,
+          "novelties": []
+        },
+        {
+          "problem": "misc2",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 1,
+          "stored_novel_episodes": 1,
+          "stored_novel_outside_single_pairs": 1,
+          "stored_novel_outside_single_episodes": 1,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 411,
+          "episodes_with_cap": 100,
+          "episodes_last_run_capped": 95,
+          "position_counts": [
+            {
+              "ijd": 2,
+              "ijk": 1,
+              "ijl": 97
+            },
+            {
+              "*CAP*": 1,
+              "abd": 14,
+              "ijd": 21,
+              "ijk": 61,
+              "ijl": 3
+            },
+            {
+              "*CAP*": 14,
+              "abd": 43,
+              "ijd": 21,
+              "ijk": 22
+            },
+            {
+              "*CAP*": 60,
+              "abd": 21,
+              "ijd": 11,
+              "ijk": 8
+            },
+            {
+              "*CAP*": 67,
+              "abd": 13,
+              "ajd": 1,
+              "ijd": 12,
+              "ijk": 7
+            },
+            {
+              "*CAP*": 85,
+              "abd": 7,
+              "ijd": 8
+            },
+            {
+              "*CAP*": 89,
+              "abd": 2,
+              "ijd": 8,
+              "ijk": 1
+            },
+            {
+              "*CAP*": 95,
+              "ijd": 5
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "abd": 46,
+            "ajd": 1,
+            "ijd": 40,
+            "ijk": 13,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.008,
+          "novelties": [
+            {
+              "member": "ajd",
+              "count": 1,
+              "in_single_run_set": false
+            }
+          ]
+        },
+        {
+          "problem": "run1",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 0,
+          "stored_novel_episodes": 0,
+          "stored_novel_outside_single_pairs": 0,
+          "stored_novel_outside_single_episodes": 0,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 180,
+          "episodes_with_cap": 96,
+          "episodes_last_run_capped": 51,
+          "position_counts": [
+            {
+              "abd": 2,
+              "mrrddd": 3,
+              "mrrjjj": 4,
+              "mrrjjjj": 3,
+              "mrrjjk": 22,
+              "mrrjkk": 2,
+              "mrrkkk": 64
+            },
+            {
+              "*CAP*": 3,
+              "abd": 4,
+              "mrrddd": 6,
+              "mrrjjd": 1,
+              "mrrjjj": 26,
+              "mrrjjjj": 12,
+              "mrrjjk": 20,
+              "mrrjkk": 5,
+              "mrrkkk": 23
+            },
+            {
+              "*CAP*": 8,
+              "abd": 8,
+              "mrrddd": 15,
+              "mrrjjj": 29,
+              "mrrjjjj": 19,
+              "mrrjjk": 9,
+              "mrrjkk": 3,
+              "mrrkkk": 9
+            },
+            {
+              "*CAP*": 12,
+              "abd": 15,
+              "mrrddd": 9,
+              "mrrjjd": 2,
+              "mrrjjj": 20,
+              "mrrjjjj": 21,
+              "mrrjjk": 13,
+              "mrrjkk": 4,
+              "mrrkkk": 4
+            },
+            {
+              "*CAP*": 25,
+              "abd": 19,
+              "mrrddd": 11,
+              "mrrjjd": 4,
+              "mrrjjj": 11,
+              "mrrjjjj": 19,
+              "mrrjjk": 8,
+              "mrrjkk": 2,
+              "msskkk": 1
+            },
+            {
+              "*CAP*": 37,
+              "abd": 12,
+              "mrrddd": 7,
+              "mrrjjd": 2,
+              "mrrjjj": 13,
+              "mrrjjjj": 14,
+              "mrrjjk": 9,
+              "mrrjkk": 2,
+              "msskkk": 4
+            },
+            {
+              "*CAP*": 44,
+              "abd": 10,
+              "mrrddd": 10,
+              "mrrjjd": 3,
+              "mrrjjj": 12,
+              "mrrjjjj": 6,
+              "mrrjjk": 9,
+              "mrrjkk": 3,
+              "msskkk": 3
+            },
+            {
+              "*CAP*": 51,
+              "abd": 9,
+              "mrrddd": 10,
+              "mrrjjd": 2,
+              "mrrjjj": 9,
+              "mrrjjjj": 5,
+              "mrrjjk": 5,
+              "mrrjkk": 3,
+              "msskkk": 5,
+              "nrrjjj": 1
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "abd": 20,
+            "mrrddd": 16,
+            "mrrjjd": 4,
+            "mrrjjj": 18,
+            "mrrjjjj": 12,
+            "mrrjjk": 16,
+            "mrrjkk": 5,
+            "msskkk": 8,
+            "nrrjjj": 1,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.004,
+          "novelties": []
+        },
+        {
+          "problem": "run4",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 0,
+          "stored_novel_episodes": 0,
+          "stored_novel_outside_single_pairs": 0,
+          "stored_novel_outside_single_episodes": 0,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 2,
+          "episodes_with_cap": 2,
+          "episodes_last_run_capped": 1,
+          "position_counts": [
+            {
+              "*NONE*": 16,
+              "abd": 1,
+              "dez": 1,
+              "dyz": 4,
+              "wyz": 19,
+              "xyd": 24,
+              "xyz": 27,
+              "yyz": 8
+            },
+            {
+              "*NONE*": 25,
+              "abd": 4,
+              "dyz": 5,
+              "wyz": 22,
+              "xyd": 17,
+              "xyz": 16,
+              "yyz": 11
+            },
+            {
+              "*NONE*": 22,
+              "abd": 2,
+              "dyz": 6,
+              "wyz": 18,
+              "xyd": 16,
+              "xyz": 17,
+              "yyz": 19
+            },
+            {
+              "*NONE*": 33,
+              "abd": 2,
+              "dyz": 6,
+              "wyz": 25,
+              "xyd": 7,
+              "xyz": 9,
+              "yyz": 18
+            },
+            {
+              "*NONE*": 38,
+              "abd": 4,
+              "dyz": 10,
+              "wyz": 7,
+              "xyd": 17,
+              "xyz": 9,
+              "yyz": 15
+            },
+            {
+              "*CAP*": 1,
+              "*NONE*": 65,
+              "abd": 6,
+              "dyz": 5,
+              "wyz": 6,
+              "xyd": 4,
+              "xyz": 4,
+              "yyz": 9
+            },
+            {
+              "*NONE*": 66,
+              "abd": 6,
+              "dyz": 6,
+              "wyz": 2,
+              "xyd": 1,
+              "xyz": 6,
+              "yyz": 13
+            },
+            {
+              "*CAP*": 1,
+              "*NONE*": 73,
+              "abd": 7,
+              "dyz": 9,
+              "wyz": 1,
+              "xyd": 3,
+              "xyz": 2,
+              "yyz": 4
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "abd": 14,
+            "dyz": 21,
+            "wyz": 8,
+            "xyd": 11,
+            "xyz": 15,
+            "yyz": 31,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.002,
+          "novelties": []
+        },
+        {
+          "problem": "misc1",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 3,
+          "stored_novel_episodes": 4,
+          "stored_novel_outside_single_pairs": 0,
+          "stored_novel_outside_single_episodes": 0,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 184,
+          "episodes_with_cap": 91,
+          "episodes_last_run_capped": 53,
+          "position_counts": [
+            {
+              "crraaa": 2,
+              "jjjrrm": 88,
+              "jjrrjm": 1,
+              "jrrjjm": 4,
+              "jrrmmm": 2,
+              "mrrjjj": 3
+            },
+            {
+              "cba": 3,
+              "jjjrrm": 71,
+              "jjrrjm": 1,
+              "jrrjjm": 10,
+              "jrrmmm": 1,
+              "mmmrrj": 1,
+              "mrrjjj": 13
+            },
+            {
+              "*CAP*": 2,
+              "cba": 16,
+              "jjjrrm": 55,
+              "jjrrjm": 1,
+              "jrrjjm": 9,
+              "jrrmmm": 3,
+              "mrrjjj": 11,
+              "rrjjjm": 3
+            },
+            {
+              "*CAP*": 8,
+              "cba": 36,
+              "jjjrrm": 31,
+              "jjrrjm": 2,
+              "jrrjjm": 7,
+              "mrrjjj": 12,
+              "rrjjjm": 4
+            },
+            {
+              "*CAP*": 24,
+              "cba": 19,
+              "crraaa": 3,
+              "jjjmrr": 1,
+              "jjjrmr": 1,
+              "jjjrrm": 23,
+              "jrrjjm": 11,
+              "mrrjjj": 10,
+              "rrjjjm": 8
+            },
+            {
+              "*CAP*": 45,
+              "cba": 14,
+              "jjjrrm": 17,
+              "jjrrjm": 1,
+              "jrrjjm": 8,
+              "jrrmmm": 2,
+              "mrrjjj": 4,
+              "rrjjjm": 9
+            },
+            {
+              "*CAP*": 52,
+              "cba": 8,
+              "crraaa": 1,
+              "jjjmrr": 1,
+              "jjjrmr": 1,
+              "jjjrrm": 7,
+              "jrrjjm": 7,
+              "jrrmmm": 1,
+              "mmmrrj": 1,
+              "mrraaa": 2,
+              "mrrjjj": 14,
+              "rrjjjm": 5
+            },
+            {
+              "*CAP*": 53,
+              "cba": 3,
+              "crraaa": 1,
+              "jjjrrm": 4,
+              "jjrrjm": 1,
+              "jrrjjm": 9,
+              "jrrmmm": 3,
+              "mmmrrj": 3,
+              "mrrjjj": 9,
+              "rrjjjm": 14
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "cba": 22,
+            "crraaa": 2,
+            "jjjmrr": 2,
+            "jjjrmr": 1,
+            "jjjrrm": 17,
+            "jjrrjm": 1,
+            "jrrjjm": 13,
+            "jrrmmm": 4,
+            "mmmrrj": 4,
+            "mrraaa": 1,
+            "mrrjjj": 13,
+            "rrjjjm": 20,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.006,
+          "novelties": [
+            {
+              "member": "crraaa",
+              "count": 2,
+              "in_single_run_set": true
+            },
+            {
+              "member": "jjjrmr",
+              "count": 1,
+              "in_single_run_set": true
+            },
+            {
+              "member": "mrraaa",
+              "count": 1,
+              "in_single_run_set": true
+            }
+          ]
+        },
+        {
+          "problem": "fig5.4-top",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 3,
+          "stored_novel_episodes": 3,
+          "stored_novel_outside_single_pairs": 0,
+          "stored_novel_outside_single_episodes": 0,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 11,
+          "episodes_with_cap": 10,
+          "episodes_last_run_capped": 0,
+          "position_counts": [
+            {
+              "*NONE*": 16,
+              "ixi": 1,
+              "ixxi": 29,
+              "ixxq": 3,
+              "qeeq": 49,
+              "qxeq": 1,
+              "qxxi": 1
+            },
+            {
+              "*NONE*": 21,
+              "ixxi": 15,
+              "ixxq": 5,
+              "ixxxq": 1,
+              "qeeq": 55,
+              "qiq": 1,
+              "qxxi": 2
+            },
+            {
+              "*CAP*": 1,
+              "*NONE*": 19,
+              "iixxxi": 1,
+              "ixxi": 17,
+              "ixxq": 8,
+              "qeeq": 47,
+              "qexq": 1,
+              "qiq": 2,
+              "qxxi": 4
+            },
+            {
+              "*NONE*": 16,
+              "ixxi": 18,
+              "ixxq": 3,
+              "qeeq": 54,
+              "qiq": 1,
+              "qixx": 1,
+              "qxeeq": 1,
+              "qxxi": 5,
+              "xix": 1
+            },
+            {
+              "*CAP*": 1,
+              "*NONE*": 20,
+              "ixxi": 14,
+              "ixxq": 4,
+              "qeeq": 53,
+              "qeqq": 1,
+              "qiq": 1,
+              "qxxi": 6
+            },
+            {
+              "*CAP*": 4,
+              "*NONE*": 16,
+              "ixxi": 10,
+              "ixxq": 11,
+              "qeeq": 51,
+              "qiq": 2,
+              "qxxi": 6
+            },
+            {
+              "*CAP*": 5,
+              "*NONE*": 24,
+              "ixxi": 10,
+              "ixxq": 7,
+              "qeeq": 47,
+              "qxeeq": 1,
+              "qxxi": 5,
+              "xxiq": 1
+            },
+            {
+              "*NONE*": 22,
+              "iixxi": 1,
+              "ixxi": 10,
+              "ixxq": 8,
+              "qeeq": 46,
+              "qexq": 1,
+              "qiiq": 1,
+              "qiq": 3,
+              "qxxi": 8
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "iixxi": 1,
+            "ixxi": 12,
+            "ixxq": 10,
+            "qeeq": 63,
+            "qexq": 1,
+            "qiiq": 1,
+            "qiq": 3,
+            "qxxi": 9,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.014,
+          "novelties": [
+            {
+              "member": "iixxi",
+              "count": 1,
+              "in_single_run_set": true
+            },
+            {
+              "member": "qexq",
+              "count": 1,
+              "in_single_run_set": true
+            },
+            {
+              "member": "qiiq",
+              "count": 1,
+              "in_single_run_set": true
+            }
+          ]
+        },
+        {
+          "problem": "eqe-baaab",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 2,
+          "stored_novel_episodes": 2,
+          "stored_novel_outside_single_pairs": 1,
+          "stored_novel_outside_single_episodes": 1,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 59,
+          "episodes_with_cap": 45,
+          "episodes_last_run_capped": 29,
+          "position_counts": [
+            {
+              "abbba": 1,
+              "baaab": 48,
+              "baaaq": 5,
+              "qaaab": 4,
+              "qbbba": 2,
+              "qbbbq": 8,
+              "qeeeq": 29,
+              "qeq": 3
+            },
+            {
+              "*NONE*": 1,
+              "abbba": 2,
+              "baaab": 41,
+              "baaaq": 4,
+              "qaaab": 2,
+              "qbbbq": 7,
+              "qeeeq": 39,
+              "qeq": 4
+            },
+            {
+              "*NONE*": 1,
+              "abbba": 5,
+              "baaab": 28,
+              "baaaq": 11,
+              "bcaab": 1,
+              "qaaab": 14,
+              "qbbba": 1,
+              "qbbbq": 8,
+              "qeeeq": 20,
+              "qeq": 11
+            },
+            {
+              "*NONE*": 2,
+              "abbba": 10,
+              "abbbq": 1,
+              "baaab": 14,
+              "baaaq": 18,
+              "qaaab": 19,
+              "qbbba": 1,
+              "qbbbq": 8,
+              "qbebq": 1,
+              "qeeeq": 8,
+              "qeq": 18
+            },
+            {
+              "*CAP*": 5,
+              "abbba": 12,
+              "abbbq": 1,
+              "baaab": 19,
+              "baaaq": 14,
+              "pqeeq": 1,
+              "qaaab": 15,
+              "qbbba": 1,
+              "qbbbq": 6,
+              "qeeeq": 5,
+              "qeq": 21
+            },
+            {
+              "*CAP*": 10,
+              "*NONE*": 2,
+              "abbba": 18,
+              "arrrq": 1,
+              "baaab": 9,
+              "baaaq": 18,
+              "qaaab": 8,
+              "qbbba": 2,
+              "qbbbq": 13,
+              "qeeeq": 2,
+              "qeq": 15,
+              "qrrrq": 2
+            },
+            {
+              "*CAP*": 15,
+              "*NONE*": 1,
+              "abbba": 19,
+              "abbbq": 3,
+              "baaab": 9,
+              "baaaq": 6,
+              "qaaab": 19,
+              "qbbba": 4,
+              "qbbbq": 11,
+              "qeeeq": 1,
+              "qeq": 10,
+              "qqqqp": 1,
+              "qrbbq": 1
+            },
+            {
+              "*CAP*": 29,
+              "*NONE*": 3,
+              "abbba": 14,
+              "abbbq": 3,
+              "aqqqp": 1,
+              "baaab": 4,
+              "baaaq": 9,
+              "baacb": 1,
+              "pqqqq": 2,
+              "qaaab": 10,
+              "qbbba": 2,
+              "qbbbq": 11,
+              "qeq": 7,
+              "qrrbq": 1,
+              "qrrrq": 3
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "abbba": 19,
+            "abbbq": 3,
+            "aqqqp": 1,
+            "baaab": 8,
+            "baaaq": 10,
+            "baacb": 1,
+            "pqqqq": 2,
+            "qaaab": 19,
+            "qbbba": 4,
+            "qbbbq": 15,
+            "qeq": 14,
+            "qrrbq": 1,
+            "qrrrq": 3,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.008,
+          "novelties": [
+            {
+              "member": "aqqqp",
+              "count": 1,
+              "in_single_run_set": true
+            },
+            {
+              "member": "qrrbq",
+              "count": 1,
+              "in_single_run_set": false
+            }
+          ]
+        },
+        {
+          "problem": "run6",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 0,
+          "stored_novel_episodes": 0,
+          "stored_novel_outside_single_pairs": 0,
+          "stored_novel_outside_single_episodes": 0,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 0,
+          "episodes_with_cap": 0,
+          "episodes_last_run_capped": 0,
+          "position_counts": [
+            {
+              "*NONE*": 9,
+              "abbbq": 1,
+              "baaaq": 5,
+              "bcaab": 1,
+              "bcccb": 1,
+              "cbbba": 6,
+              "qbbbq": 9,
+              "qcccb": 10,
+              "qeeeq": 56,
+              "qeq": 2
+            },
+            {
+              "*NONE*": 25,
+              "abbbq": 2,
+              "baaab": 1,
+              "baaaq": 8,
+              "bcccb": 2,
+              "cbbba": 3,
+              "cddda": 1,
+              "qbbbc": 1,
+              "qbbbq": 12,
+              "qbbeq": 1,
+              "qcccb": 11,
+              "qeeeq": 28,
+              "qeq": 4,
+              "qeqqr": 1
+            },
+            {
+              "*NONE*": 23,
+              "abbbq": 5,
+              "baaab": 1,
+              "baaaq": 5,
+              "bcccb": 6,
+              "cbbba": 6,
+              "cddda": 1,
+              "pqbbc": 1,
+              "pqeeq": 1,
+              "pqqeq": 1,
+              "qbbbq": 6,
+              "qcccb": 13,
+              "qeeeq": 26,
+              "qeeqr": 1,
+              "qeq": 3,
+              "qpppq": 1
+            },
+            {
+              "*NONE*": 31,
+              "baaab": 4,
+              "baaaq": 12,
+              "cbbba": 1,
+              "cddda": 6,
+              "qbbbc": 1,
+              "qbbbq": 15,
+              "qbbpq": 1,
+              "qcccb": 8,
+              "qeebq": 1,
+              "qeeeq": 16,
+              "qeq": 4
+            },
+            {
+              "*NONE*": 45,
+              "abbbq": 1,
+              "baaaq": 10,
+              "bcaab": 2,
+              "bccab": 1,
+              "bcccb": 1,
+              "cbbba": 3,
+              "qbbbc": 1,
+              "qbbbq": 9,
+              "qcccb": 6,
+              "qeeeq": 10,
+              "qeepq": 1,
+              "qeq": 8,
+              "qrccb": 1,
+              "qrqqr": 1
+            },
+            {
+              "*NONE*": 45,
+              "abbbq": 1,
+              "baaaq": 7,
+              "bcaab": 1,
+              "bcccb": 4,
+              "cbbba": 6,
+              "cddda": 1,
+              "qbbbq": 13,
+              "qbbpq": 1,
+              "qcccb": 4,
+              "qeeeq": 13,
+              "qeq": 4
+            },
+            {
+              "*NONE*": 40,
+              "baaab": 5,
+              "baaaq": 11,
+              "baqqr": 1,
+              "bcaab": 1,
+              "bcccb": 4,
+              "cbbba": 5,
+              "cddda": 2,
+              "qbbbc": 1,
+              "qbbbq": 12,
+              "qcccb": 10,
+              "qeeeq": 6,
+              "qeq": 2
+            },
+            {
+              "*NONE*": 44,
+              "baaab": 3,
+              "baaaq": 11,
+              "bcaab": 1,
+              "bccab": 1,
+              "bcccb": 1,
+              "cbbba": 4,
+              "cddda": 1,
+              "pqqeq": 1,
+              "pqqqq": 1,
+              "qbbbc": 3,
+              "qbbbq": 8,
+              "qcccb": 7,
+              "qeeeq": 11,
+              "qeq": 3
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "baaab": 7,
+            "baaaq": 20,
+            "bcaab": 1,
+            "bccab": 1,
+            "bcccb": 5,
+            "cbbba": 8,
+            "cddda": 2,
+            "pqqeq": 1,
+            "pqqqq": 1,
+            "qbbbc": 4,
+            "qbbbq": 17,
+            "qcccb": 10,
+            "qeeeq": 19,
+            "qeq": 4,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.016,
+          "novelties": []
+        },
+        {
+          "problem": "run3",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 0,
+          "stored_novel_episodes": 0,
+          "stored_novel_outside_single_pairs": 0,
+          "stored_novel_outside_single_episodes": 0,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 1,
+          "episodes_with_cap": 1,
+          "episodes_last_run_capped": 0,
+          "position_counts": [
+            {
+              "*NONE*": 26,
+              "rsu": 7,
+              "wyz": 18,
+              "xyu": 17,
+              "xyz": 23,
+              "yyz": 9
+            },
+            {
+              "*NONE*": 28,
+              "rsu": 2,
+              "uyz": 3,
+              "wyz": 16,
+              "xyu": 21,
+              "xyz": 25,
+              "yyz": 5
+            },
+            {
+              "*NONE*": 40,
+              "rsu": 5,
+              "uyz": 1,
+              "wyz": 24,
+              "xyu": 12,
+              "xyz": 8,
+              "yyz": 10
+            },
+            {
+              "*NONE*": 36,
+              "rsu": 6,
+              "uyz": 5,
+              "wyz": 11,
+              "xyu": 9,
+              "xyz": 15,
+              "yyz": 18
+            },
+            {
+              "*CAP*": 1,
+              "*NONE*": 48,
+              "rsu": 4,
+              "uyz": 10,
+              "wyz": 10,
+              "xyu": 9,
+              "xyz": 6,
+              "yyz": 12
+            },
+            {
+              "*NONE*": 59,
+              "rsu": 4,
+              "uyz": 7,
+              "wyz": 11,
+              "xyu": 2,
+              "xyz": 10,
+              "yyz": 7
+            },
+            {
+              "*NONE*": 55,
+              "rsu": 8,
+              "uyz": 4,
+              "wyz": 4,
+              "xyu": 8,
+              "xyz": 8,
+              "yyz": 13
+            },
+            {
+              "*NONE*": 74,
+              "rsu": 4,
+              "uyz": 7,
+              "wxz": 1,
+              "wyz": 1,
+              "xyu": 6,
+              "yyz": 7
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "rsu": 12,
+            "uyz": 17,
+            "wxz": 1,
+            "wyz": 10,
+            "xyu": 15,
+            "xyz": 15,
+            "yyz": 30,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.004,
+          "novelties": []
+        },
+        {
+          "problem": "run2",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 0,
+          "stored_novel_episodes": 0,
+          "stored_novel_outside_single_pairs": 0,
+          "stored_novel_outside_single_episodes": 0,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 170,
+          "episodes_with_cap": 98,
+          "episodes_last_run_capped": 71,
+          "position_counts": [
+            {
+              "mrrddd": 1,
+              "mrrjjj": 5,
+              "mrrjjk": 24,
+              "mrrjkk": 3,
+              "mrrkkk": 67
+            },
+            {
+              "mrrddd": 20,
+              "mrrjjd": 1,
+              "mrrjjj": 13,
+              "mrrjjk": 36,
+              "mrrjkk": 1,
+              "mrrkkk": 26,
+              "xqd": 3
+            },
+            {
+              "mrrddd": 42,
+              "mrrjjd": 4,
+              "mrrjjj": 9,
+              "mrrjjk": 24,
+              "mrrjkk": 4,
+              "mrrkkk": 7,
+              "xqd": 10
+            },
+            {
+              "mrrddd": 25,
+              "mrrjjd": 31,
+              "mrrjjj": 12,
+              "mrrjjk": 11,
+              "mrrjkk": 3,
+              "xqd": 18
+            },
+            {
+              "*CAP*": 6,
+              "mrrddd": 8,
+              "mrrjjd": 28,
+              "mrrjjj": 18,
+              "mrrjjk": 4,
+              "mrrjkk": 6,
+              "xqd": 30
+            },
+            {
+              "*CAP*": 29,
+              "mrrddd": 3,
+              "mrrjjd": 24,
+              "mrrjjj": 12,
+              "mrrjjk": 1,
+              "mrrjkk": 3,
+              "xqd": 28
+            },
+            {
+              "*CAP*": 64,
+              "mrrddd": 1,
+              "mrrjdd": 1,
+              "mrrjjd": 7,
+              "mrrjjj": 15,
+              "mrrjkk": 4,
+              "xqd": 8
+            },
+            {
+              "*CAP*": 71,
+              "mrrjdd": 1,
+              "mrrjjd": 4,
+              "mrrjjj": 18,
+              "mrrjkk": 4,
+              "xqd": 2
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "mrrddd": 2,
+            "mrrjdd": 2,
+            "mrrjjd": 34,
+            "mrrjjj": 31,
+            "mrrjkk": 9,
+            "xqd": 22,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.0,
+          "novelties": []
+        },
+        {
+          "problem": "copy1",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 0,
+          "stored_novel_episodes": 0,
+          "stored_novel_outside_single_pairs": 0,
+          "stored_novel_outside_single_episodes": 0,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 233,
+          "episodes_with_cap": 97,
+          "episodes_last_run_capped": 55,
+          "position_counts": [
+            {
+              "ab": 8,
+              "c": 92
+            },
+            {
+              "*NONE*": 1,
+              "ab": 2,
+              "c": 97
+            },
+            {
+              "*NONE*": 3,
+              "ab": 10,
+              "c": 87
+            },
+            {
+              "*CAP*": 16,
+              "*NONE*": 15,
+              "ab": 8,
+              "c": 61
+            },
+            {
+              "*CAP*": 45,
+              "*NONE*": 27,
+              "ab": 5,
+              "c": 23
+            },
+            {
+              "*CAP*": 58,
+              "*NONE*": 26,
+              "ab": 9,
+              "c": 7
+            },
+            {
+              "*CAP*": 59,
+              "*NONE*": 30,
+              "ab": 6,
+              "c": 5
+            },
+            {
+              "*CAP*": 55,
+              "*NONE*": 32,
+              "ab": 9,
+              "c": 4
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "ab": 30,
+            "c": 70,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.0,
+          "novelties": []
+        },
+        {
+          "problem": "copy2",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 0,
+          "stored_novel_episodes": 0,
+          "stored_novel_outside_single_pairs": 0,
+          "stored_novel_outside_single_episodes": 0,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 227,
+          "episodes_with_cap": 96,
+          "episodes_last_run_capped": 46,
+          "position_counts": [
+            {
+              "d": 100
+            },
+            {
+              "*NONE*": 12,
+              "d": 88
+            },
+            {
+              "*NONE*": 26,
+              "d": 74
+            },
+            {
+              "*CAP*": 29,
+              "*NONE*": 46,
+              "d": 25
+            },
+            {
+              "*CAP*": 42,
+              "*NONE*": 48,
+              "d": 10
+            },
+            {
+              "*CAP*": 56,
+              "*NONE*": 43,
+              "d": 1
+            },
+            {
+              "*CAP*": 54,
+              "*NONE*": 44,
+              "d": 2
+            },
+            {
+              "*CAP*": 46,
+              "*NONE*": 54
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "d": 100,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.0,
+          "novelties": []
+        },
+        {
+          "problem": "copy3",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 0,
+          "stored_novel_episodes": 0,
+          "stored_novel_outside_single_pairs": 0,
+          "stored_novel_outside_single_episodes": 0,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 225,
+          "episodes_with_cap": 95,
+          "episodes_last_run_capped": 45,
+          "position_counts": [
+            {
+              "z": 100
+            },
+            {
+              "*NONE*": 10,
+              "z": 90
+            },
+            {
+              "*NONE*": 31,
+              "z": 69
+            },
+            {
+              "*CAP*": 35,
+              "*NONE*": 42,
+              "z": 23
+            },
+            {
+              "*CAP*": 38,
+              "*NONE*": 49,
+              "z": 13
+            },
+            {
+              "*CAP*": 54,
+              "*NONE*": 43,
+              "z": 3
+            },
+            {
+              "*CAP*": 53,
+              "*NONE*": 45,
+              "z": 2
+            },
+            {
+              "*CAP*": 45,
+              "*NONE*": 55
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "z": 100,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.0,
+          "novelties": []
+        },
+        {
+          "problem": "copy4",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 0,
+          "stored_novel_episodes": 0,
+          "stored_novel_outside_single_pairs": 0,
+          "stored_novel_outside_single_episodes": 0,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 233,
+          "episodes_with_cap": 99,
+          "episodes_last_run_capped": 55,
+          "position_counts": [
+            {
+              "x": 88,
+              "zy": 12
+            },
+            {
+              "*NONE*": 2,
+              "x": 92,
+              "zy": 6
+            },
+            {
+              "*NONE*": 4,
+              "x": 86,
+              "zy": 10
+            },
+            {
+              "*CAP*": 20,
+              "*NONE*": 12,
+              "x": 57,
+              "zy": 11
+            },
+            {
+              "*CAP*": 41,
+              "*NONE*": 32,
+              "x": 23,
+              "zy": 4
+            },
+            {
+              "*CAP*": 60,
+              "*NONE*": 23,
+              "x": 8,
+              "zy": 9
+            },
+            {
+              "*CAP*": 57,
+              "*NONE*": 30,
+              "x": 7,
+              "zy": 6
+            },
+            {
+              "*CAP*": 55,
+              "*NONE*": 32,
+              "x": 6,
+              "zy": 7
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "x": 73,
+            "zy": 27,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.0,
+          "novelties": []
+        },
+        {
+          "problem": "copy5",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 1,
+          "stored_novel_episodes": 1,
+          "stored_novel_outside_single_pairs": 0,
+          "stored_novel_outside_single_episodes": 0,
+          "missing_head_members": 0,
+          "episodes_never_answering": 4,
+          "capped_runs": 0,
+          "episodes_with_cap": 0,
+          "episodes_last_run_capped": 0,
+          "position_counts": [
+            {
+              "*NONE*": 71,
+              "aac": 1,
+              "cac": 1,
+              "cc": 27
+            },
+            {
+              "*NONE*": 74,
+              "cc": 26
+            },
+            {
+              "*NONE*": 71,
+              "aac": 1,
+              "cc": 28
+            },
+            {
+              "*NONE*": 64,
+              "aac": 2,
+              "cac": 2,
+              "cc": 32
+            },
+            {
+              "*NONE*": 70,
+              "aac": 1,
+              "cc": 29
+            },
+            {
+              "*NONE*": 76,
+              "aac": 1,
+              "acc": 1,
+              "cc": 22
+            },
+            {
+              "*NONE*": 79,
+              "cbc": 1,
+              "cc": 20
+            },
+            {
+              "*NONE*": 80,
+              "aac": 1,
+              "cbc": 1,
+              "cc": 18
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "aac": 1,
+            "cac": 1,
+            "cbc": 1,
+            "cc": 93,
+            "*NO_ANSWER*": 4
+          },
+          "stored_reference_f1_over_n": 0.004008,
+          "novelties": [
+            {
+              "member": "cac",
+              "count": 1,
+              "in_single_run_set": true
+            }
+          ]
+        },
+        {
+          "problem": "copy6",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 0,
+          "stored_novel_episodes": 0,
+          "stored_novel_outside_single_pairs": 0,
+          "stored_novel_outside_single_episodes": 0,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 246,
+          "episodes_with_cap": 98,
+          "episodes_last_run_capped": 58,
+          "position_counts": [
+            {
+              "abc": 7,
+              "d": 93
+            },
+            {
+              "*NONE*": 2,
+              "abc": 7,
+              "d": 91
+            },
+            {
+              "*NONE*": 8,
+              "abc": 10,
+              "d": 82
+            },
+            {
+              "*CAP*": 28,
+              "*NONE*": 16,
+              "abc": 5,
+              "d": 51
+            },
+            {
+              "*CAP*": 41,
+              "*NONE*": 22,
+              "abc": 9,
+              "d": 28
+            },
+            {
+              "*CAP*": 55,
+              "*NONE*": 27,
+              "abc": 9,
+              "d": 9
+            },
+            {
+              "*CAP*": 64,
+              "*NONE*": 27,
+              "abc": 6,
+              "d": 2,
+              "dc": 1
+            },
+            {
+              "*CAP*": 58,
+              "*NONE*": 32,
+              "abc": 6,
+              "d": 4
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "abc": 26,
+            "d": 73,
+            "dc": 1,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.004,
+          "novelties": []
+        }
+      ]
+    },
+    {
+      "file": "data/vs-metacat-mlx.json",
+      "sha256": "ef1a7dbecb0f5516dae2c02b73bef3abe596a16c4947387bbb373dd63c5cfd35",
+      "backend": "mlx",
+      "episode_horizon": 8,
+      "start_seed": 900000,
+      "seed_source": "stored",
+      "working_cap": 20000,
+      "reference_cap": null,
+      "totals": {
+        "episodes": 1900,
+        "runs": 15200,
+        "stored_novel_pairs": 17,
+        "stored_novel_episodes": 28,
+        "stored_novel_outside_single_pairs": 6,
+        "stored_novel_outside_single_episodes": 16,
+        "missing_head_members": 0,
+        "episodes_never_answering": 4,
+        "capped_runs": 1309,
+        "episodes_with_cap": 626,
+        "episodes_last_run_capped": 361
+      },
+      "results": [
+        {
+          "problem": "misc4",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 0,
+          "stored_novel_episodes": 0,
+          "stored_novel_outside_single_pairs": 0,
+          "stored_novel_outside_single_episodes": 0,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 0,
+          "episodes_with_cap": 0,
+          "episodes_last_run_capped": 0,
+          "position_counts": [
+            {
+              "*NONE*": 4,
+              "b": 29,
+              "y": 30,
+              "z": 37
+            },
+            {
+              "*NONE*": 12,
+              "b": 39,
+              "y": 26,
+              "z": 23
+            },
+            {
+              "*NONE*": 21,
+              "b": 38,
+              "y": 27,
+              "z": 14
+            },
+            {
+              "*NONE*": 52,
+              "b": 24,
+              "y": 11,
+              "z": 13
+            },
+            {
+              "*NONE*": 56,
+              "b": 29,
+              "y": 4,
+              "z": 11
+            },
+            {
+              "*NONE*": 77,
+              "b": 20,
+              "y": 2,
+              "z": 1
+            },
+            {
+              "*NONE*": 91,
+              "b": 8,
+              "z": 1
+            },
+            {
+              "*NONE*": 95,
+              "b": 5
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "b": 76,
+            "y": 10,
+            "z": 14,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.0,
+          "novelties": []
+        },
+        {
+          "problem": "fig5.7",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 0,
+          "stored_novel_episodes": 0,
+          "stored_novel_outside_single_pairs": 0,
+          "stored_novel_outside_single_episodes": 0,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 26,
+          "episodes_with_cap": 25,
+          "episodes_last_run_capped": 7,
+          "position_counts": [
+            {
+              "aabd": 2,
+              "djkk": 1,
+              "hjkk": 4,
+              "ijdd": 2,
+              "ijkd": 2,
+              "ijkk": 5,
+              "ijkl": 31,
+              "ijl": 8,
+              "ijll": 43,
+              "jjkk": 2
+            },
+            {
+              "*CAP*": 2,
+              "aabd": 1,
+              "hjkk": 1,
+              "ijdd": 1,
+              "ijkd": 3,
+              "ijkk": 10,
+              "ijkl": 29,
+              "ijl": 10,
+              "ijll": 37,
+              "jjkk": 6
+            },
+            {
+              "aabd": 1,
+              "hjkk": 1,
+              "ijd": 3,
+              "ijdd": 6,
+              "ijkd": 3,
+              "ijkk": 18,
+              "ijkl": 37,
+              "ijl": 7,
+              "ijll": 21,
+              "jjkk": 3
+            },
+            {
+              "*CAP*": 1,
+              "aabd": 1,
+              "djkk": 1,
+              "hjkk": 1,
+              "ijd": 1,
+              "ijdd": 6,
+              "ijkd": 1,
+              "ijkk": 10,
+              "ijkl": 26,
+              "ijl": 15,
+              "ijll": 33,
+              "jjkk": 4
+            },
+            {
+              "*CAP*": 5,
+              "aabd": 1,
+              "djkk": 1,
+              "hjkk": 3,
+              "ijd": 1,
+              "ijdd": 6,
+              "ijkd": 2,
+              "ijkk": 7,
+              "ijkl": 27,
+              "ijl": 13,
+              "ijll": 32,
+              "jjkk": 2
+            },
+            {
+              "*CAP*": 6,
+              "aabd": 5,
+              "ijd": 3,
+              "ijdd": 8,
+              "ijkd": 2,
+              "ijkk": 11,
+              "ijkl": 24,
+              "ijl": 9,
+              "ijll": 29,
+              "jjkk": 3
+            },
+            {
+              "*CAP*": 5,
+              "aabd": 5,
+              "ajkd": 1,
+              "hjkk": 5,
+              "ijdd": 10,
+              "ijkd": 3,
+              "ijkk": 25,
+              "ijkl": 15,
+              "ijl": 10,
+              "ijll": 14,
+              "jjkk": 7
+            },
+            {
+              "*CAP*": 7,
+              "aabd": 3,
+              "hjkk": 1,
+              "ijd": 2,
+              "ijdd": 12,
+              "ijkd": 6,
+              "ijkk": 17,
+              "ijkl": 13,
+              "ijl": 10,
+              "ijll": 28,
+              "jjkk": 1
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "aabd": 3,
+            "hjkk": 1,
+            "ijd": 2,
+            "ijdd": 13,
+            "ijkd": 6,
+            "ijkk": 18,
+            "ijkl": 15,
+            "ijl": 12,
+            "ijll": 29,
+            "jjkk": 1,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.0,
+          "novelties": []
+        },
+        {
+          "problem": "misc3",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 3,
+          "stored_novel_episodes": 3,
+          "stored_novel_outside_single_pairs": 0,
+          "stored_novel_outside_single_episodes": 0,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 189,
+          "episodes_with_cap": 91,
+          "episodes_last_run_capped": 23,
+          "position_counts": [
+            {
+              "*CAP*": 31,
+              "*NONE*": 1,
+              "kji": 12,
+              "kjji": 1,
+              "kjjiii": 1,
+              "kkjjii": 12,
+              "kkjjjii": 1,
+              "kkkji": 1,
+              "kkkjiii": 1,
+              "kkkjjii": 3,
+              "kkkjjiii": 1,
+              "kkkjjjiii": 35
+            },
+            {
+              "*CAP*": 20,
+              "kji": 14,
+              "kjiii": 1,
+              "kjji": 1,
+              "kjjiii": 2,
+              "kjjjiii": 2,
+              "kkjjii": 8,
+              "kkjjiii": 2,
+              "kkjjiiiii": 1,
+              "kkjjji": 1,
+              "kkjjjiii": 2,
+              "kkjjjiiiii": 1,
+              "kkkji": 1,
+              "kkkjiii": 4,
+              "kkkjjiii": 1,
+              "kkkjjjiihhh": 1,
+              "kkkjjjiii": 38
+            },
+            {
+              "*CAP*": 16,
+              "*NONE*": 2,
+              "kji": 16,
+              "kjiii": 1,
+              "kjjji": 1,
+              "kjjjiii": 1,
+              "kkjji": 1,
+              "kkjjii": 18,
+              "kkjjiii": 1,
+              "kkjjiiiii": 1,
+              "kkjjjii": 1,
+              "kkkji": 1,
+              "kkkjiii": 1,
+              "kkkjjii": 1,
+              "kkkjjiii": 2,
+              "kkkjjji": 1,
+              "kkkjjjiihhh": 1,
+              "kkkjjjiii": 34
+            },
+            {
+              "*CAP*": 30,
+              "*NONE*": 1,
+              "kji": 15,
+              "kjjjiii": 1,
+              "kkjjii": 10,
+              "kkjjiiiii": 1,
+              "kkjjiiiiii": 1,
+              "kkjjjiii": 2,
+              "kkjjjjii": 1,
+              "kkkji": 3,
+              "kkkjji": 1,
+              "kkkjjiihh": 1,
+              "kkkjjiii": 1,
+              "kkkjjji": 1,
+              "kkkjjjii": 1,
+              "kkkjjjiii": 30
+            },
+            {
+              "*CAP*": 23,
+              "kji": 10,
+              "kjiii": 2,
+              "kjjjiii": 3,
+              "kkjjii": 10,
+              "kkjjiii": 1,
+              "kkjjiiiii": 1,
+              "kkjjjiii": 2,
+              "kkkji": 1,
+              "kkkjiii": 2,
+              "kkkjjii": 1,
+              "kkkjjiihh": 3,
+              "kkkjjiii": 1,
+              "kkkjjji": 1,
+              "kkkjjjiii": 38,
+              "kkkkjjjiii": 1
+            },
+            {
+              "*CAP*": 27,
+              "*NONE*": 3,
+              "aabbcc": 1,
+              "kji": 12,
+              "kjiii": 2,
+              "kjjji": 1,
+              "kkjjii": 15,
+              "kkjjiiiii": 2,
+              "kkjjji": 1,
+              "kkjjjii": 1,
+              "kkjjjiihhh": 1,
+              "kkkji": 1,
+              "kkkjiii": 1,
+              "kkkjjiihh": 1,
+              "kkkjjiii": 2,
+              "kkkjjji": 1,
+              "kkkjjjii": 3,
+              "kkkjjjiii": 25
+            },
+            {
+              "*CAP*": 19,
+              "*NONE*": 2,
+              "kji": 16,
+              "kjiii": 1,
+              "kkjiii": 1,
+              "kkjji": 1,
+              "kkjjii": 17,
+              "kkjjiiiii": 2,
+              "kkjjjiii": 1,
+              "kkjjjjii": 1,
+              "kkkji": 1,
+              "kkkjiii": 2,
+              "kkkjjii": 1,
+              "kkkjjiihh": 1,
+              "kkkjjiii": 2,
+              "kkkjjjiii": 31,
+              "kkkjjjjiii": 1
+            },
+            {
+              "*CAP*": 23,
+              "*NONE*": 1,
+              "kji": 14,
+              "kjiii": 1,
+              "kjjji": 2,
+              "kjjjiii": 1,
+              "kkjiii": 1,
+              "kkjjii": 20,
+              "kkjjiii": 1,
+              "kkjjjii": 3,
+              "kkjjjjii": 1,
+              "kkkjjiihh": 1,
+              "kkkjjiii": 3,
+              "kkkjjji": 1,
+              "kkkjjjiii": 26,
+              "kkkjjjjiii": 1
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "kji": 20,
+            "kjiii": 1,
+            "kjjji": 2,
+            "kjjjiii": 1,
+            "kkjiii": 1,
+            "kkjjii": 25,
+            "kkjjiii": 1,
+            "kkjjiiiii": 1,
+            "kkjjjii": 3,
+            "kkjjjjii": 1,
+            "kkkji": 1,
+            "kkkjiii": 1,
+            "kkkjjiihh": 1,
+            "kkkjjiii": 3,
+            "kkkjjji": 1,
+            "kkkjjjiii": 35,
+            "kkkjjjjiii": 2,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.008,
+          "novelties": [
+            {
+              "member": "kkjiii",
+              "count": 1,
+              "in_single_run_set": true
+            },
+            {
+              "member": "kkjjiiiii",
+              "count": 1,
+              "in_single_run_set": true
+            },
+            {
+              "member": "kkjjjjii",
+              "count": 1,
+              "in_single_run_set": true
+            }
+          ]
+        },
+        {
+          "problem": "misc5",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 0,
+          "stored_novel_episodes": 0,
+          "stored_novel_outside_single_pairs": 0,
+          "stored_novel_outside_single_episodes": 0,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 8,
+          "episodes_with_cap": 8,
+          "episodes_last_run_capped": 2,
+          "position_counts": [
+            {
+              "*NONE*": 5,
+              "abd": 4,
+              "dlz": 3,
+              "flz": 17,
+              "gld": 28,
+              "glz": 23,
+              "hlz": 20
+            },
+            {
+              "*CAP*": 2,
+              "*NONE*": 22,
+              "abd": 4,
+              "dlz": 3,
+              "flz": 12,
+              "gld": 9,
+              "glz": 15,
+              "hlz": 33
+            },
+            {
+              "*CAP*": 1,
+              "*NONE*": 25,
+              "abd": 3,
+              "dlz": 6,
+              "flz": 19,
+              "gld": 16,
+              "glz": 14,
+              "hlz": 16
+            },
+            {
+              "*CAP*": 1,
+              "*NONE*": 27,
+              "abd": 4,
+              "dlz": 7,
+              "flz": 21,
+              "gld": 12,
+              "glz": 11,
+              "hlz": 17
+            },
+            {
+              "*NONE*": 33,
+              "abd": 6,
+              "dlz": 14,
+              "flz": 18,
+              "gld": 8,
+              "glz": 11,
+              "hlz": 10
+            },
+            {
+              "*NONE*": 65,
+              "abd": 3,
+              "dlz": 10,
+              "flz": 5,
+              "gld": 4,
+              "glz": 9,
+              "hlz": 4
+            },
+            {
+              "*CAP*": 2,
+              "*NONE*": 62,
+              "abd": 6,
+              "dlz": 16,
+              "flz": 7,
+              "gld": 2,
+              "glz": 5
+            },
+            {
+              "*CAP*": 2,
+              "*NONE*": 76,
+              "abd": 6,
+              "dlz": 7,
+              "gld": 3,
+              "glz": 6
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "abd": 17,
+            "dlz": 34,
+            "flz": 15,
+            "gld": 10,
+            "glz": 22,
+            "hlz": 2,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.0,
+          "novelties": []
+        },
+        {
+          "problem": "misc2",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 1,
+          "stored_novel_episodes": 1,
+          "stored_novel_outside_single_pairs": 1,
+          "stored_novel_outside_single_episodes": 1,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 411,
+          "episodes_with_cap": 100,
+          "episodes_last_run_capped": 95,
+          "position_counts": [
+            {
+              "ijd": 2,
+              "ijk": 1,
+              "ijl": 97
+            },
+            {
+              "*CAP*": 1,
+              "abd": 14,
+              "ijd": 21,
+              "ijk": 61,
+              "ijl": 3
+            },
+            {
+              "*CAP*": 14,
+              "abd": 43,
+              "ijd": 21,
+              "ijk": 22
+            },
+            {
+              "*CAP*": 60,
+              "abd": 21,
+              "ijd": 11,
+              "ijk": 8
+            },
+            {
+              "*CAP*": 67,
+              "abd": 13,
+              "ajd": 1,
+              "ijd": 12,
+              "ijk": 7
+            },
+            {
+              "*CAP*": 85,
+              "abd": 7,
+              "ijd": 8
+            },
+            {
+              "*CAP*": 89,
+              "abd": 2,
+              "ijd": 8,
+              "ijk": 1
+            },
+            {
+              "*CAP*": 95,
+              "ijd": 5
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "abd": 46,
+            "ajd": 1,
+            "ijd": 40,
+            "ijk": 13,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.008,
+          "novelties": [
+            {
+              "member": "ajd",
+              "count": 1,
+              "in_single_run_set": false
+            }
+          ]
+        },
+        {
+          "problem": "run1",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 0,
+          "stored_novel_episodes": 0,
+          "stored_novel_outside_single_pairs": 0,
+          "stored_novel_outside_single_episodes": 0,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 180,
+          "episodes_with_cap": 96,
+          "episodes_last_run_capped": 51,
+          "position_counts": [
+            {
+              "abd": 2,
+              "mrrddd": 3,
+              "mrrjjj": 4,
+              "mrrjjjj": 3,
+              "mrrjjk": 22,
+              "mrrjkk": 2,
+              "mrrkkk": 64
+            },
+            {
+              "*CAP*": 3,
+              "abd": 4,
+              "mrrddd": 6,
+              "mrrjjd": 1,
+              "mrrjjj": 26,
+              "mrrjjjj": 12,
+              "mrrjjk": 20,
+              "mrrjkk": 5,
+              "mrrkkk": 23
+            },
+            {
+              "*CAP*": 8,
+              "abd": 8,
+              "mrrddd": 15,
+              "mrrjjj": 29,
+              "mrrjjjj": 19,
+              "mrrjjk": 9,
+              "mrrjkk": 3,
+              "mrrkkk": 9
+            },
+            {
+              "*CAP*": 11,
+              "abd": 15,
+              "mrrddd": 9,
+              "mrrjjd": 2,
+              "mrrjjj": 20,
+              "mrrjjjj": 22,
+              "mrrjjk": 13,
+              "mrrjkk": 4,
+              "mrrkkk": 4
+            },
+            {
+              "*CAP*": 25,
+              "abd": 19,
+              "mrrddd": 11,
+              "mrrjjd": 4,
+              "mrrjjj": 11,
+              "mrrjjjj": 19,
+              "mrrjjk": 8,
+              "mrrjkk": 2,
+              "msskkk": 1
+            },
+            {
+              "*CAP*": 38,
+              "abd": 12,
+              "mrrddd": 7,
+              "mrrjjd": 2,
+              "mrrjjj": 13,
+              "mrrjjjj": 13,
+              "mrrjjk": 9,
+              "mrrjkk": 2,
+              "msskkk": 4
+            },
+            {
+              "*CAP*": 44,
+              "abd": 10,
+              "mrrddd": 10,
+              "mrrjjd": 3,
+              "mrrjjj": 12,
+              "mrrjjjj": 6,
+              "mrrjjk": 9,
+              "mrrjkk": 3,
+              "msskkk": 3
+            },
+            {
+              "*CAP*": 51,
+              "abd": 9,
+              "mrrddd": 10,
+              "mrrjjd": 2,
+              "mrrjjj": 9,
+              "mrrjjjj": 5,
+              "mrrjjk": 5,
+              "mrrjkk": 3,
+              "msskkk": 5,
+              "nrrjjj": 1
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "abd": 20,
+            "mrrddd": 16,
+            "mrrjjd": 4,
+            "mrrjjj": 18,
+            "mrrjjjj": 12,
+            "mrrjjk": 16,
+            "mrrjkk": 5,
+            "msskkk": 8,
+            "nrrjjj": 1,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.004,
+          "novelties": []
+        },
+        {
+          "problem": "run4",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 0,
+          "stored_novel_episodes": 0,
+          "stored_novel_outside_single_pairs": 0,
+          "stored_novel_outside_single_episodes": 0,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 3,
+          "episodes_with_cap": 3,
+          "episodes_last_run_capped": 1,
+          "position_counts": [
+            {
+              "*NONE*": 19,
+              "abd": 4,
+              "dyz": 3,
+              "wyz": 20,
+              "xyd": 28,
+              "xyz": 25,
+              "yyz": 1
+            },
+            {
+              "*NONE*": 30,
+              "abd": 6,
+              "dyz": 4,
+              "wxz": 1,
+              "wyz": 21,
+              "xyd": 13,
+              "xyz": 20,
+              "yyz": 5
+            },
+            {
+              "*NONE*": 37,
+              "abd": 2,
+              "dyz": 3,
+              "wyz": 14,
+              "xyd": 16,
+              "xyz": 15,
+              "yyz": 13
+            },
+            {
+              "*NONE*": 43,
+              "abd": 1,
+              "dyz": 2,
+              "wyz": 22,
+              "xyd": 9,
+              "xyz": 10,
+              "yyz": 13
+            },
+            {
+              "*NONE*": 61,
+              "abd": 4,
+              "dyz": 3,
+              "wyz": 8,
+              "xyd": 12,
+              "xyz": 6,
+              "yyz": 6
+            },
+            {
+              "*CAP*": 1,
+              "*NONE*": 62,
+              "abd": 3,
+              "dyz": 9,
+              "wyz": 3,
+              "xyd": 3,
+              "xyz": 7,
+              "yyz": 12
+            },
+            {
+              "*CAP*": 1,
+              "*NONE*": 52,
+              "abd": 6,
+              "dyz": 10,
+              "wyz": 2,
+              "xyd": 4,
+              "xyz": 4,
+              "yyz": 21
+            },
+            {
+              "*CAP*": 1,
+              "*NONE*": 72,
+              "abd": 6,
+              "dyz": 8,
+              "wyz": 3,
+              "xyz": 3,
+              "yyz": 7
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "abd": 11,
+            "dyz": 20,
+            "wyz": 11,
+            "xyd": 8,
+            "xyz": 17,
+            "yyz": 33,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.002,
+          "novelties": []
+        },
+        {
+          "problem": "misc1",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 3,
+          "stored_novel_episodes": 4,
+          "stored_novel_outside_single_pairs": 0,
+          "stored_novel_outside_single_episodes": 0,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 184,
+          "episodes_with_cap": 91,
+          "episodes_last_run_capped": 53,
+          "position_counts": [
+            {
+              "crraaa": 2,
+              "jjjrrm": 88,
+              "jjrrjm": 1,
+              "jrrjjm": 4,
+              "jrrmmm": 2,
+              "mrrjjj": 3
+            },
+            {
+              "cba": 3,
+              "jjjrrm": 71,
+              "jjrrjm": 1,
+              "jrrjjm": 10,
+              "jrrmmm": 1,
+              "mmmrrj": 1,
+              "mrrjjj": 13
+            },
+            {
+              "*CAP*": 2,
+              "cba": 16,
+              "jjjrrm": 55,
+              "jjrrjm": 1,
+              "jrrjjm": 9,
+              "jrrmmm": 3,
+              "mrrjjj": 11,
+              "rrjjjm": 3
+            },
+            {
+              "*CAP*": 8,
+              "cba": 36,
+              "jjjrrm": 31,
+              "jjrrjm": 2,
+              "jrrjjm": 7,
+              "mrrjjj": 12,
+              "rrjjjm": 4
+            },
+            {
+              "*CAP*": 24,
+              "cba": 19,
+              "crraaa": 3,
+              "jjjmrr": 1,
+              "jjjrmr": 1,
+              "jjjrrm": 23,
+              "jrrjjm": 11,
+              "mrrjjj": 10,
+              "rrjjjm": 8
+            },
+            {
+              "*CAP*": 45,
+              "cba": 14,
+              "jjjrrm": 17,
+              "jjrrjm": 1,
+              "jrrjjm": 8,
+              "jrrmmm": 2,
+              "mrrjjj": 4,
+              "rrjjjm": 9
+            },
+            {
+              "*CAP*": 52,
+              "cba": 8,
+              "crraaa": 1,
+              "jjjmrr": 1,
+              "jjjrmr": 1,
+              "jjjrrm": 7,
+              "jrrjjm": 7,
+              "jrrmmm": 1,
+              "mmmrrj": 1,
+              "mrraaa": 2,
+              "mrrjjj": 14,
+              "rrjjjm": 5
+            },
+            {
+              "*CAP*": 53,
+              "cba": 3,
+              "crraaa": 1,
+              "jjjrrm": 4,
+              "jjrrjm": 1,
+              "jrrjjm": 9,
+              "jrrmmm": 3,
+              "mmmrrj": 3,
+              "mrrjjj": 9,
+              "rrjjjm": 14
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "cba": 22,
+            "crraaa": 2,
+            "jjjmrr": 2,
+            "jjjrmr": 1,
+            "jjjrrm": 17,
+            "jjrrjm": 1,
+            "jrrjjm": 13,
+            "jrrmmm": 4,
+            "mmmrrj": 4,
+            "mrraaa": 1,
+            "mrrjjj": 13,
+            "rrjjjm": 20,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.006,
+          "novelties": [
+            {
+              "member": "crraaa",
+              "count": 2,
+              "in_single_run_set": true
+            },
+            {
+              "member": "jjjrmr",
+              "count": 1,
+              "in_single_run_set": true
+            },
+            {
+              "member": "mrraaa",
+              "count": 1,
+              "in_single_run_set": true
+            }
+          ]
+        },
+        {
+          "problem": "fig5.4-top",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 3,
+          "stored_novel_episodes": 3,
+          "stored_novel_outside_single_pairs": 0,
+          "stored_novel_outside_single_episodes": 0,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 9,
+          "episodes_with_cap": 9,
+          "episodes_last_run_capped": 0,
+          "position_counts": [
+            {
+              "*NONE*": 14,
+              "ixi": 1,
+              "ixxi": 31,
+              "ixxq": 3,
+              "qeeq": 49,
+              "qxeq": 1,
+              "qxxi": 1
+            },
+            {
+              "*NONE*": 22,
+              "ixxi": 15,
+              "ixxq": 5,
+              "ixxxq": 1,
+              "qeeq": 54,
+              "qiq": 1,
+              "qxxi": 2
+            },
+            {
+              "*CAP*": 1,
+              "*NONE*": 20,
+              "iixxxi": 1,
+              "ixxi": 16,
+              "ixxq": 7,
+              "qeeq": 48,
+              "qexq": 1,
+              "qiq": 2,
+              "qxxi": 4
+            },
+            {
+              "*NONE*": 16,
+              "ixxi": 17,
+              "ixxq": 2,
+              "qeeq": 56,
+              "qiq": 1,
+              "qixx": 1,
+              "qxeeq": 1,
+              "qxxi": 5,
+              "xix": 1
+            },
+            {
+              "*NONE*": 19,
+              "ixxi": 14,
+              "ixxq": 4,
+              "qeeq": 54,
+              "qeqq": 1,
+              "qiiq": 1,
+              "qiq": 1,
+              "qxxi": 6
+            },
+            {
+              "*CAP*": 4,
+              "*NONE*": 16,
+              "ixxi": 11,
+              "ixxq": 9,
+              "qeeq": 52,
+              "qiq": 2,
+              "qxxi": 6
+            },
+            {
+              "*CAP*": 4,
+              "*NONE*": 24,
+              "ixxi": 10,
+              "ixxq": 7,
+              "qeeq": 47,
+              "qxeeq": 1,
+              "qxxi": 6,
+              "xxiq": 1
+            },
+            {
+              "*NONE*": 21,
+              "iixxi": 1,
+              "ixxi": 9,
+              "ixxq": 8,
+              "qeeq": 48,
+              "qexq": 1,
+              "qiiq": 1,
+              "qiq": 3,
+              "qxxi": 8
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "iixxi": 1,
+            "ixxi": 11,
+            "ixxq": 9,
+            "qeeq": 64,
+            "qexq": 1,
+            "qiiq": 1,
+            "qiq": 3,
+            "qxxi": 10,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.014,
+          "novelties": [
+            {
+              "member": "iixxi",
+              "count": 1,
+              "in_single_run_set": true
+            },
+            {
+              "member": "qexq",
+              "count": 1,
+              "in_single_run_set": true
+            },
+            {
+              "member": "qiiq",
+              "count": 1,
+              "in_single_run_set": true
+            }
+          ]
+        },
+        {
+          "problem": "eqe-baaab",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 4,
+          "stored_novel_episodes": 10,
+          "stored_novel_outside_single_pairs": 3,
+          "stored_novel_outside_single_episodes": 9,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 55,
+          "episodes_with_cap": 43,
+          "episodes_last_run_capped": 25,
+          "position_counts": [
+            {
+              "abbba": 1,
+              "abbbb": 1,
+              "baaab": 47,
+              "baaaq": 5,
+              "qaaab": 4,
+              "qbbba": 2,
+              "qbbbq": 8,
+              "qeeeq": 29,
+              "qeq": 3
+            },
+            {
+              "*NONE*": 1,
+              "abbba": 2,
+              "abbbb": 1,
+              "baaab": 42,
+              "baaaq": 4,
+              "qaaab": 2,
+              "qbbbq": 6,
+              "qeeeq": 38,
+              "qeq": 4
+            },
+            {
+              "*NONE*": 1,
+              "abbba": 4,
+              "baaab": 28,
+              "baaaq": 11,
+              "bcaab": 1,
+              "qaaab": 14,
+              "qbbba": 1,
+              "qbbbq": 8,
+              "qeeeq": 20,
+              "qeq": 12
+            },
+            {
+              "*NONE*": 2,
+              "abbba": 7,
+              "abbbq": 1,
+              "baaab": 14,
+              "baaaq": 19,
+              "qaaab": 19,
+              "qbbba": 1,
+              "qbbbq": 8,
+              "qbebq": 1,
+              "qeeeq": 8,
+              "qeq": 19,
+              "qqqqp": 1
+            },
+            {
+              "*CAP*": 5,
+              "*NONE*": 1,
+              "abaab": 1,
+              "abbba": 8,
+              "abbbb": 3,
+              "abbbq": 2,
+              "baaab": 19,
+              "baaaq": 14,
+              "qaaab": 13,
+              "qbbba": 1,
+              "qbbbq": 5,
+              "qeeeq": 6,
+              "qeq": 22
+            },
+            {
+              "*CAP*": 10,
+              "*NONE*": 1,
+              "abbba": 15,
+              "abbbb": 5,
+              "abbbq": 1,
+              "baaab": 9,
+              "baaaq": 17,
+              "qaaab": 10,
+              "qbbba": 2,
+              "qbbbq": 13,
+              "qeeeq": 2,
+              "qeq": 13,
+              "qqqqp": 1,
+              "qrrrq": 1
+            },
+            {
+              "*CAP*": 15,
+              "*NONE*": 2,
+              "abbba": 16,
+              "abbbb": 3,
+              "abbbq": 4,
+              "baaab": 9,
+              "baaaq": 7,
+              "qaaab": 20,
+              "qbbba": 4,
+              "qbbbq": 10,
+              "qeeeq": 1,
+              "qeq": 8,
+              "qrbbq": 1
+            },
+            {
+              "*CAP*": 25,
+              "*NONE*": 4,
+              "abbba": 14,
+              "abbbb": 5,
+              "abbbq": 3,
+              "aqqqp": 1,
+              "baaab": 4,
+              "baaaq": 10,
+              "baaba": 1,
+              "qaaab": 9,
+              "qbbba": 1,
+              "qbbbq": 9,
+              "qeq": 9,
+              "qqqqp": 2,
+              "qrbbq": 1,
+              "qrrbq": 1,
+              "qrrrq": 1
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "abbba": 19,
+            "abbbb": 7,
+            "abbbq": 3,
+            "aqqqp": 1,
+            "baaab": 8,
+            "baaaq": 11,
+            "baaba": 1,
+            "qaaab": 17,
+            "qbbba": 2,
+            "qbbbq": 12,
+            "qeq": 14,
+            "qqqqp": 2,
+            "qrbbq": 1,
+            "qrrbq": 1,
+            "qrrrq": 1,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.008,
+          "novelties": [
+            {
+              "member": "abbbb",
+              "count": 7,
+              "in_single_run_set": false
+            },
+            {
+              "member": "aqqqp",
+              "count": 1,
+              "in_single_run_set": true
+            },
+            {
+              "member": "baaba",
+              "count": 1,
+              "in_single_run_set": false
+            },
+            {
+              "member": "qrrbq",
+              "count": 1,
+              "in_single_run_set": false
+            }
+          ]
+        },
+        {
+          "problem": "run6",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 2,
+          "stored_novel_episodes": 6,
+          "stored_novel_outside_single_pairs": 2,
+          "stored_novel_outside_single_episodes": 6,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 0,
+          "episodes_with_cap": 0,
+          "episodes_last_run_capped": 0,
+          "position_counts": [
+            {
+              "*NONE*": 9,
+              "abbbq": 1,
+              "baaaq": 5,
+              "bcaab": 1,
+              "cbbba": 6,
+              "cdddb": 1,
+              "qbbbq": 9,
+              "qcccb": 9,
+              "qeeeq": 57,
+              "qeq": 2
+            },
+            {
+              "*NONE*": 25,
+              "abbbq": 2,
+              "baaab": 1,
+              "baaaq": 7,
+              "caaab": 2,
+              "cbbba": 3,
+              "cdccb": 1,
+              "cddda": 1,
+              "cdddb": 1,
+              "qbbbc": 1,
+              "qbbbq": 12,
+              "qbbeq": 1,
+              "qcccb": 8,
+              "qeeeq": 29,
+              "qeq": 5,
+              "qeqqr": 1
+            },
+            {
+              "*NONE*": 22,
+              "abbbq": 4,
+              "baaab": 1,
+              "baaaq": 5,
+              "caaab": 3,
+              "cbbba": 5,
+              "cddcb": 1,
+              "cddda": 1,
+              "cdddb": 4,
+              "qbbbq": 5,
+              "qcccb": 15,
+              "qeeeq": 25,
+              "qeeqr": 1,
+              "qeq": 6,
+              "qreeq": 1,
+              "qrreq": 1
+            },
+            {
+              "*NONE*": 28,
+              "baaab": 4,
+              "baaaq": 13,
+              "caaab": 2,
+              "cbbba": 2,
+              "cddda": 4,
+              "qbbbc": 1,
+              "qbbbq": 14,
+              "qbbqr": 1,
+              "qcccb": 9,
+              "qeebq": 1,
+              "qeeeq": 17,
+              "qeq": 4
+            },
+            {
+              "*NONE*": 39,
+              "abbbq": 1,
+              "baaaq": 14,
+              "bcaab": 2,
+              "cbbba": 3,
+              "cddbc": 1,
+              "cdddb": 1,
+              "qbbbc": 1,
+              "qbbbq": 10,
+              "qcccb": 6,
+              "qeeeq": 11,
+              "qeeqr": 1,
+              "qeq": 8,
+              "qrccb": 1,
+              "qrqqr": 1
+            },
+            {
+              "*NONE*": 40,
+              "abbbq": 1,
+              "baaaq": 5,
+              "cbbba": 7,
+              "cddda": 1,
+              "cdddb": 4,
+              "qbbbq": 15,
+              "qbbqr": 1,
+              "qcccb": 4,
+              "qeeeq": 17,
+              "qeq": 5
+            },
+            {
+              "*NONE*": 32,
+              "baaab": 4,
+              "baaaq": 12,
+              "baqqr": 1,
+              "bcaab": 1,
+              "cbbba": 6,
+              "cddda": 3,
+              "cdddb": 3,
+              "qbbbc": 1,
+              "qbbbq": 12,
+              "qcccb": 11,
+              "qeeeq": 11,
+              "qeq": 3
+            },
+            {
+              "*NONE*": 46,
+              "baaab": 3,
+              "baaaq": 11,
+              "bcaab": 1,
+              "cbbba": 3,
+              "cddbc": 1,
+              "cddda": 2,
+              "cdddb": 2,
+              "qbbbc": 2,
+              "qbbbq": 8,
+              "qcccb": 9,
+              "qeeeq": 8,
+              "qeq": 2,
+              "qrreq": 1,
+              "qrrrq": 1
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "baaab": 6,
+            "baaaq": 20,
+            "bcaab": 1,
+            "cbbba": 6,
+            "cddbc": 1,
+            "cddda": 3,
+            "cdddb": 5,
+            "qbbbc": 3,
+            "qbbbq": 16,
+            "qcccb": 14,
+            "qeeeq": 21,
+            "qeq": 2,
+            "qrreq": 1,
+            "qrrrq": 1,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.016,
+          "novelties": [
+            {
+              "member": "cddbc",
+              "count": 1,
+              "in_single_run_set": false
+            },
+            {
+              "member": "cdddb",
+              "count": 5,
+              "in_single_run_set": false
+            }
+          ]
+        },
+        {
+          "problem": "run3",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 0,
+          "stored_novel_episodes": 0,
+          "stored_novel_outside_single_pairs": 0,
+          "stored_novel_outside_single_episodes": 0,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 1,
+          "episodes_with_cap": 1,
+          "episodes_last_run_capped": 0,
+          "position_counts": [
+            {
+              "*NONE*": 32,
+              "rsu": 4,
+              "wyz": 7,
+              "xyu": 19,
+              "xyz": 26,
+              "yyz": 12
+            },
+            {
+              "*NONE*": 40,
+              "rsu": 5,
+              "wyz": 14,
+              "xyu": 19,
+              "xyz": 17,
+              "yyz": 5
+            },
+            {
+              "*NONE*": 39,
+              "rsu": 3,
+              "wyz": 26,
+              "xyu": 14,
+              "xyz": 9,
+              "yyz": 9
+            },
+            {
+              "*NONE*": 53,
+              "rsu": 4,
+              "uyz": 2,
+              "wyz": 10,
+              "xyu": 7,
+              "xyz": 15,
+              "yyz": 9
+            },
+            {
+              "*CAP*": 1,
+              "*NONE*": 54,
+              "rsu": 5,
+              "uyz": 2,
+              "wyz": 12,
+              "xyu": 12,
+              "xyz": 4,
+              "yyz": 10
+            },
+            {
+              "*NONE*": 59,
+              "rsu": 5,
+              "uyz": 6,
+              "wyz": 7,
+              "xyu": 4,
+              "xyz": 12,
+              "yyz": 7
+            },
+            {
+              "*NONE*": 58,
+              "rsu": 10,
+              "uyz": 3,
+              "wyz": 4,
+              "xyu": 10,
+              "xyz": 7,
+              "yyz": 8
+            },
+            {
+              "*NONE*": 75,
+              "rsu": 1,
+              "uyz": 6,
+              "wyz": 8,
+              "xyu": 2,
+              "xyz": 2,
+              "yyz": 6
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "rsu": 11,
+            "uyz": 12,
+            "wyz": 20,
+            "xyu": 18,
+            "xyz": 17,
+            "yyz": 22,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.004,
+          "novelties": []
+        },
+        {
+          "problem": "run2",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 0,
+          "stored_novel_episodes": 0,
+          "stored_novel_outside_single_pairs": 0,
+          "stored_novel_outside_single_episodes": 0,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 170,
+          "episodes_with_cap": 98,
+          "episodes_last_run_capped": 71,
+          "position_counts": [
+            {
+              "mrrddd": 1,
+              "mrrjjj": 5,
+              "mrrjjk": 24,
+              "mrrjkk": 3,
+              "mrrkkk": 67
+            },
+            {
+              "mrrddd": 20,
+              "mrrjjd": 1,
+              "mrrjjj": 13,
+              "mrrjjk": 36,
+              "mrrjkk": 1,
+              "mrrkkk": 26,
+              "xqd": 3
+            },
+            {
+              "mrrddd": 42,
+              "mrrjjd": 4,
+              "mrrjjj": 9,
+              "mrrjjk": 24,
+              "mrrjkk": 4,
+              "mrrkkk": 7,
+              "xqd": 10
+            },
+            {
+              "mrrddd": 25,
+              "mrrjjd": 31,
+              "mrrjjj": 12,
+              "mrrjjk": 11,
+              "mrrjkk": 3,
+              "xqd": 18
+            },
+            {
+              "*CAP*": 6,
+              "mrrddd": 8,
+              "mrrjjd": 28,
+              "mrrjjj": 18,
+              "mrrjjk": 4,
+              "mrrjkk": 6,
+              "xqd": 30
+            },
+            {
+              "*CAP*": 29,
+              "mrrddd": 3,
+              "mrrjjd": 24,
+              "mrrjjj": 12,
+              "mrrjjk": 1,
+              "mrrjkk": 3,
+              "xqd": 28
+            },
+            {
+              "*CAP*": 64,
+              "mrrddd": 1,
+              "mrrjdd": 1,
+              "mrrjjd": 7,
+              "mrrjjj": 15,
+              "mrrjkk": 4,
+              "xqd": 8
+            },
+            {
+              "*CAP*": 71,
+              "mrrjdd": 1,
+              "mrrjjd": 4,
+              "mrrjjj": 18,
+              "mrrjkk": 4,
+              "xqd": 2
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "mrrddd": 2,
+            "mrrjdd": 2,
+            "mrrjjd": 34,
+            "mrrjjj": 31,
+            "mrrjkk": 9,
+            "xqd": 22,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.0,
+          "novelties": []
+        },
+        {
+          "problem": "copy1",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 0,
+          "stored_novel_episodes": 0,
+          "stored_novel_outside_single_pairs": 0,
+          "stored_novel_outside_single_episodes": 0,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 25,
+          "episodes_with_cap": 21,
+          "episodes_last_run_capped": 12,
+          "position_counts": [
+            {
+              "*NONE*": 1,
+              "ab": 8,
+              "c": 91
+            },
+            {
+              "*NONE*": 24,
+              "ab": 2,
+              "c": 74
+            },
+            {
+              "*NONE*": 41,
+              "ab": 10,
+              "c": 49
+            },
+            {
+              "*CAP*": 1,
+              "*NONE*": 66,
+              "ab": 8,
+              "c": 25
+            },
+            {
+              "*CAP*": 3,
+              "*NONE*": 75,
+              "ab": 6,
+              "c": 16
+            },
+            {
+              "*CAP*": 3,
+              "*NONE*": 80,
+              "ab": 8,
+              "c": 9
+            },
+            {
+              "*CAP*": 6,
+              "*NONE*": 81,
+              "ab": 6,
+              "c": 7
+            },
+            {
+              "*CAP*": 12,
+              "*NONE*": 75,
+              "ab": 9,
+              "c": 4
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "ab": 34,
+            "c": 66,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.0,
+          "novelties": []
+        },
+        {
+          "problem": "copy2",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 0,
+          "stored_novel_episodes": 0,
+          "stored_novel_outside_single_pairs": 0,
+          "stored_novel_outside_single_episodes": 0,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 0,
+          "episodes_with_cap": 0,
+          "episodes_last_run_capped": 0,
+          "position_counts": [
+            {
+              "*NONE*": 3,
+              "d": 97
+            },
+            {
+              "*NONE*": 43,
+              "d": 57
+            },
+            {
+              "*NONE*": 76,
+              "d": 24
+            },
+            {
+              "*NONE*": 94,
+              "d": 6
+            },
+            {
+              "*NONE*": 93,
+              "d": 7
+            },
+            {
+              "*NONE*": 98,
+              "d": 2
+            },
+            {
+              "*NONE*": 94,
+              "d": 6
+            },
+            {
+              "*NONE*": 99,
+              "d": 1
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "d": 100,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.0,
+          "novelties": []
+        },
+        {
+          "problem": "copy3",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 0,
+          "stored_novel_episodes": 0,
+          "stored_novel_outside_single_pairs": 0,
+          "stored_novel_outside_single_episodes": 0,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 0,
+          "episodes_with_cap": 0,
+          "episodes_last_run_capped": 0,
+          "position_counts": [
+            {
+              "*NONE*": 2,
+              "z": 98
+            },
+            {
+              "*NONE*": 41,
+              "z": 59
+            },
+            {
+              "*NONE*": 77,
+              "z": 23
+            },
+            {
+              "*NONE*": 89,
+              "z": 11
+            },
+            {
+              "*NONE*": 97,
+              "z": 3
+            },
+            {
+              "*NONE*": 97,
+              "z": 3
+            },
+            {
+              "*NONE*": 99,
+              "z": 1
+            },
+            {
+              "*NONE*": 99,
+              "z": 1
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "z": 100,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.0,
+          "novelties": []
+        },
+        {
+          "problem": "copy4",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 0,
+          "stored_novel_episodes": 0,
+          "stored_novel_outside_single_pairs": 0,
+          "stored_novel_outside_single_episodes": 0,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 24,
+          "episodes_with_cap": 18,
+          "episodes_last_run_capped": 9,
+          "position_counts": [
+            {
+              "*NONE*": 2,
+              "x": 86,
+              "zy": 12
+            },
+            {
+              "*NONE*": 22,
+              "x": 72,
+              "zy": 6
+            },
+            {
+              "*NONE*": 42,
+              "x": 48,
+              "zy": 10
+            },
+            {
+              "*CAP*": 2,
+              "*NONE*": 63,
+              "x": 25,
+              "zy": 10
+            },
+            {
+              "*CAP*": 2,
+              "*NONE*": 83,
+              "x": 11,
+              "zy": 4
+            },
+            {
+              "*CAP*": 6,
+              "*NONE*": 74,
+              "x": 11,
+              "zy": 9
+            },
+            {
+              "*CAP*": 5,
+              "*NONE*": 84,
+              "x": 5,
+              "zy": 6
+            },
+            {
+              "*CAP*": 9,
+              "*NONE*": 77,
+              "x": 7,
+              "zy": 7
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "x": 71,
+            "zy": 29,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.0,
+          "novelties": []
+        },
+        {
+          "problem": "copy5",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 1,
+          "stored_novel_episodes": 1,
+          "stored_novel_outside_single_pairs": 0,
+          "stored_novel_outside_single_episodes": 0,
+          "missing_head_members": 0,
+          "episodes_never_answering": 4,
+          "capped_runs": 0,
+          "episodes_with_cap": 0,
+          "episodes_last_run_capped": 0,
+          "position_counts": [
+            {
+              "*NONE*": 71,
+              "aac": 1,
+              "cac": 1,
+              "cc": 27
+            },
+            {
+              "*NONE*": 74,
+              "cc": 26
+            },
+            {
+              "*NONE*": 71,
+              "aac": 1,
+              "cc": 28
+            },
+            {
+              "*NONE*": 64,
+              "aac": 2,
+              "cac": 2,
+              "cc": 32
+            },
+            {
+              "*NONE*": 70,
+              "aac": 1,
+              "cc": 29
+            },
+            {
+              "*NONE*": 76,
+              "aac": 1,
+              "acc": 1,
+              "cc": 22
+            },
+            {
+              "*NONE*": 79,
+              "cbc": 1,
+              "cc": 20
+            },
+            {
+              "*NONE*": 80,
+              "aac": 1,
+              "cbc": 1,
+              "cc": 18
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "aac": 1,
+            "cac": 1,
+            "cbc": 1,
+            "cc": 93,
+            "*NO_ANSWER*": 4
+          },
+          "stored_reference_f1_over_n": 0.004008,
+          "novelties": [
+            {
+              "member": "cac",
+              "count": 1,
+              "in_single_run_set": true
+            }
+          ]
+        },
+        {
+          "problem": "copy6",
+          "episodes": 100,
+          "runs": 800,
+          "stored_novel_pairs": 0,
+          "stored_novel_episodes": 0,
+          "stored_novel_outside_single_pairs": 0,
+          "stored_novel_outside_single_episodes": 0,
+          "missing_head_members": 0,
+          "episodes_never_answering": 0,
+          "capped_runs": 24,
+          "episodes_with_cap": 22,
+          "episodes_last_run_capped": 12,
+          "position_counts": [
+            {
+              "*NONE*": 3,
+              "abc": 7,
+              "d": 90
+            },
+            {
+              "*NONE*": 28,
+              "abc": 7,
+              "d": 65
+            },
+            {
+              "*NONE*": 49,
+              "abc": 10,
+              "d": 41
+            },
+            {
+              "*CAP*": 1,
+              "*NONE*": 72,
+              "abc": 5,
+              "d": 22
+            },
+            {
+              "*CAP*": 2,
+              "*NONE*": 71,
+              "abc": 7,
+              "d": 20
+            },
+            {
+              "*CAP*": 4,
+              "*NONE*": 77,
+              "abc": 8,
+              "d": 11
+            },
+            {
+              "*CAP*": 5,
+              "*NONE*": 83,
+              "abc": 7,
+              "d": 5
+            },
+            {
+              "*CAP*": 12,
+              "*NONE*": 77,
+              "abc": 6,
+              "d": 5
+            }
+          ],
+          "endpoint_counts_including_no_answer": {
+            "abc": 24,
+            "d": 76,
+            "*NO_ANSWER*": 0
+          },
+          "stored_reference_f1_over_n": 0.004,
+          "novelties": []
+        }
+      ]
+    }
+  ]
+}

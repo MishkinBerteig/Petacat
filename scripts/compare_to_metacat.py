@@ -29,10 +29,10 @@ TWO MODES, TWO CHECKS EACH, AND NOTHING FAILS
 
 Both are FLAGS. Metacat is stochastic and self-watching with no ground truth, so
 this says stable or changed, never pass or fail. Every novel result is reported
-with the reference's own f1/n, which is the rate at which the reference would
-produce an unseen member itself -- on the convergence sets that is deliberately
-non-zero, so roughly eight novel answers per cycle are expected even from a
-perfect port.
+with the reference's own f1/n, a missing-mass estimate rather than a certified
+bound. It supplies a plug-in reference-distribution baseline only if the check
+distribution matches the reference. Support equality alone does not transfer
+that rate, and repeated-look stopping adds uncertainty not quantified here.
 
 WHAT THIS DOES NOT DO. It draws no conclusion about whether Petacat is a faithful
 port. It reports what differs.
@@ -61,9 +61,10 @@ ANSWERLESS = {"*NONE*", "*CAP*"}
 # 20,000 may be a run that would have answered given the reference's budget.
 #
 # SINGLE RUNS RESOLVE THAT, rather than reporting a state the comparison knows is
-# not comparable. A single run is independent -- fresh memory, one seed -- so
-# re-running it at REFERENCE_MAX_STEPS is the same run continued, and whatever it
-# reaches there is what gets compared. It is cheap because caps are rare: 23 of
+# not comparable. If replay is deterministic and the larger cap does not alter
+# earlier transitions, re-running at REFERENCE_MAX_STEPS extends the trajectory.
+# Fresh memory alone does not establish those assumptions. What it reaches there
+# is what gets compared. It is cheap because caps are rare: 23 of
 # 1,900 in a cycle, 22 of them on misc3, where the reference *also* caps (10.96%
 # of 19,000 runs) and *CAP* is a member of the reference set in its own right.
 #
@@ -243,10 +244,9 @@ def compare(name, produced: Counter, ref_set: dict, ref_p50: dict, n: int,
 def mark_recurrences(rows, previous, mode):
     """Flag every novel member the previous cycle also produced.
 
-    A member that recurs across cycles is not missing mass, whatever its count in
-    one of them -- the Good-Turing argument that excuses a singleton is an
-    argument about *one* sample. Comparing by hand needs someone to remember the
-    last cycle; this reads it off the file the last cycle wrote.
+    This is a prioritization marker, not independent evidence of invalidity.
+    A valid outcome omitted from a finite reference can recur. Reusing seeds
+    can also replay the same observation rather than provide a new sample.
     """
     if not previous:
         return

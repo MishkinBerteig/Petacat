@@ -1,0 +1,649 @@
+{
+  "description": "Arithmetic audit of saved artifacts, not a new experiment or validation of statistical guarantees.",
+  "reference_sha256": "a3d422aae0b3aabe3bd8e9fad749e150c1710c998d57fba2a4a595191768ceeb",
+  "reference_parameters": {
+    "shards": 8,
+    "batch": 1000,
+    "min_runs": 3000,
+    "max_runs": 200000,
+    "checkpoint": 50000,
+    "max_steps": 100000
+  },
+  "problems": 19,
+  "total_reference_runs": 374500,
+  "total_observed_problem_outcome_pairs": 366,
+  "total_head_members": 27,
+  "zero_singleton_problems": [
+    "misc4",
+    "run1",
+    "copy1",
+    "copy2",
+    "copy3",
+    "copy4"
+  ],
+  "above_target": [
+    "misc3",
+    "fig5.4-top",
+    "eqe-baaab"
+  ],
+  "plug_in_expected_novel_draws_per_cycle": 0.16948513249570998,
+  "plug_in_expected_flagged_problems_per_cycle": 0.1678980032285794,
+  "plug_in_probability_any_novelty_per_cycle": 0.1559143459024962,
+  "plug_in_maximum_head_absence": 3.935496047786154e-10,
+  "plug_in_cycle_head_union_bound": 6.133984122523596e-10,
+  "run_count_ratio": 197.10526315789474,
+  "same_support_counterexample_head_absence": 0.9047921471137089,
+  "zero_singleton_floor_counterexample_probability": 0.13530821527775996,
+  "analytic_examples": {
+    "description": "Exact toy-distribution calculations, not engine experiments.",
+    "same_support_head_absence": 0.9047921471137089,
+    "zero_singleton_floor_failure": 0.13530821527775996,
+    "matched_p85_head_absence": 4.065611775352213e-83,
+    "reweighted_p20_head_absence": 2.0370359763344975e-10,
+    "binomial_test": {
+      "description": "Known Bernoulli null p=0.85; reject if C<=50 in n=100.",
+      "null_rejection_probability": 2.296912631459641e-16,
+      "power_at_p20": 0.9999999999948256
+    },
+    "novel_mass_detection_at_100": {
+      "0.0001": 0.009950661308628095,
+      "0.001": 0.09520785288629108,
+      "0.01": 0.6339676587267709
+    },
+    "independent_zero_discovery_validation": {
+      "confidence": 0.95,
+      "target": 0.0001,
+      "minimum_fixed_sample": 29956
+    }
+  },
+  "results": [
+    {
+      "problem": "misc4",
+      "input": [
+        "a",
+        "b",
+        "z"
+      ],
+      "N": 11000,
+      "distinct": 4,
+      "f1": 0,
+      "missing_mass_estimate": 0.0,
+      "stop_reason": "no_singletons",
+      "p50": [
+        {
+          "outcome": "b",
+          "count": 5476,
+          "share": 0.4978181818181818,
+          "plug_in_absence_at_100": 1.2192660321222398e-30
+        },
+        {
+          "outcome": "z",
+          "count": 4055,
+          "share": 0.36863636363636365,
+          "plug_in_absence_at_100": 1.0664892729253078e-20
+        }
+      ]
+    },
+    {
+      "problem": "fig5.7",
+      "input": [
+        "aabc",
+        "aabd",
+        "ijkk"
+      ],
+      "N": 18125,
+      "distinct": 18,
+      "f1": 1,
+      "missing_mass_estimate": 5.5172413793103446e-05,
+      "stop_reason": "saturated",
+      "p50": [
+        {
+          "outcome": "ijll",
+          "count": 8401,
+          "share": 0.4635034482758621,
+          "plug_in_absence_at_100": 9.050935976186622e-28
+        },
+        {
+          "outcome": "ijkl",
+          "count": 6457,
+          "share": 0.356248275862069,
+          "plug_in_absence_at_100": 7.444585475567833e-20
+        }
+      ]
+    },
+    {
+      "problem": "misc3",
+      "input": [
+        "abc",
+        "aabbcc",
+        "kkjjii"
+      ],
+      "N": 19000,
+      "distinct": 54,
+      "f1": 4,
+      "missing_mass_estimate": 0.0002105263157894737,
+      "stop_reason": "shards_exited",
+      "p50": [
+        {
+          "outcome": "kkjjii",
+          "count": 6189,
+          "share": 0.32573684210526316,
+          "plug_in_absence_at_100": 7.637355806741554e-18
+        },
+        {
+          "outcome": "kkkjjjiii",
+          "count": 4966,
+          "share": 0.2613684210526316,
+          "plug_in_absence_at_100": 6.962851357703845e-14
+        }
+      ]
+    },
+    {
+      "problem": "misc5",
+      "input": [
+        "abc",
+        "abd",
+        "glz"
+      ],
+      "N": 11125,
+      "distinct": 8,
+      "f1": 1,
+      "missing_mass_estimate": 8.988764044943821e-05,
+      "stop_reason": "saturated",
+      "p50": [
+        {
+          "outcome": "gld",
+          "count": 2872,
+          "share": 0.2581573033707865,
+          "plug_in_absence_at_100": 1.0744409338296826e-13
+        },
+        {
+          "outcome": "hlz",
+          "count": 2450,
+          "share": 0.2202247191011236,
+          "plug_in_absence_at_100": 1.5737885488803073e-11
+        },
+        {
+          "outcome": "glz",
+          "count": 2242,
+          "share": 0.20152808988764045,
+          "plug_in_absence_at_100": 1.6825355363395113e-10
+        }
+      ]
+    },
+    {
+      "problem": "misc2",
+      "input": [
+        "abc",
+        "abd",
+        "ijk"
+      ],
+      "N": 11000,
+      "distinct": 6,
+      "f1": 1,
+      "missing_mass_estimate": 9.09090909090909e-05,
+      "stop_reason": "saturated",
+      "p50": [
+        {
+          "outcome": "ijl",
+          "count": 10483,
+          "share": 0.953,
+          "plug_in_absence_at_100": 1.621010371591209e-133
+        }
+      ]
+    },
+    {
+      "problem": "run1",
+      "input": [
+        "abc",
+        "abd",
+        "mrrjjj"
+      ],
+      "N": 11000,
+      "distinct": 11,
+      "f1": 0,
+      "missing_mass_estimate": 0.0,
+      "stop_reason": "no_singletons",
+      "p50": [
+        {
+          "outcome": "mrrkkk",
+          "count": 7031,
+          "share": 0.6391818181818182,
+          "plug_in_absence_at_100": 5.356009946952342e-45
+        }
+      ]
+    },
+    {
+      "problem": "run4",
+      "input": [
+        "abc",
+        "abd",
+        "xyz"
+      ],
+      "N": 11000,
+      "distinct": 10,
+      "f1": 1,
+      "missing_mass_estimate": 9.09090909090909e-05,
+      "stop_reason": "saturated",
+      "p50": [
+        {
+          "outcome": "xyd",
+          "count": 4045,
+          "share": 0.36772727272727274,
+          "plug_in_absence_at_100": 1.2315297768059165e-20
+        },
+        {
+          "outcome": "wyz",
+          "count": 2352,
+          "share": 0.21381818181818182,
+          "plug_in_absence_at_100": 3.566971001875377e-11
+        }
+      ]
+    },
+    {
+      "problem": "misc1",
+      "input": [
+        "abc",
+        "cba",
+        "mrrjjj"
+      ],
+      "N": 30750,
+      "distinct": 18,
+      "f1": 3,
+      "missing_mass_estimate": 9.75609756097561e-05,
+      "stop_reason": "saturated",
+      "p50": [
+        {
+          "outcome": "jjjrrm",
+          "count": 26189,
+          "share": 0.8516747967479675,
+          "plug_in_absence_at_100": 1.3228031272138869e-83
+        }
+      ]
+    },
+    {
+      "problem": "fig5.4-top",
+      "input": [
+        "eeqee",
+        "qeeq",
+        "xxixx"
+      ],
+      "N": 51000,
+      "distinct": 61,
+      "f1": 19,
+      "missing_mass_estimate": 0.00037254901960784314,
+      "stop_reason": "checkpoint",
+      "p50": [
+        {
+          "outcome": "qeeq",
+          "count": 24683,
+          "share": 0.4839803921568627,
+          "plug_in_absence_at_100": 1.8476531092840616e-29
+        },
+        {
+          "outcome": "ixxi",
+          "count": 14033,
+          "share": 0.27515686274509804,
+          "plug_in_absence_at_100": 1.057798971655225e-14
+        }
+      ]
+    },
+    {
+      "problem": "eqe-baaab",
+      "input": [
+        "eqe",
+        "qeq",
+        "abbba"
+      ],
+      "N": 51000,
+      "distinct": 51,
+      "f1": 13,
+      "missing_mass_estimate": 0.00025490196078431374,
+      "stop_reason": "checkpoint",
+      "p50": [
+        {
+          "outcome": "baaab",
+          "count": 29696,
+          "share": 0.5822745098039216,
+          "plug_in_absence_at_100": 1.2277154842178728e-38
+        }
+      ]
+    },
+    {
+      "problem": "run6",
+      "input": [
+        "eqe",
+        "qeq",
+        "abbbc"
+      ],
+      "N": 47500,
+      "distinct": 80,
+      "f1": 4,
+      "missing_mass_estimate": 8.421052631578948e-05,
+      "stop_reason": "saturated",
+      "p50": [
+        {
+          "outcome": "qeeeq",
+          "count": 25299,
+          "share": 0.5326105263157894,
+          "plug_in_absence_at_100": 9.287369405408013e-34
+        }
+      ]
+    },
+    {
+      "problem": "run3",
+      "input": [
+        "rst",
+        "rsu",
+        "xyz"
+      ],
+      "N": 21000,
+      "distinct": 12,
+      "f1": 2,
+      "missing_mass_estimate": 9.523809523809524e-05,
+      "stop_reason": "saturated",
+      "p50": [
+        {
+          "outcome": "xyu",
+          "count": 8084,
+          "share": 0.38495238095238093,
+          "plug_in_absence_at_100": 7.778111439284644e-22
+        },
+        {
+          "outcome": "wyz",
+          "count": 4089,
+          "share": 0.1947142857142857,
+          "plug_in_absence_at_100": 3.935496047786154e-10
+        }
+      ]
+    },
+    {
+      "problem": "run2",
+      "input": [
+        "xqc",
+        "xqd",
+        "mrrjjj"
+      ],
+      "N": 11000,
+      "distinct": 10,
+      "f1": 1,
+      "missing_mass_estimate": 9.09090909090909e-05,
+      "stop_reason": "saturated",
+      "p50": [
+        {
+          "outcome": "mrrkkk",
+          "count": 7540,
+          "share": 0.6854545454545454,
+          "plug_in_absence_at_100": 5.865990610109577e-51
+        }
+      ]
+    },
+    {
+      "problem": "copy1",
+      "input": [
+        "ab",
+        "c",
+        "ab"
+      ],
+      "N": 10875,
+      "distinct": 2,
+      "f1": 0,
+      "missing_mass_estimate": 0.0,
+      "stop_reason": "no_singletons",
+      "p50": [
+        {
+          "outcome": "c",
+          "count": 9414,
+          "share": 0.8656551724137931,
+          "plug_in_absence_at_100": 6.638883241733554e-88
+        }
+      ]
+    },
+    {
+      "problem": "copy2",
+      "input": [
+        "bc",
+        "d",
+        "bc"
+      ],
+      "N": 11250,
+      "distinct": 1,
+      "f1": 0,
+      "missing_mass_estimate": 0.0,
+      "stop_reason": "no_singletons",
+      "p50": [
+        {
+          "outcome": "d",
+          "count": 11250,
+          "share": 1.0,
+          "plug_in_absence_at_100": 0.0
+        }
+      ]
+    },
+    {
+      "problem": "copy3",
+      "input": [
+        "xy",
+        "z",
+        "xy"
+      ],
+      "N": 11000,
+      "distinct": 1,
+      "f1": 0,
+      "missing_mass_estimate": 0.0,
+      "stop_reason": "no_singletons",
+      "p50": [
+        {
+          "outcome": "z",
+          "count": 11000,
+          "share": 1.0,
+          "plug_in_absence_at_100": 0.0
+        }
+      ]
+    },
+    {
+      "problem": "copy4",
+      "input": [
+        "zy",
+        "x",
+        "zy"
+      ],
+      "N": 11125,
+      "distinct": 2,
+      "f1": 0,
+      "missing_mass_estimate": 0.0,
+      "stop_reason": "no_singletons",
+      "p50": [
+        {
+          "outcome": "x",
+          "count": 9587,
+          "share": 0.861752808988764,
+          "plug_in_absence_at_100": 1.1631389019721863e-86
+        }
+      ]
+    },
+    {
+      "problem": "copy5",
+      "input": [
+        "aabb",
+        "cc",
+        "aabb"
+      ],
+      "N": 15500,
+      "distinct": 13,
+      "f1": 1,
+      "missing_mass_estimate": 6.451612903225807e-05,
+      "stop_reason": "saturated",
+      "p50": [
+        {
+          "outcome": "cc",
+          "count": 7750,
+          "share": 0.5,
+          "plug_in_absence_at_100": 7.888609052210118e-31
+        }
+      ]
+    },
+    {
+      "problem": "copy6",
+      "input": [
+        "abc",
+        "d",
+        "abc"
+      ],
+      "N": 10250,
+      "distinct": 4,
+      "f1": 1,
+      "missing_mass_estimate": 9.75609756097561e-05,
+      "stop_reason": "saturated",
+      "p50": [
+        {
+          "outcome": "d",
+          "count": 8890,
+          "share": 0.8673170731707317,
+          "plug_in_absence_at_100": 1.9120722466695395e-88
+        }
+      ]
+    }
+  ],
+  "saved_cycles": [
+    {
+      "file": "data/vs-metacat-pre-rc-a.json",
+      "sha256": "3ff86eeebf8204abc45e4119cf2d63578e1ea4d2648380abb21640667f0e4d18",
+      "backend": "numpy",
+      "start_seed": 900000,
+      "working_cap": 20000,
+      "initial_runs": 1900,
+      "cap_resolution_reruns": 0,
+      "novel_problem_outcome_pairs": 5,
+      "missing_head_members": 0,
+      "novelties": [
+        {
+          "problem": "run1",
+          "novel": [
+            {
+              "member": "*CAP*",
+              "count": 1
+            }
+          ]
+        },
+        {
+          "problem": "eqe-baaab",
+          "novel": [
+            {
+              "member": "abbbb",
+              "count": 1
+            }
+          ]
+        },
+        {
+          "problem": "run6",
+          "novel": [
+            {
+              "member": "cdddb",
+              "count": 1
+            }
+          ]
+        },
+        {
+          "problem": "copy1",
+          "novel": [
+            {
+              "member": "*NONE*",
+              "count": 1
+            }
+          ]
+        },
+        {
+          "problem": "copy5",
+          "novel": [
+            {
+              "member": "aac",
+              "count": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "file": "data/vs-metacat.json",
+      "sha256": "9f984e3b70ae0b75405d52bea1dd505d4fc32d9bd708f5fee9444da2de7c14d4",
+      "backend": "numpy",
+      "start_seed": 900000,
+      "working_cap": 20000,
+      "initial_runs": 1900,
+      "cap_resolution_reruns": 23,
+      "novel_problem_outcome_pairs": 1,
+      "missing_head_members": 0,
+      "novelties": [
+        {
+          "problem": "copy5",
+          "novel": [
+            {
+              "member": "aac",
+              "count": 1,
+              "also_last_cycle": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "file": "data/vs-metacat-mlx.json",
+      "sha256": "ef1a7dbecb0f5516dae2c02b73bef3abe596a16c4947387bbb373dd63c5cfd35",
+      "backend": "mlx",
+      "start_seed": 900000,
+      "working_cap": 20000,
+      "initial_runs": 1900,
+      "cap_resolution_reruns": 0,
+      "novel_problem_outcome_pairs": 5,
+      "missing_head_members": 0,
+      "novelties": [
+        {
+          "problem": "run1",
+          "novel": [
+            {
+              "member": "*CAP*",
+              "count": 1
+            }
+          ]
+        },
+        {
+          "problem": "eqe-baaab",
+          "novel": [
+            {
+              "member": "abbbb",
+              "count": 1
+            }
+          ]
+        },
+        {
+          "problem": "run6",
+          "novel": [
+            {
+              "member": "cdddb",
+              "count": 1
+            }
+          ]
+        },
+        {
+          "problem": "copy1",
+          "novel": [
+            {
+              "member": "*NONE*",
+              "count": 1
+            }
+          ]
+        },
+        {
+          "problem": "copy5",
+          "novel": [
+            {
+              "member": "aac",
+              "count": 1
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

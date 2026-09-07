@@ -1,0 +1,397 @@
+{
+  "complete": true,
+  "interpretation": "f1/N is a heuristic missing-mass estimate for entire unordered best-answer sets, not a confidence bound or a per-member discovery probability. The two projections are paired, not independent.",
+  "results": [
+    {
+      "checkpoints": [
+        {
+          "N": 4,
+          "both_below_threshold": false,
+          "consecutive_passing_checkpoints": 0,
+          "rates": {
+            "preference": 0.0,
+            "quality": 0.0
+          }
+        },
+        {
+          "N": 8,
+          "both_below_threshold": false,
+          "consecutive_passing_checkpoints": 0,
+          "rates": {
+            "preference": 0.0,
+            "quality": 0.125
+          }
+        },
+        {
+          "N": 12,
+          "both_below_threshold": true,
+          "consecutive_passing_checkpoints": 1,
+          "rates": {
+            "preference": 0.0,
+            "quality": 0.08333333333333333
+          }
+        },
+        {
+          "N": 16,
+          "both_below_threshold": true,
+          "consecutive_passing_checkpoints": 2,
+          "rates": {
+            "preference": 0.0,
+            "quality": 0.0625
+          }
+        }
+      ],
+      "construction_stop_reason": "heuristic-target",
+      "phase_counts": {
+        "construction": 16,
+        "port": 4,
+        "validation": 4
+      },
+      "populations": {
+        "preference": {
+          "port": {
+            "N": 4,
+            "missing_p50": [],
+            "new_individual_answer_strings": [],
+            "note": "Novel sets, novel member strings, and missing heads are different observations; none alone diagnoses a defect.",
+            "novel_outcome_episodes": 0,
+            "novel_outcome_fraction": 0.0,
+            "novel_outcomes": [],
+            "zero_novelty_nominal_95_percent_upper": 0.5271291954984121
+          },
+          "reference": {
+            "N": 16,
+            "counts": [
+              {
+                "count": 16,
+                "outcome": {
+                  "answers": [
+                    "y"
+                  ],
+                  "kind": "answers"
+                }
+              }
+            ],
+            "distinct_outcomes": 1,
+            "f1": 0,
+            "f1_over_N": 0.0,
+            "p50": [
+              {
+                "answers": [
+                  "y"
+                ],
+                "kind": "answers"
+              }
+            ],
+            "p50_empirical_mass": 1.0
+          },
+          "validation": {
+            "N": 4,
+            "missing_p50": [],
+            "new_individual_answer_strings": [],
+            "note": "Novel sets, novel member strings, and missing heads are different observations; none alone diagnoses a defect.",
+            "novel_outcome_episodes": 0,
+            "novel_outcome_fraction": 0.0,
+            "novel_outcomes": [],
+            "zero_novelty_nominal_95_percent_upper": 0.5271291954984121
+          }
+        },
+        "quality": {
+          "port": {
+            "N": 4,
+            "missing_p50": [],
+            "new_individual_answer_strings": [],
+            "note": "Novel sets, novel member strings, and missing heads are different observations; none alone diagnoses a defect.",
+            "novel_outcome_episodes": 0,
+            "novel_outcome_fraction": 0.0,
+            "novel_outcomes": [],
+            "zero_novelty_nominal_95_percent_upper": 0.5271291954984121
+          },
+          "reference": {
+            "N": 16,
+            "counts": [
+              {
+                "count": 8,
+                "outcome": {
+                  "answers": [
+                    "y"
+                  ],
+                  "kind": "answers"
+                }
+              },
+              {
+                "count": 7,
+                "outcome": {
+                  "answers": [
+                    "y",
+                    "z"
+                  ],
+                  "kind": "answers"
+                }
+              },
+              {
+                "count": 1,
+                "outcome": {
+                  "answers": [
+                    "z"
+                  ],
+                  "kind": "answers"
+                }
+              }
+            ],
+            "distinct_outcomes": 3,
+            "f1": 1,
+            "f1_over_N": 0.0625,
+            "p50": [
+              {
+                "answers": [
+                  "y"
+                ],
+                "kind": "answers"
+              }
+            ],
+            "p50_empirical_mass": 0.5
+          },
+          "validation": {
+            "N": 4,
+            "missing_p50": [],
+            "new_individual_answer_strings": [],
+            "note": "Novel sets, novel member strings, and missing heads are different observations; none alone diagnoses a defect.",
+            "novel_outcome_episodes": 0,
+            "novel_outcome_fraction": 0.0,
+            "novel_outcomes": [],
+            "zero_novelty_nominal_95_percent_upper": 0.5271291954984121
+          }
+        }
+      },
+      "problem": "misc4"
+    },
+    {
+      "checkpoints": [
+        {
+          "N": 4,
+          "both_below_threshold": false,
+          "consecutive_passing_checkpoints": 0,
+          "rates": {
+            "preference": 0.5,
+            "quality": 0.0
+          }
+        },
+        {
+          "N": 8,
+          "both_below_threshold": false,
+          "consecutive_passing_checkpoints": 0,
+          "rates": {
+            "preference": 0.125,
+            "quality": 0.0
+          }
+        },
+        {
+          "N": 12,
+          "both_below_threshold": true,
+          "consecutive_passing_checkpoints": 1,
+          "rates": {
+            "preference": 0.0,
+            "quality": 0.08333333333333333
+          }
+        },
+        {
+          "N": 16,
+          "both_below_threshold": true,
+          "consecutive_passing_checkpoints": 2,
+          "rates": {
+            "preference": 0.0,
+            "quality": 0.0
+          }
+        }
+      ],
+      "construction_stop_reason": "heuristic-target",
+      "phase_counts": {
+        "construction": 16,
+        "port": 4,
+        "validation": 4
+      },
+      "populations": {
+        "preference": {
+          "port": {
+            "N": 4,
+            "missing_p50": [],
+            "new_individual_answer_strings": [],
+            "note": "Novel sets, novel member strings, and missing heads are different observations; none alone diagnoses a defect.",
+            "novel_outcome_episodes": 1,
+            "novel_outcome_fraction": 0.25,
+            "novel_outcomes": [
+              {
+                "count": 1,
+                "outcome": {
+                  "answers": [
+                    "xyd",
+                    "yyz"
+                  ],
+                  "kind": "answers"
+                }
+              }
+            ],
+            "zero_novelty_nominal_95_percent_upper": null
+          },
+          "reference": {
+            "N": 16,
+            "counts": [
+              {
+                "count": 6,
+                "outcome": {
+                  "answers": [
+                    "yyz"
+                  ],
+                  "kind": "answers"
+                }
+              },
+              {
+                "count": 4,
+                "outcome": {
+                  "answers": [
+                    "wyz",
+                    "yyz"
+                  ],
+                  "kind": "answers"
+                }
+              },
+              {
+                "count": 4,
+                "outcome": {
+                  "answers": [
+                    "wyz"
+                  ],
+                  "kind": "answers"
+                }
+              },
+              {
+                "count": 2,
+                "outcome": {
+                  "answers": [
+                    "wyz",
+                    "xyd",
+                    "yyz"
+                  ],
+                  "kind": "answers"
+                }
+              }
+            ],
+            "distinct_outcomes": 4,
+            "f1": 0,
+            "f1_over_N": 0.0,
+            "p50": [
+              {
+                "answers": [
+                  "yyz"
+                ],
+                "kind": "answers"
+              },
+              {
+                "answers": [
+                  "wyz",
+                  "yyz"
+                ],
+                "kind": "answers"
+              }
+            ],
+            "p50_empirical_mass": 0.625
+          },
+          "validation": {
+            "N": 4,
+            "missing_p50": [
+              {
+                "answers": [
+                  "yyz"
+                ],
+                "kind": "answers"
+              }
+            ],
+            "new_individual_answer_strings": [],
+            "note": "Novel sets, novel member strings, and missing heads are different observations; none alone diagnoses a defect.",
+            "novel_outcome_episodes": 0,
+            "novel_outcome_fraction": 0.0,
+            "novel_outcomes": [],
+            "zero_novelty_nominal_95_percent_upper": 0.5271291954984121
+          }
+        },
+        "quality": {
+          "port": {
+            "N": 4,
+            "missing_p50": [],
+            "new_individual_answer_strings": [],
+            "note": "Novel sets, novel member strings, and missing heads are different observations; none alone diagnoses a defect.",
+            "novel_outcome_episodes": 0,
+            "novel_outcome_fraction": 0.0,
+            "novel_outcomes": [],
+            "zero_novelty_nominal_95_percent_upper": 0.5271291954984121
+          },
+          "reference": {
+            "N": 16,
+            "counts": [
+              {
+                "count": 10,
+                "outcome": {
+                  "answers": [
+                    "yyz"
+                  ],
+                  "kind": "answers"
+                }
+              },
+              {
+                "count": 4,
+                "outcome": {
+                  "answers": [
+                    "wyz"
+                  ],
+                  "kind": "answers"
+                }
+              },
+              {
+                "count": 2,
+                "outcome": {
+                  "answers": [
+                    "wyz",
+                    "yyz"
+                  ],
+                  "kind": "answers"
+                }
+              }
+            ],
+            "distinct_outcomes": 3,
+            "f1": 0,
+            "f1_over_N": 0.0,
+            "p50": [
+              {
+                "answers": [
+                  "yyz"
+                ],
+                "kind": "answers"
+              }
+            ],
+            "p50_empirical_mass": 0.625
+          },
+          "validation": {
+            "N": 4,
+            "missing_p50": [],
+            "new_individual_answer_strings": [],
+            "note": "Novel sets, novel member strings, and missing heads are different observations; none alone diagnoses a defect.",
+            "novel_outcome_episodes": 0,
+            "novel_outcome_fraction": 0.0,
+            "novel_outcomes": [],
+            "zero_novelty_nominal_95_percent_upper": 0.5271291954984121
+          }
+        }
+      },
+      "problem": "run4"
+    }
+  ],
+  "study_id": "episodic-v1-smoke",
+  "study_kind": "smoke",
+  "totals": {
+    "attempted_inner_runs": 384,
+    "capped_inner_runs": 0,
+    "engine_error_episodes": 0,
+    "episodes": 48
+  }
+}

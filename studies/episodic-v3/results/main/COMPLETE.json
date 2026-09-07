@@ -1,0 +1,38 @@
+{
+  "analysis_sha256": "1ecdc3528048430f8c432884983e6718b956df30023fb9cb337e1b635a557718",
+  "finished_utc": "2026-09-07T14:26:43.411588+00:00",
+  "protocol_sha256": "b81d5b97f9ba32b9a02ec654c8d8ff611b527ea8aba2178952c3b9c3047c6691",
+  "seeds_sha256": "b79670a214269a06cc2c62a35b10b18cf77a69549d0b28267f5ed774424738a8",
+  "totals": {
+    "construction": {
+      "answer_runs": 65108,
+      "answerless_runs": 13467,
+      "attempted_runs": 80591,
+      "capped_runs": 2015,
+      "codelets": 547181826,
+      "elapsed_seconds": 69252.88071972178,
+      "engine_error_episodes": 1,
+      "episodes": 10074
+    },
+    "port": {
+      "answer_runs": 9815,
+      "answerless_runs": 3388,
+      "attempted_runs": 15200,
+      "capped_runs": 1997,
+      "codelets": 262675511,
+      "elapsed_seconds": 27524.54487620108,
+      "engine_error_episodes": 0,
+      "episodes": 1900
+    },
+    "validation": {
+      "answer_runs": 73383,
+      "answerless_runs": 20132,
+      "attempted_runs": 112000,
+      "capped_runs": 18485,
+      "codelets": 2356814181,
+      "elapsed_seconds": 215671.83894536272,
+      "engine_error_episodes": 0,
+      "episodes": 14000
+    }
+  }
+}

@@ -1,0 +1,246 @@
+{
+  "amendment": {
+    "analysis_status": "Amended after observing a failure; not an unchanged prospective experiment. The original budgets, seeds, reference freeze, and comparators are retained.",
+    "engine_changes": false,
+    "error_outcome": "*ERROR*",
+    "error_policy": "Record in-engine assertion/error conditions, excluding I/O and implementation-resource conditions. Restart the process after every engine error. Unclassified exits, startup failures, malformed records, and infrastructure failures stop collection.",
+    "inheritance": "Rehash and copy complete parent chunks without changing their receipts. Preserve incomplete attempts separately. Replay incomplete chunks, verify their successful prefixes, and admit one observation per assigned seed.",
+    "known_failure": {
+      "chunk_offset": 13750,
+      "exception": "attempt to apply non-procedure #f",
+      "index": 13988,
+      "phase": "validation",
+      "problem": "misc1",
+      "seed": 20713988,
+      "successful_prefix_rows": 238
+    },
+    "parent_commit": "1d7f9f19f2e28b634e9c40c5b04b24cdb71baf26",
+    "parent_manifest_sha256": "8c497eeb7d9425bce436f22bc9c5fdb95fcbba779048af95daa87625d4e4b820",
+    "parent_protocol_sha256": "8358d32c1fb85029f458631ac8bb0498e34da272753470f61f042fc32f42505c",
+    "parent_study_id": "support-v1",
+    "preflight": {
+      "construction_first_chunk_interior_count": 3,
+      "construction_first_chunk_interior_offset": 3,
+      "construction_first_chunk_prefix_per_input": 3,
+      "excluded_from_main_observations": true,
+      "replay_known_failed_chunk": true
+    },
+    "reason": "Post-failure continuation; the original collection halted on a reproducible Scheme exception during validation.",
+    "schema_version": 2,
+    "study_id": "support-v1a"
+  },
+  "analysis": {
+    "alpha": 0.05,
+    "check_batch_size": 100,
+    "fixed_prefixes": [
+      1000,
+      5000,
+      10000,
+      20000
+    ],
+    "frequency_permutations": 999,
+    "frequency_rng_seed": 61000000,
+    "heuristic_checkpoint_interval": 500,
+    "heuristic_min_runs": 3000,
+    "no_discovery_gap": 1000,
+    "singleton_threshold": 0.0001,
+    "zero_singleton_floor": 10000
+  },
+  "backend": "numpy",
+  "chunk_size": 250,
+  "chunk_timeout_seconds": 14400,
+  "max_codelets": 100000,
+  "mode": "single-run-fresh-memory",
+  "phases": [
+    {
+      "engine": "metacat",
+      "name": "construction",
+      "runs_per_problem": 20000,
+      "seed_base": 10000000
+    },
+    {
+      "engine": "metacat",
+      "name": "validation",
+      "runs_per_problem": 30000,
+      "seed_base": 20000000
+    },
+    {
+      "engine": "petacat",
+      "name": "port",
+      "runs_per_problem": 1000,
+      "seed_base": 30000000
+    }
+  ],
+  "pilot_phases": [
+    {
+      "engine": "metacat",
+      "name": "pilot-reference",
+      "runs_per_problem": 25,
+      "seed_base": 40000000
+    },
+    {
+      "engine": "petacat",
+      "name": "pilot-port",
+      "runs_per_problem": 5,
+      "seed_base": 50000000
+    }
+  ],
+  "problems": [
+    {
+      "name": "misc4",
+      "strings": [
+        "a",
+        "b",
+        "z"
+      ]
+    },
+    {
+      "name": "fig5.7",
+      "strings": [
+        "aabc",
+        "aabd",
+        "ijkk"
+      ]
+    },
+    {
+      "name": "misc3",
+      "strings": [
+        "abc",
+        "aabbcc",
+        "kkjjii"
+      ]
+    },
+    {
+      "name": "misc5",
+      "strings": [
+        "abc",
+        "abd",
+        "glz"
+      ]
+    },
+    {
+      "name": "misc2",
+      "strings": [
+        "abc",
+        "abd",
+        "ijk"
+      ]
+    },
+    {
+      "name": "run1",
+      "strings": [
+        "abc",
+        "abd",
+        "mrrjjj"
+      ]
+    },
+    {
+      "name": "run4",
+      "strings": [
+        "abc",
+        "abd",
+        "xyz"
+      ]
+    },
+    {
+      "name": "misc1",
+      "strings": [
+        "abc",
+        "cba",
+        "mrrjjj"
+      ]
+    },
+    {
+      "name": "fig5.4-top",
+      "strings": [
+        "eeqee",
+        "qeeq",
+        "xxixx"
+      ]
+    },
+    {
+      "name": "eqe-baaab",
+      "strings": [
+        "eqe",
+        "qeq",
+        "abbba"
+      ]
+    },
+    {
+      "name": "run6",
+      "strings": [
+        "eqe",
+        "qeq",
+        "abbbc"
+      ]
+    },
+    {
+      "name": "run3",
+      "strings": [
+        "rst",
+        "rsu",
+        "xyz"
+      ]
+    },
+    {
+      "name": "run2",
+      "strings": [
+        "xqc",
+        "xqd",
+        "mrrjjj"
+      ]
+    },
+    {
+      "name": "copy1",
+      "strings": [
+        "ab",
+        "c",
+        "ab"
+      ]
+    },
+    {
+      "name": "copy2",
+      "strings": [
+        "bc",
+        "d",
+        "bc"
+      ]
+    },
+    {
+      "name": "copy3",
+      "strings": [
+        "xy",
+        "z",
+        "xy"
+      ]
+    },
+    {
+      "name": "copy4",
+      "strings": [
+        "zy",
+        "x",
+        "zy"
+      ]
+    },
+    {
+      "name": "copy5",
+      "strings": [
+        "aabb",
+        "cc",
+        "aabb"
+      ]
+    },
+    {
+      "name": "copy6",
+      "strings": [
+        "abc",
+        "d",
+        "abc"
+      ]
+    }
+  ],
+  "schema_version": 2,
+  "seed_stride": 100000,
+  "study_id": "support-v1a",
+  "workers": 12
+}

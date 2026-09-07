@@ -1,5 +1,9 @@
 # Support-Set Oracles for Comparing Stochastic Systems
 
+> Historical draft, superseded by [the revised manuscript](manuscript.md).
+> This version retains statistical claims corrected in the revision; do not
+> use it as the submission source. See [REVISION-STATUS.md](REVISION-STATUS.md).
+
 ### A cheap two-sided test, saturated by Good–Turing, applied to a port of the Metacat cognitive architecture
 
 **Mishkin Berteig**

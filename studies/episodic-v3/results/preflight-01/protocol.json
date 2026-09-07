@@ -1,0 +1,70 @@
+{
+  "backend": "numpy",
+  "construction": {
+    "checkpoint_every": 1,
+    "max_episodes": 4,
+    "min_episodes": 1,
+    "singleton_threshold": 0.5
+  },
+  "definitions": {
+    "best_a": "quality",
+    "best_b": "preference"
+  },
+  "episode_runs": 8,
+  "episode_timeout_seconds": 300,
+  "invocation_timeout_seconds": 1800,
+  "max_codelets": 100000,
+  "pilot_reuse": "all-recorded-pilot-episodes-as-construction-prefix-no-retrospective-freezing",
+  "population": "individual-best-answer-conditional-on-answered-episode",
+  "port_episodes": 2,
+  "port_frequency_inference": "descriptive-only",
+  "problems": [
+    {
+      "name": "misc4",
+      "strings": [
+        "a",
+        "b",
+        "z"
+      ]
+    },
+    {
+      "name": "run4",
+      "strings": [
+        "abc",
+        "abd",
+        "xyz"
+      ]
+    },
+    {
+      "name": "fig5.7",
+      "strings": [
+        "aabc",
+        "aabd",
+        "ijkk"
+      ]
+    },
+    {
+      "name": "copy5",
+      "strings": [
+        "aabb",
+        "cc",
+        "aabb"
+      ]
+    }
+  ],
+  "sampling": "independent-uniform-first-seeds-with-replacement",
+  "schema_version": 3,
+  "study_id": "episodic-v3-preflight",
+  "study_kind": "smoke",
+  "tie_policy": "earliest-winning-occurrence-v1",
+  "validation": {
+    "episodes": 2,
+    "family_alpha": 0.05,
+    "family_size": 8,
+    "fixed_sample_size": true,
+    "method": "one-sided-exact-binomial-bonferroni",
+    "missing_mass_target": 0.01,
+    "requires_both_thresholds": true
+  },
+  "workers": 2
+}

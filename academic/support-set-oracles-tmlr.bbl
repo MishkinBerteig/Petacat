@@ -1,0 +1,290 @@
+\begin{thebibliography}{35}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Arcuri \& Briand(2014)Arcuri and Briand]{ref31}
+Andrea Arcuri and Lionel Briand.
+\newblock A hitchhiker's guide to statistical tests for assessing randomized
+  algorithms in software engineering.
+\newblock \emph{Software Testing, Verification and Reliability}, 24\penalty0
+  (3):\penalty0 219--250, 2014.
+\newblock \doi{10.1002/stvr.1486}.
+\newblock URL \url{https://doi.org/10.1002/stvr.1486}.
+
+\bibitem[Axtell et~al.(1996)Axtell, Axelrod, Epstein, and Cohen]{ref19}
+Robert Axtell, Robert Axelrod, Joshua~M. Epstein, and Michael~D. Cohen.
+\newblock Aligning simulation models: A case study and results.
+\newblock \emph{Computational and Mathematical Organization Theory}, 1\penalty0
+  (2):\penalty0 123--141, 1996.
+\newblock \doi{10.1007/BF01299065}.
+\newblock URL \url{https://doi.org/10.1007/BF01299065}.
+
+\bibitem[Barr et~al.(2015)Barr, Harman, McMinn, Shahbaz, and Yoo]{ref3}
+Earl~T. Barr, Mark Harman, Phil McMinn, Muzammil Shahbaz, and Shin Yoo.
+\newblock The oracle problem in software testing: A survey.
+\newblock \emph{IEEE Transactions on Software Engineering}, 41\penalty0
+  (5):\penalty0 507--525, 2015.
+\newblock \doi{10.1109/TSE.2014.2372785}.
+\newblock URL \url{https://doi.org/10.1109/TSE.2014.2372785}.
+
+\bibitem[Bhattacharya \& Valiant(2015)Bhattacharya and Valiant]{ref32}
+Bhaswar Bhattacharya and Gregory Valiant.
+\newblock Testing closeness with unequal sized samples.
+\newblock In \emph{Advances in Neural Information Processing Systems},
+  volume~28, 2015.
+\newblock URL
+  \url{https://proceedings.neurips.cc/paper/2015/hash/5cce8dede893813f879b873962fb669f-Abstract.html}.
+
+\bibitem[B{\"o}hme(2018)]{ref13}
+Marcel B{\"o}hme.
+\newblock {STADS}: Software testing as species discovery.
+\newblock \emph{ACM Transactions on Software Engineering and Methodology},
+  27\penalty0 (2):\penalty0 7:1--7:52, 2018.
+\newblock \doi{10.1145/3210309}.
+\newblock URL \url{https://doi.org/10.1145/3210309}.
+
+\bibitem[B{\"o}hme et~al.(2021)B{\"o}hme, Liyanage, and W{\"u}stholz]{ref14}
+Marcel B{\"o}hme, Danushka Liyanage, and Valentin W{\"u}stholz.
+\newblock Estimating residual risk in greybox fuzzing.
+\newblock In \emph{Proceedings of the 29th ACM Joint Meeting on European
+  Software Engineering Conference and Symposium on the Foundations of Software
+  Engineering (ESEC/FSE)}, pp.\  230--241, 2021.
+\newblock \doi{10.1145/3468264.3468570}.
+\newblock URL \url{https://doi.org/10.1145/3468264.3468570}.
+
+\bibitem[Chao(1984)]{ref12}
+Anne Chao.
+\newblock Nonparametric estimation of the number of classes in a population.
+\newblock \emph{Scandinavian Journal of Statistics}, 11\penalty0 (4):\penalty0
+  265--270, 1984.
+\newblock URL \url{https://www.jstor.org/stable/4615964}.
+
+\bibitem[Chao \& Lee(1992)Chao and Lee]{ref30}
+Anne Chao and Shen-Ming Lee.
+\newblock Estimating the number of classes via sample coverage.
+\newblock \emph{Journal of the American Statistical Association}, 87\penalty0
+  (417):\penalty0 210--217, 1992.
+\newblock \doi{10.1080/01621459.1992.10475194}.
+\newblock URL \url{https://doi.org/10.1080/01621459.1992.10475194}.
+
+\bibitem[Chen et~al.(1998)Chen, Cheung, and Yiu]{ref7}
+Tsong~Yueh Chen, S.~C. Cheung, and S.~M. Yiu.
+\newblock Metamorphic testing: A new approach for generating next test cases.
+\newblock Technical Report HKUST-CS98-01, Department of Computer Science, Hong
+  Kong University of Science and Technology, 1998.
+\newblock URL \url{https://arxiv.org/abs/2002.12543}.
+\newblock Reissued on arXiv in 2020.
+
+\bibitem[Chen et~al.(2018)Chen, Kuo, Liu, Poon, Towey, Tse, and Zhou]{ref5}
+Tsong~Yueh Chen, Fei-Ching Kuo, Huai Liu, Pak-Lok Poon, Dave Towey, T.~H. Tse,
+  and Zhi~Quan Zhou.
+\newblock Metamorphic testing: A review of challenges and opportunities.
+\newblock \emph{ACM Computing Surveys}, 51\penalty0 (1):\penalty0 4:1--4:27,
+  2018.
+\newblock \doi{10.1145/3143561}.
+\newblock URL \url{https://doi.org/10.1145/3143561}.
+
+\bibitem[Davis \& Weyuker(1981)Davis and Weyuker]{ref2}
+Martin~D. Davis and Elaine~J. Weyuker.
+\newblock Pseudo-oracles for non-testable programs.
+\newblock In \emph{Proceedings of the ACM '81 Conference}, pp.\  254--257,
+  1981.
+\newblock \doi{10.1145/800175.809889}.
+\newblock URL \url{https://doi.org/10.1145/800175.809889}.
+
+\bibitem[Dutta et~al.(2018)Dutta, Legunsen, Huang, and Misailovic]{ref18}
+Saikat Dutta, Owolabi Legunsen, Zixin Huang, and Sasa Misailovic.
+\newblock Testing probabilistic programming systems.
+\newblock In \emph{Proceedings of the 26th ACM Joint Meeting on European
+  Software Engineering Conference and Symposium on the Foundations of Software
+  Engineering (ESEC/FSE)}, pp.\  574--586, 2018.
+\newblock \doi{10.1145/3236024.3236057}.
+\newblock URL \url{https://doi.org/10.1145/3236024.3236057}.
+
+\bibitem[Efron \& Thisted(1976)Efron and Thisted]{ref11}
+Bradley Efron and Ronald Thisted.
+\newblock Estimating the number of unseen species: How many words did
+  {Shakespeare} know?
+\newblock \emph{Biometrika}, 63\penalty0 (3):\penalty0 435--447, 1976.
+\newblock \doi{10.1093/biomet/63.3.435}.
+\newblock URL \url{https://doi.org/10.1093/biomet/63.3.435}.
+
+\bibitem[Eick et~al.(1992)Eick, Loader, Long, Votta, and {Vander Wiel}]{ref25}
+Stephen~G. Eick, Catherine~R. Loader, M.~David Long, Lawrence~G. Votta, and
+  Scott {Vander Wiel}.
+\newblock Estimating software fault content before coding.
+\newblock In \emph{Proceedings of the 14th International Conference on Software
+  Engineering (ICSE)}, pp.\  59--65, 1992.
+\newblock \doi{10.1145/143062.143090}.
+\newblock URL \url{https://doi.org/10.1145/143062.143090}.
+
+\bibitem[Gale \& Sampson(1995)Gale and Sampson]{ref9}
+William~A. Gale and Geoffrey Sampson.
+\newblock {Good--Turing} frequency estimation without tears.
+\newblock \emph{Journal of Quantitative Linguistics}, 2\penalty0 (3):\penalty0
+  217--237, 1995.
+\newblock \doi{10.1080/09296179508590051}.
+\newblock URL \url{https://doi.org/10.1080/09296179508590051}.
+
+\bibitem[Gerhold \& Stoelinga(2018)Gerhold and Stoelinga]{ref34}
+Marcus Gerhold and Mari{\"e}lle Stoelinga.
+\newblock Model-based testing of probabilistic systems.
+\newblock \emph{Formal Aspects of Computing}, 30:\penalty0 77--106, 2018.
+\newblock \doi{10.1007/s00165-017-0440-4}.
+\newblock URL \url{https://doi.org/10.1007/s00165-017-0440-4}.
+
+\bibitem[Good(1953)]{ref8}
+I.~J. Good.
+\newblock The population frequencies of species and the estimation of
+  population parameters.
+\newblock \emph{Biometrika}, 40\penalty0 (3--4):\penalty0 237--264, 1953.
+\newblock \doi{10.1093/biomet/40.3-4.237}.
+\newblock URL \url{https://doi.org/10.1093/biomet/40.3-4.237}.
+
+\bibitem[Guderlei \& Mayer(2007)Guderlei and Mayer]{ref6}
+Ralph Guderlei and Johannes Mayer.
+\newblock Statistical metamorphic testing: Testing programs with random output
+  by means of statistical hypothesis tests and metamorphic testing.
+\newblock In \emph{Seventh International Conference on Quality Software
+  (QSIC)}, pp.\  404--409, 2007.
+\newblock \doi{10.1109/QSIC.2007.4385527}.
+\newblock URL \url{https://doi.org/10.1109/QSIC.2007.4385527}.
+
+\bibitem[Hofstadter \& {Fluid Analogies Research Group}(1995)Hofstadter and
+  {Fluid Analogies Research Group}]{ref24}
+Douglas~R. Hofstadter and {Fluid Analogies Research Group}.
+\newblock \emph{Fluid Concepts and Creative Analogies: Computer Models of the
+  Fundamental Mechanisms of Thought}.
+\newblock Basic Books, 1995.
+\newblock ISBN 9780465051540.
+
+\bibitem[Legay et~al.(2010)Legay, Delahaye, and Bensalem]{ref16}
+Axel Legay, Beno{\^i}t Delahaye, and Saddek Bensalem.
+\newblock Statistical model checking: An overview.
+\newblock In \emph{Runtime Verification (RV)}, volume 6418 of \emph{Lecture
+  Notes in Computer Science}, pp.\  122--135. Springer, 2010.
+\newblock \doi{10.1007/978-3-642-16612-9_11}.
+\newblock URL \url{https://doi.org/10.1007/978-3-642-16612-9_11}.
+
+\bibitem[Luo et~al.(2014)Luo, Hariri, Eloussi, and Marinov]{ref17}
+Qingzhou Luo, Farah Hariri, Lamyaa Eloussi, and Darko Marinov.
+\newblock An empirical analysis of flaky tests.
+\newblock In \emph{Proceedings of the 22nd ACM SIGSOFT International Symposium
+  on Foundations of Software Engineering (FSE)}, pp.\  643--653, 2014.
+\newblock \doi{10.1145/2635868.2635920}.
+\newblock URL \url{https://doi.org/10.1145/2635868.2635920}.
+
+\bibitem[Marshall(1999)]{ref21}
+James~B. Marshall.
+\newblock \emph{{Metacat}: A Self-Watching Cognitive Architecture for
+  Analogy-Making and High-Level Perception}.
+\newblock PhD thesis, Indiana University, Bloomington, 1999.
+\newblock URL \url{https://science.slc.edu/jmarshall/metacat/dissertation.pdf}.
+
+\bibitem[Marshall \& Hofstadter(1997)Marshall and Hofstadter]{ref22}
+James~B. Marshall and Douglas~R. Hofstadter.
+\newblock The {Metacat} project: A self-watching model of analogy-making.
+\newblock \emph{Cognitive Studies: Bulletin of the Japanese Cognitive Science
+  Society}, 4\penalty0 (4):\penalty0 57--71, 1997.
+\newblock \doi{10.11225/jcss.4.4_57}.
+\newblock URL \url{https://doi.org/10.11225/jcss.4.4_57}.
+
+\bibitem[McAllester \& Schapire(2000)McAllester and Schapire]{ref10}
+David~A. McAllester and Robert~E. Schapire.
+\newblock On the convergence rate of {Good--Turing} estimators.
+\newblock In \emph{Proceedings of the 13th Annual Conference on Computational
+  Learning Theory (COLT)}, pp.\  1--6, 2000.
+\newblock URL
+  \url{https://www.learningtheory.org/colt2000/papers/McAllesterSchapire.pdf}.
+
+\bibitem[McKeeman(1998)]{ref4}
+William~M. McKeeman.
+\newblock Differential testing for software.
+\newblock \emph{Digital Technical Journal}, 10\penalty0 (1):\penalty0 100--107,
+  1998.
+\newblock URL \url{https://www.bitsavers.org/pdf/dec/dtj/dtj_v10-01_1998.pdf}.
+
+\bibitem[Mitchell(1993)]{ref23}
+Melanie Mitchell.
+\newblock \emph{Analogy-Making as Perception: A Computer Model}.
+\newblock MIT Press, 1993.
+\newblock URL
+  \url{https://mitpress.mit.edu/9780262132893/analogy-making-as-perception/}.
+
+\bibitem[O'Neill(2022)]{ref33}
+Ben O'Neill.
+\newblock Smallest covering regions and highest density regions for discrete
+  distributions.
+\newblock \emph{Computational Statistics}, 37:\penalty0 1229--1254, 2022.
+\newblock \doi{10.1007/s00180-021-01172-6}.
+\newblock URL \url{https://doi.org/10.1007/s00180-021-01172-6}.
+
+\bibitem[Orlitsky et~al.(2016)Orlitsky, Suresh, and Wu]{ref29}
+Alon Orlitsky, Ananda~Theertha Suresh, and Yihong Wu.
+\newblock Optimal prediction of the number of unseen species.
+\newblock \emph{Proceedings of the National Academy of Sciences}, 113\penalty0
+  (47):\penalty0 13283--13288, 2016.
+\newblock \doi{10.1073/pnas.1607774113}.
+\newblock URL \url{https://doi.org/10.1073/pnas.1607774113}.
+
+\bibitem[Pananjady et~al.(2024)Pananjady, Muthukumar, and Thangaraj]{ref35}
+Ashwin Pananjady, Vidya Muthukumar, and Andrew Thangaraj.
+\newblock Just wing it: Near-optimal estimation of missing mass in a
+  {Markovian} sequence.
+\newblock \emph{Journal of Machine Learning Research}, 25\penalty0
+  (312):\penalty0 1--43, 2024.
+\newblock URL \url{https://jmlr.org/papers/v25/24-0511.html}.
+
+\bibitem[Patel \& Hierons(2018)Patel and Hierons]{ref26}
+Krishna Patel and Robert~M. Hierons.
+\newblock A mapping study on testing non-testable systems.
+\newblock \emph{Software Quality Journal}, 26\penalty0 (4):\penalty0
+  1373--1413, 2018.
+\newblock \doi{10.1007/s11219-017-9392-4}.
+\newblock URL \url{https://doi.org/10.1007/s11219-017-9392-4}.
+
+\bibitem[Segura et~al.(2016)Segura, Fraser, Sanchez, and
+  Ruiz-Cort{\'e}s]{ref28}
+Sergio Segura, Gordon Fraser, Ana~B. Sanchez, and Antonio Ruiz-Cort{\'e}s.
+\newblock A survey on metamorphic testing.
+\newblock \emph{IEEE Transactions on Software Engineering}, 42\penalty0
+  (9):\penalty0 805--824, 2016.
+\newblock URL \url{https://eprints.whiterose.ac.uk/id/eprint/110335/}.
+
+\bibitem[Weyuker(1982)]{ref1}
+Elaine~J. Weyuker.
+\newblock On testing non-testable programs.
+\newblock \emph{The Computer Journal}, 25\penalty0 (4):\penalty0 465--470,
+  1982.
+\newblock \doi{10.1093/comjnl/25.4.465}.
+\newblock URL \url{https://doi.org/10.1093/comjnl/25.4.465}.
+
+\bibitem[Wilensky \& Rand(2007)Wilensky and Rand]{ref20}
+Uri Wilensky and William Rand.
+\newblock Making models match: Replicating an agent-based model.
+\newblock \emph{Journal of Artificial Societies and Social Simulation},
+  10\penalty0 (4), 2007.
+\newblock URL \url{https://www.jasss.org/10/4/2.html}.
+\newblock Article 2.
+
+\bibitem[Yoo(2010)]{ref27}
+Shin Yoo.
+\newblock Metamorphic testing of stochastic optimisation.
+\newblock In \emph{Third International Conference on Software Testing,
+  Verification and Validation Workshops (ICSTW)}, pp.\  192--201, 2010.
+\newblock \doi{10.1109/ICSTW.2010.26}.
+\newblock URL \url{https://doi.org/10.1109/ICSTW.2010.26}.
+
+\bibitem[Younes \& Simmons(2002)Younes and Simmons]{ref15}
+H{\aa}kan L.~S. Younes and Reid~G. Simmons.
+\newblock Probabilistic verification of discrete event systems using acceptance
+  sampling.
+\newblock In \emph{Computer Aided Verification (CAV)}, volume 2404 of
+  \emph{Lecture Notes in Computer Science}, pp.\  223--235. Springer, 2002.
+\newblock \doi{10.1007/3-540-45657-0_17}.
+\newblock URL \url{https://doi.org/10.1007/3-540-45657-0_17}.
+
+\end{thebibliography}

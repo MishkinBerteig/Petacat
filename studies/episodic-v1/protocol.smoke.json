@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "study_id": "episodic-v1-smoke",
+  "study_kind": "smoke",
+  "population": "unordered-tied-answer-sets",
+  "projections": ["quality", "preference"],
+  "episode_runs": 8,
+  "max_codelets": 100000,
+  "backend": "numpy",
+  "workers": 2,
+  "episode_timeout_seconds": 300,
+  "invocation_timeout_seconds": 1800,
+  "construction": {
+    "min_episodes": 8,
+    "max_episodes": 20,
+    "checkpoint_every": 4,
+    "consecutive_checkpoints": 2,
+    "singleton_threshold": 0.1
+  },
+  "validation_episodes": 4,
+  "port_episodes": 4,
+  "seed_stride": 100000,
+  "seed_bases": {"construction": 60000000, "validation": 70000000, "port": 80000000},
+  "problems": [
+    {"name": "misc4", "strings": ["a", "b", "z"]},
+    {"name": "run4", "strings": ["abc", "abd", "xyz"]}
+  ]
+}

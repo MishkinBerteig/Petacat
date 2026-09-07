@@ -1,0 +1,7 @@
+# Local LaTeX build diagnostics; retain the PDF, bibliography, and source.
+*.aux
+*.blg
+*.log
+*.out
+*.xdv
+__pycache__/

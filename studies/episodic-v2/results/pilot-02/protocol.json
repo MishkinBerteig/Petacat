@@ -1,0 +1,56 @@
+{
+  "checkpoint_every": 100,
+  "definitions": {
+    "best_a": "quality",
+    "best_b": "preference"
+  },
+  "episode_runs": 8,
+  "episode_timeout_seconds": 300,
+  "episodes_per_problem": 1000,
+  "invocation_timeout_seconds": 14400,
+  "max_codelets": 100000,
+  "population": "individual-best-answer-conditional-on-answered-episode",
+  "problems": [
+    {
+      "name": "misc4",
+      "strings": [
+        "a",
+        "b",
+        "z"
+      ]
+    },
+    {
+      "name": "run4",
+      "strings": [
+        "abc",
+        "abd",
+        "xyz"
+      ]
+    },
+    {
+      "name": "run1",
+      "strings": [
+        "abc",
+        "abd",
+        "mrrjjj"
+      ]
+    },
+    {
+      "name": "fig5.4-top",
+      "strings": [
+        "eeqee",
+        "qeeq",
+        "xxixx"
+      ]
+    }
+  ],
+  "schema_version": 2,
+  "seed_base": 90000000,
+  "seed_stride": 100000,
+  "singleton_threshold": 0.0001,
+  "stop_at_threshold": false,
+  "study_id": "episodic-v2-answer-discovery-pilot",
+  "study_kind": "reference-discovery-pilot",
+  "tie_policy": "earliest-winning-occurrence-v1",
+  "workers": 12
+}

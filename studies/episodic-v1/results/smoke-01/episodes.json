@@ -1,0 +1,3941 @@
+[
+  {
+    "answer_runs": 7,
+    "answerless_runs": 1,
+    "attempted_runs": 8,
+    "capped_runs": 0,
+    "codelets": 6333,
+    "elapsed_seconds": 1.7653828342445195,
+    "outcomes": {
+      "preference": {
+        "answers": [
+          "y"
+        ],
+        "kind": "answers"
+      },
+      "quality": {
+        "answers": [
+          "y"
+        ],
+        "kind": "answers"
+      }
+    },
+    "status": "complete",
+    "task": {
+      "engine": "metacat",
+      "episode": 0,
+      "episode_runs": 8,
+      "first_seed": 60000000,
+      "max_codelets": 100000,
+      "phase": "construction",
+      "problem": "misc4",
+      "strings": [
+        "a",
+        "b",
+        "z"
+      ]
+    },
+    "winners": {
+      "preference": [
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 98.0,
+          "rule_abstractness": 95.0,
+          "temperature": 0.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ],
+      "quality": [
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 98.0,
+          "rule_abstractness": 95.0,
+          "temperature": 0.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    }
+  },
+  {
+    "answer_runs": 6,
+    "answerless_runs": 2,
+    "attempted_runs": 8,
+    "capped_runs": 0,
+    "codelets": 5741,
+    "elapsed_seconds": 1.748756917193532,
+    "outcomes": {
+      "preference": {
+        "answers": [
+          "y"
+        ],
+        "kind": "answers"
+      },
+      "quality": {
+        "answers": [
+          "y",
+          "z"
+        ],
+        "kind": "answers"
+      }
+    },
+    "status": "complete",
+    "task": {
+      "engine": "metacat",
+      "episode": 1,
+      "episode_runs": 8,
+      "first_seed": 60000008,
+      "max_codelets": 100000,
+      "phase": "construction",
+      "problem": "misc4",
+      "strings": [
+        "a",
+        "b",
+        "z"
+      ]
+    },
+    "winners": {
+      "preference": [
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 97.0,
+          "rule_abstractness": 95.0,
+          "temperature": 2.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ],
+      "quality": [
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 97.0,
+          "rule_abstractness": 95.0,
+          "temperature": 2.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        },
+        {
+          "answer": "z",
+          "coherent": true,
+          "quality": 97.0,
+          "rule_abstractness": 95.0,
+          "temperature": 3.0,
+          "theme_abstractness": 35.0,
+          "theme_count": 1,
+          "themes": [
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    }
+  },
+  {
+    "answer_runs": 7,
+    "answerless_runs": 1,
+    "attempted_runs": 8,
+    "capped_runs": 0,
+    "codelets": 6204,
+    "elapsed_seconds": 1.7250576661899686,
+    "outcomes": {
+      "preference": {
+        "answers": [
+          "y"
+        ],
+        "kind": "answers"
+      },
+      "quality": {
+        "answers": [
+          "y",
+          "z"
+        ],
+        "kind": "answers"
+      }
+    },
+    "status": "complete",
+    "task": {
+      "engine": "metacat",
+      "episode": 2,
+      "episode_runs": 8,
+      "first_seed": 60000016,
+      "max_codelets": 100000,
+      "phase": "construction",
+      "problem": "misc4",
+      "strings": [
+        "a",
+        "b",
+        "z"
+      ]
+    },
+    "winners": {
+      "preference": [
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 97.0,
+          "rule_abstractness": 95.0,
+          "temperature": 3.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ],
+      "quality": [
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 97.0,
+          "rule_abstractness": 92.0,
+          "temperature": 0.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        },
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 97.0,
+          "rule_abstractness": 95.0,
+          "temperature": 3.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        },
+        {
+          "answer": "z",
+          "coherent": true,
+          "quality": 97.0,
+          "rule_abstractness": 95.0,
+          "temperature": 3.0,
+          "theme_abstractness": 35.0,
+          "theme_count": 1,
+          "themes": [
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    }
+  },
+  {
+    "answer_runs": 6,
+    "answerless_runs": 2,
+    "attempted_runs": 8,
+    "capped_runs": 0,
+    "codelets": 5717,
+    "elapsed_seconds": 1.7298827078193426,
+    "outcomes": {
+      "preference": {
+        "answers": [
+          "y"
+        ],
+        "kind": "answers"
+      },
+      "quality": {
+        "answers": [
+          "y"
+        ],
+        "kind": "answers"
+      }
+    },
+    "status": "complete",
+    "task": {
+      "engine": "metacat",
+      "episode": 3,
+      "episode_runs": 8,
+      "first_seed": 60000024,
+      "max_codelets": 100000,
+      "phase": "construction",
+      "problem": "misc4",
+      "strings": [
+        "a",
+        "b",
+        "z"
+      ]
+    },
+    "winners": {
+      "preference": [
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 98.0,
+          "rule_abstractness": 95.0,
+          "temperature": 0.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ],
+      "quality": [
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 98.0,
+          "rule_abstractness": 95.0,
+          "temperature": 0.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    }
+  },
+  {
+    "answer_runs": 4,
+    "answerless_runs": 4,
+    "attempted_runs": 8,
+    "capped_runs": 0,
+    "codelets": 8988,
+    "elapsed_seconds": 1.8872077921405435,
+    "outcomes": {
+      "preference": {
+        "answers": [
+          "y"
+        ],
+        "kind": "answers"
+      },
+      "quality": {
+        "answers": [
+          "y"
+        ],
+        "kind": "answers"
+      }
+    },
+    "status": "complete",
+    "task": {
+      "engine": "metacat",
+      "episode": 4,
+      "episode_runs": 8,
+      "first_seed": 60000032,
+      "max_codelets": 100000,
+      "phase": "construction",
+      "problem": "misc4",
+      "strings": [
+        "a",
+        "b",
+        "z"
+      ]
+    },
+    "winners": {
+      "preference": [
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 97.0,
+          "rule_abstractness": 95.0,
+          "temperature": 2.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ],
+      "quality": [
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 97.0,
+          "rule_abstractness": 92.0,
+          "temperature": 0.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        },
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 97.0,
+          "rule_abstractness": 95.0,
+          "temperature": 2.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    }
+  },
+  {
+    "answer_runs": 5,
+    "answerless_runs": 3,
+    "attempted_runs": 8,
+    "capped_runs": 0,
+    "codelets": 7739,
+    "elapsed_seconds": 1.8851735424250364,
+    "outcomes": {
+      "preference": {
+        "answers": [
+          "y"
+        ],
+        "kind": "answers"
+      },
+      "quality": {
+        "answers": [
+          "y"
+        ],
+        "kind": "answers"
+      }
+    },
+    "status": "complete",
+    "task": {
+      "engine": "metacat",
+      "episode": 5,
+      "episode_runs": 8,
+      "first_seed": 60000040,
+      "max_codelets": 100000,
+      "phase": "construction",
+      "problem": "misc4",
+      "strings": [
+        "a",
+        "b",
+        "z"
+      ]
+    },
+    "winners": {
+      "preference": [
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 97.0,
+          "rule_abstractness": 95.0,
+          "temperature": 2.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ],
+      "quality": [
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 97.0,
+          "rule_abstractness": 95.0,
+          "temperature": 2.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    }
+  },
+  {
+    "answer_runs": 7,
+    "answerless_runs": 1,
+    "attempted_runs": 8,
+    "capped_runs": 0,
+    "codelets": 4003,
+    "elapsed_seconds": 1.8388913329690695,
+    "outcomes": {
+      "preference": {
+        "answers": [
+          "y"
+        ],
+        "kind": "answers"
+      },
+      "quality": {
+        "answers": [
+          "y"
+        ],
+        "kind": "answers"
+      }
+    },
+    "status": "complete",
+    "task": {
+      "engine": "metacat",
+      "episode": 6,
+      "episode_runs": 8,
+      "first_seed": 60000048,
+      "max_codelets": 100000,
+      "phase": "construction",
+      "problem": "misc4",
+      "strings": [
+        "a",
+        "b",
+        "z"
+      ]
+    },
+    "winners": {
+      "preference": [
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 98.0,
+          "rule_abstractness": 95.0,
+          "temperature": 0.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ],
+      "quality": [
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 98.0,
+          "rule_abstractness": 95.0,
+          "temperature": 0.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    }
+  },
+  {
+    "answer_runs": 5,
+    "answerless_runs": 3,
+    "attempted_runs": 8,
+    "capped_runs": 0,
+    "codelets": 6432,
+    "elapsed_seconds": 1.888411208987236,
+    "outcomes": {
+      "preference": {
+        "answers": [
+          "y"
+        ],
+        "kind": "answers"
+      },
+      "quality": {
+        "answers": [
+          "z"
+        ],
+        "kind": "answers"
+      }
+    },
+    "status": "complete",
+    "task": {
+      "engine": "metacat",
+      "episode": 7,
+      "episode_runs": 8,
+      "first_seed": 60000056,
+      "max_codelets": 100000,
+      "phase": "construction",
+      "problem": "misc4",
+      "strings": [
+        "a",
+        "b",
+        "z"
+      ]
+    },
+    "winners": {
+      "preference": [
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 96.0,
+          "rule_abstractness": 92.0,
+          "temperature": 2.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ],
+      "quality": [
+        {
+          "answer": "z",
+          "coherent": true,
+          "quality": 97.0,
+          "rule_abstractness": 95.0,
+          "temperature": 3.0,
+          "theme_abstractness": 35.0,
+          "theme_count": 1,
+          "themes": [
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    }
+  },
+  {
+    "answer_runs": 5,
+    "answerless_runs": 3,
+    "attempted_runs": 8,
+    "capped_runs": 0,
+    "codelets": 6011,
+    "elapsed_seconds": 1.8198509579524398,
+    "outcomes": {
+      "preference": {
+        "answers": [
+          "y"
+        ],
+        "kind": "answers"
+      },
+      "quality": {
+        "answers": [
+          "y",
+          "z"
+        ],
+        "kind": "answers"
+      }
+    },
+    "status": "complete",
+    "task": {
+      "engine": "metacat",
+      "episode": 8,
+      "episode_runs": 8,
+      "first_seed": 60000064,
+      "max_codelets": 100000,
+      "phase": "construction",
+      "problem": "misc4",
+      "strings": [
+        "a",
+        "b",
+        "z"
+      ]
+    },
+    "winners": {
+      "preference": [
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 97.0,
+          "rule_abstractness": 95.0,
+          "temperature": 2.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ],
+      "quality": [
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 97.0,
+          "rule_abstractness": 95.0,
+          "temperature": 2.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        },
+        {
+          "answer": "z",
+          "coherent": true,
+          "quality": 97.0,
+          "rule_abstractness": 95.0,
+          "temperature": 3.0,
+          "theme_abstractness": 35.0,
+          "theme_count": 1,
+          "themes": [
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    }
+  },
+  {
+    "answer_runs": 5,
+    "answerless_runs": 3,
+    "attempted_runs": 8,
+    "capped_runs": 0,
+    "codelets": 6585,
+    "elapsed_seconds": 1.8613729998469353,
+    "outcomes": {
+      "preference": {
+        "answers": [
+          "y"
+        ],
+        "kind": "answers"
+      },
+      "quality": {
+        "answers": [
+          "y",
+          "z"
+        ],
+        "kind": "answers"
+      }
+    },
+    "status": "complete",
+    "task": {
+      "engine": "metacat",
+      "episode": 9,
+      "episode_runs": 8,
+      "first_seed": 60000072,
+      "max_codelets": 100000,
+      "phase": "construction",
+      "problem": "misc4",
+      "strings": [
+        "a",
+        "b",
+        "z"
+      ]
+    },
+    "winners": {
+      "preference": [
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 97.0,
+          "rule_abstractness": 95.0,
+          "temperature": 2.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ],
+      "quality": [
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 97.0,
+          "rule_abstractness": 95.0,
+          "temperature": 2.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        },
+        {
+          "answer": "z",
+          "coherent": true,
+          "quality": 97.0,
+          "rule_abstractness": 95.0,
+          "temperature": 3.0,
+          "theme_abstractness": 35.0,
+          "theme_count": 1,
+          "themes": [
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    }
+  },
+  {
+    "answer_runs": 6,
+    "answerless_runs": 2,
+    "attempted_runs": 8,
+    "capped_runs": 0,
+    "codelets": 4243,
+    "elapsed_seconds": 1.8344122087582946,
+    "outcomes": {
+      "preference": {
+        "answers": [
+          "y"
+        ],
+        "kind": "answers"
+      },
+      "quality": {
+        "answers": [
+          "y",
+          "z"
+        ],
+        "kind": "answers"
+      }
+    },
+    "status": "complete",
+    "task": {
+      "engine": "metacat",
+      "episode": 10,
+      "episode_runs": 8,
+      "first_seed": 60000080,
+      "max_codelets": 100000,
+      "phase": "construction",
+      "problem": "misc4",
+      "strings": [
+        "a",
+        "b",
+        "z"
+      ]
+    },
+    "winners": {
+      "preference": [
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 97.0,
+          "rule_abstractness": 95.0,
+          "temperature": 2.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ],
+      "quality": [
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 97.0,
+          "rule_abstractness": 92.0,
+          "temperature": 0.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        },
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 97.0,
+          "rule_abstractness": 95.0,
+          "temperature": 2.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        },
+        {
+          "answer": "z",
+          "coherent": true,
+          "quality": 97.0,
+          "rule_abstractness": 95.0,
+          "temperature": 3.0,
+          "theme_abstractness": 35.0,
+          "theme_count": 1,
+          "themes": [
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    }
+  },
+  {
+    "answer_runs": 6,
+    "answerless_runs": 2,
+    "attempted_runs": 8,
+    "capped_runs": 0,
+    "codelets": 6640,
+    "elapsed_seconds": 1.8586971671320498,
+    "outcomes": {
+      "preference": {
+        "answers": [
+          "y"
+        ],
+        "kind": "answers"
+      },
+      "quality": {
+        "answers": [
+          "y"
+        ],
+        "kind": "answers"
+      }
+    },
+    "status": "complete",
+    "task": {
+      "engine": "metacat",
+      "episode": 11,
+      "episode_runs": 8,
+      "first_seed": 60000088,
+      "max_codelets": 100000,
+      "phase": "construction",
+      "problem": "misc4",
+      "strings": [
+        "a",
+        "b",
+        "z"
+      ]
+    },
+    "winners": {
+      "preference": [
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 98.0,
+          "rule_abstractness": 95.0,
+          "temperature": 0.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ],
+      "quality": [
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 98.0,
+          "rule_abstractness": 95.0,
+          "temperature": 0.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    }
+  },
+  {
+    "answer_runs": 7,
+    "answerless_runs": 1,
+    "attempted_runs": 8,
+    "capped_runs": 0,
+    "codelets": 4593,
+    "elapsed_seconds": 1.642785333096981,
+    "outcomes": {
+      "preference": {
+        "answers": [
+          "y"
+        ],
+        "kind": "answers"
+      },
+      "quality": {
+        "answers": [
+          "y"
+        ],
+        "kind": "answers"
+      }
+    },
+    "status": "complete",
+    "task": {
+      "engine": "metacat",
+      "episode": 12,
+      "episode_runs": 8,
+      "first_seed": 60000096,
+      "max_codelets": 100000,
+      "phase": "construction",
+      "problem": "misc4",
+      "strings": [
+        "a",
+        "b",
+        "z"
+      ]
+    },
+    "winners": {
+      "preference": [
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 98.0,
+          "rule_abstractness": 95.0,
+          "temperature": 0.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ],
+      "quality": [
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 98.0,
+          "rule_abstractness": 95.0,
+          "temperature": 0.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    }
+  },
+  {
+    "answer_runs": 6,
+    "answerless_runs": 2,
+    "attempted_runs": 8,
+    "capped_runs": 0,
+    "codelets": 6215,
+    "elapsed_seconds": 1.6346053751185536,
+    "outcomes": {
+      "preference": {
+        "answers": [
+          "y"
+        ],
+        "kind": "answers"
+      },
+      "quality": {
+        "answers": [
+          "y",
+          "z"
+        ],
+        "kind": "answers"
+      }
+    },
+    "status": "complete",
+    "task": {
+      "engine": "metacat",
+      "episode": 13,
+      "episode_runs": 8,
+      "first_seed": 60000104,
+      "max_codelets": 100000,
+      "phase": "construction",
+      "problem": "misc4",
+      "strings": [
+        "a",
+        "b",
+        "z"
+      ]
+    },
+    "winners": {
+      "preference": [
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 97.0,
+          "rule_abstractness": 95.0,
+          "temperature": 2.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ],
+      "quality": [
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 97.0,
+          "rule_abstractness": 92.0,
+          "temperature": 0.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        },
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 97.0,
+          "rule_abstractness": 95.0,
+          "temperature": 2.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        },
+        {
+          "answer": "z",
+          "coherent": true,
+          "quality": 97.0,
+          "rule_abstractness": 95.0,
+          "temperature": 3.0,
+          "theme_abstractness": 35.0,
+          "theme_count": 1,
+          "themes": [
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    }
+  },
+  {
+    "answer_runs": 6,
+    "answerless_runs": 2,
+    "attempted_runs": 8,
+    "capped_runs": 0,
+    "codelets": 7992,
+    "elapsed_seconds": 1.70662762504071,
+    "outcomes": {
+      "preference": {
+        "answers": [
+          "y"
+        ],
+        "kind": "answers"
+      },
+      "quality": {
+        "answers": [
+          "y"
+        ],
+        "kind": "answers"
+      }
+    },
+    "status": "complete",
+    "task": {
+      "engine": "metacat",
+      "episode": 14,
+      "episode_runs": 8,
+      "first_seed": 60000112,
+      "max_codelets": 100000,
+      "phase": "construction",
+      "problem": "misc4",
+      "strings": [
+        "a",
+        "b",
+        "z"
+      ]
+    },
+    "winners": {
+      "preference": [
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 97.0,
+          "rule_abstractness": 95.0,
+          "temperature": 2.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ],
+      "quality": [
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 97.0,
+          "rule_abstractness": 92.0,
+          "temperature": 0.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        },
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 97.0,
+          "rule_abstractness": 95.0,
+          "temperature": 2.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    }
+  },
+  {
+    "answer_runs": 5,
+    "answerless_runs": 3,
+    "attempted_runs": 8,
+    "capped_runs": 0,
+    "codelets": 6097,
+    "elapsed_seconds": 1.638252249918878,
+    "outcomes": {
+      "preference": {
+        "answers": [
+          "y"
+        ],
+        "kind": "answers"
+      },
+      "quality": {
+        "answers": [
+          "y",
+          "z"
+        ],
+        "kind": "answers"
+      }
+    },
+    "status": "complete",
+    "task": {
+      "engine": "metacat",
+      "episode": 15,
+      "episode_runs": 8,
+      "first_seed": 60000120,
+      "max_codelets": 100000,
+      "phase": "construction",
+      "problem": "misc4",
+      "strings": [
+        "a",
+        "b",
+        "z"
+      ]
+    },
+    "winners": {
+      "preference": [
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 97.0,
+          "rule_abstractness": 95.0,
+          "temperature": 2.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ],
+      "quality": [
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 97.0,
+          "rule_abstractness": 95.0,
+          "temperature": 2.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        },
+        {
+          "answer": "z",
+          "coherent": true,
+          "quality": 97.0,
+          "rule_abstractness": 95.0,
+          "temperature": 3.0,
+          "theme_abstractness": 35.0,
+          "theme_count": 1,
+          "themes": [
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    }
+  },
+  {
+    "answer_runs": 6,
+    "answerless_runs": 2,
+    "attempted_runs": 8,
+    "capped_runs": 0,
+    "codelets": 28668,
+    "elapsed_seconds": 4.1916314591653645,
+    "outcomes": {
+      "preference": {
+        "answers": [
+          "wyz"
+        ],
+        "kind": "answers"
+      },
+      "quality": {
+        "answers": [
+          "wyz"
+        ],
+        "kind": "answers"
+      }
+    },
+    "status": "complete",
+    "task": {
+      "engine": "metacat",
+      "episode": 0,
+      "episode_runs": 8,
+      "first_seed": 60100000,
+      "max_codelets": 100000,
+      "phase": "construction",
+      "problem": "run4",
+      "strings": [
+        "abc",
+        "abd",
+        "xyz"
+      ]
+    },
+    "winners": {
+      "preference": [
+        {
+          "answer": "wyz",
+          "coherent": true,
+          "quality": 90.0,
+          "rule_abstractness": 92.0,
+          "temperature": 18.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 4,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        }
+      ],
+      "quality": [
+        {
+          "answer": "wyz",
+          "coherent": true,
+          "quality": 90.0,
+          "rule_abstractness": 92.0,
+          "temperature": 18.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 4,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    }
+  },
+  {
+    "answer_runs": 5,
+    "answerless_runs": 3,
+    "attempted_runs": 8,
+    "capped_runs": 0,
+    "codelets": 25475,
+    "elapsed_seconds": 3.883071582764387,
+    "outcomes": {
+      "preference": {
+        "answers": [
+          "wyz"
+        ],
+        "kind": "answers"
+      },
+      "quality": {
+        "answers": [
+          "wyz"
+        ],
+        "kind": "answers"
+      }
+    },
+    "status": "complete",
+    "task": {
+      "engine": "metacat",
+      "episode": 1,
+      "episode_runs": 8,
+      "first_seed": 60100008,
+      "max_codelets": 100000,
+      "phase": "construction",
+      "problem": "run4",
+      "strings": [
+        "abc",
+        "abd",
+        "xyz"
+      ]
+    },
+    "winners": {
+      "preference": [
+        {
+          "answer": "wyz",
+          "coherent": true,
+          "quality": 90.0,
+          "rule_abstractness": 92.0,
+          "temperature": 18.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 4,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        }
+      ],
+      "quality": [
+        {
+          "answer": "wyz",
+          "coherent": true,
+          "quality": 90.0,
+          "rule_abstractness": 92.0,
+          "temperature": 18.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 4,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    }
+  },
+  {
+    "answer_runs": 5,
+    "answerless_runs": 3,
+    "attempted_runs": 8,
+    "capped_runs": 0,
+    "codelets": 38714,
+    "elapsed_seconds": 4.7404432920739055,
+    "outcomes": {
+      "preference": {
+        "answers": [
+          "wyz",
+          "xyd",
+          "yyz"
+        ],
+        "kind": "answers"
+      },
+      "quality": {
+        "answers": [
+          "wyz"
+        ],
+        "kind": "answers"
+      }
+    },
+    "status": "complete",
+    "task": {
+      "engine": "metacat",
+      "episode": 2,
+      "episode_runs": 8,
+      "first_seed": 60100016,
+      "max_codelets": 100000,
+      "phase": "construction",
+      "problem": "run4",
+      "strings": [
+        "abc",
+        "abd",
+        "xyz"
+      ]
+    },
+    "winners": {
+      "preference": [
+        {
+          "answer": "wyz",
+          "coherent": true,
+          "quality": 89.0,
+          "rule_abstractness": 92.0,
+          "temperature": 20.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 3,
+          "themes": [
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        },
+        {
+          "answer": "xyd",
+          "coherent": true,
+          "quality": 74.0,
+          "rule_abstractness": 50.0,
+          "temperature": 20.0,
+          "theme_abstractness": 37.0,
+          "theme_count": 3,
+          "themes": [
+            "plato-direction-category=plato-identity",
+            "plato-group-category=plato-identity",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        },
+        {
+          "answer": "yyz",
+          "coherent": true,
+          "quality": 86.0,
+          "rule_abstractness": 92.0,
+          "temperature": 27.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 3,
+          "themes": [
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        }
+      ],
+      "quality": [
+        {
+          "answer": "wyz",
+          "coherent": true,
+          "quality": 89.0,
+          "rule_abstractness": 92.0,
+          "temperature": 20.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 3,
+          "themes": [
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    }
+  },
+  {
+    "answer_runs": 3,
+    "answerless_runs": 5,
+    "attempted_runs": 8,
+    "capped_runs": 0,
+    "codelets": 38442,
+    "elapsed_seconds": 4.954626916907728,
+    "outcomes": {
+      "preference": {
+        "answers": [
+          "wyz",
+          "yyz"
+        ],
+        "kind": "answers"
+      },
+      "quality": {
+        "answers": [
+          "wyz"
+        ],
+        "kind": "answers"
+      }
+    },
+    "status": "complete",
+    "task": {
+      "engine": "metacat",
+      "episode": 3,
+      "episode_runs": 8,
+      "first_seed": 60100024,
+      "max_codelets": 100000,
+      "phase": "construction",
+      "problem": "run4",
+      "strings": [
+        "abc",
+        "abd",
+        "xyz"
+      ]
+    },
+    "winners": {
+      "preference": [
+        {
+          "answer": "wyz",
+          "coherent": true,
+          "quality": 90.0,
+          "rule_abstractness": 92.0,
+          "temperature": 18.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 4,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        },
+        {
+          "answer": "yyz",
+          "coherent": true,
+          "quality": 89.0,
+          "rule_abstractness": 92.0,
+          "temperature": 20.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 4,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        }
+      ],
+      "quality": [
+        {
+          "answer": "wyz",
+          "coherent": true,
+          "quality": 90.0,
+          "rule_abstractness": 92.0,
+          "temperature": 18.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 4,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    }
+  },
+  {
+    "answer_runs": 5,
+    "answerless_runs": 3,
+    "attempted_runs": 8,
+    "capped_runs": 0,
+    "codelets": 23390,
+    "elapsed_seconds": 3.341871874872595,
+    "outcomes": {
+      "preference": {
+        "answers": [
+          "yyz"
+        ],
+        "kind": "answers"
+      },
+      "quality": {
+        "answers": [
+          "yyz"
+        ],
+        "kind": "answers"
+      }
+    },
+    "status": "complete",
+    "task": {
+      "engine": "metacat",
+      "episode": 4,
+      "episode_runs": 8,
+      "first_seed": 60100032,
+      "max_codelets": 100000,
+      "phase": "construction",
+      "problem": "run4",
+      "strings": [
+        "abc",
+        "abd",
+        "xyz"
+      ]
+    },
+    "winners": {
+      "preference": [
+        {
+          "answer": "yyz",
+          "coherent": true,
+          "quality": 89.0,
+          "rule_abstractness": 92.0,
+          "temperature": 21.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 4,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        }
+      ],
+      "quality": [
+        {
+          "answer": "yyz",
+          "coherent": true,
+          "quality": 89.0,
+          "rule_abstractness": 92.0,
+          "temperature": 21.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 4,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    }
+  },
+  {
+    "answer_runs": 5,
+    "answerless_runs": 3,
+    "attempted_runs": 8,
+    "capped_runs": 0,
+    "codelets": 24962,
+    "elapsed_seconds": 3.5610460001043975,
+    "outcomes": {
+      "preference": {
+        "answers": [
+          "yyz"
+        ],
+        "kind": "answers"
+      },
+      "quality": {
+        "answers": [
+          "yyz"
+        ],
+        "kind": "answers"
+      }
+    },
+    "status": "complete",
+    "task": {
+      "engine": "metacat",
+      "episode": 5,
+      "episode_runs": 8,
+      "first_seed": 60100040,
+      "max_codelets": 100000,
+      "phase": "construction",
+      "problem": "run4",
+      "strings": [
+        "abc",
+        "abd",
+        "xyz"
+      ]
+    },
+    "winners": {
+      "preference": [
+        {
+          "answer": "yyz",
+          "coherent": true,
+          "quality": 90.0,
+          "rule_abstractness": 92.0,
+          "temperature": 17.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 4,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        }
+      ],
+      "quality": [
+        {
+          "answer": "yyz",
+          "coherent": true,
+          "quality": 90.0,
+          "rule_abstractness": 92.0,
+          "temperature": 17.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 4,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    }
+  },
+  {
+    "answer_runs": 5,
+    "answerless_runs": 3,
+    "attempted_runs": 8,
+    "capped_runs": 0,
+    "codelets": 22466,
+    "elapsed_seconds": 3.164565042126924,
+    "outcomes": {
+      "preference": {
+        "answers": [
+          "wyz",
+          "xyd",
+          "yyz"
+        ],
+        "kind": "answers"
+      },
+      "quality": {
+        "answers": [
+          "yyz"
+        ],
+        "kind": "answers"
+      }
+    },
+    "status": "complete",
+    "task": {
+      "engine": "metacat",
+      "episode": 6,
+      "episode_runs": 8,
+      "first_seed": 60100048,
+      "max_codelets": 100000,
+      "phase": "construction",
+      "problem": "run4",
+      "strings": [
+        "abc",
+        "abd",
+        "xyz"
+      ]
+    },
+    "winners": {
+      "preference": [
+        {
+          "answer": "wyz",
+          "coherent": true,
+          "quality": 87.0,
+          "rule_abstractness": 92.0,
+          "temperature": 25.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 3,
+          "themes": [
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        },
+        {
+          "answer": "xyd",
+          "coherent": true,
+          "quality": 42.0,
+          "rule_abstractness": 50.0,
+          "temperature": 100.0,
+          "theme_abstractness": 37.0,
+          "theme_count": 3,
+          "themes": [
+            "plato-direction-category=plato-identity",
+            "plato-group-category=plato-identity",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        },
+        {
+          "answer": "yyz",
+          "coherent": true,
+          "quality": 89.0,
+          "rule_abstractness": 92.0,
+          "temperature": 19.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 3,
+          "themes": [
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        }
+      ],
+      "quality": [
+        {
+          "answer": "yyz",
+          "coherent": true,
+          "quality": 89.0,
+          "rule_abstractness": 92.0,
+          "temperature": 19.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 3,
+          "themes": [
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    }
+  },
+  {
+    "answer_runs": 5,
+    "answerless_runs": 3,
+    "attempted_runs": 8,
+    "capped_runs": 0,
+    "codelets": 20888,
+    "elapsed_seconds": 3.1244654590263963,
+    "outcomes": {
+      "preference": {
+        "answers": [
+          "yyz"
+        ],
+        "kind": "answers"
+      },
+      "quality": {
+        "answers": [
+          "yyz"
+        ],
+        "kind": "answers"
+      }
+    },
+    "status": "complete",
+    "task": {
+      "engine": "metacat",
+      "episode": 7,
+      "episode_runs": 8,
+      "first_seed": 60100056,
+      "max_codelets": 100000,
+      "phase": "construction",
+      "problem": "run4",
+      "strings": [
+        "abc",
+        "abd",
+        "xyz"
+      ]
+    },
+    "winners": {
+      "preference": [
+        {
+          "answer": "yyz",
+          "coherent": true,
+          "quality": 91.0,
+          "rule_abstractness": 92.0,
+          "temperature": 16.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 4,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        }
+      ],
+      "quality": [
+        {
+          "answer": "yyz",
+          "coherent": true,
+          "quality": 91.0,
+          "rule_abstractness": 92.0,
+          "temperature": 16.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 4,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    }
+  },
+  {
+    "answer_runs": 5,
+    "answerless_runs": 3,
+    "attempted_runs": 8,
+    "capped_runs": 0,
+    "codelets": 37411,
+    "elapsed_seconds": 4.681513791903853,
+    "outcomes": {
+      "preference": {
+        "answers": [
+          "yyz"
+        ],
+        "kind": "answers"
+      },
+      "quality": {
+        "answers": [
+          "yyz"
+        ],
+        "kind": "answers"
+      }
+    },
+    "status": "complete",
+    "task": {
+      "engine": "metacat",
+      "episode": 8,
+      "episode_runs": 8,
+      "first_seed": 60100064,
+      "max_codelets": 100000,
+      "phase": "construction",
+      "problem": "run4",
+      "strings": [
+        "abc",
+        "abd",
+        "xyz"
+      ]
+    },
+    "winners": {
+      "preference": [
+        {
+          "answer": "yyz",
+          "coherent": true,
+          "quality": 89.0,
+          "rule_abstractness": 92.0,
+          "temperature": 20.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 4,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        }
+      ],
+      "quality": [
+        {
+          "answer": "yyz",
+          "coherent": true,
+          "quality": 89.0,
+          "rule_abstractness": 92.0,
+          "temperature": 20.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 4,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    }
+  },
+  {
+    "answer_runs": 5,
+    "answerless_runs": 3,
+    "attempted_runs": 8,
+    "capped_runs": 0,
+    "codelets": 29463,
+    "elapsed_seconds": 3.9020620831288397,
+    "outcomes": {
+      "preference": {
+        "answers": [
+          "wyz",
+          "yyz"
+        ],
+        "kind": "answers"
+      },
+      "quality": {
+        "answers": [
+          "yyz"
+        ],
+        "kind": "answers"
+      }
+    },
+    "status": "complete",
+    "task": {
+      "engine": "metacat",
+      "episode": 9,
+      "episode_runs": 8,
+      "first_seed": 60100072,
+      "max_codelets": 100000,
+      "phase": "construction",
+      "problem": "run4",
+      "strings": [
+        "abc",
+        "abd",
+        "xyz"
+      ]
+    },
+    "winners": {
+      "preference": [
+        {
+          "answer": "wyz",
+          "coherent": true,
+          "quality": 89.0,
+          "rule_abstractness": 92.0,
+          "temperature": 20.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 4,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        },
+        {
+          "answer": "yyz",
+          "coherent": true,
+          "quality": 90.0,
+          "rule_abstractness": 92.0,
+          "temperature": 18.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 4,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        }
+      ],
+      "quality": [
+        {
+          "answer": "yyz",
+          "coherent": true,
+          "quality": 90.0,
+          "rule_abstractness": 92.0,
+          "temperature": 18.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 4,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    }
+  },
+  {
+    "answer_runs": 5,
+    "answerless_runs": 3,
+    "attempted_runs": 8,
+    "capped_runs": 0,
+    "codelets": 25869,
+    "elapsed_seconds": 3.3539389171637595,
+    "outcomes": {
+      "preference": {
+        "answers": [
+          "wyz",
+          "yyz"
+        ],
+        "kind": "answers"
+      },
+      "quality": {
+        "answers": [
+          "wyz",
+          "yyz"
+        ],
+        "kind": "answers"
+      }
+    },
+    "status": "complete",
+    "task": {
+      "engine": "metacat",
+      "episode": 10,
+      "episode_runs": 8,
+      "first_seed": 60100080,
+      "max_codelets": 100000,
+      "phase": "construction",
+      "problem": "run4",
+      "strings": [
+        "abc",
+        "abd",
+        "xyz"
+      ]
+    },
+    "winners": {
+      "preference": [
+        {
+          "answer": "wyz",
+          "coherent": true,
+          "quality": 90.0,
+          "rule_abstractness": 92.0,
+          "temperature": 17.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 4,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        },
+        {
+          "answer": "yyz",
+          "coherent": true,
+          "quality": 90.0,
+          "rule_abstractness": 92.0,
+          "temperature": 17.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 4,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        }
+      ],
+      "quality": [
+        {
+          "answer": "wyz",
+          "coherent": true,
+          "quality": 90.0,
+          "rule_abstractness": 92.0,
+          "temperature": 17.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 4,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        },
+        {
+          "answer": "yyz",
+          "coherent": true,
+          "quality": 90.0,
+          "rule_abstractness": 92.0,
+          "temperature": 17.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 4,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    }
+  },
+  {
+    "answer_runs": 5,
+    "answerless_runs": 3,
+    "attempted_runs": 8,
+    "capped_runs": 0,
+    "codelets": 29991,
+    "elapsed_seconds": 3.4876558338291943,
+    "outcomes": {
+      "preference": {
+        "answers": [
+          "yyz"
+        ],
+        "kind": "answers"
+      },
+      "quality": {
+        "answers": [
+          "yyz"
+        ],
+        "kind": "answers"
+      }
+    },
+    "status": "complete",
+    "task": {
+      "engine": "metacat",
+      "episode": 11,
+      "episode_runs": 8,
+      "first_seed": 60100088,
+      "max_codelets": 100000,
+      "phase": "construction",
+      "problem": "run4",
+      "strings": [
+        "abc",
+        "abd",
+        "xyz"
+      ]
+    },
+    "winners": {
+      "preference": [
+        {
+          "answer": "yyz",
+          "coherent": true,
+          "quality": 89.0,
+          "rule_abstractness": 92.0,
+          "temperature": 19.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 4,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        }
+      ],
+      "quality": [
+        {
+          "answer": "yyz",
+          "coherent": true,
+          "quality": 89.0,
+          "rule_abstractness": 92.0,
+          "temperature": 19.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 4,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    }
+  },
+  {
+    "answer_runs": 4,
+    "answerless_runs": 4,
+    "attempted_runs": 8,
+    "capped_runs": 0,
+    "codelets": 23925,
+    "elapsed_seconds": 3.21778916567564,
+    "outcomes": {
+      "preference": {
+        "answers": [
+          "wyz",
+          "yyz"
+        ],
+        "kind": "answers"
+      },
+      "quality": {
+        "answers": [
+          "yyz"
+        ],
+        "kind": "answers"
+      }
+    },
+    "status": "complete",
+    "task": {
+      "engine": "metacat",
+      "episode": 12,
+      "episode_runs": 8,
+      "first_seed": 60100096,
+      "max_codelets": 100000,
+      "phase": "construction",
+      "problem": "run4",
+      "strings": [
+        "abc",
+        "abd",
+        "xyz"
+      ]
+    },
+    "winners": {
+      "preference": [
+        {
+          "answer": "wyz",
+          "coherent": true,
+          "quality": 88.0,
+          "rule_abstractness": 92.0,
+          "temperature": 22.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 4,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        },
+        {
+          "answer": "yyz",
+          "coherent": true,
+          "quality": 89.0,
+          "rule_abstractness": 92.0,
+          "temperature": 21.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 4,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        }
+      ],
+      "quality": [
+        {
+          "answer": "yyz",
+          "coherent": true,
+          "quality": 89.0,
+          "rule_abstractness": 92.0,
+          "temperature": 21.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 4,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    }
+  },
+  {
+    "answer_runs": 6,
+    "answerless_runs": 2,
+    "attempted_runs": 8,
+    "capped_runs": 0,
+    "codelets": 22017,
+    "elapsed_seconds": 2.9729369580745697,
+    "outcomes": {
+      "preference": {
+        "answers": [
+          "yyz"
+        ],
+        "kind": "answers"
+      },
+      "quality": {
+        "answers": [
+          "yyz"
+        ],
+        "kind": "answers"
+      }
+    },
+    "status": "complete",
+    "task": {
+      "engine": "metacat",
+      "episode": 13,
+      "episode_runs": 8,
+      "first_seed": 60100104,
+      "max_codelets": 100000,
+      "phase": "construction",
+      "problem": "run4",
+      "strings": [
+        "abc",
+        "abd",
+        "xyz"
+      ]
+    },
+    "winners": {
+      "preference": [
+        {
+          "answer": "yyz",
+          "coherent": true,
+          "quality": 90.0,
+          "rule_abstractness": 92.0,
+          "temperature": 18.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 4,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        }
+      ],
+      "quality": [
+        {
+          "answer": "yyz",
+          "coherent": true,
+          "quality": 90.0,
+          "rule_abstractness": 92.0,
+          "temperature": 18.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 4,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    }
+  },
+  {
+    "answer_runs": 5,
+    "answerless_runs": 3,
+    "attempted_runs": 8,
+    "capped_runs": 0,
+    "codelets": 26639,
+    "elapsed_seconds": 3.390790792182088,
+    "outcomes": {
+      "preference": {
+        "answers": [
+          "wyz"
+        ],
+        "kind": "answers"
+      },
+      "quality": {
+        "answers": [
+          "wyz",
+          "yyz"
+        ],
+        "kind": "answers"
+      }
+    },
+    "status": "complete",
+    "task": {
+      "engine": "metacat",
+      "episode": 14,
+      "episode_runs": 8,
+      "first_seed": 60100112,
+      "max_codelets": 100000,
+      "phase": "construction",
+      "problem": "run4",
+      "strings": [
+        "abc",
+        "abd",
+        "xyz"
+      ]
+    },
+    "winners": {
+      "preference": [
+        {
+          "answer": "wyz",
+          "coherent": true,
+          "quality": 88.0,
+          "rule_abstractness": 92.0,
+          "temperature": 22.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 4,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        }
+      ],
+      "quality": [
+        {
+          "answer": "wyz",
+          "coherent": true,
+          "quality": 88.0,
+          "rule_abstractness": 92.0,
+          "temperature": 22.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 4,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        },
+        {
+          "answer": "yyz",
+          "coherent": true,
+          "quality": 88.0,
+          "rule_abstractness": 92.0,
+          "temperature": 23.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 3,
+          "themes": [
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    }
+  },
+  {
+    "answer_runs": 6,
+    "answerless_runs": 2,
+    "attempted_runs": 8,
+    "capped_runs": 0,
+    "codelets": 24760,
+    "elapsed_seconds": 3.229643000289798,
+    "outcomes": {
+      "preference": {
+        "answers": [
+          "wyz"
+        ],
+        "kind": "answers"
+      },
+      "quality": {
+        "answers": [
+          "yyz"
+        ],
+        "kind": "answers"
+      }
+    },
+    "status": "complete",
+    "task": {
+      "engine": "metacat",
+      "episode": 15,
+      "episode_runs": 8,
+      "first_seed": 60100120,
+      "max_codelets": 100000,
+      "phase": "construction",
+      "problem": "run4",
+      "strings": [
+        "abc",
+        "abd",
+        "xyz"
+      ]
+    },
+    "winners": {
+      "preference": [
+        {
+          "answer": "wyz",
+          "coherent": true,
+          "quality": 88.0,
+          "rule_abstractness": 92.0,
+          "temperature": 23.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 4,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        }
+      ],
+      "quality": [
+        {
+          "answer": "yyz",
+          "coherent": true,
+          "quality": 90.0,
+          "rule_abstractness": 92.0,
+          "temperature": 18.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 3,
+          "themes": [
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    }
+  },
+  {
+    "answer_runs": 5,
+    "answerless_runs": 3,
+    "attempted_runs": 8,
+    "capped_runs": 0,
+    "codelets": 6137,
+    "elapsed_seconds": 1.625463374890387,
+    "outcomes": {
+      "preference": {
+        "answers": [
+          "y"
+        ],
+        "kind": "answers"
+      },
+      "quality": {
+        "answers": [
+          "y"
+        ],
+        "kind": "answers"
+      }
+    },
+    "status": "complete",
+    "task": {
+      "engine": "metacat",
+      "episode": 0,
+      "episode_runs": 8,
+      "first_seed": 70000000,
+      "max_codelets": 100000,
+      "phase": "validation",
+      "problem": "misc4",
+      "strings": [
+        "a",
+        "b",
+        "z"
+      ]
+    },
+    "winners": {
+      "preference": [
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 97.0,
+          "rule_abstractness": 95.0,
+          "temperature": 4.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ],
+      "quality": [
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 97.0,
+          "rule_abstractness": 92.0,
+          "temperature": 0.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        },
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 97.0,
+          "rule_abstractness": 95.0,
+          "temperature": 4.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    }
+  },
+  {
+    "answer_runs": 7,
+    "answerless_runs": 1,
+    "attempted_runs": 8,
+    "capped_runs": 0,
+    "codelets": 6510,
+    "elapsed_seconds": 1.655212250072509,
+    "outcomes": {
+      "preference": {
+        "answers": [
+          "y"
+        ],
+        "kind": "answers"
+      },
+      "quality": {
+        "answers": [
+          "y"
+        ],
+        "kind": "answers"
+      }
+    },
+    "status": "complete",
+    "task": {
+      "engine": "metacat",
+      "episode": 1,
+      "episode_runs": 8,
+      "first_seed": 70000008,
+      "max_codelets": 100000,
+      "phase": "validation",
+      "problem": "misc4",
+      "strings": [
+        "a",
+        "b",
+        "z"
+      ]
+    },
+    "winners": {
+      "preference": [
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 97.0,
+          "rule_abstractness": 95.0,
+          "temperature": 3.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ],
+      "quality": [
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 97.0,
+          "rule_abstractness": 92.0,
+          "temperature": 0.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        },
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 97.0,
+          "rule_abstractness": 95.0,
+          "temperature": 3.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    }
+  },
+  {
+    "answer_runs": 6,
+    "answerless_runs": 2,
+    "attempted_runs": 8,
+    "capped_runs": 0,
+    "codelets": 5952,
+    "elapsed_seconds": 1.6625795420259237,
+    "outcomes": {
+      "preference": {
+        "answers": [
+          "y"
+        ],
+        "kind": "answers"
+      },
+      "quality": {
+        "answers": [
+          "y"
+        ],
+        "kind": "answers"
+      }
+    },
+    "status": "complete",
+    "task": {
+      "engine": "metacat",
+      "episode": 2,
+      "episode_runs": 8,
+      "first_seed": 70000016,
+      "max_codelets": 100000,
+      "phase": "validation",
+      "problem": "misc4",
+      "strings": [
+        "a",
+        "b",
+        "z"
+      ]
+    },
+    "winners": {
+      "preference": [
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 98.0,
+          "rule_abstractness": 95.0,
+          "temperature": 0.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ],
+      "quality": [
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 98.0,
+          "rule_abstractness": 95.0,
+          "temperature": 0.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    }
+  },
+  {
+    "answer_runs": 6,
+    "answerless_runs": 2,
+    "attempted_runs": 8,
+    "capped_runs": 0,
+    "codelets": 6199,
+    "elapsed_seconds": 1.646275958046317,
+    "outcomes": {
+      "preference": {
+        "answers": [
+          "y"
+        ],
+        "kind": "answers"
+      },
+      "quality": {
+        "answers": [
+          "y"
+        ],
+        "kind": "answers"
+      }
+    },
+    "status": "complete",
+    "task": {
+      "engine": "metacat",
+      "episode": 3,
+      "episode_runs": 8,
+      "first_seed": 70000024,
+      "max_codelets": 100000,
+      "phase": "validation",
+      "problem": "misc4",
+      "strings": [
+        "a",
+        "b",
+        "z"
+      ]
+    },
+    "winners": {
+      "preference": [
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 98.0,
+          "rule_abstractness": 95.0,
+          "temperature": 0.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ],
+      "quality": [
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 98.0,
+          "rule_abstractness": 95.0,
+          "temperature": 0.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    }
+  },
+  {
+    "answer_runs": 5,
+    "answerless_runs": 3,
+    "attempted_runs": 8,
+    "capped_runs": 0,
+    "codelets": 39075,
+    "elapsed_seconds": 4.513118207920343,
+    "outcomes": {
+      "preference": {
+        "answers": [
+          "wyz"
+        ],
+        "kind": "answers"
+      },
+      "quality": {
+        "answers": [
+          "yyz"
+        ],
+        "kind": "answers"
+      }
+    },
+    "status": "complete",
+    "task": {
+      "engine": "metacat",
+      "episode": 0,
+      "episode_runs": 8,
+      "first_seed": 70100000,
+      "max_codelets": 100000,
+      "phase": "validation",
+      "problem": "run4",
+      "strings": [
+        "abc",
+        "abd",
+        "xyz"
+      ]
+    },
+    "winners": {
+      "preference": [
+        {
+          "answer": "wyz",
+          "coherent": true,
+          "quality": 88.0,
+          "rule_abstractness": 92.0,
+          "temperature": 23.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 4,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        }
+      ],
+      "quality": [
+        {
+          "answer": "yyz",
+          "coherent": true,
+          "quality": 91.0,
+          "rule_abstractness": 92.0,
+          "temperature": 15.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 3,
+          "themes": [
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    }
+  },
+  {
+    "answer_runs": 5,
+    "answerless_runs": 3,
+    "attempted_runs": 8,
+    "capped_runs": 0,
+    "codelets": 25518,
+    "elapsed_seconds": 3.219295124989003,
+    "outcomes": {
+      "preference": {
+        "answers": [
+          "wyz",
+          "yyz"
+        ],
+        "kind": "answers"
+      },
+      "quality": {
+        "answers": [
+          "wyz"
+        ],
+        "kind": "answers"
+      }
+    },
+    "status": "complete",
+    "task": {
+      "engine": "metacat",
+      "episode": 1,
+      "episode_runs": 8,
+      "first_seed": 70100008,
+      "max_codelets": 100000,
+      "phase": "validation",
+      "problem": "run4",
+      "strings": [
+        "abc",
+        "abd",
+        "xyz"
+      ]
+    },
+    "winners": {
+      "preference": [
+        {
+          "answer": "wyz",
+          "coherent": true,
+          "quality": 86.0,
+          "rule_abstractness": 92.0,
+          "temperature": 27.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 4,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        },
+        {
+          "answer": "yyz",
+          "coherent": true,
+          "quality": 75.0,
+          "rule_abstractness": 92.0,
+          "temperature": 54.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 4,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        }
+      ],
+      "quality": [
+        {
+          "answer": "wyz",
+          "coherent": true,
+          "quality": 86.0,
+          "rule_abstractness": 92.0,
+          "temperature": 27.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 4,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    }
+  },
+  {
+    "answer_runs": 6,
+    "answerless_runs": 2,
+    "attempted_runs": 8,
+    "capped_runs": 0,
+    "codelets": 20906,
+    "elapsed_seconds": 3.2079322077333927,
+    "outcomes": {
+      "preference": {
+        "answers": [
+          "wyz"
+        ],
+        "kind": "answers"
+      },
+      "quality": {
+        "answers": [
+          "wyz"
+        ],
+        "kind": "answers"
+      }
+    },
+    "status": "complete",
+    "task": {
+      "engine": "metacat",
+      "episode": 2,
+      "episode_runs": 8,
+      "first_seed": 70100016,
+      "max_codelets": 100000,
+      "phase": "validation",
+      "problem": "run4",
+      "strings": [
+        "abc",
+        "abd",
+        "xyz"
+      ]
+    },
+    "winners": {
+      "preference": [
+        {
+          "answer": "wyz",
+          "coherent": true,
+          "quality": 88.0,
+          "rule_abstractness": 92.0,
+          "temperature": 23.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 4,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        }
+      ],
+      "quality": [
+        {
+          "answer": "wyz",
+          "coherent": true,
+          "quality": 88.0,
+          "rule_abstractness": 92.0,
+          "temperature": 23.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 4,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    }
+  },
+  {
+    "answer_runs": 5,
+    "answerless_runs": 3,
+    "attempted_runs": 8,
+    "capped_runs": 0,
+    "codelets": 25047,
+    "elapsed_seconds": 3.3460236666724086,
+    "outcomes": {
+      "preference": {
+        "answers": [
+          "wyz",
+          "yyz"
+        ],
+        "kind": "answers"
+      },
+      "quality": {
+        "answers": [
+          "yyz"
+        ],
+        "kind": "answers"
+      }
+    },
+    "status": "complete",
+    "task": {
+      "engine": "metacat",
+      "episode": 3,
+      "episode_runs": 8,
+      "first_seed": 70100024,
+      "max_codelets": 100000,
+      "phase": "validation",
+      "problem": "run4",
+      "strings": [
+        "abc",
+        "abd",
+        "xyz"
+      ]
+    },
+    "winners": {
+      "preference": [
+        {
+          "answer": "wyz",
+          "coherent": true,
+          "quality": 88.0,
+          "rule_abstractness": 92.0,
+          "temperature": 22.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 4,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        },
+        {
+          "answer": "yyz",
+          "coherent": true,
+          "quality": 89.0,
+          "rule_abstractness": 92.0,
+          "temperature": 20.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 4,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        }
+      ],
+      "quality": [
+        {
+          "answer": "yyz",
+          "coherent": true,
+          "quality": 89.0,
+          "rule_abstractness": 92.0,
+          "temperature": 20.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 4,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    }
+  },
+  {
+    "answer_runs": 4,
+    "answerless_runs": 4,
+    "attempted_runs": 8,
+    "capped_runs": 0,
+    "codelets": 12388,
+    "elapsed_seconds": 1.3587057502008975,
+    "outcomes": {
+      "preference": {
+        "answers": [
+          "y"
+        ],
+        "kind": "answers"
+      },
+      "quality": {
+        "answers": [
+          "y"
+        ],
+        "kind": "answers"
+      }
+    },
+    "status": "complete",
+    "task": {
+      "engine": "petacat",
+      "episode": 0,
+      "episode_runs": 8,
+      "first_seed": 80000000,
+      "max_codelets": 100000,
+      "phase": "port",
+      "problem": "misc4",
+      "strings": [
+        "a",
+        "b",
+        "z"
+      ]
+    },
+    "winners": {
+      "preference": [
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 96.0,
+          "rule_abstractness": 92.0,
+          "temperature": 2.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ],
+      "quality": [
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 96.0,
+          "rule_abstractness": 92.0,
+          "temperature": 2.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    }
+  },
+  {
+    "answer_runs": 4,
+    "answerless_runs": 4,
+    "attempted_runs": 8,
+    "capped_runs": 0,
+    "codelets": 17963,
+    "elapsed_seconds": 1.8115651672706008,
+    "outcomes": {
+      "preference": {
+        "answers": [
+          "y"
+        ],
+        "kind": "answers"
+      },
+      "quality": {
+        "answers": [
+          "y"
+        ],
+        "kind": "answers"
+      }
+    },
+    "status": "complete",
+    "task": {
+      "engine": "petacat",
+      "episode": 1,
+      "episode_runs": 8,
+      "first_seed": 80000008,
+      "max_codelets": 100000,
+      "phase": "port",
+      "problem": "misc4",
+      "strings": [
+        "a",
+        "b",
+        "z"
+      ]
+    },
+    "winners": {
+      "preference": [
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 96.0,
+          "rule_abstractness": 92.0,
+          "temperature": 2.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ],
+      "quality": [
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 96.0,
+          "rule_abstractness": 92.0,
+          "temperature": 2.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    }
+  },
+  {
+    "answer_runs": 5,
+    "answerless_runs": 3,
+    "attempted_runs": 8,
+    "capped_runs": 0,
+    "codelets": 12573,
+    "elapsed_seconds": 1.155396040994674,
+    "outcomes": {
+      "preference": {
+        "answers": [
+          "y"
+        ],
+        "kind": "answers"
+      },
+      "quality": {
+        "answers": [
+          "y"
+        ],
+        "kind": "answers"
+      }
+    },
+    "status": "complete",
+    "task": {
+      "engine": "petacat",
+      "episode": 2,
+      "episode_runs": 8,
+      "first_seed": 80000016,
+      "max_codelets": 100000,
+      "phase": "port",
+      "problem": "misc4",
+      "strings": [
+        "a",
+        "b",
+        "z"
+      ]
+    },
+    "winners": {
+      "preference": [
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 97.0,
+          "rule_abstractness": 92.0,
+          "temperature": 0.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ],
+      "quality": [
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 97.0,
+          "rule_abstractness": 92.0,
+          "temperature": 0.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    }
+  },
+  {
+    "answer_runs": 4,
+    "answerless_runs": 4,
+    "attempted_runs": 8,
+    "capped_runs": 0,
+    "codelets": 15488,
+    "elapsed_seconds": 1.4400605410337448,
+    "outcomes": {
+      "preference": {
+        "answers": [
+          "y"
+        ],
+        "kind": "answers"
+      },
+      "quality": {
+        "answers": [
+          "y"
+        ],
+        "kind": "answers"
+      }
+    },
+    "status": "complete",
+    "task": {
+      "engine": "petacat",
+      "episode": 3,
+      "episode_runs": 8,
+      "first_seed": 80000024,
+      "max_codelets": 100000,
+      "phase": "port",
+      "problem": "misc4",
+      "strings": [
+        "a",
+        "b",
+        "z"
+      ]
+    },
+    "winners": {
+      "preference": [
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 97.0,
+          "rule_abstractness": 92.0,
+          "temperature": 0.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ],
+      "quality": [
+        {
+          "answer": "y",
+          "coherent": true,
+          "quality": 97.0,
+          "rule_abstractness": 92.0,
+          "temperature": 0.0,
+          "theme_abstractness": 60.0,
+          "theme_count": 2,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    }
+  },
+  {
+    "answer_runs": 6,
+    "answerless_runs": 2,
+    "attempted_runs": 8,
+    "capped_runs": 0,
+    "codelets": 17896,
+    "elapsed_seconds": 2.108219833113253,
+    "outcomes": {
+      "preference": {
+        "answers": [
+          "wyz",
+          "yyz"
+        ],
+        "kind": "answers"
+      },
+      "quality": {
+        "answers": [
+          "yyz"
+        ],
+        "kind": "answers"
+      }
+    },
+    "status": "complete",
+    "task": {
+      "engine": "petacat",
+      "episode": 0,
+      "episode_runs": 8,
+      "first_seed": 80100000,
+      "max_codelets": 100000,
+      "phase": "port",
+      "problem": "run4",
+      "strings": [
+        "abc",
+        "abd",
+        "xyz"
+      ]
+    },
+    "winners": {
+      "preference": [
+        {
+          "answer": "wyz",
+          "coherent": true,
+          "quality": 89.0,
+          "rule_abstractness": 92.0,
+          "temperature": 20.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 4,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        },
+        {
+          "answer": "yyz",
+          "coherent": true,
+          "quality": 91.0,
+          "rule_abstractness": 92.0,
+          "temperature": 16.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 4,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        }
+      ],
+      "quality": [
+        {
+          "answer": "yyz",
+          "coherent": true,
+          "quality": 91.0,
+          "rule_abstractness": 92.0,
+          "temperature": 16.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 4,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    }
+  },
+  {
+    "answer_runs": 5,
+    "answerless_runs": 3,
+    "attempted_runs": 8,
+    "capped_runs": 0,
+    "codelets": 31085,
+    "elapsed_seconds": 3.4759650831110775,
+    "outcomes": {
+      "preference": {
+        "answers": [
+          "xyd",
+          "yyz"
+        ],
+        "kind": "answers"
+      },
+      "quality": {
+        "answers": [
+          "yyz"
+        ],
+        "kind": "answers"
+      }
+    },
+    "status": "complete",
+    "task": {
+      "engine": "petacat",
+      "episode": 1,
+      "episode_runs": 8,
+      "first_seed": 80100008,
+      "max_codelets": 100000,
+      "phase": "port",
+      "problem": "run4",
+      "strings": [
+        "abc",
+        "abd",
+        "xyz"
+      ]
+    },
+    "winners": {
+      "preference": [
+        {
+          "answer": "xyd",
+          "coherent": true,
+          "quality": 74.0,
+          "rule_abstractness": 50.0,
+          "temperature": 20.0,
+          "theme_abstractness": 37.0,
+          "theme_count": 3,
+          "themes": [
+            "plato-direction-category=plato-identity",
+            "plato-group-category=plato-identity",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        },
+        {
+          "answer": "yyz",
+          "coherent": true,
+          "quality": 89.0,
+          "rule_abstractness": 92.0,
+          "temperature": 20.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 3,
+          "themes": [
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        }
+      ],
+      "quality": [
+        {
+          "answer": "yyz",
+          "coherent": true,
+          "quality": 89.0,
+          "rule_abstractness": 92.0,
+          "temperature": 20.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 3,
+          "themes": [
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    }
+  },
+  {
+    "answer_runs": 3,
+    "answerless_runs": 5,
+    "attempted_runs": 8,
+    "capped_runs": 0,
+    "codelets": 28913,
+    "elapsed_seconds": 3.2957303752191365,
+    "outcomes": {
+      "preference": {
+        "answers": [
+          "wyz",
+          "yyz"
+        ],
+        "kind": "answers"
+      },
+      "quality": {
+        "answers": [
+          "yyz"
+        ],
+        "kind": "answers"
+      }
+    },
+    "status": "complete",
+    "task": {
+      "engine": "petacat",
+      "episode": 2,
+      "episode_runs": 8,
+      "first_seed": 80100016,
+      "max_codelets": 100000,
+      "phase": "port",
+      "problem": "run4",
+      "strings": [
+        "abc",
+        "abd",
+        "xyz"
+      ]
+    },
+    "winners": {
+      "preference": [
+        {
+          "answer": "wyz",
+          "coherent": true,
+          "quality": 88.0,
+          "rule_abstractness": 92.0,
+          "temperature": 22.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 4,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        },
+        {
+          "answer": "yyz",
+          "coherent": true,
+          "quality": 90.0,
+          "rule_abstractness": 92.0,
+          "temperature": 17.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 4,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        }
+      ],
+      "quality": [
+        {
+          "answer": "yyz",
+          "coherent": true,
+          "quality": 90.0,
+          "rule_abstractness": 92.0,
+          "temperature": 17.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 4,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    }
+  },
+  {
+    "answer_runs": 5,
+    "answerless_runs": 3,
+    "attempted_runs": 8,
+    "capped_runs": 0,
+    "codelets": 26450,
+    "elapsed_seconds": 2.9221264999359846,
+    "outcomes": {
+      "preference": {
+        "answers": [
+          "yyz"
+        ],
+        "kind": "answers"
+      },
+      "quality": {
+        "answers": [
+          "wyz"
+        ],
+        "kind": "answers"
+      }
+    },
+    "status": "complete",
+    "task": {
+      "engine": "petacat",
+      "episode": 3,
+      "episode_runs": 8,
+      "first_seed": 80100024,
+      "max_codelets": 100000,
+      "phase": "port",
+      "problem": "run4",
+      "strings": [
+        "abc",
+        "abd",
+        "xyz"
+      ]
+    },
+    "winners": {
+      "preference": [
+        {
+          "answer": "yyz",
+          "coherent": true,
+          "quality": 88.0,
+          "rule_abstractness": 92.0,
+          "temperature": 22.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 4,
+          "themes": [
+            "plato-alphabetic-position-category=plato-opposite",
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        }
+      ],
+      "quality": [
+        {
+          "answer": "wyz",
+          "coherent": true,
+          "quality": 90.0,
+          "rule_abstractness": 92.0,
+          "temperature": 18.0,
+          "theme_abstractness": 82.0,
+          "theme_count": 3,
+          "themes": [
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    }
+  }
+]

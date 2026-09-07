@@ -1,0 +1,13 @@
+problem,definition,validation_eligible,coverage_qualified,answer,reference_count,reference_fraction,port_count,port_fraction
+misc4,best_a,True,False,y,2,1.0,2,1.0
+misc4,best_b,True,False,y,2,1.0,2,1.0
+run4,best_a,True,False,wyz,1,0.3333333333333333,0,0.0
+run4,best_a,True,False,yyz,2,0.6666666666666666,2,1.0
+run4,best_b,True,False,wyz,2,0.6666666666666666,2,1.0
+run4,best_b,True,False,yyz,1,0.3333333333333333,0,0.0
+fig5.7,best_a,True,False,ijkl,2,0.6666666666666666,0,0.0
+fig5.7,best_a,True,False,ijll,1,0.3333333333333333,2,1.0
+fig5.7,best_b,True,False,ijkd,1,0.3333333333333333,0,0.0
+fig5.7,best_b,True,False,ijll,2,0.6666666666666666,2,1.0
+copy5,best_a,True,False,cc,2,1.0,2,1.0
+copy5,best_b,True,False,cc,2,1.0,2,1.0

@@ -1,0 +1,38 @@
+{
+  "analysis_sha256": "4a66bc4e5e8bedcae2292c18598b419df4d84d72bdc7a083fce5e05a8576ddb6",
+  "finished_utc": "2026-09-07T03:57:22.157301+00:00",
+  "protocol_sha256": "808b43fc55fbf06068fb6c219b267e3f58c37db3ad463a52a7576585681b255a",
+  "seeds_sha256": "6d9b8808b7a55c1a95a9b0150a64c55e6e003487af0bb8696b454ba7876acacc",
+  "totals": {
+    "construction": {
+      "answer_runs": 55,
+      "answerless_runs": 24,
+      "attempted_runs": 80,
+      "capped_runs": 1,
+      "codelets": 391660,
+      "elapsed_seconds": 50.56554566603154,
+      "engine_error_episodes": 0,
+      "episodes": 10
+    },
+    "port": {
+      "answer_runs": 38,
+      "answerless_runs": 26,
+      "attempted_runs": 64,
+      "capped_runs": 0,
+      "codelets": 280323,
+      "elapsed_seconds": 31.077693791594356,
+      "engine_error_episodes": 0,
+      "episodes": 8
+    },
+    "validation": {
+      "answer_runs": 47,
+      "answerless_runs": 17,
+      "attempted_runs": 64,
+      "capped_runs": 0,
+      "codelets": 199037,
+      "elapsed_seconds": 29.736631791573018,
+      "engine_error_episodes": 0,
+      "episodes": 8
+    }
+  }
+}

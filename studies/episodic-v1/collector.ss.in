@@ -1,0 +1,73 @@
+(define *metacat-directory* "/metacat/")
+(load "/metacat/metacat-headless.ss")
+(load "/study/projections.ss")
+(set! report-error-and-halt
+  (lambda (message object)
+    (assertion-violation 'metacat-message "unrecognized object message" (cdr message))))
+(reset-handler (lambda () (exit 1)))
+(define study-stage 'clear-memory)
+(define study-step 0)
+(define study-attempted 0)
+(define study-answered 0)
+(define study-caps 0)
+(define study-none 0)
+(define study-codelets 0)
+
+(define (study-error c)
+  (call-with-output-file "/out/error-stage.txt"
+    (lambda (port) (display study-stage port) (write-char #\newline port)))
+  (call-with-output-file "/out/condition.txt"
+    (lambda (port)
+      (write (list 'stage study-stage 'step study-step
+                   'who (if (who-condition? c) (condition-who c) #f)
+                   'message (if (message-condition? c) (condition-message c) #f)
+                   'irritants (if (irritants-condition? c) (condition-irritants c) '())) port)
+      (write-char #\newline port)))
+  (call-with-output-file "/out/raw.tsv"
+    (lambda (port)
+      (display (format "EP\tengine-error\t~a\t~a\t~a\t~a\t~a\t~a"
+                       study-attempted study-answered study-caps study-none
+                       (+ study-codelets (if (eq? study-stage 'run) *codelet-count* 0))
+                       study-step) port)
+      (write-char #\newline port)))
+  (exit 86))
+
+;; An engine error terminates the entire episode. Never continue its suffix with
+;; empty memory. Projection and I/O errors are outside this engine-error handler.
+(guard (c ((and (memq study-stage '(clear-memory initialize run))
+                (or (assertion-violation? c) (error? c))
+                (not (i/o-error? c))
+                (not (implementation-restriction-violation? c))) (study-error c)))
+  (tell *memory* 'clear)
+  (do ((i 0 (+ i 1))) ((= i $episode_runs))
+    (set! study-step i)
+    (set! study-attempted (+ study-attempted 1))
+    (set! study-stage 'initialize)
+    (let ((before (length (tell *memory* 'get-answers))))
+      (init-mcat '$initial '$modified '$target #f (+ $first_seed i))
+      (set! *break-time* $cap)
+      (set! study-stage 'run)
+      (let ((termination (call/cc (lambda (k)
+                           (set! suspend (lambda () (k 'suspended)))
+                           (set! break (lambda () (k 'capped)))
+                           (run-mcat)))))
+        (set! study-stage 'accounting)
+        (set! study-codelets (+ study-codelets *codelet-count*))
+        (cond ((> (length (tell *memory* 'get-answers)) before)
+               (set! study-answered (+ study-answered 1)))
+              ((eq? termination 'capped) (set! study-caps (+ study-caps 1)))
+              (else (set! study-none (+ study-none 1))))))))
+
+(let* ((answers (tell *memory* 'get-answers))
+       (quality (study-best-quality answers))
+       (preferred (study-preferred answers)))
+  (unless (= (length answers) study-answered)
+    (assertion-violation 'study-collector "answer count mismatch"))
+  (call-with-output-file "/out/raw.tsv"
+    (lambda (port)
+      (display (format "EP\tcomplete\t~a\t~a\t~a\t~a\t~a\t-1"
+                       study-attempted study-answered study-caps study-none study-codelets) port)
+      (write-char #\newline port)
+      (for-each (lambda (a) (study-write-description port 'quality a)) quality)
+      (for-each (lambda (a) (study-write-description port 'preference a)) preferred))))
+(exit 0)

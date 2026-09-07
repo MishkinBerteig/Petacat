@@ -1,0 +1,39 @@
+{
+  "schema_version": 3,
+  "study_id": "episodic-v3-preflight",
+  "study_kind": "smoke",
+  "population": "individual-best-answer-conditional-on-answered-episode",
+  "definitions": {"best_a": "quality", "best_b": "preference"},
+  "tie_policy": "earliest-winning-occurrence-v1",
+  "episode_runs": 8,
+  "max_codelets": 100000,
+  "backend": "numpy",
+  "workers": 2,
+  "episode_timeout_seconds": 300,
+  "invocation_timeout_seconds": 1800,
+  "construction": {
+    "min_episodes": 1,
+    "max_episodes": 4,
+    "checkpoint_every": 1,
+    "singleton_threshold": 0.5
+  },
+  "validation": {
+    "episodes": 2,
+    "requires_both_thresholds": true,
+    "missing_mass_target": 0.01,
+    "family_alpha": 0.05,
+    "family_size": 8,
+    "method": "one-sided-exact-binomial-bonferroni",
+    "fixed_sample_size": true
+  },
+  "port_episodes": 2,
+  "port_frequency_inference": "descriptive-only",
+  "sampling": "independent-uniform-first-seeds-with-replacement",
+  "pilot_reuse": "all-recorded-pilot-episodes-as-construction-prefix-no-retrospective-freezing",
+  "problems": [
+    {"name": "misc4", "strings": ["a", "b", "z"]},
+    {"name": "run4", "strings": ["abc", "abd", "xyz"]},
+    {"name": "fig5.7", "strings": ["aabc", "aabd", "ijkk"]},
+    {"name": "copy5", "strings": ["aabb", "cc", "aabb"]}
+  ]
+}
