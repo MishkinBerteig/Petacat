@@ -1,0 +1,33 @@
+{
+  "authorization": "Author-requested editorial changes, 2026-09-07: remove all statistical distribution-comparison discussion, results, and associated table material from the paper; remove discarded-account and peripheral preflight details; add potential applications before the conclusion.",
+  "references_removed": ["@ref32"],
+  "bibliography_authorization": "Author-supplied reference diff, 2026-09-09: remove ref12 URL, add ref28 DOI, and add issue numbers for ref33 and ref34. Earlier bibliography and evidence remain unchanged.",
+  "bibliography_csl_field_changes": {
+    "ref12": {"URL": {"before": "https://www.jstor.org/stable/4615964", "after": null}},
+    "ref28": {"DOI": {"before": null, "after": "10.1109/TSE.2016.2532875"}},
+    "ref33": {"issue": {"before": null, "after": "3"}},
+    "ref34": {"issue": {"before": null, "after": "1"}}
+  },
+  "section_labels_added": ["sec:applications"],
+  "section_labels_removed": ["sec:frequency"],
+  "data_tables_removed": ["generated/episodic-capped-frequency-table.tex"],
+  "data_tables_replaced": {
+    "generated/reference-table.tex": "final/generated/reference-table.tex",
+    "generated/cycle-table.tex": "final/generated/cycle-table.tex",
+    "generated/episode-table.tex": "final/generated/episode-table.tex",
+    "generated/input-table.tex": "final/generated/input-table.tex",
+    "generated/episodic-coverage-table.tex": "final/generated/episodic-coverage-table.tex",
+    "generated/episodic-port-table.tex": "final/generated/episodic-port-table.tex",
+    "generated/episodic-accounting-table.tex": "final/generated/episodic-accounting-table.tex",
+    "generated/misc3-frequency-table.tex": "final/generated/misc3-count-table.tex",
+    "generated/single-check-table.tex": "final/generated/single-check-table.tex",
+    "generated/single-input-table.tex": "final/generated/single-input-table.tex",
+    "generated/single-novelty-table.tex": "final/generated/single-novelty-table.tex",
+    "generated/single-prefix-table.tex": "final/generated/single-prefix-table.tex"
+  },
+  "display_equations_removed": [
+    "\\sum_{k=0}^{50}{100\\choose k}(0.85)^k(0.15)^{100-k}\\simeq2.30\\times10^{-16}."
+  ],
+  "removed_numeric_values": ["0.001", "0.15", "0.1947", "0.20", "0.8", "0.85", "0.999", "0.999999999995", "04", "1,999", "1.18", "1000", "30", "31", "35", "375", "570", "90", "9048", "94", "988", "999"],
+  "numeric_scope": "Approved prose removals cover statistical-comparison examples, outputs, and reproduction instructions; the discarded historical anecdote; and peripheral pilot/preflight counts. Legacy scanning includes TeX-adjacent token fragments. Archived observations and earlier tables remain byte-identical; final tables retain original counts while omitting the unauthorized comparisons."
+}

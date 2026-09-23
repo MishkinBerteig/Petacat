@@ -1,0 +1,1473 @@
+% Revised manuscript. See REVISION-STATUS.md for remaining scientific work.
+\documentclass[10pt,letterpaper]{article}
+\usepackage{tmlr}
+\usepackage{amsmath,amssymb,booktabs,longtable,array,calc}
+\usepackage{fvextra,float}
+\usepackage{xurl}
+\usepackage{hyperref}
+\hypersetup{pdftitle={Large References, Fast Checks: Oracle-Guided Porting of a Stochastic
+Learning System},pdfauthor={},hidelinks}
+\newcommand{\tightlist}{\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\RecustomVerbatimEnvironment{verbatim}{Verbatim}{breaklines=true,breakanywhere=true}
+\title{Large References, Fast Checks: Oracle-Guided Porting of a Stochastic Learning
+System}
+\author{Anonymous authors}
+\begin{document}
+\maketitle
+\begin{abstract}
+Rewriting a program in another programming language is called porting. How do we check
+that the new version, the \emph{port}, preserves the original behaviour when the original
+can give different answers to the same question, and no answer is strictly correct? We
+investigate this problem while porting Metacat, a system that makes analogies in a
+micro-domain and learns from previous attempts over the course of an episode. The idea is
+to collect reference answers once, at some expense, then reuse them for fast checks during
+development. Good--Turing estimates the chance of an unseen reference answer and guides
+collection of the set used to flag unexpected port solutions. A p50 set contains the most
+frequent reference outcomes accounting for at least half the sample; their absence flags
+potentially missing port solutions. Automating these comparisons removes manual inspection
+of result distributions after each change. For episodes retaining memory across eight
+runs, Metacat's own quality score and conceptual preference select the answers to compare.
+This makes conceptual behaviour testable without prescribing a fixed expected answer. The
+main result is practical: the workflow helped repair a direction-handling error and
+exposed a misleading comparison caused by different execution limits. Historical records
+do not identify every tested build. Later studies provide 969,000 single-run observations
+and 25,974 episodes. Only three of 19 problems pass independent episodic coverage
+validation for both answer definitions. For one validated quality set, none of 1,000
+reference-validation episodes selects an answer outside the set, compared with 24 of 100
+port episodes; the cause remains unresolved. The process and its application contribute
+novelty alongside the repair history. We do not quantify the speedup over manual
+inspection, and we do not establish complete implementation fidelity or better learning.
+\end{abstract}
+\section{Introduction}\label{sec:introduction}
+
+If \texttt{abc} changes to \texttt{abd}, what should happen to \texttt{ijk}? One
+interpretation is to replace the last letter with its successor in the alphabet, giving
+\texttt{ijl}. Another is to replace the last letter with \texttt{d}, giving \texttt{ijd}.
+This simple example raises a less simple question: what does it mean for an analogy-making
+program with basic learning capabilities to give a good answer?
+
+Metacat explores questions like this \citep{ref21, ref22}. It extends Copycat
+\citep{ref23, ref24}, a computational model of analogy-making. For this testing problem,
+we can view Metacat as a \emph{fuzzy classifier} with an unknown set of answer classes and
+a simple learning loop.\footnote{For a non-academic introduction, see Wikipedia,
+  \href{https://en.wikipedia.org/wiki/Fuzzy_classification}{``Fuzzy classification''}.
+  This is a functional view of Metacat's graded assessments; we make no claim that its
+  answer frequencies are fuzzy-set membership values.} It builds and assesses candidate
+relationships between letters and groups of letters, rather than choosing from a supplied
+list of target answers. Memory of previous attempts can influence later attempts. Random
+choices influence which possibilities it explores. Such a program is called
+\emph{stochastic}: running it again on the same problem can produce a different result.
+That variation is part of the design.
+
+Our engineering task was to rewrite Metacat from the Scheme programming language into
+Python. A rewrite intended to preserve the original program's behaviour is called a
+\emph{port}. We call the Scheme program the \emph{reference} and the Python program the
+\emph{port}. We wanted the port to keep the reference's ways of interpreting analogies.
+
+So what should a test expect? One particular answer? The same answer on every attempt?
+Neither would be a satisfactory test of this system. Nor does giving both programs the
+same random seed solve the problem. A seed starts a repeatable sequence of pseudorandom
+numbers, but the two programs may generate different sequences or use their numbers in a
+different order.
+
+We took a different approach. Run the reference many times and record what it does. Keep
+that record. As the port changes, use it for fast, automated checks with a much smaller
+sample. Ask two concrete questions: did the port produce an unexpected solution, and did
+it fail to produce a common reference solution? Good--Turing guides collection of the
+reference answers against which we flag the unexpected ones. The p50 rule selects common
+reference answers whose absence we flag. We explain both below. Either finding gives us
+something specific to investigate.
+
+In software testing, an \emph{oracle} supplies the expected behaviour against which a test
+is judged. Our oracle is a collected record, not an authority on every possible answer. It
+can be incomplete. It can even contain evidence of an error in the reference itself. The
+word therefore needs care: an oracle flag is a reason to investigate, not a verdict that
+the port is wrong.
+
+The cost is deliberately unequal: a large, reusable reference and fast, repeated checks.
+Without an automated comparison, a person must inspect the distribution of answers after
+each change and decide which differences deserve attention. Our checks do that comparison
+and name the differences, so human attention goes to investigating them. Collect
+extensively once, then get actionable feedback after each revision. We have not timed the
+manual alternative or measured the speedup.
+
+Metacat also remembers previous attempts. A \emph{run} is one attempt to solve a problem.
+In an \emph{episode}, we run the same problem eight times while keeping memory between
+attempts, then clear memory before the next episode. Testing only runs that start with
+empty memory would leave this experience-dependent behaviour untested. By testing learning
+we mean checking that the port implements this behaviour as the reference does. Whether
+memory yields better answers, faster learning, or transfer to new problems is a different
+question, and we do not ask it.
+
+There is a second benefit. A test that requires one fixed expected answer cannot capture a
+system meant to entertain several analogies and revise its preferences through experience.
+We instead let Metacat's own assessments select the episode results we compare. That gives
+an automated check on conceptual coherence at the level of selected answers: does the port
+choose among interpretations the way the reference does? No person has to judge every
+analogy.
+
+The most important result is that this testing approach helped improve the port. Named
+problem-and-answer differences led to discovering an error in the handling of direction, a
+repair, and focused tests of that repair. Another detected difference turned out to come
+from unequal execution limits rather than a faulty analogy rule. Those investigations
+motivated this paper but, unfortunately, their historical build records are incomplete.
+Therefore, we designed and executed two additional, properly-documented studies.
+
+These two later studies give a more reproducible account of what the checks find and what
+they miss. The first study records 969,000 individual runs. The second study records
+25,974 episodes and chooses answers using Metacat's own assessments of quality and
+conceptual preference. Both studies evaluate fixed, recorded program versions.
+
+There is also a contribution in the process itself. Good--Turing estimation,
+observed-support sets, and frequency-based selection are established tools; the novelty is
+how they combine into one reusable testing process for a stochastic port, extended to
+episodic behaviour. Section \ref{sec:related} compares the closest prior work.
+
+We first explain the testing method with examples, then state its costs and statistical
+limits. The development history comes next, followed by the two recorded studies.
+Throughout, we distinguish the answers a program produces from the internal reasoning that
+produces them; our checks concern the former.
+
+\section{Building and Using the Reference}\label{sec:method}
+
+\subsection{What We Count}\label{sec:outcomes}
+
+Suppose repeated runs produce the answers \texttt{ijl}, \texttt{ijd}, and \texttt{ijk}.
+The set \texttt{\{ijl,\ ijd,\ ijk\}} records which answers appeared, without recording how
+often each appeared. A probability \emph{distribution} describes the chance of each
+possible outcome. In probability theory, its \emph{support} is the set of outcomes that
+have a nonzero chance of occurring. Our three observed answers belong to the reference's
+support, but the reference may also be able to produce answers that we have not yet seen.
+We therefore call our record the \emph{observed support}.
+
+The counts matter too. Seeing \texttt{ijl} 900 times is different from seeing it once. We
+keep both the set and the count for each result. An \emph{outcome} is the thing we choose
+to record from an attempt. Usually it is an answer string, but not every attempt ends with
+an answer.
+
+Metacat works through small computational tasks called \emph{codelets}, which build or
+assess parts of a proposed analogy. We limit how many codelets a run may execute; that
+limit is the \emph{cap}. The historical data use \texttt{*NONE*} when execution stops
+without an answer and \texttt{*CAP*} when it reaches the codelet limit. The later
+single-run study also uses \texttt{*ERROR*} for a failure inside the program. These
+outcomes stay in the counts. An error additionally raises a separate error flag; we never
+require the port to reproduce a reference defect.
+
+Here is the notation used below. Let \(x\) be one analogy problem and \(o\) one recorded
+outcome. Write \(p_R(o\mid x)\) for the probability that the reference produces \(o\), and
+\(p_P(o\mid x)\) for the corresponding port probability. The subscripts distinguish the
+two programs; the vertical bar means ``given this problem.'' Both probabilities also
+depend on the recorded program version, settings, memory, execution limit, and definition
+of an outcome.
+
+After \(N_x\) reference runs, \(c_x(o)\) is the number of times outcome \(o\) appeared.
+The observed support set and its estimated frequencies are
+
+\[
+S_x=\{o:c_x(o)>0\},\qquad \widehat p_R(o\mid x)=c_x(o)/N_x.
+\]
+
+Here \(S_x\) is the \emph{observed support set for problem \(x\)}: the outcomes seen at
+least once in its reference sample. The estimate \(\widehat p_R\) is each outcome's share
+of that sample. A hat denotes an estimate. We use \(n_x\) for the smaller port-check size
+and \(J\) for the number of problems. The true support is
+\(\operatorname{supp}(p)=\{o:p(o)>0\}\), in a countable space of possible outcomes
+\(\mathcal O\).
+
+Recording answer letters loses information. Two answers with the same letters may come
+from different rules, different internal structures, or different sequences of decisions.
+This test does not compare all of those details. Even a very large or infinite answer
+space can be manageable if most answers are rare in total. A space with probability spread
+thinly across many answers may be much harder to sample adequately.
+
+\subsection{How Good--Turing Guides Collection}\label{sec:stopping}
+
+To flag unexpected port solutions usefully, we first need to explore what the reference
+can produce; otherwise an unfamiliar port answer may only expose a poorly sampled
+reference. How much reference sampling is enough? We use Good--Turing estimation
+\citep{ref8} to help decide. Its simplest missing-mass estimate counts \emph{singletons}:
+distinct outcomes that have appeared exactly once so far. If five answer types have each
+appeared once in 100 runs, then \(f_1/N=5/100=0.05\). This estimates the chance that the
+next reference run produces an outcome we have not yet seen. It does not estimate how many
+possible answer types remain undiscovered.
+
+An answer stops being a singleton when it appears again. If the only once-seen answer
+reappears on the next run, \(f_1\) falls from one to zero. A zero estimate therefore means
+only that no observed type has count one.
+
+More formally, \(f_{1,x}=|\{o:c_x(o)=1\}|\) counts the singleton types. The reference's
+\emph{missing mass} is the total probability of all outcomes outside our observed set. Its
+value and the estimate are
+
+\[
+M_{R,x}=\sum_{o\notin S_x}p_R(o\mid x),\qquad
+\widehat M_{R,x}=f_{1,x}/N_x.
+\]
+
+The distinction matters. Missing mass is a property of the unknown reference distribution;
+the singleton ratio is a number calculated from one sample. It is useful guidance; it is
+no upper confidence bound. Our construction rules are \emph{heuristics}: practical
+decision rules with no guarantee that the desired condition holds when the rule says to
+stop. The finite-sample analysis of \citet{ref10} adds uncertainty terms for independent
+sampling, and even that does not turn repeated inspection of the raw ratio into a
+guarantee.
+
+The historical single-run collector used these rules:
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  After at least 3,000 runs, stop if there is a singleton and \(f_{1,x}/N_x\le10^{-4}\),
+  or 0.0001.
+\item
+  If there are no singletons, require at least 10,000 runs before stopping.
+\item
+  Record an overshoot below \(6\times10^{-5}\), but do not treat it as a second acceptance
+  condition. Use a 50,000-run checkpoint and a 200,000-run hard maximum to limit spending.
+\end{enumerate}
+
+Eight worker processes sampled separate, interleaved seed indices. A coordinator merged
+their counts and calculated one overall singleton ratio; workers did not make independent
+stopping decisions. Work already underway could finish after a stopping condition was
+reached.
+
+The 10,000-run minimum sounds substantial, but it does not certify the target. Suppose
+there are just two outcomes, with probabilities 0.9998 and 0.0002. The chance of seeing
+only the first in 10,000 runs is
+
+\[
+(0.9998)^{10000}\simeq0.1353.
+\]
+
+In that case, the estimate is zero, although the actual missing mass is
+\(2\times10^{-4}\), twice the intended target. Also, one singleton at 10,000 runs
+satisfies the positive-singleton rule; the minimum is not justified by rejecting that
+case.
+
+The historical files contain counts and codelet-use summaries but no discovery order, so
+they cannot support a retrospective comparison of stopping rules. The later single-run
+study preserves order and permits the comparisons in Section \ref{sec:single-cost}.
+
+The later episodic study deliberately allowed an earlier stop: check after every episode,
+with no minimum, and \emph{freeze} the observed set as soon as \(f_1/N\le10^{-4}\). Two
+identical first answers can therefore stop collection with a one-answer set. We call the
+frozen set a \emph{candidate oracle}; whether it covers reference behaviour is a separate
+question, answered by new reference observations.
+
+\subsection{Which Common Answers Should a Check Look For?}\label{sec:flags}
+
+Unexpected solutions are only half of the comparison. A port may also lose solutions the
+reference regularly produces, and the p50 check targets those. A fast check cannot be
+expected to repeat every rare reference answer, so we select a set of common outcomes and
+ask whether each appears at least once. The dissertation's alternative rules and analogy
+families \citep[Chapters 3 and 5]{ref21} led us to expect broad answer sets; checking only
+the common answers keeps that breadth from forcing a new reference collection after every
+code change. Rank outcomes from most to least frequent, then take the shortest initial
+list accounting for at least half of the reference observations. We call this the
+\emph{p50 head}; the ``50'' is half of the observations. Equal counts are ordered by
+outcome text, in fixed dictionary order.
+
+For a small worked example, suppose 100 reference observations contain 40 \texttt{ijl}, 25
+\texttt{ijd}, 20 \texttt{ijk}, and 15 \texttt{ijm}. The observed set contains all four
+answers. The p50 head contains \texttt{ijl} and \texttt{ijd}, whose counts add to 65;
+\texttt{ijl} alone accounts for only 40.
+
+Now suppose a port check produces \texttt{ijl}, \texttt{ijk}, and \texttt{ijn}. It missed
+the selected common answer \texttt{ijd}, and produced \texttt{ijn}, which was outside the
+reference record. Those two findings are the report: two questions to investigate.
+
+Let \(H_x\) be the p50 head and \(T_x\) the set of outcomes observed in the port check.
+The reports are
+
+\[
+\operatorname{MISSING}_x=H_x\setminus T_x,\qquad
+\operatorname{NOVEL}_x=T_x\setminus S_x.
+\]
+
+The symbol \(\setminus\) means set difference: members of the first set that are absent
+from the second. \texttt{MISSING} means ``a selected reference result was not seen in this
+check.'' \texttt{NOVEL} means ``a check result was not seen in the reference sample'',
+which is weaker than genuinely new. A check with no flags establishes only these
+memberships.
+
+We freeze the reference set and head before checking the port. Adding each unexpected
+answer as soon as we see it would erase the evidence we wanted to study. The report
+instead retains the problem, answer, count, seeds, settings, reference size, stopping
+reason, and singleton ratio. Investigation may reveal a reference omission, a reference
+defect, a port defect, or mismatched test settings.
+
+The p50 rule does not guarantee that each head member is common enough to appear reliably
+within the check budget: if \(B\) answers are equally likely, each has probability
+\(1/B\), head member or not. A boundary answer can also move in or out when the reference
+is resampled; in the historical data, \texttt{copy5/cc} sits exactly on the half-mass
+boundary.
+
+\subsection{What Counts as an Episode's Answer?}\label{sec:episode-method}
+
+Memory changes the sampling question. The second run in an episode starts with experience
+from the first, and the third starts with experience from both. Those eight runs are not
+eight independent observations of one fixed distribution, so we treat the \emph{whole
+episode} as one observation. Every new episode starts from the specified initial memory
+\(M_0\), uses the same problem schedule, and lasts a fixed number \(L\) of runs.
+
+We must then decide which feature of the episode to compare. A \emph{projection} is a rule
+for turning an episode into one recorded result. The historical study selected the last
+successful answer among eight runs. That is an endpoint within a fixed budget; the system
+may not have converged on it. It also needs a separate record of episodes that never
+answer and of runs that end at the cap.
+
+The later study asks a more conceptual question: which answer did Metacat itself judge
+best? We use two definitions, each based on the program's own, or \emph{native},
+evaluation:
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \texttt{best\_a} is the answer with the highest numerical quality score in the episode.
+  We call it the \emph{quality winner}.
+\item
+  \texttt{best\_b} is an answer that no other answer defeats under Metacat's own pairwise
+  conceptual-preference comparison. We call it the \emph{preference winner}. This need not
+  be the answer with the highest numerical score.
+\end{enumerate}
+
+For ties, select the eligible answer reached first. Each complete episode that produces
+any answer supplies one selected string to each of two frequency tables; the two strings
+may be identical, and our analysis never assumes they are independent.
+
+Why these definitions? The last answer is easy to record, but being last is no conceptual
+justification; quality and preference let Metacat's own assessments justify the choice.
+Within each table, distinct types are distinct selected letter strings, which still merges
+different structures with the same letters. That is a deliberate choice about what to
+test; Section \ref{sec:episodic-coverage} asks whether a better population exists.
+
+These selections make the conceptual comparison repeatable without a human reviewer and
+without prescribing one answer per episode. We ask whether the port chooses from the same
+observed answer populations when quality and conceptual preference pick the winners. Fixed
+expected-answer assertions leave that aspect of conceptual coherence unspecified.
+
+Let \(\mathcal E_{x,e}\) denote episode \(e\), including its answers and memory changes,
+and let \(Z_{x,e}=\phi(\mathcal E_{x,e})\) be its selected result under the chosen
+projection \(\phi\). Episode counts and observed sets follow the same pattern as run
+counts:
+
+\[
+c_x^\phi(z)=\sum_{e=1}^{N_x}\mathbf 1\{Z_{x,e}=z\},\qquad
+S_x^\phi=\{z:c_x^\phi(z)>0\}.
+\]
+
+The indicator \(\mathbf 1\) adds one when the selected result equals \(z\) and zero
+otherwise. Here \(N_x\) counts episodes rather than the \(L N_x\) runs inside them; for
+quality and preference winners, it counts complete episodes with an answer. Answerless
+episodes and program errors stay in separate records, so every coverage statement is
+conditional on completing an episode with an answer.
+
+Resetting between independently randomized episodes makes it reasonable to model them as
+draws from one episode distribution, provided no hidden state leaks between episodes. This
+uses established reset-based testing ideas \citep{ref34}, not a new independence theorem.
+Good--Turing and head selection apply to these episode results, not to all inner runs
+pooled together.
+
+These checks never compare complete answer sequences; claiming agreement in retrieval,
+memory updates, or the route through an episode would need richer observations and
+memory-specific controls. Letting memory grow across episodes would be a different
+problem, in which both the dependence and the distribution could change. Results for
+stationary Markov sequences \citep{ref35}, a model of dependence with an unchanging
+distribution, do not automatically cover that case.
+
+\subsection{Checking the Reference With New Data}\label{sec:qualification}
+
+A low singleton ratio suggests that collection might stop; it says nothing with stated
+confidence about whether the frozen set is adequate. For that second question we run the
+reference again with new randomness after freezing the candidate set. These \emph{held-out
+validation} observations played no part in building the set they test.
+
+Each validation winner outside the frozen set counts as a miss, every time it occurs. From
+the number of misses in a fixed-size sample, we calculate a one-sided binomial upper
+confidence bound on the probability of another outside result; one-sided means the bound
+is an upper limit only. A set \emph{qualifies} only if that upper bound meets the declared
+coverage target; failed or absent validation supplies no claim.
+
+The episodic study uses a coverage target of 0.01, or 1\%, looser than the 0.0001
+construction heuristic. It considers 19 problems and two answer definitions per problem:
+38 populations in all. To make simultaneous 95\% confidence statements, we allocate a
+total error allowance of 0.05 equally across those 38 populations. This Bonferroni
+allocation uses \(\alpha=0.05/38\) for each bound and does not require independence
+between the two winner definitions. We keep the allocation fixed even for populations that
+never become eligible for validation.
+
+Under this study's rule, a problem receives validation only when both answer sets have
+frozen. One definition can pass validation while the other fails. Passing means that the
+reference's conditional chance of an outside winner meets the bound; it does not establish
+port correctness, validate a p50 head, or transfer the bound to a port with a different
+answer distribution.
+
+Validation is part of building the reference and belongs in its cost. With zero misses in
+\(m\) independent validation draws, the one-sided \((1-\alpha)\) upper limit is
+\(1-\alpha^{1/m}\). For a single population at \(\alpha=0.05\), achieving a limit of
+\(10^{-4}\) requires 29,956 draws. Asking for simultaneous confidence across several
+populations requires more evidence. The later single-run study uses 30,000 validation runs
+per problem; its nominal and simultaneous results appear in Section
+\ref{sec:single-results}.
+
+The process is straightforward to state, although its limits matter:
+
+\begin{verbatim}
+Build the reference for each problem:
+  Collect outcomes under a recorded sampling rule and budget.
+  Freeze the observed set and, where used, its p50 head.
+  Record counts, settings, stopping reason, and singleton ratio.
+  Use separate reference observations to assess coverage.
+  Keep failed or missing validation visible.
+  Do not add validation discoveries to erase misses.
+
+Check a port revision:
+  Use the same outcome definitions and compatible test settings.
+  Collect the budgeted sample of runs or whole reset episodes.
+  Report outcomes outside the frozen reference set.
+  Where a p50 head is used, report its absent members.
+  Keep enough evidence to investigate each finding.
+  Do not treat a check without flags as proof of equivalence.
+\end{verbatim}
+
+\section{Why Spend More on the Reference?}\label{sec:amortization}
+
+The point is iteration speed. Building a reference is expensive, and so is inspecting
+result distributions by hand after every code change. Once the reference exists, the
+software counts outcomes, checks membership, and reports missing and unexpected answers;
+the human's job shrinks to investigating them.
+
+\emph{Test-driven development} (TDD) is the closest analogy. In TDD, we write an automated
+test before implementing the behaviour it asks for, make it pass, then improve the code
+while keeping the tests passing.\footnote{See Martin Fowler's practitioner account,
+  \href{https://martinfowler.com/bliki/TestDrivenDevelopment.html}{``Test Driven
+  Development''}.} Time spent up front means later checks report failures without a person
+inspecting every passing result. Our reference makes the same investment for stochastic
+behaviour. Section \ref{sec:applications} considers development beyond porting, and the
+difference between a sampled reference and a specification.
+
+Automation is the speed advantage over manual review. It does not make a discrepancy
+statistically significant; that depends on the sampling design and the test. A reference
+that costs 100 times one check may still pay for itself over many checks, but the
+arithmetic must include the whole job: collection, validation, storage, running the port,
+comparing results, and following up the findings.
+
+Let \(C_R\) be the one-time reference cost. For check cycle \(k\), let \(C_{P,k}\) be the
+sampling-and-comparison cost and \(C_{F,k}\) the cost of investigating its findings.
+Across \(K\) cycles that can legitimately reuse the reference, the total and average costs
+are
+
+\[
+C_{\mathrm{total}}(K)=C_R+\sum_{k=1}^{K}(C_{P,k}+C_{F,k}),\qquad
+\overline C(K)=\frac{C_R}{K}+\frac{1}{K}\sum_{k=1}^{K}(C_{P,k}+C_{F,k}).
+\]
+
+The first term in the average, \(C_R/K\), spreads the reference cost across checks; that
+is what \emph{amortized cost} means here. It is an accounting identity. Any fair
+comparison with another method must let that method reuse its reference too.
+
+In a single-run check the imbalance is \(N_x\) reference runs against \(n_x\) port runs,
+usually with \(N_x\gg n_x\); for learning-mode tests the units are episodes. Counts are
+not elapsed time. One episode may cost far more than another, especially when memory
+changes how long an answer takes, and Scheme versus Python, processor, numerical software,
+and concurrency all move the cost. We therefore report count ratios only as count ratios.
+
+What can stay fixed while the port changes? We retain reference counts, the observed set,
+any selected head, program and dependency versions, seeds, problem schedules, initial
+memory, stopping conditions, and outcome definitions. Together, these specify the question
+the reference answers. Changing an episode from eight runs to sixteen changes that
+question, as does changing the initial memory, the cap, or the meaning of an outcome; each
+needs a new reference or a justified transformation of the old one. A confirmed reference
+defect invalidates the affected part of the reference.
+
+There is another limit to reuse. Developers can gradually adapt a port to the particular
+reference they keep checking. Repeated checks are then not independent new evidence, and
+their individual statistical claims do not add up to a guarantee over the whole
+development history. Fresh final audit samples and tests with known defects remain
+important.
+
+\section{What the Flags Can and Cannot Tell Us}\label{sec:statistics}
+
+A named-answer flag gives us a concrete case to investigate. Interpreting it still
+requires care about sampling, reference coverage, and the chance of observing the answer
+within the check budget. This section states those limits.
+
+\subsection{When a Common Answer Is Missing}\label{sec:absence}
+
+Suppose a frozen head contains an answer with port probability \(p_P(o\mid x)\). If the
+check observations are independent and that probability stays fixed, the chance of missing
+it in all \(n_x\) observations is
+
+\[
+\Pr(o\notin T_x\mid S_x,H_x)=(1-p_P(o\mid x))^{n_x}.
+\]
+
+This is the probability of not seeing the answer once, multiplied across all draws, and it
+uses the \emph{port's} probability. Substituting the observed reference share
+\(\widehat p_R(o\mid x)\) gives a comparison number we call a \emph{plug-in baseline}: an
+estimate plugged into a formula as if it were the true probability. The substitution
+ignores uncertainty in the reference sample, head selection, and stopping rule, and a
+reference share is not an established lower bound on the port's chance of an answer, so
+the baseline is not a calibrated error probability.
+
+If we could justify a lower bound \(p_P(o\mid x)\ge\ell_{x,o}>0\), then
+\((1-\ell_{x,o})^{n_x}\) would be an upper bound on absence. Adding these bounds over all
+selected answers gives a union bound for a check cycle; the absence events themselves need
+not be independent. Establishing such lower bounds, with their uncertainty, is separate
+work; support equality alone supplies none.
+
+There is also a difference between a false alarm and a missed defect. Failing to see a
+still-possible answer can produce a misleading discrepancy flag. If the port has
+completely lost an answer, so that \(p_P(o\mid x)=0\), then the answer is absent with
+certainty. Its head-membership test cannot miss that deletion merely because the check
+sample is small.
+
+\subsection{When an Answer Falls Outside the Reference}\label{sec:novelty}
+
+An outside answer has three useful counts. How many times did it occur? How many different
+outside answer types appeared? Did the problem receive any outside-answer flag at all? Ten
+occurrences of one answer are ten draws, one distinct type, and one flagged problem.
+
+For frozen \(S_x\), let \(q_{P,x}=\sum_{o\notin S_x}p_P(o\mid x)\) be the port's
+probability of producing anything outside the reference. With independent check draws, the
+expected number \(D_x\) of outside draws and the probability of at least one are
+
+\[
+\mathbb E[D_x\mid S_x]=n_xq_{P,x},\qquad
+\Pr(D_x>0\mid S_x)=1-(1-q_{P,x})^{n_x}.
+\]
+
+The test software also lists distinct problem--outcome pairs. If \(U_x\) counts the
+distinct outside types for problem \(x\), then
+
+\[
+\mathbb E[U_x\mid S_x]
+=\sum_{o\notin S_x}\left[1-(1-p_P(o\mid x))^{n_x}\right]
+\le n_xq_{P,x}.
+\]
+
+Each term is the chance of seeing that outside type at least once. Counting distinct types
+cannot exceed counting every occurrence.
+
+Reference validation concerns \(M_{R,x}\), the chance of an unseen answer from the
+reference. It does not bound \(q_{P,x}\), the port's chance of an outside answer. The port
+check therefore records outside answers for investigation without treating the reference's
+coverage bound as a guarantee about the port.
+
+A budgeted check can also miss rare defects. Suppose the answers caused by a defect have
+total port probability \(\epsilon\) and all lie outside \(S_x\). The chance of missing all
+of them in \(n_x\) independent runs is \((1-\epsilon)^{n_x}\); with 100 runs, detection
+probabilities for \(\epsilon=10^{-4},10^{-3},10^{-2}\) are about 0.0100, 0.0952, and
+0.6340. Seeing all selected common answers does not make those rare defects easy to
+detect.
+
+\section{How This Relates to Earlier Work}\label{sec:related}
+
+The difficulty of knowing what a test should expect is the \emph{oracle problem} in
+software testing \citep{ref1, ref3, ref26}. Comparing with another program is an
+established response: it can act as a pseudo-oracle \citep{ref2}, or as the reference in
+differential testing \citep{ref4}. Agreement does not prove both programs correct, and
+disagreement needs interpretation. Here the variation is intentional, unlike test
+\emph{flakiness}, where repeated tests unexpectedly change their pass/fail result
+\citep{ref17}.
+
+Another response is \emph{metamorphic testing}: check a relationship between executions
+when individual expected answers are hard to specify \citep{ref7, ref5, ref28}, for
+example when a known relationship between two inputs implies one between their outputs.
+Statistical versions and work on stochastic optimization address random outcomes
+\citep{ref6, ref27}. Such tests could complement ours where domain knowledge supplies
+reliable relationships. Tests of randomized algorithms also need a stated null hypothesis
+(the assumption the test is designed to challenge), a sampling protocol, and a specified
+difference to detect \citep{ref31}. Statistical model checking asks whether particular
+properties of stochastic executions hold \citep{ref15, ref16}. Its guarantees do not come
+from repeatedly looking at a convenient statistic.
+
+Good--Turing is well established \citep{ref8}. Practical frequency estimation
+\citep{ref9}, unseen-vocabulary estimation \citep{ref11}, estimating the number of types
+\citep{ref12}, and coverage-based estimation \citep{ref30} address neighbouring,
+non-interchangeable questions. Bounds on missing mass carry uncertainty terms
+\citep{ref10}, and the optimality results of \citet{ref29} concern predicting numbers of
+unseen types rather than a stopping rule or port diagnostic.
+
+The closest software-testing precedent is STADS \citep{ref13}, which treats program
+behaviours as species to be discovered through sampling. Work on residual risk in greybox
+fuzzing, which uses execution feedback to generate tests, also estimates the chance of
+further discoveries \citep{ref14}. Capture--recapture methods have been used to estimate
+software fault content \citep{ref25}. We therefore do not claim to have invented the use
+of discovery statistics in testing. Our focus is a frozen reference record that repeatedly
+supplies named-answer comparisons during development. Guarantees for other sampling
+schemes do not automatically carry over.
+
+Selecting the most frequent outcomes until a target share is reached is an empirical
+smallest covering region \citep{ref33}, which we apply at 50\% without claiming a new
+algorithm or an optimal threshold.
+
+Work on aligning and replicating simulation models distinguishes different levels of
+agreement \citep{ref19, ref20}. Our distinction between answer sets and internal processes
+belongs in that tradition. Differential testing of probabilistic programming systems
+\citep{ref18} is a related application we have not tried. Resetting probabilistic stateful
+systems between fixed-length trials is established \citep{ref34}; that is the relevant
+precedent for treating an episode as one observation. Missing-mass estimation for Markov
+sequences \citep{ref35} shows that the ordinary singleton estimate is biased once
+observations are dependent, which is one reason we do not pool singleton counts across a
+memory history.
+
+Where, then, is the process contribution? It joins construction, freezing, fast checks,
+and investigation into one reusable workflow for a stochastic port: Good--Turing guides
+reference collection, p50 heads name common reference solutions missing from a check, and
+the named differences guide code inspection and repair. We have not found this complete
+process in the prior work we examined. That is a bounded comparison, not proof of
+exclusive priority.
+
+The learning-mode application is part of this contribution, with a boundary: the
+single-run studies and the historical episodic checks use p50 heads, while the later
+quality-and-preference study extends construction and independent coverage validation to
+two episode-answer populations and tests frozen supports only.
+
+\section{How the Checks Helped Build the Port}\label{sec:case}
+
+Testing ran alongside the writing of the Python program. An automated check could name a
+problem and an unexpected answer, which was a concrete starting point for tracing the
+source, trying an explanation, and checking a repair. Two investigations show how: one
+found a real direction-handling error, the other a misleading test condition.
+
+\subsection{What the Historical Records Establish}\label{sec:protocol}
+
+The port was developed with language-model assistance, source comparison against the
+Scheme source, and repeated consultation of the dissertation. Running the program supplied
+evidence that reading could not, and reading explained differences that running could not.
+
+The benchmark contains 19 letter-string problems from demonstrations and simpler analogy
+cases. Appendix \ref{app:inputs} lists them all, with examples of answers shared by the
+reference and port. Individual-run checks clear episodic memory before every run;
+learning-mode checks retain it within eight-run episodes.
+
+The historical reference was a modified Metacat 1.2 with a 100,000-codelet cap, run
+\emph{headless}, without the graphical interface. The modifications also addressed
+unsupported messages sent to program objects, rules acting on whole strings, and message
+dispatch, and some of them can affect answers. This reference is therefore modified
+Metacat, and we do not claim the modifications preserve every aspect of its behaviour.
+
+A reconstruction package supplies patches for the linked original release without
+redistributing its source. Reconstructing the current modified source still does not
+identify the exact build behind every historical sample; that evidence is missing. The old
+counts can be audited. The complete historical experiment cannot be reproduced end to end.
+
+The historical single-run checks use seeds 900,000--900,099 for each input. Because the
+seeds are reused before and after repairs, the two checks are a paired replay.
+
+\subsection{The Large Historical Reference}\label{sec:reference-results}
+
+The saved reference contains 374,500 runs and 366 distinct problem--outcome pairs. The
+same answer to two different problems counts as two pairs. There are 27 selected p50 head
+members across the 19 problems. Reference sizes range from 10,250 to 51,000 runs,
+averaging 19,710.5 per problem. Six problems have no singletons; three have singleton
+ratios above \(10^{-4}\).
+
+Table \ref{tab:reference} gives the full counts. In its headings, \(|S_x|\) is the number
+of different observed outcomes and \(|H_x|\) is the number selected for the p50 head. A
+stored stopping label records what the collector reported.
+
+\input{final/generated/reference-table.tex}
+
+\texttt{saturated} means only that the heuristic stopped collection. Two checkpoint cases
+finished at 51,000 runs because work was already underway. The other above-target case,
+\texttt{misc3}, records \texttt{shards\_exited}; development notes describe a manual stop,
+but the aggregate file does not say why the worker processes exited. The spread of
+collection sizes makes adaptive spending worth considering, though not yet proven better
+than a fixed budget.
+
+The historical probability calculations are worth keeping, with their assumptions stated.
+With 100 runs per check, the smallest head-member reference share is
+\(4089/21000=0.194714\ldots\) for answer \texttt{wyz} on problem \texttt{run3}. The
+absence formula gives \(3.9355\times10^{-10}\) for it, and the 27 member-specific absence
+terms add to \(6.1340\times10^{-10}\). Both are plug-in baselines in the sense of Section
+\ref{sec:absence}.
+
+The saved singleton ratios give 0.169485 expected outside draws per benchmark-wide cycle
+and 0.167898 expected problems with at least one outside draw. If checks are independent
+across problems too, the plug-in probability of any outside draw is \(1-\prod_x(1-\widehat
+M_{R,x})^{100}=0.155914\). The expected number of distinct outside pairs is bounded above
+by the expected draw count. A zero singleton ratio contributes zero to these calculations
+without establishing zero risk.
+
+The rough design figure \(19\times100\times10^{-4}=0.19\) is therefore no proved upper
+bound: three recorded estimates exceed the target, and none is an upper confidence limit.
+The plug-in total happens to fall below 0.19.
+
+\subsection{Making the Execution Limits Comparable}\label{sec:cost}
+
+One historical check schedules 100 initial runs per problem, or 1,900 across the
+benchmark, so the reference-to-check ratio is \(374500/1900=197.105\ldots\) in run counts.
+
+The port initially used a working cap of 20,000 codelets against 100,000 in the reference,
+so a port run could stop before the reference's budget was exhausted. The repaired test
+driver reruns capped seeds at 100,000 codelets; the saved post-repair cycle has 23 such
+reruns, for 1,923 execution attempts. The 197-fold ratio excludes those attempts and any
+difference in work per attempt.
+
+Rerunning with a larger cap is equivalent to extending the original path only if seeded
+replay is deterministic and the new cap does not change decisions before the old cutoff.
+Starting a fresh session is not enough to guarantee that. Equal numerical limits also do
+not prove equal codelet semantics or equal behaviour across numerical backends. A
+\emph{backend} is the software-and-hardware route used to execute the calculation. The
+records include an ordinary CPU (central processing unit) path and a path using the MLX
+numerical library. They do not establish equivalence between CPU and GPU (graphics
+processing unit) execution.
+
+\subsection{Following the Differences Into the Code}\label{sec:results}
+
+All three saved single-run checks produced every p50 member (Table \ref{tab:cycles}) but
+disagreed with the reference on some observed outcomes. Before repair, the CPU check
+reported five outside problem--outcome pairs: \texttt{eqe-baaab/abbbb},
+\texttt{run6/cdddb}, \texttt{copy1/*NONE*}, \texttt{run1/*CAP*}, and \texttt{copy5/aac}.
+
+\input{final/generated/cycle-table.tex}
+
+The first three led to the direction-image investigation, labelled RC-A in the development
+record. Here an \emph{image} is an internal representation of letters or groups to which a
+rule can be applied, not a bitmap picture. A group treated as leftward had its image
+assembled in physical left-to-right order and marked rightward. Reversing both direction
+and constituent order can leave the displayed, unchanged string looking correct. That made
+the error easy to miss until a later operation depended on direction.
+
+The investigation includes a Python execution trace and Scheme-side probes. The
+development account reports that inserting the suspected defect into the reference
+produced \texttt{cdddb} and \texttt{*NONE*}, matching two flagged outcomes. Its
+intervention table does not show reproduction of \texttt{abbbb}. The evidence for that
+answer is the Python trace and its disappearance after repair, not a claim that every
+flagged string was recreated in Scheme. Focused regression tests, designed to catch the
+same error if it returns, provide additional local evidence. These historical instrumented
+runs were not independently repeated for the paper revision.
+
+The \texttt{run1/*CAP*} result, RC-B, had a different explanation: the two programs were
+allowed different execution budgets, and it disappeared when the caps were reconciled.
+After the image repair and the driver change, the paired CPU replay contained only
+\texttt{copy5/aac}. One proposed explanation, RC-C, was investigated and rejected; the
+answer remains unresolved. The separate archived MLX check still contains five outside
+pairs, so the repairs are unvalidated on that backend.
+
+The useful result is more than five flags reduced to one. The checks located a semantic
+error, supported a repair and regression tests, distinguished an unfair comparison from a
+program defect, and kept an unanswered question visible. That is an improvement in
+specific port behaviour; Section \ref{sec:limits} says what it leaves unproved.
+
+Seeing the same flag again helps decide what to investigate first, and no more: a
+legitimate reference answer omitted from the frozen sample can recur indefinitely, and
+these historical cycles reuse the same seed block.
+
+\subsection{The Earlier Checks With Memory}\label{sec:episodic-results}
+
+The historical learning-mode reference is described as 500 eight-run episodes per problem:
+9,500 episodes, or 76,000 inner runs. A port check uses 100 episodes per problem: 1,900
+episodes and 15,200 inner runs per cycle. The reference-to-check episode ratio is
+therefore 5:1, far below the 197:1 of the individual-run checks, though both references
+were meant for reuse.
+
+Those 500 episodes do not establish the single-run heuristic target. Stored episodic
+singleton ratios reach 0.016, and the available record has no independent missing-mass
+validation of this reference.
+
+What does memory change? The port retains descriptions of answers and of \emph{snags},
+difficulties met while forming an analogy. Between runs it resets the workspace, the
+concept network, the codelet scheduler, and the current reminding activations, but keeps
+the stored experiences. The direct effect on later search is the rejection of an answer
+already remembered under the relevant structural description.
+
+The duplicate check uses the problem, the answer string, the inferred rule, and the
+translation of that rule to the target, so the same letters reached through a different
+rule need not be a duplicate. Answer-finding, justification, and recovery from a
+justification clamp all consult this memory; the clamp is part of the control of
+justification, and its recovery path must not bypass the check. In the reference source,
+an answer already present in memory makes the answer-finding codelet fizzle, and the port
+does the same; search continues, which changes both what later runs find and whether they
+terminate.
+
+There is also an explanatory role. After storing an answer, the inspected reporting code
+compares it with earlier answers through rules, themes, justification, and coherence, then
+records reminding strengths and generates commentary. Here \emph{themes} describe
+conceptual relationships in an analogy, and \emph{coherence} is the program's assessment
+of how well those relationships fit together. Stored snags can change how an otherwise
+unjustified theme is explained. These are implemented behaviours, not evidence that
+remembering improves answer quality. The repeated-problem experiment tests exploration
+conditioned on experience, not learning transferable to new problems.
+
+Existing regression definitions address several memory-related repairs: distinguishing
+answers with different rules; preventing clamp recovery from accepting a remembered
+answer; comparing snag rules structurally rather than by potentially identical English
+descriptions; and assigning zero reminding strength at the relevant distance threshold.
+Further tests cover distance components, snag-based theme classification, clearing
+activations without deleting answers, and session-scoped identifiers. The test driver
+counts a run as successful only if it reports an answer and adds a new memory entry.
+
+These test definitions were inspected for this paper; the engine regressions were not
+freshly rerun, and Scheme and Python memory paths were not compared. Nor do the historical
+build records let us attribute each change in the endpoint counts to a particular memory
+repair.
+
+For the saved port episodes, we recover the last successful answer by looking backward
+past \texttt{*NONE*} and \texttt{*CAP*}, then check the stored endpoint counts and
+missing-head lists. Four episodes in each cycle never answer; the old endpoint histogram
+omits them but records their number, which Table \ref{tab:episodes} retains.
+
+The historical episodic reference itself is absent from the supplement: its size comes
+from the development account, and the stored outside-answer lists cannot be regenerated.
+The saved port sequences do establish how often each listed endpoint occurred.
+
+\input{final/generated/episode-table.tex}
+
+The paired CPU records contain 17 outside problem/endpoint pairs across 28 episodes before
+repair, and 13 pairs across 14 episodes afterward. Neither cycle misses a selected head
+member. Of the 13 post-repair pairs, 11 also appear in the separate single-run reference.
+The other two are \texttt{misc2/ajd} and \texttt{eqe-baaab/qrrbq}, each seen once. That
+overlap is context only: an answer possible without memory need not have the same
+probability, or be reachable at all, under a particular learned context.
+
+The development investigation links the direction-image repair to the disappearance of
+\texttt{abbbb}, \texttt{baaba}, \texttt{cdddb}, and \texttt{cddbc} from the episodic
+outside list, which complements the individual-run findings under the same limits on
+historical build evidence. The archived MLX sequences are another unvalidated cycle.
+
+Two problems keep these records from being a controlled learning-mode validation. First,
+the port cap is 20,000 codelets and the reported reference cap is 100,000. An early cap
+can change memory and therefore every later run in the episode, and similar aggregate cap
+rates would not make that harmless: capped CPU runs rise from 1,311 to 2,404 after repair
+even as outside endpoints fall. Later prose reports 2,406 capped runs in 1,054 episodes;
+the identifiable saved sequences give 2,404 in 1,052, and we use the latter.
+
+Second, episode \(e\), run \(i\) uses seed \(900000+8e+i\), with \(0\le e<100\) and
+\(0\le i<8\), so these paired samples overlap the single-run seed block and cannot confirm
+it independently. Those limitations led to the later study with matching caps and native
+winners.
+
+\section{A Recorded Study of Individual Runs}\label{sec:single-study}
+
+The later \texttt{support-v1a} study records program versions, ordered observations,
+frozen construction samples, and fresh validation checks, all for one port revision.
+
+\subsection{The Protocol and Its Change After a Failure}\label{sec:single-protocol}
+
+Every run starts with empty memory. Both programs receive a direct 100,000-codelet limit.
+For each of the 19 problems, we collect 20,000 reference runs to build the oracle, 30,000
+separate reference runs for validation, and 1,000 port runs. The totals are 380,000,
+570,000, and 19,000, respectively: 969,000 main observations.
+
+Validation and port observations are divided into prespecified blocks of 100 runs, giving
+300 reference checks and ten port checks per problem. The three phases use disjoint seed
+blocks. A seed equals the recorded phase base plus \(100000j+i\), where \(j\) indexes the
+problem and \(i\) the run. Independence under a fixed distribution remains a modelling
+assumption about this pseudorandom sampling.
+
+Reference execution uses Chez Scheme 9.5.4 in a Linux/amd64 environment under emulation.
+The serial port uses Python 3.14.6 and NumPy 2.5.1. Manifests, inventories of file hashes,
+record the source, parameter files, dependencies, protocol, and completion receipts.
+
+The original \texttt{support-v1} collection stopped when the reference failed reproducibly
+during validation. Rather than drop the failure or repair the engine mid-collection, we
+made a separately versioned continuation with the original budgets, problems, seeds,
+engines, caps, and frozen reference sets. A recognized failure inside the engine becomes
+\texttt{*ERROR*} and the process restarts at the next assigned seed; infrastructure and
+unclassified failures still stop collection.
+
+Verified complete chunks from the parent study are inherited once. The interrupted chunk
+is replayed with its original seeds, checking that its 238 successful prefix observations
+agree. Exactly one observation is admitted for each assigned seed. Incomplete attempts are
+retained as records of what happened, not extra independent data.
+
+The 969,000 main observations comprise the scheduled construction, validation, and port
+checks. No engine repair was introduced. To be clear: the continuation is an explicit
+response to a failure, not an unchanged experiment planned in every detail before it
+began.
+
+\subsection{What the Frozen References Found}\label{sec:single-results}
+
+The full 20,000-run construction sample for each problem is frozen, along with its p50
+head. There are 27 head members across the benchmark. All 3,876 main chunks are complete
+and pass checksum verification. Table \ref{tab:single-checks} summarizes checks against
+those references; Appendix \ref{app:single-study} gives the per-problem counts.
+
+\input{final/generated/single-check-table.tex}
+
+New reference data show what the construction missed. Sixteen problems have held-out
+discoveries: 124 validation draws fall outside construction, including the three program
+errors. Those draws occur in 119 of 5,700 reference-validation checks.
+
+The other three problems, \texttt{misc4}, \texttt{misc5}, and \texttt{copy6}, have no
+outside outcomes in 30,000 validation runs each. For one problem on its own, that gives a
+one-sided 95\% upper bound of about \(9.9853\times10^{-5}\). None meets \(10^{-4}\) with
+simultaneous confidence across all 19 problems: even a zero-miss problem then has an upper
+bound of about \(1.9799\times10^{-4}\). These are per-problem bounds on the reference.
+
+The port has eight outside draws in six of 190 checks, representing five distinct
+problem--outcome pairs (Table \ref{tab:single-novelty}). Six of the eight have
+counterparts in the new reference observations: direct evidence that a finite construction
+sample can omit answers the reference produces. We keep the original flags, because
+validation discoveries never enlarge the frozen oracle.
+
+The remaining two, \texttt{misc1/*NONE*} and \texttt{copy5/acc}, warrant investigation. No
+check misses a p50 member.
+
+\input{final/generated/single-novelty-table.tex}
+
+\subsection{The Reference Also Failed}\label{sec:reference-failures}
+
+The expensive reference validation exposed three failed executions on allowed inputs.
+Their seeds and failure signatures are retained:
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}lrrl@{}}
+\toprule\noalign{}
+Input & Seed & Codelets & Exception signature \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{misc1} & 20713988 & 2,835 & Non-procedure \texttt{\#f} \\
+\texttt{misc1} & 20716342 & 1,981 & Non-procedure \texttt{\#f} \\
+\texttt{misc3} & 20226148 & 2,088 & \texttt{caddr}: incorrect list structure
+\texttt{\#f} \\
+\end{longtable}
+}
+
+Three executions, two exception signatures, and so far one diagnosis: the first failing
+continuation identifies a missing letter-category descriptor in \texttt{make-group}, and
+we do not yet know whether the other failures share that cause. Errors stay in the
+execution denominators and receive separate hard-error flags. The port has no engine
+errors in this study.
+
+This is another useful development result: building and validating a large oracle
+stress-tests the original program, and the retained failures are concrete starting points
+for repair and regression tests. Any sample this large might have found them; we left them
+in the study.
+
+\subsection{Alternative Collection Rules and Their Costs}\label{sec:single-cost}
+
+Because this study saves discovery order, we can ask what would have happened had
+construction stopped earlier. A \emph{prefix} is the first part of the ordered sample. We
+compare fixed prefixes of 1,000, 5,000, 10,000, and 20,000 runs per problem, plus two
+stopping heuristics checked every 500 runs after at least 3,000 observations.
+
+The singleton rule accepts \(f_1/N\le10^{-4}\), requiring at least 10,000 runs when
+\(f_1=0\). The no-discovery rule stops after a gap of at least 1,000 runs without a new
+outcome. If a rule never fires, it retains the full 20,000-run prefix.
+
+The singleton rule fires for 14 problems. Including the five that reach the limit, it uses
+268,500 construction observations and leaves 135 held-out outside draws and nine port
+outside draws. The no-discovery rule fires for all 19, uses 81,500 observations, and
+leaves 346 and 34 outside draws, respectively. Table \ref{tab:single-prefixes} reports all
+six choices. They share observations and spend different amounts, so the comparison is
+descriptive; and since the full construction was collected anyway, the prefix totals are
+hypothetical allocations.
+
+Construction and validation together cost 950,000 reference executions. The ten sets of
+port checks use 19,000 runs, a 50:1 aggregate count ratio; one benchmark-wide check uses
+1,900, so the upfront reference is 500 times one check. The ten checks sample one frozen
+port. They demonstrate the allocation; savings across a development lifecycle would need
+successive revisions.
+
+Recorded aggregate attempt wall time is about 466,573 seconds. It adds the durations of
+inherited, interrupted, continuation, and corrected preflight attempts. Because attempts
+may overlap, this is neither the campaign's elapsed duration nor CPU time. Pilot work,
+earlier diagnosis, wrapper-development preflight, setup, human work, and analysis are not
+fully included. A complete cost claim would need those too.
+
+\section{A Recorded Study of Episodes With Memory}\label{sec:episodic-coverage}
+
+The episodic v3 study covers all 19 problems. Both programs receive eight runs per episode
+and a 100,000-codelet cap per run, with memory reset between episodes. Each complete
+episode with an answer contributes a quality winner, \texttt{best\_a}, and a preference
+winner, \texttt{best\_b} (Section \ref{sec:episode-method}). We compare these answer
+strings against frozen supports; there is no p50 head for these definitions.
+
+\textbf{The collection rule.} Each answer population freezes at its first eligible
+\(f_1/N\le10^{-4}\) crossing, independently of when its partner freezes. Construction ends
+when both have frozen or after 2,000 episodes for that problem. Four problems reuse the
+complete 1,000-episode prefixes already collected in an exploratory pilot. Their first
+eligible freeze is evaluated at that full prefix, not at a reconstructed earlier crossing.
+The other 15 problems can freeze immediately. This pilot reuse is an explicit part of the
+design, not an unchanged plan made before the pilot. For new episodes, first seeds are
+sampled independently with replacement; validation randomness is separate from
+construction.
+
+If both supports freeze, the problem receives exactly 1,000 reference validation episodes;
+if construction reaches 2,000 episodes without both crossings, it receives none. Every
+problem receives 100 port episodes regardless, with descriptive comparison where coverage
+cannot be claimed. No construction was extended, no validation batch was added, and no
+frozen set was enlarged after seeing the results.
+
+In total, the study records 10,074 construction, 14,000 validation, and 1,900 port
+episodes: 25,974 episodes and 207,791 inner runs, including the reused pilot. The one
+construction error comes from that pilot. Preflight and serializer-diagnostic executions
+(a serializer writes program results into the saved data format) are overhead outside
+these totals.
+
+\textbf{Did the frozen references pass validation?} Table \ref{tab:episodic-coverage}
+reports every problem, including failed and skipped validation. A and B mean quality and
+preference winners. ``Build \(E\)'' counts construction episodes; ``Freeze'' gives the
+episode at which the corresponding set stopped changing. A dash means no freeze or no
+collected validation; zero misses is written 0. Five \texttt{copy5} validation episodes
+never answer, leaving 995 answered episodes for each of its populations; every other
+tested population has 1,000.
+
+\input{final/generated/episodic-coverage-table.tex}
+
+Only \texttt{copy1}, \texttt{copy2}, and \texttt{copy3} meet the 1\% coverage target for
+both answer populations. Eight of the 28 tested populations pass: those six,
+\texttt{misc3\ best\_a}, and \texttt{copy4\ best\_b}. The other 20 fail. The ten
+populations belonging to five construction-limited problems receive no validation. Each
+passing population has zero misses among 1,000 answered episodes, giving an adjusted upper
+bound of about 0.006611 under the fixed 38-population allocation.
+
+The early-stopping problem is especially clear in \texttt{misc5}. Both sets freeze after
+just two episodes. Yet validation then produces 480 out of 1,000 quality winners and 591
+out of 1,000 preference winners outside those sets. The estimate was zero early, but the
+reference was far from adequately covered. Independent validation exposed that failure.
+Fewer construction runs here are not evidence that learning made oracle collection more
+efficient.
+
+\textbf{Could we have chosen a better population?} Possibly. We chose quality and
+preference to make the episode's selected result internally justifiable by Metacat, rather
+than simply using the last answer. We did not know that the resulting discovery
+frequencies would suit Good--Turing-guided collection. It may work more effectively with a
+different set of episodic results, and a future experiment could choose another
+conceptually meaningful projection to build a better oracle.
+
+That needs a new construction sample and its own validation. The present data cannot
+separate the effect of the population choice from the effect of stopping immediately, and
+no change of definition would turn a zero singleton ratio into a confidence certificate.
+The failed validations stand as results to explain.
+
+\textbf{What did the port do?} Table \ref{tab:episodic-port} gives both populations for
+every problem, validated or not, each with 100 assigned port episodes. Four \texttt{copy5}
+episodes never answer, so its winner denominator is 96; every other denominator is 100.
+``Outside'' counts occurrences outside that population's frozen set. Where one population
+froze and its partner did not, membership is reported descriptively for the frozen one.
+
+\input{final/generated/episodic-port-table.tex}
+
+Among the eight qualified populations, only \texttt{misc3\ best\_a} has outside port
+winners: 24 in 100 episodes. The other seven have none.
+
+Large outside counts also appear against references that failed validation: for
+\texttt{misc5}, 47 quality and 62 preference winners outside in 100 episodes; for
+\texttt{run3}, 45 and 54. With no coverage guarantee behind those sets, the counts are
+observations only.
+
+\textbf{Answers and completion are different questions.} The port attempts all 15,200
+scheduled inner runs. Of these, 9,815 answer, 3,388 stop without an answer below the cap,
+and 1,997 reach the cap. None has an engine error. Caps occur in 863 episodes, but another
+run in the same episode may still provide a winner. The four entirely answerless episodes
+supply neither A nor B and remain in the execution totals. Appendix
+\ref{app:episodic-comparisons} accounts for every phase and the inherited error episode.
+Comparing winners does not test whether the two systems answer or terminate equally often.
+
+\subsection{Looking Closely at One Discrepancy}\label{sec:misc3-discrepancy}
+
+The problem \texttt{misc3} is
+\texttt{abc\ -\textgreater{}\ aabbcc;\ kkjjii\ -\textgreater{}\ ?}. The example doubles
+single letters; the target already contains pairs, in descending alphabetical order. Both
+frozen reference sets contain \texttt{kji}, \texttt{kkjjii}, and \texttt{kkkjjjiii}: one,
+two, and three copies of each target letter, three different interpretations.
+
+The quality set freezes after 11 episodes with counts 3, 6, and 2 for those strings. The
+preference set freezes after seven with counts 2, 3, and 2. The observed sets happen to
+match, but their counts and freeze decisions are separate.
+
+In 1,000 held-out reference episodes, the quality winner is \texttt{kji} 466 times,
+\texttt{kkjjii} 319 times, and \texttt{kkkjjjiii} 215 times. No quality winner falls
+outside, so its adjusted upper missing-mass bound is 0.006611, under the 0.01 target. 99
+preference winners fall outside; that bound is 0.130501, and that reference fails.
+
+The port's 100 episodes have 24 outside quality winners across ten strings and 26 outside
+preference winners across 16. Every outside port string also occurs among the reference
+validation's selected \emph{preference} winners, so Metacat can produce all of them; the
+discrepancy is how often each becomes the winner under each definition. The failed
+preference validation limits that comparison to description and leaves the separately
+qualified quality reference intact.
+
+Could ties explain the quality result? We divide the 24 episodes into three groups: 21
+have a single maximum-quality string, one ties among outside strings, and two tie between
+an outside and an inside string. Only the last two could change membership under a
+different tie rule, and we retain the specified earliest-occurrence rule. Nine of the
+outside episodes answer on all eight runs, so truncation cannot explain the whole result
+either.
+
+Reading the source finds two differences in rule generalization, the replacement of
+specific changes by a more general rule: the port excludes some literal common changes the
+reference retains, and it omits some eligibility checks when generalizing changes to an
+object's components. Appendix \ref{app:misc3} gives the findings and the saved evidence.
+The recorded winner descriptions lack the rule and workspace detail needed to assign
+episodes to either cause. Neither engine has been repaired, and no observation has been
+removed or reclassified.
+
+This problem illustrates the intended imbalance: 11 construction plus 1,000 validation
+episodes cost 8,088 reference runs, and the 100-episode port check costs 800. The check
+identifies a substantial difference worth investigating. Whether memory caused it is open.
+
+\section{What Remains Unanswered}\label{sec:limits}
+
+The checks helped improve the port, and the later studies expose useful differences. What
+would be needed to make stronger claims?
+
+\textbf{Known defects and fair cost comparisons.} We have not measured how reliably the
+workflow detects a controlled collection of defects. That would require deliberately
+introduced, understood changes, fresh checks, and comparison with alternatives given the
+same reference-reuse opportunity. The prefix comparisons spend different construction
+budgets and do not establish superior cost or detection power. Section
+\ref{sec:statistics} also shows why these flags are not an unrestricted test of support
+equality with calibrated error rates.
+
+\textbf{Recoverable historical evidence.} The repair history is central, and its missing
+build records remain missing. We can audit saved measurements and inspect the documented
+investigation; not every historical program version or intervention can be recovered.
+Sections \ref{sec:protocol} and \ref{sec:results} state those boundaries, and Appendix
+\ref{app:artifacts} says what the supplement reproduces.
+
+\textbf{Evidence specific to learning.} Memory-retained and memory-cleared episodes,
+together with known memory defects, would help show which experience-dependent changes
+these checks detect. The current native-winner study does not diagnose a memory defect,
+establish faithful memory paths, or separate population choice from immediate stopping.
+Alternative episode-result definitions remain a future experiment.
+
+\textbf{Scope beyond this system.} The 19 problems and testing parameters were chosen
+during development, without preregistration, and belong to one cognitive architecture. We
+have not evaluated continuous or high-dimensional outputs, changing generative pipelines,
+or transfer to new analogy problems. A different scheduler, numerical precision, or
+concurrency setting may change the support however harmless the change was meant to be,
+and matching answer letters can conceal different internal reasoning.
+
+\textbf{The whole development cost.} Neither historical records nor aggregate execution
+totals include all human investigation and repeated revision costs. A prospective series
+of repairs with fresh check blocks would measure actual reuse without replaying the same
+seeds. Comparing development with and without the workflow would help quantify its
+incremental benefit. The current workflow already automates comparisons that otherwise
+require manual inspection. What remains unmeasured is the size of that speedup and the
+total saving after sampling, investigation, and repair are included.
+
+\section{Potential Application of the Process}\label{sec:applications}
+
+Must this process stop at porting? No.~The same investment could support test-driven
+development of other stochastic systems: define and automate the check up front, then let
+repeated checks direct attention to the differences.
+
+Consider speeding up a randomized search program without changing the kinds of solutions
+it finds. An extensively sampled, reviewed version supplies the reference. Before touching
+the search, define the outcome categories, execution limits, and check budget; let
+Good--Turing guide collection and independent validation assess coverage. After each
+change, a budgeted sample reports unexpected solution types and missing common ones,
+giving the developer specific cases to investigate while unit tests check individual
+rules.
+
+The same pattern could apply when restructuring a simulator or re-implementing a learning
+system while preserving selected behaviour. For a system that learns during testing,
+define the initial state and the unit of observation first; an episode-level result based
+on the system's own assessments is one option, and it keeps the check on the behaviour of
+interest without a fixed answer per run or a comparison of internal sequences.
+
+The reference need not be software at all. Sampled human results could supply an oracle
+for a system that has yet to be built. Consider a collection of speeches from one
+consenting speaker, whose characteristic expressions recur across speeches without
+appearing equally often. First define how to segment the speeches into distinguishable
+phrasing patterns, so that a new sentence is not automatically a new pattern. A p50 head
+could then select the patterns accounting for at least half the recorded pattern
+occurrences. A discovery estimate similar to Good--Turing could guide further collection,
+with its sampling unit and assumptions adapted to the dependencies within and between
+speeches. Held-out speeches could help assess the frozen oracle's coverage. A large
+language model fine-tuned to imitate the speaker could then be checked, within a fixed
+generation budget, for missing characteristic patterns and distinguishable patterns
+outside the observed support set. The check would ask which patterns appear, without
+prescribing how often each must recur. An outside pattern would prompt inspection, not
+prove that the person could never use it. This would be a concrete experiment in using
+human examples to drive implementation and repeated automated testing of a style
+generator, with pattern definitions reviewed before testing rather than adjusted to accept
+whatever the model produces.
+
+One distinction from full TDD matters. A sampled reference describes observed behaviour
+and says nothing about capabilities absent from it. For new behaviour, developers still
+need a requirement, a trusted example, or a relationship between executions;
+reference-based checks then guard the behaviour that should stay unchanged while those
+tests drive the addition. An intentional change in outcomes calls for a reviewed new
+reference.
+
+The aim is the familiar test-driven loop: define what to check, change the code, inspect
+the reported failures or differences, and repeat. Here a discrepancy may reflect sampling
+or an incomplete reference rather than a defect. A check without flags is therefore
+limited evidence, not a complete pass on the system's behaviour. These applications are
+proposals beyond the Metacat case, not additional experiments. They offer a way to extend
+automated feedback to systems for which a single expected result is the wrong testing
+abstraction.
+
+\section{Conclusion}\label{sec:conclusion}
+
+How do we test a rewrite of a program that is meant to give different answers? Our answer
+is to collect a large reference, reuse it for fast checks, and investigate the differences
+those checks name. Good--Turing guides collection of the observed reference set used to
+flag unexpected port solutions. The p50 head identifies common reference solutions whose
+absence should be investigated. The comparison is deliberately two-sided: what appeared
+unexpectedly, and what failed to appear?
+
+Automating those questions removes repeated manual inspection of result distributions from
+the development loop. Metacat's own quality and preference judgments make selected
+conceptual behaviour testable where one fixed expected answer cannot express what the
+program is meant to do.
+
+In this case the process helped repair a direction-handling error, exposed an
+execution-limit mismatch, kept unresolved findings visible, and when done as a proper
+study, exposed further areas of investigation to improve the port. That is the core
+result.
+
+The later studies make the limits of this method clearer. Some apparently new port answers
+also appear in fresh reference data. The expensive reference campaign finds failures in
+the reference itself. For episodes with memory, immediate Good--Turing stopping often
+freezes a set too early: only three of 19 problems qualify for both winner definitions.
+Yet one qualified quality reference highlights a clear difference, with 24 outside port
+winners in 100 episodes against none in 1,000 reference-validation episodes. We do not yet
+know its cause. Different, internally justifiable episode populations may support better
+oracle construction, but that needs another experiment.
+
+The novelty is in bringing Good--Turing guidance, reusable support sets, and p50 checks
+together for stochastic port development, and in extending them to episodic learning
+results. The ingredients are established. Their value here is that they gave the
+development work concrete questions to answer.
+
+\clearpage
+\bibliography{final/references}
+\bibliographystyle{tmlr}
+\clearpage
+\appendix
+
+\section{What the Supplement Can Reproduce}\label{app:artifacts}
+
+The submission attachment contains a standalone LaTeX source bundle for this manuscript
+and a separate experimental bundle. The latter contains historical measurements,
+scientific exports from both later studies, the recorded port source and seed data,
+analysis code, tests, and Metacat reconstruction patches. Its README links results to
+evidence and gives dependency instructions. Its manifest records included file hashes,
+original source hashes, replaced documentation, and exclusions.
+
+The original Metacat source archive and runtime binaries are not redistributed. The
+reconstruction helper downloads the linked upstream release, applies the supplied patches,
+and checks the resulting files. This supplies the modified reference without silently
+replacing its original licence or source distribution.
+
+\textbf{Checking saved data does not repeat the experiments.} From the extracted
+experimental bundle, \texttt{python3\ verify.py} checks file and frozen-source hashes,
+regenerates saved-data audit reports and tables, and runs the academic and
+reconstruction-helper tests. It also reproduces episodic stopping decisions, validation
+eligibility, bounds, and outcome counts. These checks use the Python standard library and
+run neither analogy engine. A Unix locking dependency requires macOS, Linux, or a Linux
+environment such as Windows Subsystem for Linux (WSL).
+
+The historical audits recover p50 heads, stored flags, probability calculations, endpoint
+counts, and cap accounting from saved measurements. They do not recover missing discovery
+order, identify all sampled historical builds, or reconstruct historical episodic novelty
+from an unavailable reference.
+
+The episodic all-problem audit checks both winner populations and their separately frozen
+sets against the saved episodes. It retains all 38 construction/port count vectors. The
+\texttt{misc3} audit records selected-answer counts, the 24 outside quality-winner events,
+native winner descriptions, and the diagnostic groups. It does not rebuild unrecorded rule
+clauses, workspace states, or causal interventions. The public episodic export contains
+observations and descriptions of selected and tied winners; the full attempt archive is
+private. The raw-record inspection described in Appendix \ref{app:misc3} is consequently a
+documented audit finding that the public export alone cannot reproduce.
+
+Four single-run scientific archives preserve ordered observations, raw attempt evidence,
+receipts, manifests, and collection history. The main observation ledger identifies each
+counted result; archived copies of attempts add no observations. The lightweight table
+audit checks saved summaries without repeating the 969,000 engine executions, the
+manuscript source bundle supplies this version's tables, and optional reference
+reconstruction runs no analogy episodes. Checking the reported results needs neither the
+graphical interface nor new experiments.
+
+For anonymous review, two repository READMEs have replacement instructions. Repository
+ignore files, a GUI screenshot, private operational metadata, and Git history are omitted.
+Scientific records, executable source, technical implementation labels, and hash chains
+remain unchanged. Third-party attribution, the Metacat licence, and the port's MIT terms
+are retained; the MIT copyright holder's display name is anonymized for review.
+
+The bundle is neither a complete user-interface/database deployment nor a ready-configured
+rerun of the campaign, and packaging changed nothing in the studies.
+
+\clearpage
+
+\section{The misc3 Evidence in Detail}\label{app:misc3}
+
+Table \ref{tab:misc3-counts} contains every selected-answer count for \texttt{misc3}. Each
+construction column ends at its own freeze point, not the final common construction
+horizon. Reference validation does not add answers to either frozen set. Counts are one
+selected string per answered episode, not all tied winners or all answers across its eight
+runs.
+
+\input{final/generated/misc3-count-table.tex}
+
+\textbf{What the saved descriptions say.} All 24 outside port quality winners are also
+undefeated in the conceptual comparison. They are marked coherent, have three themes and
+zero unjustified themes, and score from 84 to 88. Unequal numbers of letters in the answer
+do not by themselves make it incoherent under the native checks.
+
+In 20 of the 24 episodes, saved descriptions also establish that an answer belonging to
+the frozen set was available: 18 had lower quality, and two tied for highest quality. The
+other four lack saved evidence of an inside answer, and since the export does not retain
+every losing description, one may still have occurred.
+
+The three tie cases explain the 21/1/2 grouping in Section \ref{sec:misc3-discrepancy}.
+Using one-based port episode numbers: episode 43 ties \texttt{kjjjiii}, \texttt{kjjji},
+and \texttt{kkkjji} at quality 86, all outside. Episode 74 selects \texttt{kjjji}, tied
+with inside answer \texttt{kkkjjjiii} at 87. Episode 84 selects \texttt{kjjjiii}, tied
+with outside \texttt{kkkjjiii} and inside \texttt{kkkjjjiii} at 86. Selection uses
+original memory order, which the sorted exports do not preserve, so arrival order for the
+three ties cannot be independently recovered. Changing tie order cannot remove the other
+22 outside memberships.
+
+\textbf{How the quality score is calculated.} Both inspected code paths use
+\(\operatorname{round}(0.6 Q_{\mathrm{rule}}+0.4(100-T))\). Here \(Q_{\mathrm{rule}}\) is
+the native rule-quality score and \(T\) is the program's temperature, an internal control
+quantity rather than a physical temperature. Rule quality combines uniformity,
+abstractness, and succinctness: native assessments of consistency, generality, and economy
+of the rule. Sharing this outer formula does not establish that both programs supply the
+same inputs to it.
+
+An illustrative calculation shows why rule details matter. At abstractness 96 and
+uniformity 100, a one-clause rule has succinctness 100 and rule quality 98; three
+unit-cost clauses have succinctness 67 and rule quality 84. At temperature 10, the
+resulting answer scores are 95 and 86. Outside strings are not uniformly over-scored in
+the port, either: reference preference co-winners with string \texttt{kkkji} reach quality
+88, whereas its two selected port quality winners score 86. The lack of high-scoring port
+episode maxima is a lead to investigate.
+
+\textbf{Two source differences, not two proved causes.} First, the port's common-change
+filter requires an explicitly recorded, non-null relation. The reference excludes only
+Identity (no change) and can retain a shared literal destination without a named relation.
+In plain terms, a rule may recognize a common change without expressing it as a named
+relation such as successor. A letter-to-group object-category change is relevant to
+grouping \texttt{a\ -\textgreater{}\ aa}, \texttt{b\ -\textgreater{}\ bb}, and
+\texttt{c\ -\textgreater{}\ cc} under one description. Excluding such schemas, or rule
+templates, can change which concise component-level rules are available.
+
+Second, the port generalizes common schemas to subobjects without the reference checks for
+component coverage, shared enclosing objects, and descriptors on uncovered components.
+Those conditions limit when a change observed in components is eligible for
+generalization. Omitting them can admit proposals the reference would not make from the
+same cluster. A subsequent evaluator still assesses rules, however; the missing checks
+alone do not prove that an invalid proposal survives.
+
+The inspected source hashes match the frozen study manifest and the
+reconstructed-reference manifest. A read-only audit of the full archive verified all 1,111
+\texttt{misc3} completion receipts and their 9,699 named files against the public episode
+and selection records. The 1,011 reference raw exports agree with the published co-winner
+descriptions and saved earliest selections. This checks that the records agree with each
+other.
+
+The archive lacks rule clauses, rule-quality components, workspace groupings, and a
+complete record of memory interventions, so outside episodes cannot be assigned to
+generation, scoring, translation, or memory causes. This investigation includes no repair,
+new episode, or enlarged oracle; checking a repaired port needs a separately versioned
+comparison. Without a matched memory-disabled control, whether learning caused the
+difference stays open.
+
+\clearpage
+
+\section{Individual-Run Tables}\label{app:single-study}
+
+Table \ref{tab:single-inputs} reports all 19 problems in the later fresh-memory study. The
+construction sets remain frozen. Program errors remain in the validation and port
+denominators; an error can count both as an outside draw and as a hard error. Those
+columns therefore overlap. The three problems with no validation discoveries meet the
+nominal, individual \(10^{-4}\) target, but none meets it under the 19-problem confidence
+allocation.
+
+\input{final/generated/single-input-table.tex}
+
+Table \ref{tab:single-prefixes} compares the prespecified collection rules on prefixes of
+the same ordered construction samples, all 20,000 runs of which were collected; the
+simulated stops describe possible budgets. Each row uses the same validation and port
+observations.
+
+The singleton rule fails to trigger on five inputs; their full prefixes and later
+discoveries remain included. The no-discovery rule triggers on every input but leaves more
+outside reference and port draws. No later discovery is merged into an earlier reference.
+
+\input{final/generated/single-prefix-table.tex}
+
+\clearpage
+
+\section{Episode Execution Counts}\label{app:episodic-comparisons}
+
+\textbf{Keeping the denominators straight.} Construction has 10,073 complete answered
+episodes and one error episode. It has no complete, entirely answerless episodes.
+Validation has 13,995 answered and five entirely answerless complete episodes. The port
+has 1,896 answered and four entirely answerless complete episodes. All nine entirely
+answerless cases are \texttt{copy5}. They count toward execution totals but supply no
+winner.
+
+\input{final/generated/episodic-accounting-table.tex}
+
+The inherited \texttt{run4} construction failure is zero-based episode 46, with first seed
+90100368. It attempts seven runs: four answer, two stop without an answer, and the seventh
+raises an unrecognized \texttt{get-bond-facet} message. The eighth is never attempted.
+Earlier answers stay in the inner-run accounting, but the incomplete episode supplies
+neither A nor B. This explains 207,791 actual runs instead of \(25,974\times8=207,792\)
+scheduled runs. The error was not retried as a replacement scientific observation.
+
+Caps affect 1,489 construction, 7,405 validation, and 863 port episodes. These episode
+counts differ from the capped-run counts in Table \ref{tab:episodic-accounting}, because
+one episode can contain several capped runs and still have a winner from another run.
+
+\clearpage
+
+\section{Notation}\label{app:notation}
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.2342}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.7658}}@{}}
+\caption{Symbols keep observed counts, unknown probabilities, and estimates
+separate.}\tabularnewline
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Symbol
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Meaning
+\end{minipage} \\
+\midrule\noalign{}
+\endfirsthead
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Symbol
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Meaning
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\(p_R,p_P\) & Reference and port outcome probabilities under fixed settings \\
+\(N_x,n_x\) & Reference and check sizes for problem \(x\), in runs or episodes as
+specified \\
+\(K,C_R\) & Number of check cycles and one-time reference cost \\
+\(C_{P,k},C_{F,k}\) & Cost of check \(k\) and of investigating its findings \\
+\(L,\phi\) & Runs per episode and the rule selecting an episode's recorded result \\
+\(J\) & Number of problems, 19 here \\
+\(c_x(o),f_{1,x}\) & Count of outcome \(o\) and number of types seen exactly once \\
+\(S_x,H_x,T_x\) & Observed reference support set for problem \(x\), p50 head, and observed
+port-check set \\
+\(M_{R,x},\widehat M_{R,x}\) & True reference missing mass and its singleton-ratio
+estimate \\
+\(q_{P,x}\) & Port probability of an outcome outside the frozen reference set \\
+\(D_x,U_x\) & Outside occurrences and distinct outside outcome types \\
+\end{longtable}
+
+\clearpage
+
+\section{The Nineteen Problems}\label{app:inputs}
+
+Table \ref{tab:inputs} gives the complete benchmark. For example, the row's Initial and
+Modified strings specify the demonstrated change, and Target is the string to which an
+analogous change is sought. The shared-answer column lists up to three outputs seen in
+both the historical reference and post-repair CPU check, ordered by decreasing reference
+count, with lexicographic ties.
+
+\input{final/generated/input-table.tex}
+\end{document}

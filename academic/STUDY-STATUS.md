@@ -1,7 +1,13 @@
 # Versioned Study Status
 
 Updated 2026-09-07. **Both the single-run continuation and the episodic v3
-study are complete. Their results are not yet integrated into the manuscript.**
+study are complete. Episodic coverage and the misc3 port-discrepancy case study
+are integrated under approved Issues 1 and 2. Approved Issue 3 integrates the
+single-run study while keeping the historical port-improvement workflow central.
+Approved Issue 4 adds the all-19-input episodic port comparison and termination
+accounting, with descriptive frequencies for construction-limited problems.
+Approved Issue 5 packages both studies for review, with recorded exclusions
+and a clean-copy saved-data verification workflow.**
 This document is a snapshot, not a live progress monitor.
 
 ## Episodic Final Status
@@ -21,13 +27,27 @@ incomplete supports, which held-out validation exposed.
 
 For the individually validated `misc3 best_a` support, the port produced
 24/100 outside winners, compared with 0/1000 in reference validation. This
-warrants investigation, not an automatic bug verdict. No engine was modified
+warranted the now-completed [saved-data and code investigation](investigations/MISC3-EPISODIC.md),
+not an automatic bug verdict. Two static rule-generalization differences were
+identified, but the saved records do not establish their event-level causal
+contributions. The approved manuscript treatment reports the full frequencies
+and distinguishes diagnostic partitions from root causes. No engine was modified
 and no additional validation batch was added after inspecting the result.
 There were no new engine-error episodes; the preserved pilot error remains
 in construction. All public statistics reproduce without running an engine.
 The full private raw archive remains ignored and is not part of the public
-release. The manuscript must incorporate the failures and limitations, not
-only the successful coverage checks.
+release. The current manuscript reports failed and skipped validation alongside
+successes and the unresolved port discrepancy; further issues require separate
+author approval.
+
+The complete manuscript comparison reports eight coverage-qualified populations:
+`misc3 best_a` has 24/100 outside port winners and the other seven have zero.
+Unqualified frozen supports still have descriptive memberships; missing frozen
+supports are not reported as zero misses. Four entirely answerless `copy5` port
+episodes leave 96 winners per population. The new
+[saved-data audit](episodic-study-audit.json) includes all 38 construction/port
+frequency vectors, five capped problems' descriptive summaries, and disjoint
+inner-run accounting. It does not change frozen data or execute either engine.
 
 ## Single-Run Final Status
 
@@ -40,8 +60,12 @@ A full post-completion analysis rerun reproduced the analysis and report
 hashes, and a separate inventory audit confirmed that the original interrupted
 study's files remain unchanged. Monitoring ended after completion was verified.
 See [results and paper implications](SUPPORT-V1A-RESULTS.md) and the
-[local result-summary export](data/support-v1a/README.md). The older manuscript
-PDF and bundles have not yet been revised to include this completed study.
+[local result-summary export](data/support-v1a/README.md). The manuscript,
+PDF, and LaTeX source bundle now include this study in Section 7 and Appendix C.
+The historical arithmetic ZIP remains separate and unchanged; anonymous
+packaging is now supplied in the separate experimental review ZIP. Its original
+scientific archives and executable source retain their recorded hashes; the
+manifest documents review-specific documentation and licensing-display changes.
 
 Completion inventory SHA-256:
 

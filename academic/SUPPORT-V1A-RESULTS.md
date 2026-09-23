@@ -121,17 +121,18 @@ attempt, continuation attempts, and the successful corrected preflight. It is
 not elapsed campaign time or CPU time. Earlier diagnosis, wrapper-development
 preflight, setup, human effort, and analysis costs are not fully included.
 
-## Manuscript Work Remaining
+## Manuscript Integration
 
-Replace the draft's future-tense independent-validation discussion with these
-qualified completed results; retain the protocol amendment. Add the reference
-failure case study without attributing ordinary crash detection to the
-statistical heuristic. Explain the finite-reference flags and the frequency
-comparator's complementary findings. Do not present the absence of missing
-p50 members as evidence of distributional equivalence.
+The author-approved Issue 3 revision incorporates these completed results in
+Section 7 and Appendix C, retaining the protocol amendment, all three failures,
+finite-reference discoveries, the frequency comparator, and qualified costs.
+The historical development and repair narrative remains in the main text as
+the core engineering result and motivation for the paper. Stronger provenance
+for the new study does not replace the practical evidence of that earlier work
+or retroactively make its interventions independently reproducible.
 
-The manuscript PDF and its existing bundles have not yet been regenerated to
-include this study. A separate [full raw-data release](../studies/support-v1a/data/README.md)
-now supports self-contained verification and reanalysis. Manuscript integration
-and the matched-cap, independently versioned episodic-memory study remain
-central follow-up work for the intended TMLR submission.
+The manuscript PDF and source bundle are regenerated from the integrated draft.
+The [full raw-data release](../studies/support-v1a/data/README.md) supports
+self-contained verification and reanalysis without engine execution. The
+historical arithmetic ZIP remains unchanged; anonymous experimental packaging,
+remaining review issues, and final author approval are still pending.

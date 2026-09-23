@@ -1,0 +1,3589 @@
+{
+  "capped_frequency_comparisons": [
+    {
+      "definition": "best_a",
+      "empirical_tv": 0.1995,
+      "frequencies": [
+        {
+          "answer": "b",
+          "port_count": 20,
+          "port_fraction": 0.2,
+          "reference_count": 1,
+          "reference_fraction": 0.0005
+        },
+        {
+          "answer": "y",
+          "port_count": 74,
+          "port_fraction": 0.74,
+          "reference_count": 1481,
+          "reference_fraction": 0.7405
+        },
+        {
+          "answer": "z",
+          "port_count": 6,
+          "port_fraction": 0.06,
+          "reference_count": 518,
+          "reference_fraction": 0.259
+        }
+      ],
+      "largest_gap": {
+        "answer": "b",
+        "port_count": 20,
+        "port_fraction": 0.2,
+        "reference_count": 1,
+        "reference_fraction": 0.0005
+      },
+      "port_N": 100,
+      "problem": "misc4",
+      "reference_N": 2000
+    },
+    {
+      "definition": "best_b",
+      "empirical_tv": 0.0135,
+      "frequencies": [
+        {
+          "answer": "b",
+          "port_count": 0,
+          "port_fraction": 0.0,
+          "reference_count": 16,
+          "reference_fraction": 0.008
+        },
+        {
+          "answer": "y",
+          "port_count": 100,
+          "port_fraction": 1.0,
+          "reference_count": 1973,
+          "reference_fraction": 0.9865
+        },
+        {
+          "answer": "z",
+          "port_count": 0,
+          "port_fraction": 0.0,
+          "reference_count": 11,
+          "reference_fraction": 0.0055
+        }
+      ],
+      "largest_gap": {
+        "answer": "y",
+        "port_count": 100,
+        "port_fraction": 1.0,
+        "reference_count": 1973,
+        "reference_fraction": 0.9865
+      },
+      "port_N": 100,
+      "problem": "misc4",
+      "reference_N": 2000
+    },
+    {
+      "definition": "best_a",
+      "empirical_tv": 0.0305,
+      "frequencies": [
+        {
+          "answer": "lrrjjj",
+          "port_count": 0,
+          "port_fraction": 0.0,
+          "reference_count": 1,
+          "reference_fraction": 0.0005
+        },
+        {
+          "answer": "mrrjjjj",
+          "port_count": 83,
+          "port_fraction": 0.83,
+          "reference_count": 1614,
+          "reference_fraction": 0.807
+        },
+        {
+          "answer": "mrrjjk",
+          "port_count": 5,
+          "port_fraction": 0.05,
+          "reference_count": 141,
+          "reference_fraction": 0.0705
+        },
+        {
+          "answer": "mrrjkk",
+          "port_count": 0,
+          "port_fraction": 0.0,
+          "reference_count": 9,
+          "reference_fraction": 0.0045
+        },
+        {
+          "answer": "mrrkkk",
+          "port_count": 11,
+          "port_fraction": 0.11,
+          "reference_count": 205,
+          "reference_fraction": 0.1025
+        },
+        {
+          "answer": "msskkk",
+          "port_count": 1,
+          "port_fraction": 0.01,
+          "reference_count": 30,
+          "reference_fraction": 0.015
+        }
+      ],
+      "largest_gap": {
+        "answer": "mrrjjjj",
+        "port_count": 83,
+        "port_fraction": 0.83,
+        "reference_count": 1614,
+        "reference_fraction": 0.807
+      },
+      "port_N": 100,
+      "problem": "run1",
+      "reference_N": 2000
+    },
+    {
+      "definition": "best_b",
+      "empirical_tv": 0.0435,
+      "frequencies": [
+        {
+          "answer": "abd",
+          "port_count": 20,
+          "port_fraction": 0.2,
+          "reference_count": 423,
+          "reference_fraction": 0.2115
+        },
+        {
+          "answer": "mrrjjd",
+          "port_count": 0,
+          "port_fraction": 0.0,
+          "reference_count": 1,
+          "reference_fraction": 0.0005
+        },
+        {
+          "answer": "mrrjjj",
+          "port_count": 0,
+          "port_fraction": 0.0,
+          "reference_count": 1,
+          "reference_fraction": 0.0005
+        },
+        {
+          "answer": "mrrjjjj",
+          "port_count": 73,
+          "port_fraction": 0.73,
+          "reference_count": 1387,
+          "reference_fraction": 0.6935
+        },
+        {
+          "answer": "mrrjjk",
+          "port_count": 2,
+          "port_fraction": 0.02,
+          "reference_count": 70,
+          "reference_fraction": 0.035
+        },
+        {
+          "answer": "mrrkkk",
+          "port_count": 5,
+          "port_fraction": 0.05,
+          "reference_count": 86,
+          "reference_fraction": 0.043
+        },
+        {
+          "answer": "msskkk",
+          "port_count": 0,
+          "port_fraction": 0.0,
+          "reference_count": 32,
+          "reference_fraction": 0.016
+        }
+      ],
+      "largest_gap": {
+        "answer": "mrrjjjj",
+        "port_count": 73,
+        "port_fraction": 0.73,
+        "reference_count": 1387,
+        "reference_fraction": 0.6935
+      },
+      "port_N": 100,
+      "problem": "run1",
+      "reference_N": 2000
+    },
+    {
+      "definition": "best_a",
+      "empirical_tv": 0.027998999499749874,
+      "frequencies": [
+        {
+          "answer": "dyz",
+          "port_count": 0,
+          "port_fraction": 0.0,
+          "reference_count": 5,
+          "reference_fraction": 0.0025012506253126563
+        },
+        {
+          "answer": "wyz",
+          "port_count": 58,
+          "port_fraction": 0.58,
+          "reference_count": 1172,
+          "reference_fraction": 0.5862931465732867
+        },
+        {
+          "answer": "xyd",
+          "port_count": 2,
+          "port_fraction": 0.02,
+          "reference_count": 3,
+          "reference_fraction": 0.0015007503751875938
+        },
+        {
+          "answer": "xyz",
+          "port_count": 0,
+          "port_fraction": 0.0,
+          "reference_count": 1,
+          "reference_fraction": 0.0005002501250625312
+        },
+        {
+          "answer": "yyz",
+          "port_count": 39,
+          "port_fraction": 0.39,
+          "reference_count": 817,
+          "reference_fraction": 0.408704352176088
+        },
+        {
+          "answer": "yzz",
+          "port_count": 1,
+          "port_fraction": 0.01,
+          "reference_count": 1,
+          "reference_fraction": 0.0005002501250625312
+        }
+      ],
+      "largest_gap": {
+        "answer": "yyz",
+        "port_count": 39,
+        "port_fraction": 0.39,
+        "reference_count": 817,
+        "reference_fraction": 0.408704352176088
+      },
+      "port_N": 100,
+      "problem": "run4",
+      "reference_N": 1999
+    },
+    {
+      "definition": "best_b",
+      "empirical_tv": 0.06307153576788395,
+      "frequencies": [
+        {
+          "answer": "abd",
+          "port_count": 1,
+          "port_fraction": 0.01,
+          "reference_count": 14,
+          "reference_fraction": 0.007003501750875438
+        },
+        {
+          "answer": "wyz",
+          "port_count": 59,
+          "port_fraction": 0.59,
+          "reference_count": 1092,
+          "reference_fraction": 0.5462731365682841
+        },
+        {
+          "answer": "xyd",
+          "port_count": 8,
+          "port_fraction": 0.08,
+          "reference_count": 286,
+          "reference_fraction": 0.14307153576788395
+        },
+        {
+          "answer": "xyz",
+          "port_count": 1,
+          "port_fraction": 0.01,
+          "reference_count": 6,
+          "reference_fraction": 0.0030015007503751876
+        },
+        {
+          "answer": "yyz",
+          "port_count": 31,
+          "port_fraction": 0.31,
+          "reference_count": 601,
+          "reference_fraction": 0.3006503251625813
+        }
+      ],
+      "largest_gap": {
+        "answer": "xyd",
+        "port_count": 8,
+        "port_fraction": 0.08,
+        "reference_count": 286,
+        "reference_fraction": 0.14307153576788395
+      },
+      "port_N": 100,
+      "problem": "run4",
+      "reference_N": 1999
+    },
+    {
+      "definition": "best_a",
+      "empirical_tv": 0.0195,
+      "frequencies": [
+        {
+          "answer": "iiiixxi",
+          "port_count": 0,
+          "port_fraction": 0.0,
+          "reference_count": 2,
+          "reference_fraction": 0.001
+        },
+        {
+          "answer": "iixxxi",
+          "port_count": 0,
+          "port_fraction": 0.0,
+          "reference_count": 1,
+          "reference_fraction": 0.0005
+        },
+        {
+          "answer": "ixxi",
+          "port_count": 95,
+          "port_fraction": 0.95,
+          "reference_count": 1881,
+          "reference_fraction": 0.9405
+        },
+        {
+          "answer": "ixxiiii",
+          "port_count": 0,
+          "port_fraction": 0.0,
+          "reference_count": 5,
+          "reference_fraction": 0.0025
+        },
+        {
+          "answer": "ixxq",
+          "port_count": 0,
+          "port_fraction": 0.0,
+          "reference_count": 1,
+          "reference_fraction": 0.0005
+        },
+        {
+          "answer": "ixxxii",
+          "port_count": 0,
+          "port_fraction": 0.0,
+          "reference_count": 1,
+          "reference_fraction": 0.0005
+        },
+        {
+          "answer": "qeeq",
+          "port_count": 4,
+          "port_fraction": 0.04,
+          "reference_count": 107,
+          "reference_fraction": 0.0535
+        },
+        {
+          "answer": "qiq",
+          "port_count": 0,
+          "port_fraction": 0.0,
+          "reference_count": 1,
+          "reference_fraction": 0.0005
+        },
+        {
+          "answer": "qxeeq",
+          "port_count": 1,
+          "port_fraction": 0.01,
+          "reference_count": 0,
+          "reference_fraction": 0.0
+        },
+        {
+          "answer": "xxixx",
+          "port_count": 0,
+          "port_fraction": 0.0,
+          "reference_count": 1,
+          "reference_fraction": 0.0005
+        }
+      ],
+      "largest_gap": {
+        "answer": "qeeq",
+        "port_count": 4,
+        "port_fraction": 0.04,
+        "reference_count": 107,
+        "reference_fraction": 0.0535
+      },
+      "port_N": 100,
+      "problem": "fig5.4-top",
+      "reference_N": 2000
+    },
+    {
+      "definition": "best_b",
+      "empirical_tv": 0.0405,
+      "frequencies": [
+        {
+          "answer": "iixxxi",
+          "port_count": 0,
+          "port_fraction": 0.0,
+          "reference_count": 5,
+          "reference_fraction": 0.0025
+        },
+        {
+          "answer": "ixi",
+          "port_count": 0,
+          "port_fraction": 0.0,
+          "reference_count": 2,
+          "reference_fraction": 0.001
+        },
+        {
+          "answer": "ixii",
+          "port_count": 0,
+          "port_fraction": 0.0,
+          "reference_count": 1,
+          "reference_fraction": 0.0005
+        },
+        {
+          "answer": "ixq",
+          "port_count": 0,
+          "port_fraction": 0.0,
+          "reference_count": 1,
+          "reference_fraction": 0.0005
+        },
+        {
+          "answer": "ixxi",
+          "port_count": 38,
+          "port_fraction": 0.38,
+          "reference_count": 768,
+          "reference_fraction": 0.384
+        },
+        {
+          "answer": "ixxii",
+          "port_count": 0,
+          "port_fraction": 0.0,
+          "reference_count": 1,
+          "reference_fraction": 0.0005
+        },
+        {
+          "answer": "ixxiiii",
+          "port_count": 0,
+          "port_fraction": 0.0,
+          "reference_count": 3,
+          "reference_fraction": 0.0015
+        },
+        {
+          "answer": "ixxq",
+          "port_count": 7,
+          "port_fraction": 0.07,
+          "reference_count": 78,
+          "reference_fraction": 0.039
+        },
+        {
+          "answer": "ixxxi",
+          "port_count": 0,
+          "port_fraction": 0.0,
+          "reference_count": 1,
+          "reference_fraction": 0.0005
+        },
+        {
+          "answer": "ixxxii",
+          "port_count": 0,
+          "port_fraction": 0.0,
+          "reference_count": 3,
+          "reference_fraction": 0.0015
+        },
+        {
+          "answer": "qeeq",
+          "port_count": 50,
+          "port_fraction": 0.5,
+          "reference_count": 1009,
+          "reference_fraction": 0.5045
+        },
+        {
+          "answer": "qeexq",
+          "port_count": 0,
+          "port_fraction": 0.0,
+          "reference_count": 1,
+          "reference_fraction": 0.0005
+        },
+        {
+          "answer": "qexq",
+          "port_count": 0,
+          "port_fraction": 0.0,
+          "reference_count": 1,
+          "reference_fraction": 0.0005
+        },
+        {
+          "answer": "qiiq",
+          "port_count": 0,
+          "port_fraction": 0.0,
+          "reference_count": 6,
+          "reference_fraction": 0.003
+        },
+        {
+          "answer": "qiq",
+          "port_count": 0,
+          "port_fraction": 0.0,
+          "reference_count": 4,
+          "reference_fraction": 0.002
+        },
+        {
+          "answer": "qiqq",
+          "port_count": 0,
+          "port_fraction": 0.0,
+          "reference_count": 1,
+          "reference_fraction": 0.0005
+        },
+        {
+          "answer": "qixx",
+          "port_count": 0,
+          "port_fraction": 0.0,
+          "reference_count": 1,
+          "reference_fraction": 0.0005
+        },
+        {
+          "answer": "qqxeeq",
+          "port_count": 0,
+          "port_fraction": 0.0,
+          "reference_count": 1,
+          "reference_fraction": 0.0005
+        },
+        {
+          "answer": "qxeq",
+          "port_count": 0,
+          "port_fraction": 0.0,
+          "reference_count": 1,
+          "reference_fraction": 0.0005
+        },
+        {
+          "answer": "qxi",
+          "port_count": 0,
+          "port_fraction": 0.0,
+          "reference_count": 1,
+          "reference_fraction": 0.0005
+        },
+        {
+          "answer": "qxxi",
+          "port_count": 4,
+          "port_fraction": 0.04,
+          "reference_count": 105,
+          "reference_fraction": 0.0525
+        },
+        {
+          "answer": "qxxxi",
+          "port_count": 0,
+          "port_fraction": 0.0,
+          "reference_count": 1,
+          "reference_fraction": 0.0005
+        },
+        {
+          "answer": "xiix",
+          "port_count": 0,
+          "port_fraction": 0.0,
+          "reference_count": 1,
+          "reference_fraction": 0.0005
+        },
+        {
+          "answer": "xxiq",
+          "port_count": 0,
+          "port_fraction": 0.0,
+          "reference_count": 2,
+          "reference_fraction": 0.001
+        },
+        {
+          "answer": "xxixx",
+          "port_count": 1,
+          "port_fraction": 0.01,
+          "reference_count": 1,
+          "reference_fraction": 0.0005
+        },
+        {
+          "answer": "xxxix",
+          "port_count": 0,
+          "port_fraction": 0.0,
+          "reference_count": 1,
+          "reference_fraction": 0.0005
+        }
+      ],
+      "largest_gap": {
+        "answer": "ixxq",
+        "port_count": 7,
+        "port_fraction": 0.07,
+        "reference_count": 78,
+        "reference_fraction": 0.039
+      },
+      "port_N": 100,
+      "problem": "fig5.4-top",
+      "reference_N": 2000
+    },
+    {
+      "definition": "best_a",
+      "empirical_tv": 0.006,
+      "frequencies": [
+        {
+          "answer": "abbba",
+          "port_count": 6,
+          "port_fraction": 0.06,
+          "reference_count": 108,
+          "reference_fraction": 0.054
+        },
+        {
+          "answer": "baaab",
+          "port_count": 94,
+          "port_fraction": 0.94,
+          "reference_count": 1886,
+          "reference_fraction": 0.943
+        },
+        {
+          "answer": "baacb",
+          "port_count": 0,
+          "port_fraction": 0.0,
+          "reference_count": 1,
+          "reference_fraction": 0.0005
+        },
+        {
+          "answer": "baccb",
+          "port_count": 0,
+          "port_fraction": 0.0,
+          "reference_count": 1,
+          "reference_fraction": 0.0005
+        },
+        {
+          "answer": "bcaab",
+          "port_count": 0,
+          "port_fraction": 0.0,
+          "reference_count": 3,
+          "reference_fraction": 0.0015
+        },
+        {
+          "answer": "bccab",
+          "port_count": 0,
+          "port_fraction": 0.0,
+          "reference_count": 1,
+          "reference_fraction": 0.0005
+        }
+      ],
+      "largest_gap": {
+        "answer": "abbba",
+        "port_count": 6,
+        "port_fraction": 0.06,
+        "reference_count": 108,
+        "reference_fraction": 0.054
+      },
+      "port_N": 100,
+      "problem": "eqe-baaab",
+      "reference_N": 2000
+    },
+    {
+      "definition": "best_b",
+      "empirical_tv": 0.0955,
+      "frequencies": [
+        {
+          "answer": "abbba",
+          "port_count": 3,
+          "port_fraction": 0.03,
+          "reference_count": 50,
+          "reference_fraction": 0.025
+        },
+        {
+          "answer": "abbbq",
+          "port_count": 1,
+          "port_fraction": 0.01,
+          "reference_count": 7,
+          "reference_fraction": 0.0035
+        },
+        {
+          "answer": "baaab",
+          "port_count": 63,
+          "port_fraction": 0.63,
+          "reference_count": 1180,
+          "reference_fraction": 0.59
+        },
+        {
+          "answer": "baaaq",
+          "port_count": 1,
+          "port_fraction": 0.01,
+          "reference_count": 66,
+          "reference_fraction": 0.033
+        },
+        {
+          "answer": "baccb",
+          "port_count": 0,
+          "port_fraction": 0.0,
+          "reference_count": 1,
+          "reference_fraction": 0.0005
+        },
+        {
+          "answer": "bcaab",
+          "port_count": 0,
+          "port_fraction": 0.0,
+          "reference_count": 1,
+          "reference_fraction": 0.0005
+        },
+        {
+          "answer": "pqqqq",
+          "port_count": 0,
+          "port_fraction": 0.0,
+          "reference_count": 1,
+          "reference_fraction": 0.0005
+        },
+        {
+          "answer": "qaaab",
+          "port_count": 2,
+          "port_fraction": 0.02,
+          "reference_count": 41,
+          "reference_fraction": 0.0205
+        },
+        {
+          "answer": "qaacb",
+          "port_count": 0,
+          "port_fraction": 0.0,
+          "reference_count": 1,
+          "reference_fraction": 0.0005
+        },
+        {
+          "answer": "qbabb",
+          "port_count": 0,
+          "port_fraction": 0.0,
+          "reference_count": 1,
+          "reference_fraction": 0.0005
+        },
+        {
+          "answer": "qbbba",
+          "port_count": 1,
+          "port_fraction": 0.01,
+          "reference_count": 5,
+          "reference_fraction": 0.0025
+        },
+        {
+          "answer": "qbbbq",
+          "port_count": 5,
+          "port_fraction": 0.05,
+          "reference_count": 47,
+          "reference_fraction": 0.0235
+        },
+        {
+          "answer": "qeeeq",
+          "port_count": 21,
+          "port_fraction": 0.21,
+          "reference_count": 551,
+          "reference_fraction": 0.2755
+        },
+        {
+          "answer": "qeeqp",
+          "port_count": 0,
+          "port_fraction": 0.0,
+          "reference_count": 1,
+          "reference_fraction": 0.0005
+        },
+        {
+          "answer": "qeerq",
+          "port_count": 0,
+          "port_fraction": 0.0,
+          "reference_count": 1,
+          "reference_fraction": 0.0005
+        },
+        {
+          "answer": "qeq",
+          "port_count": 2,
+          "port_fraction": 0.02,
+          "reference_count": 44,
+          "reference_fraction": 0.022
+        },
+        {
+          "answer": "qrbbq",
+          "port_count": 0,
+          "port_fraction": 0.0,
+          "reference_count": 2,
+          "reference_fraction": 0.001
+        },
+        {
+          "answer": "qreeq",
+          "port_count": 1,
+          "port_fraction": 0.01,
+          "reference_count": 0,
+          "reference_fraction": 0.0
+        }
+      ],
+      "largest_gap": {
+        "answer": "qeeeq",
+        "port_count": 21,
+        "port_fraction": 0.21,
+        "reference_count": 551,
+        "reference_fraction": 0.2755
+      },
+      "port_N": 100,
+      "problem": "eqe-baaab",
+      "reference_N": 2000
+    }
+  ],
+  "frequency_reference": "All collected construction episodes only; no validation pooling or oracle enlargement",
+  "input_sha256": {
+    "analysis.json": "1ecdc3528048430f8c432884983e6718b956df30023fb9cb337e1b635a557718",
+    "episodes.json": "da371bb2c5841592a0c1b9405abe45aea19583271df68f695cfb9a50993faa80"
+  },
+  "qualified_populations": [
+    {
+      "definition": "best_a",
+      "outside_occurrences": 24,
+      "port_N": 100,
+      "problem": "misc3"
+    },
+    {
+      "definition": "best_a",
+      "outside_occurrences": 0,
+      "port_N": 100,
+      "problem": "copy1"
+    },
+    {
+      "definition": "best_b",
+      "outside_occurrences": 0,
+      "port_N": 100,
+      "problem": "copy1"
+    },
+    {
+      "definition": "best_a",
+      "outside_occurrences": 0,
+      "port_N": 100,
+      "problem": "copy2"
+    },
+    {
+      "definition": "best_b",
+      "outside_occurrences": 0,
+      "port_N": 100,
+      "problem": "copy2"
+    },
+    {
+      "definition": "best_a",
+      "outside_occurrences": 0,
+      "port_N": 100,
+      "problem": "copy3"
+    },
+    {
+      "definition": "best_b",
+      "outside_occurrences": 0,
+      "port_N": 100,
+      "problem": "copy3"
+    },
+    {
+      "definition": "best_b",
+      "outside_occurrences": 0,
+      "port_N": 100,
+      "problem": "copy4"
+    }
+  ],
+  "results": [
+    {
+      "definitions": {
+        "best_a": {
+          "coverage_qualified": false,
+          "frequency_comparison": {
+            "empirical_tv": 0.1995,
+            "frequencies": [
+              {
+                "answer": "b",
+                "port_count": 20,
+                "port_fraction": 0.2,
+                "reference_count": 1,
+                "reference_fraction": 0.0005
+              },
+              {
+                "answer": "y",
+                "port_count": 74,
+                "port_fraction": 0.74,
+                "reference_count": 1481,
+                "reference_fraction": 0.7405
+              },
+              {
+                "answer": "z",
+                "port_count": 6,
+                "port_fraction": 0.06,
+                "reference_count": 518,
+                "reference_fraction": 0.259
+              }
+            ],
+            "largest_gap": {
+              "answer": "b",
+              "port_count": 20,
+              "port_fraction": 0.2,
+              "reference_count": 1,
+              "reference_fraction": 0.0005
+            },
+            "port_N": 100,
+            "reference_N": 2000
+          },
+          "outside_counts": null,
+          "outside_occurrences": null,
+          "port_N": 100,
+          "validation_status": "skipped-threshold-not-met"
+        },
+        "best_b": {
+          "coverage_qualified": false,
+          "frequency_comparison": {
+            "empirical_tv": 0.0135,
+            "frequencies": [
+              {
+                "answer": "b",
+                "port_count": 0,
+                "port_fraction": 0.0,
+                "reference_count": 16,
+                "reference_fraction": 0.008
+              },
+              {
+                "answer": "y",
+                "port_count": 100,
+                "port_fraction": 1.0,
+                "reference_count": 1973,
+                "reference_fraction": 0.9865
+              },
+              {
+                "answer": "z",
+                "port_count": 0,
+                "port_fraction": 0.0,
+                "reference_count": 11,
+                "reference_fraction": 0.0055
+              }
+            ],
+            "largest_gap": {
+              "answer": "y",
+              "port_count": 100,
+              "port_fraction": 1.0,
+              "reference_count": 1973,
+              "reference_fraction": 0.9865
+            },
+            "port_N": 100,
+            "reference_N": 2000
+          },
+          "outside_counts": {},
+          "outside_occurrences": 0,
+          "port_N": 100,
+          "validation_status": "skipped-threshold-not-met"
+        }
+      },
+      "port": {
+        "answer_runs": 386,
+        "answered_episodes": 100,
+        "answerless_episodes": 0,
+        "answerless_runs": 414,
+        "attempted_runs": 800,
+        "capped_runs": 0,
+        "engine_error_episodes": 0,
+        "episodes": 100,
+        "episodes_with_cap": 0,
+        "error_runs": 0
+      },
+      "problem": "misc4",
+      "validation_eligible": false
+    },
+    {
+      "definitions": {
+        "best_a": {
+          "coverage_qualified": false,
+          "frequency_comparison": {
+            "empirical_tv": 0.3,
+            "frequencies": [
+              {
+                "answer": "ijkd",
+                "port_count": 1,
+                "port_fraction": 0.01,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "ijkl",
+                "port_count": 53,
+                "port_fraction": 0.53,
+                "reference_count": 2,
+                "reference_fraction": 0.25
+              },
+              {
+                "answer": "ijll",
+                "port_count": 45,
+                "port_fraction": 0.45,
+                "reference_count": 6,
+                "reference_fraction": 0.75
+              },
+              {
+                "answer": "jjkk",
+                "port_count": 1,
+                "port_fraction": 0.01,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              }
+            ],
+            "largest_gap": {
+              "answer": "ijll",
+              "port_count": 45,
+              "port_fraction": 0.45,
+              "reference_count": 6,
+              "reference_fraction": 0.75
+            },
+            "port_N": 100,
+            "reference_N": 8
+          },
+          "outside_counts": {
+            "ijkd": 1,
+            "jjkk": 1
+          },
+          "outside_occurrences": 2,
+          "port_N": 100,
+          "validation_status": "coverage-target-not-met"
+        },
+        "best_b": {
+          "coverage_qualified": false,
+          "frequency_comparison": {
+            "empirical_tv": 0.13,
+            "frequencies": [
+              {
+                "answer": "aabd",
+                "port_count": 1,
+                "port_fraction": 0.01,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "hjkk",
+                "port_count": 1,
+                "port_fraction": 0.01,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "ijdd",
+                "port_count": 3,
+                "port_fraction": 0.03,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "ijkk",
+                "port_count": 5,
+                "port_fraction": 0.05,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "ijkl",
+                "port_count": 39,
+                "port_fraction": 0.39,
+                "reference_count": 4,
+                "reference_fraction": 0.5
+              },
+              {
+                "answer": "ijl",
+                "port_count": 2,
+                "port_fraction": 0.02,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "ijll",
+                "port_count": 48,
+                "port_fraction": 0.48,
+                "reference_count": 4,
+                "reference_fraction": 0.5
+              },
+              {
+                "answer": "jjkk",
+                "port_count": 1,
+                "port_fraction": 0.01,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              }
+            ],
+            "largest_gap": {
+              "answer": "ijkl",
+              "port_count": 39,
+              "port_fraction": 0.39,
+              "reference_count": 4,
+              "reference_fraction": 0.5
+            },
+            "port_N": 100,
+            "reference_N": 8
+          },
+          "outside_counts": {
+            "aabd": 1,
+            "hjkk": 1,
+            "ijdd": 3,
+            "ijkk": 5,
+            "ijl": 2,
+            "jjkk": 1
+          },
+          "outside_occurrences": 13,
+          "port_N": 100,
+          "validation_status": "coverage-target-not-met"
+        }
+      },
+      "port": {
+        "answer_runs": 800,
+        "answered_episodes": 100,
+        "answerless_episodes": 0,
+        "answerless_runs": 0,
+        "attempted_runs": 800,
+        "capped_runs": 0,
+        "engine_error_episodes": 0,
+        "episodes": 100,
+        "episodes_with_cap": 0,
+        "error_runs": 0
+      },
+      "problem": "fig5.7",
+      "validation_eligible": true
+    },
+    {
+      "definitions": {
+        "best_a": {
+          "coverage_qualified": true,
+          "frequency_comparison": {
+            "empirical_tv": 0.41818181818181815,
+            "frequencies": [
+              {
+                "answer": "kji",
+                "port_count": 25,
+                "port_fraction": 0.25,
+                "reference_count": 3,
+                "reference_fraction": 0.2727272727272727
+              },
+              {
+                "answer": "kjiii",
+                "port_count": 5,
+                "port_fraction": 0.05,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "kjjiii",
+                "port_count": 1,
+                "port_fraction": 0.01,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "kjjji",
+                "port_count": 2,
+                "port_fraction": 0.02,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "kjjjiii",
+                "port_count": 4,
+                "port_fraction": 0.04,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "kkjjii",
+                "port_count": 15,
+                "port_fraction": 0.15,
+                "reference_count": 6,
+                "reference_fraction": 0.5454545454545454
+              },
+              {
+                "answer": "kkkji",
+                "port_count": 2,
+                "port_fraction": 0.02,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "kkkjiii",
+                "port_count": 3,
+                "port_fraction": 0.03,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "kkkjji",
+                "port_count": 1,
+                "port_fraction": 0.01,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "kkkjjiii",
+                "port_count": 4,
+                "port_fraction": 0.04,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "kkkjjji",
+                "port_count": 1,
+                "port_fraction": 0.01,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "kkkjjjiii",
+                "port_count": 36,
+                "port_fraction": 0.36,
+                "reference_count": 2,
+                "reference_fraction": 0.18181818181818182
+              },
+              {
+                "answer": "kkkkjjjii",
+                "port_count": 1,
+                "port_fraction": 0.01,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              }
+            ],
+            "largest_gap": {
+              "answer": "kkjjii",
+              "port_count": 15,
+              "port_fraction": 0.15,
+              "reference_count": 6,
+              "reference_fraction": 0.5454545454545454
+            },
+            "port_N": 100,
+            "reference_N": 11
+          },
+          "outside_counts": {
+            "kjiii": 5,
+            "kjjiii": 1,
+            "kjjji": 2,
+            "kjjjiii": 4,
+            "kkkji": 2,
+            "kkkjiii": 3,
+            "kkkjji": 1,
+            "kkkjjiii": 4,
+            "kkkjjji": 1,
+            "kkkkjjjii": 1
+          },
+          "outside_occurrences": 24,
+          "port_N": 100,
+          "validation_status": "qualified"
+        },
+        "best_b": {
+          "coverage_qualified": false,
+          "frequency_comparison": {
+            "empirical_tv": 0.35545454545454547,
+            "frequencies": [
+              {
+                "answer": "kji",
+                "port_count": 28,
+                "port_fraction": 0.28,
+                "reference_count": 3,
+                "reference_fraction": 0.2727272727272727
+              },
+              {
+                "answer": "kjii",
+                "port_count": 1,
+                "port_fraction": 0.01,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "kjiii",
+                "port_count": 2,
+                "port_fraction": 0.02,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "kjji",
+                "port_count": 1,
+                "port_fraction": 0.01,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "kjjiii",
+                "port_count": 1,
+                "port_fraction": 0.01,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "kjjji",
+                "port_count": 1,
+                "port_fraction": 0.01,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "kjjjiii",
+                "port_count": 1,
+                "port_fraction": 0.01,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "kkjjii",
+                "port_count": 19,
+                "port_fraction": 0.19,
+                "reference_count": 6,
+                "reference_fraction": 0.5454545454545454
+              },
+              {
+                "answer": "kkjjji",
+                "port_count": 1,
+                "port_fraction": 0.01,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "kkjjjiii",
+                "port_count": 1,
+                "port_fraction": 0.01,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "kkjjjiiiii",
+                "port_count": 1,
+                "port_fraction": 0.01,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "kkkji",
+                "port_count": 4,
+                "port_fraction": 0.04,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "kkkjiii",
+                "port_count": 1,
+                "port_fraction": 0.01,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "kkkjjii",
+                "port_count": 1,
+                "port_fraction": 0.01,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "kkkjjiii",
+                "port_count": 7,
+                "port_fraction": 0.07,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "kkkjjji",
+                "port_count": 1,
+                "port_fraction": 0.01,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "kkkjjjii",
+                "port_count": 1,
+                "port_fraction": 0.01,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "kkkjjjiii",
+                "port_count": 27,
+                "port_fraction": 0.27,
+                "reference_count": 2,
+                "reference_fraction": 0.18181818181818182
+              },
+              {
+                "answer": "kkkkjjjii",
+                "port_count": 1,
+                "port_fraction": 0.01,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              }
+            ],
+            "largest_gap": {
+              "answer": "kkjjii",
+              "port_count": 19,
+              "port_fraction": 0.19,
+              "reference_count": 6,
+              "reference_fraction": 0.5454545454545454
+            },
+            "port_N": 100,
+            "reference_N": 11
+          },
+          "outside_counts": {
+            "kjii": 1,
+            "kjiii": 2,
+            "kjji": 1,
+            "kjjiii": 1,
+            "kjjji": 1,
+            "kjjjiii": 1,
+            "kkjjji": 1,
+            "kkjjjiii": 1,
+            "kkjjjiiiii": 1,
+            "kkkji": 4,
+            "kkkjiii": 1,
+            "kkkjjii": 1,
+            "kkkjjiii": 7,
+            "kkkjjji": 1,
+            "kkkjjjii": 1,
+            "kkkkjjjii": 1
+          },
+          "outside_occurrences": 26,
+          "port_N": 100,
+          "validation_status": "coverage-target-not-met"
+        }
+      },
+      "port": {
+        "answer_runs": 731,
+        "answered_episodes": 100,
+        "answerless_episodes": 0,
+        "answerless_runs": 3,
+        "attempted_runs": 800,
+        "capped_runs": 66,
+        "engine_error_episodes": 0,
+        "episodes": 100,
+        "episodes_with_cap": 49,
+        "error_runs": 0
+      },
+      "problem": "misc3",
+      "validation_eligible": true
+    },
+    {
+      "definitions": {
+        "best_a": {
+          "coverage_qualified": false,
+          "frequency_comparison": {
+            "empirical_tv": 0.47,
+            "frequencies": [
+              {
+                "answer": "flz",
+                "port_count": 53,
+                "port_fraction": 0.53,
+                "reference_count": 2,
+                "reference_fraction": 1.0
+              },
+              {
+                "answer": "hlz",
+                "port_count": 47,
+                "port_fraction": 0.47,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              }
+            ],
+            "largest_gap": {
+              "answer": "flz",
+              "port_count": 53,
+              "port_fraction": 0.53,
+              "reference_count": 2,
+              "reference_fraction": 1.0
+            },
+            "port_N": 100,
+            "reference_N": 2
+          },
+          "outside_counts": {
+            "hlz": 47
+          },
+          "outside_occurrences": 47,
+          "port_N": 100,
+          "validation_status": "coverage-target-not-met"
+        },
+        "best_b": {
+          "coverage_qualified": false,
+          "frequency_comparison": {
+            "empirical_tv": 0.62,
+            "frequencies": [
+              {
+                "answer": "abd",
+                "port_count": 1,
+                "port_fraction": 0.01,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "dlz",
+                "port_count": 4,
+                "port_fraction": 0.04,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "flz",
+                "port_count": 38,
+                "port_fraction": 0.38,
+                "reference_count": 2,
+                "reference_fraction": 1.0
+              },
+              {
+                "answer": "gld",
+                "port_count": 1,
+                "port_fraction": 0.01,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "hlz",
+                "port_count": 56,
+                "port_fraction": 0.56,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              }
+            ],
+            "largest_gap": {
+              "answer": "flz",
+              "port_count": 38,
+              "port_fraction": 0.38,
+              "reference_count": 2,
+              "reference_fraction": 1.0
+            },
+            "port_N": 100,
+            "reference_N": 2
+          },
+          "outside_counts": {
+            "abd": 1,
+            "dlz": 4,
+            "gld": 1,
+            "hlz": 56
+          },
+          "outside_occurrences": 62,
+          "port_N": 100,
+          "validation_status": "coverage-target-not-met"
+        }
+      },
+      "port": {
+        "answer_runs": 496,
+        "answered_episodes": 100,
+        "answerless_episodes": 0,
+        "answerless_runs": 304,
+        "attempted_runs": 800,
+        "capped_runs": 0,
+        "engine_error_episodes": 0,
+        "episodes": 100,
+        "episodes_with_cap": 0,
+        "error_runs": 0
+      },
+      "problem": "misc5",
+      "validation_eligible": true
+    },
+    {
+      "definitions": {
+        "best_a": {
+          "coverage_qualified": false,
+          "frequency_comparison": {
+            "empirical_tv": 0.0,
+            "frequencies": [
+              {
+                "answer": "ijl",
+                "port_count": 100,
+                "port_fraction": 1.0,
+                "reference_count": 2,
+                "reference_fraction": 1.0
+              }
+            ],
+            "largest_gap": {
+              "answer": "ijl",
+              "port_count": 100,
+              "port_fraction": 1.0,
+              "reference_count": 2,
+              "reference_fraction": 1.0
+            },
+            "port_N": 100,
+            "reference_N": 2
+          },
+          "outside_counts": {},
+          "outside_occurrences": 0,
+          "port_N": 100,
+          "validation_status": "coverage-target-not-met"
+        },
+        "best_b": {
+          "coverage_qualified": false,
+          "frequency_comparison": {
+            "empirical_tv": 0.08,
+            "frequencies": [
+              {
+                "answer": "abd",
+                "port_count": 5,
+                "port_fraction": 0.05,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "ijd",
+                "port_count": 3,
+                "port_fraction": 0.03,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "ijl",
+                "port_count": 92,
+                "port_fraction": 0.92,
+                "reference_count": 2,
+                "reference_fraction": 1.0
+              }
+            ],
+            "largest_gap": {
+              "answer": "ijl",
+              "port_count": 92,
+              "port_fraction": 0.92,
+              "reference_count": 2,
+              "reference_fraction": 1.0
+            },
+            "port_N": 100,
+            "reference_N": 2
+          },
+          "outside_counts": {
+            "abd": 5,
+            "ijd": 3
+          },
+          "outside_occurrences": 8,
+          "port_N": 100,
+          "validation_status": "coverage-target-not-met"
+        }
+      },
+      "port": {
+        "answer_runs": 394,
+        "answered_episodes": 100,
+        "answerless_episodes": 0,
+        "answerless_runs": 0,
+        "attempted_runs": 800,
+        "capped_runs": 406,
+        "engine_error_episodes": 0,
+        "episodes": 100,
+        "episodes_with_cap": 100,
+        "error_runs": 0
+      },
+      "problem": "misc2",
+      "validation_eligible": true
+    },
+    {
+      "definitions": {
+        "best_a": {
+          "coverage_qualified": false,
+          "frequency_comparison": {
+            "empirical_tv": 0.0305,
+            "frequencies": [
+              {
+                "answer": "lrrjjj",
+                "port_count": 0,
+                "port_fraction": 0.0,
+                "reference_count": 1,
+                "reference_fraction": 0.0005
+              },
+              {
+                "answer": "mrrjjjj",
+                "port_count": 83,
+                "port_fraction": 0.83,
+                "reference_count": 1614,
+                "reference_fraction": 0.807
+              },
+              {
+                "answer": "mrrjjk",
+                "port_count": 5,
+                "port_fraction": 0.05,
+                "reference_count": 141,
+                "reference_fraction": 0.0705
+              },
+              {
+                "answer": "mrrjkk",
+                "port_count": 0,
+                "port_fraction": 0.0,
+                "reference_count": 9,
+                "reference_fraction": 0.0045
+              },
+              {
+                "answer": "mrrkkk",
+                "port_count": 11,
+                "port_fraction": 0.11,
+                "reference_count": 205,
+                "reference_fraction": 0.1025
+              },
+              {
+                "answer": "msskkk",
+                "port_count": 1,
+                "port_fraction": 0.01,
+                "reference_count": 30,
+                "reference_fraction": 0.015
+              }
+            ],
+            "largest_gap": {
+              "answer": "mrrjjjj",
+              "port_count": 83,
+              "port_fraction": 0.83,
+              "reference_count": 1614,
+              "reference_fraction": 0.807
+            },
+            "port_N": 100,
+            "reference_N": 2000
+          },
+          "outside_counts": {},
+          "outside_occurrences": 0,
+          "port_N": 100,
+          "validation_status": "skipped-threshold-not-met"
+        },
+        "best_b": {
+          "coverage_qualified": false,
+          "frequency_comparison": {
+            "empirical_tv": 0.0435,
+            "frequencies": [
+              {
+                "answer": "abd",
+                "port_count": 20,
+                "port_fraction": 0.2,
+                "reference_count": 423,
+                "reference_fraction": 0.2115
+              },
+              {
+                "answer": "mrrjjd",
+                "port_count": 0,
+                "port_fraction": 0.0,
+                "reference_count": 1,
+                "reference_fraction": 0.0005
+              },
+              {
+                "answer": "mrrjjj",
+                "port_count": 0,
+                "port_fraction": 0.0,
+                "reference_count": 1,
+                "reference_fraction": 0.0005
+              },
+              {
+                "answer": "mrrjjjj",
+                "port_count": 73,
+                "port_fraction": 0.73,
+                "reference_count": 1387,
+                "reference_fraction": 0.6935
+              },
+              {
+                "answer": "mrrjjk",
+                "port_count": 2,
+                "port_fraction": 0.02,
+                "reference_count": 70,
+                "reference_fraction": 0.035
+              },
+              {
+                "answer": "mrrkkk",
+                "port_count": 5,
+                "port_fraction": 0.05,
+                "reference_count": 86,
+                "reference_fraction": 0.043
+              },
+              {
+                "answer": "msskkk",
+                "port_count": 0,
+                "port_fraction": 0.0,
+                "reference_count": 32,
+                "reference_fraction": 0.016
+              }
+            ],
+            "largest_gap": {
+              "answer": "mrrjjjj",
+              "port_count": 73,
+              "port_fraction": 0.73,
+              "reference_count": 1387,
+              "reference_fraction": 0.6935
+            },
+            "port_N": 100,
+            "reference_N": 2000
+          },
+          "outside_counts": null,
+          "outside_occurrences": null,
+          "port_N": 100,
+          "validation_status": "skipped-threshold-not-met"
+        }
+      },
+      "port": {
+        "answer_runs": 678,
+        "answered_episodes": 100,
+        "answerless_episodes": 0,
+        "answerless_runs": 0,
+        "attempted_runs": 800,
+        "capped_runs": 122,
+        "engine_error_episodes": 0,
+        "episodes": 100,
+        "episodes_with_cap": 81,
+        "error_runs": 0
+      },
+      "problem": "run1",
+      "validation_eligible": false
+    },
+    {
+      "definitions": {
+        "best_a": {
+          "coverage_qualified": false,
+          "frequency_comparison": {
+            "empirical_tv": 0.027998999499749874,
+            "frequencies": [
+              {
+                "answer": "dyz",
+                "port_count": 0,
+                "port_fraction": 0.0,
+                "reference_count": 5,
+                "reference_fraction": 0.0025012506253126563
+              },
+              {
+                "answer": "wyz",
+                "port_count": 58,
+                "port_fraction": 0.58,
+                "reference_count": 1172,
+                "reference_fraction": 0.5862931465732867
+              },
+              {
+                "answer": "xyd",
+                "port_count": 2,
+                "port_fraction": 0.02,
+                "reference_count": 3,
+                "reference_fraction": 0.0015007503751875938
+              },
+              {
+                "answer": "xyz",
+                "port_count": 0,
+                "port_fraction": 0.0,
+                "reference_count": 1,
+                "reference_fraction": 0.0005002501250625312
+              },
+              {
+                "answer": "yyz",
+                "port_count": 39,
+                "port_fraction": 0.39,
+                "reference_count": 817,
+                "reference_fraction": 0.408704352176088
+              },
+              {
+                "answer": "yzz",
+                "port_count": 1,
+                "port_fraction": 0.01,
+                "reference_count": 1,
+                "reference_fraction": 0.0005002501250625312
+              }
+            ],
+            "largest_gap": {
+              "answer": "yyz",
+              "port_count": 39,
+              "port_fraction": 0.39,
+              "reference_count": 817,
+              "reference_fraction": 0.408704352176088
+            },
+            "port_N": 100,
+            "reference_N": 1999
+          },
+          "outside_counts": null,
+          "outside_occurrences": null,
+          "port_N": 100,
+          "validation_status": "skipped-threshold-not-met"
+        },
+        "best_b": {
+          "coverage_qualified": false,
+          "frequency_comparison": {
+            "empirical_tv": 0.06307153576788395,
+            "frequencies": [
+              {
+                "answer": "abd",
+                "port_count": 1,
+                "port_fraction": 0.01,
+                "reference_count": 14,
+                "reference_fraction": 0.007003501750875438
+              },
+              {
+                "answer": "wyz",
+                "port_count": 59,
+                "port_fraction": 0.59,
+                "reference_count": 1092,
+                "reference_fraction": 0.5462731365682841
+              },
+              {
+                "answer": "xyd",
+                "port_count": 8,
+                "port_fraction": 0.08,
+                "reference_count": 286,
+                "reference_fraction": 0.14307153576788395
+              },
+              {
+                "answer": "xyz",
+                "port_count": 1,
+                "port_fraction": 0.01,
+                "reference_count": 6,
+                "reference_fraction": 0.0030015007503751876
+              },
+              {
+                "answer": "yyz",
+                "port_count": 31,
+                "port_fraction": 0.31,
+                "reference_count": 601,
+                "reference_fraction": 0.3006503251625813
+              }
+            ],
+            "largest_gap": {
+              "answer": "xyd",
+              "port_count": 8,
+              "port_fraction": 0.08,
+              "reference_count": 286,
+              "reference_fraction": 0.14307153576788395
+            },
+            "port_N": 100,
+            "reference_N": 1999
+          },
+          "outside_counts": {},
+          "outside_occurrences": 0,
+          "port_N": 100,
+          "validation_status": "skipped-threshold-not-met"
+        }
+      },
+      "port": {
+        "answer_runs": 462,
+        "answered_episodes": 100,
+        "answerless_episodes": 0,
+        "answerless_runs": 338,
+        "attempted_runs": 800,
+        "capped_runs": 0,
+        "engine_error_episodes": 0,
+        "episodes": 100,
+        "episodes_with_cap": 0,
+        "error_runs": 0
+      },
+      "problem": "run4",
+      "validation_eligible": false
+    },
+    {
+      "definitions": {
+        "best_a": {
+          "coverage_qualified": false,
+          "frequency_comparison": {
+            "empirical_tv": 0.36,
+            "frequencies": [
+              {
+                "answer": "jjjrrm",
+                "port_count": 76,
+                "port_fraction": 0.76,
+                "reference_count": 7,
+                "reference_fraction": 0.5
+              },
+              {
+                "answer": "jrrjjm",
+                "port_count": 3,
+                "port_fraction": 0.03,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "mmmrrj",
+                "port_count": 0,
+                "port_fraction": 0.0,
+                "reference_count": 3,
+                "reference_fraction": 0.21428571428571427
+              },
+              {
+                "answer": "mrrjjj",
+                "port_count": 14,
+                "port_fraction": 0.14,
+                "reference_count": 4,
+                "reference_fraction": 0.2857142857142857
+              },
+              {
+                "answer": "rrjjjm",
+                "port_count": 7,
+                "port_fraction": 0.07,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              }
+            ],
+            "largest_gap": {
+              "answer": "jjjrrm",
+              "port_count": 76,
+              "port_fraction": 0.76,
+              "reference_count": 7,
+              "reference_fraction": 0.5
+            },
+            "port_N": 100,
+            "reference_N": 14
+          },
+          "outside_counts": {
+            "jrrjjm": 3,
+            "mrrjjj": 14,
+            "rrjjjm": 7
+          },
+          "outside_occurrences": 24,
+          "port_N": 100,
+          "validation_status": "coverage-target-not-met"
+        },
+        "best_b": {
+          "coverage_qualified": false,
+          "frequency_comparison": {
+            "empirical_tv": 0.43,
+            "frequencies": [
+              {
+                "answer": "cba",
+                "port_count": 22,
+                "port_fraction": 0.22,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "crraaa",
+                "port_count": 2,
+                "port_fraction": 0.02,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "jjjrrm",
+                "port_count": 57,
+                "port_fraction": 0.57,
+                "reference_count": 7,
+                "reference_fraction": 0.5
+              },
+              {
+                "answer": "jrrjjm",
+                "port_count": 9,
+                "port_fraction": 0.09,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "mmmrrj",
+                "port_count": 1,
+                "port_fraction": 0.01,
+                "reference_count": 2,
+                "reference_fraction": 0.14285714285714285
+              },
+              {
+                "answer": "mrraaa",
+                "port_count": 2,
+                "port_fraction": 0.02,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "mrrjjj",
+                "port_count": 6,
+                "port_fraction": 0.06,
+                "reference_count": 5,
+                "reference_fraction": 0.35714285714285715
+              },
+              {
+                "answer": "rrjjjm",
+                "port_count": 1,
+                "port_fraction": 0.01,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              }
+            ],
+            "largest_gap": {
+              "answer": "mrrjjj",
+              "port_count": 6,
+              "port_fraction": 0.06,
+              "reference_count": 5,
+              "reference_fraction": 0.35714285714285715
+            },
+            "port_N": 100,
+            "reference_N": 14
+          },
+          "outside_counts": {
+            "cba": 22,
+            "crraaa": 2,
+            "jrrjjm": 9,
+            "mrraaa": 2,
+            "rrjjjm": 1
+          },
+          "outside_occurrences": 36,
+          "port_N": 100,
+          "validation_status": "coverage-target-not-met"
+        }
+      },
+      "port": {
+        "answer_runs": 701,
+        "answered_episodes": 100,
+        "answerless_episodes": 0,
+        "answerless_runs": 2,
+        "attempted_runs": 800,
+        "capped_runs": 97,
+        "engine_error_episodes": 0,
+        "episodes": 100,
+        "episodes_with_cap": 65,
+        "error_runs": 0
+      },
+      "problem": "misc1",
+      "validation_eligible": true
+    },
+    {
+      "definitions": {
+        "best_a": {
+          "coverage_qualified": false,
+          "frequency_comparison": {
+            "empirical_tv": 0.0195,
+            "frequencies": [
+              {
+                "answer": "iiiixxi",
+                "port_count": 0,
+                "port_fraction": 0.0,
+                "reference_count": 2,
+                "reference_fraction": 0.001
+              },
+              {
+                "answer": "iixxxi",
+                "port_count": 0,
+                "port_fraction": 0.0,
+                "reference_count": 1,
+                "reference_fraction": 0.0005
+              },
+              {
+                "answer": "ixxi",
+                "port_count": 95,
+                "port_fraction": 0.95,
+                "reference_count": 1881,
+                "reference_fraction": 0.9405
+              },
+              {
+                "answer": "ixxiiii",
+                "port_count": 0,
+                "port_fraction": 0.0,
+                "reference_count": 5,
+                "reference_fraction": 0.0025
+              },
+              {
+                "answer": "ixxq",
+                "port_count": 0,
+                "port_fraction": 0.0,
+                "reference_count": 1,
+                "reference_fraction": 0.0005
+              },
+              {
+                "answer": "ixxxii",
+                "port_count": 0,
+                "port_fraction": 0.0,
+                "reference_count": 1,
+                "reference_fraction": 0.0005
+              },
+              {
+                "answer": "qeeq",
+                "port_count": 4,
+                "port_fraction": 0.04,
+                "reference_count": 107,
+                "reference_fraction": 0.0535
+              },
+              {
+                "answer": "qiq",
+                "port_count": 0,
+                "port_fraction": 0.0,
+                "reference_count": 1,
+                "reference_fraction": 0.0005
+              },
+              {
+                "answer": "qxeeq",
+                "port_count": 1,
+                "port_fraction": 0.01,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "xxixx",
+                "port_count": 0,
+                "port_fraction": 0.0,
+                "reference_count": 1,
+                "reference_fraction": 0.0005
+              }
+            ],
+            "largest_gap": {
+              "answer": "qeeq",
+              "port_count": 4,
+              "port_fraction": 0.04,
+              "reference_count": 107,
+              "reference_fraction": 0.0535
+            },
+            "port_N": 100,
+            "reference_N": 2000
+          },
+          "outside_counts": null,
+          "outside_occurrences": null,
+          "port_N": 100,
+          "validation_status": "skipped-threshold-not-met"
+        },
+        "best_b": {
+          "coverage_qualified": false,
+          "frequency_comparison": {
+            "empirical_tv": 0.0405,
+            "frequencies": [
+              {
+                "answer": "iixxxi",
+                "port_count": 0,
+                "port_fraction": 0.0,
+                "reference_count": 5,
+                "reference_fraction": 0.0025
+              },
+              {
+                "answer": "ixi",
+                "port_count": 0,
+                "port_fraction": 0.0,
+                "reference_count": 2,
+                "reference_fraction": 0.001
+              },
+              {
+                "answer": "ixii",
+                "port_count": 0,
+                "port_fraction": 0.0,
+                "reference_count": 1,
+                "reference_fraction": 0.0005
+              },
+              {
+                "answer": "ixq",
+                "port_count": 0,
+                "port_fraction": 0.0,
+                "reference_count": 1,
+                "reference_fraction": 0.0005
+              },
+              {
+                "answer": "ixxi",
+                "port_count": 38,
+                "port_fraction": 0.38,
+                "reference_count": 768,
+                "reference_fraction": 0.384
+              },
+              {
+                "answer": "ixxii",
+                "port_count": 0,
+                "port_fraction": 0.0,
+                "reference_count": 1,
+                "reference_fraction": 0.0005
+              },
+              {
+                "answer": "ixxiiii",
+                "port_count": 0,
+                "port_fraction": 0.0,
+                "reference_count": 3,
+                "reference_fraction": 0.0015
+              },
+              {
+                "answer": "ixxq",
+                "port_count": 7,
+                "port_fraction": 0.07,
+                "reference_count": 78,
+                "reference_fraction": 0.039
+              },
+              {
+                "answer": "ixxxi",
+                "port_count": 0,
+                "port_fraction": 0.0,
+                "reference_count": 1,
+                "reference_fraction": 0.0005
+              },
+              {
+                "answer": "ixxxii",
+                "port_count": 0,
+                "port_fraction": 0.0,
+                "reference_count": 3,
+                "reference_fraction": 0.0015
+              },
+              {
+                "answer": "qeeq",
+                "port_count": 50,
+                "port_fraction": 0.5,
+                "reference_count": 1009,
+                "reference_fraction": 0.5045
+              },
+              {
+                "answer": "qeexq",
+                "port_count": 0,
+                "port_fraction": 0.0,
+                "reference_count": 1,
+                "reference_fraction": 0.0005
+              },
+              {
+                "answer": "qexq",
+                "port_count": 0,
+                "port_fraction": 0.0,
+                "reference_count": 1,
+                "reference_fraction": 0.0005
+              },
+              {
+                "answer": "qiiq",
+                "port_count": 0,
+                "port_fraction": 0.0,
+                "reference_count": 6,
+                "reference_fraction": 0.003
+              },
+              {
+                "answer": "qiq",
+                "port_count": 0,
+                "port_fraction": 0.0,
+                "reference_count": 4,
+                "reference_fraction": 0.002
+              },
+              {
+                "answer": "qiqq",
+                "port_count": 0,
+                "port_fraction": 0.0,
+                "reference_count": 1,
+                "reference_fraction": 0.0005
+              },
+              {
+                "answer": "qixx",
+                "port_count": 0,
+                "port_fraction": 0.0,
+                "reference_count": 1,
+                "reference_fraction": 0.0005
+              },
+              {
+                "answer": "qqxeeq",
+                "port_count": 0,
+                "port_fraction": 0.0,
+                "reference_count": 1,
+                "reference_fraction": 0.0005
+              },
+              {
+                "answer": "qxeq",
+                "port_count": 0,
+                "port_fraction": 0.0,
+                "reference_count": 1,
+                "reference_fraction": 0.0005
+              },
+              {
+                "answer": "qxi",
+                "port_count": 0,
+                "port_fraction": 0.0,
+                "reference_count": 1,
+                "reference_fraction": 0.0005
+              },
+              {
+                "answer": "qxxi",
+                "port_count": 4,
+                "port_fraction": 0.04,
+                "reference_count": 105,
+                "reference_fraction": 0.0525
+              },
+              {
+                "answer": "qxxxi",
+                "port_count": 0,
+                "port_fraction": 0.0,
+                "reference_count": 1,
+                "reference_fraction": 0.0005
+              },
+              {
+                "answer": "xiix",
+                "port_count": 0,
+                "port_fraction": 0.0,
+                "reference_count": 1,
+                "reference_fraction": 0.0005
+              },
+              {
+                "answer": "xxiq",
+                "port_count": 0,
+                "port_fraction": 0.0,
+                "reference_count": 2,
+                "reference_fraction": 0.001
+              },
+              {
+                "answer": "xxixx",
+                "port_count": 1,
+                "port_fraction": 0.01,
+                "reference_count": 1,
+                "reference_fraction": 0.0005
+              },
+              {
+                "answer": "xxxix",
+                "port_count": 0,
+                "port_fraction": 0.0,
+                "reference_count": 1,
+                "reference_fraction": 0.0005
+              }
+            ],
+            "largest_gap": {
+              "answer": "ixxq",
+              "port_count": 7,
+              "port_fraction": 0.07,
+              "reference_count": 78,
+              "reference_fraction": 0.039
+            },
+            "port_N": 100,
+            "reference_N": 2000
+          },
+          "outside_counts": null,
+          "outside_occurrences": null,
+          "port_N": 100,
+          "validation_status": "skipped-threshold-not-met"
+        }
+      },
+      "port": {
+        "answer_runs": 637,
+        "answered_episodes": 100,
+        "answerless_episodes": 0,
+        "answerless_runs": 163,
+        "attempted_runs": 800,
+        "capped_runs": 0,
+        "engine_error_episodes": 0,
+        "episodes": 100,
+        "episodes_with_cap": 0,
+        "error_runs": 0
+      },
+      "problem": "fig5.4-top",
+      "validation_eligible": false
+    },
+    {
+      "definitions": {
+        "best_a": {
+          "coverage_qualified": false,
+          "frequency_comparison": {
+            "empirical_tv": 0.006,
+            "frequencies": [
+              {
+                "answer": "abbba",
+                "port_count": 6,
+                "port_fraction": 0.06,
+                "reference_count": 108,
+                "reference_fraction": 0.054
+              },
+              {
+                "answer": "baaab",
+                "port_count": 94,
+                "port_fraction": 0.94,
+                "reference_count": 1886,
+                "reference_fraction": 0.943
+              },
+              {
+                "answer": "baacb",
+                "port_count": 0,
+                "port_fraction": 0.0,
+                "reference_count": 1,
+                "reference_fraction": 0.0005
+              },
+              {
+                "answer": "baccb",
+                "port_count": 0,
+                "port_fraction": 0.0,
+                "reference_count": 1,
+                "reference_fraction": 0.0005
+              },
+              {
+                "answer": "bcaab",
+                "port_count": 0,
+                "port_fraction": 0.0,
+                "reference_count": 3,
+                "reference_fraction": 0.0015
+              },
+              {
+                "answer": "bccab",
+                "port_count": 0,
+                "port_fraction": 0.0,
+                "reference_count": 1,
+                "reference_fraction": 0.0005
+              }
+            ],
+            "largest_gap": {
+              "answer": "abbba",
+              "port_count": 6,
+              "port_fraction": 0.06,
+              "reference_count": 108,
+              "reference_fraction": 0.054
+            },
+            "port_N": 100,
+            "reference_N": 2000
+          },
+          "outside_counts": {
+            "abbba": 6
+          },
+          "outside_occurrences": 6,
+          "port_N": 100,
+          "validation_status": "skipped-threshold-not-met"
+        },
+        "best_b": {
+          "coverage_qualified": false,
+          "frequency_comparison": {
+            "empirical_tv": 0.0955,
+            "frequencies": [
+              {
+                "answer": "abbba",
+                "port_count": 3,
+                "port_fraction": 0.03,
+                "reference_count": 50,
+                "reference_fraction": 0.025
+              },
+              {
+                "answer": "abbbq",
+                "port_count": 1,
+                "port_fraction": 0.01,
+                "reference_count": 7,
+                "reference_fraction": 0.0035
+              },
+              {
+                "answer": "baaab",
+                "port_count": 63,
+                "port_fraction": 0.63,
+                "reference_count": 1180,
+                "reference_fraction": 0.59
+              },
+              {
+                "answer": "baaaq",
+                "port_count": 1,
+                "port_fraction": 0.01,
+                "reference_count": 66,
+                "reference_fraction": 0.033
+              },
+              {
+                "answer": "baccb",
+                "port_count": 0,
+                "port_fraction": 0.0,
+                "reference_count": 1,
+                "reference_fraction": 0.0005
+              },
+              {
+                "answer": "bcaab",
+                "port_count": 0,
+                "port_fraction": 0.0,
+                "reference_count": 1,
+                "reference_fraction": 0.0005
+              },
+              {
+                "answer": "pqqqq",
+                "port_count": 0,
+                "port_fraction": 0.0,
+                "reference_count": 1,
+                "reference_fraction": 0.0005
+              },
+              {
+                "answer": "qaaab",
+                "port_count": 2,
+                "port_fraction": 0.02,
+                "reference_count": 41,
+                "reference_fraction": 0.0205
+              },
+              {
+                "answer": "qaacb",
+                "port_count": 0,
+                "port_fraction": 0.0,
+                "reference_count": 1,
+                "reference_fraction": 0.0005
+              },
+              {
+                "answer": "qbabb",
+                "port_count": 0,
+                "port_fraction": 0.0,
+                "reference_count": 1,
+                "reference_fraction": 0.0005
+              },
+              {
+                "answer": "qbbba",
+                "port_count": 1,
+                "port_fraction": 0.01,
+                "reference_count": 5,
+                "reference_fraction": 0.0025
+              },
+              {
+                "answer": "qbbbq",
+                "port_count": 5,
+                "port_fraction": 0.05,
+                "reference_count": 47,
+                "reference_fraction": 0.0235
+              },
+              {
+                "answer": "qeeeq",
+                "port_count": 21,
+                "port_fraction": 0.21,
+                "reference_count": 551,
+                "reference_fraction": 0.2755
+              },
+              {
+                "answer": "qeeqp",
+                "port_count": 0,
+                "port_fraction": 0.0,
+                "reference_count": 1,
+                "reference_fraction": 0.0005
+              },
+              {
+                "answer": "qeerq",
+                "port_count": 0,
+                "port_fraction": 0.0,
+                "reference_count": 1,
+                "reference_fraction": 0.0005
+              },
+              {
+                "answer": "qeq",
+                "port_count": 2,
+                "port_fraction": 0.02,
+                "reference_count": 44,
+                "reference_fraction": 0.022
+              },
+              {
+                "answer": "qrbbq",
+                "port_count": 0,
+                "port_fraction": 0.0,
+                "reference_count": 2,
+                "reference_fraction": 0.001
+              },
+              {
+                "answer": "qreeq",
+                "port_count": 1,
+                "port_fraction": 0.01,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              }
+            ],
+            "largest_gap": {
+              "answer": "qeeeq",
+              "port_count": 21,
+              "port_fraction": 0.21,
+              "reference_count": 551,
+              "reference_fraction": 0.2755
+            },
+            "port_N": 100,
+            "reference_N": 2000
+          },
+          "outside_counts": null,
+          "outside_occurrences": null,
+          "port_N": 100,
+          "validation_status": "skipped-threshold-not-met"
+        }
+      },
+      "port": {
+        "answer_runs": 781,
+        "answered_episodes": 100,
+        "answerless_episodes": 0,
+        "answerless_runs": 19,
+        "attempted_runs": 800,
+        "capped_runs": 0,
+        "engine_error_episodes": 0,
+        "episodes": 100,
+        "episodes_with_cap": 0,
+        "error_runs": 0
+      },
+      "problem": "eqe-baaab",
+      "validation_eligible": false
+    },
+    {
+      "definitions": {
+        "best_a": {
+          "coverage_qualified": false,
+          "frequency_comparison": {
+            "empirical_tv": 0.2438095238095238,
+            "frequencies": [
+              {
+                "answer": "baaab",
+                "port_count": 9,
+                "port_fraction": 0.09,
+                "reference_count": 2,
+                "reference_fraction": 0.09523809523809523
+              },
+              {
+                "answer": "bcaab",
+                "port_count": 2,
+                "port_fraction": 0.02,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "bcccb",
+                "port_count": 15,
+                "port_fraction": 0.15,
+                "reference_count": 2,
+                "reference_fraction": 0.09523809523809523
+              },
+              {
+                "answer": "cbbba",
+                "port_count": 15,
+                "port_fraction": 0.15,
+                "reference_count": 6,
+                "reference_fraction": 0.2857142857142857
+              },
+              {
+                "answer": "cdbba",
+                "port_count": 1,
+                "port_fraction": 0.01,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "cddda",
+                "port_count": 4,
+                "port_fraction": 0.04,
+                "reference_count": 3,
+                "reference_fraction": 0.14285714285714285
+              },
+              {
+                "answer": "pqqeq",
+                "port_count": 1,
+                "port_fraction": 0.01,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "qbbbq",
+                "port_count": 2,
+                "port_fraction": 0.02,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "qcccb",
+                "port_count": 1,
+                "port_fraction": 0.01,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "qeeeq",
+                "port_count": 50,
+                "port_fraction": 0.5,
+                "reference_count": 8,
+                "reference_fraction": 0.38095238095238093
+              }
+            ],
+            "largest_gap": {
+              "answer": "cbbba",
+              "port_count": 15,
+              "port_fraction": 0.15,
+              "reference_count": 6,
+              "reference_fraction": 0.2857142857142857
+            },
+            "port_N": 100,
+            "reference_N": 21
+          },
+          "outside_counts": {
+            "bcaab": 2,
+            "cdbba": 1,
+            "pqqeq": 1,
+            "qbbbq": 2,
+            "qcccb": 1
+          },
+          "outside_occurrences": 7,
+          "port_N": 100,
+          "validation_status": "coverage-target-not-met"
+        },
+        "best_b": {
+          "coverage_qualified": false,
+          "frequency_comparison": {
+            "empirical_tv": 0.23238095238095238,
+            "frequencies": [
+              {
+                "answer": "baaab",
+                "port_count": 2,
+                "port_fraction": 0.02,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "baaaq",
+                "port_count": 7,
+                "port_fraction": 0.07,
+                "reference_count": 1,
+                "reference_fraction": 0.047619047619047616
+              },
+              {
+                "answer": "bcccb",
+                "port_count": 1,
+                "port_fraction": 0.01,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "cbbba",
+                "port_count": 2,
+                "port_fraction": 0.02,
+                "reference_count": 1,
+                "reference_fraction": 0.047619047619047616
+              },
+              {
+                "answer": "cddda",
+                "port_count": 0,
+                "port_fraction": 0.0,
+                "reference_count": 1,
+                "reference_fraction": 0.047619047619047616
+              },
+              {
+                "answer": "pqqeq",
+                "port_count": 1,
+                "port_fraction": 0.01,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "qbbbc",
+                "port_count": 2,
+                "port_fraction": 0.02,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "qbbbq",
+                "port_count": 5,
+                "port_fraction": 0.05,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "qcccb",
+                "port_count": 10,
+                "port_fraction": 0.1,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "qeeeq",
+                "port_count": 67,
+                "port_fraction": 0.67,
+                "reference_count": 17,
+                "reference_fraction": 0.8095238095238095
+              },
+              {
+                "answer": "qeq",
+                "port_count": 3,
+                "port_fraction": 0.03,
+                "reference_count": 1,
+                "reference_fraction": 0.047619047619047616
+              }
+            ],
+            "largest_gap": {
+              "answer": "qeeeq",
+              "port_count": 67,
+              "port_fraction": 0.67,
+              "reference_count": 17,
+              "reference_fraction": 0.8095238095238095
+            },
+            "port_N": 100,
+            "reference_N": 21
+          },
+          "outside_counts": {
+            "baaab": 2,
+            "baaaq": 7,
+            "bcccb": 1,
+            "cbbba": 2,
+            "pqqeq": 1,
+            "qbbbc": 2,
+            "qbbbq": 5,
+            "qcccb": 10,
+            "qeq": 3
+          },
+          "outside_occurrences": 33,
+          "port_N": 100,
+          "validation_status": "coverage-target-not-met"
+        }
+      },
+      "port": {
+        "answer_runs": 531,
+        "answered_episodes": 100,
+        "answerless_episodes": 0,
+        "answerless_runs": 269,
+        "attempted_runs": 800,
+        "capped_runs": 0,
+        "engine_error_episodes": 0,
+        "episodes": 100,
+        "episodes_with_cap": 0,
+        "error_runs": 0
+      },
+      "problem": "run6",
+      "validation_eligible": true
+    },
+    {
+      "definitions": {
+        "best_a": {
+          "coverage_qualified": false,
+          "frequency_comparison": {
+            "empirical_tv": 0.45,
+            "frequencies": [
+              {
+                "answer": "uyz",
+                "port_count": 1,
+                "port_fraction": 0.01,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "wyz",
+                "port_count": 55,
+                "port_fraction": 0.55,
+                "reference_count": 2,
+                "reference_fraction": 1.0
+              },
+              {
+                "answer": "xyu",
+                "port_count": 1,
+                "port_fraction": 0.01,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "yyz",
+                "port_count": 43,
+                "port_fraction": 0.43,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              }
+            ],
+            "largest_gap": {
+              "answer": "wyz",
+              "port_count": 55,
+              "port_fraction": 0.55,
+              "reference_count": 2,
+              "reference_fraction": 1.0
+            },
+            "port_N": 100,
+            "reference_N": 2
+          },
+          "outside_counts": {
+            "uyz": 1,
+            "xyu": 1,
+            "yyz": 43
+          },
+          "outside_occurrences": 45,
+          "port_N": 100,
+          "validation_status": "coverage-target-not-met"
+        },
+        "best_b": {
+          "coverage_qualified": false,
+          "frequency_comparison": {
+            "empirical_tv": 0.54,
+            "frequencies": [
+              {
+                "answer": "rsu",
+                "port_count": 2,
+                "port_fraction": 0.02,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "wyz",
+                "port_count": 32,
+                "port_fraction": 0.32,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "xyu",
+                "port_count": 46,
+                "port_fraction": 0.46,
+                "reference_count": 2,
+                "reference_fraction": 1.0
+              },
+              {
+                "answer": "xyz",
+                "port_count": 12,
+                "port_fraction": 0.12,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "yyz",
+                "port_count": 8,
+                "port_fraction": 0.08,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              }
+            ],
+            "largest_gap": {
+              "answer": "xyu",
+              "port_count": 46,
+              "port_fraction": 0.46,
+              "reference_count": 2,
+              "reference_fraction": 1.0
+            },
+            "port_N": 100,
+            "reference_N": 2
+          },
+          "outside_counts": {
+            "rsu": 2,
+            "wyz": 32,
+            "xyz": 12,
+            "yyz": 8
+          },
+          "outside_occurrences": 54,
+          "port_N": 100,
+          "validation_status": "coverage-target-not-met"
+        }
+      },
+      "port": {
+        "answer_runs": 432,
+        "answered_episodes": 100,
+        "answerless_episodes": 0,
+        "answerless_runs": 368,
+        "attempted_runs": 800,
+        "capped_runs": 0,
+        "engine_error_episodes": 0,
+        "episodes": 100,
+        "episodes_with_cap": 0,
+        "error_runs": 0
+      },
+      "problem": "run3",
+      "validation_eligible": true
+    },
+    {
+      "definitions": {
+        "best_a": {
+          "coverage_qualified": false,
+          "frequency_comparison": {
+            "empirical_tv": 0.23,
+            "frequencies": [
+              {
+                "answer": "mrrjjk",
+                "port_count": 14,
+                "port_fraction": 0.14,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "mrrjkk",
+                "port_count": 9,
+                "port_fraction": 0.09,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "mrrkkk",
+                "port_count": 77,
+                "port_fraction": 0.77,
+                "reference_count": 2,
+                "reference_fraction": 1.0
+              }
+            ],
+            "largest_gap": {
+              "answer": "mrrkkk",
+              "port_count": 77,
+              "port_fraction": 0.77,
+              "reference_count": 2,
+              "reference_fraction": 1.0
+            },
+            "port_N": 100,
+            "reference_N": 2
+          },
+          "outside_counts": {
+            "mrrjjk": 14,
+            "mrrjkk": 9
+          },
+          "outside_occurrences": 23,
+          "port_N": 100,
+          "validation_status": "coverage-target-not-met"
+        },
+        "best_b": {
+          "coverage_qualified": false,
+          "frequency_comparison": {
+            "empirical_tv": 0.28,
+            "frequencies": [
+              {
+                "answer": "mrrjjk",
+                "port_count": 22,
+                "port_fraction": 0.22,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "mrrjkk",
+                "port_count": 6,
+                "port_fraction": 0.06,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "mrrkkk",
+                "port_count": 72,
+                "port_fraction": 0.72,
+                "reference_count": 2,
+                "reference_fraction": 1.0
+              }
+            ],
+            "largest_gap": {
+              "answer": "mrrkkk",
+              "port_count": 72,
+              "port_fraction": 0.72,
+              "reference_count": 2,
+              "reference_fraction": 1.0
+            },
+            "port_N": 100,
+            "reference_N": 2
+          },
+          "outside_counts": {
+            "mrrjjk": 22,
+            "mrrjkk": 6
+          },
+          "outside_occurrences": 28,
+          "port_N": 100,
+          "validation_status": "coverage-target-not-met"
+        }
+      },
+      "port": {
+        "answer_runs": 611,
+        "answered_episodes": 100,
+        "answerless_episodes": 0,
+        "answerless_runs": 0,
+        "attempted_runs": 800,
+        "capped_runs": 189,
+        "engine_error_episodes": 0,
+        "episodes": 100,
+        "episodes_with_cap": 96,
+        "error_runs": 0
+      },
+      "problem": "run2",
+      "validation_eligible": true
+    },
+    {
+      "definitions": {
+        "best_a": {
+          "coverage_qualified": true,
+          "frequency_comparison": {
+            "empirical_tv": 0.0,
+            "frequencies": [
+              {
+                "answer": "c",
+                "port_count": 100,
+                "port_fraction": 1.0,
+                "reference_count": 2,
+                "reference_fraction": 1.0
+              }
+            ],
+            "largest_gap": {
+              "answer": "c",
+              "port_count": 100,
+              "port_fraction": 1.0,
+              "reference_count": 2,
+              "reference_fraction": 1.0
+            },
+            "port_N": 100,
+            "reference_N": 2
+          },
+          "outside_counts": {},
+          "outside_occurrences": 0,
+          "port_N": 100,
+          "validation_status": "qualified"
+        },
+        "best_b": {
+          "coverage_qualified": true,
+          "frequency_comparison": {
+            "empirical_tv": 0.0,
+            "frequencies": [
+              {
+                "answer": "c",
+                "port_count": 100,
+                "port_fraction": 1.0,
+                "reference_count": 2,
+                "reference_fraction": 1.0
+              }
+            ],
+            "largest_gap": {
+              "answer": "c",
+              "port_count": 100,
+              "port_fraction": 1.0,
+              "reference_count": 2,
+              "reference_fraction": 1.0
+            },
+            "port_N": 100,
+            "reference_N": 2
+          },
+          "outside_counts": {},
+          "outside_occurrences": 0,
+          "port_N": 100,
+          "validation_status": "qualified"
+        }
+      },
+      "port": {
+        "answer_runs": 445,
+        "answered_episodes": 100,
+        "answerless_episodes": 0,
+        "answerless_runs": 122,
+        "attempted_runs": 800,
+        "capped_runs": 233,
+        "engine_error_episodes": 0,
+        "episodes": 100,
+        "episodes_with_cap": 99,
+        "error_runs": 0
+      },
+      "problem": "copy1",
+      "validation_eligible": true
+    },
+    {
+      "definitions": {
+        "best_a": {
+          "coverage_qualified": true,
+          "frequency_comparison": {
+            "empirical_tv": 0.0,
+            "frequencies": [
+              {
+                "answer": "d",
+                "port_count": 100,
+                "port_fraction": 1.0,
+                "reference_count": 2,
+                "reference_fraction": 1.0
+              }
+            ],
+            "largest_gap": {
+              "answer": "d",
+              "port_count": 100,
+              "port_fraction": 1.0,
+              "reference_count": 2,
+              "reference_fraction": 1.0
+            },
+            "port_N": 100,
+            "reference_N": 2
+          },
+          "outside_counts": {},
+          "outside_occurrences": 0,
+          "port_N": 100,
+          "validation_status": "qualified"
+        },
+        "best_b": {
+          "coverage_qualified": true,
+          "frequency_comparison": {
+            "empirical_tv": 0.0,
+            "frequencies": [
+              {
+                "answer": "d",
+                "port_count": 100,
+                "port_fraction": 1.0,
+                "reference_count": 2,
+                "reference_fraction": 1.0
+              }
+            ],
+            "largest_gap": {
+              "answer": "d",
+              "port_count": 100,
+              "port_fraction": 1.0,
+              "reference_count": 2,
+              "reference_fraction": 1.0
+            },
+            "port_N": 100,
+            "reference_N": 2
+          },
+          "outside_counts": {},
+          "outside_occurrences": 0,
+          "port_N": 100,
+          "validation_status": "qualified"
+        }
+      },
+      "port": {
+        "answer_runs": 300,
+        "answered_episodes": 100,
+        "answerless_episodes": 0,
+        "answerless_runs": 285,
+        "attempted_runs": 800,
+        "capped_runs": 215,
+        "engine_error_episodes": 0,
+        "episodes": 100,
+        "episodes_with_cap": 88,
+        "error_runs": 0
+      },
+      "problem": "copy2",
+      "validation_eligible": true
+    },
+    {
+      "definitions": {
+        "best_a": {
+          "coverage_qualified": true,
+          "frequency_comparison": {
+            "empirical_tv": 0.0,
+            "frequencies": [
+              {
+                "answer": "z",
+                "port_count": 100,
+                "port_fraction": 1.0,
+                "reference_count": 2,
+                "reference_fraction": 1.0
+              }
+            ],
+            "largest_gap": {
+              "answer": "z",
+              "port_count": 100,
+              "port_fraction": 1.0,
+              "reference_count": 2,
+              "reference_fraction": 1.0
+            },
+            "port_N": 100,
+            "reference_N": 2
+          },
+          "outside_counts": {},
+          "outside_occurrences": 0,
+          "port_N": 100,
+          "validation_status": "qualified"
+        },
+        "best_b": {
+          "coverage_qualified": true,
+          "frequency_comparison": {
+            "empirical_tv": 0.0,
+            "frequencies": [
+              {
+                "answer": "z",
+                "port_count": 100,
+                "port_fraction": 1.0,
+                "reference_count": 2,
+                "reference_fraction": 1.0
+              }
+            ],
+            "largest_gap": {
+              "answer": "z",
+              "port_count": 100,
+              "port_fraction": 1.0,
+              "reference_count": 2,
+              "reference_fraction": 1.0
+            },
+            "port_N": 100,
+            "reference_N": 2
+          },
+          "outside_counts": {},
+          "outside_occurrences": 0,
+          "port_N": 100,
+          "validation_status": "qualified"
+        }
+      },
+      "port": {
+        "answer_runs": 300,
+        "answered_episodes": 100,
+        "answerless_episodes": 0,
+        "answerless_runs": 276,
+        "attempted_runs": 800,
+        "capped_runs": 224,
+        "engine_error_episodes": 0,
+        "episodes": 100,
+        "episodes_with_cap": 96,
+        "error_runs": 0
+      },
+      "problem": "copy3",
+      "validation_eligible": true
+    },
+    {
+      "definitions": {
+        "best_a": {
+          "coverage_qualified": false,
+          "frequency_comparison": {
+            "empirical_tv": 0.0,
+            "frequencies": [
+              {
+                "answer": "x",
+                "port_count": 100,
+                "port_fraction": 1.0,
+                "reference_count": 2,
+                "reference_fraction": 1.0
+              }
+            ],
+            "largest_gap": {
+              "answer": "x",
+              "port_count": 100,
+              "port_fraction": 1.0,
+              "reference_count": 2,
+              "reference_fraction": 1.0
+            },
+            "port_N": 100,
+            "reference_N": 2
+          },
+          "outside_counts": {},
+          "outside_occurrences": 0,
+          "port_N": 100,
+          "validation_status": "coverage-target-not-met"
+        },
+        "best_b": {
+          "coverage_qualified": true,
+          "frequency_comparison": {
+            "empirical_tv": 0.0,
+            "frequencies": [
+              {
+                "answer": "x",
+                "port_count": 100,
+                "port_fraction": 1.0,
+                "reference_count": 2,
+                "reference_fraction": 1.0
+              }
+            ],
+            "largest_gap": {
+              "answer": "x",
+              "port_count": 100,
+              "port_fraction": 1.0,
+              "reference_count": 2,
+              "reference_fraction": 1.0
+            },
+            "port_N": 100,
+            "reference_N": 2
+          },
+          "outside_counts": {},
+          "outside_occurrences": 0,
+          "port_N": 100,
+          "validation_status": "qualified"
+        }
+      },
+      "port": {
+        "answer_runs": 444,
+        "answered_episodes": 100,
+        "answerless_episodes": 0,
+        "answerless_runs": 127,
+        "attempted_runs": 800,
+        "capped_runs": 229,
+        "engine_error_episodes": 0,
+        "episodes": 100,
+        "episodes_with_cap": 99,
+        "error_runs": 0
+      },
+      "problem": "copy4",
+      "validation_eligible": true
+    },
+    {
+      "definitions": {
+        "best_a": {
+          "coverage_qualified": false,
+          "frequency_comparison": {
+            "empirical_tv": 0.020833333333333332,
+            "frequencies": [
+              {
+                "answer": "aac",
+                "port_count": 1,
+                "port_fraction": 0.010416666666666666,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "cbc",
+                "port_count": 1,
+                "port_fraction": 0.010416666666666666,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "cc",
+                "port_count": 94,
+                "port_fraction": 0.9791666666666666,
+                "reference_count": 2,
+                "reference_fraction": 1.0
+              }
+            ],
+            "largest_gap": {
+              "answer": "cc",
+              "port_count": 94,
+              "port_fraction": 0.9791666666666666,
+              "reference_count": 2,
+              "reference_fraction": 1.0
+            },
+            "port_N": 96,
+            "reference_N": 2
+          },
+          "outside_counts": {
+            "aac": 1,
+            "cbc": 1
+          },
+          "outside_occurrences": 2,
+          "port_N": 96,
+          "validation_status": "coverage-target-not-met"
+        },
+        "best_b": {
+          "coverage_qualified": false,
+          "frequency_comparison": {
+            "empirical_tv": 0.03125,
+            "frequencies": [
+              {
+                "answer": "aac",
+                "port_count": 3,
+                "port_fraction": 0.03125,
+                "reference_count": 0,
+                "reference_fraction": 0.0
+              },
+              {
+                "answer": "cc",
+                "port_count": 93,
+                "port_fraction": 0.96875,
+                "reference_count": 2,
+                "reference_fraction": 1.0
+              }
+            ],
+            "largest_gap": {
+              "answer": "aac",
+              "port_count": 3,
+              "port_fraction": 0.03125,
+              "reference_count": 0,
+              "reference_fraction": 0.0
+            },
+            "port_N": 96,
+            "reference_N": 2
+          },
+          "outside_counts": {
+            "aac": 3
+          },
+          "outside_occurrences": 3,
+          "port_N": 96,
+          "validation_status": "coverage-target-not-met"
+        }
+      },
+      "port": {
+        "answer_runs": 243,
+        "answered_episodes": 96,
+        "answerless_episodes": 4,
+        "answerless_runs": 557,
+        "attempted_runs": 800,
+        "capped_runs": 0,
+        "engine_error_episodes": 0,
+        "episodes": 100,
+        "episodes_with_cap": 0,
+        "error_runs": 0
+      },
+      "problem": "copy5",
+      "validation_eligible": true
+    },
+    {
+      "definitions": {
+        "best_a": {
+          "coverage_qualified": false,
+          "frequency_comparison": {
+            "empirical_tv": 0.0,
+            "frequencies": [
+              {
+                "answer": "d",
+                "port_count": 100,
+                "port_fraction": 1.0,
+                "reference_count": 2,
+                "reference_fraction": 1.0
+              }
+            ],
+            "largest_gap": {
+              "answer": "d",
+              "port_count": 100,
+              "port_fraction": 1.0,
+              "reference_count": 2,
+              "reference_fraction": 1.0
+            },
+            "port_N": 100,
+            "reference_N": 2
+          },
+          "outside_counts": {},
+          "outside_occurrences": 0,
+          "port_N": 100,
+          "validation_status": "coverage-target-not-met"
+        },
+        "best_b": {
+          "coverage_qualified": false,
+          "frequency_comparison": {
+            "empirical_tv": 0.0,
+            "frequencies": [
+              {
+                "answer": "d",
+                "port_count": 100,
+                "port_fraction": 1.0,
+                "reference_count": 2,
+                "reference_fraction": 1.0
+              }
+            ],
+            "largest_gap": {
+              "answer": "d",
+              "port_count": 100,
+              "port_fraction": 1.0,
+              "reference_count": 2,
+              "reference_fraction": 1.0
+            },
+            "port_N": 100,
+            "reference_N": 2
+          },
+          "outside_counts": {},
+          "outside_occurrences": 0,
+          "port_N": 100,
+          "validation_status": "coverage-target-not-met"
+        }
+      },
+      "port": {
+        "answer_runs": 443,
+        "answered_episodes": 100,
+        "answerless_episodes": 0,
+        "answerless_runs": 141,
+        "attempted_runs": 800,
+        "capped_runs": 216,
+        "engine_error_episodes": 0,
+        "episodes": 100,
+        "episodes_with_cap": 90,
+        "error_runs": 0
+      },
+      "problem": "copy6",
+      "validation_eligible": true
+    }
+  ],
+  "scope": "Saved episode-selection and accounting audit; no engine execution or new inferential test",
+  "totals": {
+    "construction": {
+      "answer_runs": 65108,
+      "answered_episodes": 10073,
+      "answerless_episodes": 0,
+      "answerless_runs": 13467,
+      "attempted_runs": 80591,
+      "capped_runs": 2015,
+      "engine_error_episodes": 1,
+      "episodes": 10074,
+      "episodes_with_cap": 1489,
+      "error_runs": 1
+    },
+    "port": {
+      "answer_runs": 9815,
+      "answered_episodes": 1896,
+      "answerless_episodes": 4,
+      "answerless_runs": 3388,
+      "attempted_runs": 15200,
+      "capped_runs": 1997,
+      "engine_error_episodes": 0,
+      "episodes": 1900,
+      "episodes_with_cap": 863,
+      "error_runs": 0
+    },
+    "validation": {
+      "answer_runs": 73383,
+      "answered_episodes": 13995,
+      "answerless_episodes": 5,
+      "answerless_runs": 20132,
+      "attempted_runs": 112000,
+      "capped_runs": 18485,
+      "engine_error_episodes": 0,
+      "episodes": 14000,
+      "episodes_with_cap": 7405,
+      "error_runs": 0
+    }
+  }
+}

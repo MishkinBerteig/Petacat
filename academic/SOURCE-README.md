@@ -1,5 +1,7 @@
 # LaTeX Build Bundle
 
+**Large References, Small Checks: Oracle-Guided Porting of a Stochastic Learning System**
+
 From the extracted directory, use a standard TeX installation:
 
 ```sh

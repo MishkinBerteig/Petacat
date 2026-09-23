@@ -1,17 +1,76 @@
 # TMLR Manuscript
 
+**Current regular-length submission candidate:**
+[support-set-oracles-12-page.pdf](support-set-oracles-12-page.pdf), with ten
+main-content pages, followed by references and evidence appendices. It retains
+the anonymous TMLR format and the author's plain-language essay voice.
+The editable base is [support-set-oracles-12-page.md](support-set-oracles-12-page.md).
+The 2026-09-11 clarity revision follows the author's new abstract and uses
+consistent solution/process terminology, with an explicit relation over
+countable problem and solution sets.
+See [short/README.md](short/README.md) for the matching submission attachment,
+verification, relocation notes, and rebuild instructions. Final manual author
+approval is pending; nothing has been committed, pushed, or submitted.
+
+The previous 21-page-main-text draft remains preserved as
+[support-set-oracles-final.pdf](support-set-oracles-final.pdf), with its
+own [source and review record](final/README.md).
+
+## Earlier Draft and Review Record
+
+The earlier files and review history below are retained for comparison.
+
 **Status: substantively revised draft; not yet cleared for submission.**
-Current title: **Large References, Small Checks: Amortized Testing of Stochastic
-Learning Systems**.
+Current title: **Large References, Small Checks: Oracle-Guided Porting of a
+Stochastic Learning System**.
 Start with [REVISION-STATUS.md](REVISION-STATUS.md), which maps the major and
 minor review findings to their corrections and identifies the remaining
 evidence gaps. No OpenReview submission has been made.
 
-## Completed Studies Awaiting Manuscript Integration
+The anonymous initial-submission files have been checked against TMLR's current
+style and public OpenReview form definition. See
+[INITIAL-SUBMISSION.md](INITIAL-SUBMISSION.md) for the exact two uploads: the
+PDF and the single combined supplementary ZIP. This is not a preprint or
+camera-ready version; final manual author review and approval remain pending.
 
-Publication checkpoint, 2026-09-07: both new studies are complete and their
-public results are available. The current manuscript, PDF, and submission ZIPs
-still describe the earlier evidence and have **not** incorporated these results.
+## Integration and Approval Status
+
+Revision checkpoint, 2026-09-07: both new studies are complete. The author-approved
+Issue 1 resolution incorporates the episodic coverage results and population
+choice limitations into the manuscript, PDF, and LaTeX source bundle. Approved
+Issue 2 adds the `misc3` discrepancy case study and complete frequency appendix,
+distinguishing diagnostic groups and code-level leads from proven root causes.
+Approved Issue 3 integrates the completed single-run study while preserving
+the historical repair workflow as the core engineering result. The development
+history remains in the main text; the versioned study strengthens, rather than
+replaces, that account. Approved Issue 4 adds the complete 19-input episodic
+port comparison, descriptive frequencies for construction-limited problems,
+and full episode/run termination accounting. Final author review remains
+pending. Approved Issue 5 adds a separate review supplement with
+both studies, frozen source, reconstruction patches, audits, and clean-copy
+verification instructions. The historical arithmetic-analysis ZIP is unchanged;
+the new experimental ZIP includes that evidence as well as the newer studies.
+Approved Issue 6 consolidates repeated explanations and shortens the abstract,
+introduction, limitations, and conclusion while keeping the historical repair
+narrative central. All results and appendix prose are preserved; two large
+episodic tables use the existing keep-together layout option. The experimental
+ZIP is refreshed for those layout files and the converter, not new evidence.
+Approved Issue 7 adopts the current title, foregrounding oracle-guided port
+improvement and the scope of a single stochastic learning system. The manuscript
+body and experimental evidence are unchanged by the title revision.
+The proposed declarations checklist was rejected; the author instead requested
+verification of anonymous initial-submission readiness. That audit confirms
+the PDF's submission mode and adds one upload ZIP containing both verified
+inner bundles. No identifying declarations were added to the manuscript.
+The author's subsequent process-novelty clarification is implemented in the
+abstract, introduction, related work, and conclusion. It credits the integrated
+Good-Turing/support/p50 workflow and its episodic application while retaining
+port improvement as the primary result and distinguishing the newer support-only
+native-best study. Scientific evidence and the experimental ZIP are unchanged.
+
+Issues are reviewed one at a time, as recorded in
+[ISSUE-RESOLUTIONS.md](ISSUE-RESOLUTIONS.md). **No changes may be committed or
+pushed until the author manually reviews the final draft and gives final approval.**
 
 - [Single-run study results](SUPPORT-V1A-RESULTS.md) and
   [full scientific-data release](../studies/support-v1a/data/README.md):
@@ -21,15 +80,26 @@ still describe the earlier evidence and have **not** incorporated these results.
   coverage target for both answer sets; five capped problems skip validation.
   The validated `misc3 best_a` reference flags 24/100 outside port winners,
   versus 0/1000 in reference validation. Its cause remains unestablished.
+- [Episodic discrepancy investigation](investigations/MISC3-EPISODIC.md):
+  complete frequencies, all 24 outside quality-winner events, and the two static
+  rule-generalization differences. The approved treatment is in Section 8.1
+  and Appendix B; no repairs or new experimental observations were made.
 
-The next manuscript revision must report these limitations and distinguish
-construction qualification from held-out coverage validation. Completion of
+The current coverage revision reports failures and distinguishes construction
+qualification from held-out coverage validation. Completion of
 the episodic study does not establish port fidelity or replace memory-specific
 controls, defect interventions, or learning-efficiency evidence. See
 [STUDY-STATUS.md](STUDY-STATUS.md) for the publication status of both studies.
 
 ## Current Files
 
+- [support-set-oracles-submission-supplement.zip](support-set-oracles-submission-supplement.zip):
+  the single anonymous Supplementary Material upload, containing the unchanged
+  experimental and LaTeX source ZIPs, a README, and checksum manifest.
+- [INITIAL-SUBMISSION.md](INITIAL-SUBMISSION.md): verified initial-submission
+  mode, exact field/file mapping, and separation of anonymous files from private
+  form metadata. [submission-readiness.json](submission-readiness.json) records
+  technical checks; [submission-build.json](submission-build.json) records hashes.
 - [manuscript.md](manuscript.md): the current editable manuscript and the source
   of the LaTeX conversion. Make prose changes here, not in generated LaTeX.
 - [support-set-oracles-tmlr.pdf](support-set-oracles-tmlr.pdf): anonymous TMLR
@@ -40,9 +110,20 @@ controls, defect interventions, or learning-efficiency evidence. See
 - [support-set-oracles-analysis.zip](support-set-oracles-analysis.zip):
   analysis-only supplement containing archived counts, arithmetic code, tests,
   and [instructions](ANALYSIS-README.md). It is not an engine replication bundle.
+- [support-set-oracles-experiments.zip](support-set-oracles-experiments.zip):
+  review supplement containing both versioned studies, frozen source, all paper
+  audits and tables, and Metacat reconstruction patches. Start with its root
+  README after extraction. Original upstream source is not included.
+- [supplement-build.json](supplement-build.json): experimental ZIP checksum,
+  size, inventory count, and nested-archive verification result.
 - [references.bib](references.bib): all 35 verified references.
 - [REFERENCE-AUDIT.md](REFERENCE-AUDIT.md): reference identities and source links.
 - [number-audit.json](number-audit.json): recomputed quantities and input hashes.
+- [support-study-audit.json](support-study-audit.json): the versioned single-run
+  study's batch totals, reference errors, prefix comparisons, and input hashes.
+- [episodic-study-audit.json](episodic-study-audit.json): all 19 episodic port
+  comparisons, complete construction/port frequency vectors for both populations,
+  termination accounting, and input hashes. Generated without engine execution.
 - [data/README.md](data/README.md): bundled measurement inputs and their limits.
 - [BUILD-CHECKS.md](BUILD-CHECKS.md): build, PDF, and bundle verification.
 - [NOVELTY-REVIEW.md](NOVELTY-REVIEW.md): additional primary literature and
@@ -54,6 +135,11 @@ controls, defect interventions, or learning-efficiency evidence. See
   to the expanded paper section. Inspection is distinguished from test execution.
 - [episode-audit.json](episode-audit.json): newly audited archived episode
   sequences, summarized in the manuscript and included in the analysis ZIP.
+- [generated/episodic-coverage-table.tex](generated/episodic-coverage-table.tex):
+  the new 19-input coverage table, generated from the separate v3 result bundle.
+- [generated/misc3-frequency-table.tex](generated/misc3-frequency-table.tex):
+  all 27 observed `misc3` strings across construction, validation, and port checks,
+  generated from the [saved-data audit](investigations/misc3-episodic-audit.json).
 
 The [dated Markdown](20260828%20oracles-for-stochastic-system-comparison.md) is a
 **superseded historical draft** and retains claims rejected in the revision.
@@ -88,8 +174,9 @@ improved learning performance. The expanded case study explains structural
 duplicate rejection, retained memory versus reset activations, and retrospective
 reminding, alongside existing regression contracts. These test definitions were
 reviewed, not newly executed as an engine validation. A separately versioned
-matched-cap episodic study has since completed, as linked above; its results
-have not yet been incorporated into this draft. Memory-specific controls
+matched-cap episodic study has since completed, as linked above; its coverage
+results and `misc3` discrepancy are now incorporated, as are the versioned
+single-run results. Memory-specific controls
 remain an evidence gap for the intended learning-system contribution.
 
 The audit now uses files in `data/`, not a sibling repository. All copied data
@@ -100,22 +187,28 @@ and replay comments were corrected without changing comparison behavior.
 ## Rebuild
 
 Commands below run from **this `academic` directory**. The audit and its tests
-need Python 3.9 or later and no third-party Python modules:
+need Python 3.11 or later and no third-party Python modules:
 
 ```sh
 python3 tools/audit_numbers.py
 python3 tools/audit_episodes.py
+python3 tools/audit_support_study.py
+python3 tools/audit_episodic_study.py
+python3 tools/investigate_misc3.py --output investigations/misc3-episodic-audit.json
 python3 -m unittest discover -s tests -p 'test_*.py'
 ```
 
-To regenerate LaTeX and the four data tables, install Pandoc (the tested version
+To regenerate LaTeX and the thirteen data tables, install Pandoc (the tested version
 is 3.11), then run:
 
 ```sh
 python3 tools/convert_manuscript.py --pandoc pandoc
 ```
 
-This reads `manuscript.md` and the bundled measurements. It does not read or
+This reads `manuscript.md`, the bundled historical measurements, the versioned
+single-run summaries in `data/support-v1a/`, and
+the saved episodes, oracles, protocol, manifest, and analysis under
+`../studies/episodic-v3/results/main/`. It does not read or
 rewrite the historical Markdown. Conversion overwrites the generated `.tex`
 and `generated/*.tex`; edit the Markdown or converter instead.
 
@@ -142,19 +235,59 @@ does not rebuild the PDF; run it after conversion and compilation. The source
 ZIP contains everything needed by the generated LaTeX and does not require
 Pandoc or the analysis data to typeset.
 
+Build the separate experimental supplement from the repository root:
+
+```sh
+python3 academic/tools/package_experiments.py
+```
+
+Add repeated `--forbid` arguments for author/machine identifiers during the
+private pre-submission check. The builder checks frozen source hashes and the
+nested scientific archives, replaces only review navigation and the displayed
+copyright-holder identity, and preserves the original files. The package
+manifest records the exact policy and original hash for each included file.
+It refuses unexpected source changes or a package at or above 100 MB.
+Its `--verify ZIP --extract NEW_DIRECTORY` mode checks and safely extracts a
+clean copy; the destination must not already exist. Inside that copy,
+`python3 verify.py` regenerates all audit reports and tables, runs tests, and
+verifies the episodic study without an engine. See its `REPRODUCE.md` for full
+single-run reanalysis with pinned dependencies.
+
+Finally, combine the verified experimental and source ZIPs into the one
+attachment accepted by the current submission form:
+
+```sh
+python3 academic/tools/package_submission.py
+python3 -m unittest discover -s academic/submission/tests -p 'test_*.py'
+```
+
+These two commands run from the repository root. They do not rebuild the
+inner bundles, so run the preceding manuscript/experimental packaging steps
+first after changing their contents. Repeated `--forbid` arguments also apply
+to this outer builder's identifying-token checks.
+
 ## Evidence and Submission
 
 The portable [Metacat patch bundle](../Metacat/README.md) provides reconstructible
 modified source. It does **not** establish which historical build generated the
-374,500-run reference sample. Independent held-out calibration, empirical
-baseline comparisons, and stronger sampled-build/intervention provenance remain
-open. Their absence is disclosed in the manuscript and revision checklist.
+374,500-run historical reference sample. The versioned study adds identified
+builds, held-out validation, and a frequency comparator without retroactively
+establishing the historical intervention provenance. Equal-cost defect-power
+comparisons and memory-specific controls remain open. The paper retains the
+historical repair narrative as central evidence of the approach's practical value.
 
 The manuscript has an anonymous byline, empty PDF author metadata, no named
 acknowledgements, and no author-identifying repository URL. The public
 repository is not anonymous. The author must review all intended uploads for
-anonymity, scientific accuracy, and required disclosures; the analysis ZIP alone
-is not a complete anonymous experimental artifact.
+anonymity, scientific accuracy, and required disclosures. The experimental ZIP
+is the experimental inner bundle; the final single supplementary upload wraps
+it together with the LaTeX source ZIP. The older analysis ZIP alone is insufficient.
+The original MIT license and GPL reconstruction license remain unchanged in the
+repository. Only the review copy's MIT copyright-holder display name is withheld;
+restore its original named notice for a nonanonymous release. Scientific labels
+and hash chains remain intact, so anonymity checks do not promise resistance
+to deliberate external fingerprinting. Private episodic attempt files and
+historically unavailable evidence are explicitly excluded, not fabricated.
 
 Use the [TMLR author guide](https://jmlr.org/tmlr/author-guide.html) and
 [editorial policies](https://jmlr.org/tmlr/editorial-policies.html) when preparing

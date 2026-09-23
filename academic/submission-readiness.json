@@ -1,0 +1,34 @@
+{
+  "abstract_characters": 1417,
+  "account_eligibility_and_private_responses": "Not accessed or supplied; not a manuscript-anonymity finding.",
+  "all_page_text_bounds": "PASS",
+  "anonymous_submission_mode_verified": true,
+  "author_manual_review_and_final_approval": "Pending; no commit, push, or submission authorized.",
+  "author_metadata_empty": true,
+  "beyond_pdf": "Leave empty for this standard PDF submission.",
+  "checked_date": "2026-09-07",
+  "current_official_style_bytes_verified": true,
+  "invitation": "TMLR/-/Submission",
+  "invitation_sha256": "b85251477241f8101fc8a3efefdc0d6febc4e5dfbb403d5175deacebecc8eee9",
+  "main_text_pages": 18,
+  "pdf_pages": 27,
+  "pdf_text_metadata_and_links_private_identifier_scan": "PASS",
+  "private_author_form_fields_not_part_of_pdf": true,
+  "reference_entries": 35,
+  "scope": "Anonymous initial-submission files; no preprint, camera-ready version, account login, or upload.",
+  "submission_type": "Long submission (more than 12 pages of main content)",
+  "title": "Large References, Small Checks: Oracle-Guided Porting of a Stochastic Learning System",
+  "title_characters": 85,
+  "upload_files": {
+    "pdf": {
+      "bytes": 187278,
+      "file": "support-set-oracles-tmlr.pdf",
+      "sha256": "219badf514ad7dd071dac5878caf7f93de6cbb15619dc18718439748baed4fc2"
+    },
+    "supplement": {
+      "bytes": 77920750,
+      "file": "support-set-oracles-submission-supplement.zip",
+      "sha256": "ae11bf6c894bf08ef532adcf21b294602cd183a57d7164358fe1e7e951ddbc05"
+    }
+  }
+}

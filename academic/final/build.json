@@ -1,0 +1,35 @@
+{
+  "approved_content_changes_sha256": "cae2479283782f6444ceebd71a5445b67df54e90d02f591a2c2a13cd93e1f3df",
+  "bibliography_sha256": "a20f086b1ffeeaebe7b55ac648142194ab3c95a5c955710cc5a04f9add0c5f2b",
+  "bytes": 77954190,
+  "engine_executions": 0,
+  "files": {
+    "README.md": {
+      "bytes": 1264,
+      "sha256": "e528d7c5923af1d4fb9dcb51b9cdfd4d52b68cb34d357ed9812a5d0dea1ae9c3"
+    },
+    "support-set-oracles-experiments.zip": {
+      "bytes": 77854002,
+      "sha256": "08cb16fee2840f73dfdd78033a38c0c85eb9ac1ceba4432c1724928d2a327713"
+    },
+    "support-set-oracles-final-source.zip": {
+      "bytes": 97907,
+      "sha256": "68ce5e58cac21cdb85f21994441cc1adf07a5778e7e38a6b807349e40ec14526"
+    }
+  },
+  "final_human_approval": "Pending",
+  "manuscript_contract": {
+    "data_tables": 12,
+    "display_equations": 9,
+    "references": 34,
+    "section_labels": 34
+  },
+  "markdown_sha256": "34cbfb42cd5043a66e2c993b7554f425662a92430a6e9df0598f41744bcd09af",
+  "pdf": {
+    "bytes": 195343,
+    "file": "support-set-oracles-final.pdf",
+    "sha256": "23e4dca9c4c2cc1e25efcb86a720259334586e4d26100ec3fd7dbbbfaea0019c"
+  },
+  "preserved_original_files": 29,
+  "sha256": "2903f1e6d0d20718e636ca484a84a3ff716f664f003216d4d98916cbed7e8818"
+}

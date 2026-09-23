@@ -1,0 +1,24 @@
+{
+  "bytes": 77920750,
+  "engine_executions": 0,
+  "files": {
+    "README.md": {
+      "bytes": 1384,
+      "sha256": "655ec551093b42c3f728e8927021250ac1e77e5cba9df52fca2808c5b07a16a4"
+    },
+    "support-set-oracles-experiments.zip": {
+      "bytes": 77854002,
+      "sha256": "08cb16fee2840f73dfdd78033a38c0c85eb9ac1ceba4432c1724928d2a327713"
+    },
+    "support-set-oracles-tmlr-source.zip": {
+      "bytes": 64350,
+      "sha256": "e477953198edd8bc834cdfcaac3e004425a9cccbe0f4e447976651ea0c1d10d4"
+    }
+  },
+  "pdf": {
+    "bytes": 187278,
+    "file": "support-set-oracles-tmlr.pdf",
+    "sha256": "219badf514ad7dd071dac5878caf7f93de6cbb15619dc18718439748baed4fc2"
+  },
+  "sha256": "ae11bf6c894bf08ef532adcf21b294602cd183a57d7164358fe1e7e951ddbc05"
+}

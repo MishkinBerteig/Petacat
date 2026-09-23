@@ -1,0 +1,314 @@
+{
+  "date": "2026-09-08",
+  "received_diff": "support-set-oracles-final.md.diff",
+  "received_diff_sha256": "531a2b8f35a191ded0a0353efe67bfc99d696a3ee251f449ec26f94ee3d66a0f",
+  "baseline_markdown_sha256": "2afd9eb323578b9e7a55e9ec8c6f11c18e67f2692385c92325e7c9da772b1b35",
+  "applied_markdown_sha256": "de79b75f8c4d24efd0887191cfcaba5a49a95c99126c8ac5e2bf4f68ed6a2353",
+  "hunks": 31,
+  "protections": [
+    {
+      "reason": "Keep the author's explicit process-novelty contribution in the abstract; the proposed list alone no longer states that claim.",
+      "proposed": "The contribution is the process, its application, and the repair history.",
+      "retained": "The process and its application contribute novelty alongside the repair history.",
+      "kind": "fragment",
+      "applied_line": 4,
+      "proposed_line": 4
+    },
+    {
+      "reason": "Sharing a seed does not solve cross-language comparison; saying it does not help at all is a stronger, unsupported claim.",
+      "proposed": "So what should a test expect? One particular answer? The same answer on\nevery attempt? Neither is a fair test of this system. Sharing a random seed\ndoes not help either: a seed starts a repeatable sequence of pseudorandom\nnumbers, but the two programs may generate different sequences or consume\nthem in a different order.",
+      "retained": "So what should a test expect? One particular answer? The same answer on every\nattempt? Neither would be a satisfactory test of this system. Nor does giving\nboth programs the same random seed solve the problem. A seed starts a\nrepeatable sequence of pseudorandom numbers, but the two programs may generate\ndifferent sequences or use their numbers in a different order.",
+      "kind": "paragraph",
+      "applied_line": 36,
+      "proposed_line": 36
+    },
+    {
+      "reason": "Retain the explicit distinction between an investigation flag, a port defect, and an incomplete reference, without the less precise 'port may be right' shorthand.",
+      "proposed": "In software testing, an *oracle* supplies the expected behaviour against\nwhich a test is judged. Ours is a collected record. It can be incomplete,\nand it can even contain evidence of an error in the reference itself. So the\nword needs care. An oracle flag is an invitation to investigate; the port\nmay be right and the record incomplete.",
+      "retained": "In software testing, an *oracle* supplies the expected behaviour against which\na test is judged. Our oracle is a collected record, not an authority on every\npossible answer. It can be incomplete. It can even contain evidence of an error\nin the reference itself. The word therefore needs care: an oracle flag is a\nreason to investigate, not a verdict that the port is wrong.",
+      "kind": "paragraph",
+      "applied_line": 51,
+      "proposed_line": 51
+    },
+    {
+      "reason": "A concentrated large or infinite answer space can be manageable; changing 'can be' and 'may be' into categorical sampling claims is not merely stylistic.",
+      "proposed": "Recording answer letters loses information: two answers with the same\nletters may come from different rules, structures, or sequences of\ndecisions, and this test does not compare those details. Even a very large\nor infinite answer space is manageable if most answers are rare in total; a\nspace with probability spread thinly across many answers is much harder to\nsample.",
+      "retained": "Recording answer letters loses information. Two answers with the same letters\nmay come from different rules, different internal structures, or different\nsequences of decisions. This test does not compare all of those details.\nEven a very large or infinite answer space can be manageable if most answers\nare rare in total. A space with probability spread thinly across many answers\nmay be much harder to sample adequately.",
+      "kind": "paragraph",
+      "applied_line": 157,
+      "proposed_line": 157
+    },
+    {
+      "reason": "The method compares observed answer populations, not the unknown complete populations.",
+      "proposed": "port chooses from the same answer populations when quality and conceptual",
+      "retained": "port chooses from the same observed answer populations when quality and conceptual",
+      "kind": "fragment",
+      "applied_line": 328,
+      "proposed_line": 328
+    },
+    {
+      "reason": "Coverage requires a complete answered episode; an incomplete error episode may contain answers but supplies no winner.",
+      "proposed": "records, so every coverage statement is conditional on an episode answering\nat all.",
+      "retained": "records, so every coverage statement is conditional on completing an\nepisode with an answer.",
+      "kind": "fragment",
+      "applied_line": 346,
+      "proposed_line": 346
+    },
+    {
+      "reason": "The proposed sentence assigns an independence assumption to p50 head selection itself. Keep the original separation between deterministic selection and probabilistic sampling assumptions.",
+      "proposed": "Resetting between independently randomized episodes makes it reasonable to\nmodel them as draws from one episode distribution, provided no hidden state\nleaks between episodes; this is established reset-based testing [@ref34].\nGood--Turing and head selection apply to episode results; pooling the inner\nruns would violate the independence they assume.",
+      "retained": "Resetting between independently randomized episodes makes it reasonable to\nmodel them as draws from one episode distribution, provided no hidden state\nleaks between episodes. This uses established reset-based testing ideas\n[@ref34], not a new independence theorem. Good--Turing and head selection\napply to these episode results, not to all inner runs pooled together.",
+      "kind": "paragraph",
+      "applied_line": 349,
+      "proposed_line": 349
+    },
+    {
+      "reason": "Keep explicit that reference qualification neither validates a p50 head nor proves port fidelity; the new cross-reference covered only transfer of the bound.",
+      "proposed": "A problem receives validation only when both answer sets have frozen, and\none definition can pass while the other fails. Passing bounds the\nreference's conditional chance of an outside winner; Section\n\\ref{sec:novelty} explains why that bound does not transfer to the port.",
+      "retained": "Under this study's rule, a problem receives validation only when both answer\nsets have frozen. One definition can pass validation while the other fails.\nPassing means that the reference's conditional chance of an outside winner\nmeets the bound; it does not establish port correctness, validate a p50 head,\nor transfer the bound to a port with a different answer distribution.",
+      "kind": "paragraph",
+      "applied_line": 387,
+      "proposed_line": 387
+    },
+    {
+      "reason": "Fresh audit samples and known-defect tests remain important; saying they guard against adaptive reuse can suggest a guarantee not established here.",
+      "proposed": "There is another limit to reuse. Developers can gradually fit a port to the\nreference they keep checking against; repeated checks then stop being\nindependent evidence, and their individual statistical claims do not add up\nto a guarantee over the whole history. A fresh final audit sample, and tests\nwith known defects, guard against that.",
+      "retained": "There is another limit to reuse. Developers can gradually adapt a port to\nthe particular reference they keep checking. Repeated checks are then not\nindependent new evidence, and their individual statistical claims do not add\nup to a guarantee over the whole development history. Fresh final audit\nsamples and tests with known defects remain important.",
+      "kind": "paragraph",
+      "applied_line": 478,
+      "proposed_line": 477
+    },
+    {
+      "reason": "The certainty-of-detection statement applies only to a deleted answer included in the tested head. The proposed wording drops that condition.",
+      "proposed": "A false alarm and a missed defect differ here. Failing to see a\nstill-possible answer produces a misleading flag. But if the port has lost\nan answer entirely, so that $p_P(o\\mid x)=0$, the answer is absent with\ncertainty, and no check sample is too small to notice.",
+      "retained": "There is also a difference between a false alarm and a missed defect.\nFailing to see a still-possible answer can produce a misleading discrepancy\nflag. If the port has completely lost an answer, so that $p_P(o\\mid x)=0$,\nthen the answer is absent with certainty. Its head-membership test cannot\nmiss that deletion merely because the check sample is small.",
+      "kind": "paragraph",
+      "applied_line": 517,
+      "proposed_line": 516
+    },
+    {
+      "reason": "The theory permits the programs to agree or differ. The proposed blanket assertion that they have different distributions is not an assumption or a result of this general argument.",
+      "proposed": "Reference validation bounds $M_{R,x}$, the chance of an unseen answer from\nthe reference. It says nothing about $q_{P,x}$, the port's chance of an\noutside answer; the two programs have different distributions. The port\ncheck therefore records outside answers for investigation and claims nothing\nmore.",
+      "retained": "Reference validation concerns $M_{R,x}$, the chance of an unseen answer\nfrom the reference. It does not bound $q_{P,x}$, the port's chance of an\noutside answer. The port check therefore records outside answers for\ninvestigation without treating the reference's coverage bound as a\nguarantee about the port.",
+      "kind": "paragraph",
+      "applied_line": 552,
+      "proposed_line": 550
+    },
+    {
+      "reason": "The unconditional detection calculation does not establish that conditioning on observing every head member leaves the odds unchanged.",
+      "proposed": "Seeing every head member does nothing to change those odds.",
+      "retained": "Seeing all selected common answers does not make those rare defects easy\nto detect.",
+      "kind": "fragment",
+      "applied_line": 563,
+      "proposed_line": 561
+    },
+    {
+      "reason": "The novelty claim concerns the complete workflow, not inventing a frozen reference record alone; retain the original bounded comparison with prior work.",
+      "proposed": "The closest software-testing precedent is STADS [@ref13], which treats\nprogram behaviours, including outputs, as species to be discovered through\nsampling. Work on residual risk in greybox fuzzing, which uses execution\nfeedback to generate tests, also estimates the chance of further discoveries\n[@ref14]. Capture--recapture methods have estimated software fault content\n[@ref25]. Discovery statistics in testing are therefore not ours to claim.\nWhat we add is a frozen reference record that repeatedly supplies\nnamed-answer comparisons during development; guarantees for other sampling\nschemes do not automatically carry over.",
+      "retained": "The closest software-testing precedent is STADS [@ref13], which treats\nprogram behaviours, including outputs, as species to be discovered through\nsampling. Work on residual risk in greybox fuzzing, which uses execution\nfeedback to generate tests, also estimates the chance of further discoveries\n[@ref14]. Capture--recapture methods have been used to estimate software\nfault content [@ref25]. We therefore do not claim to have invented the use\nof discovery statistics in testing. Our focus is a frozen reference record\nthat repeatedly supplies named-answer comparisons during development.\nGuarantees for other sampling schemes do not automatically carry over.",
+      "kind": "paragraph",
+      "applied_line": 596,
+      "proposed_line": 593
+    },
+    {
+      "reason": "Preserve the scope limit on the prior-work novelty search.",
+      "proposed": "prior work we examined.",
+      "retained": "prior work we examined. That is a bounded comparison, not proof of exclusive priority.",
+      "kind": "fragment",
+      "applied_line": 625,
+      "proposed_line": 622
+    },
+    {
+      "reason": "The new wording identifies the historical MLX execution as GPU execution. The incomplete historical build record does not establish that additional hardware claim.",
+      "proposed": "Rerunning with a larger cap extends the original path only if seeded replay\nis deterministic and the new cap changes no decision before the old cutoff;\nstarting a fresh session does not guarantee that. Equal limits also do not\nmake codelet semantics equal, or behaviour equal across numerical\n*backends*, the software-and-hardware routes that execute the calculation.\nThe records include an ordinary CPU (central processing unit) path and a\npath using the MLX numerical library on the GPU (graphics processing unit),\nand establish nothing about their equivalence.",
+      "retained": "Rerunning with a larger cap is equivalent to extending the original path\nonly if seeded replay is deterministic and the new cap does not change\ndecisions before the old cutoff. Starting a fresh session is not enough\nto guarantee that. Equal numerical limits also do not prove equal codelet\nsemantics or equal behaviour across numerical backends. A *backend* is\nthe software-and-hardware route used to execute the calculation. The records\ninclude an ordinary CPU (central processing unit) path and a path using\nthe MLX numerical library. They do not establish equivalence between CPU\nand GPU (graphics processing unit) execution.",
+      "kind": "paragraph",
+      "applied_line": 725,
+      "proposed_line": 722
+    },
+    {
+      "reason": "The direction reversal can conceal the error in the unchanged displayed string; the proposed version makes this an unconditional transformation claim.",
+      "proposed": "The first three led to the direction-image investigation, RC-A in the\ndevelopment record. An *image* here is an internal representation of letters\nor groups to which a rule can be applied. A group treated as leftward had\nits image assembled in physical left-to-right order and marked rightward.\nReversing both direction and constituent order leaves the displayed string\nlooking correct, so the error hid until a later operation depended on\ndirection.",
+      "retained": "The first three led to the direction-image investigation, labelled RC-A\nin the development record. Here an *image* is an internal representation\nof letters or groups to which a rule can be applied, not a bitmap picture.\nA group treated as leftward had its image assembled in physical left-to-right\norder and marked rightward. Reversing both direction and constituent order\ncan leave the displayed, unchanged string looking correct. That made the\nerror easy to miss until a later operation depended on direction.",
+      "kind": "paragraph",
+      "applied_line": 745,
+      "proposed_line": 741
+    },
+    {
+      "reason": "Keep the reported historical intervention attributed to its development account, including which two flagged outcomes it reproduced and the separate evidence for the third.",
+      "proposed": "The investigation includes a Python execution trace and Scheme-side probes.\nInserting the suspected defect into the reference produced `cdddb` and\n`*NONE*`, matching two flagged outcomes; the intervention table does not\nshow `abbbb`, whose evidence is the Python trace and its disappearance after\nrepair. Focused regression tests, designed to catch the same error if it\nreturns, add local evidence. These historical instrumented runs were not\nrepeated for this paper.",
+      "retained": "The investigation includes a Python execution trace and Scheme-side probes.\nThe development account reports that inserting the suspected defect into\nthe reference produced `cdddb` and `*NONE*`, matching two flagged outcomes.\nIts intervention table does not show reproduction of `abbbb`. The evidence\nfor that answer is the Python trace and its disappearance after repair,\nnot a claim that every flagged string was recreated in Scheme. Focused\nregression tests, designed to catch the same error if it returns, provide\nadditional local evidence. These historical instrumented runs were not\nindependently repeated for the paper revision.",
+      "kind": "paragraph",
+      "applied_line": 753,
+      "proposed_line": 749
+    },
+    {
+      "reason": "The saved episodic ratios do not certify the target; the proposed wording can imply all 500-episode references are known to fall short.",
+      "proposed": "Those 500 episodes fall short of the single-run heuristic target: stored\nepisodic singleton ratios reach 0.016, and the record has no independent\nvalidation of this reference.",
+      "retained": "Those 500 episodes do not establish the single-run heuristic target.\nStored episodic singleton ratios reach 0.016, and the available record\nhas no independent missing-mass validation of this reference.",
+      "kind": "paragraph",
+      "applied_line": 790,
+      "proposed_line": 784
+    },
+    {
+      "reason": "Endpoint checks do not test all implemented reminding and explanatory behaviours or establish improved learning. The new last sentence overstates their scope.",
+      "proposed": "Memory also has an explanatory role. After storing an answer, the reporting\ncode compares it with earlier answers through rules, themes, justification,\nand coherence, then records reminding strengths and generates commentary.\n*Themes* describe conceptual relationships in an analogy; *coherence* is the\nprogram's assessment of how well they fit together. Stored snags can change\nhow an otherwise unjustified theme is explained. All of this is implemented\nbehaviour, and that is what the checks test.",
+      "retained": "There is also an explanatory role. After storing an answer, the inspected\nreporting code compares it with earlier answers through rules, themes,\njustification, and coherence, then records reminding strengths and generates\ncommentary. Here *themes* describe conceptual relationships in an analogy,\nand *coherence* is the program's assessment of how well those relationships\nfit together. Stored snags can change how an otherwise unjustified theme\nis explained. These are implemented behaviours, not evidence that remembering\nimproves answer quality. The repeated-problem experiment tests exploration\nconditioned on experience, not learning transferable to new problems.",
+      "kind": "paragraph",
+      "applied_line": 810,
+      "proposed_line": 804
+    },
+    {
+      "reason": "Incomplete attempt records are not extra independent data, but verified results from interrupted work can be admitted once. 'Never counted' obscures that accounting.",
+      "proposed": "Verified complete chunks from the parent study are inherited once. The\ninterrupted chunk is replayed with its original seeds, and its 238\nsuccessful prefix observations are checked to agree. Exactly one observation\nis admitted per assigned seed; incomplete attempts are kept on record and\nnever counted.",
+      "retained": "Verified complete chunks from the parent study are inherited once.\nThe interrupted chunk is replayed with its original seeds, checking that\nits 238 successful prefix observations agree. Exactly one observation\nis admitted for each assigned seed. Incomplete attempts are retained\nas records of what happened, not extra independent data.",
+      "kind": "paragraph",
+      "applied_line": 909,
+      "proposed_line": 901
+    },
+    {
+      "reason": "Retain the explicit post-failure continuation description without the new assertion that the study departed from its original plan in exactly one respect.",
+      "proposed": "No engine repair was introduced. To be clear: the continuation was a\nresponse to a failure, so the study as run departs from its original plan in\nthat one respect.",
+      "retained": "The 969,000 main observations comprise the scheduled construction,\nvalidation, and port checks. No engine repair was introduced.\nTo be clear: the continuation is an\nexplicit response to a failure, not an unchanged experiment planned in\nevery detail before it began.",
+      "kind": "paragraph",
+      "applied_line": 915,
+      "proposed_line": 907
+    },
+    {
+      "reason": "The records do not fully include the listed overheads. Saying they omit every listed category changes the cost-accounting claim.",
+      "proposed": "Recorded aggregate attempt wall time is about 466,573 seconds, summed over\ninherited, interrupted, continuation, and corrected preflight attempts.\nAttempts may overlap, so this is neither elapsed duration nor CPU time, and\nit omits pilot work, earlier diagnosis, wrapper preflight, setup, human\nwork, and analysis.",
+      "retained": "Recorded aggregate attempt wall time is about 466,573 seconds. It adds\nthe durations of inherited, interrupted, continuation, and corrected\npreflight attempts. Because attempts may overlap, this is neither the\ncampaign's elapsed duration nor CPU time. Pilot work, earlier diagnosis,\nwrapper-development preflight, setup, human work, and analysis are not\nfully included. A complete cost claim would need those too.",
+      "kind": "paragraph",
+      "applied_line": 1006,
+      "proposed_line": 996
+    },
+    {
+      "reason": "Keep the precise pilot-reuse and freeze protocol without asserting the existence or contents of a distinct pre-pilot plan.",
+      "proposed": "**The collection rule.** Each answer population freezes at its first\neligible $f_1/N\\le10^{-4}$ crossing, independently of its partner.\nConstruction ends when both have frozen or after 2,000 episodes. Four\nproblems reuse the complete 1,000-episode prefixes collected in an\nexploratory pilot, and their first eligible freeze is evaluated at that full\nprefix; the other 15 can freeze immediately. The pilot reuse is a deliberate\ndeparture from the pre-pilot plan. For new episodes, first seeds are sampled\nindependently with replacement, and validation randomness is separate from\nconstruction.",
+      "retained": "**The collection rule.** Each answer population freezes at its first\neligible $f_1/N\\le10^{-4}$ crossing, independently of when its partner\nfreezes. Construction ends when both have frozen or after 2,000 episodes\nfor that problem. Four problems reuse the complete 1,000-episode prefixes\nalready collected in an exploratory pilot. Their first eligible freeze\nis evaluated at that full prefix, not at a reconstructed earlier crossing.\nThe other 15 problems can freeze immediately. This pilot reuse is an\nexplicit part of the design, not an unchanged plan made before the pilot.\nFor new episodes, first seeds are sampled independently with replacement;\nvalidation randomness is separate from construction.",
+      "kind": "paragraph",
+      "applied_line": 1022,
+      "proposed_line": 1011
+    },
+    {
+      "reason": "Failed coverage is not evidence of learning-induced collection efficiency. 'The cheap construction here was no saving' instead makes an unmeasured cost-benefit claim.",
+      "proposed": "The early-stopping problem is starkest in `misc5`. Both sets freeze after\ntwo episodes, yet validation then produces 480 of 1,000 quality winners and\n591 of 1,000 preference winners outside those sets. The estimate reached\nzero early while the reference was far from covered, and only independent\nvalidation exposed that. The cheap construction here was no saving.",
+      "retained": "The early-stopping problem is especially clear in `misc5`. Both sets\nfreeze after just two episodes. Yet validation then produces 480 out\nof 1,000 quality winners and 591 out of 1,000 preference winners outside\nthose sets. The estimate was zero early, but the reference was far from\nadequately covered. Independent validation exposed that failure.\nFewer construction runs here are not evidence that learning made\noracle collection more efficient.",
+      "kind": "paragraph",
+      "applied_line": 1065,
+      "proposed_line": 1053
+    },
+    {
+      "reason": "Retain the author's explicit, conditional future hypothesis that another conceptually meaningful population may suit Good-Turing collection better.",
+      "proposed": "**Could we have chosen a better population?** Possibly. We chose quality and\npreference so that Metacat itself would justify the episode's selected\nresult, without knowing whether the resulting discovery frequencies would\nsuit Good--Turing-guided collection. A future experiment could choose\nanother conceptually meaningful projection.",
+      "retained": "**Could we have chosen a better population?** Possibly. We chose quality\nand preference to make the episode's selected result internally\njustifiable by Metacat, rather than simply using the last answer.\nWe did not know that the resulting discovery frequencies would suit\nGood--Turing-guided collection. It may work more effectively with a\ndifferent set of episodic results, and a future experiment could choose\nanother conceptually meaningful projection to build a better oracle.",
+      "kind": "paragraph",
+      "applied_line": 1073,
+      "proposed_line": 1059
+    },
+    {
+      "reason": "Keep the distinction between conditional winner coverage and how often an episode answers or completes.",
+      "proposed": "error episode.\n\n## Looking Closely",
+      "retained": "error episode. Comparing winners does not test whether the two systems\nanswer or terminate equally often.\n\n## Looking Closely",
+      "kind": "fragment",
+      "applied_line": 1111,
+      "proposed_line": 1095
+    },
+    {
+      "reason": "Unequal-budget comparisons do not establish superiority; saying they settle nothing about cost or detection discards the descriptive evidence they do provide.",
+      "proposed": "**Known defects and fair cost comparisons.** We have not measured how\nreliably the workflow detects a controlled collection of defects. That needs\ndeliberately introduced, understood changes, fresh checks, and alternatives\ngiven the same reference-reuse opportunity. The prefix comparisons spend\nunequal budgets and settle nothing about cost or detection power, and\nSection \\ref{sec:statistics} shows why the flags are no calibrated test of\nsupport equality.",
+      "retained": "**Known defects and fair cost comparisons.** We have not measured\nhow reliably the workflow detects a controlled collection of defects.\nThat would require deliberately introduced, understood changes,\nfresh checks, and comparison with alternatives given the same\nreference-reuse opportunity. The prefix comparisons spend different\nconstruction budgets and do not establish superior cost or detection\npower. Section \\ref{sec:statistics} also shows why these flags are\nnot an unrestricted test of support equality with calibrated\nerror rates.",
+      "kind": "paragraph",
+      "applied_line": 1167,
+      "proposed_line": 1150
+    },
+    {
+      "reason": "Proposed memory controls would help assess detection; the data do not establish in advance that those controls would resolve the question.",
+      "proposed": "**Evidence specific to learning.** Matched memory-retained and\nmemory-cleared episodes, plus known memory defects, would show which\nexperience-dependent changes these checks detect. The native-winner study\ndiagnoses no memory defect, establishes no memory path as faithful, and\ncannot separate population choice from immediate stopping. Alternative\nepisode-result definitions remain a future experiment.",
+      "retained": "**Evidence specific to learning.** Memory-retained and memory-cleared\nepisodes, together with known memory defects, would help show\nwhich experience-dependent changes these checks detect. The current\nnative-winner study does not diagnose a memory defect, establish\nfaithful memory paths, or separate population choice from immediate\nstopping. Alternative episode-result definitions remain a future\nexperiment, not a result already obtained.",
+      "kind": "paragraph",
+      "applied_line": 1184,
+      "proposed_line": 1165
+    },
+    {
+      "reason": "Keep 'not all' costs rather than 'none', and keep future controlled comparisons conditional rather than guaranteed to quantify benefit.",
+      "proposed": "**The whole development cost.** Neither the historical records nor the\nexecution totals include the human investigation and repeated revision. A\nprospective series of repairs with fresh check blocks would measure real\nreuse without replaying seeds, and development with and without the workflow\nwould quantify its benefit. What remains unmeasured is the size of the\nspeedup and the total saving once sampling, investigation, and repair are\ncounted.",
+      "retained": "**The whole development cost.** Neither historical records nor\naggregate execution totals include all human investigation and\nrepeated revision costs. A prospective series of repairs with fresh\ncheck blocks would measure actual reuse without replaying the same\nseeds. Comparing development with and without the workflow would\nhelp quantify its incremental benefit. The current workflow already\nautomates comparisons that otherwise require manual inspection.\nWhat remains unmeasured is the size of that speedup and the total\nsaving after sampling, investigation, and repair are included.",
+      "kind": "paragraph",
+      "applied_line": 1200,
+      "proposed_line": 1180
+    },
+    {
+      "reason": "Applications beyond the evaluated case remain proposals, not demonstrated transfers.",
+      "proposed": "The same pattern fits restructuring a simulator, or re-implementing a",
+      "retained": "The same pattern could apply when restructuring a simulator or re-implementing a",
+      "kind": "fragment",
+      "applied_line": 1226,
+      "proposed_line": 1204
+    },
+    {
+      "reason": "The speech example must retain 'at least half', sampling assumptions as well as the sampling unit, and its status as a proposed experiment.",
+      "proposed": "The reference need not be software. Sampled human results could supply an\noracle for a system yet to be built. Consider the speeches of one consenting\nspeaker, whose characteristic expressions recur unevenly across speeches.\nFirst define how to segment speeches into distinguishable phrasing patterns,\nso that a new sentence is not automatically a new pattern. A p50 head then\nselects the patterns accounting for half the recorded occurrences; a\nGood--Turing-style discovery estimate, with its sampling unit adapted to the\ndependencies within and between speeches, guides further collection;\nheld-out speeches assess coverage. A large language model fine-tuned to\nimitate the speaker is then checked, within a fixed generation budget, for\nmissing characteristic patterns and for patterns outside the observed\nsupport. The check asks which patterns appear, without prescribing how\noften, and an outside pattern prompts inspection. The pattern definitions\nwould be reviewed before testing rather than adjusted to accept whatever the\nmodel produces.",
+      "retained": "The reference need not be software at all. Sampled human results could\nsupply an oracle for a system that has yet to be built. Consider a collection\nof speeches from one consenting speaker, whose characteristic expressions\nrecur across speeches without appearing equally often. First define how to\nsegment the speeches into distinguishable phrasing patterns, so that a new\nsentence is not automatically a new pattern. A p50 head could then select\nthe patterns accounting for at least half the recorded pattern occurrences.\nA discovery estimate similar to Good--Turing could guide further collection,\nwith its sampling unit and assumptions adapted to the dependencies within\nand between speeches. Held-out speeches could help assess the frozen\noracle's coverage. A large language model fine-tuned to imitate the speaker\ncould then be checked, within a fixed generation budget, for missing\ncharacteristic patterns and distinguishable patterns outside the observed\nsupport set. The check would ask which patterns appear, without prescribing\nhow often each must recur. An outside pattern would prompt inspection, not\nprove that the person could never use it. This would be a concrete experiment\nin using human examples to drive implementation and repeated automated\ntesting of a style generator, with pattern definitions reviewed before\ntesting rather than adjusted to accept whatever the model produces.",
+      "kind": "paragraph",
+      "applied_line": 1233,
+      "proposed_line": 1211
+    },
+    {
+      "reason": "The proposed phrase 'as easily as a defect' suggests an unsupported relative likelihood; preserve the existing sampling-versus-defect caveat and hypothetical application status.",
+      "proposed": "The aim is the familiar test-driven loop: define what to check, change the\ncode, inspect the reported differences, repeat. Here a discrepancy may\nreflect sampling or an incomplete reference as easily as a defect, so a\nclean check is limited evidence. These applications are proposals. They\nextend automated feedback to systems for which a single expected result is\nthe wrong testing abstraction.",
+      "retained": "The aim is the familiar test-driven loop: define what to check, change the\ncode, inspect the reported failures or differences, and repeat. Here a\ndiscrepancy may reflect sampling or an incomplete reference rather than\na defect. A check without flags is therefore limited evidence, not a\ncomplete pass on the system's behaviour. These applications are proposals\nbeyond the Metacat case, not additional experiments. They offer a way to\nextend automated feedback to systems for which a single expected result\nis the wrong testing abstraction.",
+      "kind": "paragraph",
+      "applied_line": 1260,
+      "proposed_line": 1234
+    },
+    {
+      "reason": "The original licence is retained. Claiming it is not redistributed contradicts the existing licence-preservation description.",
+      "proposed": "The original Metacat source archive and runtime binaries are not\nredistributed. The reconstruction helper downloads the linked upstream\nrelease, applies the supplied patches, and checks the resulting files, so\nthe modified reference is available without redistributing the original\nlicence or source.",
+      "retained": "The original Metacat source archive and runtime binaries are not\nredistributed. The reconstruction helper downloads the linked\nupstream release, applies the supplied patches, and checks the\nresulting files. This supplies the modified reference without\nsilently replacing its original licence or source distribution.",
+      "kind": "paragraph",
+      "applied_line": 1325,
+      "proposed_line": 1297
+    },
+    {
+      "reason": "One earliest selected tied winner contributes to the counts; saying tied winners are excluded can describe a different selection rule.",
+      "proposed": "Table \\ref{tab:misc3-counts} contains every selected-answer count for\n`misc3`. Each construction column ends at its own freeze point, and\nreference validation adds nothing to either frozen set. Each answered\nepisode contributes one selected string; tied winners and the other answers\nacross its eight runs are excluded.",
+      "retained": "Table \\ref{tab:misc3-counts} contains every selected-answer\ncount for `misc3`. Each construction column ends at its own\nfreeze point, not the final common construction horizon. Reference\nvalidation does not add answers to either frozen set. Counts are\none selected string per answered episode, not all tied winners\nor all answers across its eight runs.",
+      "kind": "paragraph",
+      "applied_line": 1383,
+      "proposed_line": 1355
+    },
+    {
+      "reason": "Retain the distinction between static implementation differences and demonstrated episode-level root causes.",
+      "proposed": "**Two source differences.**",
+      "retained": "**Two source differences, not two proved causes.**",
+      "kind": "fragment",
+      "applied_line": 1432,
+      "proposed_line": 1403
+    },
+    {
+      "reason": "The restriction concerns replacement scientific observations, not every possible diagnostic retry.",
+      "proposed": "runs. The error was not retried.",
+      "retained": "runs. The error was not retried as a replacement scientific observation.",
+      "kind": "fragment",
+      "applied_line": 1510,
+      "proposed_line": 1481
+    },
+    {
+      "reason": "The value is unchanged; retaining its numeric spelling keeps the existing numeric-inventory guard without weakening that guard.",
+      "proposed": "Ninety-nine preference winners fall outside;",
+      "retained": "99 preference winners fall outside;",
+      "kind": "fragment",
+      "applied_line": 1130,
+      "proposed_line": 1113
+    },
+    {
+      "proposed": "sample, head selection, and stopping rule, and a reference share is no lower\nbound on the port's chance of an answer, so the baseline is not a calibrated",
+      "retained": "sample, head selection, and stopping rule, and a reference share is not an\nestablished lower bound on the port's chance of an answer, so the baseline is not a calibrated",
+      "reason": "An empirical reference share is not an established lower bound on a port probability; the proposed wording asserted that it could not be a lower bound at all.",
+      "kind": "fragment",
+      "applied_line": 506,
+      "proposed_line": 505
+    }
+  ]
+}

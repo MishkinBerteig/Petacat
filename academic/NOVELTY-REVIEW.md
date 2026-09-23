@@ -6,6 +6,38 @@ This is a targeted research review, not an exhaustive systematic review or a
 certificate of uniqueness. No experiment files or manuscript claims were changed
 as part of this review.
 
+## Process-Level Positioning Update, 2026-09-07
+
+At the author's request, the current manuscript now explicitly claims
+process-level novelty in the integration and application, while retaining
+documented port improvement as the primary engineering result. This does not
+claim a new Good-Turing estimator, a new cumulative-mass selection algorithm,
+or exclusive priority for the combination.
+
+The abstract, introduction, related work, and conclusion identify the integrated
+construction--freeze--check--investigate workflow: Good-Turing sampling guidance,
+reusable observed-support sets, empirical p50 heads, and named-outcome diagnosis
+across single-run and episodic behavior. The body distinguishes the historical
+episodic endpoint/p50 checks from the subsequent native-best-answer study,
+which evaluates two frozen supports and independent coverage qualification,
+not a new p50-head experiment. This is a process contribution alongside the
+historical repair evidence, not a claim that every stage was independently
+validated in every historical study.
+
+A targeted search refresh combined Good-Turing with differential testing,
+support, oracle, p50, stochastic porting, and episodic testing. The closest
+comparisons were rechecked in the primary
+[STADS paper](https://mboehme.github.io/paper/TOSEM18.pdf),
+[unequal-sample closeness paper](https://theory.stanford.edu/~valiant/papers/testingUnequal.pdf),
+[discrete covering-region paper](https://link.springer.com/article/10.1007/s00180-021-01172-6),
+and [probabilistic stateful-testing paper](https://link.springer.com/content/pdf/10.1007/s00165-017-0440-4.pdf).
+They establish the components and nearby methods described below. No exact
+complete port-development process was identified in this bounded review;
+absence from these results is not a certificate of uniqueness. Existing
+manuscript references suffice for this positioning; no reference or scientific
+result was added or removed. The remainder of this note records the earlier
+review and its then-prospective recommendations, not current study status.
+
 ## Bottom Line
 
 **Do not claim that Good-Turing/p50 is a unique or newly invented statistical

@@ -1,0 +1,1407 @@
+{
+  "answer_table": [
+    {
+      "answer": "jii",
+      "frozen_a": 0,
+      "frozen_b": 0,
+      "port_best_a": 0,
+      "port_best_b": 0,
+      "validation_best_a": 0,
+      "validation_best_b": 1
+    },
+    {
+      "answer": "kji",
+      "frozen_a": 3,
+      "frozen_b": 2,
+      "port_best_a": 25,
+      "port_best_b": 28,
+      "validation_best_a": 466,
+      "validation_best_b": 380
+    },
+    {
+      "answer": "kjii",
+      "frozen_a": 0,
+      "frozen_b": 0,
+      "port_best_a": 0,
+      "port_best_b": 1,
+      "validation_best_a": 0,
+      "validation_best_b": 1
+    },
+    {
+      "answer": "kjiii",
+      "frozen_a": 0,
+      "frozen_b": 0,
+      "port_best_a": 5,
+      "port_best_b": 2,
+      "validation_best_a": 0,
+      "validation_best_b": 8
+    },
+    {
+      "answer": "kjji",
+      "frozen_a": 0,
+      "frozen_b": 0,
+      "port_best_a": 0,
+      "port_best_b": 1,
+      "validation_best_a": 0,
+      "validation_best_b": 3
+    },
+    {
+      "answer": "kjjiii",
+      "frozen_a": 0,
+      "frozen_b": 0,
+      "port_best_a": 1,
+      "port_best_b": 1,
+      "validation_best_a": 0,
+      "validation_best_b": 1
+    },
+    {
+      "answer": "kjjji",
+      "frozen_a": 0,
+      "frozen_b": 0,
+      "port_best_a": 2,
+      "port_best_b": 1,
+      "validation_best_a": 0,
+      "validation_best_b": 9
+    },
+    {
+      "answer": "kjjjiii",
+      "frozen_a": 0,
+      "frozen_b": 0,
+      "port_best_a": 4,
+      "port_best_b": 1,
+      "validation_best_a": 0,
+      "validation_best_b": 7
+    },
+    {
+      "answer": "kkji",
+      "frozen_a": 0,
+      "frozen_b": 0,
+      "port_best_a": 0,
+      "port_best_b": 0,
+      "validation_best_a": 0,
+      "validation_best_b": 2
+    },
+    {
+      "answer": "kkjiii",
+      "frozen_a": 0,
+      "frozen_b": 0,
+      "port_best_a": 0,
+      "port_best_b": 0,
+      "validation_best_a": 0,
+      "validation_best_b": 1
+    },
+    {
+      "answer": "kkjji",
+      "frozen_a": 0,
+      "frozen_b": 0,
+      "port_best_a": 0,
+      "port_best_b": 0,
+      "validation_best_a": 0,
+      "validation_best_b": 3
+    },
+    {
+      "answer": "kkjjii",
+      "frozen_a": 6,
+      "frozen_b": 3,
+      "port_best_a": 15,
+      "port_best_b": 19,
+      "validation_best_a": 319,
+      "validation_best_b": 293
+    },
+    {
+      "answer": "kkjjiii",
+      "frozen_a": 0,
+      "frozen_b": 0,
+      "port_best_a": 0,
+      "port_best_b": 0,
+      "validation_best_a": 0,
+      "validation_best_b": 4
+    },
+    {
+      "answer": "kkjjiiiii",
+      "frozen_a": 0,
+      "frozen_b": 0,
+      "port_best_a": 0,
+      "port_best_b": 0,
+      "validation_best_a": 0,
+      "validation_best_b": 2
+    },
+    {
+      "answer": "kkjjji",
+      "frozen_a": 0,
+      "frozen_b": 0,
+      "port_best_a": 0,
+      "port_best_b": 1,
+      "validation_best_a": 0,
+      "validation_best_b": 5
+    },
+    {
+      "answer": "kkjjjii",
+      "frozen_a": 0,
+      "frozen_b": 0,
+      "port_best_a": 0,
+      "port_best_b": 0,
+      "validation_best_a": 0,
+      "validation_best_b": 3
+    },
+    {
+      "answer": "kkjjjiii",
+      "frozen_a": 0,
+      "frozen_b": 0,
+      "port_best_a": 0,
+      "port_best_b": 1,
+      "validation_best_a": 0,
+      "validation_best_b": 3
+    },
+    {
+      "answer": "kkjjjiiiii",
+      "frozen_a": 0,
+      "frozen_b": 0,
+      "port_best_a": 0,
+      "port_best_b": 1,
+      "validation_best_a": 0,
+      "validation_best_b": 3
+    },
+    {
+      "answer": "kkkji",
+      "frozen_a": 0,
+      "frozen_b": 0,
+      "port_best_a": 2,
+      "port_best_b": 4,
+      "validation_best_a": 0,
+      "validation_best_b": 9
+    },
+    {
+      "answer": "kkkjiii",
+      "frozen_a": 0,
+      "frozen_b": 0,
+      "port_best_a": 3,
+      "port_best_b": 1,
+      "validation_best_a": 0,
+      "validation_best_b": 5
+    },
+    {
+      "answer": "kkkjji",
+      "frozen_a": 0,
+      "frozen_b": 0,
+      "port_best_a": 1,
+      "port_best_b": 0,
+      "validation_best_a": 0,
+      "validation_best_b": 3
+    },
+    {
+      "answer": "kkkjjii",
+      "frozen_a": 0,
+      "frozen_b": 0,
+      "port_best_a": 0,
+      "port_best_b": 1,
+      "validation_best_a": 0,
+      "validation_best_b": 2
+    },
+    {
+      "answer": "kkkjjiii",
+      "frozen_a": 0,
+      "frozen_b": 0,
+      "port_best_a": 4,
+      "port_best_b": 7,
+      "validation_best_a": 0,
+      "validation_best_b": 10
+    },
+    {
+      "answer": "kkkjjji",
+      "frozen_a": 0,
+      "frozen_b": 0,
+      "port_best_a": 1,
+      "port_best_b": 1,
+      "validation_best_a": 0,
+      "validation_best_b": 8
+    },
+    {
+      "answer": "kkkjjjii",
+      "frozen_a": 0,
+      "frozen_b": 0,
+      "port_best_a": 0,
+      "port_best_b": 1,
+      "validation_best_a": 0,
+      "validation_best_b": 4
+    },
+    {
+      "answer": "kkkjjjiii",
+      "frozen_a": 2,
+      "frozen_b": 2,
+      "port_best_a": 36,
+      "port_best_b": 27,
+      "validation_best_a": 215,
+      "validation_best_b": 228
+    },
+    {
+      "answer": "kkkkjjjii",
+      "frozen_a": 0,
+      "frozen_b": 0,
+      "port_best_a": 1,
+      "port_best_b": 1,
+      "validation_best_a": 0,
+      "validation_best_b": 2
+    }
+  ],
+  "frozen": {
+    "best_a": {
+      "N": 11,
+      "answer_counts": {
+        "kji": 3,
+        "kkjjii": 6,
+        "kkkjjjiii": 2
+      },
+      "at_episode": 11,
+      "distinct_answers": 3,
+      "f1": 0,
+      "f1_over_N": 0.0
+    },
+    "best_b": {
+      "N": 7,
+      "answer_counts": {
+        "kji": 2,
+        "kkjjii": 3,
+        "kkkjjjiii": 2
+      },
+      "at_episode": 7,
+      "distinct_answers": 3,
+      "f1": 0,
+      "f1_over_N": 0.0
+    }
+  },
+  "input_sha256": {
+    "analysis.json": "1ecdc3528048430f8c432884983e6718b956df30023fb9cb337e1b635a557718",
+    "episodes.json": "da371bb2c5841592a0c1b9405abe45aea19583271df68f695cfb9a50993faa80",
+    "manifest.json": "96b7f1de4ebc1302d1678bba2052f63e95483b90d91100849d84e2c5d2e9ba2b",
+    "oracles.json": "20c86bf2397643e12ae1de5e5f6b0adbf8fcf26fc6015b57e7cd90ca470efdb2",
+    "protocol.json": "b81d5b97f9ba32b9a02ec654c8d8ff611b527ea8aba2178952c3b9c3047c6691"
+  },
+  "outside_best_a_events": [
+    {
+      "answer_runs": 7,
+      "answerless_runs": 0,
+      "best_a": "kkkjiii",
+      "best_b": "kkkjiii",
+      "capped_runs": 1,
+      "diagnostic_partition": "single-outside-winning-string",
+      "episode_index": 0,
+      "episode_number": 1,
+      "first_seed": 2895888787,
+      "highest_saved_inside_quality": 85.0,
+      "inside_quality_cowinner_strings": [],
+      "quality": 86.0,
+      "quality_cowinner_occurrences": 1,
+      "quality_cowinner_strings": [
+        "kkkjiii"
+      ],
+      "selected_description_is_undefeated": true,
+      "selected_descriptions": [
+        {
+          "answer": "kkkjiii",
+          "coherent": true,
+          "quality": 86.0,
+          "rule_abstractness": 96.0,
+          "temperature": 10.0,
+          "theme_abstractness": 52.0,
+          "theme_count": 3,
+          "themes": [
+            "plato-direction-category=plato-identity",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    },
+    {
+      "answer_runs": 7,
+      "answerless_runs": 0,
+      "best_a": "kkkjjiii",
+      "best_b": "kkjjii",
+      "capped_runs": 1,
+      "diagnostic_partition": "single-outside-winning-string",
+      "episode_index": 7,
+      "episode_number": 8,
+      "first_seed": 2354468294,
+      "highest_saved_inside_quality": 83.0,
+      "inside_quality_cowinner_strings": [],
+      "quality": 84.0,
+      "quality_cowinner_occurrences": 1,
+      "quality_cowinner_strings": [
+        "kkkjjiii"
+      ],
+      "selected_description_is_undefeated": true,
+      "selected_descriptions": [
+        {
+          "answer": "kkkjjiii",
+          "coherent": true,
+          "quality": 84.0,
+          "rule_abstractness": 96.0,
+          "temperature": 15.0,
+          "theme_abstractness": 67.0,
+          "theme_count": 3,
+          "themes": [
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-identity",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    },
+    {
+      "answer_runs": 7,
+      "answerless_runs": 0,
+      "best_a": "kkkji",
+      "best_b": "kkkji",
+      "capped_runs": 1,
+      "diagnostic_partition": "single-outside-winning-string",
+      "episode_index": 14,
+      "episode_number": 15,
+      "first_seed": 2530390575,
+      "highest_saved_inside_quality": 85.0,
+      "inside_quality_cowinner_strings": [],
+      "quality": 86.0,
+      "quality_cowinner_occurrences": 1,
+      "quality_cowinner_strings": [
+        "kkkji"
+      ],
+      "selected_description_is_undefeated": true,
+      "selected_descriptions": [
+        {
+          "answer": "kkkji",
+          "coherent": true,
+          "quality": 86.0,
+          "rule_abstractness": 96.0,
+          "temperature": 11.0,
+          "theme_abstractness": 52.0,
+          "theme_count": 3,
+          "themes": [
+            "plato-direction-category=plato-identity",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    },
+    {
+      "answer_runs": 8,
+      "answerless_runs": 0,
+      "best_a": "kkkkjjjii",
+      "best_b": "kkjjjiii",
+      "capped_runs": 0,
+      "diagnostic_partition": "single-outside-winning-string",
+      "episode_index": 21,
+      "episode_number": 22,
+      "first_seed": 1834014277,
+      "highest_saved_inside_quality": 84.0,
+      "inside_quality_cowinner_strings": [],
+      "quality": 85.0,
+      "quality_cowinner_occurrences": 1,
+      "quality_cowinner_strings": [
+        "kkkkjjjii"
+      ],
+      "selected_description_is_undefeated": true,
+      "selected_descriptions": [
+        {
+          "answer": "kkkkjjjii",
+          "coherent": true,
+          "quality": 85.0,
+          "rule_abstractness": 96.0,
+          "temperature": 14.0,
+          "theme_abstractness": 67.0,
+          "theme_count": 3,
+          "themes": [
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-identity",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    },
+    {
+      "answer_runs": 6,
+      "answerless_runs": 1,
+      "best_a": "kjjjiii",
+      "best_b": "kkjjii",
+      "capped_runs": 1,
+      "diagnostic_partition": "single-outside-winning-string",
+      "episode_index": 22,
+      "episode_number": 23,
+      "first_seed": 3482947846,
+      "highest_saved_inside_quality": 84.0,
+      "inside_quality_cowinner_strings": [],
+      "quality": 86.0,
+      "quality_cowinner_occurrences": 1,
+      "quality_cowinner_strings": [
+        "kjjjiii"
+      ],
+      "selected_description_is_undefeated": true,
+      "selected_descriptions": [
+        {
+          "answer": "kjjjiii",
+          "coherent": true,
+          "quality": 86.0,
+          "rule_abstractness": 96.0,
+          "temperature": 11.0,
+          "theme_abstractness": 52.0,
+          "theme_count": 3,
+          "themes": [
+            "plato-direction-category=plato-identity",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    },
+    {
+      "answer_runs": 6,
+      "answerless_runs": 0,
+      "best_a": "kjiii",
+      "best_b": "kkkjjiii",
+      "capped_runs": 2,
+      "diagnostic_partition": "single-outside-winning-string",
+      "episode_index": 26,
+      "episode_number": 27,
+      "first_seed": 2476902826,
+      "highest_saved_inside_quality": null,
+      "inside_quality_cowinner_strings": [],
+      "quality": 84.0,
+      "quality_cowinner_occurrences": 1,
+      "quality_cowinner_strings": [
+        "kjiii"
+      ],
+      "selected_description_is_undefeated": true,
+      "selected_descriptions": [
+        {
+          "answer": "kjiii",
+          "coherent": true,
+          "quality": 84.0,
+          "rule_abstractness": 96.0,
+          "temperature": 16.0,
+          "theme_abstractness": 52.0,
+          "theme_count": 3,
+          "themes": [
+            "plato-direction-category=plato-identity",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    },
+    {
+      "answer_runs": 7,
+      "answerless_runs": 0,
+      "best_a": "kkkjiii",
+      "best_b": "kkkjjjiii",
+      "capped_runs": 1,
+      "diagnostic_partition": "single-outside-winning-string",
+      "episode_index": 31,
+      "episode_number": 32,
+      "first_seed": 280639574,
+      "highest_saved_inside_quality": 84.0,
+      "inside_quality_cowinner_strings": [],
+      "quality": 87.0,
+      "quality_cowinner_occurrences": 1,
+      "quality_cowinner_strings": [
+        "kkkjiii"
+      ],
+      "selected_description_is_undefeated": true,
+      "selected_descriptions": [
+        {
+          "answer": "kkkjiii",
+          "coherent": true,
+          "quality": 87.0,
+          "rule_abstractness": 96.0,
+          "temperature": 9.0,
+          "theme_abstractness": 52.0,
+          "theme_count": 3,
+          "themes": [
+            "plato-direction-category=plato-identity",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    },
+    {
+      "answer_runs": 7,
+      "answerless_runs": 0,
+      "best_a": "kkkjji",
+      "best_b": "kkkjjjiii",
+      "capped_runs": 1,
+      "diagnostic_partition": "single-outside-winning-string",
+      "episode_index": 33,
+      "episode_number": 34,
+      "first_seed": 437836071,
+      "highest_saved_inside_quality": 85.0,
+      "inside_quality_cowinner_strings": [],
+      "quality": 86.0,
+      "quality_cowinner_occurrences": 1,
+      "quality_cowinner_strings": [
+        "kkkjji"
+      ],
+      "selected_description_is_undefeated": true,
+      "selected_descriptions": [
+        {
+          "answer": "kkkjji",
+          "coherent": true,
+          "quality": 86.0,
+          "rule_abstractness": 96.0,
+          "temperature": 10.0,
+          "theme_abstractness": 52.0,
+          "theme_count": 3,
+          "themes": [
+            "plato-direction-category=plato-identity",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    },
+    {
+      "answer_runs": 8,
+      "answerless_runs": 0,
+      "best_a": "kkkjiii",
+      "best_b": "kji",
+      "capped_runs": 0,
+      "diagnostic_partition": "single-outside-winning-string",
+      "episode_index": 39,
+      "episode_number": 40,
+      "first_seed": 2578937273,
+      "highest_saved_inside_quality": 85.0,
+      "inside_quality_cowinner_strings": [],
+      "quality": 86.0,
+      "quality_cowinner_occurrences": 1,
+      "quality_cowinner_strings": [
+        "kkkjiii"
+      ],
+      "selected_description_is_undefeated": true,
+      "selected_descriptions": [
+        {
+          "answer": "kkkjiii",
+          "coherent": true,
+          "quality": 86.0,
+          "rule_abstractness": 96.0,
+          "temperature": 10.0,
+          "theme_abstractness": 52.0,
+          "theme_count": 3,
+          "themes": [
+            "plato-direction-category=plato-identity",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    },
+    {
+      "answer_runs": 8,
+      "answerless_runs": 0,
+      "best_a": "kjjjiii",
+      "best_b": "kkkjjiii",
+      "capped_runs": 0,
+      "diagnostic_partition": "outside-only-quality-tie",
+      "episode_index": 42,
+      "episode_number": 43,
+      "first_seed": 2194106505,
+      "highest_saved_inside_quality": null,
+      "inside_quality_cowinner_strings": [],
+      "quality": 86.0,
+      "quality_cowinner_occurrences": 3,
+      "quality_cowinner_strings": [
+        "kjjji",
+        "kjjjiii",
+        "kkkjji"
+      ],
+      "selected_description_is_undefeated": true,
+      "selected_descriptions": [
+        {
+          "answer": "kjjjiii",
+          "coherent": true,
+          "quality": 86.0,
+          "rule_abstractness": 96.0,
+          "temperature": 11.0,
+          "theme_abstractness": 52.0,
+          "theme_count": 3,
+          "themes": [
+            "plato-direction-category=plato-identity",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    },
+    {
+      "answer_runs": 7,
+      "answerless_runs": 0,
+      "best_a": "kkkjjiii",
+      "best_b": "kkkjjiii",
+      "capped_runs": 1,
+      "diagnostic_partition": "single-outside-winning-string",
+      "episode_index": 47,
+      "episode_number": 48,
+      "first_seed": 3442677868,
+      "highest_saved_inside_quality": null,
+      "inside_quality_cowinner_strings": [],
+      "quality": 85.0,
+      "quality_cowinner_occurrences": 1,
+      "quality_cowinner_strings": [
+        "kkkjjiii"
+      ],
+      "selected_description_is_undefeated": true,
+      "selected_descriptions": [
+        {
+          "answer": "kkkjjiii",
+          "coherent": true,
+          "quality": 85.0,
+          "rule_abstractness": 96.0,
+          "temperature": 13.0,
+          "theme_abstractness": 67.0,
+          "theme_count": 3,
+          "themes": [
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-identity",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    },
+    {
+      "answer_runs": 8,
+      "answerless_runs": 0,
+      "best_a": "kkkjjiii",
+      "best_b": "kkkjjiii",
+      "capped_runs": 0,
+      "diagnostic_partition": "single-outside-winning-string",
+      "episode_index": 48,
+      "episode_number": 49,
+      "first_seed": 105575245,
+      "highest_saved_inside_quality": 85.0,
+      "inside_quality_cowinner_strings": [],
+      "quality": 86.0,
+      "quality_cowinner_occurrences": 1,
+      "quality_cowinner_strings": [
+        "kkkjjiii"
+      ],
+      "selected_description_is_undefeated": true,
+      "selected_descriptions": [
+        {
+          "answer": "kkkjjiii",
+          "coherent": true,
+          "quality": 86.0,
+          "rule_abstractness": 94.0,
+          "temperature": 10.0,
+          "theme_abstractness": 67.0,
+          "theme_count": 3,
+          "themes": [
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-identity",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    },
+    {
+      "answer_runs": 6,
+      "answerless_runs": 0,
+      "best_a": "kjiii",
+      "best_b": "kkjjii",
+      "capped_runs": 2,
+      "diagnostic_partition": "single-outside-winning-string",
+      "episode_index": 50,
+      "episode_number": 51,
+      "first_seed": 4025459556,
+      "highest_saved_inside_quality": 86.0,
+      "inside_quality_cowinner_strings": [],
+      "quality": 88.0,
+      "quality_cowinner_occurrences": 1,
+      "quality_cowinner_strings": [
+        "kjiii"
+      ],
+      "selected_description_is_undefeated": true,
+      "selected_descriptions": [
+        {
+          "answer": "kjiii",
+          "coherent": true,
+          "quality": 88.0,
+          "rule_abstractness": 96.0,
+          "temperature": 7.0,
+          "theme_abstractness": 52.0,
+          "theme_count": 3,
+          "themes": [
+            "plato-direction-category=plato-identity",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    },
+    {
+      "answer_runs": 7,
+      "answerless_runs": 0,
+      "best_a": "kjjji",
+      "best_b": "kjjji",
+      "capped_runs": 1,
+      "diagnostic_partition": "single-outside-winning-string",
+      "episode_index": 66,
+      "episode_number": 67,
+      "first_seed": 2269513683,
+      "highest_saved_inside_quality": 84.0,
+      "inside_quality_cowinner_strings": [],
+      "quality": 87.0,
+      "quality_cowinner_occurrences": 1,
+      "quality_cowinner_strings": [
+        "kjjji"
+      ],
+      "selected_description_is_undefeated": true,
+      "selected_descriptions": [
+        {
+          "answer": "kjjji",
+          "coherent": true,
+          "quality": 87.0,
+          "rule_abstractness": 96.0,
+          "temperature": 9.0,
+          "theme_abstractness": 52.0,
+          "theme_count": 3,
+          "themes": [
+            "plato-direction-category=plato-identity",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    },
+    {
+      "answer_runs": 7,
+      "answerless_runs": 0,
+      "best_a": "kkkji",
+      "best_b": "kkkji",
+      "capped_runs": 1,
+      "diagnostic_partition": "single-outside-winning-string",
+      "episode_index": 67,
+      "episode_number": 68,
+      "first_seed": 1418809673,
+      "highest_saved_inside_quality": 84.0,
+      "inside_quality_cowinner_strings": [],
+      "quality": 86.0,
+      "quality_cowinner_occurrences": 1,
+      "quality_cowinner_strings": [
+        "kkkji"
+      ],
+      "selected_description_is_undefeated": true,
+      "selected_descriptions": [
+        {
+          "answer": "kkkji",
+          "coherent": true,
+          "quality": 86.0,
+          "rule_abstractness": 96.0,
+          "temperature": 10.0,
+          "theme_abstractness": 52.0,
+          "theme_count": 3,
+          "themes": [
+            "plato-direction-category=plato-identity",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    },
+    {
+      "answer_runs": 7,
+      "answerless_runs": 0,
+      "best_a": "kjjiii",
+      "best_b": "kji",
+      "capped_runs": 1,
+      "diagnostic_partition": "single-outside-winning-string",
+      "episode_index": 68,
+      "episode_number": 69,
+      "first_seed": 2666739882,
+      "highest_saved_inside_quality": 84.0,
+      "inside_quality_cowinner_strings": [],
+      "quality": 86.0,
+      "quality_cowinner_occurrences": 1,
+      "quality_cowinner_strings": [
+        "kjjiii"
+      ],
+      "selected_description_is_undefeated": true,
+      "selected_descriptions": [
+        {
+          "answer": "kjjiii",
+          "coherent": true,
+          "quality": 86.0,
+          "rule_abstractness": 96.0,
+          "temperature": 12.0,
+          "theme_abstractness": 52.0,
+          "theme_count": 3,
+          "themes": [
+            "plato-direction-category=plato-identity",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    },
+    {
+      "answer_runs": 8,
+      "answerless_runs": 0,
+      "best_a": "kjiii",
+      "best_b": "kkkjjji",
+      "capped_runs": 0,
+      "diagnostic_partition": "single-outside-winning-string",
+      "episode_index": 70,
+      "episode_number": 71,
+      "first_seed": 876818767,
+      "highest_saved_inside_quality": null,
+      "inside_quality_cowinner_strings": [],
+      "quality": 86.0,
+      "quality_cowinner_occurrences": 1,
+      "quality_cowinner_strings": [
+        "kjiii"
+      ],
+      "selected_description_is_undefeated": true,
+      "selected_descriptions": [
+        {
+          "answer": "kjiii",
+          "coherent": true,
+          "quality": 86.0,
+          "rule_abstractness": 96.0,
+          "temperature": 11.0,
+          "theme_abstractness": 52.0,
+          "theme_count": 3,
+          "themes": [
+            "plato-direction-category=plato-identity",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    },
+    {
+      "answer_runs": 8,
+      "answerless_runs": 0,
+      "best_a": "kjiii",
+      "best_b": "kkkjjjiii",
+      "capped_runs": 0,
+      "diagnostic_partition": "single-outside-winning-string",
+      "episode_index": 71,
+      "episode_number": 72,
+      "first_seed": 4101556133,
+      "highest_saved_inside_quality": 85.0,
+      "inside_quality_cowinner_strings": [],
+      "quality": 86.0,
+      "quality_cowinner_occurrences": 1,
+      "quality_cowinner_strings": [
+        "kjiii"
+      ],
+      "selected_description_is_undefeated": true,
+      "selected_descriptions": [
+        {
+          "answer": "kjiii",
+          "coherent": true,
+          "quality": 86.0,
+          "rule_abstractness": 96.0,
+          "temperature": 10.0,
+          "theme_abstractness": 52.0,
+          "theme_count": 3,
+          "themes": [
+            "plato-direction-category=plato-identity",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    },
+    {
+      "answer_runs": 8,
+      "answerless_runs": 0,
+      "best_a": "kjjji",
+      "best_b": "kkkkjjjii",
+      "capped_runs": 0,
+      "diagnostic_partition": "inside-outside-quality-tie",
+      "episode_index": 73,
+      "episode_number": 74,
+      "first_seed": 759832026,
+      "highest_saved_inside_quality": 87.0,
+      "inside_quality_cowinner_strings": [
+        "kkkjjjiii"
+      ],
+      "quality": 87.0,
+      "quality_cowinner_occurrences": 2,
+      "quality_cowinner_strings": [
+        "kjjji",
+        "kkkjjjiii"
+      ],
+      "selected_description_is_undefeated": true,
+      "selected_descriptions": [
+        {
+          "answer": "kjjji",
+          "coherent": true,
+          "quality": 87.0,
+          "rule_abstractness": 96.0,
+          "temperature": 9.0,
+          "theme_abstractness": 52.0,
+          "theme_count": 3,
+          "themes": [
+            "plato-direction-category=plato-identity",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    },
+    {
+      "answer_runs": 7,
+      "answerless_runs": 0,
+      "best_a": "kkkjjiii",
+      "best_b": "kkkjjiii",
+      "capped_runs": 1,
+      "diagnostic_partition": "single-outside-winning-string",
+      "episode_index": 81,
+      "episode_number": 82,
+      "first_seed": 2969366380,
+      "highest_saved_inside_quality": 72.0,
+      "inside_quality_cowinner_strings": [],
+      "quality": 85.0,
+      "quality_cowinner_occurrences": 1,
+      "quality_cowinner_strings": [
+        "kkkjjiii"
+      ],
+      "selected_description_is_undefeated": true,
+      "selected_descriptions": [
+        {
+          "answer": "kkkjjiii",
+          "coherent": true,
+          "quality": 85.0,
+          "rule_abstractness": 96.0,
+          "temperature": 14.0,
+          "theme_abstractness": 67.0,
+          "theme_count": 3,
+          "themes": [
+            "plato-direction-category=plato-opposite",
+            "plato-group-category=plato-identity",
+            "plato-string-position-category=plato-opposite"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    },
+    {
+      "answer_runs": 8,
+      "answerless_runs": 0,
+      "best_a": "kjjjiii",
+      "best_b": "kjjjiii",
+      "capped_runs": 0,
+      "diagnostic_partition": "inside-outside-quality-tie",
+      "episode_index": 83,
+      "episode_number": 84,
+      "first_seed": 533424517,
+      "highest_saved_inside_quality": 86.0,
+      "inside_quality_cowinner_strings": [
+        "kkkjjjiii"
+      ],
+      "quality": 86.0,
+      "quality_cowinner_occurrences": 3,
+      "quality_cowinner_strings": [
+        "kjjjiii",
+        "kkkjjiii",
+        "kkkjjjiii"
+      ],
+      "selected_description_is_undefeated": true,
+      "selected_descriptions": [
+        {
+          "answer": "kjjjiii",
+          "coherent": true,
+          "quality": 86.0,
+          "rule_abstractness": 96.0,
+          "temperature": 11.0,
+          "theme_abstractness": 52.0,
+          "theme_count": 3,
+          "themes": [
+            "plato-direction-category=plato-identity",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    },
+    {
+      "answer_runs": 5,
+      "answerless_runs": 0,
+      "best_a": "kjiii",
+      "best_b": "kjiii",
+      "capped_runs": 3,
+      "diagnostic_partition": "single-outside-winning-string",
+      "episode_index": 85,
+      "episode_number": 86,
+      "first_seed": 2770496526,
+      "highest_saved_inside_quality": 73.0,
+      "inside_quality_cowinner_strings": [],
+      "quality": 86.0,
+      "quality_cowinner_occurrences": 1,
+      "quality_cowinner_strings": [
+        "kjiii"
+      ],
+      "selected_description_is_undefeated": true,
+      "selected_descriptions": [
+        {
+          "answer": "kjiii",
+          "coherent": true,
+          "quality": 86.0,
+          "rule_abstractness": 96.0,
+          "temperature": 12.0,
+          "theme_abstractness": 52.0,
+          "theme_count": 3,
+          "themes": [
+            "plato-direction-category=plato-identity",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    },
+    {
+      "answer_runs": 8,
+      "answerless_runs": 0,
+      "best_a": "kjjjiii",
+      "best_b": "kkjjii",
+      "capped_runs": 0,
+      "diagnostic_partition": "single-outside-winning-string",
+      "episode_index": 93,
+      "episode_number": 94,
+      "first_seed": 1694651647,
+      "highest_saved_inside_quality": 72.0,
+      "inside_quality_cowinner_strings": [],
+      "quality": 87.0,
+      "quality_cowinner_occurrences": 1,
+      "quality_cowinner_strings": [
+        "kjjjiii"
+      ],
+      "selected_description_is_undefeated": true,
+      "selected_descriptions": [
+        {
+          "answer": "kjjjiii",
+          "coherent": true,
+          "quality": 87.0,
+          "rule_abstractness": 96.0,
+          "temperature": 8.0,
+          "theme_abstractness": 52.0,
+          "theme_count": 3,
+          "themes": [
+            "plato-direction-category=plato-identity",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    },
+    {
+      "answer_runs": 6,
+      "answerless_runs": 0,
+      "best_a": "kkkjjji",
+      "best_b": "kji",
+      "capped_runs": 2,
+      "diagnostic_partition": "single-outside-winning-string",
+      "episode_index": 94,
+      "episode_number": 95,
+      "first_seed": 2299010004,
+      "highest_saved_inside_quality": 84.0,
+      "inside_quality_cowinner_strings": [],
+      "quality": 85.0,
+      "quality_cowinner_occurrences": 1,
+      "quality_cowinner_strings": [
+        "kkkjjji"
+      ],
+      "selected_description_is_undefeated": true,
+      "selected_descriptions": [
+        {
+          "answer": "kkkjjji",
+          "coherent": true,
+          "quality": 85.0,
+          "rule_abstractness": 96.0,
+          "temperature": 14.0,
+          "theme_abstractness": 52.0,
+          "theme_count": 3,
+          "themes": [
+            "plato-direction-category=plato-identity",
+            "plato-group-category=plato-opposite",
+            "plato-string-position-category=plato-identity"
+          ],
+          "unjustified_count": 0
+        }
+      ]
+    }
+  ],
+  "outside_best_a_summary": {
+    "all_eight_runs_answered": 9,
+    "diagnostic_partitions_not_root_causes": {
+      "inside-outside-quality-tie": 2,
+      "outside-only-quality-tie": 1,
+      "single-outside-winning-string": 21
+    },
+    "distinct_strings": 10,
+    "episodes": 24,
+    "same_best_a_and_best_b": 9,
+    "saved_inside_answer_present": 20,
+    "with_answerless_inner_runs": 1,
+    "with_caps": 15
+  },
+  "phases": {
+    "construction": {
+      "best_a_quality": {
+        "above_90": 10,
+        "max": 96.0,
+        "median": 94.0,
+        "min": 89.0
+      },
+      "definitions": {
+        "best_a": {
+          "counts": {
+            "kji": 3,
+            "kkjjii": 6,
+            "kkkjjjiii": 2
+          },
+          "episodes_with_outside_cowinners": 0,
+          "multiple_winning_strings": 1,
+          "outside_counts": {},
+          "outside_occurrences": 0
+        },
+        "best_b": {
+          "counts": {
+            "kji": 3,
+            "kkjjii": 6,
+            "kkkjjjiii": 2
+          },
+          "episodes_with_outside_cowinners": 5,
+          "multiple_winning_strings": 10,
+          "outside_counts": {},
+          "outside_occurrences": 0
+        }
+      },
+      "episodes": 11,
+      "episodes_with_caps": 9,
+      "totals": {
+        "answer_runs": 75,
+        "answerless_runs": 0,
+        "attempted_runs": 88,
+        "capped_runs": 13,
+        "codelets": 2334225
+      }
+    },
+    "port": {
+      "best_a_quality": {
+        "above_90": 0,
+        "max": 90.0,
+        "median": 86.0,
+        "min": 82.0
+      },
+      "definitions": {
+        "best_a": {
+          "counts": {
+            "kji": 25,
+            "kjiii": 5,
+            "kjjiii": 1,
+            "kjjji": 2,
+            "kjjjiii": 4,
+            "kkjjii": 15,
+            "kkkji": 2,
+            "kkkjiii": 3,
+            "kkkjji": 1,
+            "kkkjjiii": 4,
+            "kkkjjji": 1,
+            "kkkjjjiii": 36,
+            "kkkkjjjii": 1
+          },
+          "episodes_with_outside_cowinners": 30,
+          "multiple_winning_strings": 19,
+          "outside_counts": {
+            "kjiii": 5,
+            "kjjiii": 1,
+            "kjjji": 2,
+            "kjjjiii": 4,
+            "kkkji": 2,
+            "kkkjiii": 3,
+            "kkkjji": 1,
+            "kkkjjiii": 4,
+            "kkkjjji": 1,
+            "kkkkjjjii": 1
+          },
+          "outside_occurrences": 24
+        },
+        "best_b": {
+          "counts": {
+            "kji": 28,
+            "kjii": 1,
+            "kjiii": 2,
+            "kjji": 1,
+            "kjjiii": 1,
+            "kjjji": 1,
+            "kjjjiii": 1,
+            "kkjjii": 19,
+            "kkjjji": 1,
+            "kkjjjiii": 1,
+            "kkjjjiiiii": 1,
+            "kkkji": 4,
+            "kkkjiii": 1,
+            "kkkjjii": 1,
+            "kkkjjiii": 7,
+            "kkkjjji": 1,
+            "kkkjjjii": 1,
+            "kkkjjjiii": 27,
+            "kkkkjjjii": 1
+          },
+          "episodes_with_outside_cowinners": 62,
+          "multiple_winning_strings": 88,
+          "outside_counts": {
+            "kjii": 1,
+            "kjiii": 2,
+            "kjji": 1,
+            "kjjiii": 1,
+            "kjjji": 1,
+            "kjjjiii": 1,
+            "kkjjji": 1,
+            "kkjjjiii": 1,
+            "kkjjjiiiii": 1,
+            "kkkji": 4,
+            "kkkjiii": 1,
+            "kkkjjii": 1,
+            "kkkjjiii": 7,
+            "kkkjjji": 1,
+            "kkkjjjii": 1,
+            "kkkkjjjii": 1
+          },
+          "outside_occurrences": 26
+        }
+      },
+      "episodes": 100,
+      "episodes_with_caps": 49,
+      "totals": {
+        "answer_runs": 731,
+        "answerless_runs": 3,
+        "attempted_runs": 800,
+        "capped_runs": 66,
+        "codelets": 14227726
+      }
+    },
+    "validation": {
+      "best_a_quality": {
+        "above_90": 988,
+        "max": 97.0,
+        "median": 94.0,
+        "min": 82.0
+      },
+      "definitions": {
+        "best_a": {
+          "counts": {
+            "kji": 466,
+            "kkjjii": 319,
+            "kkkjjjiii": 215
+          },
+          "episodes_with_outside_cowinners": 0,
+          "multiple_winning_strings": 211,
+          "outside_counts": {},
+          "outside_occurrences": 0,
+          "status": "qualified",
+          "upper_bound": 0.006611366541343647
+        },
+        "best_b": {
+          "counts": {
+            "jii": 1,
+            "kji": 380,
+            "kjii": 1,
+            "kjiii": 8,
+            "kjji": 3,
+            "kjjiii": 1,
+            "kjjji": 9,
+            "kjjjiii": 7,
+            "kkji": 2,
+            "kkjiii": 1,
+            "kkjji": 3,
+            "kkjjii": 293,
+            "kkjjiii": 4,
+            "kkjjiiiii": 2,
+            "kkjjji": 5,
+            "kkjjjii": 3,
+            "kkjjjiii": 3,
+            "kkjjjiiiii": 3,
+            "kkkji": 9,
+            "kkkjiii": 5,
+            "kkkjji": 3,
+            "kkkjjii": 2,
+            "kkkjjiii": 10,
+            "kkkjjji": 8,
+            "kkkjjjii": 4,
+            "kkkjjjiii": 228,
+            "kkkkjjjii": 2
+          },
+          "episodes_with_outside_cowinners": 383,
+          "multiple_winning_strings": 873,
+          "outside_counts": {
+            "jii": 1,
+            "kjii": 1,
+            "kjiii": 8,
+            "kjji": 3,
+            "kjjiii": 1,
+            "kjjji": 9,
+            "kjjjiii": 7,
+            "kkji": 2,
+            "kkjiii": 1,
+            "kkjji": 3,
+            "kkjjiii": 4,
+            "kkjjiiiii": 2,
+            "kkjjji": 5,
+            "kkjjjii": 3,
+            "kkjjjiii": 3,
+            "kkjjjiiiii": 3,
+            "kkkji": 9,
+            "kkkjiii": 5,
+            "kkkjji": 3,
+            "kkkjjii": 2,
+            "kkkjjiii": 10,
+            "kkkjjji": 8,
+            "kkkjjjii": 4,
+            "kkkkjjjii": 2
+          },
+          "outside_occurrences": 99,
+          "status": "coverage-target-not-met",
+          "upper_bound": 0.13050070397763958
+        }
+      },
+      "episodes": 1000,
+      "episodes_with_caps": 652,
+      "totals": {
+        "answer_runs": 6984,
+        "answerless_runs": 25,
+        "attempted_runs": 8000,
+        "capped_runs": 991,
+        "codelets": 183374763
+      }
+    }
+  },
+  "problem": [
+    "abc",
+    "aabbcc",
+    "kkjjii"
+  ],
+  "scope": "post-hoc saved-data investigation; no engine execution or causal attribution"
+}

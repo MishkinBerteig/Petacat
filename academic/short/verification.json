@@ -1,0 +1,56 @@
+{
+  "abstract_characters": 2056,
+  "abstract_words": 303,
+  "anonymous_mode_metadata_and_identifier_scan": "PASS",
+  "beyond_pdf": "Leave empty",
+  "bibliography_sha256": "a20f086b1ffeeaebe7b55ac648142194ab3c95a5c955710cc5a04f9add0c5f2b",
+  "embedded_fonts": 24,
+  "engine_executions": 0,
+  "final_human_approval": "Pending; no commit, push, or submission authorized",
+  "form_sha256": "b85251477241f8101fc8a3efefdc0d6febc4e5dfbb403d5175deacebecc8eee9",
+  "main_text_pages": 10,
+  "manuscript_contract": {
+    "appendices": 10,
+    "audited_tables": 12,
+    "display_equations": 9,
+    "main_source_word_count": 5879,
+    "misc3_summary": "Matches saved study",
+    "references": 34
+  },
+  "markdown_sha256": "59b8be9d558ddb55808845516c81e5c4b296b62ab9941f306dee0d887d76fd63",
+  "maximum_main_text_pages": 12,
+  "official_style_bytes": "PASS",
+  "overfull_boxes_or_undefined_references": 0,
+  "page_text_bounds": "PASS",
+  "pdf": {
+    "bytes": 198938,
+    "file": "support-set-oracles-12-page.pdf",
+    "sha256": "ee2e3a051793172de8038c091a1cad123aece8ab5527fb02c86db4927602148e"
+  },
+  "pdf_pages": 32,
+  "preserved_files": 64,
+  "private_form_responses": "Not supplied",
+  "style_sha256": "48f9f972cc812d2cfc8032a78578c2f5d8939b92fbd4f61095e8cbeb3394f92d",
+  "submission_type": "Regular submission (no more than 12 pages of main content)",
+  "supplement": {
+    "bytes": 77955541,
+    "file": "support-set-oracles-12-page-supplement.zip",
+    "files": {
+      "README.md": {
+        "bytes": 1307,
+        "sha256": "f3c5275e117d054f2faaf7f7b691d71d436314b4a207ff0a7f4a261138d76603"
+      },
+      "support-set-oracles-12-page-source.zip": {
+        "bytes": 99209,
+        "sha256": "cad76fc4476a8b2d13f1437bbd45157c7b447eb5be9df8baad6c2a751b6f8701"
+      },
+      "support-set-oracles-experiments.zip": {
+        "bytes": 77854002,
+        "sha256": "08cb16fee2840f73dfdd78033a38c0c85eb9ac1ceba4432c1724928d2a327713"
+      }
+    },
+    "sha256": "3949e987fab0c1a1377040bf6a928e4dc2b9137a87167c9a29622b039ac43134"
+  },
+  "title": "Large References, Fast Checks: Oracle-Guided Porting of a Stochastic Learning System",
+  "unchanged_conversion_template": "PASS"
+}

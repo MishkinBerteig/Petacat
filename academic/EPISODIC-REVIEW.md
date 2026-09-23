@@ -3,7 +3,10 @@
 2026-09-05. Historical-data audit and proposed next study, **not new experimental
 results or an amendment to the running `support-v1` protocol**.
 
-## Current Direction
+This planning note preserves the title and direction at that time. See
+[the manuscript README](README.md) for the current approved title and draft.
+
+## Direction at the Time
 
 **Large References, Small Checks: Amortized Testing of Stochastic Learning Systems**
 

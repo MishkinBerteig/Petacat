@@ -1,0 +1,400 @@
+{
+  "comparisons": {
+    "port": {
+      "batches": 190,
+      "engine_error_runs": 0,
+      "frequency_rejections_19_input_adjusted": 31,
+      "missing_batches": 0,
+      "novel_batches": 6,
+      "novel_draws": 8,
+      "runs": 19000
+    },
+    "validation": {
+      "batches": 5700,
+      "engine_error_runs": 3,
+      "frequency_rejections_19_input_adjusted": 4,
+      "missing_batches": 0,
+      "novel_batches": 119,
+      "novel_draws": 124,
+      "runs": 570000
+    }
+  },
+  "errors": [
+    {
+      "codelets": 2088,
+      "elapsed_seconds": 0.276,
+      "engine": "metacat",
+      "error": {
+        "category": "scheme-condition",
+        "detail": "(assertion #t error #f who caddr message \"incorrect list structure ~s\" irritants (#f))",
+        "stage": "run"
+      },
+      "index": 26148,
+      "max_codelets": 100000,
+      "phase": "validation",
+      "problem": "misc3",
+      "seed": 20226148,
+      "state": "*ERROR*",
+      "termination": "engine-error"
+    },
+    {
+      "codelets": 2835,
+      "elapsed_seconds": 0.301,
+      "engine": "metacat",
+      "error": {
+        "category": "scheme-condition",
+        "detail": "(assertion #t error #f who #f message \"attempt to apply non-procedure ~s\" irritants (#f))",
+        "stage": "run"
+      },
+      "index": 13988,
+      "max_codelets": 100000,
+      "phase": "validation",
+      "problem": "misc1",
+      "seed": 20713988,
+      "state": "*ERROR*",
+      "termination": "engine-error"
+    },
+    {
+      "codelets": 1981,
+      "elapsed_seconds": 0.245,
+      "engine": "metacat",
+      "error": {
+        "category": "scheme-condition",
+        "detail": "(assertion #t error #f who #f message \"attempt to apply non-procedure ~s\" irritants (#f))",
+        "stage": "run"
+      },
+      "index": 16342,
+      "max_codelets": 100000,
+      "phase": "validation",
+      "problem": "misc1",
+      "seed": 20716342,
+      "state": "*ERROR*",
+      "termination": "engine-error"
+    }
+  ],
+  "flagged_port_draws_also_seen_in_validation": 6,
+  "input_sha256": {
+    "COMPLETE.json": "3abfc9771de43120cf75772a03d5fb24b8bfd949d47923cef09d283913036eec",
+    "analysis.json": "26ff98e0ca39eeddb8eec2b85186bd235682048625bb07cd8bf4a8bb65fd8128",
+    "manifest.json": "948e361edd6fad6fa9f84cae8d15895a6a9075599aa605d507ae46f60c50f217",
+    "protocol.json": "7fcad7a070165571f1f715f8f534e498edd8b516671b4e8e20e1f5a5863f6bcf"
+  },
+  "known_aggregate_attempt_wall_seconds": 466573.08944671415,
+  "nominal_95_qualified_inputs": [
+    "misc4",
+    "misc5",
+    "copy6"
+  ],
+  "per_input": [
+    {
+      "port_errors": 0,
+      "port_flag_batches": 0,
+      "port_frequency_rejections": 3,
+      "port_novel": 0,
+      "problem": "misc4",
+      "states": 4,
+      "validation_errors": 0,
+      "validation_novel": 0,
+      "validation_upper_95": 9.985275683338813e-05,
+      "validation_upper_family": 0.00019798610658750988
+    },
+    {
+      "port_errors": 0,
+      "port_flag_batches": 0,
+      "port_frequency_rejections": 0,
+      "port_novel": 0,
+      "problem": "fig5.7",
+      "states": 20,
+      "validation_errors": 0,
+      "validation_novel": 2,
+      "validation_upper_95": 0.00020984476266244778,
+      "validation_upper_family": 0.00033536283713558884
+    },
+    {
+      "port_errors": 0,
+      "port_flag_batches": 0,
+      "port_frequency_rejections": 8,
+      "port_novel": 0,
+      "problem": "misc3",
+      "states": 58,
+      "validation_errors": 1,
+      "validation_novel": 15,
+      "validation_upper_95": 0.000769800422512124,
+      "validation_upper_family": 0.000980579336223919
+    },
+    {
+      "port_errors": 0,
+      "port_flag_batches": 0,
+      "port_frequency_rejections": 0,
+      "port_novel": 0,
+      "problem": "misc5",
+      "states": 8,
+      "validation_errors": 0,
+      "validation_novel": 0,
+      "validation_upper_95": 9.985275683338813e-05,
+      "validation_upper_family": 0.00019798610658750988
+    },
+    {
+      "port_errors": 0,
+      "port_flag_batches": 0,
+      "port_frequency_rejections": 0,
+      "port_novel": 0,
+      "problem": "misc2",
+      "states": 9,
+      "validation_errors": 0,
+      "validation_novel": 1,
+      "validation_upper_95": 0.00015811895074141486,
+      "validation_upper_family": 0.0002717811450247408
+    },
+    {
+      "port_errors": 0,
+      "port_flag_batches": 0,
+      "port_frequency_rejections": 0,
+      "port_novel": 0,
+      "problem": "run1",
+      "states": 11,
+      "validation_errors": 0,
+      "validation_novel": 1,
+      "validation_upper_95": 0.00015811895074141486,
+      "validation_upper_family": 0.0002717811450247408
+    },
+    {
+      "port_errors": 0,
+      "port_flag_batches": 0,
+      "port_frequency_rejections": 7,
+      "port_novel": 0,
+      "problem": "run4",
+      "states": 12,
+      "validation_errors": 0,
+      "validation_novel": 1,
+      "validation_upper_95": 0.00015811895074141486,
+      "validation_upper_family": 0.0002717811450247408
+    },
+    {
+      "port_errors": 0,
+      "port_flag_batches": 1,
+      "port_frequency_rejections": 0,
+      "port_novel": 1,
+      "problem": "misc1",
+      "states": 17,
+      "validation_errors": 2,
+      "validation_novel": 4,
+      "validation_upper_95": 0.00030509109449777794,
+      "validation_upper_family": 0.00044945280066827076
+    },
+    {
+      "port_errors": 0,
+      "port_flag_batches": 1,
+      "port_frequency_rejections": 0,
+      "port_novel": 1,
+      "problem": "fig5.4-top",
+      "states": 41,
+      "validation_errors": 0,
+      "validation_novel": 28,
+      "validation_upper_95": 0.0012794084639373145,
+      "validation_upper_family": 0.001542603140843258
+    },
+    {
+      "port_errors": 0,
+      "port_flag_batches": 0,
+      "port_frequency_rejections": 0,
+      "port_novel": 0,
+      "problem": "eqe-baaab",
+      "states": 41,
+      "validation_errors": 0,
+      "validation_novel": 17,
+      "validation_upper_95": 0.0008498539296198373,
+      "validation_upper_family": 0.0010698048599575012
+    },
+    {
+      "port_errors": 0,
+      "port_flag_batches": 1,
+      "port_frequency_rejections": 0,
+      "port_novel": 1,
+      "problem": "run6",
+      "states": 68,
+      "validation_errors": 0,
+      "validation_novel": 28,
+      "validation_upper_95": 0.0012794084639373145,
+      "validation_upper_family": 0.001542603140843258
+    },
+    {
+      "port_errors": 0,
+      "port_flag_batches": 0,
+      "port_frequency_rejections": 10,
+      "port_novel": 0,
+      "problem": "run3",
+      "states": 13,
+      "validation_errors": 0,
+      "validation_novel": 6,
+      "validation_upper_95": 0.0003947080847837571,
+      "validation_upper_family": 0.0005544391640718847
+    },
+    {
+      "port_errors": 0,
+      "port_flag_batches": 0,
+      "port_frequency_rejections": 0,
+      "port_novel": 0,
+      "problem": "run2",
+      "states": 12,
+      "validation_errors": 0,
+      "validation_novel": 1,
+      "validation_upper_95": 0.00015811895074141486,
+      "validation_upper_family": 0.0002717811450247408
+    },
+    {
+      "port_errors": 0,
+      "port_flag_batches": 0,
+      "port_frequency_rejections": 0,
+      "port_novel": 0,
+      "problem": "copy1",
+      "states": 2,
+      "validation_errors": 0,
+      "validation_novel": 3,
+      "validation_upper_95": 0.00025843474145031953,
+      "validation_upper_family": 0.00039396166204436217
+    },
+    {
+      "port_errors": 0,
+      "port_flag_batches": 0,
+      "port_frequency_rejections": 0,
+      "port_novel": 0,
+      "problem": "copy2",
+      "states": 2,
+      "validation_errors": 0,
+      "validation_novel": 1,
+      "validation_upper_95": 0.00015811895074141486,
+      "validation_upper_family": 0.0002717811450247408
+    },
+    {
+      "port_errors": 0,
+      "port_flag_batches": 0,
+      "port_frequency_rejections": 0,
+      "port_novel": 0,
+      "problem": "copy3",
+      "states": 2,
+      "validation_errors": 0,
+      "validation_novel": 2,
+      "validation_upper_95": 0.00020984476266244778,
+      "validation_upper_family": 0.00033536283713558884
+    },
+    {
+      "port_errors": 0,
+      "port_flag_batches": 0,
+      "port_frequency_rejections": 0,
+      "port_novel": 0,
+      "problem": "copy4",
+      "states": 2,
+      "validation_errors": 0,
+      "validation_novel": 3,
+      "validation_upper_95": 0.00025843474145031953,
+      "validation_upper_family": 0.00039396166204436217
+    },
+    {
+      "port_errors": 0,
+      "port_flag_batches": 3,
+      "port_frequency_rejections": 3,
+      "port_novel": 5,
+      "problem": "copy5",
+      "states": 13,
+      "validation_errors": 0,
+      "validation_novel": 11,
+      "validation_upper_95": 0.0006068442354040806,
+      "validation_upper_family": 0.000797388392517362
+    },
+    {
+      "port_errors": 0,
+      "port_flag_batches": 0,
+      "port_frequency_rejections": 0,
+      "port_novel": 0,
+      "problem": "copy6",
+      "states": 5,
+      "validation_errors": 0,
+      "validation_novel": 0,
+      "validation_upper_95": 9.985275683338813e-05,
+      "validation_upper_family": 0.00019798610658750988
+    }
+  ],
+  "port_novelty": [
+    {
+      "answer": "*NONE*",
+      "port_count": 1,
+      "problem": "misc1",
+      "validation_count": 0
+    },
+    {
+      "answer": "qqiqq",
+      "port_count": 1,
+      "problem": "fig5.4-top",
+      "validation_count": 5
+    },
+    {
+      "answer": "pqqbc",
+      "port_count": 1,
+      "problem": "run6",
+      "validation_count": 2
+    },
+    {
+      "answer": "acc",
+      "port_count": 1,
+      "problem": "copy5",
+      "validation_count": 0
+    },
+    {
+      "answer": "cbb",
+      "port_count": 4,
+      "problem": "copy5",
+      "validation_count": 2
+    }
+  ],
+  "prefixes": [
+    {
+      "construction_runs": 19000,
+      "model": "fixed-1000",
+      "port_novel": 49,
+      "rule_fired_inputs": null,
+      "validation_novel": 991
+    },
+    {
+      "construction_runs": 95000,
+      "model": "fixed-5000",
+      "port_novel": 33,
+      "rule_fired_inputs": null,
+      "validation_novel": 383
+    },
+    {
+      "construction_runs": 190000,
+      "model": "fixed-10000",
+      "port_novel": 16,
+      "rule_fired_inputs": null,
+      "validation_novel": 229
+    },
+    {
+      "construction_runs": 380000,
+      "model": "fixed-20000",
+      "port_novel": 8,
+      "rule_fired_inputs": null,
+      "validation_novel": 124
+    },
+    {
+      "construction_runs": 268500,
+      "model": "singleton",
+      "port_novel": 9,
+      "rule_fired_inputs": 14,
+      "validation_novel": 135
+    },
+    {
+      "construction_runs": 81500,
+      "model": "no-discovery",
+      "port_novel": 34,
+      "rule_fired_inputs": 19,
+      "validation_novel": 346
+    }
+  ],
+  "scope": "Published-summary and batch consistency audit; does not rerun engines or permutation simulations",
+  "totals": {
+    "construction": 380000,
+    "port": 19000,
+    "validation": 570000
+  }
+}

@@ -22,7 +22,12 @@ def main():
     source_names = ["SOURCE-README.md", "support-set-oracles-tmlr.tex", "references.bib",
                     "support-set-oracles-tmlr.bbl", "tmlr.sty", "tmlr.bst", "fancyhdr.sty",
                     "generated/reference-table.tex", "generated/cycle-table.tex",
-                    "generated/input-table.tex", "generated/episode-table.tex"]
+                    "generated/input-table.tex", "generated/episode-table.tex",
+                    "generated/episodic-coverage-table.tex", "generated/misc3-frequency-table.tex",
+                    "generated/single-check-table.tex", "generated/single-novelty-table.tex",
+                    "generated/single-input-table.tex", "generated/single-prefix-table.tex",
+                    "generated/episodic-port-table.tex", "generated/episodic-accounting-table.tex",
+                    "generated/episodic-capped-frequency-table.tex"]
     source_files = [(ACADEMIC / name, name) for name in source_names]
     source_files.append((ACADEMIC / "tmlr-template/tmlr-style-file-main/LICENSE", "TMLR-TEMPLATE-LICENSE"))
     write_zip(ACADEMIC / "support-set-oracles-tmlr-source.zip", source_files)
