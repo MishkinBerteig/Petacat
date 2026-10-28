@@ -24,7 +24,7 @@ are recorded in `DISCREPANCIES5.md`: the status lines on A-1…D-11 and section 
 | --- | --- | --- | --- |
 | Development: 19 demo problems × seeds 1–10 | `traces/<slug>/<seed>.metacat.jsonl.gz` | 190 traces, ~130 MB | Only `abc-abd-xyz` |
 | Held-out: the same problems × seeds 11–30 | `traces-heldout/` | 380 traces, ~320 MB | No |
-| Episodes: 8 runs per episode, memory carried | `traces/episodes/<slug>/<S>.r<k>.metacat.jsonl.gz` | 5 problems × 5 episodes (more being added) | No |
+| Episodes: 8 runs per episode, memory carried | `traces/episodes/<slug>/<S>.r<k>.metacat.jsonl.gz` | 67 episodes over all 19 problems (536 runs, 6.5 M codelets, ~1.6 GB) | No |
 | Justify mode: the demo answers × seeds 1–5 | `traces/justify/<i-m-t-a>/<seed>…` | 85 traces | No |
 | Metacat's known failures (unpatched and patched) | `traces-known-failures/` | 6 traces | Yes |
 
@@ -76,12 +76,22 @@ The traps that produced most of the bugs:
 
 ## Results of the lockstep pass (2026-10-27/28)
 
-| Corpus | Before the fixes | After |
+| Corpus | First replay | After the pass |
 | --- | --- | --- |
-| Development (190) | reach 21.0 %, 29 traces replay to their end | reach 100 %, all 190 replay to their end, 188 with no error |
-| Held-out (380) | — (recorded mid-pass: 260 to their end) | reach 99.6 %, 377 replay to their end, 371 with no error |
-| Episodes (200 runs) | — (built mid-pass: 66 runs to their end) | all 200 runs replay to their end with no error |
-| Justify (85) | — (built mid-pass: 21 to their end) | 66 replay to their end, 64 with no error |
+| Development: 19 problems × seeds 1–10 (190 runs) | reach 21 % of codelets; 29 traces replay to their end | **all 190 replay to their end with no error** |
+| Held-out: seeds 11–30 (380 runs) | 260 to their end (first run, mid-pass) | **all 380 replay to their end with no error** |
+| Justify mode (85 runs) | 21 to their end (first run, mid-pass) | **all 85 replay to their end with no error** |
+| Episodes, memory carried (536 runs, 6.5 M codelets) | 66 of 200 runs to their end (first run, mid-pass) | 533 of 536 runs replay to their end with no error (95.5 % of codelets); one `zy-x-zy` run diverges at codelet 2,340 of 100,000 |
+| Metacat's three known crashes | — | Petacat follows Metacat to each crash point with no error |
 
-The individual fixes are listed in `DISCREPANCIES5.md` section G (G-A1 … G-Q3) and in the
+"No error" means every random decision had the same options with the same weights or
+probability, at every update cycle the Trace, Slipnet, Themespace, coderack and
+structures (strengths and time stamps) agreed, and the run ended the same way.
+
+As the spec's final confirmation, Petacat's own answer distributions were compared with the
+published support-v1a reference: 200 runs per problem against 20,000 Metacat runs per
+problem. No significant difference was found on any of the 19 problems
+(`measurements/vs-metacat-support-v1a-lockstep.md`).
+
+The individual fixes are listed in `DISCREPANCIES5.md` section G (G-A1 … G-U1) and in the
 status lines of A-1 … D-11.
