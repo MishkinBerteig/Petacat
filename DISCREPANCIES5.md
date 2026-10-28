@@ -804,3 +804,7 @@ D-1 (rule abstraction gate absent).
 **Four entries are recorded as possibly unreachable and deliberately left open**, per the
 standard at the top: D-4, the frozen-node jump in D-11, the double clamp in D-10, and
 `is_verbatim_rule` in D-11.
+
+# G. Found by the lockstep replay (2026-10-28)
+
+- **G-A1. String-level average intra-string unhappiness was computed live, not stored.** Metacat's `get-average-intra-string-unhappiness` (`workspace-strings.ss:116`) returns a value set only by `update-average-intra-string-unhappiness` (`workspace-strings.ss:335`), called once per update cycle from `update-workspace-values` (`run.ss:339-343`; the answer string only when justifying). Petacat recomputed it on every read, so string-choice weights of top-down scouts and `group-scout:whole-string` saw objects created/broken since the last cycle. Fix: `WorkspaceString` caches it (`update_average_intra_string_unhappiness`), refreshed from `Workspace.update_average_unhappiness_values`.

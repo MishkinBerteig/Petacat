@@ -200,10 +200,26 @@ class WorkspaceString:
         (:meth:`Workspace.get_average_intra_string_unhappiness`), which is
         importance-weighted.
         """
+        cached = getattr(self, "_average_intra_string_unhappiness", None)
+        if cached is not None:
+            return cached
+        return self.compute_average_intra_string_unhappiness()
+
+    def compute_average_intra_string_unhappiness(self) -> float:
         if not self.objects:
             return 0.0
         total = sum(o.intra_string_unhappiness for o in self.objects)
         return float(round(total / len(self.objects)))
+
+    def update_average_intra_string_unhappiness(self) -> None:
+        """Scheme: ``update-average-intra-string-unhappiness``
+        (``workspace-strings.ss:335-338``), called once per update cycle from
+        ``update-workspace-values`` (``run.ss:339-343``).  The accessor
+        (``workspace-strings.ss:116``) returns this *stored* value, so objects
+        built or broken between cycles do not move it until the next update."""
+        self._average_intra_string_unhappiness = (
+            self.compute_average_intra_string_unhappiness()
+        )
 
     def bond_present(self, bond: Bond) -> bool:
         """Check if an equivalent bond already exists in this string.
@@ -984,6 +1000,14 @@ class Workspace:
         there is no answer string to map the target onto, and the stored value
         stays at its initial 0.
         """
+        # run.ss:339-343: the per-string averages are refreshed here, the answer
+        # string only when justifying.
+        self.initial_string.update_average_intra_string_unhappiness()
+        self.modified_string.update_average_intra_string_unhappiness()
+        self.target_string.update_average_intra_string_unhappiness()
+        if self.justify_mode:
+            self.answer_string.update_average_intra_string_unhappiness()
+
         self.average_top_inter_string_unhappiness = (
             self._average_inter_string_unhappiness(
                 self.initial_string, self.modified_string, "horizontal"

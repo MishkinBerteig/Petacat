@@ -26,6 +26,7 @@ from typing import Any, Callable, Iterable, Sequence
 from server.engine.rng import RNG
 from tests.lockstep.context import ReplayStop
 from tests.lockstep.tracing_rng import (
+    picked_scope,
     picked_weight,
     LockstepBase, caller_site, choice_fields, name_of, option_name,
 )
@@ -330,6 +331,8 @@ class ReplayRNG(LockstepBase):
             fields["picked_weight"] = picked_weight(options, weights, chosen)
             fields["picked_urgency"] = float(chosen.urgency)
             fields["picked_original_urgency"] = float(chosen.original_urgency)
+            if picked_scope(chosen) is not None:
+                fields["picked_scope"] = picked_scope(chosen)
             self._finish("choice", fields, None, site)
             return chosen
         rec = self.trace.decisions[pair]
@@ -355,6 +358,10 @@ class ReplayRNG(LockstepBase):
         # alike in name, stamp and bin can still differ there: match both
         # urgencies first.
         target_weight = rec.get("picked_weight")
+        if len(candidates) > 1 and "picked_scope" in rec:
+            same = [j for j in candidates
+                    if picked_scope(options[idx[j]]) == rec["picked_scope"]]
+            candidates = same or candidates
         if len(candidates) > 1 and "picked_urgency" in rec:
             want = (rec["picked_urgency"], rec.get("picked_original_urgency"))
             same = [j for j in candidates
@@ -377,6 +384,8 @@ class ReplayRNG(LockstepBase):
         fields["picked_weight"] = None if weights is None else float(weights[idx[k]])
         fields["picked_urgency"] = float(chosen.urgency)
         fields["picked_original_urgency"] = float(chosen.original_urgency)
+        if picked_scope(chosen) is not None:
+            fields["picked_scope"] = picked_scope(chosen)
         self._finish("choice", fields, pair, site)
         return chosen
 

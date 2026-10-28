@@ -314,6 +314,11 @@ def capture_run_state(ctx: Any) -> dict:
                 "groups": [writer.ref(g) for g in getattr(ws, f"{role}_string").groups],
                 "justify_mode": getattr(ws, f"{role}_string").justify_mode,
                 "string_type": getattr(ws, f"{role}_string").string_type,
+                # Stored per-cycle value (workspace-strings.ss:335); None until the
+                # first update cycle.
+                "average_intra_string_unhappiness": getattr(
+                    getattr(ws, f"{role}_string"), "_average_intra_string_unhappiness", None
+                ),
                 # ``image`` is built lazily, so a string that has not needed one
                 # yet simply has no attribute rather than a null.
                 "image": writer.value(
@@ -516,6 +521,9 @@ def restore_run_state(runner: Any, state: dict) -> None:
         target.groups = [reader.resolve(g) for g in s_state["groups"]]
         target.justify_mode = s_state["justify_mode"]
         target.string_type = s_state["string_type"]
+        target._average_intra_string_unhappiness = s_state.get(
+            "average_intra_string_unhappiness"
+        )
         image = reader.resolve(s_state["image"])
         # Re-link the environment the capture deliberately omitted.
         target.workspace = ws

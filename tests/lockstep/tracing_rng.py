@@ -302,6 +302,9 @@ class TracingRNG(LockstepBase):
         fields["picked_weight"] = picked_weight(options, weights, r)
         fields["picked_urgency"] = float(r.urgency)
         fields["picked_original_urgency"] = float(r.original_urgency)
+        scope = picked_scope(r)
+        if scope is not None:
+            fields["picked_scope"] = scope
         self._emit("choice", fields, site=label if label == "choose" else f"{label}@{caller_site()}")
         return r
 
@@ -316,6 +319,21 @@ def picked_weight(options, weights, chosen) -> float | None:
     for option, weight in zip(options, weights):
         if option is chosen:
             return float(weight)
+    return None
+
+
+def picked_scope(codelet) -> str | None:
+    """The scope a top-down scout was handed, named as Metacat's recorder names it.
+
+    Metacat hands every top-down scout a scope -- the workspace when the slipnet
+    posts it, an object's string when a bridge proposal recruits it -- and logs it
+    as ``picked_scope``.  Petacat stores only the second kind, as ``scope``.
+    """
+    scope = (codelet.arguments or {}).get("scope")
+    if scope is not None:
+        return name_of(scope)
+    if codelet.codelet_type.startswith("top-down-") and (codelet.arguments or {}):
+        return "workspace"
     return None
 
 

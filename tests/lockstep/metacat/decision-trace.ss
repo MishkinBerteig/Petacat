@@ -507,7 +507,13 @@
           (tr-put ",\"picked_urgency\":")
           (tr-float (tell chosen 'get-relative-urgency))
           (tr-put ",\"picked_original_urgency\":")
-          (tr-float (tell chosen 'get-original-urgency)))))))
+          (tr-float (tell chosen 'get-original-urgency))
+          ;; A top-down scout's scope (its second argument) is not part of its
+          ;; name, so log the picked one's for replay to match on.
+          (let ((args (tell chosen 'get-arguments)))
+            (if (and (pair? args) (pair? (cdr args)))
+                (begin (tr-put ",\"picked_scope\":")
+                       (tr-q (tr-name (cadr args)))))))))))
 
 (set! trace-hook-choose-end
   (lambda (codelets chosen mark)
