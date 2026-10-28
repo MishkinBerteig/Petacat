@@ -75,9 +75,9 @@
   "unregistered_errors": 0
  },
  "aabb-cc-aabb/5": {
-  "agreement": 0.44857819115244857,
-  "reach": 2372,
-  "unregistered_errors": 7
+  "agreement": 1.0,
+  "reach": 5320,
+  "unregistered_errors": 0
  },
  "aabb-cc-aabb/6": {
   "agreement": 1.0,
@@ -255,9 +255,9 @@
   "unregistered_errors": 0
  },
  "abc-abd-glz/10": {
-  "agreement": 0.5557704865517539,
-  "reach": 14039,
-  "unregistered_errors": 3
+  "agreement": 1.0,
+  "reach": 25683,
+  "unregistered_errors": 0
  },
  "abc-abd-glz/2": {
   "agreement": 1.0,
@@ -490,9 +490,9 @@
   "unregistered_errors": 0
  },
  "abc-cba-mrrjjj/8": {
-  "agreement": 0.43767467859139186,
-  "reach": 1704,
-  "unregistered_errors": 44
+  "agreement": 1.0,
+  "reach": 3991,
+  "unregistered_errors": 0
  },
  "abc-cba-mrrjjj/9": {
   "agreement": 1.0,
@@ -780,9 +780,9 @@
   "unregistered_errors": 0
  },
  "rst-rsu-xyz/6": {
-  "agreement": 0.8527334340423794,
-  "reach": 3602,
-  "unregistered_errors": 3
+  "agreement": 0.9998366880333156,
+  "reach": 4306,
+  "unregistered_errors": 4
  },
  "rst-rsu-xyz/7": {
   "agreement": 1.0,

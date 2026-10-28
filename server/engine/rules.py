@@ -543,7 +543,7 @@ class IntrinsicChangeDescription:
         ending = _get_ending_letter_category(self.reference_object)
         return ending is not None and ending is self.descriptor2
 
-    def get_bond_facet_change(self) -> tuple | None:
+    def get_bond_facet_change(self, slipnet: Any = None) -> tuple | None:
         """Scheme: get-BondFacet-change.
 
         If this is a self GroupCtgy change on a group, return a
@@ -558,7 +558,12 @@ class IntrinsicChangeDescription:
         bf = getattr(self.reference_object, "bond_facet", None)
         if bf is None:
             return None
-        return (SCOPE_SELF, bf, [bf])  # (scope, dimension_node, [descriptors])
+        # rules.ss:1051-1054: `(self ,plato-bond-facet (,bond-facet))` -- the
+        # dimension is the bond-facet node itself, the descriptor the facet.
+        facet_dim = slipnet.nodes.get("plato-bond-facet") if slipnet is not None else None
+        if facet_dim is None:
+            return None
+        return (SCOPE_SELF, facet_dim, [bf])
 
     def make_change_template(self) -> tuple:
         """Scheme: make-change-template.
@@ -844,7 +849,10 @@ def _get_ending_letter_category(group: Any) -> SlipnetNode | None:
     objects = getattr(group, "objects", [])
     if not objects:
         return None
-    last = objects[-1]
+    # groups.ss:70-73,228-229: the *last of the ordered objects*, and a left-
+    # directed group's ordered objects are its objects reversed.
+    left = getattr(getattr(group, "direction", None), "name", "") == "plato-left"
+    last = objects[0] if left else objects[-1]
     return getattr(last, "letter_category", None)
 
 
@@ -2134,6 +2142,7 @@ def remove_redundant_change_descriptions(
 
 def change_descriptions_to_rule_clause_template(
     change_descriptions: list[IntrinsicChangeDescription | ExtrinsicChangeDescription],
+    slipnet: Any = None,
 ) -> tuple:
     """Convert a group of change descriptions into a rule-clause-template.
 
@@ -2142,7 +2151,7 @@ def change_descriptions_to_rule_clause_template(
     first = change_descriptions[0]
     if first.is_intrinsic:
         ref_obj = first.reference_object
-        bf_change = first.get_bond_facet_change()
+        bf_change = first.get_bond_facet_change(slipnet)
         templates = [cd.make_change_template() for cd in change_descriptions]
         if bf_change is not None:
             templates = [bf_change] + templates
@@ -3558,15 +3567,13 @@ def _get_all_swaps(cluster: list[Bridge]) -> list[tuple]:
         )
 
     # Partition by CM type (dimension)
-    dim_groups: dict[int, list[tuple]] = {}
-    for slip, obj in all_slippages:
-        did = id(slip.description_type1)
-        if did not in dim_groups:
-            dim_groups[did] = []
-        dim_groups[did].append((slip, obj))
+    # rules.ss:758-765: Scheme ``partition`` order (utilities.ss:811-825).
+    dim_groups = _partition_by(
+        lambda a, b: a[0].description_type1 is b[0].description_type1, all_slippages
+    )
 
     swaps = []
-    for group in dim_groups.values():
+    for group in dim_groups:
         from_descs = set()
         to_descs = set()
         objects = []
@@ -3626,15 +3633,15 @@ def _get_common_schemas(cluster: list[Bridge]) -> list[tuple]:
         all_cms.extend(b.concept_mappings)
 
     # Partition by CM type (dimension)
-    dim_groups: dict[int, list] = {}
-    for cm in all_cms:
-        did = id(cm.description_type1)
-        if did not in dim_groups:
-            dim_groups[did] = []
-        dim_groups[did].append(cm)
+    # rules.ss:709-735: the Scheme ``partition`` (utilities.ss:811-825), whose
+    # class order is not first-seen order -- it fixes the order the schemas are
+    # drawn in.
+    dim_groups = _partition_by(
+        lambda c1, c2: c1.description_type1 is c2.description_type1, all_cms
+    )
 
     schemas = []
-    for group in dim_groups.values():
+    for group in dim_groups:
         if len(group) < num_bridges:
             continue
         schema = _concept_mappings_to_schema(group)
@@ -3778,7 +3785,7 @@ def build_rule_from_bridges(
 
     # 4. Convert to rule clause templates
     templates = [
-        change_descriptions_to_rule_clause_template(group)
+        change_descriptions_to_rule_clause_template(group, slipnet)
         for group in partitioned
     ]
     templates = sort_templates(templates)

@@ -124,8 +124,10 @@ class Bridge(WorkspaceStructure):
         )
 
     def add_concept_mappings(self, cms: list[ConceptMapping]) -> None:
-        """``add-concept-mappings`` (bridges.ss:210-213)."""
-        self.concept_mappings.extend(cms)
+        """``add-concept-mappings`` (bridges.ss:210-213) -- new mappings go on the
+        **front** of the list (``(append cm-list concept-mappings)``); the order is
+        visible to the rule abstraction's schema partition."""
+        self.concept_mappings[:0] = list(cms)
 
     def add_bond_concept_mapping(self, cm: ConceptMapping) -> None:
         """``add-bond-concept-mapping`` (bridges.ss:222-225)."""
@@ -647,7 +649,7 @@ class Bridge(WorkspaceStructure):
     def add_concept_mapping(self, cm: ConceptMapping) -> None:
         """Add a new concept mapping to this bridge."""
         if cm not in self.concept_mappings:
-            self.concept_mappings.append(cm)
+            self.concept_mappings.insert(0, cm)  # bridges.ss:210-213 prepends
 
     def __repr__(self) -> str:
         n_cms = len(self.concept_mappings)
@@ -1052,8 +1054,12 @@ def make_concept_mappings(
 
     cms: list[ConceptMapping] = []
     seen: set[tuple[int, int, int]] = set()
-    for d1 in descriptions1:
-        for d2 in descriptions2:
+    # The Scheme's description lists are built by ``cons`` (workspace-objects.ss:
+    # 294), newest first; this port appends.  ``cross-product-filter-map``
+    # (utilities.ss:689-701) emits in list order, and that order decides which
+    # schema the rule abstraction's draws fall on (rules.ss:709-722).
+    for d1 in reversed(descriptions1):
+        for d2 in reversed(descriptions2):
             if not mappable_descriptions(d1, d2, object1, object2, bridge_type):
                 continue
             key = (id(d1.description_type), id(d1.descriptor), id(d2.descriptor))

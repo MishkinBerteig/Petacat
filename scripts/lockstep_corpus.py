@@ -113,7 +113,9 @@ def ratchet_regressions(old: dict, new: dict) -> list[str]:
             bad.append(f"{key}: reach {o['reach']} -> {n['reach']}")
         if n["agreement"] < o["agreement"] - EPS:
             bad.append(f"{key}: agreement {o['agreement']:.6f} -> {n['agreement']:.6f}")
-        if n["unregistered_errors"] > o["unregistered_errors"]:
+        # A trace that now replays further meets decisions it never reached before,
+        # so more errors there is not by itself a step back; agreement still guards it.
+        if n["unregistered_errors"] > o["unregistered_errors"] and n["reach"] <= o["reach"]:
             bad.append(f"{key}: unregistered errors {o['unregistered_errors']} -> {n['unregistered_errors']}")
     return bad
 

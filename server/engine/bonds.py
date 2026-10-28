@@ -453,6 +453,10 @@ def get_common_groups(object1: Any, object2: Any) -> list[Any]:
             continue
         if nested(object1) and nested(object2):
             result.append(group)
+    # The Scheme's ``group-list`` is built by ``cons`` (workspace-strings.ss:
+    # 264), newest first; ``string.groups`` appends.  The fights run through
+    # this list in order and stop at the first loss, so the order is visible.
+    result.reverse()
     return result
 
 
