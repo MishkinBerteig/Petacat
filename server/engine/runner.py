@@ -17,6 +17,7 @@ from typing import Any, Iterator
 logger = logging.getLogger("petacat.engine")
 
 from server.engine.codelet_dsl.builtins import get_builtins
+from server.engine.workspace_structures import set_structure_clock
 from server.engine.commentary import CommentaryLog, CommentaryWriter, emit_new_problem
 from server.engine.codelet_dsl.interpreter import CodeletInterpreter, CodeletRegistry
 from server.engine.access import AccessRecorder
@@ -336,6 +337,7 @@ class EngineRunner:
         Coderack's ``rng`` and so every codelet body's ``rng`` — the lockstep
         harness (``tests/lockstep/``) passes a tracing or replaying generator here.
         """
+        set_structure_clock(0)  # ``*codelet-count*`` is 0 while the run is set up
         with use_allocator(IdAllocator()) as ids:
             # Parameter overrides apply for this Run only, so the metadata is
             # replaced on the runner rather than mutated: two Runs in one process must
@@ -778,6 +780,7 @@ class EngineRunner:
         # ``codelet_count`` of an event it records, a clamp's start time — is
         # therefore one lower than the count reported for the codelet itself.
         ctx.coderack.current_time = ctx.codelet_count
+        set_structure_clock(ctx.codelet_count)
         result.codelet_type = codelet.codelet_type
         result.codelet_count = ctx.codelet_count + 1
 
@@ -807,6 +810,7 @@ class EngineRunner:
         # ``run.ss:182`` — the increment is the last thing ``step-mcat`` does.
         ctx.codelet_count += 1
         ctx.coderack.current_time = ctx.codelet_count
+        set_structure_clock(ctx.codelet_count)
 
         # ``run.ss:151-154``: the fixed-time initial unclamp, checked right after the
         # codelet and before the rack-empty test below.  Off by default.

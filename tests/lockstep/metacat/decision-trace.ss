@@ -521,7 +521,15 @@
           (let ((args (tell chosen 'get-arguments)))
             (if (and (pair? args) (pair? (cdr args)))
                 (begin (tr-put ",\"picked_scope\":")
-                       (tr-q (tr-name (cadr args)))))))))))
+                       (tr-q (tr-name (cadr args)))))
+            ;; Two evaluators/builders can agree on name, stamp, urgency and bin
+            ;; yet carry different proposals of the same structure name (made at
+            ;; different times).  Log the proposal's own time stamp so replay
+            ;; can tell them apart.
+            (if (and (pair? args)
+                     (memq (tell (car args) 'object-type) '(bond group bridge)))
+                (begin (tr-put ",\"picked_arg_stamp\":")
+                       (tr-num (tell (car args) 'get-time-stamp))))))))))
 
 (set! trace-hook-choose-end
   (lambda (codelets chosen mark)
@@ -599,6 +607,8 @@
     (tr-q (tr-name s))
     (tr-char #\,)
     (tr-float (tell s 'get-strength))
+    (tr-char #\,)
+    (tr-put (number->string (tell s 'get-time-stamp)))
     (tr-char #\])))
 
 (define tr-write-object-field

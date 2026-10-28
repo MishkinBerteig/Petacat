@@ -369,6 +369,14 @@ class ReplayRNG(LockstepBase):
                     and (want[1] is None
                          or _close(options[idx[j]].original_urgency, want[1]))]
             candidates = same or candidates
+        # Same name, stamp and urgency can still be two proposals of one structure
+        # made at different times (e.g. two bridge-evaluators for the same bridge
+        # name); Metacat logs the picked proposal's own time stamp.
+        if len(candidates) > 1 and "picked_arg_stamp" in rec:
+            same = [j for j in candidates
+                    if getattr((options[idx[j]].arguments or {}).get("structure"),
+                               "time_stamp", None) == rec["picked_arg_stamp"]]
+            candidates = same or candidates
         if len(candidates) > 1 and target_weight is not None and weights is not None \
                 and rec.get("weights"):
             want_share = target_weight / sum(rec["weights"])

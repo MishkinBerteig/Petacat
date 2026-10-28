@@ -92,7 +92,7 @@
  "aabb-cc-aabb/8": {
   "agreement": 1.0,
   "reach": 4640,
-  "unregistered_errors": 1
+  "unregistered_errors": 0
  },
  "aabb-cc-aabb/9": {
   "agreement": 1.0,
@@ -195,9 +195,9 @@
   "unregistered_errors": 0
  },
  "ab-c-ab/9": {
-  "agreement": 0.9950598023920957,
+  "agreement": 1.0,
   "reach": 903,
-  "unregistered_errors": 19
+  "unregistered_errors": 0
  },
  "abc-aabbcc-kkjjii/1": {
   "agreement": 1.0,

@@ -54,7 +54,7 @@ def _coderack(ctx: Any) -> dict:
 
 
 def _strengths(structs: list, namer: Callable[[Any], str]) -> list:
-    built = sorted([namer(s), float(s.strength)] for s in structs if s.is_built)
+    built = sorted([namer(s), float(s.strength), int(s.time_stamp)] for s in structs if s.is_built)
     return built
 
 
@@ -96,7 +96,7 @@ def _structures(ctx: Any) -> dict:
         "groups": _strengths(groups, group_name),
         "bridges": _strengths(bridges, bridge_name),
         "descriptions": sorted(
-            [description_name(d), float(d.strength)] for d in descriptions
+            [description_name(d), float(d.strength), int(d.time_stamp)] for d in descriptions
         ),
         "rules": _strengths(rules, rule_name),
         "proposed": {

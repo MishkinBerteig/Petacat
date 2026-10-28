@@ -1118,7 +1118,8 @@ def _consolidate_group(ctx: EngineContext, group: Group) -> Group | None:
         flat = GroupClass(
             string, group.group_category, letter_category, group.direction, letters, bonds
         )
-        flat.time_stamp = group.time_stamp
+        # ``make-group`` stamps the new group with the current count (workspace-
+        # structures.ss:22); the group it replaces keeps its own, older, stamp.
         flat.proposal_level = group.proposal_level
         if length_node is not None and group.description_type_present(length_node):
             attach_length_description(flat)
@@ -1156,7 +1157,6 @@ def _consolidate_group(ctx: EngineContext, group: Group) -> Group | None:
         spliced_group = GroupClass(
             string, group.group_category, length_node, group.direction, spliced, bonds
         )
-        spliced_group.time_stamp = group.time_stamp
         spliced_group.proposal_level = group.proposal_level
         attach_length_description(spliced_group)
         return spliced_group

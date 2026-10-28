@@ -5,6 +5,7 @@ Scheme source: workspace-structures.ss
 
 from __future__ import annotations
 
+import threading
 from typing import TYPE_CHECKING
 
 from server.engine.formulas import weighted_average
@@ -13,6 +14,18 @@ from server.engine.ids import KIND_STRUCTURE, next_id
 if TYPE_CHECKING:
     from server.engine.metadata import MetadataProvider
     from server.engine.rng import RNG
+
+
+#: The running engine's codelet count, as ``*codelet-count*`` is for Scheme's
+#: ``make-workspace-structure`` (workspace-structures.ss:22: ``(time-stamp
+#: *codelet-count*)``): every structure is stamped with the count at the moment it is
+#: *made*.  The runner sets it before and after each codelet.  Thread-local, so
+#: engines running in separate threads do not stamp each other's structures.
+_clock = threading.local()
+
+
+def set_structure_clock(codelet_count: int) -> None:
+    _clock.now = codelet_count
 
 
 class WorkspaceStructure:
@@ -31,7 +44,9 @@ class WorkspaceStructure:
         self.id = next_id(KIND_STRUCTURE)
         self.proposal_level = self.PROPOSED
         self.strength: float = 0.0
-        self.time_stamp: int = 0
+        #: workspace-structures.ss:22 -- the count when the structure was made (not
+        #: when built); the progress-watcher's activity is the age of the youngest.
+        self.time_stamp: int = getattr(_clock, "now", 0)
         #: The group this structure is a constituent of, if any.  Set for *bonds*
         #: by ``build-group`` (groups.ss:927-928) and cleared by ``break-group``
         #: (groups.ss:988-989); the breaker reads it to decide whether a bond can
