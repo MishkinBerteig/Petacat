@@ -12,6 +12,22 @@ Chez Scheme 9.5.4, no network) on ``Metacat/build/recorder-source``, a copy of
 the reconstructed ``Metacat/build/source`` with ``recorder.patch`` applied.  The
 plain trace is gzipped (mtime 0, so equal traces are equal bytes) into
 ``<out>/<slug>/<seed>.metacat.jsonl.gz``.
+
+Episodes and justify mode (task J)::
+
+    python3 tests/lockstep/metacat/record.py --problem abc abd xyz --seeds 1-5 --episode-runs 8
+    python3 tests/lockstep/metacat/record.py --problem abc abd xyz --answer wyz --seeds 1-5
+
+``--episode-runs N`` runs N runs of the problem in one Metacat process, memory cleared
+only before run 1 (``init-mcat`` keeps memory).  Run k (1-based) uses seed
+``S + k - 1`` where S is the episode seed -- the convention of the study collectors
+(``studies/episodic-v2/collector.ss.in``: ``(+ first_seed i)``).  Each run writes its own
+trace ``<out>/episodes/<slug>/<S>.r<k>.metacat.jsonl.gz`` whose header carries
+``episode_run`` k and ``episode_seed`` S (and ``seed`` = S + k - 1).  An error ends the
+episode (later runs are not recorded).  ``--answer A`` is justify mode; the slug gets
+the answer as a fourth part and the traces go under ``justify/`` (or
+``episodes-justify/``), header field ``answer``.  The default (single-run, discovery)
+layout and the existing traces are unchanged.
 """
 
 from __future__ import annotations
@@ -82,15 +98,30 @@ def parse_seeds(text: str) -> list[int]:
     return seeds
 
 
-def slug_of(problem: list[str]) -> str:
-    return "-".join(problem)
+def slug_of(problem: list[str], answer: str | None = None) -> str:
+    return "-".join(problem + ([answer] if answer else []))
+
+
+def subdir_of(args_answer, episode_runs: int) -> str:
+    """Directory under ``--out`` for a recording mode ('' = the classic layout)."""
+    return {(False, 0): "", (False, 1): "episodes", (True, 0): "justify",
+            (True, 1): "episodes-justify"}[(bool(args_answer), 1 if episode_runs else 0)]
+
+
+def trace_name(seed: int, episode_runs: int, episode_seed: int | None = None) -> str:
+    """File stem of a run's trace: ``<seed>`` or ``<episode seed>.r<k>``."""
+    return f"{seed}" if not episode_runs else f"{episode_seed}.r{seed - episode_seed + 1}"
 
 
 def driver_text(problem: list[str], seed: int, cap: int, revision: str,
-                snapshots: bool, audit: bool, mode: str) -> str:
+                snapshots: bool, audit: bool, mode: str, answer: str | None = None,
+                episode_runs: int = 0) -> str:
     """The per-run Scheme driver (spec 5.2).  Paths are the container's."""
     i, m, t = problem
-    slug = slug_of(problem)
+    slug = slug_of(problem, answer)
+    sub = subdir_of(answer, episode_runs)
+    prefix = f"/x/{sub}/{slug}" if sub else f"/x/{slug}"
+    a = f"'{answer}" if answer else "#f"
     lines = ["(define *metacat-directory* \"/metacat/\")"]
     if audit:
         lines.append("(load \"/recorder/random-audit.ss\")")
@@ -98,19 +129,43 @@ def driver_text(problem: list[str], seed: int, cap: int, revision: str,
     lines.append("(load \"/recorder/decision-trace.ss\")")
     if not snapshots:
         lines.append("(set! *tr-snapshots?* #f)")
+    if answer:
+        # Justify mode is a global the GUI sets from a 4-part problem (gui.ss:752);
+        # init-mcat only reads it.
+        lines.append("(set! %justify-mode% #t)")
     if mode == "names":
         lines += [
             "(tell *memory* 'clear)",
-            f"(init-mcat '{i} '{m} '{t} #f {seed})",
+            f"(init-mcat '{i} '{m} '{t} {a} {seed})",
             f"(dump-opening-names \"/x/opening-names.{slug}.json\")",
             "(exit 0)",
         ]
+    elif episode_runs:
+        lines.append("(tell *memory* 'clear)                 ; once, before run 1")
+        for k in range(1, episode_runs + 1):
+            run_seed = seed + k - 1
+            extra = f",\\\"episode_run\\\":{k},\\\"episode_seed\\\":{seed}"
+            if answer:
+                extra += f",\\\"answer\\\":\\\"{answer}\\\""
+            lines += [
+                f"(if (not *tr-failed?*)",
+                f"  (begin",
+                f"    (set! *tr-header-extra* \"{extra}\")",
+                f"    (trace-open \"{prefix}/{seed}.r{k}.metacat.jsonl\" '({i} {m} {t}) "
+                f"{run_seed} {cap} \"{revision}\")",
+                f"    (init-mcat '{i} '{m} '{t} {a} {run_seed})   ; keeps memory (run.ss:212-213)",
+                f"    (set! *break-time* {cap})",
+                f"    (trace-run)))",
+            ]
+        lines.append("(exit 0)")
     else:
+        if answer:
+            lines.append(f"(set! *tr-header-extra* \",\\\"answer\\\":\\\"{answer}\\\"\")")
         lines += [
-            f"(trace-open \"/x/{slug}/{seed}.metacat.jsonl\" '({i} {m} {t}) "
+            f"(trace-open \"{prefix}/{seed}.metacat.jsonl\" '({i} {m} {t}) "
             f"{seed} {cap} \"{revision}\")",
             "(tell *memory* 'clear)                 ; init-mcat keeps memory (run.ss:212-213)",
-            f"(init-mcat '{i} '{m} '{t} #f {seed})",
+            f"(init-mcat '{i} '{m} '{t} {a} {seed})",
             f"(set! *break-time* {cap})",
             "(trace-run)",
             "(exit 0)",
@@ -118,32 +173,43 @@ def driver_text(problem: list[str], seed: int, cap: int, revision: str,
     return "\n".join(lines) + "\n"
 
 
-def baseline_driver_text(problem: list[str], seed: int, cap: int) -> str:
-    """The unpatched collector-style driver (studies/support-v1a/collector.ss.in)."""
+def baseline_driver_text(problem: list[str], seed: int, cap: int,
+                         answer: str | None = None, episode_runs: int = 0) -> str:
+    """The unpatched collector-style driver (studies/support-v1a/collector.ss.in;
+    with ``episode_runs`` the episodic-v2 loop: memory cleared once, seeds S+k-1)."""
     i, m, t = problem
+    a = f"'{answer}" if answer else "#f"
+    n = episode_runs or 1
     return f"""(define *metacat-directory* "/metacat/")
 (load "/metacat/metacat-headless.ss")
 (set! report-error-and-halt
   (lambda (message object)
     (assertion-violation 'metacat-message "unrecognized object message" (cdr message))))
 (reset-handler (lambda () (exit 1)))
+{"(set! %justify-mode% #t)" if answer else ""}
 (tell *memory* 'clear)
-(let* ((outcome
-         (guard (c (#t 'error))
-           (init-mcat '{i} '{m} '{t} #f {seed})
-           (set! *break-time* {cap})
-           (call/cc (lambda (k)
-                      (set! suspend (lambda () (k 'suspended)))
-                      (set! break (lambda () (k 'capped)))
-                      (run-mcat)))))
-       (answers (tell *memory* 'get-answers)))
-  (display (format "RESULT ~a ~a"
-             (cond ((eq? outcome 'error) "*ERROR*")
-                   ((not (null? answers)) (tell (car answers) 'get-answer-print-name))
-                   ((eq? outcome 'capped) "*CAP*")
-                   (else "*NONE*"))
-             *codelet-count*))
-  (write-char #\\newline))
+(define (one-run run-seed)
+  (let* ((before (length (tell *memory* 'get-answers)))
+         (outcome
+           (guard (c (#t 'error))
+             (init-mcat '{i} '{m} '{t} {a} run-seed)
+             (set! *break-time* {cap})
+             (call/cc (lambda (k)
+                        (set! suspend (lambda () (k 'suspended)))
+                        (set! break (lambda () (k 'capped)))
+                        (run-mcat)))))
+         (answers (tell *memory* 'get-answers)))
+    (display (format "RESULT ~a ~a"
+               (cond ((eq? outcome 'error) "*ERROR*")
+                     ((> (length answers) before) (tell (car answers) 'get-answer-print-name))
+                     ((eq? outcome 'capped) "*CAP*")
+                     (else "*NONE*"))
+               *codelet-count*))
+    (write-char #\\newline)
+    outcome))
+(let loop ((k 0))
+  (if (< k {n})
+      (if (not (eq? (one-run (+ {seed} k)) 'error)) (loop (+ k 1)))))
 (exit 0)
 """
 
@@ -186,30 +252,37 @@ def last_record(path: Path) -> str:
 
 
 def record_one(args, source: Path, revision: str, problem: list[str], seed: int) -> dict:
-    slug = slug_of(problem)
+    answer, runs = args.answer, args.episode_runs
+    slug = slug_of(problem, answer)
+    sub = subdir_of(answer, runs)
     rundir = WORK / f"{slug}-{seed}-{os.getpid()}-{time.monotonic_ns()}"
-    (rundir / slug).mkdir(parents=True)
+    (rundir / sub / slug).mkdir(parents=True)
     (rundir / "driver.ss").write_text(
         driver_text(problem, seed, args.cap, revision, not args.no_snapshots,
-                    args.audit, "run"))
+                    args.audit, "run", answer, runs))
     try:
         code, output, wall = run_container(source, rundir, args.timeout)
-        plain = rundir / slug / f"{seed}.metacat.jsonl"
+        stems = [f"{seed}.r{k}" for k in range(1, runs + 1)] if runs else [f"{seed}"]
+        plains = [rundir / sub / slug / f"{stem}.metacat.jsonl" for stem in stems]
         result = {"seed": seed, "wall": wall, "output": output, "code": code}
-        if code != 0 or not plain.exists():
+        if code != 0 or not plains[0].exists():
             result["error"] = f"container exit {code}"
             return result
-        match = re.search(r"^RESULT (\S+) (\d+)$", output, re.M)
-        result["state"], result["codelets"] = (match.group(1), int(match.group(2))) \
-            if match else (None, None)
-        result["plain_bytes"] = plain.stat().st_size
-        result["end"] = last_record(plain)
-        if args.keep_plain:
-            keep = Path(args.out) / slug / f"{seed}.metacat.jsonl"
-            keep.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(plain, keep)
-        result["gz_bytes"] = gzip_deterministic(
-            plain, Path(args.out) / slug / f"{seed}.metacat.jsonl.gz")
+        matches = re.findall(r"^RESULT (\S+) (\d+)$", output, re.M)
+        result["state"], result["codelets"] = (matches[0][0], int(matches[0][1])) \
+            if matches else (None, None)
+        result["results"] = [(st, int(n)) for st, n in matches]
+        done = [p for p in plains if p.exists()]
+        result["plain_bytes"] = sum(p.stat().st_size for p in done)
+        result["end"] = last_record(done[-1])
+        out = Path(args.out) / sub / slug
+        result["gz_bytes"] = 0
+        for p in done:
+            if args.keep_plain:
+                out.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(p, out / p.name)
+            result["gz_bytes"] += gzip_deterministic(p, out / (p.name + ".gz"))
+        result["files"] = [p.name + ".gz" for p in done]
         return result
     finally:
         if not args.keep_work:
@@ -217,27 +290,29 @@ def record_one(args, source: Path, revision: str, problem: list[str], seed: int)
 
 
 def baseline_one(args, problem: list[str], seed: int) -> dict:
-    slug = slug_of(problem)
+    slug = slug_of(problem, args.answer)
     rundir = WORK / f"base-{slug}-{seed}-{os.getpid()}-{time.monotonic_ns()}"
     rundir.mkdir(parents=True)
-    (rundir / "driver.ss").write_text(baseline_driver_text(problem, seed, args.cap))
+    (rundir / "driver.ss").write_text(
+        baseline_driver_text(problem, seed, args.cap, args.answer, args.episode_runs))
     try:
         code, output, wall = run_container(SOURCE, rundir, args.timeout)
-        match = re.search(r"^RESULT (\S+) (\d+)$", output, re.M)
+        matches = re.findall(r"^RESULT (\S+) (\d+)$", output, re.M)
         return {"seed": seed, "wall": wall, "code": code,
-                "state": match.group(1) if match else None,
-                "codelets": int(match.group(2)) if match else None,
+                "state": matches[0][0] if matches else None,
+                "codelets": int(matches[0][1]) if matches else None,
+                "results": [(st, int(n)) for st, n in matches],
                 "output": output}
     finally:
         shutil.rmtree(rundir, ignore_errors=True)
 
 
 def dump_names(args, source: Path, problem: list[str]) -> None:
-    slug = slug_of(problem)
+    slug = slug_of(problem, args.answer)
     rundir = WORK / f"names-{slug}-{os.getpid()}"
     rundir.mkdir(parents=True)
     (rundir / "driver.ss").write_text(
-        driver_text(problem, 1, args.cap, "", False, False, "names"))
+        driver_text(problem, 1, args.cap, "", False, False, "names", args.answer))
     try:
         code, output, _ = run_container(source, rundir, args.timeout)
         produced = rundir / f"opening-names.{slug}.json"
@@ -262,6 +337,13 @@ def main() -> None:
     parser.add_argument("--no-snapshots", action="store_true")
     parser.add_argument("--timeout", type=int, default=3 * 3600,
                         help="per-container timeout in seconds")
+    parser.add_argument("--episode-runs", type=int, default=0, metavar="N",
+                        help="record an episode: N runs of the problem in one process, "
+                             "memory cleared only before run 1; run k uses seed S+k-1 "
+                             "(S = each value of --seeds); traces <S>.r<k> under episodes/")
+    parser.add_argument("--answer", metavar="A",
+                        help="justify mode: the answer string (lowercase letters); the "
+                             "slug gets it as a fourth part, traces go under justify/")
     parser.add_argument("--names", action="store_true",
                         help="write tests/lockstep/metacat/opening-names.<slug>.json and exit")
     parser.add_argument("--baseline", action="store_true",
@@ -275,7 +357,7 @@ def main() -> None:
     parser.add_argument("--keep-work", action="store_true")
     args = parser.parse_args()
 
-    for word in args.problem:
+    for word in args.problem + ([args.answer] if args.answer else []):
         if not re.fullmatch(r"[a-z]+", word):
             sys.exit(f"problem strings must be lowercase letters: {word!r}")
     problem = list(args.problem)
@@ -286,7 +368,9 @@ def main() -> None:
         with concurrent.futures.ThreadPoolExecutor(args.jobs) as pool:
             for r in pool.map(lambda s: baseline_one(args, problem, s), seeds):
                 print(f"seed {r['seed']}: {r['state']} {r['codelets']} "
-                      f"({r['wall']:.1f}s, exit {r['code']})", flush=True)
+                      f"({r['wall']:.1f}s, exit {r['code']})"
+                      + (" | " + " ".join(f"{st}/{n}" for st, n in r["results"])
+                         if args.episode_runs else ""), flush=True)
         return
 
     source = ensure_recorder_source()
@@ -296,7 +380,7 @@ def main() -> None:
 
     revision = "metacat-bundle-manifest-sha256:" + sha256(METACAT / "manifest.json")
     seeds = parse_seeds(args.seeds)
-    print(f"recording {slug_of(problem)} seeds {seeds[0]}..{seeds[-1]} ({len(seeds)}) "
+    print(f"recording {slug_of(problem, args.answer)} seeds {seeds[0]}..{seeds[-1]} ({len(seeds)}) "
           f"cap {args.cap} jobs {args.jobs} snapshots {not args.no_snapshots}", flush=True)
     failures = 0
     with concurrent.futures.ThreadPoolExecutor(args.jobs) as pool:
@@ -313,6 +397,12 @@ def main() -> None:
             if args.audit:
                 extra = " | " + " ; ".join(
                     l for l in r["output"].splitlines() if l.startswith("AUDIT"))
+            if args.episode_runs:
+                print(f"episode {r['seed']}: " + " ".join(f"{st}/{n}" for st, n in r["results"])
+                      + f" ({len(r['files'])} runs, {r['wall']:.1f}s, "
+                      f"{r['plain_bytes']/1e6:.1f} MB raw, {r['gz_bytes']/1e6:.2f} MB gz)",
+                      flush=True)
+                continue
             print(f"seed {r['seed']}: {r['state']} {r['codelets']} codelets, "
                   f"{r['wall']:.1f}s, {r['plain_bytes']/1e6:.1f} MB raw, "
                   f"{r['gz_bytes']/1e6:.2f} MB gz{extra}", flush=True)

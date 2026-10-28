@@ -1,0 +1,1002 @@
+{
+ "episodes/aabc-aabd-ijkk/1.r1": {
+  "agreement": 0.17982093663911847,
+  "reach": 434,
+  "unregistered_errors": 171
+ },
+ "episodes/aabc-aabd-ijkk/1.r2": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/aabc-aabd-ijkk/1.r3": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/aabc-aabd-ijkk/1.r4": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/aabc-aabd-ijkk/1.r5": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/aabc-aabd-ijkk/1.r6": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/aabc-aabd-ijkk/1.r7": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/aabc-aabd-ijkk/1.r8": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/aabc-aabd-ijkk/2.r1": {
+  "agreement": 1.0,
+  "reach": 1102,
+  "unregistered_errors": 0
+ },
+ "episodes/aabc-aabd-ijkk/2.r2": {
+  "agreement": 0.32586015538290786,
+  "reach": 1940,
+  "unregistered_errors": 149
+ },
+ "episodes/aabc-aabd-ijkk/2.r3": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/aabc-aabd-ijkk/2.r4": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/aabc-aabd-ijkk/2.r5": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/aabc-aabd-ijkk/2.r6": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/aabc-aabd-ijkk/2.r7": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/aabc-aabd-ijkk/2.r8": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/aabc-aabd-ijkk/3.r1": {
+  "agreement": 0.32586015538290786,
+  "reach": 1940,
+  "unregistered_errors": 149
+ },
+ "episodes/aabc-aabd-ijkk/3.r2": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/aabc-aabd-ijkk/3.r3": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/aabc-aabd-ijkk/3.r4": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/aabc-aabd-ijkk/3.r5": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/aabc-aabd-ijkk/3.r6": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/aabc-aabd-ijkk/3.r7": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/aabc-aabd-ijkk/3.r8": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/aabc-aabd-ijkk/4.r1": {
+  "agreement": 1.0,
+  "reach": 711,
+  "unregistered_errors": 0
+ },
+ "episodes/aabc-aabd-ijkk/4.r2": {
+  "agreement": 0.9875980156825092,
+  "reach": 1847,
+  "unregistered_errors": 160
+ },
+ "episodes/aabc-aabd-ijkk/4.r3": {
+  "agreement": 0.9997468674851284,
+  "reach": 1127,
+  "unregistered_errors": 2
+ },
+ "episodes/aabc-aabd-ijkk/4.r4": {
+  "agreement": 0.9940250447227191,
+  "reach": 4098,
+  "unregistered_errors": 168
+ },
+ "episodes/aabc-aabd-ijkk/4.r5": {
+  "agreement": 0.047592961851129566,
+  "reach": 363,
+  "unregistered_errors": 52
+ },
+ "episodes/aabc-aabd-ijkk/4.r6": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/aabc-aabd-ijkk/4.r7": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/aabc-aabd-ijkk/4.r8": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/aabc-aabd-ijkk/5.r1": {
+  "agreement": 0.9875980156825092,
+  "reach": 1847,
+  "unregistered_errors": 160
+ },
+ "episodes/aabc-aabd-ijkk/5.r2": {
+  "agreement": 0.9997468674851284,
+  "reach": 1127,
+  "unregistered_errors": 2
+ },
+ "episodes/aabc-aabd-ijkk/5.r3": {
+  "agreement": 0.9940250447227191,
+  "reach": 4098,
+  "unregistered_errors": 168
+ },
+ "episodes/aabc-aabd-ijkk/5.r4": {
+  "agreement": 0.047592961851129566,
+  "reach": 363,
+  "unregistered_errors": 52
+ },
+ "episodes/aabc-aabd-ijkk/5.r5": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/aabc-aabd-ijkk/5.r6": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/aabc-aabd-ijkk/5.r7": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/aabc-aabd-ijkk/5.r8": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-mrrjjj/1.r1": {
+  "agreement": 1.0,
+  "reach": 1251,
+  "unregistered_errors": 0
+ },
+ "episodes/abc-abd-mrrjjj/1.r2": {
+  "agreement": 1.0,
+  "reach": 1088,
+  "unregistered_errors": 0
+ },
+ "episodes/abc-abd-mrrjjj/1.r3": {
+  "agreement": 0.3993230537796164,
+  "reach": 810,
+  "unregistered_errors": 407
+ },
+ "episodes/abc-abd-mrrjjj/1.r4": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-mrrjjj/1.r5": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-mrrjjj/1.r6": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-mrrjjj/1.r7": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-mrrjjj/1.r8": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-mrrjjj/2.r1": {
+  "agreement": 1.0,
+  "reach": 549,
+  "unregistered_errors": 0
+ },
+ "episodes/abc-abd-mrrjjj/2.r2": {
+  "agreement": 0.3993230537796164,
+  "reach": 810,
+  "unregistered_errors": 407
+ },
+ "episodes/abc-abd-mrrjjj/2.r3": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-mrrjjj/2.r4": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-mrrjjj/2.r5": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-mrrjjj/2.r6": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-mrrjjj/2.r7": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-mrrjjj/2.r8": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-mrrjjj/3.r1": {
+  "agreement": 0.3993230537796164,
+  "reach": 810,
+  "unregistered_errors": 407
+ },
+ "episodes/abc-abd-mrrjjj/3.r2": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-mrrjjj/3.r3": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-mrrjjj/3.r4": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-mrrjjj/3.r5": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-mrrjjj/3.r6": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-mrrjjj/3.r7": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-mrrjjj/3.r8": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-mrrjjj/4.r1": {
+  "agreement": 0.998422159887798,
+  "reach": 777,
+  "unregistered_errors": 9
+ },
+ "episodes/abc-abd-mrrjjj/4.r2": {
+  "agreement": 0.426725453620485,
+  "reach": 1936,
+  "unregistered_errors": 8
+ },
+ "episodes/abc-abd-mrrjjj/4.r3": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-mrrjjj/4.r4": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-mrrjjj/4.r5": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-mrrjjj/4.r6": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-mrrjjj/4.r7": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-mrrjjj/4.r8": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-mrrjjj/5.r1": {
+  "agreement": 1.0,
+  "reach": 1023,
+  "unregistered_errors": 0
+ },
+ "episodes/abc-abd-mrrjjj/5.r2": {
+  "agreement": 1.0,
+  "reach": 1101,
+  "unregistered_errors": 0
+ },
+ "episodes/abc-abd-mrrjjj/5.r3": {
+  "agreement": 1.0,
+  "reach": 2935,
+  "unregistered_errors": 0
+ },
+ "episodes/abc-abd-mrrjjj/5.r4": {
+  "agreement": 0.989602406487052,
+  "reach": 2080,
+  "unregistered_errors": 160
+ },
+ "episodes/abc-abd-mrrjjj/5.r5": {
+  "agreement": 0.09006047127554109,
+  "reach": 5735,
+  "unregistered_errors": 43
+ },
+ "episodes/abc-abd-mrrjjj/5.r6": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-mrrjjj/5.r7": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-mrrjjj/5.r8": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-xyz/1.r1": {
+  "agreement": 0.7686938002839565,
+  "reach": 1035,
+  "unregistered_errors": 287
+ },
+ "episodes/abc-abd-xyz/1.r2": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-xyz/1.r3": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-xyz/1.r4": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-xyz/1.r5": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-xyz/1.r6": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-xyz/1.r7": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-xyz/1.r8": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-xyz/2.r1": {
+  "agreement": 0.3055691364060625,
+  "reach": 1196,
+  "unregistered_errors": 1181
+ },
+ "episodes/abc-abd-xyz/2.r2": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-xyz/2.r3": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-xyz/2.r4": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-xyz/2.r5": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-xyz/2.r6": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-xyz/2.r7": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-xyz/2.r8": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-xyz/3.r1": {
+  "agreement": 0.9713392059236563,
+  "reach": 2428,
+  "unregistered_errors": 450
+ },
+ "episodes/abc-abd-xyz/3.r2": {
+  "agreement": 1.0,
+  "reach": 362,
+  "unregistered_errors": 0
+ },
+ "episodes/abc-abd-xyz/3.r3": {
+  "agreement": 0.43498294753646327,
+  "reach": 1996,
+  "unregistered_errors": 181
+ },
+ "episodes/abc-abd-xyz/3.r4": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-xyz/3.r5": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-xyz/3.r6": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-xyz/3.r7": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-xyz/3.r8": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-xyz/4.r1": {
+  "agreement": 1.0,
+  "reach": 362,
+  "unregistered_errors": 0
+ },
+ "episodes/abc-abd-xyz/4.r2": {
+  "agreement": 0.43498294753646327,
+  "reach": 1996,
+  "unregistered_errors": 181
+ },
+ "episodes/abc-abd-xyz/4.r3": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-xyz/4.r4": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-xyz/4.r5": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-xyz/4.r6": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-xyz/4.r7": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-xyz/4.r8": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-xyz/5.r1": {
+  "agreement": 0.7805338541666667,
+  "reach": 1996,
+  "unregistered_errors": 181
+ },
+ "episodes/abc-abd-xyz/5.r2": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-xyz/5.r3": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-xyz/5.r4": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-xyz/5.r5": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-xyz/5.r6": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-xyz/5.r7": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/abc-abd-xyz/5.r8": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/eqe-qeq-abbba/1.r1": {
+  "agreement": 1.0,
+  "reach": 1190,
+  "unregistered_errors": 0
+ },
+ "episodes/eqe-qeq-abbba/1.r2": {
+  "agreement": 1.0,
+  "reach": 989,
+  "unregistered_errors": 0
+ },
+ "episodes/eqe-qeq-abbba/1.r3": {
+  "agreement": 1.0,
+  "reach": 3635,
+  "unregistered_errors": 0
+ },
+ "episodes/eqe-qeq-abbba/1.r4": {
+  "agreement": 1.0,
+  "reach": 1546,
+  "unregistered_errors": 0
+ },
+ "episodes/eqe-qeq-abbba/1.r5": {
+  "agreement": 1.0,
+  "reach": 1233,
+  "unregistered_errors": 0
+ },
+ "episodes/eqe-qeq-abbba/1.r6": {
+  "agreement": 1.0,
+  "reach": 2948,
+  "unregistered_errors": 0
+ },
+ "episodes/eqe-qeq-abbba/1.r7": {
+  "agreement": 1.0,
+  "reach": 5498,
+  "unregistered_errors": 0
+ },
+ "episodes/eqe-qeq-abbba/1.r8": {
+  "agreement": 1.0,
+  "reach": 36125,
+  "unregistered_errors": 0
+ },
+ "episodes/eqe-qeq-abbba/2.r1": {
+  "agreement": 1.0,
+  "reach": 989,
+  "unregistered_errors": 0
+ },
+ "episodes/eqe-qeq-abbba/2.r2": {
+  "agreement": 1.0,
+  "reach": 2717,
+  "unregistered_errors": 0
+ },
+ "episodes/eqe-qeq-abbba/2.r3": {
+  "agreement": 1.0,
+  "reach": 1165,
+  "unregistered_errors": 0
+ },
+ "episodes/eqe-qeq-abbba/2.r4": {
+  "agreement": 1.0,
+  "reach": 1233,
+  "unregistered_errors": 0
+ },
+ "episodes/eqe-qeq-abbba/2.r5": {
+  "agreement": 1.0,
+  "reach": 1729,
+  "unregistered_errors": 0
+ },
+ "episodes/eqe-qeq-abbba/2.r6": {
+  "agreement": 1.0,
+  "reach": 5498,
+  "unregistered_errors": 0
+ },
+ "episodes/eqe-qeq-abbba/2.r7": {
+  "agreement": 1.0,
+  "reach": 36125,
+  "unregistered_errors": 0
+ },
+ "episodes/eqe-qeq-abbba/2.r8": {
+  "agreement": 0.9998410006359975,
+  "reach": 12165,
+  "unregistered_errors": 54
+ },
+ "episodes/eqe-qeq-abbba/3.r1": {
+  "agreement": 1.0,
+  "reach": 2717,
+  "unregistered_errors": 0
+ },
+ "episodes/eqe-qeq-abbba/3.r2": {
+  "agreement": 1.0,
+  "reach": 1165,
+  "unregistered_errors": 0
+ },
+ "episodes/eqe-qeq-abbba/3.r3": {
+  "agreement": 1.0,
+  "reach": 1233,
+  "unregistered_errors": 0
+ },
+ "episodes/eqe-qeq-abbba/3.r4": {
+  "agreement": 1.0,
+  "reach": 1729,
+  "unregistered_errors": 0
+ },
+ "episodes/eqe-qeq-abbba/3.r5": {
+  "agreement": 1.0,
+  "reach": 5498,
+  "unregistered_errors": 0
+ },
+ "episodes/eqe-qeq-abbba/3.r6": {
+  "agreement": 1.0,
+  "reach": 16279,
+  "unregistered_errors": 0
+ },
+ "episodes/eqe-qeq-abbba/3.r7": {
+  "agreement": 0.9998410006359975,
+  "reach": 12165,
+  "unregistered_errors": 54
+ },
+ "episodes/eqe-qeq-abbba/3.r8": {
+  "agreement": 0.9999747704107377,
+  "reach": 16727,
+  "unregistered_errors": 2
+ },
+ "episodes/eqe-qeq-abbba/4.r1": {
+  "agreement": 1.0,
+  "reach": 1165,
+  "unregistered_errors": 0
+ },
+ "episodes/eqe-qeq-abbba/4.r2": {
+  "agreement": 1.0,
+  "reach": 650,
+  "unregistered_errors": 0
+ },
+ "episodes/eqe-qeq-abbba/4.r3": {
+  "agreement": 1.0,
+  "reach": 1729,
+  "unregistered_errors": 0
+ },
+ "episodes/eqe-qeq-abbba/4.r4": {
+  "agreement": 1.0,
+  "reach": 5498,
+  "unregistered_errors": 0
+ },
+ "episodes/eqe-qeq-abbba/4.r5": {
+  "agreement": 1.0,
+  "reach": 3527,
+  "unregistered_errors": 0
+ },
+ "episodes/eqe-qeq-abbba/4.r6": {
+  "agreement": 0.9999060733003964,
+  "reach": 11406,
+  "unregistered_errors": 5
+ },
+ "episodes/eqe-qeq-abbba/4.r7": {
+  "agreement": 0.9999747704107377,
+  "reach": 16727,
+  "unregistered_errors": 2
+ },
+ "episodes/eqe-qeq-abbba/4.r8": {
+  "agreement": 0.9998986161099002,
+  "reach": 3765,
+  "unregistered_errors": 43
+ },
+ "episodes/eqe-qeq-abbba/5.r1": {
+  "agreement": 1.0,
+  "reach": 616,
+  "unregistered_errors": 0
+ },
+ "episodes/eqe-qeq-abbba/5.r2": {
+  "agreement": 1.0,
+  "reach": 971,
+  "unregistered_errors": 0
+ },
+ "episodes/eqe-qeq-abbba/5.r3": {
+  "agreement": 1.0,
+  "reach": 3042,
+  "unregistered_errors": 0
+ },
+ "episodes/eqe-qeq-abbba/5.r4": {
+  "agreement": 1.0,
+  "reach": 3527,
+  "unregistered_errors": 0
+ },
+ "episodes/eqe-qeq-abbba/5.r5": {
+  "agreement": 1.0,
+  "reach": 4531,
+  "unregistered_errors": 0
+ },
+ "episodes/eqe-qeq-abbba/5.r6": {
+  "agreement": 1.0,
+  "reach": 10853,
+  "unregistered_errors": 0
+ },
+ "episodes/eqe-qeq-abbba/5.r7": {
+  "agreement": 0.9998986161099002,
+  "reach": 3765,
+  "unregistered_errors": 43
+ },
+ "episodes/eqe-qeq-abbba/5.r8": {
+  "agreement": 1.0,
+  "reach": 12127,
+  "unregistered_errors": 0
+ },
+ "episodes/rst-rsu-xyz/1.r1": {
+  "agreement": 0.9409656902266416,
+  "reach": 1710,
+  "unregistered_errors": 364
+ },
+ "episodes/rst-rsu-xyz/1.r2": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/rst-rsu-xyz/1.r3": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/rst-rsu-xyz/1.r4": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/rst-rsu-xyz/1.r5": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/rst-rsu-xyz/1.r6": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/rst-rsu-xyz/1.r7": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/rst-rsu-xyz/1.r8": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/rst-rsu-xyz/2.r1": {
+  "agreement": 0.986786355475763,
+  "reach": 2303,
+  "unregistered_errors": 186
+ },
+ "episodes/rst-rsu-xyz/2.r2": {
+  "agreement": 1.0,
+  "reach": 571,
+  "unregistered_errors": 0
+ },
+ "episodes/rst-rsu-xyz/2.r3": {
+  "agreement": 0.9995425434583715,
+  "reach": 754,
+  "unregistered_errors": 3
+ },
+ "episodes/rst-rsu-xyz/2.r4": {
+  "agreement": 0.2654710505922728,
+  "reach": 943,
+  "unregistered_errors": 45
+ },
+ "episodes/rst-rsu-xyz/2.r5": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/rst-rsu-xyz/2.r6": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/rst-rsu-xyz/2.r7": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/rst-rsu-xyz/2.r8": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/rst-rsu-xyz/3.r1": {
+  "agreement": 1.0,
+  "reach": 571,
+  "unregistered_errors": 0
+ },
+ "episodes/rst-rsu-xyz/3.r2": {
+  "agreement": 0.9995425434583715,
+  "reach": 754,
+  "unregistered_errors": 3
+ },
+ "episodes/rst-rsu-xyz/3.r3": {
+  "agreement": 0.2654710505922728,
+  "reach": 943,
+  "unregistered_errors": 45
+ },
+ "episodes/rst-rsu-xyz/3.r4": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/rst-rsu-xyz/3.r5": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/rst-rsu-xyz/3.r6": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/rst-rsu-xyz/3.r7": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/rst-rsu-xyz/3.r8": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/rst-rsu-xyz/4.r1": {
+  "agreement": 0.9995425434583715,
+  "reach": 754,
+  "unregistered_errors": 3
+ },
+ "episodes/rst-rsu-xyz/4.r2": {
+  "agreement": 0.2654710505922728,
+  "reach": 943,
+  "unregistered_errors": 45
+ },
+ "episodes/rst-rsu-xyz/4.r3": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/rst-rsu-xyz/4.r4": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/rst-rsu-xyz/4.r5": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/rst-rsu-xyz/4.r6": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/rst-rsu-xyz/4.r7": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/rst-rsu-xyz/4.r8": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/rst-rsu-xyz/5.r1": {
+  "agreement": 1.0,
+  "reach": 588,
+  "unregistered_errors": 0
+ },
+ "episodes/rst-rsu-xyz/5.r2": {
+  "agreement": 0.7502960029396154,
+  "reach": 3187,
+  "unregistered_errors": 353
+ },
+ "episodes/rst-rsu-xyz/5.r3": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/rst-rsu-xyz/5.r4": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/rst-rsu-xyz/5.r5": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/rst-rsu-xyz/5.r6": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/rst-rsu-xyz/5.r7": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ },
+ "episodes/rst-rsu-xyz/5.r8": {
+  "agreement": 0.0,
+  "reach": 0,
+  "unregistered_errors": 1
+ }
+}

@@ -195,6 +195,9 @@ def _safe_repr(x: Any) -> str:
         return "unprintable"
 
 
+_THEME_TYPE_STRINGS = frozenset({"top_bridge", "bottom_bridge", "vertical_bridge"})
+
+
 def _name_of(x: Any) -> str:
     if x is None:
         return "-"
@@ -203,7 +206,8 @@ def _name_of(x: Any) -> str:
     if isinstance(x, (int, float)):
         return number_name(x)
     if isinstance(x, str):
-        return x
+        # Theme types are Metacat symbols spelled with hyphens (``themes.ss:750``).
+        return x.replace("_", "-") if x in _THEME_TYPE_STRINGS else x
     if isinstance(x, (list, tuple)):
         return "(" + ",".join(name_of(i) for i in x) + ")"
 

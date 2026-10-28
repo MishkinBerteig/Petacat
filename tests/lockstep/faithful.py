@@ -36,7 +36,7 @@ def faithful_settings() -> dict[str, Any]:
         "runner": "EngineRunner",
         "rng": "RNG",
         "numeric_backend": "off",
-        "memory": "fresh",
+        "memory": "fresh",  # an episode carries one memory across its runs
         "parameters": dict(FAITHFUL_PARAMETERS),
         "spreading_activation_threshold": 100,
         "staleness_delay": 0,
@@ -68,7 +68,7 @@ def _metadata() -> Any:
 
 
 def header_record(problem: tuple[str, str, str], seed: int, cap: int,
-                  **extra: Any) -> dict[str, Any]:
+                  answer: str | None = None, **extra: Any) -> dict[str, Any]:
     from tests.lockstep.trace_io import FORMAT
 
     rec: dict[str, Any] = {
@@ -76,6 +76,8 @@ def header_record(problem: tuple[str, str, str], seed: int, cap: int,
         "revision": git_revision(), "problem": list(problem), "seed": seed,
         "cap": cap, "settings": faithful_settings(),
     }
+    if answer:
+        rec["answer"] = answer  # justify mode (after "cap", as Metacat's header has it)
     rec.update(extra)
     return rec
 
@@ -101,8 +103,12 @@ class Outcome:
         return rec
 
 
-def run_faithful(problem: tuple[str, str, str], seed: int, cap: int, rng: Any) -> Outcome:
+def run_faithful(problem: tuple[str, str, str], seed: int, cap: int, rng: Any,
+                 answer: str | None = None, memory: Any = None) -> Outcome:
     """Run ``problem`` with ``rng`` in faithful mode and say how it ended.
+
+    ``answer`` selects justify mode (``init_mcat``'s fourth argument); ``memory`` is
+    the episode's ``EpisodicMemory`` carried over from earlier runs (fresh when None).
 
     ``rng`` is installed as ``ctx.rng``, ``ctx.coderack.rng`` and every codelet body's
     ``rng`` by ``init_mcat(..., rng=rng)``.
@@ -117,7 +123,8 @@ def run_faithful(problem: tuple[str, str, str], seed: int, cap: int, rng: Any) -
     with use_backend("off"):
         try:
             runner.init_mcat(
-                *problem, seed=seed, memory=EpisodicMemory(),
+                *problem, answer=answer, seed=seed,
+                memory=memory if memory is not None else EpisodicMemory(),
                 parameters=dict(FAITHFUL_PARAMETERS), rng=rng,
             )
             result = runner.run_mcat(max_steps=cap)

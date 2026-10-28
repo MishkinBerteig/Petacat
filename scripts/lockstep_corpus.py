@@ -38,20 +38,46 @@ DEFAULT_CMD = ".venv/bin/python -m tests.lockstep.run_trace replay --metacat {me
 EPS = 1e-12
 
 
-def find_traces(root: Path, problems: list[str] | None = None, seeds: list[str] | None = None) -> list[tuple[str, str, Path]]:
+def _seed_key(seed: str) -> tuple[int, int]:
+    """Sort key of ``7`` or an episode run ``7.r3`` (episode seed, run)."""
+    head, _, run = seed.partition(".r")
+    return (int(head) if head.isdigit() else 0, int(run) if run.isdigit() else 0)
+
+
+def find_traces(root: Path, problems: list[str] | None = None, seeds: list[str] | None = None,
+                kind: str = "single") -> list[tuple[str, str, Path]]:
+    """Metacat traces under ``root`` (the traces directory).
+
+    ``kind`` picks the layout: ``single`` -- ``<slug>/<seed>.metacat.jsonl.gz`` (the
+    default; episodic and justify traces are not in this glob); ``justify`` --
+    ``justify/<slug>/<seed>...``; ``episodes`` -- ``episodes/<slug>/<S>.r<k>...`` (seed
+    ``S.rk``; ``--seed S`` selects the whole episode).  The returned slug carries the
+    sub-directory (``episodes/abc-abd-xyz``).
+    """
+    sub = {"single": "", "justify": "justify", "episodes": "episodes"}[kind]
+    base = root / sub if sub else root
     out = []
-    for p in sorted(root.glob("*/*.metacat.jsonl*")):
-        slug, seed = p.parent.name, p.name.split(".")[0]
-        if problems and slug not in problems:
+    for p in sorted(base.glob("*/*.metacat.jsonl*")):
+        slug, seed = p.parent.name, ".".join(p.name.split(".")[:2] if kind == "episodes" else p.name.split(".")[:1])
+        if problems and slug not in problems and f"{sub}/{slug}" not in problems:
             continue
-        if seeds and seed not in seeds:
+        if seeds and seed not in seeds and seed.split(".")[0] not in seeds:
             continue
-        out.append((slug, seed, p))
-    return sorted(out, key=lambda t: (t[0], int(t[1]) if t[1].isdigit() else 0))
+        out.append((f"{sub}/{slug}" if sub else slug, seed, p))
+    return sorted(out, key=lambda t: (t[0], _seed_key(t[1])))
 
 
 def petacat_path(out_dir: Path, slug: str, seed: str) -> Path:
     return out_dir / slug / f"{seed}.petacat.jsonl.gz"
+
+
+def _header(path: Path) -> dict:
+    import gzip
+    try:
+        with (gzip.open(path, "rt") if path.suffix == ".gz" else open(path)) as f:
+            return json.loads(f.readline())
+    except (OSError, ValueError):
+        return {}
 
 
 def replay(metacat: Path, out: Path, cmd_template: str) -> tuple[bool, str]:
@@ -66,6 +92,8 @@ def summarise(slug: str, seed: str, meta: Path, pet: Path, registry: ct.Registry
     rep = ct.compare(meta, pet, registry)
     ff = rep.first_fatal
     return {
+        "memory_in_sync": _header(pet).get("memory_in_sync", True),
+        "not_reached": bool(_header(pet).get("not_reached")),
         "key": f"{slug}/{seed}", "problem": slug, "seed": seed,
         "reach": rep.reach, "run_length": rep.run_length,
         "agreement": rep.agreement, "unregistered_errors": rep.unregistered_error_count,
@@ -96,10 +124,11 @@ def to_ratchet(rows: list[dict]) -> dict:
 
 
 def print_table(rows: list[dict]) -> None:
-    print(f"{'problem':24s} {'seed':>6s} {'reach':>8s} {'length':>8s} {'agree':>7s} {'errors':>7s}  first fatal")
+    print(f"{'problem':32s} {'seed':>8s} {'reach':>8s} {'length':>8s} {'agree':>7s} {'errors':>7s}  first fatal")
     for r in rows:
-        print(f"{r['problem']:24s} {r['seed']:>6s} {r['reach']:>8d} {r['run_length']:>8d} "
-              f"{r['agreement']:7.4f} {r['unregistered_errors']:>7d}  {r['first_fatal']}")
+        note = " (not reached)" if r.get("not_reached") else "" if r.get("memory_in_sync", True) else " (memory out of step)"
+        print(f"{r['problem']:32s} {r['seed']:>8s} {r['reach']:>8d} {r['run_length']:>8d} "
+              f"{r['agreement']:7.4f} {r['unregistered_errors']:>7d}  {r['first_fatal']}{note}")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -112,31 +141,53 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--replay-cmd", default=DEFAULT_CMD)
     ap.add_argument("--jobs", type=int, default=1)
     ap.add_argument("--registry", default=str(ct.DEFAULT_REGISTRY))
-    ap.add_argument("--ratchet", default=str(RATCHET))
+    ap.add_argument("--episodes", action="store_true",
+                    help="replay the episode traces (traces/episodes/<slug>/<S>.r<k>...) instead: one "
+                         "replay per episode, one memory carried across its runs; ratchet-episodes.json")
+    ap.add_argument("--justify", action="store_true",
+                    help="replay the justify-mode traces (traces/justify/<slug>/<seed>...); ratchet-justify.json")
+    ap.add_argument("--ratchet", default=None)
     ap.add_argument("--update-ratchet", action="store_true")
     ap.add_argument("--check-ratchet", action="store_true")
     args = ap.parse_args(argv)
 
-    traces = find_traces(Path(args.traces), args.problem, args.seed)
+    if args.episodes and args.justify:
+        ap.error("--episodes and --justify are separate corpora; run them one at a time")
+    kind = "episodes" if args.episodes else "justify" if args.justify else "single"
+    if args.ratchet is None:
+        args.ratchet = str(RATCHET.with_name({"single": "ratchet.json", "episodes": "ratchet-episodes.json",
+                                              "justify": "ratchet-justify.json"}[kind]))
+    traces = find_traces(Path(args.traces), args.problem, args.seed, kind)
     if not traces:
         print(f"no traces under {args.traces}", file=sys.stderr)
         return 2
     out_dir = Path(args.out_dir)
     registry = ct.Registry.load(args.registry)
 
-    def work(item):
-        slug, seed, meta = item
-        pet = petacat_path(out_dir, slug, seed)
+    # A unit of work is one replay command: one trace, or (episodes) all runs of an episode.
+    units: dict[tuple, list] = {}
+    for item in traces:
+        key = (item[0], item[1].split(".")[0]) if kind == "episodes" else (item[0], item[1])
+        units.setdefault(key, []).append(item)
+
+    def work(group):
+        out = []
+        first = group[0]
         if not args.no_replay:
-            ok, msg = replay(meta, pet, args.replay_cmd)
+            ok, msg = replay(first[2], petacat_path(out_dir, first[0], first[1]), args.replay_cmd)
             if not ok:
-                return item, None, f"replay failed: {msg}"
-        if not pet.exists():
-            return item, None, f"no petacat trace at {pet}"
-        return item, summarise(slug, seed, meta, pet, registry), None
+                return [(it, None, f"replay failed: {msg}") for it in group]
+        for item in group:
+            slug, seed, meta = item
+            pet = petacat_path(out_dir, slug, seed)
+            if not pet.exists():
+                out.append((item, None, f"no petacat trace at {pet}"))
+            else:
+                out.append((item, summarise(slug, seed, meta, pet, registry), None))
+        return out
 
     with ThreadPoolExecutor(max_workers=max(1, args.jobs)) as ex:
-        results = list(ex.map(work, traces))
+        results = [r for part in ex.map(work, units.values()) for r in part]
     rows, failures = [], []
     for item, row, err in results:
         if err:

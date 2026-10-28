@@ -1,0 +1,427 @@
+{
+ "justify/aabc-aabd-ijkk-hjkk/1": {
+  "agreement": 0.0917536705949127,
+  "reach": 882,
+  "unregistered_errors": 119
+ },
+ "justify/aabc-aabd-ijkk-hjkk/2": {
+  "agreement": 0.31293834397571446,
+  "reach": 930,
+  "unregistered_errors": 399
+ },
+ "justify/aabc-aabd-ijkk-hjkk/3": {
+  "agreement": 0.6888501966853678,
+  "reach": 1530,
+  "unregistered_errors": 333
+ },
+ "justify/aabc-aabd-ijkk-hjkk/4": {
+  "agreement": 0.4069223573433115,
+  "reach": 2220,
+  "unregistered_errors": 431
+ },
+ "justify/aabc-aabd-ijkk-hjkk/5": {
+  "agreement": 0.9995943863064817,
+  "reach": 1574,
+  "unregistered_errors": 5
+ },
+ "justify/aabc-aabd-ijkk-ijll/1": {
+  "agreement": 1.0,
+  "reach": 2301,
+  "unregistered_errors": 0
+ },
+ "justify/aabc-aabd-ijkk-ijll/2": {
+  "agreement": 1.0,
+  "reach": 856,
+  "unregistered_errors": 0
+ },
+ "justify/aabc-aabd-ijkk-ijll/3": {
+  "agreement": 0.18560506195623516,
+  "reach": 348,
+  "unregistered_errors": 144
+ },
+ "justify/aabc-aabd-ijkk-ijll/4": {
+  "agreement": 0.9994496855345912,
+  "reach": 1726,
+  "unregistered_errors": 7
+ },
+ "justify/aabc-aabd-ijkk-ijll/5": {
+  "agreement": 0.6676028739386022,
+  "reach": 1365,
+  "unregistered_errors": 219
+ },
+ "justify/abc-abd-ijk-abd/1": {
+  "agreement": 0.9998396665063332,
+  "reach": 1836,
+  "unregistered_errors": 2
+ },
+ "justify/abc-abd-ijk-abd/2": {
+  "agreement": 0.514573123549136,
+  "reach": 1200,
+  "unregistered_errors": 77
+ },
+ "justify/abc-abd-ijk-abd/3": {
+  "agreement": 0.9944062602279151,
+  "reach": 5009,
+  "unregistered_errors": 190
+ },
+ "justify/abc-abd-ijk-abd/4": {
+  "agreement": 0.08026654902598157,
+  "reach": 516,
+  "unregistered_errors": 160
+ },
+ "justify/abc-abd-ijk-abd/5": {
+  "agreement": 1.0,
+  "reach": 1234,
+  "unregistered_errors": 0
+ },
+ "justify/abc-abd-mrrjjj-mrrjjjj/1": {
+  "agreement": 1.0,
+  "reach": 2720,
+  "unregistered_errors": 0
+ },
+ "justify/abc-abd-mrrjjj-mrrjjjj/2": {
+  "agreement": 0.6791487287791406,
+  "reach": 2040,
+  "unregistered_errors": 639
+ },
+ "justify/abc-abd-mrrjjj-mrrjjjj/3": {
+  "agreement": 0.14996537614101355,
+  "reach": 1590,
+  "unregistered_errors": 1752
+ },
+ "justify/abc-abd-mrrjjj-mrrjjjj/4": {
+  "agreement": 0.23213024438480012,
+  "reach": 855,
+  "unregistered_errors": 302
+ },
+ "justify/abc-abd-mrrjjj-mrrjjjj/5": {
+  "agreement": 0.47787815612694,
+  "reach": 1605,
+  "unregistered_errors": 492
+ },
+ "justify/abc-abd-mrrjjj-mrrkkk/1": {
+  "agreement": 1.0,
+  "reach": 484,
+  "unregistered_errors": 0
+ },
+ "justify/abc-abd-mrrjjj-mrrkkk/2": {
+  "agreement": 0.5742282082324455,
+  "reach": 1020,
+  "unregistered_errors": 377
+ },
+ "justify/abc-abd-mrrjjj-mrrkkk/3": {
+  "agreement": 0.9990442054958184,
+  "reach": 1503,
+  "unregistered_errors": 12
+ },
+ "justify/abc-abd-mrrjjj-mrrkkk/4": {
+  "agreement": 0.19652689538331217,
+  "reach": 285,
+  "unregistered_errors": 211
+ },
+ "justify/abc-abd-mrrjjj-mrrkkk/5": {
+  "agreement": 1.0,
+  "reach": 1077,
+  "unregistered_errors": 0
+ },
+ "justify/abc-abd-xyz-dyz/1": {
+  "agreement": 0.8538834951456311,
+  "reach": 8139,
+  "unregistered_errors": 116
+ },
+ "justify/abc-abd-xyz-dyz/2": {
+  "agreement": 0.43563117728012013,
+  "reach": 580,
+  "unregistered_errors": 385
+ },
+ "justify/abc-abd-xyz-dyz/3": {
+  "agreement": 0.784954449764331,
+  "reach": 6794,
+  "unregistered_errors": 11
+ },
+ "justify/abc-abd-xyz-dyz/4": {
+  "agreement": 0.16655162432366236,
+  "reach": 1304,
+  "unregistered_errors": 166
+ },
+ "justify/abc-abd-xyz-dyz/5": {
+  "agreement": 0.7750868809730669,
+  "reach": 2303,
+  "unregistered_errors": 223
+ },
+ "justify/abc-abd-xyz-wyz/1": {
+  "agreement": 0.8076443705857914,
+  "reach": 585,
+  "unregistered_errors": 940
+ },
+ "justify/abc-abd-xyz-wyz/2": {
+  "agreement": 0.6986221391872957,
+  "reach": 960,
+  "unregistered_errors": 268
+ },
+ "justify/abc-abd-xyz-wyz/3": {
+  "agreement": 0.9998071731585036,
+  "reach": 1334,
+  "unregistered_errors": 3
+ },
+ "justify/abc-abd-xyz-wyz/4": {
+  "agreement": 0.5141129032258065,
+  "reach": 600,
+  "unregistered_errors": 575
+ },
+ "justify/abc-abd-xyz-wyz/5": {
+  "agreement": 0.41626946298061646,
+  "reach": 765,
+  "unregistered_errors": 789
+ },
+ "justify/abc-abd-xyz-xyd/1": {
+  "agreement": 0.24303476859313838,
+  "reach": 360,
+  "unregistered_errors": 367
+ },
+ "justify/abc-abd-xyz-xyd/2": {
+  "agreement": 0.3781499924551079,
+  "reach": 390,
+  "unregistered_errors": 444
+ },
+ "justify/abc-abd-xyz-xyd/3": {
+  "agreement": 1.0,
+  "reach": 406,
+  "unregistered_errors": 0
+ },
+ "justify/abc-abd-xyz-xyd/4": {
+  "agreement": 1.0,
+  "reach": 674,
+  "unregistered_errors": 0
+ },
+ "justify/abc-abd-xyz-xyd/5": {
+  "agreement": 0.49328417171451144,
+  "reach": 576,
+  "unregistered_errors": 222
+ },
+ "justify/abc-cba-mrrjjj-mmmrrj/1": {
+  "agreement": 0.02539039596607122,
+  "reach": 2533,
+  "unregistered_errors": 360
+ },
+ "justify/abc-cba-mrrjjj-mmmrrj/2": {
+  "agreement": 0.0085208339070805,
+  "reach": 258,
+  "unregistered_errors": 72
+ },
+ "justify/abc-cba-mrrjjj-mmmrrj/3": {
+  "agreement": 0.034500581470474224,
+  "reach": 708,
+  "unregistered_errors": 622
+ },
+ "justify/abc-cba-mrrjjj-mmmrrj/4": {
+  "agreement": 0.05167901943239182,
+  "reach": 465,
+  "unregistered_errors": 116
+ },
+ "justify/abc-cba-mrrjjj-mmmrrj/5": {
+  "agreement": 0.1329074383829427,
+  "reach": 885,
+  "unregistered_errors": 260
+ },
+ "justify/eqe-qeq-abbba-aaabaaa/1": {
+  "agreement": 0.022489492320378255,
+  "reach": 1618,
+  "unregistered_errors": 7
+ },
+ "justify/eqe-qeq-abbba-aaabaaa/2": {
+  "agreement": 0.014924463525125782,
+  "reach": 695,
+  "unregistered_errors": 349
+ },
+ "justify/eqe-qeq-abbba-aaabaaa/3": {
+  "agreement": 0.04135696173100537,
+  "reach": 1657,
+  "unregistered_errors": 118
+ },
+ "justify/eqe-qeq-abbba-aaabaaa/4": {
+  "agreement": 0.05281351927472584,
+  "reach": 1536,
+  "unregistered_errors": 23
+ },
+ "justify/eqe-qeq-abbba-aaabaaa/5": {
+  "agreement": 0.29319774934775095,
+  "reach": 4752,
+  "unregistered_errors": 211
+ },
+ "justify/eqe-qeq-abbba-baaab/1": {
+  "agreement": 0.18864447187325634,
+  "reach": 1725,
+  "unregistered_errors": 205
+ },
+ "justify/eqe-qeq-abbba-baaab/2": {
+  "agreement": 0.9384695948157361,
+  "reach": 2070,
+  "unregistered_errors": 442
+ },
+ "justify/eqe-qeq-abbba-baaab/3": {
+  "agreement": 0.4252305156338536,
+  "reach": 1290,
+  "unregistered_errors": 84
+ },
+ "justify/eqe-qeq-abbba-baaab/4": {
+  "agreement": 1.0,
+  "reach": 2033,
+  "unregistered_errors": 0
+ },
+ "justify/eqe-qeq-abbba-baaab/5": {
+  "agreement": 0.26169480801929695,
+  "reach": 1017,
+  "unregistered_errors": 50
+ },
+ "justify/eqe-qeq-abbbc-aaabccc/1": {
+  "agreement": 0.13973273572377157,
+  "reach": 1006,
+  "unregistered_errors": 80
+ },
+ "justify/eqe-qeq-abbbc-aaabccc/2": {
+  "agreement": 0.1724553636382532,
+  "reach": 1185,
+  "unregistered_errors": 573
+ },
+ "justify/eqe-qeq-abbbc-aaabccc/3": {
+  "agreement": 0.09633920035989428,
+  "reach": 1234,
+  "unregistered_errors": 737
+ },
+ "justify/eqe-qeq-abbbc-aaabccc/4": {
+  "agreement": 0.2039096626289538,
+  "reach": 1830,
+  "unregistered_errors": 196
+ },
+ "justify/eqe-qeq-abbbc-aaabccc/5": {
+  "agreement": 0.5793190575453224,
+  "reach": 5820,
+  "unregistered_errors": 498
+ },
+ "justify/rst-rsu-xyz-uyz/1": {
+  "agreement": 0.14152066678006464,
+  "reach": 654,
+  "unregistered_errors": 79
+ },
+ "justify/rst-rsu-xyz-uyz/2": {
+  "agreement": 0.4512333351325093,
+  "reach": 2760,
+  "unregistered_errors": 770
+ },
+ "justify/rst-rsu-xyz-uyz/3": {
+  "agreement": 0.8137531770686247,
+  "reach": 2805,
+  "unregistered_errors": 393
+ },
+ "justify/rst-rsu-xyz-uyz/4": {
+  "agreement": 0.2337142621395272,
+  "reach": 995,
+  "unregistered_errors": 35
+ },
+ "justify/rst-rsu-xyz-uyz/5": {
+  "agreement": 0.03052895991845353,
+  "reach": 705,
+  "unregistered_errors": 1643
+ },
+ "justify/rst-rsu-xyz-wyz/1": {
+  "agreement": 0.5930830039525692,
+  "reach": 450,
+  "unregistered_errors": 51
+ },
+ "justify/rst-rsu-xyz-wyz/2": {
+  "agreement": 0.7409768748649233,
+  "reach": 930,
+  "unregistered_errors": 298
+ },
+ "justify/rst-rsu-xyz-wyz/3": {
+  "agreement": 0.9146656815663096,
+  "reach": 795,
+  "unregistered_errors": 290
+ },
+ "justify/rst-rsu-xyz-wyz/4": {
+  "agreement": 0.17216952075890107,
+  "reach": 525,
+  "unregistered_errors": 969
+ },
+ "justify/rst-rsu-xyz-wyz/5": {
+  "agreement": 0.7633587786259542,
+  "reach": 600,
+  "unregistered_errors": 214
+ },
+ "justify/rst-rsu-xyz-xyu/1": {
+  "agreement": 0.3359282227206756,
+  "reach": 364,
+  "unregistered_errors": 126
+ },
+ "justify/rst-rsu-xyz-xyu/2": {
+  "agreement": 1.0,
+  "reach": 271,
+  "unregistered_errors": 0
+ },
+ "justify/rst-rsu-xyz-xyu/3": {
+  "agreement": 1.0,
+  "reach": 864,
+  "unregistered_errors": 0
+ },
+ "justify/rst-rsu-xyz-xyu/4": {
+  "agreement": 1.0,
+  "reach": 618,
+  "unregistered_errors": 0
+ },
+ "justify/rst-rsu-xyz-xyu/5": {
+  "agreement": 1.0,
+  "reach": 1431,
+  "unregistered_errors": 1
+ },
+ "justify/xqc-xqd-mrrjjj-mrrjjjj/1": {
+  "agreement": 0.1982170542635659,
+  "reach": 1191,
+  "unregistered_errors": 2779
+ },
+ "justify/xqc-xqd-mrrjjj-mrrjjjj/2": {
+  "agreement": 0.038106555753614574,
+  "reach": 435,
+  "unregistered_errors": 489
+ },
+ "justify/xqc-xqd-mrrjjj-mrrjjjj/3": {
+  "agreement": 0.1977126712593854,
+  "reach": 1367,
+  "unregistered_errors": 174
+ },
+ "justify/xqc-xqd-mrrjjj-mrrjjjj/4": {
+  "agreement": 0.17492067871430542,
+  "reach": 1140,
+  "unregistered_errors": 1910
+ },
+ "justify/xqc-xqd-mrrjjj-mrrjjjj/5": {
+  "agreement": 0.7288980158849998,
+  "reach": 3120,
+  "unregistered_errors": 714
+ },
+ "justify/xqc-xqd-mrrjjj-mrrkkk/1": {
+  "agreement": 1.0,
+  "reach": 1263,
+  "unregistered_errors": 0
+ },
+ "justify/xqc-xqd-mrrjjj-mrrkkk/2": {
+  "agreement": 0.2898945518453427,
+  "reach": 585,
+  "unregistered_errors": 1035
+ },
+ "justify/xqc-xqd-mrrjjj-mrrkkk/3": {
+  "agreement": 0.2616530514175877,
+  "reach": 537,
+  "unregistered_errors": 812
+ },
+ "justify/xqc-xqd-mrrjjj-mrrkkk/4": {
+  "agreement": 1.0,
+  "reach": 1060,
+  "unregistered_errors": 0
+ },
+ "justify/xqc-xqd-mrrjjj-mrrkkk/5": {
+  "agreement": 0.34168740880611104,
+  "reach": 601,
+  "unregistered_errors": 13
+ }
+}

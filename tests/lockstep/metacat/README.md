@@ -37,6 +37,30 @@ The driver is the spec 5.2 sketch: `trace-open`, `(tell *memory* 'clear)`, `init
 unrecognised-message halts and any other error into an `end` record with reason `error`,
 and prints `RESULT <answer|*CAP*|*NONE*|*ERROR*> <codelet count>` (the collector's vocabulary).
 
+## Episodes and justify mode
+
+```sh
+python3 tests/lockstep/metacat/record.py --problem abc abd xyz --seeds 1-5 --episode-runs 8   # 5 episodes of 8 runs
+python3 tests/lockstep/metacat/record.py --problem abc abd xyz --answer wyz --seeds 1-5       # justify mode
+python3 tests/lockstep/metacat/record.py --problem abc abd xyz --seeds 1-5 --episode-runs 8 --baseline   # unpatched check
+```
+
+* `--episode-runs N`: one Metacat process runs N runs of the problem; `(tell *memory* 'clear)` only before run 1
+  (`init-mcat` keeps memory, `run.ss:212-213`).  Run k (1-based) uses seed `S + k - 1`, S being the episode seed
+  (`--seeds`): the convention of `studies/episodic-v2/collector.ss.in`.  Each run writes its own trace
+  `<out>/episodes/<slug>/<S>.r<k>.metacat.jsonl.gz` whose header has `seed` = S+k-1, `episode_run` = k and
+  `episode_seed` = S.  A run that ends in an error ends the episode (later runs are not recorded).  In an episode
+  the `end` record's `reason` is `answer` only if memory *gained* an answer during this run (memory carries
+  earlier runs' answers).
+* `--answer A`: justify mode.  The GUI sets `%justify-mode%` from a four-part problem (`gui.ss:752`); the driver
+  sets it directly, then passes `'A` to `init-mcat`.  The slug gets the answer (`abc-abd-xyz-wyz`), the traces go
+  under `<out>/justify/<slug>/<seed>.metacat.jsonl.gz` (episodes + answer: `episodes-justify/`), and the header
+  carries `answer`.  Neither option changes the default layout, and recordings made without them are byte-identical
+  to those made before the options existed.
+* `decision-trace.ss`: `*tr-header-extra*` (header fields spliced after `cap`), `*tr-failed?*`, `*tr-answers-before*`.
+* Validation: `--baseline` runs the unpatched collector-style loop and prints the same `RESULT answer/codelets`
+  sequence; the recorder must match it, run for run.
+
 ## Record format
 
 Spec section 3 exactly.  Field order: `t, c, ctx, who, [u], n, [about], [scope], kind,

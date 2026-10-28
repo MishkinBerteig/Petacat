@@ -38,6 +38,14 @@
 (define *tr-scope* #f)
 (define *tr-saved* '())
 (define *tr-name-cache* (make-weak-eq-hashtable))
+;; Extra header fields (a string of ",\"key\":value" pairs) spliced in after "cap":
+;; the episode driver sets episode_run / episode_seed / answer here before trace-open.
+(define *tr-header-extra* "")
+;; Set by trace-run: #t when the run ended in an error (an episode stops there).
+(define *tr-failed?* #f)
+;; Number of answers in memory when trace-open ran: in an episode memory carries
+;; earlier runs' answers, so "this run found an answer" means the count grew.
+(define *tr-answers-before* 0)
 
 ;; ---------------------------------------------------------------------------
 ;; Output primitives.  Always write to an explicit port: Metacat rebinds
@@ -754,6 +762,7 @@
     (set! *tr-depth* 0)
     (set! *tr-u-counter* 0)
     (set! *tr-saved* '())
+    (set! *tr-answers-before* (length (tell *memory* 'get-answers)))
     (tr-set-unit! "init" "init-mcat" 1 #f)
     (tr-put "{\"t\":\"header\",\"format\":1,\"engine\":\"metacat\",\"revision\":")
     (tr-q revision)
@@ -763,6 +772,7 @@
     (tr-num seed)
     (tr-put ",\"cap\":")
     (tr-num cap)
+    (tr-put *tr-header-extra*)
     (tr-put ",\"settings\":{\"recorder\":1,\"snapshots\":")
     (tr-bool *tr-snapshots?*)
     (tr-put "}}")
@@ -799,11 +809,12 @@
                   (set! break (lambda () (k 'capped)))
                   (run-mcat))))))
       (set! *tr-depth* 0)
+      (set! *tr-failed?* (pair? outcome))
       (let ((answers (tell *memory* 'get-answers)))
         (cond
           ((pair? outcome)
            (tr-end-record "error" #f (tr-condition-text (cdr outcome)) *codelet-count*))
-          ((not (null? answers))
+          ((> (length answers) *tr-answers-before*)
            (tr-end-record "answer" (tell (car answers) 'get-answer-print-name) #f
                           *codelet-count*))
           ((eq? outcome 'capped)
@@ -820,7 +831,7 @@
         (printf "RESULT ~a ~a~%"
           (cond
             ((pair? outcome) "*ERROR*")
-            ((not (null? answers)) (tell (car answers) 'get-answer-print-name))
+            ((> (length answers) *tr-answers-before*) (tell (car answers) 'get-answer-print-name))
             ((eq? outcome 'capped) "*CAP*")
             (else "*NONE*"))
           *codelet-count*)))))

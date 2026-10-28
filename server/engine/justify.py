@@ -106,8 +106,10 @@ def attempt_justification(
         )
 
     # No floor: ``stochastic-pick-by-method ... 'get-strength`` (justify.ss:26-27)
-    # leaves a worthless rule unchosen (``utilities.ss:443-448``).
-    weights = [r.quality for r in all_supported]
+    # leaves a worthless rule unchosen (``utilities.ss:443-448``).  A rule's strength
+    # is its rank-relative quality as of the last update cycle (``rules.ss:286``,
+    # ``workspace-structures.ss:40``), not its raw quality (G-J1).
+    weights = [r.strength for r in all_supported]
     chosen_rule: Rule = rng.weighted_pick(all_supported, weights)
 
     rule_type = chosen_rule.rule_type  # "top" or "bottom"
@@ -289,8 +291,9 @@ def attempt_justification(
     # ``(100- (abs (- strength ...)))`` (justify.ss:142-146) is used raw, so a
     # rule 100 away in quality is not a unification candidate at all
     # (``utilities.ss:443-448``).
-    strength = chosen_rule.quality
-    other_weights = [100.0 - abs(strength - r.quality) for r in other_rules]
+    # ``(tell r 'get-strength)``: the stored, rank-relative strength (G-J1).
+    strength = chosen_rule.strength
+    other_weights = [100.0 - abs(strength - r.strength) for r in other_rules]
     other_rule: Rule = rng.weighted_pick(other_rules, other_weights)
 
     unifying_pattern = unify_rules(chosen_rule, other_rule, slipnet)
@@ -374,8 +377,11 @@ def clamp_rules(
     if vertical_theme_pattern is not None:
         clamped_theme_patterns.append(vertical_theme_pattern)
     elif themespace is not None:
+        # justify.ss:163-170 clamps the vertical pattern whatever it holds: a bare
+        # ``(vertical-bridge)`` still clamps the vertical theme type and switches
+        # its thematic pressure on (trace.ss:1530-1536) (G-J2).
         vtp = themespace.get_dominant_theme_pattern("vertical_bridge")
-        if vtp and len(vtp) > 1:
+        if vtp:
             tp_dict = _theme_pattern_list_to_dict(vtp)
             if tp_dict:
                 clamped_theme_patterns.append(tp_dict)
@@ -660,7 +666,13 @@ def get_vertical_theme_pattern_to_clamp(
         return _theme_pattern_list_to_dict(unifying_pattern) if unifying_pattern else {}
 
     theme_type = unifying_pattern[0]
-    pattern_entries = unifying_pattern[1:]
+    # A Themespace relation is the bare name (``identity``, ``opposite``); the entries a
+    # unification yields carry the label *node* (or ``plato-identity``), which names no
+    # theme, so the clamp silently created none of them (G-J3).
+    pattern_entries = [
+        (e[0], _relation_name(e[1])) + tuple(e[2:]) if isinstance(e, tuple) and len(e) >= 2 else e
+        for e in unifying_pattern[1:]
+    ]
 
     # Compute retention probability for each entry and filter
     final_entries: list[tuple[str, str | None]] = []
@@ -684,6 +696,14 @@ def get_vertical_theme_pattern_to_clamp(
         final_entries = [e for e in pattern_entries if isinstance(e, tuple)]
 
     return _build_theme_pattern_dict(theme_type, final_entries)
+
+
+def _relation_name(relation: Any) -> Any:
+    """A label node or ``plato-<name>`` as the Themespace spells a relation: ``<name>``."""
+    name = getattr(relation, "name", relation)
+    if isinstance(name, str) and name.startswith("plato-"):
+        return name[len("plato-"):]
+    return name
 
 
 def _retention_probability(
@@ -1157,7 +1177,7 @@ def _is_identity_label(label: Any) -> bool:
     if label is None:
         return False
     name = getattr(label, "name", label) if not isinstance(label, str) else label
-    return name == "plato-identity"
+    return name in ("plato-identity", "identity")
 
 
 def _remove_whole_single_concept_mappings(
