@@ -108,11 +108,10 @@ def _translate_rule_clause(
             )
             translated_ods.append(new_od)
             od_slippages.extend(applicable)
-            for slippage in enclosing:
-                if not any(slippage is s for s in enclosing_slippages):
-                    enclosing_slippages.append(slippage)
+            enclosing_slippages.extend(enclosing)
     except _TranslationFailure:
         return None
+    enclosing_slippages = _remq_duplicates(enclosing_slippages)
 
     possible_transform_slippages = od_slippages + enclosing_slippages
 
@@ -124,11 +123,12 @@ def _translate_rule_clause(
         if meta is not None
         else DEFAULT_SLIPPAGE_IGNORE_PROBABILITY
     )
-    dimensions: list[Any] = []
-    for slippage in possible_transform_slippages:
-        cm_type = slippage.description_type1
-        if not any(cm_type is d for d in dimensions):
-            dimensions.append(cm_type)
+    # ``remq-duplicates`` (utilities.ss:915-927) keeps the *last* occurrence of each
+    # element, so the dimensions are ordered by where they last appear — which is the
+    # order the per-dimension coins are drawn in.
+    dimensions = _remq_duplicates(
+        [slippage.description_type1 for slippage in possible_transform_slippages]
+    )
     ignored = [d for d in dimensions if rng is not None and rng.prob(ignore_probability)]
     applicable_transform_slippages = [
         s

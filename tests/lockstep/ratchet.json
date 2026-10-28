@@ -207,7 +207,7 @@
  "abc-aabbcc-kkjjii/10": {
   "agreement": 1.0,
   "reach": 2073,
-  "unregistered_errors": 1
+  "unregistered_errors": 0
  },
  "abc-aabbcc-kkjjii/2": {
   "agreement": 1.0,
@@ -217,22 +217,22 @@
  "abc-aabbcc-kkjjii/3": {
   "agreement": 1.0,
   "reach": 2596,
-  "unregistered_errors": 1
+  "unregistered_errors": 0
  },
  "abc-aabbcc-kkjjii/4": {
-  "agreement": 0.9999854815058582,
+  "agreement": 1.0,
   "reach": 27616,
-  "unregistered_errors": 3
+  "unregistered_errors": 0
  },
  "abc-aabbcc-kkjjii/5": {
   "agreement": 1.0,
   "reach": 1411,
-  "unregistered_errors": 3
+  "unregistered_errors": 0
  },
  "abc-aabbcc-kkjjii/6": {
-  "agreement": 0.9999949834873124,
+  "agreement": 1.0,
   "reach": 79626,
-  "unregistered_errors": 3
+  "unregistered_errors": 0
  },
  "abc-aabbcc-kkjjii/7": {
   "agreement": 1.0,
@@ -845,9 +845,9 @@
   "unregistered_errors": 0
  },
  "xqc-xqd-mrrjjj/9": {
-  "agreement": 0.6262028127313102,
-  "reach": 840,
-  "unregistered_errors": 2702
+  "agreement": 1.0,
+  "reach": 1043,
+  "unregistered_errors": 0
  },
  "xy-z-xy/1": {
   "agreement": 1.0,

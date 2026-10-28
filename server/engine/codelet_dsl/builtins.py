@@ -974,7 +974,9 @@ def _build_structure_locked(ctx: EngineContext, structure: Any) -> bool:
         # groups.ss:935-936 — a new non-spanning group can falsify a neighbour's
         # ``middle`` description, and those go with it.
         if not structure.spans_whole_string():
-            structure.string.delete_invalid_string_position_middle_descriptions()
+            structure.string.delete_invalid_string_position_middle_descriptions(
+                _proposed_groups(ctx, structure.string)
+            )
         _record_group_event(ctx, structure)
     elif isinstance(structure, Bridge):
         _augment_bridge_at_build(ctx, structure)
@@ -1040,6 +1042,28 @@ def _absorb_duplicate_group(
                 node.activate_from_workspace()
         ctx.sink.on_structure_change(ctx, transferred, STRUCTURE_BUILT)
     _wrote(ctx, existing)
+
+
+def _proposed_groups(ctx: EngineContext, string: Any) -> list[Any]:
+    """The proposed groups of *string* — those a pending codelet still carries.
+
+    Scheme: ``proposed-group-list`` (workspace-strings.ss).  A group joins it at
+    ``propose-group`` and leaves when its builder starts (groups.ss:629) or its
+    codelet is evicted (coderack.ss:427-442), which is exactly the span in which a
+    coderack codelet holds it as its argument.
+    """
+    found: list[Any] = []
+    for coderack_bin in ctx.coderack.bins:
+        for codelet in coderack_bin.codelets:
+            candidate = codelet.arguments.get("structure")
+            if (
+                isinstance(candidate, Group)
+                and candidate.string is string
+                and candidate not in found
+                and candidate not in string.objects
+            ):
+                found.append(candidate)
+    return found
 
 
 def _consolidate_group(ctx: EngineContext, group: Group) -> Group | None:
@@ -2043,7 +2067,9 @@ def _break_group(ctx: EngineContext, group: Group) -> None:
     group.right_bond = None
 
     if not group.spans_whole_string():
-        string.delete_invalid_string_position_middle_descriptions()
+        string.delete_invalid_string_position_middle_descriptions(
+            _proposed_groups(ctx, string)
+        )
 
     _retire(ctx, group)
 

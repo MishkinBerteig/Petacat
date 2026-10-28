@@ -503,6 +503,12 @@ def relative_importances(objects: Sequence[Any]) -> list[int]:
     (``WorkspaceString.update_object_values``).  Kept out of the backends for the
     dynamic-range reason given on ``ObjectValueBatch``.
     """
+    if objects and all(hasattr(o, "exact_raw_importance") for o in objects):
+        # Exact rationals, as the reference computes them (utilities.ss:544).
+        exacts = [o.exact_raw_importance() for o in objects]
+        total_exact = sum(exacts)
+        if total_exact != 0:
+            return [round(100 * e / total_exact) for e in exacts]
     total_raw = sum(o.raw_importance for o in objects)
     if total_raw == 0:
         # Scheme: ``update-all-relative-importances`` (workspace-strings.ss:326-329)

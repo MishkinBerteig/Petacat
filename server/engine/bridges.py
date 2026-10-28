@@ -45,6 +45,9 @@ class Bridge(WorkspaceStructure):
         self.object2 = object2
         self.bridge_type = bridge_type
         self.concept_mappings = concept_mappings
+        #: ``all-concept-mappings`` in the reference's order (newest first); see
+        #: :meth:`get_all_concept_mappings`.
+        self._all_concept_mappings: list[ConceptMapping] = list(concept_mappings)
         # Two lists the Scheme keeps alongside the main one and consults in
         # different places (bridges.ss:150-172).  ``bond_concept_mappings`` holds
         # the mappings between two groups' *bond* descriptions, computed at build
@@ -84,8 +87,29 @@ class Bridge(WorkspaceStructure):
     # ------------------------------------------------------------------
 
     def get_all_concept_mappings(self) -> list[ConceptMapping]:
-        """``get-all-concept-mappings`` (bridges.ss:161) — main list plus bond CMs."""
-        return self.concept_mappings + self.bond_concept_mappings
+        """``get-all-concept-mappings`` (bridges.ss:161, 556).
+
+        Kept as the reference keeps it: every addition is *prepended*
+        (``add-concept-mappings`` ``(append cm-list all-concept-mappings)``,
+        ``add-bond-concept-mapping`` ``(cons bond-cm ...)``), so the newest mapping
+        comes first — bond mappings, added last at build, ahead of the main ones.
+        The order is observable: rule translation tries slippages in this order and
+        each coattail attempt draws a coin.
+        """
+        # Reconcile with the two source lists: callers (and tests) that mutate
+        # ``concept_mappings`` / ``bond_concept_mappings`` directly, rather than through
+        # the ``add-*`` methods, still see their change — appended, as before.
+        current = {id(cm) for cm in self.concept_mappings}
+        current.update(id(cm) for cm in self.bond_concept_mappings)
+        ordered = [cm for cm in self._all_concept_mappings if id(cm) in current]
+        known = {id(cm) for cm in ordered}
+        ordered.extend(
+            cm
+            for cm in self.concept_mappings + self.bond_concept_mappings
+            if id(cm) not in known
+        )
+        self._all_concept_mappings = ordered
+        return list(ordered)
 
     def get_non_symmetric_slippages(self) -> list[ConceptMapping]:
         """``get-non-symmetric-slippages`` (bridges.ss:162-163) — over *all* CMs."""
@@ -125,17 +149,20 @@ class Bridge(WorkspaceStructure):
 
     def add_concept_mappings(self, cms: list[ConceptMapping]) -> None:
         """``add-concept-mappings`` (bridges.ss:210-213) -- new mappings go on the
-        **front** of the list (``(append cm-list concept-mappings)``); the order is
-        visible to the rule abstraction's schema partition."""
+        **front** of both lists (``(append cm-list concept-mappings)`` and the same for
+        ``all-concept-mappings``); the order is visible to the rule abstraction's
+        schema partition and to the order rule translation tries slippages in."""
         self.concept_mappings[:0] = list(cms)
+        self._all_concept_mappings[:0] = list(cms)
 
     def add_bond_concept_mapping(self, cm: ConceptMapping) -> None:
         """``add-bond-concept-mapping`` (bridges.ss:222-225)."""
-        self.bond_concept_mappings.append(cm)
+        self.bond_concept_mappings.insert(0, cm)
+        self._all_concept_mappings.insert(0, cm)
 
     def add_symmetric_slippage(self, slippage: ConceptMapping) -> None:
         """``add-symmetric-slippage`` (bridges.ss:226-230)."""
-        self.symmetric_slippages.append(slippage.symmetric_mapping())
+        self.symmetric_slippages.insert(0, slippage.symmetric_mapping())
 
     def concept_mapping_present(self, cm: ConceptMapping) -> bool:
         """``concept-mapping-present?`` (bridges.ss:231-233).
@@ -174,9 +201,11 @@ class Bridge(WorkspaceStructure):
         symmetric counterpart from the slippage list.  Used when a ``middle``
         string-position description is invalidated out from under a bridge.
         """
-        for cm in list(self.concept_mappings):
+        for cm in list(self._all_concept_mappings):
             if cm.description_type1 is description_type:
-                self.concept_mappings.remove(cm)
+                if cm in self.concept_mappings:
+                    self.concept_mappings.remove(cm)
+                self._all_concept_mappings.remove(cm)
                 break
         for slippage in list(self.symmetric_slippages):
             if slippage.description_type1 is description_type:
@@ -650,6 +679,7 @@ class Bridge(WorkspaceStructure):
         """Add a new concept mapping to this bridge."""
         if cm not in self.concept_mappings:
             self.concept_mappings.insert(0, cm)  # bridges.ss:210-213 prepends
+            self._all_concept_mappings.insert(0, cm)
 
     def __repr__(self) -> str:
         n_cms = len(self.concept_mappings)

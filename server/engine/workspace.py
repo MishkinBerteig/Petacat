@@ -347,7 +347,9 @@ class WorkspaceString:
                 return existing
         return None
 
-    def delete_invalid_string_position_middle_descriptions(self) -> None:
+    def delete_invalid_string_position_middle_descriptions(
+        self, proposed_groups: Any = ()
+    ) -> None:
         """Strip ``middle`` descriptions from objects that are no longer middle.
 
         Scheme: ``delete-invalid-string-position-middle-descriptions``
@@ -371,12 +373,19 @@ class WorkspaceString:
         if middle is None or position_type is None:
             return
 
-        for obj in list(self.objects):
+        # The sweep runs over ``get-all-objects`` (workspace-strings.ss:115), which
+        # includes the *proposed* groups: a proposal made while its neighbour was the
+        # string's right edge loses its stale ``middle`` here too, rather than carrying
+        # it into the duplicate-absorption branch of ``group-builder``.  Petacat keeps
+        # no proposed table; the caller passes the groups still awaiting a codelet.
+        for obj in list(self.objects) + list(proposed_groups):
             if not obj.descriptor_present(middle):
                 continue
             if obj.middle_in_string():
                 continue
             obj.delete_description_type(position_type)
+            if obj not in self.objects:
+                continue
             for orientation in ("vertical", "horizontal"):
                 bridge = getattr(obj, f"{orientation}_bridge", None)
                 if bridge is None:
@@ -755,6 +764,10 @@ class Workspace:
         #: Cached workspace-level average unhappiness, dropped by
         #: ``update_all_object_values``.  See ``get_average_unhappiness``.
         self._average_unhappiness: float | None = None
+        #: ``average-intra-string-unhappiness`` as ``update-average-unhappiness-values``
+        #: last stored it (``workspace.ss:557-561``); the accessor (``:503``) reads the
+        #: stored value, so structures built between updates do not move it.
+        self._average_intra_string_unhappiness_stored: float | None = None
 
         # Back-link so structures can reach the Workspace from an object's
         # string (Bridge._find_workspace).  Without it a bridge could not see
@@ -1018,6 +1031,13 @@ class Workspace:
         if self.justify_mode:
             self.answer_string.update_average_intra_string_unhappiness()
 
+        self._average_intra_string_unhappiness_stored = (
+            self._compute_workspace_average_intra()
+        )
+        # ``average-unhappiness`` is stored by the same step (workspace.ss:581-585), so
+        # objects built later in the cycle do not move it before the next update.
+        self._average_unhappiness = None
+        self.get_average_unhappiness()
         self.average_top_inter_string_unhappiness = (
             self._average_inter_string_unhappiness(
                 self.initial_string, self.modified_string, "horizontal"
@@ -1091,6 +1111,11 @@ class Workspace:
         short settled one.  This is the whole of the bond- and group-scout posting
         probability (``coderack.ss:474-480``).
         """
+        if self._average_intra_string_unhappiness_stored is not None:
+            return self._average_intra_string_unhappiness_stored
+        return self._compute_workspace_average_intra()
+
+    def _compute_workspace_average_intra(self) -> float:
         objects = self.all_objects
         if not objects:
             return 100.0

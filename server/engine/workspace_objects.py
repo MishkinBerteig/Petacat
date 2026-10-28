@@ -471,6 +471,33 @@ class WorkspaceObject:
     #  (Scheme: workspace-objects.ss:425-601)
     # ------------------------------------------------------------------
 
+    def exact_raw_importance(self, max_raw: float = 300.0) -> Any:
+        """Raw importance as the exact rational Metacat computes.
+
+        Scheme: ``update-raw-importance`` (workspace-objects.ss:425-434) — ``min 300``
+        of the summed descriptor activations, times ``2/3`` when enclosed.  The
+        relative importance is ``round(100 * raw / total)`` of exact rationals
+        (workspace-strings.ss:331-333, utilities.ss:544), so an exact tie rounds
+        half-to-even where the float ratio of inexact operands can fall either side.
+        Recomputed rather than stored: a ``Fraction`` attribute would be run state the
+        capture format has no type for.
+        """
+        from fractions import Fraction
+
+        exact = min(
+            Fraction(max_raw),
+            sum(
+                (
+                    Fraction(getattr(d, "descriptor_activation", 0))
+                    for d in self.get_relevant_descriptions()
+                ),
+                Fraction(0),
+            ),
+        )
+        if self.enclosing_group is not None:
+            exact *= Fraction(2, 3)
+        return exact
+
     def update_importance(
         self, max_raw: float = 300.0, enclosed_factor: float = 2.0 / 3.0
     ) -> None:
