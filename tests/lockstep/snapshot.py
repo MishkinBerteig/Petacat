@@ -107,11 +107,26 @@ def _structures(ctx: Any) -> dict:
     }
 
 
+#: Petacat's event-type names for Metacat's seven Trace event types
+#: (``trace.ss:229``): snag, answer, clamp, concept-activation, concept-mapping, rule,
+#: group.  Anything else Petacat might record is not a cognitive event and is not
+#: compared.
+_METACAT_EVENT_NAMES = {
+    "snag": "snag",
+    "answer_found": "answer",
+    "clamp_start": "clamp",
+    "concept_activation": "concept-activation",
+    "concept_mapping_built": "concept-mapping",
+    "rule_built": "rule",
+    "group_built": "group",
+}
+
+
 def _trace(ctx: Any) -> dict:
     return {
-        # Metacat's event types are hyphenated (``concept-activation``).
         "events": dict(sorted(Counter(
-            e.event_type.replace("_", "-") for e in ctx.trace.events).items())),
+            _METACAT_EVENT_NAMES[e.event_type] for e in ctx.trace.events
+            if e.event_type in _METACAT_EVENT_NAMES).items())),
         "snag": bool(ctx.trace.within_snag_period),
         "clamp": bool(ctx.trace.within_clamp_period),
     }

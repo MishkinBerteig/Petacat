@@ -54,3 +54,4 @@ tests/lockstep/replays/
 # by tests/lockstep/metacat/record.py (see tests/lockstep/metacat/README.md).
 tests/lockstep/traces/*
 !tests/lockstep/traces/abc-abd-xyz/
+tests/lockstep/traces-heldout/
