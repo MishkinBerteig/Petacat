@@ -742,6 +742,12 @@ def evaluate_structure(
     already measured relative to its peers (``get-relative-quality``), so
     re-weighting it by temperature would apply the adjustment twice.
     """
+    # bridges.ss:1153-1160 — the evaluator fizzles, before it draws anything, when
+    # either *original* object has left the Workspace; a bridge proposed against a
+    # flipped reading of a group points at a copy that was never in the string, so
+    # its premise is the group it replaces (a broken original orphans the proposal).
+    if isinstance(structure, Bridge) and not _premises_still_hold(ctx, structure):
+        return False
     structure.update_strength(ctx.rng)
     accept_prob = (
         temp_adjusted_probability(

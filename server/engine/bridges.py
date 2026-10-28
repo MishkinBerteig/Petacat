@@ -154,6 +154,17 @@ class Bridge(WorkspaceStructure):
             for cm in self.get_all_concept_mappings()
         )
 
+    def slippage_type_present(self, description_type: Any) -> bool:
+        """``slippage-type-present?`` (bridges.ss:236-238, 640-642).
+
+        The *first* mapping of the dimension decides (``select-meth``), and it must
+        be a slippage rather than an identity.
+        """
+        for cm in self.get_all_concept_mappings():
+            if cm.description_type1 is description_type:
+                return cm.is_slippage
+        return False
+
     def delete_concept_mapping_type(self, description_type: Any) -> None:
         """``delete-concept-mapping-type`` (bridges.ss:214-221).
 
@@ -506,13 +517,17 @@ class Bridge(WorkspaceStructure):
                     )
                 )
 
-        # Remove duplicates
+        # ``remq-duplicates`` (utilities.ss:915-927) drops an element when it
+        # occurs again *later* in the list, so it keeps each bridge's LAST
+        # occurrence.  The order is the order the builder fights in, and the
+        # fights share the random stream.
         seen: set[int] = set()
         unique: list[Bridge] = []
-        for b in result:
+        for b in reversed(result):
             if id(b) not in seen:
                 seen.add(id(b))
                 unique.append(b)
+        unique.reverse()
         return unique
 
     def get_incompatible_bond(self) -> Any:

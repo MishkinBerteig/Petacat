@@ -1427,6 +1427,18 @@ class Rule(WorkspaceStructure):
         self.supporting_bridges = []
         for tag_bridges in self.tagged_supporting_horizontal_bridges:
             self.supporting_bridges.extend(tag_bridges[1])
+        # rules.ss:151-160 — a rule resting on a bridge that slips Length notices the
+        # Length of its groups: any group of such a bridge lacking a Length
+        # description gets one attached (fifth site of ``attach-length-description``).
+        from server.engine.groups import Group, attach_length_description
+
+        for bridge in self.supporting_bridges:
+            length_type = Group._node(bridge.object1, "plato-length")
+            if length_type is None or not bridge.slippage_type_present(length_type):
+                continue
+            for obj in (bridge.object1, bridge.object2):
+                if isinstance(obj, Group) and not obj.description_type_present(length_type):
+                    attach_length_description(obj)
         if themespace is not None:
             self.theme_pattern = themespace.get_dominant_theme_pattern(
                 self.bridge_theme_type

@@ -343,14 +343,21 @@ class Group(WorkspaceObject, WorkspaceStructure):
         Scheme: groups.ss:283-286.
         Returns enclosing groups of this group's constituent objects (excluding self).
         """
+        # ``remq-duplicates`` keeps the LAST occurrence of a repeated group
+        # (utilities.ss:915-927), and the order is the fight order.
+        encs = [
+            enc
+            for enc in (getattr(obj, "enclosing_group", None) for obj in self.objects)
+            if enc is not None
+        ]
         result: list[Group] = []
         seen: set[int] = set()
-        for obj in self.objects:
-            enc = getattr(obj, "enclosing_group", None)
-            if enc is not None and enc is not self and id(enc) not in seen:
+        for enc in reversed(encs):
+            if id(enc) not in seen:
                 seen.add(id(enc))
                 result.append(enc)
-        return result
+        result.reverse()
+        return [g for g in result if g is not self]
 
     def get_incompatible_bridges(self, bridge_orientation: str) -> list[Any]:
         """Built bridges this group's direction would contradict.
