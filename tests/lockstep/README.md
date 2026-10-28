@@ -26,7 +26,7 @@ are recorded in `DISCREPANCIES5.md`: the status lines on A-1…D-11 and section 
 | Held-out: the same problems × seeds 11–30 | `traces-heldout/` | 380 traces, ~320 MB | No |
 | Episodes: 8 runs per episode, memory carried | `traces/episodes/<slug>/<S>.r<k>.metacat.jsonl.gz` | 67 episodes over all 19 problems (536 runs, 6.5 M codelets, ~1.6 GB) | No |
 | Justify mode: the demo answers × seeds 1–5 | `traces/justify/<i-m-t-a>/<seed>…` | 85 traces | No |
-| Metacat's known failures (unpatched and patched) | `traces-known-failures/` | 6 traces | Yes |
+| Metacat's known failures, on the reference and with the bundle's known-failure fixes | `traces-known-failures/{reference,fixes}/` | 6 traces | Yes |
 
 The uncommitted corpora regenerate in minutes with `metacat/record.py`. Recording all 190
 development traces takes about three minutes with `--jobs 12`.

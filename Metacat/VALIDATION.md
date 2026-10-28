@@ -76,6 +76,37 @@ Final harness output:
 all 19 problems clean: no bad messages, every run completed
 ```
 
+## Second Patch Group: Known-Failure Fixes
+
+Validated on 2026-10-28 for
+[patches/fixes/0001-known-failures.patch](patches/fixes/0001-known-failures.patch)
+([KNOWN-FAILURES.md](KNOWN-FAILURES.md)).
+
+- **Patching.** The patch applies to the verified reference reconstruction with
+  zero fuzz and reverses exactly. `--apply-fixes` then `--remove-fixes` returns
+  a tree byte-identical to the reference. All 69 files of the fixed tree match
+  `reconstructed_files`, overridden by `fixed_files`, in
+  [manifest.json](manifest.json).
+- **Packaging tests.** The bundle's 19 tests pass
+  (`python3 -m unittest discover -s tests -p 'test_*.py'`). They include an
+  apply/remove round trip on a copy of `build/source`.
+- **Smoke test.** The headless smoke test passes on the fixed tree.
+- **The three failures.** On the fixed tree,
+  [tests/reproduce-failures.ss](tests/reproduce-failures.ss) reports an ordinary
+  return for all three cases: `misc1-20713988` at 2835 codelets,
+  `misc1-20716342` at 1981 and `misc3-20226148` at 2152. With the default
+  reconstruction, the same commands reproduce the three exceptions.
+- **No other run changes.** Petacat's decision-trace recorder
+  (`tests/lockstep/metacat/`) logs every random decision of a run, plus a state
+  snapshot each update cycle. Traces were recorded on the reference and on the
+  fixed tree for 655 runs: all 19 demo problems at seeds 1–30 from fresh memory
+  (570 runs), and justify mode for the 17 demo answers at seeds 1–5 (85 runs).
+  All 655 pairs are byte-identical apart from the header's revision string.
+
+The fixes are not part of the reference reconstruction; plain `--verify` still
+checks the reference. Results gathered with them are from a changed engine
+(KNOWN-FAILURES.md, "When Returning to This Work").
+
 ## Limits
 
 The runtime tests used Chez 9.5.4. The GUI container build completed using

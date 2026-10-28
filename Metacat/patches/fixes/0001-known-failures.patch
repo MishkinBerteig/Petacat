@@ -1,3 +1,42 @@
+--- a/CODE-FIXES.md
++++ b/CODE-FIXES.md
+@@ -79,6 +79,36 @@
+ bad message is unaffected; these only convert an abandoned run into a completed
+ one.
+ 
++
++### 1.3 Two crashes, fixed by the second patch group — `patches/fixes/0001-known-failures.patch`
++
++These two fixes are **not** in the reference reconstruction behind Petacat's
++published studies. They are the bundle's second, optional patch group
++(`tools/reconstruct.py --fixes`). Each is a send to `#f`, found when the support
++study sampled 969,000 runs and recorded three `*ERROR*` observations (the
++bundle's `KNOWN-FAILURES.md`).
++
++- **`make-group`** (`groups.ss:43-56`) names a letter-category sameness group after
++  its first object's letter category. Building an answer, a translated rule that
++  swaps a one-letter group with a length-based group (`abc → cba; mrrjjj`) leaves
++  a letter-category group whose first object is the length group, which has no
++  letter category, and `get-uppercase-name` is sent to `#f`. The group now gets no
++  letter-category description and no print name, as a length-based group gets
++  none.
++- **`change-descriptions->rule-clause-template`** (`rules.ss:793-805`) asked only
++  the first change description of a reference object for its bond-facet change.
++  A `(self group-category opposite)` change need not come first (the order follows
++  the bridges and the abstraction coin flips); the clause then lacks the
++  bond-facet change, and `transcribe-to-english`, which every new rule goes
++  through, takes `(3rd #f)` (`abc → aabbcc; kkjjii`). The first bond-facet change
++  of any of the descriptions is now used.
++
++**Effect on behaviour: none where they do not fire.** The second always crashed
++when it arose. The first crashed for a sameness group; for a successor or
++predecessor group it would instead have given the group a letter-category
++description with no letter, a branch no recorded run reaches. Recorded runs of
++all 19 demo problems are byte-identical with and without the group.
++
+ ---
+ 
+ ## 2. Headless mode — new files, GUI untouched
 --- a/groups.ss
 +++ b/groups.ss
 @@ -43,12 +43,17 @@

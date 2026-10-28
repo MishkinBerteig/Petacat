@@ -2179,8 +2179,9 @@ def change_descriptions_to_rule_clause_template(
         ref_obj = first.reference_object
         # rules.ss:793-801 asks only the first description.  Metacat crashes in
         # transcribe-to-english (caddr of #f, KNOWN-FAILURES.md) when a GroupCtgy self
-        # change is not first; the corrected reference (tests/lockstep/metacat/
-        # known-failures.patch) takes the first BondFacet change of any description.
+        # change is not first; the bundle's second patch group
+        # (Metacat/patches/fixes/0001-known-failures.patch) takes the first BondFacet
+        # change of any description.
         bf_change = next(
             (bf for bf in (cd.get_bond_facet_change(slipnet) for cd in change_descriptions
                            if cd.is_intrinsic) if bf is not None),

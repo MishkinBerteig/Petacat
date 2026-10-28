@@ -11,7 +11,12 @@ spec differ, this file wins.
    `0002`), reconstructed with `Metacat/tools/reconstruct.py` into
    `Metacat/build/source` (git-ignored) and run in the `metacat:1.2` image built
    from `Metacat/build/source/docker`.  The recorder patch is applied to a *copy*
-   (`Metacat/build/recorder-source`), never to `build/source`.
+   (`Metacat/build/recorder-source`), never to `build/source`.  Since 2026-10-28 the
+   bundle also has a second, optional patch group, the known-failure fixes
+   (`Metacat/patches/fixes/`).  It changes no recorded run except the three crash
+   seeds, so traces recorded with and without it are interchangeable.  The recorder
+   notes which it used in the header's `revision` (`metacat/README.md`, "Which
+   Metacat").
 2. **`~`.** Petacat changes.  Metacat redefines `round` to return exact integers
    (`utilities.ss:238-252`), so every `~` delta is a whole number drawn from
    `0 .. round(sqrt n)`.  `RNG.perturb` is fixed and `tests/unit/test_rng.py`
@@ -122,11 +127,15 @@ naming table in its `README.md`):
   known-failure traces are committed. The rest regenerate with `metacat/record.py`.
 * **Ratchet.** More unregistered errors count as a step back only when reach did not
   grow, because a trace that replays further meets decisions it never reached before.
-* **Metacat's known failures.** The verified reconstruction behind the published studies
-  is not changed. The three crashes are diagnosed. A corrected reference is in
-  `metacat/known-failures.patch`: it is opt-in, and it leaves 88 other recordings
-  byte-identical. Petacat follows Metacat to each crash point and behaves as the
-  corrected reference past it. The registry marks the three as reference crashes.
+* **Metacat's known failures.** The verified reference reconstruction behind the
+  published studies is not changed, and plain `reconstruct.py --verify` still means it.
+  The three crashes are diagnosed.  Their fix is the bundle's second patch group
+  (`Metacat/patches/fixes/0001-known-failures.patch`, checksummed in
+  `Metacat/manifest.json`), applied with `reconstruct.py --apply-fixes` or `--fixes`.  It
+  is applied to the local `Metacat/build/source`.  Every other recorded run (655 across
+  the development, held-out and justify corpora) gives a byte-identical trace with and
+  without it.  Petacat follows Metacat to each crash point and behaves as the fixed
+  Metacat past it.  The registry marks the three as reference crashes.
 * **Seam test pins.** `test_seam.py`'s four ordinary runs were measured before and after
   the seam was added and matched exactly. Since then they have been re-pinned with each
   port fix, so they now guard the seam against later change.

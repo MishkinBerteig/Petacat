@@ -94,6 +94,12 @@ docker build --platform linux/amd64 -t petacat-study-runtime:chez-9.5.4 Metacat/
 
 The destination must not already exist. For an existing pristine reconstruction,
 use `python3.14 Metacat/tools/reconstruct.py --verify Metacat/build/source`.
+The study needs the **reference** reconstruction. If the bundle's optional
+known-failure fixes have been applied to `Metacat/build/source`
+([Metacat/README.md](../../Metacat/README.md#optional-the-known-failure-fixes)),
+verification fails. Take them off with a current checkout's
+`python3 Metacat/tools/reconstruct.py --remove-fixes Metacat/build/source`, or
+reconstruct a fresh copy.
 The original source is downloaded only into the ignored reconstruction
 directory, never added to Git. Collection mounts it read-only. The runtime
 container has no network access, exposed ports, or access to another checkout.

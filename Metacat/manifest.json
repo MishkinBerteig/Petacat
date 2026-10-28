@@ -635,6 +635,35 @@
       "executable": false
     }
   },
+  "fix_patches": [
+    {
+      "path": "patches/fixes/0001-known-failures.patch",
+      "sha256": "7b57eb2b486d7f71106933a0052b2ffd1466589802039f899d6e1258faac8726",
+      "files": [
+        "CODE-FIXES.md",
+        "groups.ss",
+        "rules.ss"
+      ]
+    }
+  ],
+  "fixed_files": {
+    "CODE-FIXES.md": {
+      "sha256": "206211701fa6691fc1e968d5f828525d8eab28b8257f66757ce4ec7f6c36c8c1",
+      "bytes": 8795,
+      "executable": false
+    },
+    "groups.ss": {
+      "sha256": "3e8a94dacaf4e06ea9a653439cb1a885a74b4c8baab6b473663c7fcbd69b4035",
+      "bytes": 43388,
+      "executable": false
+    },
+    "rules.ss": {
+      "sha256": "c9da79c8d2c6681234c332e72f09f81c21ce59d3cc3c011b7f7836a2481c0eaf",
+      "bytes": 84147,
+      "executable": false
+    }
+  },
+  "fix_note": "Second, optional patch group: fixes for the three reference crashes in KNOWN-FAILURES.md. Not part of the reference reconstruction behind the published studies; apply with tools/reconstruct.py --fixes or --apply-fixes. fixed_files lists the files whose hashes change when it is applied.",
   "excluded_files": {
     "CLAUDE.md": "Repository-specific agent instructions.",
     "oracle/derived/convergence-p50.json": "Measured data are not part of this source reconstruction bundle.",

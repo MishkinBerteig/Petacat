@@ -47,10 +47,12 @@ Mac, Windows, and Linux installations. See [VALIDATION.md](VALIDATION.md) for
 what was actually tested.
 
 Three reproducible reference-engine failures were subsequently found during
-the versioned support study. They are **not fixed by these patches**. See
-[KNOWN-FAILURES.md](KNOWN-FAILURES.md) for the exact inputs and seeds,
-recorded exceptions, investigation starting points, and a small standalone
-reproducer. The [full study data](../studies/support-v1a/data/README.md) is
+the versioned support study. The two patches that make the **reference
+reconstruction** do not fix them, so the published studies keep their exact
+reference. A **second, optional patch group** fixes them (see
+[the known-failure fixes](#optional-the-known-failure-fixes)). See
+[KNOWN-FAILURES.md](KNOWN-FAILURES.md) for the exact inputs and seeds, recorded
+exceptions, the diagnosis, and a small standalone reproducer. The [full study data](../studies/support-v1a/data/README.md) is
 published separately from this source-reconstruction bundle.
 
 ## 1. Install the Prerequisites
@@ -254,6 +256,40 @@ overwrite an existing `build/source`; if you already reconstructed it, use
 the verification command and continue. Do not manually unpack the original
 archive into this repository or apply the patches yourself.
 
+### Optional: the known-failure fixes
+
+What you have now is the **reference reconstruction**: Metacat 1.2 plus the
+bundle's two patches, exactly as used by Petacat's published studies. It still
+crashes on the three rare inputs in [KNOWN-FAILURES.md](KNOWN-FAILURES.md),
+3 of the 969,000 runs in the support study. A second patch group,
+[`patches/fixes/0001-known-failures.patch`](patches/fixes/0001-known-failures.patch),
+fixes both underlying bugs. Apply it to your reconstruction with:
+
+```sh
+python3 tools/reconstruct.py --apply-fixes build/source
+python3 tools/reconstruct.py --verify build/source --fixes
+```
+
+Both commands should finish with `Verified 69 files with the known-failure
+fixes`. To build a new copy with the fixes in one step, use
+`python3 tools/reconstruct.py --output DIR --fixes`.
+
+Which one to use:
+
+- **With the fixes** for everyday use, the graphical interface, and Petacat's
+  lockstep harness (`tests/lockstep/`). The fixes change no run except those
+  that would have crashed.
+- **The reference** to reproduce or extend the published studies. Their
+  collectors run `reconstruct.py --verify Metacat/build/source` and refuse a tree
+  with the fixes applied. Take the fixes off again with:
+
+  ```sh
+  python3 tools/reconstruct.py --remove-fixes build/source
+  ```
+
+Plain `--verify` always means the reference. On a tree with the fixes, it fails
+and says so.
+
 ## 4. Start the Graphical Interface
 
 Make sure Docker Desktop is running. From the same `Metacat` folder, run:
@@ -376,6 +412,7 @@ generated `build/source/README.md`.
 | A virtualization or unsupported-platform error | Check Docker's OS requirements. On Windows, verify WSL version 2 and enable hardware virtualization as directed by Microsoft's guide. ARM systems need `linux/amd64` emulation; do not change the project to `arm64`. |
 | Download/build fails with a connection or certificate error | Check internet connectivity and any required proxy settings. Retry after fixing the connection. Do not disable certificate checks or bypass the archive checksum. The archive needs to come from the linked upstream site. |
 | `Refusing to replace existing destination` | Reconstruction already created that folder. Verify it and continue, or choose a different `--output` path for a separate reconstruction. Do not delete work just to rerun setup. |
+| Verification fails on `CODE-FIXES.md`, `groups.ss` or `rules.ss` and says the tree has the known-failure fixes | Not damage: the optional fixes are applied. Use `--verify build/source --fixes`, or take them off with `--remove-fixes build/source` if you need the reference reconstruction. |
 | SHA-256 or file-inventory mismatch | Stop and inspect the reported file. The verifier expects untouched reconstructed files, with no extra reports, saved commentary, or bytecode. Keep your working copy; reconstruct into a new directory to compare. Do not edit the manifest just to make a mismatch pass. |
 | Port 6080/5901 is already allocated, or container name `metacat` is in use | Inspect `docker ps -a` or Docker Desktop's Containers view. Stop a conflicting container only if you recognize it and no longer need it. Do not remove someone else's container or service. This default setup runs one GUI at a time. |
 | Docker reports a denied bind mount or file-sharing error | Keep the project in a normal local folder. On Mac/Linux Docker Desktop, check Settings > Resources > File sharing if available. On Windows, clone inside Ubuntu's home folder rather than `/mnt/c`. |
@@ -461,7 +498,7 @@ First, check the reconstruction tools themselves from this README's folder:
 python3 -m unittest discover -s tests -p 'test_*.py'
 ```
 
-Expected: **14 tests** and `OK`. These are packaging checks, not engine runs.
+Expected: **19 tests** and `OK`. These are packaging checks, not engine runs.
 
 For an engine smoke test, build the runtime below if you have not already built
 it in the GUI steps. Then run the second command. A trailing backslash means
@@ -507,6 +544,17 @@ executable permissions, and verifies all 69 files against
 Verification expects a pristine reconstruction without added data, reports, or
 Python bytecode.
 
+The manifest describes two patch groups:
+
+- `patches` and `reconstructed_files`: the reference reconstruction.
+- `fix_patches` and `fixed_files`: the optional known-failure fixes, and the
+  hashes of the three files they change (`CODE-FIXES.md`, `groups.ss`,
+  `rules.ss`).
+
+`--apply-fixes` and `--remove-fixes` work in place. Each first verifies the
+tree, dry-runs the patch, applies it with zero fuzz, and verifies the result,
+so a mismatched tree is never half-patched.
+
 For an offline reconstruction, download
 [Metacat-1.2.tgz](https://science.slc.edu/jmarshall/metacat/Metacat-1.2.tgz) beforehand
 and keep it outside this repository. Pass its actual location, in quotes if
@@ -530,7 +578,10 @@ ec73bdc18b4e91f5a9f38fcc5af06028b8d7fe0c4bcfdbcc50e6b3c239971f4d
 Apply [0001-engine.patch](patches/0001-engine.patch) before
 [0002-harnesses-and-notes.patch](patches/0002-harnesses-and-notes.patch).
 Both are standard unified diffs relative to the extracted source directory;
-the reconstruction helper handles their application and permissions.
+the reconstruction helper handles their application and permissions. Together
+they make the reference reconstruction. The optional second patch group,
+[patches/fixes/0001-known-failures.patch](patches/fixes/0001-known-failures.patch),
+goes on top of them; it is described [below](#second-patch-group-the-known-failure-fixes).
 
 The engine patch changes six upstream Scheme files and adds `headless.ss` and
 `metacat-headless.ss`. The other 42 upstream files remain unchanged. The second
@@ -578,6 +629,32 @@ the current working directory. Start it from the reconstructed source directory;
 for a native GUI on another platform, adjust `*platform*` as indicated in
 `metacat.ss`. These portable configuration defaults replace environment-specific
 settings; the engine algorithms and headless loader are otherwise unchanged.
+
+### Second patch group: the known-failure fixes
+
+Two bugs in the original engine crashed three runs of the 969,000 in the
+support study. The second patch group fixes both, in the spirit of the code
+around them, and adds an entry to the reconstructed `CODE-FIXES.md`.
+
+- **A letter-based group with no letter** (`groups.ss`, `make-group`). While
+  building an answer, a translated rule that swaps a one-letter group with a
+  length-based group (`abc → cba; mrrjjj`) can leave a letter-category group
+  whose first member has no letter category. `make-group` then asks `#f` for
+  its uppercase name. Such a group now gets no letter description and no
+  printed letter name, as a length-based group gets none.
+- **A "reverse the group" change that lost its facet** (`rules.ss`,
+  `change-descriptions->rule-clause-template`). A rule clause that reverses a
+  group carries a companion change naming the facet (letters or lengths). Only
+  the *first* change description of the object was asked for it, but the order
+  is incidental, so the clause could lose it. The English transcription every
+  new rule goes through then took `(3rd #f)` (`abc → aabbcc; kkjjii`). The first
+  such companion found among all the change descriptions is now used.
+
+Neither fix changes a run that did not crash. The second bug always crashed
+when it arose. The first crashed for a sameness group; for a successor or
+predecessor group it would instead have attached a letter description with no
+letter, a branch no recorded run reaches. Recordings of every demo problem are
+byte-identical with and without the fixes ([VALIDATION.md](VALIDATION.md)).
 
 ### Supporting tools
 

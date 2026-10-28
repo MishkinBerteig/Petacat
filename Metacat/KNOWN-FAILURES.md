@@ -1,8 +1,12 @@
 # Three Reproducible Study Failures
 
-Recorded 2026-09-06. **Unfixed.** These are three failing executions with two
-exception signatures, not three independently diagnosed bugs. This note is
-an investigation handoff; it does not modify the reconstruction patches.
+Recorded 2026-09-06. **Unfixed in the reference reconstruction; fixed by the
+bundle's optional second patch group** (2026-10-28,
+[`patches/fixes/0001-known-failures.patch`](patches/fixes/0001-known-failures.patch);
+see [Status](#status-lockstep-pass) below). These are three failing executions
+with two exception signatures. The diagnosis found two bugs, not three. The
+reference reconstruction's patches are unchanged, so the published study keeps
+its exact reference.
 
 All three inputs and seeds are in the intended domain. The failures occurred
 in reference Metacat, not the Python port, during the held-out validation phase
@@ -54,6 +58,15 @@ new process and fresh memory. A nonzero exit with the expected exception is the
 reproduced bug, not successful application behavior. Exit status 2 from the
 helper means an invalid case key or an unexpected ordinary/capped return.
 
+The reproducer needs the **reference reconstruction**. On a tree with the
+known-failure fixes applied, the first command above fails and says the fixes
+are applied. The reproducer then prints `REPRODUCER returned suspended at N
+codelets; expected an exception` and exits with status 2: each run now ends with
+an answer, after the same number of codelets as the crash. To reproduce the
+crashes on such a copy, first run
+`python3 tools/reconstruct.py --remove-fixes build/source`, and afterwards
+`--apply-fixes build/source` to restore the fixes.
+
 The helper is [tests/reproduce-failures.ss](tests/reproduce-failures.ss). It
 contains only our small test driver, not upstream Metacat source. It leaves
 the Scheme exception unhandled so it can be inspected. For advanced diagnosis,
@@ -95,6 +108,20 @@ the remaining 11 assigned seeds. The excluded preflight is under
 `main/preflight/chunks/validation/misc1/013750/attempt-001/`.
 
 ## What Is Known About the Cause
+
+*As recorded on 2026-09-06.* The diagnosis of 2026-10-28
+([Status](#status-lockstep-pass)) answers the questions below:
+- The second case has the same cause as the first.
+- The third case's caller is `get-change-phrase`, reached through
+  `transcribe-to-english`, and the false value comes from
+  `change-descriptions->rule-clause-template`.
+- The descriptor is absent because a swap during answer construction puts a
+  length-based group first in a letter-category group.
+- The repair is not the bare guard warned against below. The group gets neither
+  the letter description nor the print name, which is how a length-based group is
+  treated.
+
+Whether an unmodified upstream installation reaches these paths was not tested.
 
 ### First case: `misc1-20713988`
 
@@ -182,13 +209,33 @@ inspector.  There are **two** causes, not three, and both are in code the patche
   follows the bridges and the abstraction coin flips), so the clause carries a group-category
   change without its bond-facet change.
 
-**Optional fix** (`tests/lockstep/metacat/known-failures.patch`, not applied by the reconstruction
-or the recorder): `make-group` skips the LettCtgy description and the print name when
-`initial-letter-category` does not exist (the group gets none, as a length-based group gets none);
-`change-descriptions->rule-clause-template` takes the first BondFacet change of any of the
-descriptions (`ormap-meth`).  Verified: the three seeds run to an answer (`rrjjjm` after 2835 and
-1981 codelets, `kji` after 2152), and 88 other recordings (`abc abd xyz`, `abc cba mrrjjj` seeds
-1-10; seeds 1-4 of the other 17 demo problems) are byte-identical with and without the patch.
-Any use of it still counts as a changed engine in the sense of item 4 above.  How to apply it:
-`tests/lockstep/metacat/README.md`.  Petacat replays all three recordings: unpatched, in lockstep
-to the crash point (it does not crash and carries on); patched, to the end with no differences.
+**The fix: the bundle's second patch group**
+([`patches/fixes/0001-known-failures.patch`](patches/fixes/0001-known-failures.patch);
+the reference reconstruction does not apply it).
+- `make-group` skips the LettCtgy description and the print name when
+  `initial-letter-category` does not exist; the group gets none, as a length-based
+  group gets none.
+- `change-descriptions->rule-clause-template` takes the first BondFacet change of any
+  of the descriptions (`ormap-meth`).
+- The patch also adds §1.3 to the reconstructed `CODE-FIXES.md`.
+
+Apply it with `python3 tools/reconstruct.py --apply-fixes build/source` and check it
+with `--verify build/source --fixes` (README, "Optional: the known-failure fixes").
+
+Verified on 2026-10-28:
+- The three seeds run to an answer: `rrjjjm` after 2835 and 1981 codelets, `kji`
+  after 2152.
+- The headless smoke test passes on the fixed tree.
+- The bundle's 19 packaging tests pass, including a real apply/remove round trip.
+- Decision traces of every other recorded run are byte-identical with and without
+  the patch: see [VALIDATION.md](VALIDATION.md).
+
+Any use of it still counts as a changed engine in the sense of item 4 above.
+
+**Petacat.** Petacat's lockstep harness records both variants (`tests/lockstep/metacat/
+record.py --reference` and `--known-failures-patch`), in
+`tests/lockstep/traces-known-failures/reference/` and `.../fixes/`. Petacat replays the
+reference recordings in lockstep up to each crash point; it does not crash, and it
+carries on as the fixed Metacat does. It replays the fixed recordings to the end with
+no differences. Investigating these seeds found two Petacat port bugs on the same path
+(`DISCREPANCIES5.md` G-Q1, G-Q2), which are fixed.

@@ -29,7 +29,8 @@
 
 
 # The three Metacat crashes of Metacat/KNOWN-FAILURES.md (cause "reference").  Two reference
-# bugs; see "Status (lockstep pass)" in that file and tests/lockstep/metacat/known-failures.patch.
+# bugs; see "Status (lockstep pass)" in that file and the bundle's second patch group,
+# Metacat/patches/fixes/0001-known-failures.patch.
 
 [[divergence]]
 id = "REF:crash-singleton-letter-swap-20713988"

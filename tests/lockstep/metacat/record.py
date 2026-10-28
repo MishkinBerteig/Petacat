@@ -8,10 +8,16 @@ Plain Python 3, standard library only.  See tests/lockstep/metacat/README.md.
     python3 tests/lockstep/metacat/record.py --seeds 1-5 --baseline   # unpatched
 
 Each (problem, seed) runs in its own ``metacat:1.2`` container (linux/amd64,
-Chez Scheme 9.5.4, no network) on ``Metacat/build/recorder-source``, a copy of
-the reconstructed ``Metacat/build/source`` with ``recorder.patch`` applied.  The
-plain trace is gzipped (mtime 0, so equal traces are equal bytes) into
-``<out>/<slug>/<seed>.metacat.jsonl.gz``.
+Chez Scheme 9.5.4, no network) on a copy of the reconstructed ``Metacat/build/source``
+with ``recorder.patch`` applied: ``Metacat/build/recorder-source`` for the reference
+reconstruction, ``Metacat/build/recorder-source-kf`` for the reconstruction with the
+bundle's second patch group (``Metacat/patches/fixes/``, the known-failure fixes).  By
+default the copy is of whichever of the two ``build/source`` is (``reconstruct.py``
+verifies it); ``--reference`` and ``--known-failures-patch`` choose one explicitly.  The
+two give byte-identical traces except on the three seeds of
+``Metacat/KNOWN-FAILURES.md``.  The header's ``revision`` names the bundle manifest and,
+with the fixes, ends in ``+known-failure-fixes``.  The plain trace is gzipped (mtime 0, so
+equal traces are equal bytes) into ``<out>/<slug>/<seed>.metacat.jsonl.gz``.
 
 Episodes and justify mode (task J)::
 
@@ -36,6 +42,7 @@ import argparse
 import concurrent.futures
 import gzip
 import hashlib
+import json
 import os
 import re
 import shutil
@@ -51,7 +58,6 @@ SOURCE = METACAT / "build" / "source"
 RECORDER_SOURCE = METACAT / "build" / "recorder-source"
 WORK = METACAT / "build" / "recorder-work"
 PATCH = HERE / "recorder.patch"
-KNOWN_FAILURES_PATCH = HERE / "known-failures.patch"
 IMAGE = "metacat:1.2"
 DEFAULT_OUT = REPO / "tests" / "lockstep" / "traces"
 
@@ -60,34 +66,60 @@ def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def ensure_recorder_source(known_failures: bool = False) -> Path:
-    """Copy build/source and apply recorder.patch; redo it if the patch changed.
+def _reconstruct():
+    """``Metacat/tools/reconstruct.py``, which knows both patch groups."""
+    import importlib.util
 
-    ``known_failures`` also applies known-failures.patch (the optional fix of the three
-    reference crashes) first, into ``build/recorder-source-kf``; the default tree is never
-    touched by it."""
+    spec = importlib.util.spec_from_file_location(
+        "metacat_reconstruct", METACAT / "tools" / "reconstruct.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _manifest() -> dict:
+    return json.loads((METACAT / "manifest.json").read_text())
+
+
+def source_state() -> str:
+    """``reference`` or ``fixes``: which reconstruction ``build/source`` is."""
     if not SOURCE.is_dir():
         sys.exit(f"missing {SOURCE}; run Metacat/tools/reconstruct.py first")
-    patches = [KNOWN_FAILURES_PATCH, PATCH] if known_failures else [PATCH]
-    target = METACAT / "build" / ("recorder-source-kf" if known_failures else "recorder-source")
+    state = _reconstruct().describe(SOURCE, _manifest())
+    if state is None:
+        sys.exit(f"{SOURCE} verifies neither as the reference reconstruction nor with the "
+                 "known-failure fixes; see Metacat/README.md")
+    return state
+
+
+def ensure_recorder_source(variant: str | None = None) -> tuple[Path, str]:
+    """Copy build/source as the ``variant`` reconstruction and apply recorder.patch.
+
+    ``variant`` is ``reference``, ``fixes`` or None (whichever build/source is).  The copy
+    is redone when the variant's inputs change: recorder.patch or the bundle manifest.
+    Returns the copy and the variant it is."""
+    state = source_state()
+    variant = variant or state
+    target = METACAT / "build" / ("recorder-source-kf" if variant == "fixes" else "recorder-source")
     marker = target / ".recorder-patch.sha256"
-    want = "+".join(sha256(p) for p in patches)
+    want = f"{variant}+{sha256(PATCH)}+{sha256(METACAT / 'manifest.json')}"
     if marker.exists() and marker.read_text().strip() == want \
-            and marker.stat().st_mtime >= max(p.stat().st_mtime for p in patches):
-        return target
+            and marker.stat().st_mtime >= PATCH.stat().st_mtime:
+        return target, variant
     if target.exists():
         shutil.rmtree(target)
     shutil.copytree(SOURCE, target)
-    for patch in patches:
-        with patch.open("rb") as handle:
-            done = subprocess.run(
-                ["patch", "-p1", "-s", "-d", str(target)],
-                stdin=handle, capture_output=True, text=True)
-        if done.returncode != 0:
-            shutil.rmtree(target, ignore_errors=True)
-            sys.exit(f"{patch.name} does not apply:\n{done.stdout}{done.stderr}")
+    if variant != state:
+        rec = _reconstruct()
+        (rec.apply_fixes if variant == "fixes" else rec.remove_fixes)(target, _manifest())
+    with PATCH.open("rb") as handle:
+        done = subprocess.run(["patch", "-p1", "-s", "-d", str(target)],
+                              stdin=handle, capture_output=True, text=True)
+    if done.returncode != 0:
+        shutil.rmtree(target, ignore_errors=True)
+        sys.exit(f"{PATCH.name} does not apply:\n{done.stdout}{done.stderr}")
     marker.write_text(want + "\n")
-    return target
+    return target, variant
 
 
 def parse_seeds(text: str) -> list[int]:
@@ -360,9 +392,13 @@ def main() -> None:
     parser.add_argument("--audit", action="store_true",
                         help="debug: shadow `random` and report raw draws attributed to "
                              "no decision (the trace itself is unchanged)")
-    parser.add_argument("--known-failures-patch", action="store_true",
-                        help="record on a copy that also has known-failures.patch applied "
-                             "(fix of the three reference crashes; see README)")
+    variant = parser.add_mutually_exclusive_group()
+    variant.add_argument("--known-failures-patch", action="store_true",
+                         help="record Metacat with the bundle's second patch group (the "
+                              "known-failure fixes), whichever build/source is")
+    variant.add_argument("--reference", action="store_true",
+                         help="record the reference reconstruction (without the fixes), "
+                              "whichever build/source is")
     parser.add_argument("--keep-plain", action="store_true",
                         help="also keep the uncompressed .jsonl next to the .gz")
     parser.add_argument("--keep-work", action="store_true")
@@ -384,12 +420,15 @@ def main() -> None:
                          if args.episode_runs else ""), flush=True)
         return
 
-    source = ensure_recorder_source(args.known_failures_patch)
+    source, variant = ensure_recorder_source(
+        "fixes" if args.known_failures_patch else "reference" if args.reference else None)
     if args.names:
         dump_names(args, source, problem)
         return
 
     revision = "metacat-bundle-manifest-sha256:" + sha256(METACAT / "manifest.json")
+    if variant == "fixes":
+        revision += "+known-failure-fixes"
     seeds = parse_seeds(args.seeds)
     print(f"recording {slug_of(problem, args.answer)} seeds {seeds[0]}..{seeds[-1]} ({len(seeds)}) "
           f"cap {args.cap} jobs {args.jobs} snapshots {not args.no_snapshots}", flush=True)

@@ -10,7 +10,6 @@ number of its own and changes nothing Metacat computes.
 | `record.py` | CLI (plain `python3`, stdlib only): builds the patched source, writes a driver per problem and seed, runs Docker, gzips the trace |
 | `recorder.patch` | Unified diff against `Metacat/build/source` (8 files, about 50 added lines) |
 | `decision-trace.ss` | Run-time wrappers, JSON writer, canonical names, `trace-open`, `trace-run`, snapshots, `dump-opening-names` |
-| `known-failures.patch` | Optional fix of the three reference crashes (`Metacat/KNOWN-FAILURES.md`); not applied by default |
 | `random-audit.ss` | Debug only: shadows `random` to find raw draws attributed to no decision |
 | `opening-names.abc-abd-xyz.json` | Canonical names of every letter, description and slipnet node of the opening state (95 names, sorted) |
 
@@ -20,14 +19,25 @@ number of its own and changes nothing Metacat computes.
 python3 tests/lockstep/metacat/record.py --problem abc abd xyz --seeds 1-10   # default out: tests/lockstep/traces
 python3 tests/lockstep/metacat/record.py --seeds 1,5,10600000-10600004 --cap 100000 --jobs 4 --no-snapshots
 python3 tests/lockstep/metacat/record.py --names                    # rewrite opening-names.<slug>.json
-python3 tests/lockstep/metacat/record.py --seeds 1-5 --baseline     # unpatched collector-style run, prints answer + codelets
+python3 tests/lockstep/metacat/record.py --seeds 1-5 --baseline     # collector-style run without the recorder patch, on build/source as it is; prints answer + codelets
 python3 tests/lockstep/metacat/record.py --seeds 1-3 --audit        # raw-draw audit (prints AUDIT lines; trace unchanged)
 ```
 
 Output: `<out>/<slug>/<seed>.metacat.jsonl.gz`, slug = the three strings joined by `-`.  Seeds
 start at 1.  The gzip header has mtime 0, so equal traces are equal bytes.  `--keep-plain`
-also keeps the `.jsonl`.  The first run copies `Metacat/build/source` to
-`Metacat/build/recorder-source` and applies the patch (redone when `recorder.patch` changes).
+also keeps the `.jsonl`.
+
+**Which Metacat.** `Metacat/build/source` is either the reference reconstruction or the
+reference with the bundle's second patch group, the known-failure fixes
+(`Metacat/README.md`, "Optional: the known-failure fixes").  The recorder checks which
+with `Metacat/tools/reconstruct.py` and refuses a tree that is neither.  By default it
+records whichever `build/source` is.  `--reference` and `--known-failures-patch` choose one
+explicitly, adding or taking off the fixes on its copy, never on `build/source`.  The copy
+is `Metacat/build/recorder-source` for the reference and `Metacat/build/recorder-source-kf`
+with the fixes; each is rebuilt when `recorder.patch` or `Metacat/manifest.json` changes.
+The trace header's `revision` names the manifest's hash and, with the fixes, ends in
+`+known-failure-fixes`.  The two variants record byte-identical traces except on the three
+crash seeds.
 Both are git-ignored.  To change the patch: edit `recorder-source`, then regenerate with
 `diff -u` against `build/source` using `a/` and `b/` path prefixes (applied with `patch -p1`).
 
@@ -175,29 +185,33 @@ byte-identical traces.
   to a run that reaches the 100,000-codelet cap: about 1 GB raw, 30 MB gzipped, a few minutes.
 
 
-## The three reference crashes and `known-failures.patch`
+## The three reference crashes
 
-`Metacat/KNOWN-FAILURES.md` lists three seeds on which Metacat itself crashes
-(`abc cba mrrjjj` 20713988 and 20716342, `abc aabbcc kkjjii` 20226148).  The reconstruction
-(`Metacat/patches/`, `Metacat/build/source`) is the reference behind published studies and is
-**not** changed.  The recorder records them as they are: the trace ends with an `end` record of
-reason `error` (`tests/lockstep/traces-known-failures/unpatched/`), and the comparer registers
-them as reference crashes (`known_divergences.toml`, `match.class = "reference-crash"`).
+`Metacat/KNOWN-FAILURES.md` lists three seeds on which Metacat itself crashes:
+`abc cba mrrjjj` seeds 20713988 and 20716342, and `abc aabbcc kkjjii` seed 20226148.
+The reference reconstruction behind the published studies is not changed.  The bundle's
+second patch group, `Metacat/patches/fixes/0001-known-failures.patch`, fixes the two
+causes, and Metacat's `CODE-FIXES.md` (§1.3 once applied) and `KNOWN-FAILURES.md`
+describe it.
 
-`known-failures.patch` is a unified diff against `Metacat/build/source` (`-p1`; two files,
-`groups.ss` and `rules.ss`) that fixes the two causes.  It changes no run that does not crash:
-`abc abd xyz` and `abc cba mrrjjj` seeds 1-10 and seeds 1-4 of every demo problem record
-byte-identical traces with and without it.  To use it on a copy:
+Both variants are recorded and committed:
 
 ```sh
-cp -R Metacat/build/source /tmp/metacat-fixed && patch -p1 -d /tmp/metacat-fixed < tests/lockstep/metacat/known-failures.patch
-# or, to record with it (applies it, then recorder.patch, to Metacat/build/recorder-source-kf):
+python3 tests/lockstep/metacat/record.py --reference --problem abc cba mrrjjj \
+    --seeds 20713988,20716342 --out tests/lockstep/traces-known-failures/reference
 python3 tests/lockstep/metacat/record.py --known-failures-patch --problem abc cba mrrjjj \
-    --seeds 20713988,20716342 --out /tmp/kf
-python3 tests/lockstep/metacat/record.py --known-failures-patch --problem abc aabbcc kkjjii \
-    --seeds 20226148 --out /tmp/kf
+    --seeds 20713988,20716342 --out tests/lockstep/traces-known-failures/fixes
+# and the same for abc aabbcc kkjjii, seed 20226148
 ```
 
-The patched recordings are in `tests/lockstep/traces-known-failures/patched/`; Petacat replays them
-with full agreement (`PYTHONPATH=. .venv/bin/python scripts/lockstep_corpus.py --traces
-tests/lockstep/traces-known-failures/patched --problem abc-cba-mrrjjj`).
+- **Reference.** Each trace ends with an `end` record of reason `error`.  The comparer
+  registers each one as a reference crash (`known_divergences.toml`,
+  `match.class = "reference-crash"`).  Petacat replays them in lockstep to each crash
+  point.
+- **Fixes.** The runs answer `rrjjjm`, `rrjjjm` and `kji`.  Petacat replays them to the end
+  with no differences:
+  `.venv/bin/python scripts/lockstep_corpus.py --traces tests/lockstep/traces-known-failures/fixes`.
+
+Every other recorded run, across the development, held-out and justify corpora, gives a
+byte-identical trace with and without the fixes, apart from the header's `revision`
+(`Metacat/VALIDATION.md`).
