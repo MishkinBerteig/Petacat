@@ -418,15 +418,12 @@ class Bridge(WorkspaceStructure):
     def get_theme_support_values(self) -> list[float]:
         """Per-theme support in -1..+1: negative if incompatible, positive if supported.
 
-        One value per theme of every *active* type — ``get-active-themes``
-        (themes.ss:181-186) returns the whole cluster set, not only the themes
-        that happen to carry activation, and ``get-theme-support-values``
-        (bridges.ss:280-288) maps over all of them, contributing 0 for a theme
-        the bridge neither supports nor contradicts.  Skipping the zeroes shrank
-        ``n``, and ``n`` is what sets the negative weight ``2n``
-        (bridges.ss:275) — so the "incompatible themes drown out compatible ones"
-        asymmetry of §4.1.2 was weaker than the reference's by exactly the
-        proportion of quiet themes.
+        One value per *existing* theme of every active type: ``get-active-themes``
+        (``themes.ss:181-186``) filters ``all-themes``, which holds only the themes
+        something has created (``add-theme``, ``themes.ss:374-386``).  The list's
+        length sets the negative weight ``2n`` (``bridges.ss:275``), so it varies with
+        what the run has built -- the Themespace must not be padded with every
+        possible theme.
         """
         themespace = WorkspaceStructure.get_themespace()
         if themespace is None:

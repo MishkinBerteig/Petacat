@@ -381,15 +381,36 @@ def project_themespace(state: dict, meta: Any) -> dict:
 
     clusters = []
     for c in state["themespace"]["clusters"]:
-        themes = [
-            {
+        # Only existing themes are captured (B-2); the view lists every possible
+        # theme, an absent one at activation 0, as the live serialization does.
+        existing = {
+            row[0]: {
                 "dimension": c["dimension"],
-                "relation": relation,
-                "activation": activation,
-                "frozen": frozen,
+                "relation": row[0],
+                "activation": row[1],
+                "frozen": row[2],
                 "dominant": False,
             }
-            for relation, activation, frozen, _buffer in c["themes"]
+            for row in c["themes"]
+        }
+        relations = next(
+            (
+                list(spec.valid_relations)
+                for spec in meta.theme_dimensions
+                if spec.slipnet_node == c["dimension"]
+            ),
+            list(existing),
+        )
+        themes = [
+            existing.get(relation)
+            or {
+                "dimension": c["dimension"],
+                "relation": relation,
+                "activation": 0.0,
+                "frozen": False,
+                "dominant": False,
+            }
+            for relation in relations
         ]
         dominant = _dominant_theme(themes, margin)
         if dominant is not None:

@@ -139,8 +139,11 @@ def _clamp_vertical(ctx, pattern: dict[str, str]):
     """
     for cluster in ctx.themespace.get_clusters(THEME_VERTICAL_BRIDGE):
         wanted = pattern.get(cluster.dimension)
-        for theme in cluster.themes:
-            theme.clamp(100.0 if theme.relation == wanted else 0.0)
+        for relation in cluster.valid_relations:
+            theme = ctx.themespace.add_theme(
+                THEME_VERTICAL_BRIDGE, cluster.dimension, relation, False
+            )
+            theme.clamp(100.0 if relation == wanted else 0.0)
     ctx.themespace.thematic_pressure_on([THEME_VERTICAL_BRIDGE])
 
 

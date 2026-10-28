@@ -64,6 +64,9 @@ class _FakeThemespace:
     def unclamp_all(self) -> None:
         pass
 
+    def delete_theme_type(self, theme_type: Any) -> None:
+        pass
+
 
 class _FakeStructure:
     """A workspace structure that is not a bond, carrying only a strength."""

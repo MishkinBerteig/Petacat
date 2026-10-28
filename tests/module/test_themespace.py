@@ -20,7 +20,7 @@ def meta():
 
 @pytest.fixture
 def themespace(meta):
-    return Themespace(meta)
+    return Themespace(meta).populate()
 
 
 def test_cluster_count(themespace):
@@ -180,7 +180,7 @@ def _clusters_of(themespace, theme_type):
 def test_saving_and_restoring_returns_every_theme_to_where_it_was(meta):
     from server.engine.themes import Themespace
 
-    themespace = Themespace(meta)
+    themespace = Themespace(meta).populate()
     cluster = _clusters_of(themespace, "vertical_bridge")[0]
     live = cluster.themes[0]
     live.activation = 64.0
@@ -197,7 +197,8 @@ def test_saving_and_restoring_returns_every_theme_to_where_it_was(meta):
     themespace.thematic_pressure_off(["vertical_bridge"])
 
     assert themespace.restore_current_state()
-    assert live.activation == 64.0
+    # Restoring re-creates the themes (themes.ss:103-125), so look them up afresh.
+    assert cluster.get_theme(live.relation).activation == 64.0
     assert cluster.frozen is True
     assert "vertical_bridge" in themespace.active_theme_types
     assert not themespace.displaying_past_state

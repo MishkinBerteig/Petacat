@@ -302,7 +302,8 @@ class ThemeLayout:
     #: ``valid[c * n_slots + s]`` — whether slot ``s`` of cluster ``c`` is a real
     #: theme rather than padding.
     valid: tuple[bool, ...]
-    #: Number of real themes in each cluster.  Enters the sigmoid's ``alpha`` as
+    #: Number of *possible* themes in each cluster (``num-relations``,
+    #: ``themes.ss:420``).  Enters the sigmoid's ``alpha`` as
     #: ``1 / n_relations``, so it is a per-cluster constant, not just a count.
     n_relations: tuple[int, ...]
 
@@ -319,7 +320,7 @@ class ThemeLayout:
             n_clusters=len(clusters),
             n_slots=n_slots,
             valid=tuple(valid),
-            n_relations=tuple(max(1, len(c.themes)) for c in clusters),
+            n_relations=tuple(max(1, len(c.valid_relations)) for c in clusters),
         )
 
 

@@ -402,7 +402,7 @@ def test_theme_spreading_matches_the_cluster_loop(
     import copy
     import random
 
-    themespace = Themespace(meta)
+    themespace = Themespace(meta).populate()
     rng = random.Random(7)
     for cluster in themespace.clusters:
         for theme in cluster.themes:

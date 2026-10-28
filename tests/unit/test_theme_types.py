@@ -30,7 +30,7 @@ def test_theme_stores_string_type():
 
 
 def test_theme_cluster_stores_string_type():
-    cluster = ThemeCluster(THEME_VERTICAL_BRIDGE, "plato-direction-category", ["identity", "opposite"])
+    cluster = ThemeCluster(THEME_VERTICAL_BRIDGE, "plato-direction-category", ["identity", "opposite"]).populate()
     assert cluster.theme_type == "vertical_bridge"
     assert len(cluster.themes) == 2
     for theme in cluster.themes:
@@ -43,5 +43,5 @@ def test_theme_repr_contains_string_type():
 
 
 def test_cluster_repr_contains_string_type():
-    cluster = ThemeCluster(THEME_TOP_BRIDGE, "plato-direction-category", ["identity"])
+    cluster = ThemeCluster(THEME_TOP_BRIDGE, "plato-direction-category", ["identity"]).populate()
     assert "top_bridge" in repr(cluster)

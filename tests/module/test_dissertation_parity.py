@@ -121,7 +121,7 @@ class TestThemespaceActivates:
     def test_dominance_needs_a_margin_over_the_runner_up(self):
         """Scheme: ``update-dominant-theme`` (themes.ss:503-518) — the leader must
         beat the runner-up by strictly more than %dominant-theme-margin% (90)."""
-        cluster = ThemeCluster(THEME_TOP_BRIDGE, "d", ["identity", "opposite"])
+        cluster = ThemeCluster(THEME_TOP_BRIDGE, "d", ["identity", "opposite"]).populate()
         identity, opposite = cluster.themes
         identity.activation = 95.0
         opposite.activation = 0.0
@@ -134,7 +134,7 @@ class TestThemespaceActivates:
         """Themes are ranked by *absolute* activation, so a negatively clamped
         theme suppresses dominance in its cluster — which is the whole point of
         clamping one in response to a recurring snag (§4.5.2)."""
-        cluster = ThemeCluster(THEME_TOP_BRIDGE, "d", ["identity", "opposite"])
+        cluster = ThemeCluster(THEME_TOP_BRIDGE, "d", ["identity", "opposite"]).populate()
         identity, opposite = cluster.themes
         identity.activation = 100.0
         opposite.activation = -95.0
@@ -185,7 +185,9 @@ class TestThematicPressure:
             if c.theme_type == THEME_TOP_BRIDGE
             and c.dimension == "plato-string-position-category"
         )
-        theme = cluster.get_theme(RELATION_IDENTITY)
+        theme = ts.add_theme(
+            THEME_TOP_BRIDGE, cluster.dimension, RELATION_IDENTITY, False
+        )
 
         ts.thematic_pressure_on([THEME_TOP_BRIDGE])
         theme.clamp(80.0)

@@ -436,7 +436,13 @@ def capture_run_state(ctx: Any) -> dict:
                     "dimension": c.dimension,
                     "frozen": c.frozen,
                     "themes": [
-                        [t.relation, t.activation, t.frozen, t._net_input_buffer]
+                        [
+                            t.relation,
+                            t.activation,
+                            t.frozen,
+                            t._net_input_buffer,
+                            ctx.themespace.all_themes.index(t),
+                        ]
                         for t in c.themes
                     ],
                 }
@@ -600,20 +606,30 @@ def restore_run_state(runner: Any, state: dict) -> None:
     ctx.themespace.active_theme_types = list(
         state["themespace"]["active_theme_types"]
     )
+    # Only the themes that existed are captured, newest first within a cluster and
+    # in ``all-themes`` order across them (B-2); restoring rebuilds exactly that set.
+    ctx.themespace.delete_everything()
     by_key = {(c.theme_type, c.dimension): c for c in ctx.themespace.clusters}
+    restored: list[tuple[int, Any]] = []
     for c_state in state["themespace"]["clusters"]:
         cluster = by_key.get((c_state["theme_type"], c_state["dimension"]))
         if cluster is None:
             continue
         cluster.frozen = c_state["frozen"]
-        themes = {t.relation: t for t in cluster.themes}
-        for relation, act, frozen, buffered in c_state["themes"]:
-            theme = themes.get(relation)
+        for row in c_state["themes"]:
+            relation, act, frozen, buffered = row[:4]
+            order = row[4] if len(row) > 4 else len(restored)
+            theme = cluster.add_theme(relation)
             if theme is None:
                 continue
             theme.activation = act
             theme.frozen = frozen
             theme._net_input_buffer = buffered
+            restored.append((order, theme))
+    # Cluster lists were rebuilt by consing, so reverse each back to saved order.
+    for cluster in ctx.themespace.clusters:
+        cluster.themes.reverse()
+    ctx.themespace.all_themes = [t for _, t in sorted(restored, key=lambda x: x[0])]
 
     # -- Temperature, RNG, counters, runner control -------------------
     temp = state["temperature"]

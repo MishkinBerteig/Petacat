@@ -125,7 +125,7 @@ def test_clamp_positive_value_sets_a_positive_activation():
 # --- ThemeCluster: dominant theme ------------------------------------------
 
 def _cluster(relations=("identity", "opposite")):
-    return ThemeCluster(THEME_TOP_BRIDGE, "direction", list(relations))
+    return ThemeCluster(THEME_TOP_BRIDGE, "direction", list(relations)).populate()
 
 
 def test_no_dominant_theme_when_none_positive():
@@ -179,7 +179,7 @@ def test_get_theme_returns_none_for_unknown_relation():
 # --- ThemeCluster: intra-cluster spreading ---------------------------------
 
 def test_spread_activation_skips_frozen_cluster():
-    cluster = ThemeCluster(THEME_TOP_BRIDGE, "direction", ["identity"])
+    cluster = ThemeCluster(THEME_TOP_BRIDGE, "direction", ["identity"]).populate()
     cluster.themes[0].activation = 40.0
     cluster.frozen = True
     cluster.spread_activation(_FakeMeta([], _SPREAD_PARAMS, _SPREAD_COEFFS))
@@ -187,7 +187,7 @@ def test_spread_activation_skips_frozen_cluster():
 
 
 def test_spread_activation_applies_decay_and_self_excitation():
-    cluster = ThemeCluster(THEME_TOP_BRIDGE, "direction", ["identity"])
+    cluster = ThemeCluster(THEME_TOP_BRIDGE, "direction", ["identity"]).populate()
     cluster.themes[0].activation = 40.0
     cluster.spread_activation(_FakeMeta([], _SPREAD_PARAMS, _SPREAD_COEFFS))
     # net_input = -25 (decay) + 40*0.5 (self) = -5
@@ -201,7 +201,7 @@ def test_spread_activation_applies_decay_and_self_excitation():
 def _themespace():
     dims = [_FakeDim("direction", ["identity", "opposite"])]
     meta = _FakeMeta(dims, {"dominant_theme_margin": 90, "theme_boost_amount": 7}, _SPREAD_COEFFS)
-    return Themespace(meta)
+    return Themespace(meta).populate()
 
 
 def test_justify_mode_makes_all_three_bridge_types_possible():

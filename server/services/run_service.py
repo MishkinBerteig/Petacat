@@ -1545,20 +1545,11 @@ class RunService:
         else:
             return
 
-        for cluster in themespace.clusters:
-            if cluster.theme_type != theme_type:
-                continue
-            for theme in cluster.themes:
-                theme.activation = 0.0
+        # ``display`` clears the type and imposes the pattern; ``impose-theme-pattern``
+        # creates each named theme (``trace.ss:1519-1528``).
+        themespace.delete_theme_type(theme_type)
         for dimension, relation in pairs:
-            for cluster in themespace.clusters:
-                if (
-                    cluster.theme_type == theme_type
-                    and cluster.dimension == dimension
-                ):
-                    theme = cluster.get_theme(relation)
-                    if theme is not None:
-                        theme.activation = 100.0
+            themespace.set_theme_activation(theme_type, dimension, relation, 100.0)
 
     def restore_themespace(self, run_id: int) -> dict:
         """Stop displaying a past episode and put the live Themespace back."""
@@ -1606,11 +1597,12 @@ class RunService:
                     continue
                 # Zero the cluster before imposing, as the Scheme does.
                 cluster.frozen = False
-                for other in cluster.themes:
-                    other.activation = 0.0
-                    other.frozen = False
+                for other in list(cluster.themes):
+                    themespace.delete_theme(other)
 
-                theme = cluster.get_theme(t.get("relation"))
+                theme = themespace.add_theme(
+                    theme_type, dimension, t.get("relation"), False
+                )
                 if theme is None:
                     break
                 activation = float(t.get("activation", 100.0))

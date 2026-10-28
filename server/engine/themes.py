@@ -217,10 +217,41 @@ class ThemeCluster:
     ) -> None:
         self.theme_type = theme_type
         self.dimension = dimension
-        self.themes: list[Theme] = [
-            Theme(theme_type, dimension, rel) for rel in valid_relations
-        ]
+        #: ``relations`` of ``make-theme-cluster`` (``themes.ss:419``): every relation
+        #: a theme here *could* have.  Fixed for the cluster's life; it sets the
+        #: sigmoid's ``alpha`` (``themes.ss:445``) whatever themes exist.
+        self.valid_relations: list[str] = list(valid_relations)
+        #: ``themes`` (``themes.ss:462``): only the themes something has touched,
+        #: newest first (``add-theme`` conses, ``themes.ss:553``).  Starts empty --
+        #: the Themespace is not populated with every possible theme (B-2).
+        self.themes: list[Theme] = []
         self.frozen: bool = False
+
+    def add_theme(self, relation: str | None) -> Theme | None:
+        """Scheme: cluster ``add-theme`` (``themes.ss:547-557``).
+
+        ``None`` unless *relation* is one this cluster allows; the new theme goes on
+        the front of the list.
+        """
+        if relation not in self.valid_relations:
+            return None
+        theme = Theme(self.theme_type, self.dimension, relation)
+        self.themes.insert(0, theme)
+        return theme
+
+    def populate(self) -> ThemeCluster:
+        """Create every possible theme, in ``valid_relations`` order.
+
+        For hand-built fixtures only.  The engine never does this: a run's
+        Themespace holds just the themes something has touched (B-2).
+        """
+        for relation in reversed(self.valid_relations):
+            self.add_theme(relation)
+        return self
+
+    def delete_themes(self) -> None:
+        """Scheme: cluster ``delete-themes`` (``themes.ss:566-569``)."""
+        self.themes = []
 
     def get_max_positive_theme_activation(self) -> float:
         """The strongest positive activation anywhere in this cluster.
@@ -295,7 +326,8 @@ class ThemeCluster:
             "max_theme_activation", DEFAULT_MAX_THEME_ACTIVATION
         )
 
-        n_relations = max(1, len(self.themes))
+        # ``num-relations`` is the count of *possible* relations (``themes.ss:420``).
+        n_relations = max(1, len(self.valid_relations))
         sensitivity = meta.get_formula_coeff("theme_net_effect_default_sensitivity")
         alpha = sensitivity * (1.0 / 50.0) * (1.0 / n_relations)
 
@@ -381,6 +413,10 @@ class Themespace:
     def __init__(self, meta: MetadataProvider) -> None:
         self.clusters: list[ThemeCluster] = []
         self.meta = meta
+        #: ``all-themes`` (``themes.ss:45``): the themes that exist, newest first.
+        #: It grows only through :meth:`add_theme` and shrinks through
+        #: :meth:`delete_theme_type`; nothing is created up front.
+        self.all_themes: list[Theme] = []
 
         # Build clusters from theme dimension specs
         for dim_spec in meta.theme_dimensions:
@@ -457,12 +493,93 @@ class Themespace:
         """
         if theme_type not in self.active_theme_types:
             return []
-        return [
-            t
-            for c in self.clusters
-            if c.theme_type == theme_type
-            for t in c.themes
-        ]
+        return self.get_themes(theme_type)
+
+    def populate(self) -> Themespace:
+        """Create every possible theme.  For hand-built fixtures only (see B-2)."""
+        for cluster in self.clusters:
+            for relation in reversed(cluster.valid_relations):
+                self.add_theme(cluster.theme_type, cluster.dimension, relation, False)
+        return self
+
+    def get_themes(self, theme_type: str) -> list[Theme]:
+        """Existing themes of *theme_type*, in ``all-themes`` order (``themes.ss:176-177``)."""
+        return [t for t in self.all_themes if t.theme_type == theme_type]
+
+    def get_all_active_themes(self) -> list[Theme]:
+        """Existing themes of every pressured type (``themes.ss:178-179``)."""
+        return [t for t in self.all_themes if t.theme_type in self.active_theme_types]
+
+    def get_cluster(self, theme_type: str, dimension: str) -> ThemeCluster | None:
+        for c in self.clusters:
+            if c.theme_type == theme_type and c.dimension == dimension:
+                return c
+        return None
+
+    def get_theme(
+        self, theme_type: str, dimension: str, relation: str | None
+    ) -> Theme | None:
+        cluster = self.get_cluster(theme_type, dimension)
+        return cluster.get_theme(relation) if cluster is not None else None
+
+    def add_theme(
+        self,
+        theme_type: str,
+        dimension: str,
+        relation: str | None,
+        check_if_frozen: bool,
+    ) -> Theme | None:
+        """Scheme: ``add-theme`` (``themes.ss:374-386``).
+
+        The existing theme if there is one; otherwise a new one, unless the cluster
+        is frozen and *check_if_frozen* (``add-theme-if-possible``), or the relation
+        is not one the cluster allows.
+        """
+        cluster = self.get_cluster(theme_type, dimension)
+        if cluster is None:
+            return None
+        theme = cluster.get_theme(relation)
+        if theme is not None:
+            return theme
+        if check_if_frozen and cluster.frozen:
+            return None
+        theme = cluster.add_theme(relation)
+        if theme is not None:
+            self.all_themes.insert(0, theme)
+        return theme
+
+    def set_theme_activation(
+        self,
+        theme_type: str,
+        dimension: str,
+        relation: str | None,
+        activation: float,
+    ) -> None:
+        """Scheme: ``set-theme-activation`` (``themes.ss:299-307``) -- adds the theme
+        if absent (ignoring any freeze), without touching frozen status."""
+        theme = self.add_theme(theme_type, dimension, relation, False)
+        if theme is not None:
+            theme.activation = activation
+
+    def delete_theme(self, theme: Theme) -> None:
+        """Scheme: ``delete-theme`` (``themes.ss:319-325``)."""
+        cluster = self.get_cluster(theme.theme_type, theme.dimension)
+        if cluster is not None and theme in cluster.themes:
+            cluster.themes.remove(theme)
+        if theme in self.all_themes:
+            self.all_themes.remove(theme)
+
+    def delete_theme_type(self, theme_type: str) -> None:
+        """Scheme: ``delete-theme-type`` (``themes.ss:341-347``); frozen status kept."""
+        for cluster in self.get_clusters(theme_type):
+            cluster.delete_themes()
+        self.all_themes = [t for t in self.all_themes if t.theme_type != theme_type]
+
+    def delete_everything(self) -> None:
+        """Scheme: ``delete-everything`` (``themes.ss:348-352``)."""
+        for cluster in self.clusters:
+            cluster.delete_themes()
+        self.all_themes = []
 
     def get_positive_themes(self, bridge_type: str) -> list[Theme]:
         """Positively-activated themes of *bridge_type* that exert pressure.
@@ -485,10 +602,9 @@ class Themespace:
         """
         if self._numeric is not _UNRESOLVED:
             return self._numeric
-        backend = select_backend(sum(len(c.themes) for c in self.clusters))
+        backend = select_backend(sum(len(c.valid_relations) for c in self.clusters))
         self._numeric = backend
         if backend is not None:
-            self._numeric_layout = ThemeLayout.from_themespace(self)
             self._numeric_params = ThemeParams.from_metadata(self.meta)
         return backend
 
@@ -500,7 +616,9 @@ class Themespace:
                 cluster.spread_activation(self.meta)
             return
 
-        layout = self._numeric_layout
+        # The set of existing themes changes as the run goes, so the layout is rebuilt
+        # for each step rather than fixed at the first.
+        layout = ThemeLayout.from_themespace(self)
         state = ThemeState.from_themespace(self, layout)
         backend.spread_themes(layout, state, self._numeric_params)
         state.apply_to_themespace(self, layout)
@@ -565,26 +683,47 @@ class Themespace:
         overwrites what the program is currently thinking, the live state is saved first
         and put back when the user is done looking (``restore_current_state``).
         """
+        # ``get-complete-state`` (``themes.ss:76-93``): the existing themes in
+        # ``all-themes`` order with their individual freeze, and every cluster's.
         self._saved_state = [
-            [(theme.activation, theme.frozen) for theme in cluster.themes]
-            for cluster in self.clusters
+            (t.theme_type, t.dimension, t.relation, t.activation, t.frozen)
+            for t in self.all_themes
         ]
-        self._saved_frozen = [cluster.frozen for cluster in self.clusters]
+        self._saved_frozen = [
+            (c.theme_type, c.dimension, c.frozen) for c in self.clusters
+        ]
         self._saved_active_types = list(self.active_theme_types)
 
     def restore_current_state(self) -> bool:
-        """Put back what ``save_current_state`` set aside.  Scheme: ``themes.ss:67-101``."""
+        """Put back what ``save_current_state`` set aside.  Scheme: ``themes.ss:67-101``.
+
+        As ``restore-state`` (``themes.ss:103-125``): every theme type is deleted,
+        unfrozen and switched off; pressure is re-applied; the saved themes are then
+        re-created one by one (so they come back in the reverse of the saved order,
+        each ``add-theme`` consing) and the saved cluster freezes re-imposed.
+        """
         saved = getattr(self, "_saved_state", None)
         if saved is None:
             return False
-        for cluster, cluster_state, frozen in zip(
-            self.clusters, saved, self._saved_frozen
-        ):
-            cluster.frozen = frozen
-            for theme, (act, theme_frozen) in zip(cluster.themes, cluster_state):
-                theme.activation = act
-                theme.frozen = theme_frozen
-        self.active_theme_types = list(self._saved_active_types)
+        for tt in ALL_THEME_TYPES:
+            self.delete_theme_type(tt)
+            for cluster in self.get_clusters(tt):
+                cluster.frozen = False
+            self.thematic_pressure_off([tt])
+        self.active_theme_types = []
+        self.thematic_pressure_on(
+            [tt for tt in self._saved_active_types if tt in self.possible_theme_types]
+        )
+        for tt, dim, rel, act, frozen in saved:
+            self.set_theme_activation(tt, dim, rel, act)
+            if frozen:
+                theme = self.get_theme(tt, dim, rel)
+                if theme is not None:
+                    theme.frozen = True
+        for tt, dim, frozen in self._saved_frozen:
+            cluster = self.get_cluster(tt, dim)
+            if cluster is not None and frozen:
+                cluster.frozen = True
         self._saved_state = None
         return True
 
@@ -676,21 +815,17 @@ class Themespace:
         reaches the theme.  Together with the check in ``Theme.boost`` this is the
         Scheme's own-or-cluster ``frozen?`` (``themes.ss:645``).
         """
-        for cluster in self.clusters:
-            if cluster.theme_type == theme_type and cluster.dimension == dimension:
-                if cluster.frozen:
-                    return
-                theme = cluster.get_theme(relation)
-                if theme:
-                    boost_amt = self.meta.get_param("theme_boost_amount", 7)
-                    theme.boost(
-                        factor,
-                        boost_amt,
-                        self.meta.get_param(
-                            "max_theme_activation", DEFAULT_MAX_THEME_ACTIVATION
-                        ),
-                    )
-                return
+        # ``add-theme-if-possible`` (``bridges.ss:301``): creates the theme if it does
+        # not exist, and gives ``#f`` for a frozen cluster or a relation the cluster
+        # does not allow -- in which case there is nothing to boost.
+        theme = self.add_theme(theme_type, dimension, relation, True)
+        if theme is None:
+            return
+        theme.boost(
+            factor,
+            self.meta.get_param("theme_boost_amount", 7),
+            self.meta.get_param("max_theme_activation", DEFAULT_MAX_THEME_ACTIVATION),
+        )
 
     def clamp_negative_pattern(
         self,
@@ -708,7 +843,9 @@ class Themespace:
             if cluster.theme_type != theme_type:
                 continue
             if cluster.dimension in pattern:
-                theme = cluster.get_theme(pattern[cluster.dimension])
+                theme = self.add_theme(
+                    theme_type, cluster.dimension, pattern[cluster.dimension], False
+                )
                 if theme:
                     theme.clamp(-100.0)
                     clamped = True
@@ -729,35 +866,34 @@ class Themespace:
         # drifted apart with nothing to notice.
         workspace_activation = self.meta.get_param("workspace_activation", 100)
 
-        for cluster in self.clusters:
-            if cluster.theme_type not in self.active_theme_types:
+        # ``update-slipnet-activations`` (``slipnet.ss:379``): ``get-all-active-themes``,
+        # i.e. the existing themes of pressured types in ``all-themes`` order.
+        for theme in self.get_all_active_themes():
+            if theme.activation == 0:
                 continue
-            for theme in cluster.themes:
-                if theme.activation == 0:
+
+            # Trace seam: both coins below concern this theme (lockstep §5.4).
+            rng.trace_about(theme)
+
+            # Activate dimension node: probability = (|activation|/100)^3
+            abs_prob = (abs(theme.activation) / 100.0) ** 3
+            if rng.prob(abs_prob):
+                dim_node = slipnet.nodes.get(theme.dimension)
+                if dim_node and not dim_node.frozen:
+                    dim_node.activation_buffer += workspace_activation
+
+            # Activate relation node: probability = (activation/100)^3.
+            # ``diff`` has no node — the "different" relation is the absence
+            # of a concept — so it contributes nothing here.
+            if theme.activation > 0:
+                rel_node_name = relation_node_name(theme.relation)
+                if rel_node_name is None:
                     continue
-
-                # Trace seam: both coins below concern this theme (lockstep §5.4).
-                rng.trace_about(theme)
-
-                # Activate dimension node: probability = (|activation|/100)^3
-                abs_prob = (abs(theme.activation) / 100.0) ** 3
-                if rng.prob(abs_prob):
-                    dim_node = slipnet.nodes.get(theme.dimension)
-                    if dim_node and not dim_node.frozen:
-                        dim_node.activation_buffer += workspace_activation
-
-                # Activate relation node: probability = (activation/100)^3.
-                # ``diff`` has no node — the "different" relation is the absence
-                # of a concept — so it contributes nothing here.
-                if theme.activation > 0:
-                    rel_node_name = relation_node_name(theme.relation)
-                    if rel_node_name is None:
-                        continue
-                    rel_prob = (theme.activation / 100.0) ** 3
-                    if rng.prob(rel_prob):
-                        rel_node = slipnet.nodes.get(rel_node_name)
-                        if rel_node and not rel_node.frozen:
-                            rel_node.activation_buffer += workspace_activation
+                rel_prob = (theme.activation / 100.0) ** 3
+                if rng.prob(rel_prob):
+                    rel_node = slipnet.nodes.get(rel_node_name)
+                    if rel_node and not rel_node.frozen:
+                        rel_node.activation_buffer += workspace_activation
         rng.trace_about(None)
 
     def unclamp_theme_type(self, theme_type: str) -> None:
@@ -788,11 +924,10 @@ class Themespace:
         self.thematic_pressure_off()
 
     def reset(self) -> None:
+        """Scheme: ``initialize`` (``themes.ss:126-130``) -- delete, unfreeze, pressure off."""
+        self.delete_everything()
         for cluster in self.clusters:
             cluster.frozen = False
-            for theme in cluster.themes:
-                theme.activation = 0.0
-                theme.frozen = False
         self.thematic_pressure_off()
 
     def __repr__(self) -> str:

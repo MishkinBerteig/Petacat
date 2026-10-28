@@ -192,7 +192,7 @@ def test_cluster_max_positive_activation_ignores_a_negative_theme():
     arithmetic that inhibits a stuck interpretation would instead invite scouting
     of it.
     """
-    cluster = ThemeCluster(THEME_TOP_BRIDGE, DIRECTION, ["identity", "opposite"])
+    cluster = ThemeCluster(THEME_TOP_BRIDGE, DIRECTION, ["identity", "opposite"]).populate()
     cluster.themes[0].activation = -100.0
     cluster.themes[1].activation = 30.0
     assert cluster.get_max_positive_theme_activation() == 30.0
@@ -201,7 +201,7 @@ def test_cluster_max_positive_activation_ignores_a_negative_theme():
 def test_cluster_of_only_negative_themes_scores_zero():
     """Scheme: themes.ss:489-490 — a wholly negative cluster is never admitted,
     because ``prob?`` of ``(0/100)²`` is false."""
-    cluster = ThemeCluster(THEME_TOP_BRIDGE, DIRECTION, ["identity", "opposite"])
+    cluster = ThemeCluster(THEME_TOP_BRIDGE, DIRECTION, ["identity", "opposite"]).populate()
     for theme in cluster.themes:
         theme.activation = -80.0
     assert cluster.get_max_positive_theme_activation() == 0.0
@@ -218,7 +218,7 @@ def test_pick_positive_theme_never_returns_a_negative_theme():
     """
     from server.engine.rng import RNG
 
-    cluster = ThemeCluster(THEME_TOP_BRIDGE, DIRECTION, ["identity", "opposite"])
+    cluster = ThemeCluster(THEME_TOP_BRIDGE, DIRECTION, ["identity", "opposite"]).populate()
     cluster.themes[0].activation = 60.0
     cluster.themes[1].activation = -100.0
     rng = RNG(7)
@@ -247,9 +247,9 @@ def test_theme_type_weight_is_activation_times_room_left_in_the_mapping():
     that second factor is what stops thematic pressure from re-scouting a
     correspondence the program has already settled on.
     """
-    top = ThemeCluster(THEME_TOP_BRIDGE, DIRECTION, ["identity"])
+    top = ThemeCluster(THEME_TOP_BRIDGE, DIRECTION, ["identity"]).populate()
     top.themes[0].activation = 100.0
-    vertical = ThemeCluster(THEME_VERTICAL_BRIDGE, DIRECTION, ["identity"])
+    vertical = ThemeCluster(THEME_VERTICAL_BRIDGE, DIRECTION, ["identity"]).populate()
     vertical.themes[0].activation = 50.0
     ts = _themespace([top, vertical], active=[THEME_TOP_BRIDGE, THEME_VERTICAL_BRIDGE])
 
@@ -277,11 +277,11 @@ def test_conjunction_draws_one_theme_from_each_admitted_cluster():
     *dimensions*, which is what §4.1.2's "same letter-category but different
     string positions" requires.  One theme per codelet could not express it.
     """
-    letter = ThemeCluster(THEME_VERTICAL_BRIDGE, "plato-letter-category", ["identity"])
+    letter = ThemeCluster(THEME_VERTICAL_BRIDGE, "plato-letter-category", ["identity"]).populate()
     letter.themes[0].activation = 100.0
     position = ThemeCluster(
         THEME_VERTICAL_BRIDGE, "plato-string-position-category", ["diff"]
-    )
+    ).populate()
     position.themes[0].activation = 100.0
     ts = _themespace([letter, position], active=[THEME_VERTICAL_BRIDGE])
 
@@ -299,7 +299,7 @@ def test_cluster_admission_probability_is_activation_squared():
     of the time, so a conjunction is usually short and made of the dimensions that
     are genuinely shouting rather than every dimension with a pulse.
     """
-    cluster = ThemeCluster(THEME_VERTICAL_BRIDGE, DIRECTION, ["identity"])
+    cluster = ThemeCluster(THEME_VERTICAL_BRIDGE, DIRECTION, ["identity"]).populate()
     cluster.themes[0].activation = 50.0
     ts = _themespace([cluster], active=[THEME_VERTICAL_BRIDGE])
 

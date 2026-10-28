@@ -665,19 +665,18 @@ def clamp_theme_pattern(pattern: Any, themespace: Themespace) -> None:
         return
 
     if isinstance(pattern, dict):
-        # Structured form: {"type": theme_type, "entries": [...]}
         theme_type = pattern.get("type")
         entries = pattern.get("entries", [])
 
-        if theme_type and entries:
-            # Clear existing themes for this type
-            for cluster in themespace.clusters:
-                if cluster.theme_type == theme_type:
-                    cluster.frozen = False
-                    for theme in cluster.themes:
-                        theme.activation = 0.0
+        # Step one of ``clamp-theme-pattern``: ``delete-theme-type`` (``trace.ss:1533``),
+        # so the clamp starts from a type holding no themes at all.  The cluster freeze
+        # is left as it is (``themes.ss:341-347``); step three re-imposes it.
+        if theme_type:
+            themespace.delete_theme_type(theme_type)
 
-            # Impose the pattern entries
+        if theme_type and entries:
+            # Structured form: {"type": theme_type, "entries": [...]}.  Step two,
+            # ``impose-theme-pattern``: each entry *creates* its theme.
             for entry in entries:
                 dim = entry.get("dimension")
                 rel = entry.get("relation")
@@ -995,13 +994,11 @@ def _set_theme_activation(
     relation: str | None,
     activation: float,
 ) -> None:
-    """Set activation on a specific theme in the Themespace."""
-    for cluster in themespace.clusters:
-        if cluster.theme_type == theme_type and cluster.dimension == dimension:
-            theme = cluster.get_theme(relation)
-            if theme:
-                theme.activation = activation
-            return
+    """Set activation on a specific theme, creating it if absent.
+
+    Scheme: ``set-theme-activation`` (``themes.ss:299-307``).
+    """
+    themespace.set_theme_activation(theme_type, dimension, relation, activation)
 
 
 # ---------------------------------------------------------------------------
