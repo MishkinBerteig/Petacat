@@ -125,12 +125,12 @@ outside the matrix take it too and the run is entirely what it says it is.
   gpu  mlx      float32    440 tests
   whole suite requested: the full matrix is required of this run
 
-  unit           526 collected    526 run    526 passed      0 failed      0 skipped  complete
-  seed_unit      456 collected    456 run    456 passed      0 failed      0 skipped  complete
-  module         909 collected    909 run    909 passed      0 failed      0 skipped  complete
+  unit           556 collected    556 run    556 passed      0 failed      0 skipped  complete
+  seed_unit      452 collected    452 run    452 passed      0 failed      0 skipped  complete
+  module         925 collected    925 run    925 passed      0 failed      0 skipped  complete
   architecture    34 collected     34 run     34 passed      0 failed      0 skipped  complete
   integration     68 collected     68 run     68 passed      0 failed      0 skipped  complete
-  lockstep       85 collected     85 run     85 passed      0 failed      0 skipped  complete
+  lockstep       96 collected     96 run     96 passed      0 failed      0 skipped  complete
   e2e            259 collected    259 run    259 passed      0 failed      0 skipped  complete
 
   run complete in 14.2 min against a 60 min ceiling
@@ -179,7 +179,7 @@ A truncated run reports itself as truncated, and the difference from a clean run
 visible three ways:
 
 ```
-  module         909 collected    198 run    198 passed      0 failed      0 skipped  INCOMPLETE
+  module         925 collected    198 run    198 passed      0 failed      0 skipped  INCOMPLETE
 
   RUN TRUNCATED: the 60 min ceiling was reached after 60.4 min. Everything above is
   what the run produced before it stopped; the tests it had not reached never ran.
@@ -238,7 +238,7 @@ first**, then move up toward the API and GUI.
 
 All seven layers run in one command — the
 [required command](#the-required-command) — and, since Petacat runs natively, all
-seven actually run: **2,337 cases**, every one of them executed. A layer that is
+seven actually run: **2,390 cases**, every one of them executed. A layer that is
 normally skipped is not a layer that is normally green, and none of these is.
 
 Wall-clock time depends heavily on the machine and on what else it is doing. The
@@ -334,6 +334,7 @@ the number of endpoints taking `Depends(get_session)`, the size of
 
 | File | Fns | Covers |
 |------|----:|--------|
+| `test_arithmetic_fidelity.py` | 10 | Metacat's exact roundings and orders: spreading, urgencies and bins, jootser, descriptor support, single-letter groups (DISCREPANCIES5 B-1…B-5, D-4, D-11) |
 | `test_bonds.py` | 25 | `Bond`: direction, facet, strength, flipping |
 | `test_bridge_types.py` | 2 | The bridge-type and orientation constants |
 | `test_codelet_dsl.py` | 3 | Compiling a codelet body: what the interpreter accepts and refuses |
@@ -347,7 +348,9 @@ the number of endpoints taking `Depends(get_session)`, the size of
 | `test_jootsing_outcomes.py` | 7 | The jootser's outcomes: what counts as the same clamp, and when it gives up |
 | `test_object_choice.py` | 8 | Weighted object choice: the temperature exponent, and the absence of floors |
 | `test_rng.py` | 17 | The deterministic RNG wrapper |
+| `test_rule_bond_facet_change.py` | 1 | A GroupCtgy self change's BondFacet change is found wherever it sits (KNOWN-FAILURES, G-Q1) |
 | `test_rule_types.py` | 9 | `Rule` and `RuleClause` predicates and translation |
+| `test_rules_lockstep_ordering.py` | 12 | Rule construction in Metacat's order: subobject gate, common change schemas, `sort-templates`, swaps, list order (DISCREPANCIES5 C-1…C-4, D-1…D-5) |
 | `test_runner_status.py` | 1 | The runner's status constants |
 | `test_scout_counts.py` | 14 | The scout-count aggregates that decide how many codelets a cycle posts |
 | `test_sink.py` | 8 | The `RunSink` port: its event vocabulary and `NullSink` |
@@ -373,11 +376,11 @@ the number of endpoints taking `Depends(get_session)`, the size of
 | `test_bridge_types.py` | 4 | Bridge orientation over letters of a real Workspace |
 | `test_codelet_dsl.py` | 2 | The codelet registry built from the seeded codelet types |
 | `test_coderack_bin.py` | 10 | The Coderack's urgency bins and temperature-weighted choice |
-| `test_coderack_clamping.py` | 14 | Codelet-type clamping, against the urgencies Petacat ships with |
+| `test_coderack_clamping.py` | 15 | Codelet-type clamping, against the urgencies Petacat ships with |
 | `test_coderack_eviction.py` | 19 | Incremental eviction picks exactly what the flat scan picked |
 | `test_commentary.py` | 6 | The emit helpers that render from the seeded commentary templates |
 | `test_episodic_memory.py` | 20 | Reminding, comparison and the reminding distance, which resolve the seeded templates and the seeded conceptual depths |
-| `test_formulas.py` | 15 | The temperature-dependent formulas against the seeded coefficients |
+| `test_formulas.py` | 10 | The temperature-dependent formulas against the seeded coefficients |
 | `test_hardware.py` | 21 | The machine description and the sizes derived from it: real probes, faked probes, environment overrides |
 | `test_metadata_provider.py` | 25 | `MetadataProvider` loading every seed collection |
 | `test_numeric_backends.py` | 25 | The numeric backends against the reference, and the engine without them |
@@ -403,6 +406,7 @@ the number of endpoints taking `Depends(get_session)`, the size of
 | `test_group_image_direction.py` | 6 | A group's image is built in the group's own direction |
 | `test_image_relations.py` | 4 | The relations a group's image is built with, and what happens when they are wrong |
 | `test_justify_and_jootsing.py` | 14 | Justify mode's verdicts and the jootser's justify outcomes |
+| `test_lockstep_structure.py` | 7 | Structure-building fidelity: bridge-proposal scout scope, bond-builder break order, answer string outside justify mode, concept-activation sampling (DISCREPANCIES5 C-5, D-6…D-10) |
 | `test_numeric_engine.py` | 7 | The engine computes the same thing with the substrate engaged |
 | `test_population.py` | 9 | Population batching: K independent runs together |
 | `test_run_identifiers.py` | 8 | Identifiers depend on the run, not on the process's history |
@@ -410,7 +414,7 @@ the number of endpoints taking `Depends(get_session)`, the size of
 | `test_run_to_answer.py` | 7 | Run-to-answer behaviour at the `EngineRunner` level |
 | `test_runner.py` | 19 | `EngineRunner`: initialisation, stepping, the update cycle |
 | `test_runner_commentary.py` | 6 | Commentary emitted as the runner drives a problem |
-| `test_runner_status.py` | 6 | The status an `EngineRunner` reports as a run moves through it |
+| `test_runner_status.py` | 7 | The status an `EngineRunner` reports as a run moves through it |
 | `test_singleton_group_images.py` | 3 | Every object a rule names owns an image, singleton groups included |
 | `test_sink_emission.py` | 9 | The engine emits a complete run record to its sink |
 | `test_snag_response.py` | 7 | The snag response driven end to end through a real run |
@@ -444,7 +448,8 @@ the number of endpoints taking `Depends(get_session)`, the size of
 
 | File | Fns | Covers |
 |------|----:|--------|
-| `test_comparer.py` | 23 | The trace comparer: hand-made trace pairs with known faults give the expected classes |
+| `test_comparer.py` | 26 | The trace comparer: hand-made trace pairs with known faults give the expected classes; the registry's reference-crash class |
+| `test_episodes.py` | 8 | Episodes and justify mode: recorder driver text, corpus globs, an episode's self-replay with memory carried, a forced fatal, justify self-replay |
 | `test_helpers.py` | 11 | Helper conformance: `prob`, `~`, `weighted_pick` and `pick` give Metacat's results for the same draws |
 | `test_naming.py` | 9 | Canonical names for plain values and every kind of object, and the opening state against Metacat's |
 | `test_replay.py` | 14 | Tracing rules, trace shape, self-replay, Guard 1, fatal and surplus paths, Guard 2 (slow) |

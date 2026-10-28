@@ -98,3 +98,37 @@ naming table in its `README.md`):
   right); Metacat traces therefore have that draw order inside such expressions.
 * Published-data seeds for `abc abd xyz` are 10600000-10600249 (construction), 20600000-
   (validation) and 30600000- (port), not 1-10.
+
+## Decisions taken during the lockstep pass (2026-10-27/28)
+
+* **Survival coins ask Metacat's question.** Rather than registering DISC5 A-4's
+  complemented coins, every Petacat site that tested the opposite half of a
+  `(stochastic-if* (1- p) (fizzle))` coin now asks `prob(1 - p)` and fizzles on true. The
+  distribution is unchanged and replay pairs the coin directly. The registry keeps no
+  A-4 entries.
+* **Composite codelet choices carry more than name and stamp.** A clamp restamps the
+  codelets it moves to another bin, and an unclamp restores each codelet's original
+  urgency, so name and stamp alone don't identify a codelet. Both recorders log
+  `picked_weight`, `picked_urgency`, `picked_original_urgency` and, for top-down scouts,
+  `picked_scope`. Replay matches on those in that order.
+* **A scout's scope is not part of its codelet name**, as in Metacat's recorder. It is
+  logged as `scope` and `picked_scope`.
+* **Proposed structures in Petacat's snapshots** are the unbuilt structures carried by
+  the codelets on the rack. Petacat keeps no proposed tables, and Metacat's tables are
+  read only by its graphics.
+* **Trace event types** are compared under Metacat's seven names. Petacat's engine-facing
+  Trace already held exactly those events.
+* **Corpus storage.** Only the `abc-abd-xyz` development traces and the six
+  known-failure traces are committed. The rest regenerate with `metacat/record.py`.
+* **Ratchet.** More unregistered errors count as a step back only when reach did not
+  grow, because a trace that replays further meets decisions it never reached before.
+* **Metacat's known failures.** The verified reconstruction behind the published studies
+  is not changed. The three crashes are diagnosed. A corrected reference is in
+  `metacat/known-failures.patch`: it is opt-in, and it leaves 88 other recordings
+  byte-identical. Petacat follows Metacat to each crash point and behaves as the
+  corrected reference past it. The registry marks the three as reference crashes.
+* **Seam test pins.** `test_seam.py`'s four ordinary runs were measured before and after
+  the seam was added and matched exactly. Since then they have been re-pinned with each
+  port fix, so they now guard the seam against later change.
+* **Episodes** use seed `S + k - 1` for run k, as `studies/episodic-v2` does. **Justify
+  mode** sets `%justify-mode%` in the driver, as Metacat's GUI does (`gui.ss:752`).
