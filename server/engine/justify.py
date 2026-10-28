@@ -114,22 +114,11 @@ def attempt_justification(
 
     rule_type = chosen_rule.rule_type  # "top" or "bottom"
     other_type_top = rule_type != "top"
-    other_rules = (
-        workspace.get_supported_rules(rule_type_top=True)
-        + _get_built_rules(workspace, top=True)
-        if other_type_top
-        else workspace.get_supported_rules(rule_type_top=False)
-        + _get_built_rules(workspace, top=False)
-    )
-    # Deduplicate
-    seen_ids: set[int] = set()
-    unique_other: list[Rule] = []
-    for r in other_rules:
-        rid = id(r)
-        if rid not in seen_ids:
-            seen_ids.add(rid)
-            unique_other.append(r)
-    other_rules = unique_other
+    # ``(tell *workspace* 'get-rules (if (eq? rule-type 'top) 'bottom 'top))``
+    # (justify.ss:44-45): every rule of the other type, in list order, supported or
+    # not.  (The old supported-then-built concatenation reordered the list the
+    # stochastic picks draw from.)
+    other_rules = _get_built_rules(workspace, top=other_type_top)
 
     # Step 2 -- Translate the chosen rule using vertical bridge slippages
     translation_result = _translate_rule(
@@ -685,11 +674,13 @@ def get_vertical_theme_pattern_to_clamp(
         if retained:
             final_entries.append((dim, rel))
 
-    # Heuristic 1: Add direction entry if StrPos entry exists but Dir doesn't
-    final_entries = _add_direction_entry(final_entries)
-
+    # ``justify.ss:297-299`` nests ``add-direction-entry`` *around*
+    # ``replace-bond-category-entry``: the bond-category swap happens first.
     # Heuristic 2: Replace BondCtgy with GroupCtgy
     final_entries = _replace_bond_category_entry(final_entries)
+
+    # Heuristic 1: Add direction entry if StrPos entry exists but Dir doesn't
+    final_entries = _add_direction_entry(final_entries)
 
     if not final_entries:
         # Fall back to original pattern
@@ -793,9 +784,15 @@ def _get_all_supported_rules(workspace: Workspace) -> list[Rule]:
 
 
 def _get_built_rules(workspace: Workspace, *, top: bool) -> list[Rule]:
-    """Get all built rules of a type (not just supported ones)."""
+    """Every rule of a type, in list order (``get-rules``, ``workspace.ss:432-435``).
+
+    No built-ness test: a rule joins the list only when it is added to the Workspace
+    (``workspace.ss:479-483``), and a translated rule that justify mode adds itself
+    (``justify.ss:109``) never has its proposal level set, so filtering on
+    ``is_built`` silently dropped it from every later pick of a rule to unify with.
+    """
     rules = workspace.top_rules if top else workspace.bottom_rules
-    return [r for r in rules if r.is_built]
+    return list(rules)
 
 
 def _translate_rule(
@@ -825,9 +822,11 @@ def _translate_rule(
             slippages.extend(bridge.concept_mappings)
             supporting_vbridges.append(bridge)
 
-    if not slippages:
-        return None
-
+    # No early exit when there are no slippages: ``translate`` (``answers.ss:1281-1342``)
+    # fails only on a missing reference object or an invalid clause.  A clause whose
+    # objects carry no vertical bridge passes through unchanged
+    # (``answers.ss:1442-1448``), so with no vertical bridges at all the rule still
+    # translates to its literal counterpart.
     from_string = (
         workspace.initial_string if rule.rule_type == "top" else workspace.target_string
     )
@@ -1206,27 +1205,48 @@ def _remove_whole_single_concept_mappings(
 
 
 def _flatten_clauses(clauses: list[RuleClause]) -> list:
-    """Flatten clause structures into a parallel-walkable list.
+    """The clause lists in the Scheme's own shape, for the parallel walk.
 
-    This transforms the clause data into a nested list structure that
-    can be traversed in parallel with another rule's clauses.
-    Each clause becomes [clause_type, object_description, changes...]
-    Each change becomes [dimension, from_descriptor, to_descriptor, relation]
+    Scheme: ``rules.ss:36-60``.  A clause is ``(intrinsic (<object-description>)
+    (<change> ...))``, ``(extrinsic (<object-description> ...) (<dimension> ...))`` or
+    ``(verbatim (<letter-category> ...))``, and a change is ``(<scope> <dimension>
+    <descriptor>)`` whose one descriptor slot holds the relation *or* the literal node
+    that was substituted for it (``rules.ss:889-909``).
+
+    The earlier flattening dropped each change's scope and an extrinsic clause's
+    dimension list, so two extrinsic clauses over ``(string StringPos whole)``
+    unified to an empty pattern and a rule that swaps Bond-Facet descriptors clamped no
+    theme at all.
     """
     result = []
     for clause in clauses:
         clause_flat: list = [clause.clause_type]
-        if clause.object_description:
-            clause_flat.append(list(clause.object_description))
+        if clause.is_verbatim:
+            clause_flat.append(list(clause.verbatim_letters or []))
+        elif clause.is_extrinsic:
+            clause_flat.append([list(od) for od in clause.object_descriptions])
+            clause_flat.append(list(clause.dimensions))
         else:
-            clause_flat.append([])
-        for change in clause.changes:
+            clause_flat.append([list(od) for od in clause.object_descriptions])
             clause_flat.append(
                 [
-                    change.dimension,
-                    change.from_descriptor,
-                    change.to_descriptor,
-                    change.relation,
+                    [
+                        change.referent,
+                        change.dimension,
+                        next(
+                            (
+                                d
+                                for d in (
+                                    change.relation,
+                                    change.to_descriptor,
+                                    change.from_descriptor,
+                                )
+                                if d is not None
+                            ),
+                            None,
+                        ),
+                    ]
+                    for change in clause.changes
                 ]
             )
         result.append(clause_flat)
@@ -1256,9 +1276,25 @@ def _theme_pattern_list_to_dict(pattern: list) -> dict[str, Any]:
     for item in pattern[1:]:
         if isinstance(item, tuple) and len(item) >= 2:
             entries.append(
-                {"dimension": item[0], "relation": item[1], "activation": 100.0}
+                {
+                    "dimension": item[0],
+                    "relation": _theme_relation(item[1]),
+                    "activation": 100.0,
+                }
             )
     return {"type": theme_type, "entries": entries}
+
+
+def _theme_relation(relation: Any) -> Any:
+    """A pattern entry's relation as a Themespace theme spells it.
+
+    An unlabelled concept mapping (``#f``, e.g. object-category letter=>group) is the
+    *different* relation (``themes.py`` ``RELATION_DIFFERENT``); left as ``None`` the
+    clamp created no theme for the entry at all.
+    """
+    from server.engine.themes import RELATION_DIFFERENT
+
+    return RELATION_DIFFERENT if relation is None else relation
 
 
 def _build_theme_pattern_dict(
@@ -1268,7 +1304,7 @@ def _build_theme_pattern_dict(
     return {
         "type": theme_type,
         "entries": [
-            {"dimension": dim, "relation": rel, "activation": 100.0}
+            {"dimension": dim, "relation": _theme_relation(rel), "activation": 100.0}
             for dim, rel in entries
         ],
     }

@@ -388,6 +388,16 @@ class ClampEvent(TraceEvent):
         """
         trace.undo_snag_condition(themespace, slipnet, temperature, workspace)
 
+        # ``slipnet.ss:139-140``: every node a clamp moves reports the change to
+        # ``monitor-slipnode-activation-change`` (threshold 85, ``trace.ss:1311``),
+        # whoever clamped.  No caller passed a monitor, so no clamp (justify, rule,
+        # snag or jootsing) ever produced the concept-activation events Metacat's
+        # does, which also left clamp progress and the event counts short.
+        if monitor is None:
+            monitor = make_concept_activation_monitor(
+                trace, self.codelet_count, self.temperature, 85
+            )
+
         # Clamp theme patterns
         for pattern in self.clamped_theme_patterns:
             clamp_theme_pattern(pattern, themespace)
@@ -674,9 +684,13 @@ def clamp_theme_pattern(pattern: Any, themespace: Themespace) -> None:
         if theme_type:
             themespace.delete_theme_type(theme_type)
 
-        if theme_type and entries:
+        if theme_type and "entries" in pattern:
             # Structured form: {"type": theme_type, "entries": [...]}.  Step two,
-            # ``impose-theme-pattern``: each entry *creates* its theme.
+            # ``impose-theme-pattern``: each entry *creates* its theme.  A pattern
+            # naming no entries (a bare ``(bottom-bridge)``) still deletes the type
+            # and, below, freezes it: ``clamp-theme-pattern`` (``trace.ss:1531-1536``)
+            # freezes and presses the type whatever the pattern holds, which is what
+            # stops later bridges re-seeding a type the clamp emptied.
             for entry in entries:
                 dim = entry.get("dimension")
                 rel = entry.get("relation")
@@ -714,7 +728,11 @@ def clamp_theme_pattern(pattern: Any, themespace: Themespace) -> None:
         # pressure on for its own theme type.  Guarded on the type actually naming a
         # cluster, so a pattern of some other kind that reaches here cannot switch
         # pressure on for a theme type that does not exist.
-        if theme_type and any(c.theme_type == theme_type for c in themespace.clusters):
+        # ``clamp-theme-pattern`` (``trace.ss:1536``) presses the type whether or not
+        # the pattern named any theme: a bare ``(vertical-bridge)`` still switches the
+        # vertical type's thematic pressure on.  ``thematic_pressure_on`` itself
+        # ignores a type the Themespace does not have.
+        if theme_type:
             themespace.thematic_pressure_on([theme_type])
 
 

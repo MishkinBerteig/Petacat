@@ -34,6 +34,10 @@ class _FakeSlipnetNode:
 
     def __init__(self, name: str) -> None:
         self.name = name
+        self.short_name = name
+        # ``ClampEvent.activate`` now reports a clamp's moves to the concept-activation
+        # monitor (``slipnet.ss:139-140``), which weighs a change by this depth.
+        self.conceptual_depth = 50
         self.activation = 0.0
         self.frozen = False
         self.clamp_cycles_remaining = 0
