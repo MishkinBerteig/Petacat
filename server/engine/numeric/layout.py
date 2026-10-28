@@ -25,7 +25,7 @@ The reference implementation spreads *from* each source::
     for node in nodes:                      # slipnet.ss:383
         if node.activation >= threshold:
             for link in node.outgoing_links:
-                link.to_node.activation_buffer += round(w * node.activation)
+                link.to_node.activation_buffer += round(w * node.activation / 100)
 
 which is a scatter: many sources write into the same destination buffer.  On a GPU
 a scatter needs atomics, and atomics make the summation order non-deterministic,
@@ -159,8 +159,12 @@ class SlipnetTopology:
     #: Source node index of each incoming edge, grouped by destination.
     in_source: tuple[int, ...]
 
-    #: ``intrinsic_degree_of_association / 100`` per edge — the association
-    #: fraction, pre-divided so the per-cycle work is one multiply.
+    #: ``intrinsic_degree_of_association`` per edge, as a percentage (0-100).  Not
+    #: pre-divided: the reference rounds the exact rational ``assoc * a / 100``
+    #: (``slipnet.ss:181-186``), and only multiplying before dividing keeps its
+    #: halfway cases (association 70 at activation 45 is exactly 31.5) exact in
+    #: float64 and float32.  Pre-dividing gave 0.7 * 45 = 31.499..., rounding to 31
+    #: where Metacat gets 32 (DISCREPANCIES5 B-1).
     in_weight: tuple[float, ...]
 
     #: Destination node index of each edge, in the same order as ``in_source``.
@@ -204,7 +208,7 @@ class SlipnetTopology:
                 if dest_i is None:  # pragma: no cover - links always resolve
                     continue
                 by_dest[dest_i].append(
-                    (src_i, link.intrinsic_degree_of_association() / 100.0)
+                    (src_i, float(link.intrinsic_degree_of_association()))
                 )
 
         indptr = [0]

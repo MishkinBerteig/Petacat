@@ -257,8 +257,12 @@ def serialize_workspace_state(ctx: EngineContext) -> dict:
         "top_bridges": [_serialize_bridge(b) for b in ws.top_bridges if b.is_built],
         "vertical_bridges": [_serialize_bridge(b) for b in ws.vertical_bridges if b.is_built],
         "bottom_bridges": [_serialize_bridge(b) for b in ws.bottom_bridges if b.is_built],
-        "top_rules": [_serialize_rule(r) for r in ws.top_rules if r.is_built],
-        "bottom_rules": [_serialize_rule(r) for r in ws.bottom_rules if r.is_built],
+        # Every rule in the Workspace's lists (``get-rules``), as ``num_top_rules``
+        # above counts them: justify mode adds its translated rule (``justify.ss:110``)
+        # without building it, and it is still one of the Workspace's rules, the one
+        # the answer it justifies rests on.
+        "top_rules": [_serialize_rule(r) for r in ws.top_rules],
+        "bottom_rules": [_serialize_rule(r) for r in ws.bottom_rules],
     }
 
 

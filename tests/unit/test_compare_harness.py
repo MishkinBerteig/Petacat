@@ -235,13 +235,20 @@ def test_a_misspelled_parameter_is_refused_rather_than_ignored(harness):
         harness._parse_param("max_coderack_size")
 
 
-def test_overrides_reach_the_provider_the_runs_are_built_from(harness):
+def test_overrides_reach_the_provider_the_runs_are_built_from(harness, monkeypatch):
     """`_init` is the only seam a pool worker has, so the override has to land there.
 
     Applied through `with_overrides`, which is the same call a Run uses for its per-Run
     parameters — so a sweep configures the engine the way the application does rather
     than by a mechanism only this script has.
     """
+    from server.engine.numeric.backend import reset_backend_cache
+
+    # `_init` writes PETACAT_NUMERIC_BACKEND, as a pool worker should. Here it would
+    # outlive the test and reach every later subprocess, so monkeypatch takes note of
+    # the variable first and puts it back afterwards.
+    monkeypatch.setenv("PETACAT_NUMERIC_BACKEND", os.environ.get("PETACAT_NUMERIC_BACKEND", "auto"))
+    monkeypatch.setattr("server.engine.numeric.backend._POLICY", None)
     harness._init("numpy", {"max_coderack_size": 600, "min_shard_capacity": 50})
     try:
         assert harness._META.get_param("max_coderack_size") == 600
@@ -250,5 +257,32 @@ def test_overrides_reach_the_provider_the_runs_are_built_from(harness):
         assert len(harness._META.posting_rules) == 17
     finally:
         harness._init("numpy")
+        reset_backend_cache()
 
     assert harness._META.get_param("max_coderack_size") == 100
+
+
+def test_the_shipped_reference_sets_are_whole_and_consistent(harness):
+    """The default reference is the in-repository one, and it is complete.
+
+    ``measurements/reference/`` is derived from the support-v1a study data by
+    ``scripts/make_reference_sets.py``. A comparison against a set missing a problem,
+    or a p50 member outside its own set, would flag nothing for the wrong reason.
+    """
+    import json
+
+    reference = harness.REFERENCE
+    assert os.path.relpath(reference, harness.ROOT) == os.path.join("measurements", "reference")
+    sets = harness.load(reference, "single-run-sets.json")
+    p50s = harness.load(reference, "single-run-p50.json")
+    with open(os.path.join(harness.SEED_DIR, "demo_problems.json")) as fh:
+        demos = {d["name"]: (d["initial"], d["modified"], d["target"]) for d in json.load(fh)}
+
+    # The nineteen problems of the study, each one a demo problem with the same strings.
+    assert set(sets) == set(p50s) and len(sets) == 19 and set(sets) <= set(demos)
+    for name, entry in sets.items():
+        assert tuple(entry["problem"][1:]) == demos[name], name
+        assert sum(m["count"] for m in entry["set"].values()) == entry["n"] == 50_000
+        assert {e["member"] for e in p50s[name]["p50"]} <= set(entry["set"])
+    # The one finding DISCREPANCIES4 left open: Metacat does reach it.
+    assert "aac" in sets["copy5"]["set"]

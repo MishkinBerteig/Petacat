@@ -181,7 +181,10 @@ SLIPNET_UPDATE_SOURCE = """
         // returns early at zero activation, and the caller gates on the
         // configurable spreading threshold.
         if (a > 0.0f && a >= threshold) {
-            partial += metal::rint((scale * weight[e]) * a);
+            // Multiply before dividing, and divide precisely (see the decay
+            // below): `weight` is the association in percent, so a halfway
+            // case such as 70 * 45 / 100 = 31.5 is exact and rounds to even.
+            partial += metal::rint(metal::precise::divide((scale * weight[e]) * a, 100.0f));
         }
     }
 

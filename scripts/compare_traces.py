@@ -474,6 +474,10 @@ class Report:
     snapshot_first_diff: dict | None = None
     snapshots_compared: int = 0
     snapshots_differing: int = 0
+    #: The same count leaving out ``REPRESENTATIONAL_SNAPSHOT_PATHS``: the state the
+    #: two programs are expected to agree on.  This is what the ratchet keeps.
+    state_snapshots_differing: int = 0
+    state_snapshot_first_diff: dict | None = None
 
     def to_dict(self) -> dict:
         d = {k: v for k, v in self.__dict__.items()}
@@ -534,20 +538,47 @@ class Report:
             if len(rows) > max_rows:
                 w(f"  ... {len(rows) - max_rows} more")
             w("")
-        w(f"snapshots compared: {self.snapshots_compared}, differing: {self.snapshots_differing}")
+        w(f"snapshots compared: {self.snapshots_compared}, differing: {self.snapshots_differing} "
+          f"({self.state_snapshots_differing} outside {', '.join(REPRESENTATIONAL_SNAPSHOT_PATHS)})")
         if self.snapshot_first_diff:
             sd = self.snapshot_first_diff
             w(f"first snapshot difference (u={sd['u']}): {sd['path']}: metacat {sd['metacat']!r} vs petacat {sd['petacat']!r}")
+        if self.state_snapshot_first_diff and self.state_snapshot_first_diff != self.snapshot_first_diff:
+            sd = self.state_snapshot_first_diff
+            w(f"first state snapshot difference (u={sd['u']}): {sd['path']}: "
+              f"metacat {sd['metacat']!r} vs petacat {sd['petacat']!r}")
         return "\n".join(out)
 
 
 # --------------------------------------------------------------------------- compare
 
 
-def _snap_diff(meta: Trace, pet: Trace, u: Any, rel_tol: float, abs_tol: float) -> dict | None:
+#: Snapshot sections the two programs hold differently by design, so a difference
+#: there is not a divergence.  Proposed structures: Petacat's are the unbuilt
+#: structures carried by the codelets on the rack, while Metacat keeps proposed
+#: tables that only its graphics read (tests/lockstep/DECISIONS.md).
+REPRESENTATIONAL_SNAPSHOT_PATHS = ("structures.proposed",)
+
+
+def _state_only(snapshot: dict) -> dict:
+    """``snapshot`` without the sections named in ``REPRESENTATIONAL_SNAPSHOT_PATHS``."""
+    out = dict(snapshot)
+    for path in REPRESENTATIONAL_SNAPSHOT_PATHS:
+        head, _, leaf = path.partition(".")
+        if leaf and isinstance(out.get(head), dict):
+            out[head] = {k: v for k, v in out[head].items() if k != leaf}
+        elif not leaf:
+            out.pop(head, None)
+    return out
+
+
+def _snap_diff(meta: Trace, pet: Trace, u: Any, rel_tol: float, abs_tol: float,
+               state_only: bool = False) -> dict | None:
     ms, ps = meta.snapshots.get(u), pet.snapshots.get(u)
     if ms is None or ps is None:
         return None
+    if state_only:
+        ms, ps = _state_only(ms), _state_only(ps)
     d = diff_snapshots(ms, ps, rel_tol, abs_tol)
     if d is None:
         return None
@@ -684,6 +715,11 @@ def compare_traces(meta: Trace, pet: Trace, registry: Registry, rel_tol: float =
                 rep.snapshots_differing += 1
                 if rep.snapshot_first_diff is None:
                     rep.snapshot_first_diff = d
+                s = _snap_diff(meta, pet, u, rel_tol, abs_tol, state_only=True)
+                if s:
+                    rep.state_snapshots_differing += 1
+                    if rep.state_snapshot_first_diff is None:
+                        rep.state_snapshot_first_diff = s
 
     # a registered reference crash: what the replay does from the crashing codelet on
     # (the codelet's remaining decisions, later codelets, the end record) is not an error

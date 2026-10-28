@@ -73,14 +73,15 @@ class PythonSlipnetSession(SlipnetSession):
         )
 
     def _weights(self, scale: float) -> list[float]:
-        """``scale * (association/100)`` per edge, cached.
+        """``scale * association`` per edge (association in percent), cached.
 
-        The reference computes ``scale * (assoc/100.0) * activation`` and Python
-        evaluates that left to right, so folding the first product into a stored
-        weight is not merely equivalent in exact arithmetic — it produces the same
-        float64 value bit for bit.  ``scale`` is ``update_cycle_length/15``, which
-        is 1.0 for every configuration in the seed data, so the cache is hit on
-        every call after the first.
+        ``SlipnetNode.spread_activation_to_neighbors`` computes
+        ``scale * assoc * activation / 100.0`` and Python evaluates that left to
+        right, so folding the first product into a stored weight is not merely
+        equivalent in exact arithmetic — it produces the same float64 value bit for
+        bit.  ``scale`` is ``update_cycle_length/15``, which is 1.0 for every
+        configuration in the seed data, so the cache is hit on every call after the
+        first.
         """
         if scale != self._scaled_for:
             self._scaled_weight = [scale * w for w in self.topology.in_weight]
@@ -184,7 +185,8 @@ class PythonSlipnetSession(SlipnetSession):
                 # configurable down to 0 and a zero-activation node must still
                 # not spread.
                 if a > 0.0 and a >= threshold:
-                    amount = round(weight[e] * a)
+                    # slipnet.ss:181-186: multiply before dividing (layout.in_weight).
+                    amount = round(weight[e] * a / 100.0)
                     if amount > 0:
                         total += amount
             if total:

@@ -297,10 +297,12 @@ def project_workspace(state: dict, meta: Any) -> dict:
         return out
 
     def rules(key: str) -> list[dict]:
+        # Every rule in the list, built or not, as the live serialization does: the
+        # translated rule justify mode adds is never built (``justify.ss:110``).
         out = []
         for ref in ws[key]:
             fields = g.record(ref)
-            if fields is not None and fields.get("proposal_level") == "built":
+            if fields is not None:
                 out.append(_project_rule(g, fields))
         return out
 

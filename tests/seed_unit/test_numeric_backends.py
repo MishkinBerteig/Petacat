@@ -280,6 +280,69 @@ def test_every_backend_reaches_the_same_decay_plateaus(
     }
 
 
+@pytest.mark.parametrize("backend_name", ALL_ALTERNATIVES + ["python"])
+def test_every_backend_rounds_spreading_halfway_cases_to_even(backend_name: str) -> None:
+    """Association 70 at activation 45 or 85 is exactly 31.5 or 59.5 in Metacat.
+
+    ``slipnet.ss:181-186`` rounds the exact rational, so the amounts are 32 and 60.
+    Dividing the association by 100 first gives 0.7 * 45 = 31.499..., which rounded
+    to 31 (DISCREPANCIES5 B-1); the engine's own loop was fixed and the backends
+    were not, until this test.
+    """
+    topology = SlipnetTopology(
+        node_names=("a45", "a85", "to-a45", "to-a85"),
+        decay_percent=(0.0, 0.0, 0.0, 0.0),
+        conceptual_depth=(100.0, 100.0, 100.0, 100.0),
+        in_indptr=(0, 0, 0, 1, 2),
+        in_source=(0, 1),
+        in_weight=(70.0, 70.0),
+        in_dest=(2, 3),
+    )
+    session = get_backend(backend_name).open_slipnet(topology)
+    session.load(
+        SlipnetState(
+            activation=[45.0, 85.0, 0.0, 0.0],
+            buffer=[0.0] * 4,
+            frozen=[False] * 4,
+            clamp_remaining=[0] * 4,
+        )
+    )
+    session.update(0.0, 1.0)
+    assert session.store().activation == [45.0, 85.0, 32.0, 60.0]
+
+
+@pytest.mark.parametrize("backend_name", ALL_ALTERNATIVES + ["python"])
+def test_every_backend_spreads_the_way_the_reference_does(
+    backend_name: str, real_slipnet: Slipnet
+) -> None:
+    """One update cycle with every active node spreading, against exact rationals.
+
+    The decay test above leaves spreading out; this one is the whole update, so a
+    backend whose per-edge arithmetic is not the Scheme's (round the exact
+    ``assoc * a / 100``) fails here rather than agreeing with an equally wrong
+    reference backend.
+    """
+    from fractions import Fraction
+
+    topology = SlipnetTopology.from_slipnet(real_slipnet)
+    state = _integral_state(topology, seed=23)
+    act = [int(a) for a in state.activation]
+
+    expected = []
+    for d in range(topology.n_nodes):
+        b = -round(Fraction(int(topology.decay_percent[d]) * act[d], 100))
+        for e in range(topology.in_indptr[d], topology.in_indptr[d + 1]):
+            a = act[topology.in_source[e]]
+            if a > 0:
+                b += round(Fraction(int(topology.in_weight[e]) * a, 100))
+        expected.append(float(min(100, max(0, act[d] + b))))
+
+    session = get_backend(backend_name).open_slipnet(topology)
+    session.load(state)
+    session.update(0.0, 1.0)
+    assert session.store().activation == expected
+
+
 def _drive_integral(backend_name: str, topology, threshold: float, cycles: int):
     session = get_backend(backend_name).open_slipnet(topology)
     session.load(_integral_state(topology, seed=topology.n_nodes + 3))
@@ -558,7 +621,7 @@ def test_topology_reproduces_the_object_graphs_edges(real_slipnet: Slipnet) -> N
                 (
                     index[node.name],
                     index[link.to_node.name],
-                    link.intrinsic_degree_of_association() / 100.0,
+                    float(link.intrinsic_degree_of_association()),
                 )
             )
     observed = list(zip(topology.in_source, topology.in_dest, topology.in_weight))

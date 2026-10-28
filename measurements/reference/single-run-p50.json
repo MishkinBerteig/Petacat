@@ -1,0 +1,405 @@
+{
+  "source": {
+    "archive": "studies/support-v1a/data/main.tar.gz",
+    "sha256": "f9b7928daf2a698f06fa31953673d8282ed2792b9a7fab4b0ae403fecc15b48f",
+    "phases": [
+      "construction",
+      "validation"
+    ],
+    "duplicate_seeds_dropped": 375
+  },
+  "definition": "A run's stopping state, from a fresh Episodic Memory at a 100,000-codelet cap: the answer, *NONE*, *CAP* or *ERROR*. Metacat's construction and validation observations of study support-v1a; derived by scripts/make_reference_sets.py.",
+  "tries_per_problem": 100,
+  "results": [
+    {
+      "name": "copy1",
+      "problem": [
+        "copy1",
+        "ab",
+        "c",
+        "ab"
+      ],
+      "n": 50000,
+      "p50": [
+        {
+          "member": "c",
+          "count": 43057,
+          "share": 0.86114,
+          "absence_probability_at_n100": 0.0
+        }
+      ]
+    },
+    {
+      "name": "copy2",
+      "problem": [
+        "copy2",
+        "bc",
+        "d",
+        "bc"
+      ],
+      "n": 50000,
+      "p50": [
+        {
+          "member": "d",
+          "count": 49997,
+          "share": 0.99994,
+          "absence_probability_at_n100": 0.0
+        }
+      ]
+    },
+    {
+      "name": "copy3",
+      "problem": [
+        "copy3",
+        "xy",
+        "z",
+        "xy"
+      ],
+      "n": 50000,
+      "p50": [
+        {
+          "member": "z",
+          "count": 49996,
+          "share": 0.99992,
+          "absence_probability_at_n100": 0.0
+        }
+      ]
+    },
+    {
+      "name": "copy4",
+      "problem": [
+        "copy4",
+        "zy",
+        "x",
+        "zy"
+      ],
+      "n": 50000,
+      "p50": [
+        {
+          "member": "x",
+          "count": 43349,
+          "share": 0.86698,
+          "absence_probability_at_n100": 0.0
+        }
+      ]
+    },
+    {
+      "name": "copy5",
+      "problem": [
+        "copy5",
+        "aabb",
+        "cc",
+        "aabb"
+      ],
+      "n": 50000,
+      "p50": [
+        {
+          "member": "cc",
+          "count": 24949,
+          "share": 0.49898,
+          "absence_probability_at_n100": 0.0
+        },
+        {
+          "member": "*NONE*",
+          "count": 24050,
+          "share": 0.481,
+          "absence_probability_at_n100": 0.0
+        }
+      ]
+    },
+    {
+      "name": "copy6",
+      "problem": [
+        "copy6",
+        "abc",
+        "d",
+        "abc"
+      ],
+      "n": 50000,
+      "p50": [
+        {
+          "member": "d",
+          "count": 43332,
+          "share": 0.86664,
+          "absence_probability_at_n100": 0.0
+        }
+      ]
+    },
+    {
+      "name": "eqe-baaab",
+      "problem": [
+        "eqe-baaab",
+        "eqe",
+        "qeq",
+        "abbba"
+      ],
+      "n": 50000,
+      "p50": [
+        {
+          "member": "baaab",
+          "count": 29283,
+          "share": 0.58566,
+          "absence_probability_at_n100": 0.0
+        }
+      ]
+    },
+    {
+      "name": "fig5.4-top",
+      "problem": [
+        "fig5.4-top",
+        "eeqee",
+        "qeeq",
+        "xxixx"
+      ],
+      "n": 50000,
+      "p50": [
+        {
+          "member": "qeeq",
+          "count": 24155,
+          "share": 0.4831,
+          "absence_probability_at_n100": 0.0
+        },
+        {
+          "member": "ixxi",
+          "count": 13910,
+          "share": 0.2782,
+          "absence_probability_at_n100": 0.0
+        }
+      ]
+    },
+    {
+      "name": "fig5.7",
+      "problem": [
+        "fig5.7",
+        "aabc",
+        "aabd",
+        "ijkk"
+      ],
+      "n": 50000,
+      "p50": [
+        {
+          "member": "ijll",
+          "count": 23309,
+          "share": 0.46618,
+          "absence_probability_at_n100": 0.0
+        },
+        {
+          "member": "ijkl",
+          "count": 17677,
+          "share": 0.35354,
+          "absence_probability_at_n100": 0.0
+        }
+      ]
+    },
+    {
+      "name": "misc1",
+      "problem": [
+        "misc1",
+        "abc",
+        "cba",
+        "mrrjjj"
+      ],
+      "n": 50000,
+      "p50": [
+        {
+          "member": "jjjrrm",
+          "count": 42511,
+          "share": 0.85022,
+          "absence_probability_at_n100": 0.0
+        }
+      ]
+    },
+    {
+      "name": "misc2",
+      "problem": [
+        "misc2",
+        "abc",
+        "abd",
+        "ijk"
+      ],
+      "n": 50000,
+      "p50": [
+        {
+          "member": "ijl",
+          "count": 47599,
+          "share": 0.95198,
+          "absence_probability_at_n100": 0.0
+        }
+      ]
+    },
+    {
+      "name": "misc3",
+      "problem": [
+        "misc3",
+        "abc",
+        "aabbcc",
+        "kkjjii"
+      ],
+      "n": 50000,
+      "p50": [
+        {
+          "member": "kkjjii",
+          "count": 16458,
+          "share": 0.32916,
+          "absence_probability_at_n100": 0.0
+        },
+        {
+          "member": "kkkjjjiii",
+          "count": 13002,
+          "share": 0.26004,
+          "absence_probability_at_n100": 0.0
+        }
+      ]
+    },
+    {
+      "name": "misc4",
+      "problem": [
+        "misc4",
+        "a",
+        "b",
+        "z"
+      ],
+      "n": 50000,
+      "p50": [
+        {
+          "member": "b",
+          "count": 25257,
+          "share": 0.50514,
+          "absence_probability_at_n100": 0.0
+        }
+      ]
+    },
+    {
+      "name": "misc5",
+      "problem": [
+        "misc5",
+        "abc",
+        "abd",
+        "glz"
+      ],
+      "n": 50000,
+      "p50": [
+        {
+          "member": "gld",
+          "count": 12792,
+          "share": 0.25584,
+          "absence_probability_at_n100": 0.0
+        },
+        {
+          "member": "hlz",
+          "count": 11431,
+          "share": 0.22862,
+          "absence_probability_at_n100": 5e-12
+        },
+        {
+          "member": "glz",
+          "count": 9635,
+          "share": 0.1927,
+          "absence_probability_at_n100": 5.05e-10
+        }
+      ]
+    },
+    {
+      "name": "run1",
+      "problem": [
+        "run1",
+        "abc",
+        "abd",
+        "mrrjjj"
+      ],
+      "n": 50000,
+      "p50": [
+        {
+          "member": "mrrkkk",
+          "count": 31515,
+          "share": 0.6303,
+          "absence_probability_at_n100": 0.0
+        }
+      ]
+    },
+    {
+      "name": "run2",
+      "problem": [
+        "run2",
+        "xqc",
+        "xqd",
+        "mrrjjj"
+      ],
+      "n": 50000,
+      "p50": [
+        {
+          "member": "mrrkkk",
+          "count": 34321,
+          "share": 0.68642,
+          "absence_probability_at_n100": 0.0
+        }
+      ]
+    },
+    {
+      "name": "run3",
+      "problem": [
+        "run3",
+        "rst",
+        "rsu",
+        "xyz"
+      ],
+      "n": 50000,
+      "p50": [
+        {
+          "member": "xyu",
+          "count": 19238,
+          "share": 0.38476,
+          "absence_probability_at_n100": 0.0
+        },
+        {
+          "member": "wyz",
+          "count": 9801,
+          "share": 0.19602,
+          "absence_probability_at_n100": 3.35e-10
+        }
+      ]
+    },
+    {
+      "name": "run4",
+      "problem": [
+        "run4",
+        "abc",
+        "abd",
+        "xyz"
+      ],
+      "n": 50000,
+      "p50": [
+        {
+          "member": "xyd",
+          "count": 18324,
+          "share": 0.36648,
+          "absence_probability_at_n100": 0.0
+        },
+        {
+          "member": "wyz",
+          "count": 10653,
+          "share": 0.21306,
+          "absence_probability_at_n100": 3.9e-11
+        }
+      ]
+    },
+    {
+      "name": "run6",
+      "problem": [
+        "run6",
+        "eqe",
+        "qeq",
+        "abbbc"
+      ],
+      "n": 50000,
+      "p50": [
+        {
+          "member": "qeeeq",
+          "count": 26614,
+          "share": 0.53228,
+          "absence_probability_at_n100": 0.0
+        }
+      ]
+    }
+  ]
+}

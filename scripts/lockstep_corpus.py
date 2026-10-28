@@ -9,7 +9,13 @@ For every ``tests/lockstep/traces/<slug>/<seed>.metacat.jsonl.gz`` this runs (un
 
 then compares the two traces and prints one row per trace.  ``--update-ratchet``
 writes ``tests/lockstep/ratchet.json``; ``--check-ratchet`` exits non-zero when any
-trace got worse (reach down, agreement down, unregistered errors up).
+trace got worse (reach down, agreement down, unregistered errors or differing state
+snapshots up).
+
+``--numeric-backend NAME`` replays with that numeric backend in place of faithful
+mode's ``off`` (``python``, ``numpy``, ``mlx``, ``mlx-cpu``), writing under
+``<out-dir>/numeric-NAME``.  It is checked against the same ratchet, since the backend
+is meant to change nothing, and it never updates one.
 
 Assumed CLI contract: ``run_trace replay --metacat PATH --out PATH``.  Use
 ``--replay-cmd`` to substitute another command template (``{metacat}``, ``{out}`` -- the
@@ -21,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shlex
 import subprocess
 import sys
@@ -35,6 +42,8 @@ TRACES = REPO / "tests" / "lockstep" / "traces"
 RATCHET = REPO / "tests" / "lockstep" / "ratchet.json"
 DEFAULT_OUT = REPO / "tests" / "lockstep" / "replays"
 DEFAULT_CMD = ".venv/bin/python -m tests.lockstep.run_trace replay --metacat {metacat} --out {outdir}"
+#: Read by ``tests/lockstep/faithful.py`` (the same name is defined there).
+NUMERIC_BACKEND_ENV = "PETACAT_LOCKSTEP_NUMERIC_BACKEND"
 EPS = 1e-12
 
 
@@ -80,11 +89,13 @@ def _header(path: Path) -> dict:
         return {}
 
 
-def replay(metacat: Path, out: Path, cmd_template: str) -> tuple[bool, str]:
+def replay(metacat: Path, out: Path, cmd_template: str,
+           numeric_backend: str | None = None) -> tuple[bool, str]:
     out.parent.mkdir(parents=True, exist_ok=True)
     cmd = shlex.split(cmd_template.format(metacat=shlex.quote(str(metacat)), out=shlex.quote(str(out)),
                                            outdir=shlex.quote(str(out.parent))))
-    r = subprocess.run(cmd, cwd=REPO, capture_output=True, text=True)
+    env = {**os.environ, NUMERIC_BACKEND_ENV: numeric_backend} if numeric_backend else None
+    r = subprocess.run(cmd, cwd=REPO, capture_output=True, text=True, env=env)
     return r.returncode == 0 or out.exists(), (r.stderr or r.stdout)[-400:]
 
 
@@ -97,6 +108,7 @@ def summarise(slug: str, seed: str, meta: Path, pet: Path, registry: ct.Registry
         "key": f"{slug}/{seed}", "problem": slug, "seed": seed,
         "reach": rep.reach, "run_length": rep.run_length,
         "agreement": rep.agreement, "unregistered_errors": rep.unregistered_error_count,
+        "state_snapshots_differing": rep.state_snapshots_differing,
         "first_fatal": f"{ff.klass} {((ff.petacat or ff.metacat or {}).get('site') or '-')}" if ff else "-",
     }
 
@@ -117,20 +129,30 @@ def ratchet_regressions(old: dict, new: dict) -> list[str]:
         # so more errors there is not by itself a step back; agreement still guards it.
         if n["unregistered_errors"] > o["unregistered_errors"] and n["reach"] <= o["reach"]:
             bad.append(f"{key}: unregistered errors {o['unregistered_errors']} -> {n['unregistered_errors']}")
+        # Same rule for the update-cycle snapshots (proposed structures aside).  An
+        # entry written before the count existed has nothing to compare against.
+        o_snap, n_snap = o.get("state_snapshots_differing"), n.get("state_snapshots_differing")
+        if o_snap is not None and n_snap is not None and n_snap > o_snap and n["reach"] <= o["reach"]:
+            bad.append(f"{key}: differing state snapshots {o_snap} -> {n_snap}")
     return bad
 
 
 def to_ratchet(rows: list[dict]) -> dict:
     return {r["key"]: {"reach": r["reach"], "agreement": r["agreement"],
-                       "unregistered_errors": r["unregistered_errors"]} for r in rows}
+                       "unregistered_errors": r["unregistered_errors"],
+                       "state_snapshots_differing": r["state_snapshots_differing"]} for r in rows}
 
 
 def print_table(rows: list[dict]) -> None:
-    print(f"{'problem':32s} {'seed':>8s} {'reach':>8s} {'length':>8s} {'agree':>7s} {'errors':>7s}  first fatal")
+    print(f"{'problem':32s} {'seed':>8s} {'reach':>8s} {'length':>8s} {'agree':>7s} {'errors':>7s} "
+          f"{'snaps':>6s}  first fatal")
     for r in rows:
         note = " (not reached)" if r.get("not_reached") else "" if r.get("memory_in_sync", True) else " (memory out of step)"
         print(f"{r['problem']:32s} {r['seed']:>8s} {r['reach']:>8d} {r['run_length']:>8d} "
-              f"{r['agreement']:7.4f} {r['unregistered_errors']:>7d}  {r['first_fatal']}{note}")
+              f"{r['agreement']:7.4f} {r['unregistered_errors']:>7d} {r['state_snapshots_differing']:>6d}  "
+              f"{r['first_fatal']}{note}")
+    print("snaps: update-cycle snapshots that differ outside "
+          + ", ".join(ct.REPRESENTATIONAL_SNAPSHOT_PATHS))
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -151,10 +173,16 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--ratchet", default=None)
     ap.add_argument("--update-ratchet", action="store_true")
     ap.add_argument("--check-ratchet", action="store_true")
+    ap.add_argument("--numeric-backend", choices=["python", "numpy", "mlx", "mlx-cpu"],
+                    help="replay with this numeric backend instead of faithful mode's 'off'; "
+                         "checked against the same ratchet, never written to it")
     args = ap.parse_args(argv)
 
     if args.episodes and args.justify:
         ap.error("--episodes and --justify are separate corpora; run them one at a time")
+    if args.numeric_backend and args.update_ratchet:
+        ap.error("the ratchet records the reference path (backend off); "
+                 "use --check-ratchet with --numeric-backend")
     kind = "episodes" if args.episodes else "justify" if args.justify else "single"
     if args.ratchet is None:
         args.ratchet = str(RATCHET.with_name({"single": "ratchet.json", "episodes": "ratchet-episodes.json",
@@ -164,6 +192,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"no traces under {args.traces}", file=sys.stderr)
         return 2
     out_dir = Path(args.out_dir)
+    if args.numeric_backend:
+        out_dir = out_dir / f"numeric-{args.numeric_backend}"
     registry = ct.Registry.load(args.registry)
 
     # A unit of work is one replay command: one trace, or (episodes) all runs of an episode.
@@ -176,7 +206,8 @@ def main(argv: list[str] | None = None) -> int:
         out = []
         first = group[0]
         if not args.no_replay:
-            ok, msg = replay(first[2], petacat_path(out_dir, first[0], first[1]), args.replay_cmd)
+            ok, msg = replay(first[2], petacat_path(out_dir, first[0], first[1]), args.replay_cmd,
+                             args.numeric_backend)
             if not ok:
                 return [(it, None, f"replay failed: {msg}") for it in group]
         for item in group:

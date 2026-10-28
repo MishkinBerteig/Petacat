@@ -147,7 +147,7 @@ def synthetic_topology(
             if src == d:  # the real Slipnet has no self-links
                 src = (src + 1) % n_nodes
             source.append(src)
-            weight.append(rng.choice(association_pool) / 100.0)
+            weight.append(float(rng.choice(association_pool)))
             dest_of_edge.append(d)
         indptr.append(len(source))
 

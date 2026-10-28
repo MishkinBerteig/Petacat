@@ -28,7 +28,7 @@ license change was authorised by Dr. Marshall directly (see
 > end-to-end. Episodic Memory shapes the runs that inherit it: a run declines an
 > answer already held for the same problem and rules, so repeating a problem
 > within a [Training Session](#persistence-modes-and-training-sessions) explores
-> a different answer each time. It ships with 2,390 test cases covering the engine, the API, and the
+> a different answer each time. It ships with 2,405 test cases covering the engine, the API, and the
 > help/config system, run on both the CPU and the GPU numeric backends. Underneath the seven components sits an execution
 > substrate — three [persistence modes](#persistence-modes-and-training-sessions),
 > a [GPU numeric substrate](#the-numeric-substrate), and
@@ -349,8 +349,8 @@ Petacat has two test suites:
   `integration` (the repository's artifacts agreeing), `lockstep` (Petacat's decision
   traces against Metacat's), and `e2e` (full HTTP
   stack against a running database). All seven run in a single command against
-  the local Postgres — 2,390 cases, which includes the numeric matrix's second
-  pass over the 440 backend-sensitive tests. See
+  the local Postgres — 2,405 cases, which includes the numeric matrix's second
+  pass over the 449 backend-sensitive tests. See
   [TESTING.md](TESTING.md) for the layer breakdown, the numeric backend matrix,
   the session ceiling, the unit-test rules, determinism requirements, test-double
   conventions, how to run the suite under the free-threaded interpreter, and what
@@ -970,11 +970,23 @@ the static [`HELP.md`](HELP.md) reference and matching TypeScript constants.
    Petacat's reference mode. Petacat can also run codelets across CPU cores with
    no global barrier, resolving lost races as fizzles. See
    [Free-running](#free-running-codelets-across-cpu-cores).
+8. **Clamps lapse by update cycle**: Metacat unfreezes the initially clamped
+   Slipnet nodes at a fixed codelet count (`run.ss:151-154`). Petacat counts
+   every clamp down by update cycles, so it lapses on the update cycle that
+   reaches its expiry. The `initial_clamp_fixed_time` parameter, off by default,
+   restores Metacat's timing, and the lockstep harness turns it on. Against
+   20,000 Metacat runs per problem, Petacat's answer frequencies show no
+   significant difference with it on or off
+   (`measurements/vs-metacat-support-v1a-lockstep.md`).
 
 None of 5–7 changes what Petacat perceives. The standard they are held to is
 that the *set* of stopping states each problem can reach is unchanged — not that
 a given seed produces the same answer, which is a thing that legitimately moves
-whenever the order of random draws does.
+whenever the order of random draws does. The GPU path is held to more than that:
+replayed against Metacat's recorded decisions with
+`scripts/lockstep_corpus.py --numeric-backend mlx`, it must make every one of
+them with the same options and weights, as the engine's own loops do (see
+[`tests/lockstep/README.md`](tests/lockstep/README.md)).
 
 Some additional minor differences include:
 

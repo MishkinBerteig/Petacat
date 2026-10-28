@@ -2,951 +2,1141 @@
  "a-b-z/1": {
   "agreement": 1.0,
   "reach": 827,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "a-b-z/10": {
   "agreement": 1.0,
   "reach": 756,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "a-b-z/2": {
   "agreement": 1.0,
   "reach": 451,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "a-b-z/3": {
   "agreement": 1.0,
   "reach": 396,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "a-b-z/4": {
   "agreement": 1.0,
   "reach": 586,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "a-b-z/5": {
   "agreement": 1.0,
   "reach": 591,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "a-b-z/6": {
   "agreement": 1.0,
   "reach": 646,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "a-b-z/7": {
   "agreement": 1.0,
   "reach": 262,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "a-b-z/8": {
   "agreement": 1.0,
   "reach": 700,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "a-b-z/9": {
   "agreement": 1.0,
   "reach": 252,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "aabb-cc-aabb/1": {
   "agreement": 1.0,
   "reach": 1660,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "aabb-cc-aabb/10": {
   "agreement": 1.0,
   "reach": 4684,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "aabb-cc-aabb/2": {
   "agreement": 1.0,
   "reach": 8976,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "aabb-cc-aabb/3": {
   "agreement": 1.0,
   "reach": 6433,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "aabb-cc-aabb/4": {
   "agreement": 1.0,
   "reach": 1116,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "aabb-cc-aabb/5": {
   "agreement": 1.0,
   "reach": 5320,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "aabb-cc-aabb/6": {
   "agreement": 1.0,
   "reach": 1201,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "aabb-cc-aabb/7": {
   "agreement": 1.0,
   "reach": 3410,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "aabb-cc-aabb/8": {
   "agreement": 1.0,
   "reach": 4640,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "aabb-cc-aabb/9": {
   "agreement": 1.0,
   "reach": 848,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "aabc-aabd-ijkk/1": {
   "agreement": 1.0,
   "reach": 1985,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "aabc-aabd-ijkk/10": {
   "agreement": 1.0,
   "reach": 1547,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "aabc-aabd-ijkk/2": {
   "agreement": 1.0,
   "reach": 1102,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "aabc-aabd-ijkk/3": {
   "agreement": 1.0,
   "reach": 5621,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "aabc-aabd-ijkk/4": {
   "agreement": 1.0,
   "reach": 711,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "aabc-aabd-ijkk/5": {
   "agreement": 1.0,
   "reach": 1847,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "aabc-aabd-ijkk/6": {
   "agreement": 1.0,
   "reach": 1127,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "aabc-aabd-ijkk/7": {
   "agreement": 1.0,
   "reach": 4098,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "aabc-aabd-ijkk/8": {
   "agreement": 1.0,
   "reach": 5908,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "aabc-aabd-ijkk/9": {
   "agreement": 1.0,
   "reach": 2343,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "ab-c-ab/1": {
   "agreement": 1.0,
   "reach": 1387,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "ab-c-ab/10": {
   "agreement": 1.0,
   "reach": 317,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "ab-c-ab/2": {
   "agreement": 1.0,
   "reach": 541,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "ab-c-ab/3": {
   "agreement": 1.0,
   "reach": 482,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "ab-c-ab/4": {
   "agreement": 1.0,
   "reach": 790,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "ab-c-ab/5": {
   "agreement": 1.0,
   "reach": 746,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "ab-c-ab/6": {
   "agreement": 1.0,
   "reach": 454,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "ab-c-ab/7": {
   "agreement": 1.0,
   "reach": 1312,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "ab-c-ab/8": {
   "agreement": 1.0,
   "reach": 1118,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "ab-c-ab/9": {
   "agreement": 1.0,
   "reach": 903,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-aabbcc-kkjjii/1": {
   "agreement": 1.0,
   "reach": 1262,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-aabbcc-kkjjii/10": {
   "agreement": 1.0,
   "reach": 2073,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-aabbcc-kkjjii/2": {
   "agreement": 1.0,
   "reach": 2303,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-aabbcc-kkjjii/3": {
   "agreement": 1.0,
   "reach": 2596,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-aabbcc-kkjjii/4": {
   "agreement": 1.0,
   "reach": 27616,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-aabbcc-kkjjii/5": {
   "agreement": 1.0,
   "reach": 1411,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-aabbcc-kkjjii/6": {
   "agreement": 1.0,
   "reach": 79626,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-aabbcc-kkjjii/7": {
   "agreement": 1.0,
   "reach": 1516,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-aabbcc-kkjjii/8": {
   "agreement": 1.0,
   "reach": 1009,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-aabbcc-kkjjii/9": {
   "agreement": 1.0,
   "reach": 2984,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-abd-glz/1": {
   "agreement": 1.0,
   "reach": 2846,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-abd-glz/10": {
   "agreement": 1.0,
   "reach": 25683,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-abd-glz/2": {
   "agreement": 1.0,
   "reach": 2406,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-abd-glz/3": {
   "agreement": 1.0,
   "reach": 2973,
+  "state_snapshots_differing": 24,
   "unregistered_errors": 0
  },
  "abc-abd-glz/4": {
   "agreement": 1.0,
   "reach": 1879,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-abd-glz/5": {
   "agreement": 1.0,
   "reach": 1494,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-abd-glz/6": {
   "agreement": 1.0,
   "reach": 943,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-abd-glz/7": {
   "agreement": 1.0,
   "reach": 1115,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-abd-glz/8": {
   "agreement": 1.0,
   "reach": 3757,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-abd-glz/9": {
   "agreement": 1.0,
   "reach": 1991,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-abd-ijk/1": {
   "agreement": 1.0,
   "reach": 396,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-abd-ijk/10": {
   "agreement": 1.0,
   "reach": 308,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-abd-ijk/2": {
   "agreement": 1.0,
   "reach": 735,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-abd-ijk/3": {
   "agreement": 1.0,
   "reach": 712,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-abd-ijk/4": {
   "agreement": 1.0,
   "reach": 617,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-abd-ijk/5": {
   "agreement": 1.0,
   "reach": 439,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-abd-ijk/6": {
   "agreement": 1.0,
   "reach": 783,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-abd-ijk/7": {
   "agreement": 1.0,
   "reach": 522,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-abd-ijk/8": {
   "agreement": 1.0,
   "reach": 542,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-abd-ijk/9": {
   "agreement": 1.0,
   "reach": 370,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-abd-mrrjjj/1": {
   "agreement": 1.0,
   "reach": 1251,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-abd-mrrjjj/10": {
   "agreement": 1.0,
   "reach": 923,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-abd-mrrjjj/2": {
   "agreement": 1.0,
   "reach": 549,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-abd-mrrjjj/3": {
   "agreement": 1.0,
   "reach": 1846,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-abd-mrrjjj/4": {
   "agreement": 1.0,
   "reach": 777,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-abd-mrrjjj/5": {
   "agreement": 1.0,
   "reach": 1023,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-abd-mrrjjj/6": {
   "agreement": 1.0,
   "reach": 919,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-abd-mrrjjj/7": {
   "agreement": 1.0,
   "reach": 2935,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-abd-mrrjjj/8": {
   "agreement": 1.0,
   "reach": 2080,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-abd-mrrjjj/9": {
   "agreement": 1.0,
   "reach": 849,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-abd-xyz/1": {
   "agreement": 1.0,
   "reach": 1332,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-abd-xyz/10": {
   "agreement": 1.0,
   "reach": 1959,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-abd-xyz/2": {
   "agreement": 1.0,
   "reach": 3515,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-abd-xyz/3": {
   "agreement": 1.0,
   "reach": 2428,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-abd-xyz/4": {
   "agreement": 1.0,
   "reach": 362,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-abd-xyz/5": {
   "agreement": 1.0,
   "reach": 2625,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-abd-xyz/6": {
   "agreement": 1.0,
   "reach": 386,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-abd-xyz/7": {
   "agreement": 1.0,
   "reach": 1710,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-abd-xyz/8": {
   "agreement": 1.0,
   "reach": 737,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-abd-xyz/9": {
   "agreement": 1.0,
   "reach": 1423,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-cba-mrrjjj/1": {
   "agreement": 1.0,
   "reach": 842,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-cba-mrrjjj/10": {
   "agreement": 1.0,
   "reach": 964,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-cba-mrrjjj/2": {
   "agreement": 1.0,
   "reach": 1486,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-cba-mrrjjj/3": {
   "agreement": 1.0,
   "reach": 857,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-cba-mrrjjj/4": {
   "agreement": 1.0,
   "reach": 691,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-cba-mrrjjj/5": {
   "agreement": 1.0,
   "reach": 902,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-cba-mrrjjj/6": {
   "agreement": 1.0,
   "reach": 944,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-cba-mrrjjj/7": {
   "agreement": 1.0,
   "reach": 772,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-cba-mrrjjj/8": {
   "agreement": 1.0,
   "reach": 3991,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-cba-mrrjjj/9": {
   "agreement": 1.0,
   "reach": 1682,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-d-abc/1": {
   "agreement": 1.0,
   "reach": 1140,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-d-abc/10": {
   "agreement": 1.0,
   "reach": 1221,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-d-abc/2": {
   "agreement": 1.0,
   "reach": 1329,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-d-abc/3": {
   "agreement": 1.0,
   "reach": 603,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-d-abc/4": {
   "agreement": 1.0,
   "reach": 472,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-d-abc/5": {
   "agreement": 1.0,
   "reach": 1166,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-d-abc/6": {
   "agreement": 1.0,
   "reach": 447,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-d-abc/7": {
   "agreement": 1.0,
   "reach": 460,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-d-abc/8": {
   "agreement": 1.0,
   "reach": 678,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "abc-d-abc/9": {
   "agreement": 1.0,
   "reach": 1812,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "bc-d-bc/1": {
   "agreement": 1.0,
   "reach": 864,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "bc-d-bc/10": {
   "agreement": 1.0,
   "reach": 409,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "bc-d-bc/2": {
   "agreement": 1.0,
   "reach": 711,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "bc-d-bc/3": {
   "agreement": 1.0,
   "reach": 627,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "bc-d-bc/4": {
   "agreement": 1.0,
   "reach": 624,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "bc-d-bc/5": {
   "agreement": 1.0,
   "reach": 824,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "bc-d-bc/6": {
   "agreement": 1.0,
   "reach": 487,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "bc-d-bc/7": {
   "agreement": 1.0,
   "reach": 1088,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "bc-d-bc/8": {
   "agreement": 1.0,
   "reach": 1277,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "bc-d-bc/9": {
   "agreement": 1.0,
   "reach": 1186,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "eeqee-qeeq-xxixx/1": {
   "agreement": 1.0,
   "reach": 2789,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "eeqee-qeeq-xxixx/10": {
   "agreement": 1.0,
   "reach": 2204,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "eeqee-qeeq-xxixx/2": {
   "agreement": 1.0,
   "reach": 4628,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "eeqee-qeeq-xxixx/3": {
   "agreement": 1.0,
   "reach": 5393,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "eeqee-qeeq-xxixx/4": {
   "agreement": 1.0,
   "reach": 2755,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "eeqee-qeeq-xxixx/5": {
   "agreement": 1.0,
   "reach": 4137,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "eeqee-qeeq-xxixx/6": {
   "agreement": 1.0,
   "reach": 2175,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "eeqee-qeeq-xxixx/7": {
   "agreement": 1.0,
   "reach": 2276,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "eeqee-qeeq-xxixx/8": {
   "agreement": 1.0,
   "reach": 5763,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "eeqee-qeeq-xxixx/9": {
   "agreement": 1.0,
   "reach": 2803,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "eqe-qeq-abbba/1": {
   "agreement": 1.0,
   "reach": 1190,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "eqe-qeq-abbba/10": {
   "agreement": 1.0,
   "reach": 955,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "eqe-qeq-abbba/2": {
   "agreement": 1.0,
   "reach": 989,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "eqe-qeq-abbba/3": {
   "agreement": 1.0,
   "reach": 2717,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "eqe-qeq-abbba/4": {
   "agreement": 1.0,
   "reach": 1165,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "eqe-qeq-abbba/5": {
   "agreement": 1.0,
   "reach": 616,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "eqe-qeq-abbba/6": {
   "agreement": 1.0,
   "reach": 971,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "eqe-qeq-abbba/7": {
   "agreement": 1.0,
   "reach": 2938,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "eqe-qeq-abbba/8": {
   "agreement": 1.0,
   "reach": 1337,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "eqe-qeq-abbba/9": {
   "agreement": 1.0,
   "reach": 1249,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "eqe-qeq-abbbc/1": {
   "agreement": 1.0,
   "reach": 1598,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "eqe-qeq-abbbc/10": {
   "agreement": 1.0,
   "reach": 2867,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "eqe-qeq-abbbc/2": {
   "agreement": 1.0,
   "reach": 1177,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "eqe-qeq-abbbc/3": {
   "agreement": 1.0,
   "reach": 6946,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "eqe-qeq-abbbc/4": {
   "agreement": 1.0,
   "reach": 1297,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "eqe-qeq-abbbc/5": {
   "agreement": 1.0,
   "reach": 3995,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "eqe-qeq-abbbc/6": {
   "agreement": 1.0,
   "reach": 1153,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "eqe-qeq-abbbc/7": {
   "agreement": 1.0,
   "reach": 1043,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "eqe-qeq-abbbc/8": {
   "agreement": 1.0,
   "reach": 2038,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "eqe-qeq-abbbc/9": {
   "agreement": 1.0,
   "reach": 1457,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "rst-rsu-xyz/1": {
   "agreement": 1.0,
   "reach": 1777,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "rst-rsu-xyz/10": {
   "agreement": 1.0,
   "reach": 1474,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "rst-rsu-xyz/2": {
   "agreement": 1.0,
   "reach": 2303,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "rst-rsu-xyz/3": {
   "agreement": 1.0,
   "reach": 571,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "rst-rsu-xyz/4": {
   "agreement": 1.0,
   "reach": 754,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "rst-rsu-xyz/5": {
   "agreement": 1.0,
   "reach": 588,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "rst-rsu-xyz/6": {
   "agreement": 1.0,
   "reach": 4306,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "rst-rsu-xyz/7": {
   "agreement": 1.0,
   "reach": 6574,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "rst-rsu-xyz/8": {
   "agreement": 1.0,
   "reach": 2467,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "rst-rsu-xyz/9": {
   "agreement": 1.0,
   "reach": 1804,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "xqc-xqd-mrrjjj/1": {
   "agreement": 1.0,
   "reach": 319,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "xqc-xqd-mrrjjj/10": {
   "agreement": 1.0,
   "reach": 456,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "xqc-xqd-mrrjjj/2": {
   "agreement": 1.0,
   "reach": 737,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "xqc-xqd-mrrjjj/3": {
   "agreement": 1.0,
   "reach": 804,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "xqc-xqd-mrrjjj/4": {
   "agreement": 1.0,
   "reach": 579,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "xqc-xqd-mrrjjj/5": {
   "agreement": 1.0,
   "reach": 1065,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "xqc-xqd-mrrjjj/6": {
   "agreement": 1.0,
   "reach": 449,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "xqc-xqd-mrrjjj/7": {
   "agreement": 1.0,
   "reach": 517,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "xqc-xqd-mrrjjj/8": {
   "agreement": 1.0,
   "reach": 768,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "xqc-xqd-mrrjjj/9": {
   "agreement": 1.0,
   "reach": 1043,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "xy-z-xy/1": {
   "agreement": 1.0,
   "reach": 789,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "xy-z-xy/10": {
   "agreement": 1.0,
   "reach": 380,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "xy-z-xy/2": {
   "agreement": 1.0,
   "reach": 891,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "xy-z-xy/3": {
   "agreement": 1.0,
   "reach": 915,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "xy-z-xy/4": {
   "agreement": 1.0,
   "reach": 807,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "xy-z-xy/5": {
   "agreement": 1.0,
   "reach": 2817,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "xy-z-xy/6": {
   "agreement": 1.0,
   "reach": 601,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "xy-z-xy/7": {
   "agreement": 1.0,
   "reach": 1576,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "xy-z-xy/8": {
   "agreement": 1.0,
   "reach": 1301,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "xy-z-xy/9": {
   "agreement": 1.0,
   "reach": 556,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "zy-x-zy/1": {
   "agreement": 1.0,
   "reach": 1606,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "zy-x-zy/10": {
   "agreement": 1.0,
   "reach": 282,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "zy-x-zy/2": {
   "agreement": 1.0,
   "reach": 706,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "zy-x-zy/3": {
   "agreement": 1.0,
   "reach": 435,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "zy-x-zy/4": {
   "agreement": 1.0,
   "reach": 763,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "zy-x-zy/5": {
   "agreement": 1.0,
   "reach": 928,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "zy-x-zy/6": {
   "agreement": 1.0,
   "reach": 1081,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "zy-x-zy/7": {
   "agreement": 1.0,
   "reach": 832,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "zy-x-zy/8": {
   "agreement": 1.0,
   "reach": 1023,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
  "zy-x-zy/9": {
   "agreement": 1.0,
   "reach": 957,
+  "state_snapshots_differing": 0,
   "unregistered_errors": 0
  }
 }

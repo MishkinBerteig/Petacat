@@ -7,8 +7,11 @@ Compare Petacat against Metacat's measured reference data.
     scripts/compare_to_metacat.py --only misc1,run6 -n 100
 
 Petacat never generates oracle data. It runs a short sample and compares it
-against the sets Metacat published; see ../Metacat/ORACLE-USAGE.md for the
-protocol this implements.
+against sets derived from Metacat's measured runs: by default
+measurements/reference/, which scripts/make_reference_sets.py derives from the
+support-v1a study data in this repository. --reference DIR reads another directory
+in the same format, such as a Metacat checkout's oracle/derived/ (whose
+ORACLE-USAGE.md describes the protocol this implements).
 
 TWO MODES, TWO CHECKS EACH, AND NOTHING FAILS
 
@@ -18,7 +21,11 @@ TWO MODES, TWO CHECKS EACH, AND NOTHING FAILS
              no single-run state is reported that the two caps make
              incomparable. See MAX_STEPS.
   episodic   100 episodes of 8 runs per problem, memory carried forward within
-             an episode, against the convergence sets. An episode's convergence
+             an episode, against the convergence sets. This repository has none
+             (make_reference_sets.py says why); with --reference pointing at a
+             directory that has them it runs, and otherwise "both" runs single
+             only and says so. studies/episodic-v3 is the in-repository check of
+             episodes. An episode's convergence
              answer is its last run that produced an answer; *NONE* and *CAP*
              are skipped looking backwards. Capped runs are NOT re-run here --
              memory carries forward, so there is no such thing as re-running one
@@ -51,8 +58,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SEED_DIR = os.path.join(ROOT, "seed_data")
-METACAT = os.path.join(os.path.dirname(ROOT), "Metacat")
-DERIVED = os.path.join(METACAT, "oracle", "derived")
+REFERENCE = os.path.join(ROOT, "measurements", "reference")
 
 ANSWERLESS = {"*NONE*", "*CAP*"}
 
@@ -202,9 +208,13 @@ def convergence_answer(states):
     return None
 
 
-def load(name):
-    with open(os.path.join(DERIVED, name)) as fh:
+def load(reference, name):
+    with open(os.path.join(reference, name)) as fh:
         return {r["name"]: r for r in json.load(fh)["results"]}
+
+
+def has(reference, *names):
+    return all(os.path.exists(os.path.join(reference, n)) for n in names)
 
 
 def compare(name, produced: Counter, ref_set: dict, ref_p50: dict, n: int,
@@ -318,10 +328,30 @@ def main():
     ap.add_argument("-j", "--jobs", type=int, default=8)
     ap.add_argument("--only")
     ap.add_argument("-o", "--out", default="measurements/vs-metacat.json")
+    ap.add_argument("--reference", default=REFERENCE,
+                    help="directory holding the reference sets "
+                         "(default: measurements/reference)")
     args = ap.parse_args()
 
-    s_sets, s_p50 = load("single-run-sets.json"), load("single-run-p50.json")
-    c_sets, c_p50 = load("convergence-sets.json"), load("convergence-p50.json")
+    single_files = ("single-run-sets.json", "single-run-p50.json")
+    episodic_files = ("convergence-sets.json", "convergence-p50.json")
+    if not has(args.reference, *single_files):
+        ap.error(f"no single-run sets in {args.reference}; "
+                 "run scripts/make_reference_sets.py")
+    if not has(args.reference, *episodic_files):
+        if args.mode == "episodic":
+            ap.error(f"no convergence sets in {args.reference}. This repository has "
+                     "none; pass --reference with a directory that does, or use "
+                     "studies/episodic-v3 for episodes")
+        if args.mode == "both":
+            print(f"no convergence sets in {args.reference}: running single runs only "
+                  "(studies/episodic-v3 is the in-repository check of episodes)")
+            args.mode = "single"
+    s_sets, s_p50 = load(args.reference, single_files[0]), load(args.reference, single_files[1])
+    c_sets = c_p50 = None
+    if args.mode in ("episodic", "both"):
+        c_sets, c_p50 = (load(args.reference, episodic_files[0]),
+                         load(args.reference, episodic_files[1]))
 
     overrides = dict(args.param)
     if overrides:
@@ -342,7 +372,7 @@ def main():
            # measurement anyone can compare against.
            "engine_param_overrides": overrides,
            "start_seed": args.start_seed,
-           "reference": os.path.relpath(DERIVED, ROOT)}
+           "reference": os.path.relpath(args.reference, ROOT)}
 
     with Pool(processes=args.jobs, initializer=_init,
               initargs=(args.backend, overrides)) as pool:

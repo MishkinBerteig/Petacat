@@ -135,6 +135,35 @@ def end_of_run_capture(meta: MetadataProvider) -> dict:
     return json.loads(json.dumps(capture_run_state(runner.ctx)))
 
 
+def test_a_translated_rule_justify_mode_adds_is_listed_live_and_recorded(meta):
+    """An unbuilt rule in the Workspace's list is still one of its rules.
+
+    Justify mode adds the rule it translates (``justify.ss:110``) without building it,
+    and the answer it justifies rests on that rule. Both the live payload and the
+    projection of a capture list it, so ``top_rules`` agrees with ``num_top_rules``.
+    """
+    runner = _run_to(meta, RESTORABLE_POINT)
+    _add_a_built_rule(runner.ctx)
+    built = runner.ctx.workspace.top_rules[0]
+    from server.engine.rules import RULE_TOP, Rule
+
+    translated = Rule(RULE_TOP, list(built.clauses))
+    translated.set_verbatim_rule_information()
+    translated.time_stamp = runner.ctx.codelet_count
+    translated.compute_quality(runner.ctx.meta)
+    translated.english_transcription = translated.transcribe_to_english()
+    before = len(runner.ctx.workspace.top_rules)
+    runner.ctx.workspace.top_rules.insert(0, translated)
+    assert not translated.is_built
+
+    live = serialize_workspace_state(runner.ctx)
+    assert len(live["top_rules"]) == live["num_top_rules"] == before + 1
+    assert [r["built"] for r in live["top_rules"]] == [False] + [True] * before
+
+    capture = json.loads(json.dumps(capture_run_state(runner.ctx)))
+    assert project_workspace(capture, meta)["top_rules"] == json.loads(json.dumps(live["top_rules"]))
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # The decisive test
 # ─────────────────────────────────────────────────────────────────────────────

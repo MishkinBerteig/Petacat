@@ -275,6 +275,40 @@ def test_ratchet_regression_detection():
     assert corpus.ratchet_regressions(old, {}) != []
 
 
+def test_ratchet_counts_differing_state_snapshots():
+    base = {"reach": 100, "agreement": 1.0, "unregistered_errors": 0}
+    old = {"x/1": {**base, "state_snapshots_differing": 1}}
+    assert corpus.ratchet_regressions(old, {"x/1": {**base, "state_snapshots_differing": 1}}) == []
+    assert corpus.ratchet_regressions(old, {"x/1": {**base, "state_snapshots_differing": 2}}) == [
+        "x/1: differing state snapshots 1 -> 2"]
+    # A ratchet written before the count existed has nothing to hold the new one to.
+    assert corpus.ratchet_regressions({"x/1": base}, {"x/1": {**base, "state_snapshots_differing": 5}}) == []
+
+
+def test_proposed_structures_are_counted_apart_from_state():
+    def snap(u, proposed, descriptions):
+        return {"t": "snapshot", "u": u, "c": u * 15, "temperature": {"value": 50.0},
+                "structures": {"descriptions": descriptions,
+                               "proposed": {"bonds": [], "groups": [], "bridges": proposed}}}
+    built = [["desc(i.0,length,one)", 40.0, 100]]
+    meta = ct.Trace.from_records([HEADER, snap(1, ["bridge(top,i.0,m.0)"], built),
+                                  snap(2, [], built), end()])
+    pet = ct.Trace.from_records([HEADER, snap(1, [], built),
+                                 snap(2, [], [["desc(i.0,length,one)", 40.0, 99]]), end()])
+    rep = ct.compare_traces(meta, pet, REGISTRY)
+    assert rep.snapshots_differing == 2
+    assert rep.state_snapshots_differing == 1
+    assert rep.snapshot_first_diff["path"] == "structures.proposed.bridges"
+    assert rep.state_snapshot_first_diff["u"] == 2
+    assert rep.state_snapshot_first_diff["path"].startswith("structures.descriptions")
+
+
+def test_the_corpus_driver_and_faithful_mode_name_the_same_backend_variable():
+    from tests.lockstep import faithful
+
+    assert corpus.NUMERIC_BACKEND_ENV == faithful.NUMERIC_BACKEND_ENV
+
+
 def test_reference_crash_registers_what_follows_the_crashing_codelet():
     # Metacat died inside codelet 5 (end reason "error"); Petacat carried on and answered.
     m = [prob(0.5, c=4), prob(0.5, c=5)]

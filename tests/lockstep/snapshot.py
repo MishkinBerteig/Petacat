@@ -98,7 +98,12 @@ def _structures(ctx: Any) -> dict:
         "descriptions": sorted(
             [description_name(d), float(d.strength), int(d.time_stamp)] for d in descriptions
         ),
-        "rules": _strengths(rules, rule_name),
+        # Every rule in the Workspace's lists, built or not, as Metacat's writer takes
+        # them from ``get-structures``: justify mode adds the translated rule itself
+        # (``justify.ss:110``) without ever setting its proposal level.
+        "rules": sorted(
+            [rule_name(r), float(r.strength), int(r.time_stamp)] for r in rules
+        ),
         "proposed": {
             "bonds": _proposed([p for p in proposals if isinstance(p, Bond)], bond_name),
             "groups": _proposed([p for p in proposals if isinstance(p, Group)], group_name),

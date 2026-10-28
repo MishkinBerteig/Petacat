@@ -237,7 +237,8 @@ class MlxSlipnetSession(SlipnetSession):
         if self.topology.n_edges:
             a = act[self.source]
             gate = mx.logical_and(a > 0.0, a >= threshold)
-            contribution = mx.round((scale * self.weight) * a)
+            # Multiply before dividing, as for decay above (``layout.in_weight``).
+            contribution = mx.round((scale * self.weight) * a / 100.0)
             contribution = mx.where(gate, contribution, mx.zeros_like(contribution))
             gathered = mx.zeros((self.n,), dtype=self.dtype).at[self.dest].add(
                 contribution

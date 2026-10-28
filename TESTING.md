@@ -121,16 +121,16 @@ outside the matrix take it too and the run is entirely what it says it is.
 
 ```
 ============================= petacat test matrix ==============================
-  cpu  numpy    float64    440 tests
-  gpu  mlx      float32    440 tests
+  cpu  numpy    float64    449 tests
+  gpu  mlx      float32    449 tests
   whole suite requested: the full matrix is required of this run
 
-  unit           556 collected    556 run    556 passed      0 failed      0 skipped  complete
-  seed_unit      452 collected    452 run    452 passed      0 failed      0 skipped  complete
-  module         925 collected    925 run    925 passed      0 failed      0 skipped  complete
+  unit           557 collected    557 run    557 passed      0 failed      0 skipped  complete
+  seed_unit      460 collected    460 run    460 passed      0 failed      0 skipped  complete
+  module         927 collected    927 run    927 passed      0 failed      0 skipped  complete
   architecture    34 collected     34 run     34 passed      0 failed      0 skipped  complete
   integration     68 collected     68 run     68 passed      0 failed      0 skipped  complete
-  lockstep       96 collected     96 run     96 passed      0 failed      0 skipped  complete
+  lockstep      100 collected    100 run    100 passed      0 failed      0 skipped  complete
   e2e            259 collected    259 run    259 passed      0 failed      0 skipped  complete
 
   run complete in 14.2 min against a 60 min ceiling
@@ -179,7 +179,7 @@ A truncated run reports itself as truncated, and the difference from a clean run
 visible three ways:
 
 ```
-  module         925 collected    198 run    198 passed      0 failed      0 skipped  INCOMPLETE
+  module         927 collected    198 run    198 passed      0 failed      0 skipped  INCOMPLETE
 
   RUN TRUNCATED: the 60 min ceiling was reached after 60.4 min. Everything above is
   what the run produced before it stopped; the tests it had not reached never ran.
@@ -203,16 +203,16 @@ that allowance.
 
 | Layer | Directory | Scope | May depend on | Cases |
 |-------|-----------|-------|---------------|-------|
-| **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 556 |
-| **seed unit** | `tests/seed_unit/` | One class or function, measured against the values Petacat ships with | Real `seed_data/*.json`, and the machine the process is running on | 452 |
-| **module** | `tests/module/` | Several real components assembled and driven | Real engine objects and `seed_data/*.json`; no DB, no HTTP | 925 |
+| **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 557 |
+| **seed unit** | `tests/seed_unit/` | One class or function, measured against the values Petacat ships with | Real `seed_data/*.json`, and the machine the process is running on | 460 |
+| **module** | `tests/module/` | Several real components assembled and driven | Real engine objects and `seed_data/*.json`; no DB, no HTTP | 927 |
 | **architecture** | `tests/architecture/` | How the source tree is allowed to depend on itself | The repository's source, `seed_data/*.json`, child interpreters | 34 |
 | **integration** | `tests/integration/` | Agreement between the repository's artifacts, and the harness's own rules | Real `seed_data/*.json`, the ORM declarations, the generated client files, the documentation, a real pytest session | 68 |
-| **lockstep** | `tests/lockstep/` | Petacat's decision traces against Metacat's: naming, helper conformance, tracing/replay RNGs, determinism guards, the comparer | Real engine in faithful mode (numeric backend off); recorded Metacat traces | 96 |
+| **lockstep** | `tests/lockstep/` | Petacat's decision traces against Metacat's: naming, helper conformance, tracing/replay RNGs, determinism guards, the comparer | Real engine in faithful mode (numeric backend off, or a named backend); recorded Metacat traces | 100 |
 | **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 259 |
 
 Those counts are cases, so they include the second pass the numeric matrix makes
-over the 440 backend-sensitive tests.
+over the 449 backend-sensitive tests.
 
 One line decides each layer. Read them as a question about what a new test's
 subject is, and write the test where the answer lands:
@@ -230,7 +230,9 @@ subject is, and write the test where the answer lands:
 - **lockstep** — the assertion is about Petacat's random decisions: what they are
   named, how a helper draws, whether a replay of a Metacat trace repeats exactly.
   It runs the engine in faithful mode, which pins the numeric backend off, so it
-  stays outside the backend matrix and the substrate-marker guard.
+  stays outside the backend matrix and the substrate-marker guard. One test names
+  the exact CPU backend instead, and `scripts/lockstep_corpus.py --numeric-backend`
+  replays whole corpora with any backend, the GPU included.
 - **e2e** — the assertion travels over HTTP.
 
 A first pass should test **the lowest level of code just above the database
@@ -238,7 +240,7 @@ first**, then move up toward the API and GUI.
 
 All seven layers run in one command — the
 [required command](#the-required-command) — and, since Petacat runs natively, all
-seven actually run: **2,390 cases**, every one of them executed. A layer that is
+seven actually run: **2,405 cases**, every one of them executed. A layer that is
 normally skipped is not a layer that is normally green, and none of these is.
 
 Wall-clock time depends heavily on the machine and on what else it is doing. The
@@ -339,7 +341,7 @@ the number of endpoints taking `Depends(get_session)`, the size of
 | `test_bridge_types.py` | 2 | The bridge-type and orientation constants |
 | `test_codelet_dsl.py` | 3 | Compiling a codelet body: what the interpreter accepts and refuses |
 | `test_commentary.py` | 23 | The `CommentaryLog`, and the emit helpers whose English is written in Python |
-| `test_compare_harness.py` | 17 | The oracle comparison's decision logic: what gets flagged, and how, and its engine-parameter passthrough |
+| `test_compare_harness.py` | 18 | The oracle comparison's decision logic: what gets flagged, and how, and its engine-parameter passthrough; the shipped reference sets in `measurements/reference/` |
 | `test_concept_mappings.py` | 37 | `ConceptMapping`: identity, slippage, distinguishing descriptors |
 | `test_descriptions.py` | 23 | `Description`: relevance, strength, descriptor predicates |
 | `test_episodic_memory.py` | 13 | `EpisodicMemory`: identifier scoping, theme distance, `answer_present` |
@@ -383,7 +385,7 @@ the number of endpoints taking `Depends(get_session)`, the size of
 | `test_formulas.py` | 10 | The temperature-dependent formulas against the seeded coefficients |
 | `test_hardware.py` | 21 | The machine description and the sizes derived from it: real probes, faked probes, environment overrides |
 | `test_metadata_provider.py` | 25 | `MetadataProvider` loading every seed collection |
-| `test_numeric_backends.py` | 25 | The numeric backends against the reference, and the engine without them |
+| `test_numeric_backends.py` | 27 | The numeric backends against the reference (decay and spreading against exact rationals, including spreading's halfway cases), and the engine without them |
 | `test_rule_quality.py` | 13 | Rule uniformity, abstractness and succinctness against the Scheme's formulas, hand-computed from the seeded depths |
 | `test_slipnet_link_lengths.py` | 6 | The Slipnet's link lengths against the reference Scheme |
 | `test_slipnet_node.py` | 23 | The 59-node Slipnet: its nodes, its links, its clamps and its spreading |
@@ -396,7 +398,7 @@ the number of endpoints taking `Depends(get_session)`, the size of
 | `test_access_sets.py` | 19 | Read-set / write-set discipline and commit-time validation |
 | `test_answer_description_pattern.py` | 13 | The vertical theme-pattern an answer description is indexed by |
 | `test_bridge_scouting.py` | 25 | The bridge scouts' probabilistic gates, the build-time mapping augmentation, the incompatibility refinements, and the deferred posting batch |
-| `test_capture_projection.py` | 8 | A recorded capture renders exactly as the same state renders live |
+| `test_capture_projection.py` | 9 | A recorded capture renders exactly as the same state renders live, including the unbuilt translated rule justify mode adds |
 | `test_codelet_behaviours.py` | 79 | What each of the 27 codelet types does to a live workspace |
 | `test_codelet_dsl.py` | 7 | Codelet bodies executed against a live engine context |
 | `test_coderack_shards.py` | 13 | The candidate sharded coderacks: fidelity and contention |
@@ -448,11 +450,11 @@ the number of endpoints taking `Depends(get_session)`, the size of
 
 | File | Fns | Covers |
 |------|----:|--------|
-| `test_comparer.py` | 26 | The trace comparer: hand-made trace pairs with known faults give the expected classes; the registry's reference-crash class |
+| `test_comparer.py` | 29 | The trace comparer: hand-made trace pairs with known faults give the expected classes; the registry's reference-crash class; proposed structures counted apart from state snapshots, and the ratchet on both |
 | `test_episodes.py` | 8 | Episodes and justify mode: recorder driver text, corpus globs, an episode's self-replay with memory carried, a forced fatal, justify self-replay |
 | `test_helpers.py` | 11 | Helper conformance: `prob`, `~`, `weighted_pick` and `pick` give Metacat's results for the same draws |
 | `test_naming.py` | 9 | Canonical names for plain values and every kind of object, and the opening state against Metacat's |
-| `test_replay.py` | 14 | Tracing rules, trace shape, self-replay, Guard 1, fatal and surplus paths, Guard 2 (slow) |
+| `test_replay.py` | 15 | Tracing rules, trace shape, self-replay, Guard 1, fatal and surplus paths, Guard 2 (slow); a committed Metacat trace replayed with the numeric backend on |
 | `test_seam.py` | 6 | The engine's trace seam changes nothing for an ordinary run; the faithful clamp-expiry switch |
 
 **`tests/e2e/` — the HTTP API against a real database**
@@ -512,18 +514,24 @@ itself perfectly, and every one of the reference's own answers arriving for the
 first time was read as an anomaly. The decision and the evidence are in
 `DISCREPANCIES3.md`.
 
-**The comparison now points at Metacat's published sets instead.**
-`scripts/compare_to_metacat.py` runs 100 tries per problem in each of two modes —
-single runs from a fresh Episodic Memory, and eight-run episodes with memory
-carried forward — against the oracle in `../Metacat/oracle/derived/`, sampled from
-the reference implementation itself. It reports two flags and fails nothing:
+**The comparison now points at Metacat's measured behaviour instead.**
+`scripts/compare_to_metacat.py` runs 100 tries per problem from a fresh Episodic
+Memory against the single-run sets in `measurements/reference/`: every stopping
+state of Metacat's 50,000 construction and validation runs per problem in the
+support-v1a study, derived from `studies/support-v1a/data/main.tar.gz` by
+`scripts/make_reference_sets.py`. Its second mode, eight-run episodes with memory
+carried forward, needs convergence sets this repository does not have, because no
+study here keeps every run of an episode. It runs with `--reference` pointing at a
+directory that has them (a Metacat checkout's `oracle/derived/`); otherwise the
+default `--mode both` runs single runs only and says so, and `studies/episodic-v3`
+is the in-repository check of episodes. It reports two flags and fails nothing:
 
 - **MISSING** — a p50 member of the reference set that Petacat did not produce.
   Decisive: the false-alarm rate at n=100 is 0.0000 on every problem.
 - **NOVEL** — something Petacat produced that the reference never did. Only as
-  strong as the reference set's saturation, which is why the episodic mode
-  separates members the reference reaches in single runs from members it reaches
-  nowhere.
+  strong as the reference set's saturation (`f1/n` is at most 0.0004 on every
+  problem), which is why the episodic mode separates members the reference reaches
+  in single runs from members it reaches nowhere.
 
 It is **not part of the test suite**, and that is deliberate: MetaCat is
 stochastic and self-watching with no ground truth, so the comparison says stable
@@ -531,15 +539,17 @@ or changed, never pass or fail. Run it when the codelet scheduler, the random
 stream, the numeric backend or the update cycle moves:
 
 ```bash
-.venv/bin/python scripts/compare_to_metacat.py -n 100 -r 8
+.venv/bin/python scripts/compare_to_metacat.py -n 100
+.venv/bin/python scripts/make_reference_sets.py   # rebuild measurements/reference/ (about two minutes)
 ```
 
 Its own decision logic *is* under test, in
 `tests/unit/test_compare_harness.py` — a broken comparison does not crash, it
 stops flagging, and a cycle comes back clean because nothing looked.
 
-The protocol is `../Metacat/ORACLE-USAGE.md`; where Petacat currently stands
-against it, and the root causes of every variation found, is `DISCREPANCIES4.md`.
+The protocol is Metacat's `ORACLE-USAGE.md` (reconstructed into
+`Metacat/build/source/`); the root causes of every variation found against the
+earlier reference are in `DISCREPANCIES4.md`.
 
 ### The oracle's environment
 

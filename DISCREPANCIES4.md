@@ -46,6 +46,15 @@ A full cycle on the repaired engine and the repaired harness, same seeds:
 and the census that would settle it, is under
 [RC-C](#the-diagnostic-was-run-and-it-refutes-its-own-hypothesis).
 
+**Amendment, 2026-10-28. That finding is closed: Metacat reaches `aac`.** The
+support-v1a study ran Metacat 50,000 times on `copy5` (construction and validation
+phases, fresh memory, 100,000-codelet cap), and 7 of those runs answered `aac`
+(`measurements/reference/single-run-sets.json`, derived by
+`scripts/make_reference_sets.py`). The reference this document measured against had
+about 19,700 runs per problem; at 7 in 50,000, a sample that size misses `aac` about
+6% of the time. `scripts/compare_to_metacat.py` now compares against the
+in-repository sets by default.
+
 ## Measurement conditions
 
 | | |

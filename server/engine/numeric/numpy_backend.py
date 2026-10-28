@@ -119,10 +119,11 @@ class NumpySlipnetSession(SlipnetSession):
         if self.src.size:
             a = act[self.src]
             gate = (a > 0.0) & (a >= threshold)
-            contrib = np.rint(self._weights(scale) * a)
+            contrib = np.rint(self._weights(scale) * a / 100.0)
             # ``np.rint`` is round-half-to-even, which is what Python's ``round``
-            # does for a float, so the per-edge contribution is the same integer
-            # the reference computes.
+            # does for a float, and multiplying before dividing keeps the halfway
+            # cases exact (``layout.in_weight``), so the per-edge contribution is
+            # the same integer the reference computes.
             np.multiply(contrib, gate, out=contrib)
             # ``increment-activation-buffer`` (``slipnet.ss:157-160``) refuses while
             # the destination is frozen: a clamped node receives no spreading.

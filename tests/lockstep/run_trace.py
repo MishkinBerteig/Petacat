@@ -13,11 +13,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any
 
-from tests.lockstep.faithful import DEFAULT_CAP, Outcome, header_record, run_faithful
+from tests.lockstep.faithful import (
+    DEFAULT_CAP, NUMERIC_BACKEND_ENV, Outcome, header_record, run_faithful,
+)
 from tests.lockstep.replay_rng import MetacatTrace, ReplayRNG
 from tests.lockstep.trace_io import TraceWriter
 from tests.lockstep.tracing_rng import TracingRNG
@@ -193,7 +196,12 @@ def main(argv: list[str] | None = None) -> int:
     rep.add_argument("--cap", type=int)
     rep.add_argument("--episode", action="store_true",
                      help="--metacat is one run (<S>.r<k>) of an episode: replay them all")
+    for p in (rec, rep):
+        p.add_argument("--numeric-backend", choices=["python", "numpy", "mlx", "mlx-cpu"],
+                       help="run with this numeric backend instead of faithful mode's 'off'")
     args = ap.parse_args(argv)
+    if args.numeric_backend:
+        os.environ[NUMERIC_BACKEND_ENV] = args.numeric_backend
 
     if args.command == "record" and args.episode_runs:
         for path, outcome in record_episode(tuple(args.problem), args.seed, args.episode_runs,

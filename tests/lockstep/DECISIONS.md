@@ -141,3 +141,23 @@ naming table in its `README.md`):
   port fix, so they now guard the seam against later change.
 * **Episodes** use seed `S + k - 1` for run k, as `studies/episodic-v2` does. **Justify
   mode** sets `%justify-mode%` in the driver, as Metacat's GUI does (`gui.ss:752`).
+
+## Decisions taken after the pass (2026-10-28)
+
+* **State snapshots are counted, and the ratchet keeps the count.** The comparer always
+  compared snapshots, but only decision errors reached the corpus table and the
+  ratchet, so a difference in state that changed no decision went unreported. The
+  comparer now also counts the snapshots that differ outside the representational
+  sections (`REPRESENTATIONAL_SNAPSHOT_PATHS`, today only `structures.proposed`), the
+  corpus driver prints it as `snaps`, and the ratchet treats a rise in it like a rise
+  in errors. Ratchet entries written before the count existed are not held to it.
+* **A tie replay cannot break is recorded, not registered.** One development trace
+  differs in a description's time stamp because two builders for the same description
+  were indistinguishable in everything the recorder logs (`DISCREPANCIES5.md` G-T3).
+  Registering it would hide the next one, so it stays visible in the count.
+* **The numeric backends are replayed too.** Faithful mode keeps the backend off, which
+  left the arithmetic Petacat runs by default (MLX) outside the comparison, and the
+  spreading fix of DISCREPANCIES5 B-1 had not reached it. `PETACAT_LOCKSTEP_NUMERIC_BACKEND`
+  (`--numeric-backend` on `run_trace` and `lockstep_corpus.py`) runs faithful mode with a
+  named backend. Such a run is checked against the same ratchet, because the backend is
+  meant to change nothing, and it never writes one.

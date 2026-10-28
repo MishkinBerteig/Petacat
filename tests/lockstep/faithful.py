@@ -1,7 +1,8 @@
 """Faithful mode (spec §6.1): one problem and seed, run the way the trace compares.
 
 Sequential ``EngineRunner`` (no free-running, shards or splittable RNG), the numeric
-backend off (the engine's own float64 object-graph loops), fresh episodic memory, the
+backend off (the engine's own float64 object-graph loops) unless
+``PETACAT_LOCKSTEP_NUMERIC_BACKEND`` names one, fresh episodic memory, the
 standard ``RNG`` interface (a tracing or replaying subclass is passed in), Metacat's
 codelet cap, and the decision-changing mechanisms that have a switch set to Metacat's
 value.  Defaults the spec says to keep (spreading threshold 100, staleness delay 0,
@@ -11,6 +12,7 @@ access tracking off, self-watching on) are simply left alone.
 from __future__ import annotations
 
 import functools
+import os
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -29,22 +31,28 @@ DEFAULT_CAP = 100_000
 #: instead of on an update-cycle countdown.
 FAITHFUL_PARAMETERS: dict[str, Any] = {"initial_clamp_fixed_time": True}
 
+#: Names the numeric backend a faithful run uses instead of ``off`` (``python``,
+#: ``numpy``, ``mlx``, ``mlx-cpu``).  ``scripts/lockstep_corpus.py --numeric-backend``
+#: sets it, so the substrate Petacat runs by default is replayed against Metacat too.
+NUMERIC_BACKEND_ENV = "PETACAT_LOCKSTEP_NUMERIC_BACKEND"
+
+
+def numeric_backend() -> str:
+    return os.environ.get(NUMERIC_BACKEND_ENV) or "off"
+
 
 def faithful_settings() -> dict[str, Any]:
     """The values recorded in a trace header's ``settings`` (informational)."""
     return {
         "runner": "EngineRunner",
         "rng": "RNG",
-        "numeric_backend": "off",
+        "numeric_backend": numeric_backend(),
         "memory": "fresh",  # an episode carries one memory across its runs
         "parameters": dict(FAITHFUL_PARAMETERS),
         "spreading_activation_threshold": 100,
         "staleness_delay": 0,
         "access_tracking": False,
         "self_watching": True,
-        # No switch exists for this one (DISCREPANCIES5.md B-2); recorded so a report
-        # can say the deviation was in force.
-        "themes_created_up_front": True,
     }
 
 
@@ -120,7 +128,7 @@ def run_faithful(problem: tuple[str, str, str], seed: int, cap: int, rng: Any,
     )
 
     runner = EngineRunner(_metadata())
-    with use_backend("off"):
+    with use_backend(numeric_backend()):
         try:
             runner.init_mcat(
                 *problem, answer=answer, seed=seed,

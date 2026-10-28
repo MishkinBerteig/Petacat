@@ -148,16 +148,21 @@ stopping states is a different engine, not a refactor.
 *how often* each is reached. Petacat gave up on `abc→abd;xyz` at 22.5% against Metacat's
 10.9% — a 2× skew, decisive at n=1000 — and the oracle reported "0 missing, 0 novel" the
 whole time, because `gave_up` is in both sets. The root cause was three arithmetic
-divergences inside one function (D-10 in `DISCREPANCIES5.md`).
+divergences inside one function (D-10 in `DISCREPANCIES5.md`), since fixed.
 
 Two consequences for the work below:
 
 - A green oracle is necessary, not sufficient. Where a change could plausibly move a
   *rate*, measure the distribution over several hundred seeds and compare it to a real
   Metacat run, not just the stopping-state set.
-- Two other frequency divergences on this problem are open and unexplained: `xyd` at
-  22.2% against a reference 37.1%, and `xyz` at 24.7% against 15.8%. Those are a
-  different mechanism from the give-up rate, which moved without moving them.
+- The two other frequency divergences this paragraph used to list on this problem
+  (`xyd` at 22.2% against 37.1%, `xyz` at 24.7% against 15.8%) were closed by the
+  lockstep pass: 37.5% against 36.6% and 18.0% against 16.7%, with no significant
+  difference on any of the 19 problems
+  (`measurements/vs-metacat-support-v1a-lockstep.md`). That is the baseline a rate
+  is now measured against, and `scripts/lockstep_corpus.py --check-ratchet` is the
+  sharper test: a change that is meant to leave cognition alone must leave every
+  recorded Metacat decision paired.
 
 ### 0.6 Why this phase owns it
 
@@ -179,6 +184,14 @@ and nine engine parameters are read from the database, each with a guard test in
 directions. This subsection is the remainder, found by auditing what the engine reads
 rather than by working from §0.2's list, and it is larger than §0.2 was.
 
+**Re-audit before starting.** The counts below predate the lockstep pass of
+2026-10-27/28, which deleted `formulas.py`'s dead `current_translation_temperature_threshold`
+(dead in the Scheme too: `formulas.ss:38` defines only the distribution) and its dead
+`single_letter_group_probability` (`DISCREPANCIES5.md` D-3). The four
+`translation_temp_bond_density_*` coefficients therefore have no reader at all now, and
+`get_formula_coeff` call sites over `server/` and the codelet bodies in
+`seed_data/codelet_types.json` name **29** keys, not 32.
+
 `seed_data/formula_coefficients.json` holds **79** keys. All 79 are loaded into
 `MetadataProvider.formula_coefficients` (`metadata.py:209`), exposed through the admin
 API (`admin.py:623-670`) and folded into the config hash (`hashing.py:83`).
@@ -195,13 +208,16 @@ read it" — in a table §0.2 did not look at.
 #### The two hazards specific to this work
 
 **Backend copies.** Nine of the 44 have a duplicate in each numeric backend
-(`python_backend.py`, `numpy_backend.py`, `mlx_backend.py`). The vectorised paths
-dispatch above `DEFAULT_VECTORISE_THRESHOLD = 512` (`numeric/backend.py:140`) — the
-shipped 59-node Slipnet and 81 themes are both below it, so **a stale copy in a backend
-is invisible to the whole suite at default size**. Every slice that touches one must be
-re-run with the threshold lowered, and once per forced backend. The one mercy: the Metal
-kernel holds no coefficient of its own; its tunables arrive through the `params` buffer,
-already parameterised.
+(`python_backend.py`, `numpy_backend.py`, `mlx_backend.py`). A stale copy is not
+invisible: the default policy runs the MLX backend at every Slipnet size
+(`numeric/backend.py`, `select_backend`), so it changes every default run, while
+faithful mode and much of the suite run with the backend off and never see it. That is
+how the spreading arithmetic of `DISCREPANCIES5.md` B-1 stayed wrong in all three
+backends after the engine's own loop was fixed. Every slice that touches a backend copy
+must be re-run once per forced backend, and the lockstep corpora replayed with
+`scripts/lockstep_corpus.py --numeric-backend mlx --check-ratchet`. The one mercy: the
+Metal kernel holds no coefficient of its own; its tunables arrive through the `params`
+buffer, already parameterised.
 
 **Three seeded values disagree with the code.** `enclosed_group_importance_factor` is
 `0.667` in the seed and `2.0/3.0` in the code; likewise `edge_object_bond_factor`
@@ -574,10 +590,10 @@ the cognition the model specifies. Two things make this cheaper than it was when
 item was written: `max_coderack_size` is now a **per-Run parameter**, so a sweep is four
 run configurations rather than four global reconfigurations; and a single spot-check at
 300 is already recorded in Phase 0 (`answer_found`, 863 codelets, `mrrjjk`), which is
-one data point but not a set comparison. The one piece of work it does need first:
-`compare_to_metacat.py` takes `--mode`, `--tries`, `--runs`, `--start-seed`, `--backend`
-and `--only`, but has no way to set an engine parameter, so it needs a passthrough
-before it can express this sweep at all.
+one data point but not a set comparison. The one piece of work it needed first is done:
+`compare_to_metacat.py` takes `--param NAME=VALUE` as well as `--mode`, `--tries`,
+`--runs`, `--start-seed`, `--backend` and `--only`, so the sweep is
+`--param max_coderack_size=200` and so on.
 
 **Read the sweep as a cognition result, not a capacity result.** A larger rack is
 expected to move the distribution — it is why the parameter is per-Run — so the question

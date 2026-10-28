@@ -1,0 +1,2063 @@
+{
+  "source": {
+    "archive": "studies/support-v1a/data/main.tar.gz",
+    "sha256": "f9b7928daf2a698f06fa31953673d8282ed2792b9a7fab4b0ae403fecc15b48f",
+    "phases": [
+      "construction",
+      "validation"
+    ],
+    "duplicate_seeds_dropped": 375
+  },
+  "definition": "A run's stopping state, from a fresh Episodic Memory at a 100,000-codelet cap: the answer, *NONE*, *CAP* or *ERROR*. Metacat's construction and validation observations of study support-v1a; derived by scripts/make_reference_sets.py.",
+  "results": [
+    {
+      "name": "copy1",
+      "problem": [
+        "copy1",
+        "ab",
+        "c",
+        "ab"
+      ],
+      "n": 50000,
+      "runs_per_phase": {
+        "construction": 20000,
+        "validation": 30000
+      },
+      "distinct": 4,
+      "f1": 1,
+      "f1_over_n": 2e-05,
+      "set": {
+        "c": {
+          "count": 43057,
+          "share": 0.86114
+        },
+        "ab": {
+          "count": 6940,
+          "share": 0.1388
+        },
+        "*NONE*": {
+          "count": 2,
+          "share": 4e-05
+        },
+        "b": {
+          "count": 1,
+          "share": 2e-05
+        }
+      }
+    },
+    {
+      "name": "copy2",
+      "problem": [
+        "copy2",
+        "bc",
+        "d",
+        "bc"
+      ],
+      "n": 50000,
+      "runs_per_phase": {
+        "construction": 20000,
+        "validation": 30000
+      },
+      "distinct": 3,
+      "f1": 1,
+      "f1_over_n": 2e-05,
+      "set": {
+        "d": {
+          "count": 49997,
+          "share": 0.99994
+        },
+        "*NONE*": {
+          "count": 2,
+          "share": 4e-05
+        },
+        "a": {
+          "count": 1,
+          "share": 2e-05
+        }
+      }
+    },
+    {
+      "name": "copy3",
+      "problem": [
+        "copy3",
+        "xy",
+        "z",
+        "xy"
+      ],
+      "n": 50000,
+      "runs_per_phase": {
+        "construction": 20000,
+        "validation": 30000
+      },
+      "distinct": 4,
+      "f1": 2,
+      "f1_over_n": 4e-05,
+      "set": {
+        "z": {
+          "count": 49996,
+          "share": 0.99992
+        },
+        "*NONE*": {
+          "count": 2,
+          "share": 4e-05
+        },
+        "w": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "y": {
+          "count": 1,
+          "share": 2e-05
+        }
+      }
+    },
+    {
+      "name": "copy4",
+      "problem": [
+        "copy4",
+        "zy",
+        "x",
+        "zy"
+      ],
+      "n": 50000,
+      "runs_per_phase": {
+        "construction": 20000,
+        "validation": 30000
+      },
+      "distinct": 3,
+      "f1": 0,
+      "f1_over_n": 0.0,
+      "set": {
+        "x": {
+          "count": 43349,
+          "share": 0.86698
+        },
+        "zy": {
+          "count": 6648,
+          "share": 0.13296
+        },
+        "*NONE*": {
+          "count": 3,
+          "share": 6e-05
+        }
+      }
+    },
+    {
+      "name": "copy5",
+      "problem": [
+        "copy5",
+        "aabb",
+        "cc",
+        "aabb"
+      ],
+      "n": 50000,
+      "runs_per_phase": {
+        "construction": 20000,
+        "validation": 30000
+      },
+      "distinct": 16,
+      "f1": 0,
+      "f1_over_n": 0.0,
+      "set": {
+        "cc": {
+          "count": 24949,
+          "share": 0.49898
+        },
+        "*NONE*": {
+          "count": 24050,
+          "share": 0.481
+        },
+        "ccc": {
+          "count": 306,
+          "share": 0.00612
+        },
+        "*CAP*": {
+          "count": 299,
+          "share": 0.00598
+        },
+        "ccbb": {
+          "count": 148,
+          "share": 0.00296
+        },
+        "a": {
+          "count": 142,
+          "share": 0.00284
+        },
+        "aabb": {
+          "count": 40,
+          "share": 0.0008
+        },
+        "ac": {
+          "count": 24,
+          "share": 0.00048
+        },
+        "cac": {
+          "count": 8,
+          "share": 0.00016
+        },
+        "aac": {
+          "count": 7,
+          "share": 0.00014
+        },
+        "cb": {
+          "count": 6,
+          "share": 0.00012
+        },
+        "cbc": {
+          "count": 6,
+          "share": 0.00012
+        },
+        "cccc": {
+          "count": 6,
+          "share": 0.00012
+        },
+        "b": {
+          "count": 4,
+          "share": 8e-05
+        },
+        "ab": {
+          "count": 3,
+          "share": 6e-05
+        },
+        "cbb": {
+          "count": 2,
+          "share": 4e-05
+        }
+      }
+    },
+    {
+      "name": "copy6",
+      "problem": [
+        "copy6",
+        "abc",
+        "d",
+        "abc"
+      ],
+      "n": 50000,
+      "runs_per_phase": {
+        "construction": 20000,
+        "validation": 30000
+      },
+      "distinct": 5,
+      "f1": 0,
+      "f1_over_n": 0.0,
+      "set": {
+        "d": {
+          "count": 43332,
+          "share": 0.86664
+        },
+        "abc": {
+          "count": 6634,
+          "share": 0.13268
+        },
+        "dc": {
+          "count": 17,
+          "share": 0.00034
+        },
+        "*NONE*": {
+          "count": 15,
+          "share": 0.0003
+        },
+        "dbc": {
+          "count": 2,
+          "share": 4e-05
+        }
+      }
+    },
+    {
+      "name": "eqe-baaab",
+      "problem": [
+        "eqe-baaab",
+        "eqe",
+        "qeq",
+        "abbba"
+      ],
+      "n": 50000,
+      "runs_per_phase": {
+        "construction": 20000,
+        "validation": 30000
+      },
+      "distinct": 57,
+      "f1": 20,
+      "f1_over_n": 0.0004,
+      "set": {
+        "baaab": {
+          "count": 29283,
+          "share": 0.58566
+        },
+        "qeeeq": {
+          "count": 13041,
+          "share": 0.26082
+        },
+        "qbbbq": {
+          "count": 2109,
+          "share": 0.04218
+        },
+        "baaaq": {
+          "count": 1381,
+          "share": 0.02762
+        },
+        "qaaab": {
+          "count": 1287,
+          "share": 0.02574
+        },
+        "abbba": {
+          "count": 1189,
+          "share": 0.02378
+        },
+        "qeq": {
+          "count": 881,
+          "share": 0.01762
+        },
+        "abbbq": {
+          "count": 194,
+          "share": 0.00388
+        },
+        "qbbba": {
+          "count": 191,
+          "share": 0.00382
+        },
+        "*NONE*": {
+          "count": 84,
+          "share": 0.00168
+        },
+        "bcaab": {
+          "count": 75,
+          "share": 0.0015
+        },
+        "baacb": {
+          "count": 63,
+          "share": 0.00126
+        },
+        "qbebq": {
+          "count": 33,
+          "share": 0.00066
+        },
+        "qreeq": {
+          "count": 20,
+          "share": 0.0004
+        },
+        "baccb": {
+          "count": 18,
+          "share": 0.00036
+        },
+        "qrrrq": {
+          "count": 17,
+          "share": 0.00034
+        },
+        "qeerq": {
+          "count": 16,
+          "share": 0.00032
+        },
+        "bccab": {
+          "count": 11,
+          "share": 0.00022
+        },
+        "pqqqq": {
+          "count": 11,
+          "share": 0.00022
+        },
+        "bbabq": {
+          "count": 9,
+          "share": 0.00018
+        },
+        "qqqqp": {
+          "count": 9,
+          "share": 0.00018
+        },
+        "qeebq": {
+          "count": 7,
+          "share": 0.00014
+        },
+        "pqeeq": {
+          "count": 6,
+          "share": 0.00012
+        },
+        "qeeqp": {
+          "count": 6,
+          "share": 0.00012
+        },
+        "qrbbq": {
+          "count": 6,
+          "share": 0.00012
+        },
+        "pqqeq": {
+          "count": 4,
+          "share": 8e-05
+        },
+        "qerrq": {
+          "count": 4,
+          "share": 8e-05
+        },
+        "baarq": {
+          "count": 3,
+          "share": 6e-05
+        },
+        "bbaab": {
+          "count": 3,
+          "share": 6e-05
+        },
+        "qbabb": {
+          "count": 3,
+          "share": 6e-05
+        },
+        "qbqqp": {
+          "count": 3,
+          "share": 6e-05
+        },
+        "qrreq": {
+          "count": 3,
+          "share": 6e-05
+        },
+        "aqqqp": {
+          "count": 2,
+          "share": 4e-05
+        },
+        "baabb": {
+          "count": 2,
+          "share": 4e-05
+        },
+        "bcaaq": {
+          "count": 2,
+          "share": 4e-05
+        },
+        "pqbba": {
+          "count": 2,
+          "share": 4e-05
+        },
+        "qbbrq": {
+          "count": 2,
+          "share": 4e-05
+        },
+        "abbqp": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "arrrq": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "baabq": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "baaqp": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "babbb": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "baqqp": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "barrq": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "bbaaq": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "bbabb": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "bbbab": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "bcacb": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "pqqab": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "pqqba": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "pqqqa": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "qaacb": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "qbbab": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "qbbqp": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "qeqqp": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "qraab": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "qrrbq": {
+          "count": 1,
+          "share": 2e-05
+        }
+      }
+    },
+    {
+      "name": "fig5.4-top",
+      "problem": [
+        "fig5.4-top",
+        "eeqee",
+        "qeeq",
+        "xxixx"
+      ],
+      "n": 50000,
+      "runs_per_phase": {
+        "construction": 20000,
+        "validation": 30000
+      },
+      "distinct": 55,
+      "f1": 11,
+      "f1_over_n": 0.00022,
+      "set": {
+        "qeeq": {
+          "count": 24155,
+          "share": 0.4831
+        },
+        "ixxi": {
+          "count": 13910,
+          "share": 0.2782
+        },
+        "*NONE*": {
+          "count": 7132,
+          "share": 0.14264
+        },
+        "ixxq": {
+          "count": 1770,
+          "share": 0.0354
+        },
+        "qxxi": {
+          "count": 1719,
+          "share": 0.03438
+        },
+        "qiq": {
+          "count": 485,
+          "share": 0.0097
+        },
+        "qeexq": {
+          "count": 154,
+          "share": 0.00308
+        },
+        "qxeeq": {
+          "count": 137,
+          "share": 0.00274
+        },
+        "qixx": {
+          "count": 56,
+          "share": 0.00112
+        },
+        "ixxxii": {
+          "count": 49,
+          "share": 0.00098
+        },
+        "qiiq": {
+          "count": 46,
+          "share": 0.00092
+        },
+        "xxiq": {
+          "count": 45,
+          "share": 0.0009
+        },
+        "iixxxi": {
+          "count": 37,
+          "share": 0.00074
+        },
+        "ixi": {
+          "count": 37,
+          "share": 0.00074
+        },
+        "xxixx": {
+          "count": 24,
+          "share": 0.00048
+        },
+        "qxeq": {
+          "count": 23,
+          "share": 0.00046
+        },
+        "qxxxi": {
+          "count": 23,
+          "share": 0.00046
+        },
+        "qexq": {
+          "count": 22,
+          "share": 0.00044
+        },
+        "iiiixxi": {
+          "count": 20,
+          "share": 0.0004
+        },
+        "qxiq": {
+          "count": 15,
+          "share": 0.0003
+        },
+        "ixxxq": {
+          "count": 14,
+          "share": 0.00028
+        },
+        "qixq": {
+          "count": 12,
+          "share": 0.00024
+        },
+        "ixxiiii": {
+          "count": 10,
+          "share": 0.0002
+        },
+        "qqiq": {
+          "count": 10,
+          "share": 0.0002
+        },
+        "ixxxi": {
+          "count": 8,
+          "share": 0.00016
+        },
+        "qqxeeq": {
+          "count": 8,
+          "share": 0.00016
+        },
+        "ixxii": {
+          "count": 7,
+          "share": 0.00014
+        },
+        "qiqq": {
+          "count": 7,
+          "share": 0.00014
+        },
+        "iixxi": {
+          "count": 6,
+          "share": 0.00012
+        },
+        "qqiqq": {
+          "count": 5,
+          "share": 0.0001
+        },
+        "qxexq": {
+          "count": 5,
+          "share": 0.0001
+        },
+        "qxi": {
+          "count": 5,
+          "share": 0.0001
+        },
+        "ixq": {
+          "count": 4,
+          "share": 8e-05
+        },
+        "qeexqq": {
+          "count": 4,
+          "share": 8e-05
+        },
+        "xixxx": {
+          "count": 4,
+          "share": 8e-05
+        },
+        "qeexx": {
+          "count": 3,
+          "share": 6e-05
+        },
+        "qix": {
+          "count": 3,
+          "share": 6e-05
+        },
+        "xiiq": {
+          "count": 3,
+          "share": 6e-05
+        },
+        "qeqq": {
+          "count": 2,
+          "share": 4e-05
+        },
+        "qqeqq": {
+          "count": 2,
+          "share": 4e-05
+        },
+        "qqqeeqqq": {
+          "count": 2,
+          "share": 4e-05
+        },
+        "qxeexq": {
+          "count": 2,
+          "share": 4e-05
+        },
+        "xiix": {
+          "count": 2,
+          "share": 4e-05
+        },
+        "xxixq": {
+          "count": 2,
+          "share": 4e-05
+        },
+        "ixii": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "ixxxx": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "qiix": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "qqeq": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "qqqeeq": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "qqxxiiq": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "qxixq": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "xiq": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "xix": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "xxeeq": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "xxxix": {
+          "count": 1,
+          "share": 2e-05
+        }
+      }
+    },
+    {
+      "name": "fig5.7",
+      "problem": [
+        "fig5.7",
+        "aabc",
+        "aabd",
+        "ijkk"
+      ],
+      "n": 50000,
+      "runs_per_phase": {
+        "construction": 20000,
+        "validation": 30000
+      },
+      "distinct": 22,
+      "f1": 3,
+      "f1_over_n": 6e-05,
+      "set": {
+        "ijll": {
+          "count": 23309,
+          "share": 0.46618
+        },
+        "ijkl": {
+          "count": 17677,
+          "share": 0.35354
+        },
+        "ijl": {
+          "count": 4343,
+          "share": 0.08686
+        },
+        "jjkk": {
+          "count": 1110,
+          "share": 0.0222
+        },
+        "ijkk": {
+          "count": 1052,
+          "share": 0.02104
+        },
+        "hjkk": {
+          "count": 1012,
+          "share": 0.02024
+        },
+        "ijdd": {
+          "count": 496,
+          "share": 0.00992
+        },
+        "ijkd": {
+          "count": 398,
+          "share": 0.00796
+        },
+        "aabd": {
+          "count": 189,
+          "share": 0.00378
+        },
+        "ijkkk": {
+          "count": 165,
+          "share": 0.0033
+        },
+        "ijd": {
+          "count": 119,
+          "share": 0.00238
+        },
+        "djkk": {
+          "count": 58,
+          "share": 0.00116
+        },
+        "ikll": {
+          "count": 23,
+          "share": 0.00046
+        },
+        "jkkk": {
+          "count": 23,
+          "share": 0.00046
+        },
+        "ijkklll": {
+          "count": 9,
+          "share": 0.00018
+        },
+        "hikk": {
+          "count": 6,
+          "share": 0.00012
+        },
+        "*NONE*": {
+          "count": 3,
+          "share": 6e-05
+        },
+        "ik": {
+          "count": 3,
+          "share": 6e-05
+        },
+        "ijk": {
+          "count": 2,
+          "share": 4e-05
+        },
+        "dekk": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "idee": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "il": {
+          "count": 1,
+          "share": 2e-05
+        }
+      }
+    },
+    {
+      "name": "misc1",
+      "problem": [
+        "misc1",
+        "abc",
+        "cba",
+        "mrrjjj"
+      ],
+      "n": 50000,
+      "runs_per_phase": {
+        "construction": 20000,
+        "validation": 30000
+      },
+      "distinct": 20,
+      "f1": 5,
+      "f1_over_n": 0.0001,
+      "set": {
+        "jjjrrm": {
+          "count": 42511,
+          "share": 0.85022
+        },
+        "mrrjjj": {
+          "count": 4306,
+          "share": 0.08612
+        },
+        "jrrmmm": {
+          "count": 1345,
+          "share": 0.0269
+        },
+        "jrrjjm": {
+          "count": 1260,
+          "share": 0.0252
+        },
+        "mmmrrj": {
+          "count": 272,
+          "share": 0.00544
+        },
+        "jjrrjm": {
+          "count": 128,
+          "share": 0.00256
+        },
+        "cba": {
+          "count": 51,
+          "share": 0.00102
+        },
+        "crraaa": {
+          "count": 34,
+          "share": 0.00068
+        },
+        "jjjrmm": {
+          "count": 29,
+          "share": 0.00058
+        },
+        "rrjjjm": {
+          "count": 23,
+          "share": 0.00046
+        },
+        "jjjmrr": {
+          "count": 20,
+          "share": 0.0004
+        },
+        "jjjrmr": {
+          "count": 5,
+          "share": 0.0001
+        },
+        "mrraaa": {
+          "count": 5,
+          "share": 0.0001
+        },
+        "crrjja": {
+          "count": 4,
+          "share": 8e-05
+        },
+        "*ERROR*": {
+          "count": 2,
+          "share": 4e-05
+        },
+        "crrjjj": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "jjrrmj": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "mrrjaa": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "mrrjja": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "nrraaa": {
+          "count": 1,
+          "share": 2e-05
+        }
+      }
+    },
+    {
+      "name": "misc2",
+      "problem": [
+        "misc2",
+        "abc",
+        "abd",
+        "ijk"
+      ],
+      "n": 50000,
+      "runs_per_phase": {
+        "construction": 20000,
+        "validation": 30000
+      },
+      "distinct": 10,
+      "f1": 4,
+      "f1_over_n": 8e-05,
+      "set": {
+        "ijl": {
+          "count": 47599,
+          "share": 0.95198
+        },
+        "ijd": {
+          "count": 1124,
+          "share": 0.02248
+        },
+        "ijk": {
+          "count": 1053,
+          "share": 0.02106
+        },
+        "abd": {
+          "count": 190,
+          "share": 0.0038
+        },
+        "*NONE*": {
+          "count": 18,
+          "share": 0.00036
+        },
+        "ikl": {
+          "count": 12,
+          "share": 0.00024
+        },
+        "hjk": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "jjjl": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "jjk": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "kjd": {
+          "count": 1,
+          "share": 2e-05
+        }
+      }
+    },
+    {
+      "name": "misc3",
+      "problem": [
+        "misc3",
+        "abc",
+        "aabbcc",
+        "kkjjii"
+      ],
+      "n": 50000,
+      "runs_per_phase": {
+        "construction": 20000,
+        "validation": 30000
+      },
+      "distinct": 70,
+      "f1": 17,
+      "f1_over_n": 0.00034,
+      "set": {
+        "kkjjii": {
+          "count": 16458,
+          "share": 0.32916
+        },
+        "kkkjjjiii": {
+          "count": 13002,
+          "share": 0.26004
+        },
+        "kji": {
+          "count": 8503,
+          "share": 0.17006
+        },
+        "*CAP*": {
+          "count": 5701,
+          "share": 0.11402
+        },
+        "kkjjjiii": {
+          "count": 1063,
+          "share": 0.02126
+        },
+        "aabbcc": {
+          "count": 923,
+          "share": 0.01846
+        },
+        "kkkjjiii": {
+          "count": 678,
+          "share": 0.01356
+        },
+        "kkkjjjii": {
+          "count": 303,
+          "share": 0.00606
+        },
+        "kkjjiii": {
+          "count": 272,
+          "share": 0.00544
+        },
+        "kkjjiiiii": {
+          "count": 263,
+          "share": 0.00526
+        },
+        "kkkjjiihh": {
+          "count": 246,
+          "share": 0.00492
+        },
+        "*NONE*": {
+          "count": 209,
+          "share": 0.00418
+        },
+        "kkkji": {
+          "count": 184,
+          "share": 0.00368
+        },
+        "kjjjiii": {
+          "count": 172,
+          "share": 0.00344
+        },
+        "kjjji": {
+          "count": 167,
+          "share": 0.00334
+        },
+        "kkjjjii": {
+          "count": 165,
+          "share": 0.0033
+        },
+        "kjiii": {
+          "count": 162,
+          "share": 0.00324
+        },
+        "kkkkjjiii": {
+          "count": 154,
+          "share": 0.00308
+        },
+        "kkkjjji": {
+          "count": 143,
+          "share": 0.00286
+        },
+        "kkkjiii": {
+          "count": 142,
+          "share": 0.00284
+        },
+        "kkkjjii": {
+          "count": 130,
+          "share": 0.0026
+        },
+        "kkkjjjjiii": {
+          "count": 106,
+          "share": 0.00212
+        },
+        "kkjjji": {
+          "count": 78,
+          "share": 0.00156
+        },
+        "kkji": {
+          "count": 62,
+          "share": 0.00124
+        },
+        "kkkkkjjii": {
+          "count": 56,
+          "share": 0.00112
+        },
+        "kjji": {
+          "count": 54,
+          "share": 0.00108
+        },
+        "kkkjji": {
+          "count": 52,
+          "share": 0.00104
+        },
+        "kkjjjiiiii": {
+          "count": 51,
+          "share": 0.00102
+        },
+        "kjjiii": {
+          "count": 47,
+          "share": 0.00094
+        },
+        "kkkkjjii": {
+          "count": 39,
+          "share": 0.00078
+        },
+        "kkjjjjii": {
+          "count": 38,
+          "share": 0.00076
+        },
+        "kjjjii": {
+          "count": 36,
+          "share": 0.00072
+        },
+        "llkkjjiii": {
+          "count": 36,
+          "share": 0.00072
+        },
+        "kkkkjjjii": {
+          "count": 34,
+          "share": 0.00068
+        },
+        "kjii": {
+          "count": 33,
+          "share": 0.00066
+        },
+        "kkjiii": {
+          "count": 33,
+          "share": 0.00066
+        },
+        "kkjji": {
+          "count": 33,
+          "share": 0.00066
+        },
+        "kkkjjiiii": {
+          "count": 32,
+          "share": 0.00064
+        },
+        "lllkkjjjiii": {
+          "count": 17,
+          "share": 0.00034
+        },
+        "kkkjii": {
+          "count": 14,
+          "share": 0.00028
+        },
+        "kkjjiiii": {
+          "count": 13,
+          "share": 0.00026
+        },
+        "kkkkjjjiii": {
+          "count": 13,
+          "share": 0.00026
+        },
+        "jii": {
+          "count": 12,
+          "share": 0.00024
+        },
+        "kjjii": {
+          "count": 11,
+          "share": 0.00022
+        },
+        "kkjjiiiiii": {
+          "count": 8,
+          "share": 0.00016
+        },
+        "kkjii": {
+          "count": 7,
+          "share": 0.00014
+        },
+        "kkkjjjiiii": {
+          "count": 7,
+          "share": 0.00014
+        },
+        "kkkkkkkjjii": {
+          "count": 5,
+          "share": 0.0001
+        },
+        "llkkjjiiii": {
+          "count": 5,
+          "share": 0.0001
+        },
+        "kkkjjjiihhh": {
+          "count": 4,
+          "share": 8e-05
+        },
+        "kkkkjjiihh": {
+          "count": 3,
+          "share": 6e-05
+        },
+        "kkkkkkjjii": {
+          "count": 2,
+          "share": 4e-05
+        },
+        "kkkkkkjjiii": {
+          "count": 2,
+          "share": 4e-05
+        },
+        "*ERROR*": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "jjiii": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "jjjii": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "kkjjiihh": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "kkkjjiiiihhgg": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "kkkjjiiiiii": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "kkkjjjj": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "kkkjjjjiiii": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "kkkkiii": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "kkkkkiii": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "lkjjii": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "lljjii": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "lljjjiii": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "llkkii": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "lllkkjii": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "lllkkjjii": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "lllkkjjiii": {
+          "count": 1,
+          "share": 2e-05
+        }
+      }
+    },
+    {
+      "name": "misc4",
+      "problem": [
+        "misc4",
+        "a",
+        "b",
+        "z"
+      ],
+      "n": 50000,
+      "runs_per_phase": {
+        "construction": 20000,
+        "validation": 30000
+      },
+      "distinct": 4,
+      "f1": 0,
+      "f1_over_n": 0.0,
+      "set": {
+        "b": {
+          "count": 25257,
+          "share": 0.50514
+        },
+        "z": {
+          "count": 18201,
+          "share": 0.36402
+        },
+        "y": {
+          "count": 4980,
+          "share": 0.0996
+        },
+        "*NONE*": {
+          "count": 1562,
+          "share": 0.03124
+        }
+      }
+    },
+    {
+      "name": "misc5",
+      "problem": [
+        "misc5",
+        "abc",
+        "abd",
+        "glz"
+      ],
+      "n": 50000,
+      "runs_per_phase": {
+        "construction": 20000,
+        "validation": 30000
+      },
+      "distinct": 8,
+      "f1": 0,
+      "f1_over_n": 0.0,
+      "set": {
+        "gld": {
+          "count": 12792,
+          "share": 0.25584
+        },
+        "hlz": {
+          "count": 11431,
+          "share": 0.22862
+        },
+        "glz": {
+          "count": 9635,
+          "share": 0.1927
+        },
+        "flz": {
+          "count": 8652,
+          "share": 0.17304
+        },
+        "dlz": {
+          "count": 3975,
+          "share": 0.0795
+        },
+        "*NONE*": {
+          "count": 2576,
+          "share": 0.05152
+        },
+        "abd": {
+          "count": 934,
+          "share": 0.01868
+        },
+        "*CAP*": {
+          "count": 5,
+          "share": 0.0001
+        }
+      }
+    },
+    {
+      "name": "run1",
+      "problem": [
+        "run1",
+        "abc",
+        "abd",
+        "mrrjjj"
+      ],
+      "n": 50000,
+      "runs_per_phase": {
+        "construction": 20000,
+        "validation": 30000
+      },
+      "distinct": 12,
+      "f1": 1,
+      "f1_over_n": 2e-05,
+      "set": {
+        "mrrkkk": {
+          "count": 31515,
+          "share": 0.6303
+        },
+        "mrrjjk": {
+          "count": 11274,
+          "share": 0.22548
+        },
+        "mrrjjjj": {
+          "count": 2192,
+          "share": 0.04384
+        },
+        "mrrjjj": {
+          "count": 1688,
+          "share": 0.03376
+        },
+        "mrrjkk": {
+          "count": 1107,
+          "share": 0.02214
+        },
+        "mrrddd": {
+          "count": 1076,
+          "share": 0.02152
+        },
+        "abd": {
+          "count": 617,
+          "share": 0.01234
+        },
+        "mrrjjd": {
+          "count": 433,
+          "share": 0.00866
+        },
+        "mrrjdd": {
+          "count": 43,
+          "share": 0.00086
+        },
+        "msskkk": {
+          "count": 33,
+          "share": 0.00066
+        },
+        "*NONE*": {
+          "count": 21,
+          "share": 0.00042
+        },
+        "lrrjjj": {
+          "count": 1,
+          "share": 2e-05
+        }
+      }
+    },
+    {
+      "name": "run2",
+      "problem": [
+        "run2",
+        "xqc",
+        "xqd",
+        "mrrjjj"
+      ],
+      "n": 50000,
+      "runs_per_phase": {
+        "construction": 20000,
+        "validation": 30000
+      },
+      "distinct": 13,
+      "f1": 2,
+      "f1_over_n": 4e-05,
+      "set": {
+        "mrrkkk": {
+          "count": 34321,
+          "share": 0.68642
+        },
+        "mrrjjk": {
+          "count": 10672,
+          "share": 0.21344
+        },
+        "mrrjkk": {
+          "count": 1564,
+          "share": 0.03128
+        },
+        "mrrjjj": {
+          "count": 1529,
+          "share": 0.03058
+        },
+        "mrrddd": {
+          "count": 1260,
+          "share": 0.0252
+        },
+        "mrrjjd": {
+          "count": 471,
+          "share": 0.00942
+        },
+        "xqd": {
+          "count": 105,
+          "share": 0.0021
+        },
+        "mrrjdd": {
+          "count": 52,
+          "share": 0.00104
+        },
+        "*NONE*": {
+          "count": 18,
+          "share": 0.00036
+        },
+        "lrrjjj": {
+          "count": 3,
+          "share": 6e-05
+        },
+        "nrrjjj": {
+          "count": 3,
+          "share": 6e-05
+        },
+        "msskkk": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "xxxrrd": {
+          "count": 1,
+          "share": 2e-05
+        }
+      }
+    },
+    {
+      "name": "run3",
+      "problem": [
+        "run3",
+        "rst",
+        "rsu",
+        "xyz"
+      ],
+      "n": 50000,
+      "runs_per_phase": {
+        "construction": 20000,
+        "validation": 30000
+      },
+      "distinct": 17,
+      "f1": 2,
+      "f1_over_n": 4e-05,
+      "set": {
+        "xyu": {
+          "count": 19238,
+          "share": 0.38476
+        },
+        "wyz": {
+          "count": 9801,
+          "share": 0.19602
+        },
+        "xyz": {
+          "count": 8161,
+          "share": 0.16322
+        },
+        "*NONE*": {
+          "count": 5826,
+          "share": 0.11652
+        },
+        "yyz": {
+          "count": 2867,
+          "share": 0.05734
+        },
+        "uyz": {
+          "count": 2799,
+          "share": 0.05598
+        },
+        "rsu": {
+          "count": 1247,
+          "share": 0.02494
+        },
+        "wxz": {
+          "count": 21,
+          "share": 0.00042
+        },
+        "yzz": {
+          "count": 15,
+          "share": 0.0003
+        },
+        "uvz": {
+          "count": 12,
+          "share": 0.00024
+        },
+        "uyr": {
+          "count": 3,
+          "share": 6e-05
+        },
+        "ryu": {
+          "count": 2,
+          "share": 4e-05
+        },
+        "xtu": {
+          "count": 2,
+          "share": 4e-05
+        },
+        "xuv": {
+          "count": 2,
+          "share": 4e-05
+        },
+        "xxyz": {
+          "count": 2,
+          "share": 4e-05
+        },
+        "xyzz": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "zyu": {
+          "count": 1,
+          "share": 2e-05
+        }
+      }
+    },
+    {
+      "name": "run4",
+      "problem": [
+        "run4",
+        "abc",
+        "abd",
+        "xyz"
+      ],
+      "n": 50000,
+      "runs_per_phase": {
+        "construction": 20000,
+        "validation": 30000
+      },
+      "distinct": 13,
+      "f1": 2,
+      "f1_over_n": 4e-05,
+      "set": {
+        "xyd": {
+          "count": 18324,
+          "share": 0.36648
+        },
+        "wyz": {
+          "count": 10653,
+          "share": 0.21306
+        },
+        "xyz": {
+          "count": 8298,
+          "share": 0.16596
+        },
+        "*NONE*": {
+          "count": 4898,
+          "share": 0.09796
+        },
+        "yyz": {
+          "count": 3403,
+          "share": 0.06806
+        },
+        "dyz": {
+          "count": 3179,
+          "share": 0.06358
+        },
+        "abd": {
+          "count": 1174,
+          "share": 0.02348
+        },
+        "yzz": {
+          "count": 29,
+          "share": 0.00058
+        },
+        "wxz": {
+          "count": 28,
+          "share": 0.00056
+        },
+        "dez": {
+          "count": 10,
+          "share": 0.0002
+        },
+        "xcd": {
+          "count": 2,
+          "share": 4e-05
+        },
+        "xde": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "xyy": {
+          "count": 1,
+          "share": 2e-05
+        }
+      }
+    },
+    {
+      "name": "run6",
+      "problem": [
+        "run6",
+        "eqe",
+        "qeq",
+        "abbbc"
+      ],
+      "n": 50000,
+      "runs_per_phase": {
+        "construction": 20000,
+        "validation": 30000
+      },
+      "distinct": 86,
+      "f1": 14,
+      "f1_over_n": 0.00028,
+      "set": {
+        "qeeeq": {
+          "count": 26614,
+          "share": 0.53228
+        },
+        "*NONE*": {
+          "count": 4793,
+          "share": 0.09586
+        },
+        "qcccb": {
+          "count": 4013,
+          "share": 0.08026
+        },
+        "baaaq": {
+          "count": 3993,
+          "share": 0.07986
+        },
+        "qbbbq": {
+          "count": 3451,
+          "share": 0.06902
+        },
+        "cbbba": {
+          "count": 2084,
+          "share": 0.04168
+        },
+        "qeq": {
+          "count": 1517,
+          "share": 0.03034
+        },
+        "bcccb": {
+          "count": 700,
+          "share": 0.014
+        },
+        "baaab": {
+          "count": 650,
+          "share": 0.013
+        },
+        "cddda": {
+          "count": 435,
+          "share": 0.0087
+        },
+        "qbbbc": {
+          "count": 395,
+          "share": 0.0079
+        },
+        "abbbq": {
+          "count": 385,
+          "share": 0.0077
+        },
+        "bcaab": {
+          "count": 224,
+          "share": 0.00448
+        },
+        "bccab": {
+          "count": 189,
+          "share": 0.00378
+        },
+        "qreeq": {
+          "count": 41,
+          "share": 0.00082
+        },
+        "qeepq": {
+          "count": 40,
+          "share": 0.0008
+        },
+        "pqqeq": {
+          "count": 34,
+          "share": 0.00068
+        },
+        "qeqqr": {
+          "count": 27,
+          "share": 0.00054
+        },
+        "pqeeq": {
+          "count": 24,
+          "share": 0.00048
+        },
+        "qbebq": {
+          "count": 24,
+          "share": 0.00048
+        },
+        "qeeqr": {
+          "count": 22,
+          "share": 0.00044
+        },
+        "qrrrq": {
+          "count": 20,
+          "share": 0.0004
+        },
+        "qeppq": {
+          "count": 19,
+          "share": 0.00038
+        },
+        "pqqqq": {
+          "count": 18,
+          "share": 0.00036
+        },
+        "qpppq": {
+          "count": 16,
+          "share": 0.00032
+        },
+        "qqqqr": {
+          "count": 14,
+          "share": 0.00028
+        },
+        "qrccb": {
+          "count": 13,
+          "share": 0.00026
+        },
+        "bccbb": {
+          "count": 11,
+          "share": 0.00022
+        },
+        "aqqqr": {
+          "count": 10,
+          "share": 0.0002
+        },
+        "bbbab": {
+          "count": 10,
+          "share": 0.0002
+        },
+        "cdbba": {
+          "count": 10,
+          "share": 0.0002
+        },
+        "qccab": {
+          "count": 10,
+          "share": 0.0002
+        },
+        "qrreq": {
+          "count": 10,
+          "share": 0.0002
+        },
+        "qbbpq": {
+          "count": 9,
+          "share": 0.00018
+        },
+        "qrbbq": {
+          "count": 9,
+          "share": 0.00018
+        },
+        "bcaaq": {
+          "count": 8,
+          "share": 0.00016
+        },
+        "pqqbq": {
+          "count": 8,
+          "share": 0.00016
+        },
+        "qeebq": {
+          "count": 8,
+          "share": 0.00016
+        },
+        "qrrrc": {
+          "count": 8,
+          "share": 0.00016
+        },
+        "baapq": {
+          "count": 7,
+          "share": 0.00014
+        },
+        "baqqr": {
+          "count": 7,
+          "share": 0.00014
+        },
+        "pqqcb": {
+          "count": 6,
+          "share": 0.00012
+        },
+        "qbbqr": {
+          "count": 6,
+          "share": 0.00012
+        },
+        "qbeeq": {
+          "count": 6,
+          "share": 0.00012
+        },
+        "qbqqr": {
+          "count": 6,
+          "share": 0.00012
+        },
+        "qrqqr": {
+          "count": 6,
+          "share": 0.00012
+        },
+        "bbaab": {
+          "count": 5,
+          "share": 0.0001
+        },
+        "pqqpq": {
+          "count": 5,
+          "share": 0.0001
+        },
+        "abbpq": {
+          "count": 4,
+          "share": 8e-05
+        },
+        "apppq": {
+          "count": 4,
+          "share": 8e-05
+        },
+        "cddba": {
+          "count": 4,
+          "share": 8e-05
+        },
+        "qcbbb": {
+          "count": 4,
+          "share": 8e-05
+        },
+        "qebbq": {
+          "count": 4,
+          "share": 8e-05
+        },
+        "qrbbc": {
+          "count": 4,
+          "share": 8e-05
+        },
+        "baaqr": {
+          "count": 3,
+          "share": 6e-05
+        },
+        "bcbbb": {
+          "count": 3,
+          "share": 6e-05
+        },
+        "pqbbq": {
+          "count": 3,
+          "share": 6e-05
+        },
+        "pqccb": {
+          "count": 3,
+          "share": 6e-05
+        },
+        "qcaab": {
+          "count": 3,
+          "share": 6e-05
+        },
+        "qrrqr": {
+          "count": 3,
+          "share": 6e-05
+        },
+        "abbqr": {
+          "count": 2,
+          "share": 4e-05
+        },
+        "abppq": {
+          "count": 2,
+          "share": 4e-05
+        },
+        "abqqr": {
+          "count": 2,
+          "share": 4e-05
+        },
+        "bappq": {
+          "count": 2,
+          "share": 4e-05
+        },
+        "pqepq": {
+          "count": 2,
+          "share": 4e-05
+        },
+        "pqqbc": {
+          "count": 2,
+          "share": 4e-05
+        },
+        "pqqqc": {
+          "count": 2,
+          "share": 4e-05
+        },
+        "qaaab": {
+          "count": 2,
+          "share": 4e-05
+        },
+        "qbbeq": {
+          "count": 2,
+          "share": 4e-05
+        },
+        "qbccb": {
+          "count": 2,
+          "share": 4e-05
+        },
+        "qbppq": {
+          "count": 2,
+          "share": 4e-05
+        },
+        "qccbb": {
+          "count": 2,
+          "share": 4e-05
+        },
+        "babbq": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "bbaaq": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "bbabq": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "bbbaq": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "bccaq": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "bcccq": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "ppqab": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "pqbbc": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "pqppq": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "qbcbb": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "qbeqr": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "qreqr": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "qrrbq": {
+          "count": 1,
+          "share": 2e-05
+        },
+        "qrrcb": {
+          "count": 1,
+          "share": 2e-05
+        }
+      }
+    }
+  ]
+}

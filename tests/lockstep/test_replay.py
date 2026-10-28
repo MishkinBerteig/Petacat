@@ -309,3 +309,37 @@ def test_guard_2_two_fresh_processes_write_byte_identical_traces(recorded, tmp_p
         outputs.append((out / "1.petacat.jsonl.gz").read_bytes())
     assert outputs[0] == outputs[1]
     assert len(outputs[0]) > 1000
+
+
+# -- The numeric substrate ------------------------------------------------------------
+
+
+def test_a_committed_metacat_trace_replays_with_the_numeric_substrate_on(tmp_path, monkeypatch):
+    """Petacat runs its arithmetic through a numeric backend by default, not through the
+    object-graph loops faithful mode uses.  The exact CPU backend must replay a real
+    Metacat trace just as well: every decision paired, the same end, and the same state
+    at every update cycle (``lockstep_corpus.py --numeric-backend`` does the whole
+    corpus, the GPU included)."""
+    sys.path.insert(0, str(REPO_ROOT / "scripts"))
+    import compare_traces as ct
+    from server.engine.numeric import python_backend
+    from tests.lockstep.faithful import NUMERIC_BACKEND_ENV
+
+    updates = []
+    original = python_backend.PythonSlipnetSession.update
+
+    def counted(self, *args, **kwargs):
+        updates.append(1)
+        return original(self, *args, **kwargs)
+
+    monkeypatch.setattr(python_backend.PythonSlipnetSession, "update", counted)
+    monkeypatch.setenv(NUMERIC_BACKEND_ENV, "python")
+    metacat = REPO_ROOT / "tests" / "lockstep" / "traces" / "abc-abd-xyz" / "1.metacat.jsonl.gz"
+    out, outcome, _ = replay_trace(metacat, tmp_path)
+
+    assert next(iter(read_records(out)))["settings"]["numeric_backend"] == "python"
+    assert updates, "the backend never ran"
+    report = ct.compare(metacat, out)
+    assert report.unregistered_error_count == 0
+    assert report.reach == report.run_length
+    assert report.state_snapshots_differing == 0
