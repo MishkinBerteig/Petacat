@@ -1053,12 +1053,17 @@ class Slipnet:
         session.store().apply_to_slipnet(self)
 
     def clamp_initially_relevant(
-        self, meta: MetadataProvider, cycles: int | None = None
+        self, meta: MetadataProvider, cycles: int | None = None,
+        monitor: Any = None,
     ) -> None:
         """Clamp initially-relevant slipnet nodes.
 
         Scheme: run.ss init-mcat.  *cycles* overrides the update-cycle countdown;
         0 clamps until something unfreezes the nodes (the runner's fixed-time mode).
+        *monitor*, if given, is called as ``monitor(node, before, after)`` for each
+        clamp, because ``clamp`` calls ``monitor-slipnode-activation-change``
+        (``slipnet.ss:139-140``) and the opening clamp of a deep concept is a
+        concept-activation event in the reference's Trace.
         """
         initially_clamped = meta.get_param("initially_clamped_slipnodes", [])
         clamp_cycles = (
@@ -1067,7 +1072,11 @@ class Slipnet:
         )
         for node_name in initially_clamped:
             if node_name in self.nodes:
-                self.nodes[node_name].clamp(clamp_cycles)
+                node = self.nodes[node_name]
+                before = node.activation
+                node.clamp(clamp_cycles)
+                if monitor is not None:
+                    monitor(node, before, node.activation)
 
     def tick_clamps(self) -> None:
         """Decrement all clamp counters."""

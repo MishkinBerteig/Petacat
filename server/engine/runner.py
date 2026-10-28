@@ -43,6 +43,7 @@ from server.engine.trace import (
     TemporalTrace,
     TraceEvent,
     concept_activation_importance,
+    make_concept_activation_monitor,
 )
 from server.engine.workspace import Workspace
 from server.engine.workspace_structures import WorkspaceStructure
@@ -596,12 +597,20 @@ class EngineRunner:
         opening clamp and part ways when the rack empties and the clamp is re-applied
         off an update boundary.
         """
+        monitor = None
+        if self.ctx is not None:
+            monitor = make_concept_activation_monitor(
+                self.ctx.trace,
+                self.ctx.codelet_count,
+                self.ctx.temperature.value,
+                self.meta.get_param("concept_activation_importance_threshold", 85),
+            )
         if not self.meta.get_param("initial_clamp_fixed_time", False):
-            slipnet.clamp_initially_relevant(self.meta)
+            slipnet.clamp_initially_relevant(self.meta, monitor=monitor)
             return
         cycles = self.meta.get_param("initial_slipnode_clamp_cycles", 50)
         ucl = self.meta.get_param("update_cycle_length", 15)
-        slipnet.clamp_initially_relevant(self.meta, cycles=0)
+        slipnet.clamp_initially_relevant(self.meta, cycles=0, monitor=monitor)
         self._initial_unclamp_time = (
             (self.ctx.codelet_count if self.ctx is not None else 0) + cycles * ucl
         )

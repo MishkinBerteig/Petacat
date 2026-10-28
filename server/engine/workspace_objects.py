@@ -53,17 +53,20 @@ class WorkspaceObject:
         self.enclosing_group: Any = None
         self.salience_clamped: bool = False
 
-        self.intra_string_unhappiness: float = 100.0
+        # Scheme: every unhappiness/salience starts at 0 (workspace-objects.ss:
+        # 69-78) and only becomes non-zero at the next update cycle, so a
+        # just-built group has weight 0 in choose-object until then.
+        self.intra_string_unhappiness: float = 0.0
         self.inter_string_unhappiness: dict[str, float] = {
-            "horizontal": 100.0,
-            "vertical": 100.0,
+            "horizontal": 0.0,
+            "vertical": 0.0,
         }
-        self.average_unhappiness: float = 100.0
+        self.average_unhappiness: float = 0.0
         self.salience: dict[str, float] = {
-            "intra": 100.0,
-            "horizontal_inter": 100.0,
-            "vertical_inter": 100.0,
-            "average": 100.0,
+            "intra": 0.0,
+            "horizontal_inter": 0.0,
+            "vertical_inter": 0.0,
+            "average": 0.0,
         }
 
     @property

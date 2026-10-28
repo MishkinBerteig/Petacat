@@ -34,7 +34,7 @@ def test_letter_creation():
 def test_initial_unhappiness():
     node = SlipnetNode("plato-a", "a", 10)
     letter = Letter(string=None, position=0, letter_category=node)
-    assert letter.intra_string_unhappiness == 100.0
+    assert letter.intra_string_unhappiness == 0.0  # workspace-objects.ss:71
 
 
 def test_salience_update():
