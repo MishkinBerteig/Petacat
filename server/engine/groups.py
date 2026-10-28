@@ -311,8 +311,12 @@ class Group(WorkspaceObject, WorkspaceStructure):
             return 100.0
 
         # Walk neighbors in both directions
+        # Trace seam: the walk's draws concern this group (lockstep spec §5.3).
+        previous = rng.trace_about(self) if rng is not None else None
         left_neighbors = _walk_group_neighbors(self, "left", rng)
         right_neighbors = _walk_group_neighbors(self, "right", rng)
+        if rng is not None:
+            rng.trace_about(previous)
         other_objects = left_neighbors + right_neighbors
         num_of_objects = len(other_objects)
 

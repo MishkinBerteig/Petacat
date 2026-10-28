@@ -736,6 +736,9 @@ class Themespace:
                 if theme.activation == 0:
                     continue
 
+                # Trace seam: both coins below concern this theme (lockstep §5.4).
+                rng.trace_about(theme)
+
                 # Activate dimension node: probability = (|activation|/100)^3
                 abs_prob = (abs(theme.activation) / 100.0) ** 3
                 if rng.prob(abs_prob):
@@ -755,6 +758,7 @@ class Themespace:
                         rel_node = slipnet.nodes.get(rel_node_name)
                         if rel_node and not rel_node.frozen:
                             rel_node.activation_buffer += workspace_activation
+        rng.trace_about(None)
 
     def unclamp_theme_type(self, theme_type: str) -> None:
         """Release the clamp on one theme type and switch its pressure off.

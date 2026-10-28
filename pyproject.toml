@@ -62,6 +62,10 @@ markers = [
     # produced by the arithmetic in server/engine/numeric/ runs once on the CPU in
     # float64 and once on the Metal GPU in float32, so one suite run covers both.
     "numeric_matrix: run once per numeric backend in the matrix",
+    # The lockstep harness (tests/lockstep/): Petacat's decision traces against
+    # Metacat's.  Its runs pin the numeric backend off themselves (faithful mode) and
+    # stay outside the backend matrix.
+    "lockstep: the Petacat/Metacat decision-trace harness (tests/lockstep/)",
 ]
 
 # The e2e database URL is not set here.  A `[tool.pytest.ini_options.env]` table used

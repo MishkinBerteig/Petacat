@@ -5,6 +5,14 @@ receives the RNG instance explicitly — this is the single source
 of all non-determinism in the engine.
 
 Scheme source: utilities.ss (random-pick, stochastic-pick, prob?, ~)
+
+The trace seam
+--------------
+``TraceSeam`` carries the lockstep harness's hooks (``tests/lockstep/``): where a
+decision happened (``trace_unit``, ``trace_about``), the end-of-cycle snapshot
+(``trace_snapshot``) and the codelet choice that Metacat logs as one decision
+(``composite_choice``).  Here every one of them is a pass-through, so an ordinary run
+draws exactly what it drew before the seam existed.
 """
 
 from __future__ import annotations
@@ -14,7 +22,47 @@ import random
 from typing import Any, Callable, Sequence
 
 
-class RNG:
+class TraceSeam:
+    """No-op hooks the lockstep harness overrides; see the module docstring.
+
+    A mixin with no state, shared by ``RNG`` and ``SplittableRNG`` so engine code can
+    call the hooks on whichever generator a codelet holds.
+    """
+
+    __slots__ = ()
+
+    def trace_unit(self, c: int, ctx: str, who: str, u: int | None = None) -> Any:
+        """Enter a unit of work (``init``/``choose``/``codelet``/``update``).
+
+        Returns a token for ``trace_restore``, which resumes the enclosing unit
+        (an update cycle can run inside a codelet).
+        """
+        return None
+
+    def trace_restore(self, token: Any) -> None:
+        """Resume the unit ``trace_unit`` returned *token* for."""
+
+    def trace_about(self, about: Any) -> Any:
+        """Name the object the following decisions concern; returns the previous one."""
+        return None
+
+    def trace_snapshot(self, ctx: Any) -> None:
+        """Called at the end of every update cycle with the engine context."""
+
+    def composite_choice(
+        self, label: str, build: Callable[[], tuple[list, list, list]],
+        pick: Callable[[], Any],
+    ) -> Any:
+        """One logical choice made in several stages (codelet selection, eviction).
+
+        *build* returns ``(options, weights, stamps)`` for a tracing generator and is
+        never called here; *pick* makes the choice with the engine's own draws and
+        returns the option.  ``label`` is ``"choose"`` or ``"evict"``.
+        """
+        return pick()
+
+
+class RNG(TraceSeam):
     __slots__ = ("_rng", "_seed", "_call_count")
 
     def __init__(self, seed: int) -> None:
@@ -61,7 +109,10 @@ class RNG:
     def weighted_pick(self, items: Sequence[Any], weights: Sequence[float]) -> Any:
         """Pick an element weighted by weights. Replaces Scheme stochastic-pick.
 
-        Each item is selected with probability proportional to its weight.
+        Each item is selected with probability proportional to its weight.  The
+        first item whose running total *exceeds* the threshold wins — the strict
+        ``<`` of ``weighted-index`` (``utilities.ss:507``) — so an item of weight 0
+        can never be picked, even by a draw of exactly 0.0.
         """
         if not items:
             raise ValueError("Cannot pick from empty sequence")
@@ -72,43 +123,43 @@ class RNG:
         cumulative = 0.0
         for item, weight in zip(items, weights):
             cumulative += weight
-            if cumulative >= threshold:
+            if cumulative > threshold:
                 return item
         return items[-1]
 
     def perturb(self, n: float) -> float:
-        """Blur ``n`` by up to about its own square root — Scheme's ``~``.
+        """Blur ``n`` by a whole number up to about its own square root — Scheme's ``~``.
 
-        ``utilities.ss:426-429``::
+        ``utilities.ss:468`` (``~``), with ``round`` as redefined at ``:250-252``::
 
+            (define round (lambda (n) (inexact->exact (scheme-round n))))   ; :250-252
             (define ~
               (lambda (n)
                 (let ((delta (random (add1 (round (sqrt n))))))
                   (if (prob? 0.5) (+ n delta) (- n delta)))))
 
-        The delta's *type* follows Chez's numeric tower, and that is not a
-        detail: ``(sqrt n)`` is exact only when ``n`` is a perfect square, and
-        ``random`` returns an exact integer for an exact argument but a flonum
-        for a flonum one.  So ``(~ 4)`` draws an integer delta from ``{0, 1,
-        2}``, while ``(~ 2)`` draws a *continuous* delta from ``[0.0, 2.0)`` —
-        ``(round (sqrt 2))`` is the flonum ``1.0``, not the integer 1.
+        Metacat shadows ``round`` so that it always returns an *exact* integer
+        (half-to-even, as Chez's ``round`` does, and as Python's does).  The bound
+        ``1 + round(sqrt n)`` is therefore always an exact integer, ``random`` of an
+        exact integer returns an exact integer, and the delta is always a whole
+        number drawn from ``0 .. round(sqrt n)``.  This used to draw a continuous
+        delta whenever ``n`` was not a perfect square (``DISCREPANCIES5.md`` A-1),
+        reasoning from Chez's unshadowed ``round`` — which is not the ``round`` the
+        reference's ``~`` calls.
 
-        The difference is reachable.  ``rough-num-of-objects`` asks
-        ``(< count (~ 2))``, and at a count of 2 the continuous reading answers
-        "few" half the time where the integer reading answers it a quarter of
-        the time.  Both of the reference's two call sites are covered here:
-        ``~ 2`` and ``~ 4``.
+        The difference is reachable: ``rough-num-of-objects`` asks
+        ``(< count (~ 2))``, and at a count of 2 the whole-number reading answers
+        "few" a quarter of the time where the continuous one answered it half.
         """
         if n <= 0:
             return n
-        root = math.isqrt(int(n)) if float(n).is_integer() else -1
-        if root >= 0 and root * root == int(n):
-            # Exact square root: an exact integer delta, as in ``(~ 4)``.
-            delta: float = self.randint(1 + root)
-        else:
-            # Inexact square root: a flonum delta, as in ``(~ 2)``.
-            delta = self.random() * (1 + round(math.sqrt(abs(n))))
+        delta = self.randint(self.perturb_bound(n))
         return n + delta if self.prob(0.5) else n - delta
+
+    @staticmethod
+    def perturb_bound(n: float) -> int:
+        """The exclusive bound ``~`` draws its delta below: ``1 + round(sqrt n)``."""
+        return 1 + round(math.sqrt(abs(n)))
 
     def stochastic_filter(
         self, items: Sequence[Any], prob_fn: Callable[[Any], float]

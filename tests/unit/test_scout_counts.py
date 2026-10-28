@@ -165,19 +165,18 @@ def test_the_thresholds_are_blurred_not_fixed(count):
 
 
 def test_blur_stays_within_the_reachable_band():
-    """``~2`` lands in ``(0, 4)`` and ``~4`` in ``{2, …, 6}``.
+    """``~2`` lands in ``{1, 2, 3}`` and ``~4`` in ``{2, …, 6}``.
 
-    The two thresholds blur differently, and that asymmetry is the reference's,
-    not an accident of this port: ``(sqrt 4)`` is exact so ``(~ 4)`` draws an
-    integer delta, while ``(round (sqrt 2))`` is the flonum ``1.0`` so ``(~ 2)``
-    draws a continuous one (``utilities.ss:426-429``, and see
-    ``RNG.perturb``).  A count of 3 is therefore ``few`` sometimes — it needs
-    only ``delta > 1`` — where an integer ``~2`` could never reach past 3.
+    Metacat redefines ``round`` to return exact integers (``utilities.ss:250-252``),
+    so every ``~`` draws a *whole-number* delta from ``0 .. round(sqrt n)``: for 2
+    that is 0 or 1 (``DISCREPANCIES5.md`` A-1; ``RNG.perturb``).  A count of 3 is
+    therefore never ``few`` (it would need a threshold above 3), where the
+    continuous reading this port once had made it ``few`` a quarter of the time.
     """
     rng = RNG(99)
-    # 4 clears every draw of ~2 (strictly below 4), so it is never 'few'.
-    assert all(rough_num_of_objects(4, rng) != "few" for _ in range(400))
-    # 3 sits inside the continuous band, so it is 'few' some of the time.
-    assert any(rough_num_of_objects(3, rng) == "few" for _ in range(400))
-    # 1 is below every draw of ~4 (min 2), so it is never 'many'.
+    # 3 clears every draw of ~2 (at most 3), so it is never 'few'.
+    assert all(rough_num_of_objects(3, rng) != "few" for _ in range(400))
+    # 2 is 'few' only when the delta is 1 on the upward side: sometimes, not always.
+    twos = [rough_num_of_objects(2, rng) == "few" for _ in range(400)]
+    assert any(twos) and not all(twos)
     assert all(rough_num_of_objects(1, rng) != "many" for _ in range(400))

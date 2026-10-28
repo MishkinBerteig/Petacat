@@ -287,6 +287,14 @@ class EngineRunner:
         self._turn_ended: bool = False
         #: How many Trace events have been handed to the sink so far.
         self._trace_emitted: int = 0
+        #: Trace seam state (``rng.trace_unit``): whether a codelet body is running
+        #: (an update cycle then belongs to that codelet's number), and how many
+        #: update cycles have started — the ``u`` that numbers them.
+        self._in_codelet: bool = False
+        self._update_cycle: int = 0
+        #: ``*initial-slipnode-unclamp-time*`` (``run.ss:272``); only used when the
+        #: ``initial_clamp_fixed_time`` parameter is on.
+        self._initial_unclamp_time: int = 0
 
         # Build the codelet interpreter and registry
         self._interpreter = CodeletInterpreter(builtins=get_builtins())
@@ -317,10 +325,15 @@ class EngineRunner:
         commentary: CommentaryWriter | None = None,
         sink: RunSink | None = None,
         parameters: dict[str, Any] | None = None,
+        rng: RNG | None = None,
     ) -> None:
         """Initialize Metacat for a new run.
 
         Scheme: run.ss init-mcat.
+
+        *rng*, when given, replaces ``RNG(seed)``.  It becomes ``ctx.rng``, the
+        Coderack's ``rng`` and so every codelet body's ``rng`` — the lockstep
+        harness (``tests/lockstep/``) passes a tracing or replaying generator here.
         """
         with use_allocator(IdAllocator()) as ids:
             # Parameter overrides apply for this Run only, so the metadata is
@@ -330,6 +343,7 @@ class EngineRunner:
                 self.meta = self.meta.with_overrides(parameters)
             self._init_mcat(
                 initial, modified, target, answer, seed, memory, ids, commentary, sink,
+                rng,
             )
 
     def _init_mcat(
@@ -343,8 +357,16 @@ class EngineRunner:
         ids: IdAllocator,
         commentary: CommentaryWriter | None = None,
         sink: RunSink | None = None,
+        rng: RNG | None = None,
     ) -> None:
-        rng = RNG(seed)
+        if rng is None:
+            rng = RNG(seed)
+        self._update_cycle = 0
+        self._in_codelet = False
+        self._initial_unclamp_time = 0
+        # Lockstep trace seam: everything drawn while the run is built belongs to the
+        # ``init`` unit (a no-op on an ordinary RNG).
+        rng.trace_unit(1, "init", "init-mcat")
 
         # Structures consult the Themespace for thematic compatibility; the
         # Scheme uses a global *themespace*, so bind ours before building any.
@@ -439,7 +461,7 @@ class EngineRunner:
         self._update_workspace_values(workspace, rng)
 
         # Clamp initially relevant slipnet nodes
-        slipnet.clamp_initially_relevant(self.meta)
+        self._clamp_initial_slipnodes(slipnet)
 
         # The snag response reaches back into the runner's loop; see
         # ``EngineContext.on_snag_restart``.
@@ -561,6 +583,35 @@ class EngineRunner:
         workspace.update_all_structure_strengths(rng)
         workspace.update_all_object_values()
         workspace.update_average_unhappiness_values()
+
+    def _clamp_initial_slipnodes(self, slipnet: Slipnet) -> None:
+        """``clamp-initial-slipnodes`` (``run.ss:268-273``).
+
+        By default the clamp is Petacat's own mechanism: a counter of update cycles
+        that ``tick_clamps`` runs down, so the clamp lapses on the update cycle that
+        reaches its expiry.  With ``initial_clamp_fixed_time`` on it is Metacat's:
+        the nodes stay frozen until the codelet count reaches a fixed unclamp time,
+        ``now + initial_slipnode_clamp_cycles x update_cycle_length``, and are then
+        unfrozen by ``_step_mcat`` (``run.ss:151-154``).  The two agree for the
+        opening clamp and part ways when the rack empties and the clamp is re-applied
+        off an update boundary.
+        """
+        if not self.meta.get_param("initial_clamp_fixed_time", False):
+            slipnet.clamp_initially_relevant(self.meta)
+            return
+        cycles = self.meta.get_param("initial_slipnode_clamp_cycles", 50)
+        ucl = self.meta.get_param("update_cycle_length", 15)
+        slipnet.clamp_initially_relevant(self.meta, cycles=0)
+        self._initial_unclamp_time = (
+            (self.ctx.codelet_count if self.ctx is not None else 0) + cycles * ucl
+        )
+
+    def _unclamp_initial_slipnodes(self, slipnet: Slipnet) -> None:
+        """``(tell node 'unfreeze)`` for each initially clamped node (``run.ss:152-153``)."""
+        for name in self.meta.get_param("initially_clamped_slipnodes", []):
+            node = slipnet.nodes.get(name)
+            if node is not None:
+                node.unclamp()
 
     def build_initial_codelet_batch(self) -> list[Codelet]:
         """The opening population, from the database.
@@ -701,9 +752,11 @@ class EngineRunner:
         # very start of a Run driven codelet-by-codelet from the service layer.
         if ctx.coderack.is_empty:
             self._post_initial_codelets()
-            ctx.slipnet.clamp_initially_relevant(self.meta)
+            self._clamp_initial_slipnodes(ctx.slipnet)
 
-        # Select and execute a codelet
+        # Select and execute a codelet.  ``c`` is the number of the codelet being chosen,
+        # which is one more than the count of those finished (lockstep spec §3).
+        ctx.rng.trace_unit(ctx.codelet_count + 1, "choose", "coderack")
         codelet = ctx.coderack.choose_and_remove(
             ctx.temperature.value, ctx.rng
         )
@@ -746,6 +799,11 @@ class EngineRunner:
         ctx.codelet_count += 1
         ctx.coderack.current_time = ctx.codelet_count
 
+        # ``run.ss:151-154``: the fixed-time initial unclamp, checked right after the
+        # codelet and before the rack-empty test below.  Off by default.
+        if self._initial_unclamp_time and ctx.codelet_count == self._initial_unclamp_time:
+            self._unclamp_initial_slipnodes(ctx.slipnet)
+
         self._emit_new_trace_events(ctx)
         ctx.sink.on_codelet(ctx, codelet, result)
 
@@ -757,7 +815,7 @@ class EngineRunner:
         # conditions — was skipped altogether.
         if ctx.coderack.is_empty:
             self._post_initial_codelets()
-            ctx.slipnet.clamp_initially_relevant(self.meta)
+            self._clamp_initial_slipnodes(ctx.slipnet)
 
         # A jootser may have decided the program is looping and given up
         # (§4.5.2 — "Metacat simply 'gives up' in a graceful manner and stops").
@@ -842,7 +900,17 @@ class EngineRunner:
         compiled = self._registry.get_compiled(codelet.codelet_type)
         if compiled.is_empty:
             return
-        self._interpreter.execute(compiled, self.ctx, **codelet.arguments)
+        ctx = self.ctx
+        # Trace seam: the unit is this codelet, and an update cycle run from inside it
+        # (answer report, snag) carries its number.  A no-op on an ordinary RNG.
+        ctx.rng.trace_unit(ctx.codelet_count + 1, "codelet", codelet.codelet_type)
+        self._in_codelet = True
+        try:
+            self._interpreter.execute(compiled, ctx, **codelet.arguments)
+        finally:
+            self._in_codelet = False
+            # Whatever the run loop does until the next choice is its own unit.
+            ctx.rng.trace_unit(ctx.codelet_count + 1, "other", "run-mcat")
 
     def run_mcat(self, max_steps: int = 0) -> RunResult:
         """Main loop: step until answer or limit.
@@ -901,14 +969,25 @@ class EngineRunner:
             self._update_everything(ctx)
 
     def _update_everything(self, ctx: EngineContext) -> None:
+        # Trace seam (lockstep spec §5.4, §6.5): each step below names its phase before
+        # it runs.  ``c`` is the codelet this cycle runs after, or inside when a codelet
+        # body called it (answer report, snag restart).  No-ops on an ordinary RNG.
+        rng = ctx.rng
+        self._update_cycle += 1
+        u = self._update_cycle
+        c = ctx.codelet_count + (1 if self._in_codelet else 0)
+        outer = rng.trace_unit(c, "update", "rules-possible", u)
+
         # 1. Check if rules are possible (Scheme: run.ss:297)
         ctx.workspace.check_if_rules_possible()
 
         # 2-3. Structure strengths, then object importances / unhappiness /
         #      salience, then the workspace-level averages (run.ss:306, 325-344).
+        rng.trace_unit(c, "update", "workspace-values", u)
         self._update_workspace_values(ctx.workspace, ctx.rng)
 
         # 4. Snag-period stochastic exit (Scheme: run.ss:299-302)
+        rng.trace_unit(c, "update", "snag-exit", u)
         if ctx.trace.within_snag_period:
             progress = ctx.trace.progress_since_last_snag(ctx.workspace)
             if ctx.rng.prob(progress / 100.0):
@@ -917,6 +996,7 @@ class EngineRunner:
                 )
 
         # 5. Clamp-period expiration check (Scheme: run.ss:303-304)
+        rng.trace_unit(c, "update", "clamp-expiry", u)
         #
         # The bound comes from the parameter, not from ``trace``'s module default.
         # ``max_clamp_period`` was read in one place only — the progress-watcher's
@@ -937,6 +1017,7 @@ class EngineRunner:
         ctx.temperature.tick_clamp()
 
         # 7. Spread activation from workspace to themespace
+        rng.trace_unit(c, "update", "themespace", u)
         if ctx.self_watching_enabled:
             self._spread_activation_to_themespace()
 
@@ -946,6 +1027,7 @@ class EngineRunner:
 
         # 9. Update slipnet: theme→slipnet, then internal spreading
         #    (Scheme: slipnet.ss:377-389 — themes spread first, then decay+spread+jump)
+        rng.trace_unit(c, "update", "slipnet", u)
         if ctx.self_watching_enabled:
             ctx.themespace.spread_activation_to_slipnet(ctx.slipnet, ctx.rng)
         threshold = getattr(ctx, "spreading_activation_threshold", 100)
@@ -958,6 +1040,7 @@ class EngineRunner:
         # 10. Update temperature.  The rule factor asks whether a rule is both
         #     *possible* and supported — and in justify mode, for both pairs
         #     (formulas.ss:65-75), not merely whether some supported rule exists.
+        rng.trace_unit(c, "update", "temperature", u)
         avg_unhappiness = ctx.workspace.get_average_unhappiness()
         ctx.temperature.update(
             avg_unhappiness, ctx.workspace.rule_established(), ctx.meta
@@ -975,10 +1058,18 @@ class EngineRunner:
         # evict each other but a *later* cycle's do: whichever types are posted
         # last are the ones the next cycle's overflow finds youngest.
         batch: list[Codelet] = []
+        rng.trace_unit(c, "update", "post-bottom-up", u)
         self._post_bottom_up_codelets(batch)
+        rng.trace_unit(c, "update", "post-top-down", u)
         self._post_top_down_codelets(batch)
         self._post_thematic_codelets(batch)
+        rng.trace_unit(c, "update", "post-deferred", u)
         ctx.coderack.post_deferred(batch, ctx.codelet_count, ctx.rng)
+
+        # End of the cycle: the snapshot (lockstep spec §8), then back to the codelet
+        # this cycle ran inside, if any.
+        rng.trace_snapshot(ctx)
+        rng.trace_restore(outer)
 
     def _record_concept_activation_events(
         self, activations_before: dict[str, float]
@@ -1124,6 +1215,7 @@ class EngineRunner:
                 continue
 
             post_prob = self._compute_posting_probability(rule)
+            ctx.rng.trace_about(codelet_type)
             if not ctx.rng.prob(post_prob):
                 continue
 
@@ -1132,6 +1224,7 @@ class EngineRunner:
 
             for _ in range(num):
                 batch.append(Codelet(codelet_type, urgency, time_stamp=time))
+        ctx.rng.trace_about(None)
 
         if deferred:
             ctx.coderack.post_deferred(batch, time, ctx.rng)
@@ -1158,6 +1251,7 @@ class EngineRunner:
         else:
             deferred = False
         post_prob = self._compute_posting_probability(thematic_rule)
+        ctx.rng.trace_about(thematic_type)
         if ctx.rng.prob(post_prob):
             urgency = evaluate_urgency(
                 thematic_rule,
@@ -1169,6 +1263,7 @@ class EngineRunner:
                 batch.append(
                     Codelet(thematic_type, urgency, time_stamp=ctx.codelet_count)
                 )
+        ctx.rng.trace_about(None)
 
         if deferred:
             ctx.coderack.post_deferred(batch, ctx.codelet_count, ctx.rng)
@@ -1295,6 +1390,9 @@ class EngineRunner:
 
                 # Stochastic posting based on workspace state
                 post_prob = self._compute_posting_probability(rule)
+                # ``about`` for a top-down coin is the codelet that would be posted,
+                # named with its argument: ``<type>(<node>)``.
+                ctx.rng.trace_about(f"{rule.codelet_type}({node_name.removeprefix('plato-')})")
                 if not ctx.rng.prob(post_prob):
                     continue
 
@@ -1308,6 +1406,7 @@ class EngineRunner:
                             time_stamp=ctx.codelet_count,
                         )
                     )
+        ctx.rng.trace_about(None)
 
         if deferred:
             ctx.coderack.post_deferred(batch, ctx.codelet_count, ctx.rng)

@@ -184,8 +184,12 @@ class Bond(WorkspaceStructure):
         if self.string is None:
             return 100.0
 
+        # Trace seam: the walk's draws concern this bond (lockstep spec §5.3).
+        previous = rng.trace_about(self) if rng is not None else None
         left_neighbors = _walk_neighbors(self.left_object, "left", rng)
         right_neighbors = _walk_neighbors(self.right_object, "right", rng)
+        if rng is not None:
+            rng.trace_about(previous)
         num_of_bond_slots = len(left_neighbors) + len(right_neighbors)
 
         if num_of_bond_slots == 0:

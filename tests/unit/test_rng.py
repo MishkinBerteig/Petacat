@@ -122,26 +122,36 @@ def test_perturb_of_a_perfect_square_draws_an_integer_delta():
     assert all(float(v).is_integer() for v in seen)
 
 
-def test_perturb_of_a_non_square_draws_a_continuous_delta():
-    """``(~ 2)``: ``(round (sqrt 2))`` is the flonum 1.0, so the delta is real.
+def test_perturb_of_a_non_square_still_draws_a_whole_number_delta():
+    """``(~ 2)``: Metacat's ``round`` is exact (``utilities.ss:250-252``), so the
+    bound is ``1 + 1 = 2`` and the delta is 0 or 1, never continuous.
 
-    ``(random 2.0)`` returns a flonum in ``[0.0, 2.0)``, giving a threshold
-    anywhere in ``(0.0, 4.0)`` rather than one of ``{1, 2, 3}``.
+    The reachable thresholds are exactly ``{1, 2, 3}`` (``DISCREPANCIES5.md`` A-1).
     """
     rng = RNG(7)
-    values = [rng.perturb(2) for _ in range(400)]
-    assert not all(float(v).is_integer() for v in values)
-    assert 0.0 < min(values) and max(values) < 4.0
+    values = {rng.perturb(2) for _ in range(400)}
+    assert values == {1, 2, 3}
+    assert all(float(v).is_integer() for v in values)
 
 
-def test_the_blur_makes_two_objects_few_about_half_the_time():
-    """The consequence that makes the flonum reading worth reproducing.
+def test_perturb_bound_is_one_plus_the_rounded_square_root():
+    """``round`` is half-to-even, as Chez's (and Python's) is."""
+    assert RNG.perturb_bound(4) == 3
+    assert RNG.perturb_bound(2) == 2          # sqrt 2 = 1.41 -> 1
+    assert RNG.perturb_bound(3) == 3          # sqrt 3 = 1.73 -> 2
+    assert RNG.perturb_bound(6.25) == 3       # sqrt = 2.5 -> 2 (even)
+    assert RNG.perturb_bound(12.25) == 5      # sqrt = 3.5 -> 4 (even)
+    assert RNG.perturb_bound(0.1) == 1        # sqrt = 0.32 -> 0: a trivial draw
+
+
+def test_the_blur_makes_two_objects_few_about_a_quarter_of_the_time():
+    """The consequence of the whole-number delta (``DISCREPANCIES5.md`` A-1).
 
     ``rough-num-of-objects`` (``workspace.ss:683-688``) asks ``(< count (~ 2))``.
-    With the continuous delta a count of 2 is ``few`` half the time — it needs
-    only ``delta > 0`` on the upward branch.  Under an integer delta it would
-    need ``delta = 1``, i.e. a quarter of the time.
+    A count of 2 is ``few`` only when the delta is 1 on the upward branch: a
+    quarter of the time, where the continuous delta this port once drew made it
+    half.
     """
     rng = RNG(11)
     few = sum(1 for _ in range(4000) if 2 < rng.perturb(2))
-    assert 0.45 < few / 4000 < 0.55
+    assert 0.20 < few / 4000 < 0.30

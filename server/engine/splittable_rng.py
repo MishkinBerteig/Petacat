@@ -43,6 +43,8 @@ import math
 import struct
 from typing import Any, Callable, Sequence
 
+from server.engine.rng import TraceSeam
+
 #: Streams are addressed by a pair of 64-bit words, which is ample: the first
 #: identifies the drawing site (worker, codelet slot, or a derived substream) and the
 #: second counts draws within it.
@@ -60,7 +62,7 @@ def _hash_words(seed: int, stream: int, counter: int) -> bytes:
     ).digest()
 
 
-class SplittableRNG:
+class SplittableRNG(TraceSeam):
     """A random stream identified by ``(seed, stream)``, counted rather than stateful.
 
     The public surface deliberately mirrors :class:`server.engine.rng.RNG` method for

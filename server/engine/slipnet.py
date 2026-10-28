@@ -573,7 +573,10 @@ class SlipnetNode:
         if not self.partially_active():
             return
         prob = (self.activation / self._max_activation) ** 3
-        if rng.prob(prob):
+        previous = rng.trace_about(self)
+        jumped = rng.prob(prob)
+        rng.trace_about(previous)
+        if jumped:
             self.activation = self._max_activation
 
     @property
@@ -1033,13 +1036,19 @@ class Slipnet:
         )
         session.store().apply_to_slipnet(self)
 
-    def clamp_initially_relevant(self, meta: MetadataProvider) -> None:
+    def clamp_initially_relevant(
+        self, meta: MetadataProvider, cycles: int | None = None
+    ) -> None:
         """Clamp initially-relevant slipnet nodes.
 
-        Scheme: run.ss init-mcat.
+        Scheme: run.ss init-mcat.  *cycles* overrides the update-cycle countdown;
+        0 clamps until something unfreezes the nodes (the runner's fixed-time mode).
         """
         initially_clamped = meta.get_param("initially_clamped_slipnodes", [])
-        clamp_cycles = meta.get_param("initial_slipnode_clamp_cycles", 50)
+        clamp_cycles = (
+            cycles if cycles is not None
+            else meta.get_param("initial_slipnode_clamp_cycles", 50)
+        )
         for node_name in initially_clamped:
             if node_name in self.nodes:
                 self.nodes[node_name].clamp(clamp_cycles)

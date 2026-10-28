@@ -372,28 +372,46 @@ class Coderack:
         # ``*temperature*`` and Petacat has to be handed.  See ``current_temperature``.
         self.current_temperature = temperature
 
-        # Stage 1: pick bin, weighted by count x the rounded table value
+        # The two stages are one logical choice over every codelet on the rack, each
+        # weighted by its bin's urgency value (lockstep spec §7.1).  ``composite_choice``
+        # runs ``pick`` — the two stages below, drawing exactly as before — on an
+        # ordinary RNG; a tracing or replaying RNG logs it, or forces it, as one choice.
         row = self.urgency_table.row(temperature)
-        weights = [len(b.codelets) * row[b.bin_number] for b in self.bins]
-        total = sum(weights)
-        if total <= 0:
-            # Fallback: pick from any non-empty bin
-            non_empty = [b for b in self.bins if b.count > 0]
-            if not non_empty:
-                return None
-            chosen_bin = rng.pick(non_empty)
-        else:
-            chosen_bin = rng.weighted_pick(self.bins, weights)
+        where: list[CoderackBin] = []
 
-        if chosen_bin.count == 0:
-            # Retry with non-empty bins
-            non_empty = [b for b in self.bins if b.count > 0]
-            if not non_empty:
-                return None
-            chosen_bin = rng.pick(non_empty)
+        def pick() -> Codelet | None:
+            # Stage 1: pick bin, weighted by count x the rounded table value
+            weights = [len(b.codelets) * row[b.bin_number] for b in self.bins]
+            total = sum(weights)
+            if total <= 0:
+                # Fallback: pick from any non-empty bin
+                non_empty = [b for b in self.bins if b.count > 0]
+                if not non_empty:
+                    return None
+                chosen_bin = rng.pick(non_empty)
+            else:
+                chosen_bin = rng.weighted_pick(self.bins, weights)
 
-        # Stage 2: pick codelet within bin
-        codelet = chosen_bin.choose_random(rng)
+            if chosen_bin.count == 0:
+                # Retry with non-empty bins
+                non_empty = [b for b in self.bins if b.count > 0]
+                if not non_empty:
+                    return None
+                chosen_bin = rng.pick(non_empty)
+
+            # Stage 2: pick codelet within bin
+            where.append(chosen_bin)
+            return chosen_bin.choose_random(rng)
+
+        def build() -> tuple[list, list, list]:
+            options = [c for b in self.bins for c in b.codelets]
+            weights = [row[b.bin_number] for b in self.bins for _ in b.codelets]
+            return options, weights, [c.time_stamp for c in options]
+
+        codelet = rng.composite_choice("choose", build, pick)
+        if codelet is None:
+            return None
+        chosen_bin = where[0] if where else self._bin_of(codelet)
         chosen_bin.remove(codelet)
         self._total_count -= 1
         return codelet
@@ -478,48 +496,70 @@ class Coderack:
         if temperature is None:
             temperature = self.current_temperature
         penalties = self._bin_urgency_penalties(temperature)
-        bin_weights = [
-            penalties[b.bin_number] * b.age_sum(current_time) if b.codelets else 0
-            for b in self.bins
-        ]
-        total = sum(bin_weights)
+        where: list[CoderackBin] = []
 
-        if total <= 0:
-            # Reachable now that the age has no floor: every codelet on the rack was
-            # posted on this very tick, so every weight is 0.  ``RNG.weighted_pick``
-            # falls back to a uniform pick here — as does the Scheme, whose
-            # ``stochastic-pick`` defers to ``random-pick`` on a zero weight-sum
-            # (``utilities.ss:443-448``) — and this has to fall back the same way to
-            # consume the same random number.
-            flat = [c for b in self.bins for c in b.codelets]
-            if not flat:
-                return None
-            codelet = rng.pick(flat)
-            return codelet, self._bin_of(codelet)
+        def pick() -> Codelet | None:
+            bin_weights = [
+                penalties[b.bin_number] * b.age_sum(current_time) if b.codelets else 0
+                for b in self.bins
+            ]
+            total = sum(bin_weights)
 
-        threshold = rng.random() * total
-        cumulative = 0.0
-        for b, bin_weight in zip(self.bins, bin_weights):
-            if not b.codelets:
-                continue
-            if cumulative + bin_weight < threshold:
-                cumulative += bin_weight
-                continue
-            # The chosen bin.  Walk it with the same running total the flat version
-            # would have had at this point, so the same codelet comes out.
-            penalty = penalties[b.bin_number]
-            for codelet in b.codelets:
-                # ``max(0, ...)`` only to stay consistent with ``age_sum``'s guard
-                # against a stamp ahead of the clock; a no-op in every real run.
-                cumulative += penalty * max(0, current_time - codelet.time_stamp)
-                if cumulative >= threshold:
-                    return codelet, b
-            # Floating-point shortfall inside the bin: keep walking the later bins,
-            # matching ``weighted_pick``'s behaviour of running on to its own end.
-        for b in reversed(self.bins):
-            if b.codelets:
-                return b.codelets[-1], b
-        return None
+            if total <= 0:
+                # Reachable now that the age has no floor: every codelet on the rack
+                # was posted on this very tick, so every weight is 0.
+                # ``RNG.weighted_pick`` falls back to a uniform pick here — as does
+                # the Scheme, whose ``stochastic-pick`` defers to ``random-pick`` on a
+                # zero weight-sum (``utilities.ss:443-448``) — and this has to fall
+                # back the same way to consume the same random number.
+                flat = [c for b in self.bins for c in b.codelets]
+                if not flat:
+                    return None
+                codelet = rng.pick(flat)
+                where.append(self._bin_of(codelet))
+                return codelet
+
+            threshold = rng.random() * total
+            cumulative = 0.0
+            for b, bin_weight in zip(self.bins, bin_weights):
+                if not b.codelets:
+                    continue
+                if cumulative + bin_weight <= threshold:
+                    cumulative += bin_weight
+                    continue
+                # The chosen bin.  Walk it with the same running total the flat
+                # version would have had at this point, so the same codelet comes out.
+                penalty = penalties[b.bin_number]
+                for codelet in b.codelets:
+                    # ``max(0, ...)`` only to stay consistent with ``age_sum``'s guard
+                    # against a stamp ahead of the clock; a no-op in every real run.
+                    cumulative += penalty * max(0, current_time - codelet.time_stamp)
+                    if cumulative > threshold:
+                        where.append(b)
+                        return codelet
+                # Floating-point shortfall inside the bin: keep walking the later
+                # bins, matching ``weighted_pick``'s behaviour of running on to its end.
+            for b in reversed(self.bins):
+                if b.codelets:
+                    where.append(b)
+                    return b.codelets[-1]
+            return None
+
+        def build() -> tuple[list, list, list]:
+            options = [c for b in self.bins for c in b.codelets]
+            weights = [
+                penalties[b.bin_number] * max(0, current_time - c.time_stamp)
+                for b in self.bins
+                for c in b.codelets
+            ]
+            return options, weights, [c.time_stamp for c in options]
+
+        # One logical choice over the whole rack, logged or forced as such by a
+        # tracing or replaying RNG; on an ordinary RNG it is ``pick()`` itself.
+        codelet = rng.composite_choice("evict", build, pick)
+        if codelet is None:
+            return None
+        return codelet, (where[0] if where else self._bin_of(codelet))
 
     def _bin_of(self, codelet: Codelet) -> CoderackBin:
         return self.bins[self._urgency_to_bin(codelet.urgency)]

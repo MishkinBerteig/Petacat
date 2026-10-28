@@ -79,7 +79,9 @@ ROLE_PREFERENCES: dict[str, tuple[str, ...]] = {
 
 #: The suite's layers, bottom-up.  The per-layer summary is printed in this order,
 #: and a directory under ``tests/`` is a layer exactly when it appears here.
-LAYERS = ("unit", "seed_unit", "module", "architecture", "integration", "e2e")
+LAYERS = (
+    "unit", "seed_unit", "module", "architecture", "integration", "lockstep", "e2e",
+)
 
 #: Layers whose tests must declare their relationship to the substrate.  A test
 #: here that executes substrate arithmetic without the marker is reported by name
@@ -88,6 +90,11 @@ LAYERS = ("unit", "seed_unit", "module", "architecture", "integration", "e2e")
 #:
 #: ``e2e`` is outside it: its subject is the HTTP and persistence stack, it adds no
 #: numeric path of its own, and it runs on the policy the application ships with.
+#:
+#: ``lockstep`` is outside it too, for the opposite reason to the matrix: its runs are
+#: *faithful mode* (``tests/lockstep/faithful.py``), which pins the numeric backend off
+#: with ``use_backend("off")`` so a trace compares the engine's own float64 loops.  A
+#: matrix test would run the same thing twice and, on the GPU role, run it on float32.
 GUARDED_LAYERS = ("unit", "seed_unit", "module", "architecture", "integration")
 
 #: Files exempt from that guard because they select backends themselves, more

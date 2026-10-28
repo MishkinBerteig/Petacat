@@ -10,7 +10,7 @@ focused on the research goals of the project.
 .venv/bin/python -m pytest tests/ -q
 ```
 
-This is the command a change is verified with. It runs all six layers against the
+This is the command a change is verified with. It runs all seven layers against the
 local Postgres, runs every test whose outcome the numeric substrate produces on
 **both the CPU and the GPU**, and stops at a **60-minute wall-clock ceiling**. The
 matrix and the ceiling are properties of the suite, so this one command carries
@@ -125,11 +125,12 @@ outside the matrix take it too and the run is entirely what it says it is.
   gpu  mlx      float32    440 tests
   whole suite requested: the full matrix is required of this run
 
-  unit           525 collected    525 run    525 passed      0 failed      0 skipped  complete
+  unit           526 collected    526 run    526 passed      0 failed      0 skipped  complete
   seed_unit      456 collected    456 run    456 passed      0 failed      0 skipped  complete
   module         909 collected    909 run    909 passed      0 failed      0 skipped  complete
   architecture    34 collected     34 run     34 passed      0 failed      0 skipped  complete
   integration     68 collected     68 run     68 passed      0 failed      0 skipped  complete
+  lockstep       85 collected     85 run     85 passed      0 failed      0 skipped  complete
   e2e            259 collected    259 run    259 passed      0 failed      0 skipped  complete
 
   run complete in 14.2 min against a 60 min ceiling
@@ -196,17 +197,18 @@ it reached.
 
 ## Test layers
 
-The backend suite (`tests/`) is organised into six layers. A layer is defined by
+The backend suite (`tests/`) is organised into seven layers. A layer is defined by
 what its tests are allowed to reach for, and every test in a layer stays inside
 that allowance.
 
 | Layer | Directory | Scope | May depend on | Cases |
 |-------|-----------|-------|---------------|-------|
-| **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 525 |
+| **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 526 |
 | **seed unit** | `tests/seed_unit/` | One class or function, measured against the values Petacat ships with | Real `seed_data/*.json`, and the machine the process is running on | 456 |
 | **module** | `tests/module/` | Several real components assembled and driven | Real engine objects and `seed_data/*.json`; no DB, no HTTP | 909 |
 | **architecture** | `tests/architecture/` | How the source tree is allowed to depend on itself | The repository's source, `seed_data/*.json`, child interpreters | 34 |
 | **integration** | `tests/integration/` | Agreement between the repository's artifacts, and the harness's own rules | Real `seed_data/*.json`, the ORM declarations, the generated client files, the documentation, a real pytest session | 68 |
+| **lockstep** | `tests/lockstep/` | Petacat's decision traces against Metacat's: naming, helper conformance, tracing/replay RNGs, determinism guards, the comparer | Real engine in faithful mode (numeric backend off); recorded Metacat traces | 85 |
 | **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 259 |
 
 Those counts are cases, so they include the second pass the numeric matrix makes
@@ -225,14 +227,18 @@ subject is, and write the test where the answer lands:
   what running it produces.
 - **integration** — the assertion is that two artifacts in the repository say
   the same thing.
+- **lockstep** — the assertion is about Petacat's random decisions: what they are
+  named, how a helper draws, whether a replay of a Metacat trace repeats exactly.
+  It runs the engine in faithful mode, which pins the numeric backend off, so it
+  stays outside the backend matrix and the substrate-marker guard.
 - **e2e** — the assertion travels over HTTP.
 
 A first pass should test **the lowest level of code just above the database
 first**, then move up toward the API and GUI.
 
-All six layers run in one command — the
+All seven layers run in one command — the
 [required command](#the-required-command) — and, since Petacat runs natively, all
-six actually run: **2,251 cases**, every one of them executed. A layer that is
+seven actually run: **2,337 cases**, every one of them executed. A layer that is
 normally skipped is not a layer that is normally green, and none of these is.
 
 Wall-clock time depends heavily on the machine and on what else it is doing. The
@@ -340,7 +346,7 @@ the number of endpoints taking `Depends(get_session)`, the size of
 | `test_groups.py` | 22 | `Group`: length, spanning, membership, internal and external strength |
 | `test_jootsing_outcomes.py` | 7 | The jootser's outcomes: what counts as the same clamp, and when it gives up |
 | `test_object_choice.py` | 8 | Weighted object choice: the temperature exponent, and the absence of floors |
-| `test_rng.py` | 16 | The deterministic RNG wrapper |
+| `test_rng.py` | 17 | The deterministic RNG wrapper |
 | `test_rule_types.py` | 9 | `Rule` and `RuleClause` predicates and translation |
 | `test_runner_status.py` | 1 | The runner's status constants |
 | `test_scout_counts.py` | 14 | The scout-count aggregates that decide how many codelets a cycle posts |
@@ -433,6 +439,16 @@ the number of endpoints taking `Depends(get_session)`, the size of
 | `test_metadata_seeding.py` | 13 | Every seed file is well-formed, and the `MetadataProvider` round-trip holds |
 | `test_numeric_matrix_harness.py` | 11 | The matrix's own reporting rules and the exit status of a narrowed run |
 | `test_seed_reconciliation.py` | 7 | The DB copy of the metadata tracks the seed files without eating runtime data, and the seeder refills every table it empties |
+
+**`tests/lockstep/` — Petacat's decision traces (the Petacat/Metacat lockstep harness)**
+
+| File | Fns | Covers |
+|------|----:|--------|
+| `test_comparer.py` | 23 | The trace comparer: hand-made trace pairs with known faults give the expected classes |
+| `test_helpers.py` | 11 | Helper conformance: `prob`, `~`, `weighted_pick` and `pick` give Metacat's results for the same draws |
+| `test_naming.py` | 9 | Canonical names for plain values and every kind of object, and the opening state against Metacat's |
+| `test_replay.py` | 14 | Tracing rules, trace shape, self-replay, Guard 1, fatal and surplus paths, Guard 2 (slow) |
+| `test_seam.py` | 6 | The engine's trace seam changes nothing for an ordinary run; the faithful clamp-expiry switch |
 
 **`tests/e2e/` — the HTTP API against a real database**
 

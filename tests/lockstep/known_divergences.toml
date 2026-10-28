@@ -1,0 +1,63 @@
+# Known divergences between Petacat and Metacat that have been triaged and kept
+# (meta-peta-trace-idea.md section 9.1).  The comparer (scripts/compare_traces.py)
+# reports a matching error separately and does not count it as an error.
+#
+# Ids are "<doc>:<id>" (DISC5:A-4 = DISCREPANCIES5.md A-4).  Several entries may share
+# one id when one divergence shows up at several sites.
+#
+# MATCHING RULE.  An entry applies to a Petacat decision when ALL of these hold:
+#   * match.class equals the error class (p, weights, options, ...);
+#   * every site key in `match` agrees with the decision's Petacat `site`:
+#       petacat_file     repo-relative path of the file in `site` ("file:line")
+#       petacat_function name of the function enclosing `line` in that file; the
+#                        comparer finds it by parsing the file with `ast`, so the
+#                        entry survives line-number edits
+#       petacat_codelet  codelet type for sites written "<codelet:name>:line"
+#       petacat_site     exact raw site string (fragile; avoid)
+#     At least one site key is required.
+#   * effect = "complement": only a `p` error where petacat p == 1 - metacat p;
+#     effect = "skip": any error of that class at the site.
+#
+# The complemented-coin sites below were verified against DISCREPANCIES5.md A-4 and
+# the engine source: each tests the survival outcome with p where Metacat tests
+# (stochastic-if* (1- p) (fizzle)).
+#   evaluate_structure  builtins.py (bond/description/bridge/rule evaluators; the rule
+#                       evaluator is a bare strength, rules.ss:468, same coin sense)
+#   evaluate_group      builtins.py (group evaluator)
+#   attempt_jootsing    jootsing.py (rng.prob(jootsing_probability))
+#   breaker codelet     seed_data/codelet_types.json body, `<codelet:breaker>`
+# builtins.py:2001 `prob` / `_temp_adjusted_prob` are generic DSL wrappers, not sites;
+# their callers appear as "<codelet:...>" sites and are NOT complemented (scouts,
+# answer-finder), so they are deliberately not registered.
+
+[[divergence]]
+id = "DISC5:A-4"
+name = "evaluate_structure"
+cause = "deliberate"
+match = { class = "p", petacat_file = "server/engine/codelet_dsl/builtins.py", petacat_function = "evaluate_structure" }
+effect = "complement"
+note = "Same survival probability, opposite half of the coin (bond, description, bridge, rule evaluators)"
+
+[[divergence]]
+id = "DISC5:A-4"
+name = "evaluate_group"
+cause = "deliberate"
+match = { class = "p", petacat_file = "server/engine/codelet_dsl/builtins.py", petacat_function = "evaluate_group" }
+effect = "complement"
+note = "Same survival probability, opposite half of the coin (group evaluator)"
+
+[[divergence]]
+id = "DISC5:A-4"
+name = "attempt_jootsing"
+cause = "deliberate"
+match = { class = "p", petacat_file = "server/engine/jootsing.py", petacat_function = "attempt_jootsing" }
+effect = "complement"
+note = "Metacat jootsing.ss:76 fizzles on (1- p); Petacat tests p"
+
+[[divergence]]
+id = "DISC5:A-4"
+name = "breaker"
+cause = "deliberate"
+match = { class = "p", petacat_codelet = "breaker" }
+effect = "complement"
+note = "Metacat breakers.ss:22 tests (1- p); Petacat's breaker body tests p"

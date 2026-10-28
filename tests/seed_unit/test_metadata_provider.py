@@ -371,6 +371,11 @@ _READ_BY_THE_ENGINE_BUT_NOT_OFFERED = {
     "max_theme_activation",
     "distance_threshold",
     "slippage_ignore_probability",
+    # A faithful-mode switch for the lockstep harness (``tests/lockstep/``), set by
+    # ``tests/lockstep/faithful.py`` and not offered as a Run control: the default
+    # (``false``) is Petacat's own update-cycle countdown, ``true`` is Metacat's fixed
+    # unclamp time (``run.ss:151-154``).
+    "initial_clamp_fixed_time",
 }
 
 #: Read by the control API, never by a run.

@@ -28,7 +28,7 @@ license change was authorised by Dr. Marshall directly (see
 > end-to-end. Episodic Memory shapes the runs that inherit it: a run declines an
 > answer already held for the same problem and rules, so repeating a problem
 > within a [Training Session](#persistence-modes-and-training-sessions) explores
-> a different answer each time. It ships with 2,251 test cases covering the engine, the API, and the
+> a different answer each time. It ships with 2,337 test cases covering the engine, the API, and the
 > help/config system, run on both the CPU and the GPU numeric backends. Underneath the seven components sits an execution
 > substrate — three [persistence modes](#persistence-modes-and-training-sessions),
 > a [GPU numeric substrate](#the-numeric-substrate), and
@@ -107,7 +107,10 @@ original Scheme `run.ss:295-315`):
 4. Snag-period stochastic exit
 5. Clamp-period expiration check
 6. Tick clamp expirations (slipnet + temperature) — Petacat's own mechanism, so a
-   clamp lapses on the update cycle that reaches its expiry
+   clamp lapses on the update cycle that reaches its expiry. (Metacat instead
+   unfreezes the initially clamped nodes at a fixed codelet count, `run.ss:151-154`;
+   the `initial_clamp_fixed_time` parameter, off by default, selects that, and the
+   lockstep harness's faithful mode turns it on.)
 7. Spread activation: workspace → themespace
 8. Spread activation within themespace
 9. Update slipnet: theme→slipnet, then internal decay/spread/jump
@@ -339,13 +342,14 @@ no run is active.
 Petacat has two test suites:
 
 - **Backend** (`tests/`) — Python / pytest. Covers the engine, the API, the
-  help-topic system, and database persistence. Organised into six layers:
+  help-topic system, and database persistence. Organised into seven layers:
   `unit` (one class or function against fakes), `seed_unit` (one class or
   function against the shipped `seed_data/`), `module` (component assembly with
   codelets running), `architecture` (properties of the source tree),
-  `integration` (the repository's artifacts agreeing), and `e2e` (full HTTP
-  stack against a running database). All six run in a single command against
-  the local Postgres — 2,251 cases, which includes the numeric matrix's second
+  `integration` (the repository's artifacts agreeing), `lockstep` (Petacat's decision
+  traces against Metacat's), and `e2e` (full HTTP
+  stack against a running database). All seven run in a single command against
+  the local Postgres — 2,337 cases, which includes the numeric matrix's second
   pass over the 440 backend-sensitive tests. See
   [TESTING.md](TESTING.md) for the layer breakdown, the numeric backend matrix,
   the session ceiling, the unit-test rules, determinism requirements, test-double

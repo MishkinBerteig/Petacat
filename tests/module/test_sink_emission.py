@@ -67,9 +67,9 @@ class RecordingSink:
         return [e[0] for e in self.events]
 
 
-def _run(meta, sink=None, steps=800, problem=("abc", "abd", "mrrjjj")):
+def _run(meta, sink=None, steps=800, problem=("abc", "abd", "mrrjjj"), seed=42):
     runner = EngineRunner(meta)
-    runner.init_mcat(*problem, seed=42, sink=sink)
+    runner.init_mcat(*problem, seed=seed, sink=sink)
     result = runner.run_mcat(max_steps=steps)
     return runner, result
 
@@ -189,8 +189,12 @@ def test_descriptions_built_by_codelets_are_reported(meta):
     # as soon as the strings are bonded (it carries the mapping deficit, per
     # ``workspace.ss:581-585``), so the run explores for longer before any
     # proposal survives its evaluator.
+    #
+    # Seed 8 rather than the file's 42: the whole-number ``~`` delta (A-1) changed which
+    # seeds reach a description builder, and seed 42 answers ``mrrjjj`` at codelet 412
+    # without ever building one.
     sink = RecordingSink()
-    _run(meta, sink, steps=1500)
+    _run(meta, sink, steps=1500, seed=8)
     described = [
         e for e in sink.events
         if e[0] == "structure" and e[2] == "Description"

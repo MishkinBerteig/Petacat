@@ -13,6 +13,7 @@ real ``WorkspaceString`` over a slipnet faked down to its ``.nodes`` mapping.
 
 from server.engine.bonds import Bond
 from server.engine.groups import Group
+from server.engine.rng import TraceSeam
 from server.engine.workspace import WorkspaceString
 
 from tests.unit._fakes import FakeNode
@@ -304,7 +305,7 @@ def test_local_density_ignores_a_neighbour_bond_of_another_category():
 # free-running the walk consumes the executing codelet's own stream.
 
 
-class _RecordingRNG:
+class _RecordingRNG(TraceSeam):
     """Only the one method the neighbour pick calls."""
 
     def __init__(self):

@@ -19,6 +19,7 @@
   "initial_temperature": 100,
   "update_cycle_length": 15,
   "initial_slipnode_clamp_cycles": 50,
+  "initial_clamp_fixed_time": false,
   "garbage_collect_cycles": 100,
   "step_cycles": 1,
   "expiration_period": 500,
