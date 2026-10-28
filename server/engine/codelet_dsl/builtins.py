@@ -809,7 +809,7 @@ def _premises_still_hold(ctx: EngineContext, structure: Any) -> bool:
         obj = _flip_original(structure, obj) or obj
         string = getattr(obj, "string", None)
         if string is None:
-            continue
+            return False  # `object-exists?` is membership in the Workspace's objects
         if obj not in string.objects:
             return False
     return True
@@ -1019,11 +1019,13 @@ def _absorb_duplicate_group(
             descriptor.activate_from_workspace()
 
     for description in proposed.descriptions:
-        # ``description-present?`` is ``descriptions-equal?`` (descriptions.ss:195-197):
-        # the same type *and* descriptor, not merely the same type.
-        if any(d.description_type is description.description_type
-               and d.descriptor is description.descriptor
-               for d in existing.descriptions):
+        # ``description-present?`` (workspace-objects.ss:281-282) compares type AND
+        # descriptor over ``get-all-descriptions``, not the type alone.
+        if any(
+            d.description_type is description.description_type
+            and d.descriptor is description.descriptor
+            for d in existing.get_all_descriptions()
+        ):
             continue
         transferred = Description(
             existing, description.description_type, description.descriptor
@@ -1417,9 +1419,17 @@ def _apply_group_flips(ctx: EngineContext, bridge: Bridge) -> None:
         for bond in getattr(new_group, "group_bonds", ()):
             bond.proposal_level = bond.BUILT
             new_group.string.add_bond(bond)
+            # ``build-bond`` (bonds.ss:419-421) jolts the category and the direction.
+            activate_from_workspace(ctx, bond.bond_category, bond.direction)
             ctx.sink.on_structure_change(ctx, bond, STRUCTURE_BUILT)
         new_group.proposal_level = new_group.BUILT
         new_group.string.add_group(new_group)
+        # ``build-group`` (groups.ss:925-930) claims the bonds and jolts every
+        # description's descriptor, as the ordinary build does above.
+        for bond in getattr(new_group, "group_bonds", ()):
+            bond.enclosing_group = new_group
+        for description in new_group.descriptions:
+            activate_from_workspace(ctx, getattr(description, "descriptor", None))
         _record_group_event(ctx, new_group, flipped=True)
         ctx.sink.on_structure_change(ctx, new_group, STRUCTURE_BUILT)
         _wrote(ctx, new_group, *getattr(new_group, "objects", ()))
