@@ -1749,41 +1749,10 @@ class Workspace:
         return letters
 
     def _rule_describable_bridge(self, bridge: Bridge) -> bool:
-        """Check if a bridge can be used to describe a rule change.
+        """Scheme: rules.ss:528-541 (one implementation, in rules.py)."""
+        from server.engine.rules import rule_describable_bridge
 
-        Scheme: rules.ss:528-541.
-        Conditions based on object types (letter vs group) and bond facets.
-        """
-        from server.engine.groups import Group as GroupClass
-        obj1 = bridge.object1
-        obj2 = bridge.object2
-        obj1_is_letter = isinstance(obj1, Letter)
-        obj2_is_letter = isinstance(obj2, Letter)
-        obj1_is_group = isinstance(obj1, GroupClass)
-        obj2_is_group = isinstance(obj2, GroupClass)
-
-        # letter -> letter: always ok
-        if obj1_is_letter and obj2_is_letter:
-            return True
-        # letter -> group: only sameness group based on letter-category
-        if obj1_is_letter and obj2_is_group:
-            bf = getattr(obj2, "bond_facet", None)
-            gc = getattr(obj2, "group_category", None)
-            bf_name = getattr(bf, "name", "") if bf else ""
-            gc_name = getattr(gc, "name", "") if gc else ""
-            return bf_name == "plato-letter-category" and gc_name == "plato-samegrp"
-        # group -> letter: ok if group based on letter-category
-        if obj1_is_group and obj2_is_letter:
-            bf = getattr(obj1, "bond_facet", None)
-            bf_name = getattr(bf, "name", "") if bf else ""
-            return bf_name == "plato-letter-category"
-        # group -> group: both must share same bond-facet
-        if obj1_is_group and obj2_is_group:
-            bf1 = getattr(obj1, "bond_facet", None)
-            bf2 = getattr(obj2, "bond_facet", None)
-            return bf1 is bf2 and bf1 is not None
-
-        return False
+        return rule_describable_bridge(bridge)
 
     @staticmethod
     def _rules_equal(rule1: Rule, rule2: Rule) -> bool:

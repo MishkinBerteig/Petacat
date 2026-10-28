@@ -1910,8 +1910,9 @@ def rule_describable_bridge(bridge: Bridge) -> bool:
         # Check if related (same node, or linked)
         if gc1 is gc2:
             return True
-        label = get_label(gc1, gc2, _get_slipnet_from_object(o1))
-        return label is not None
+        # ``related?`` = eq? or ``linked?`` (slipnet.ss:352-359): any outgoing link,
+        # labelled or not (the old ``get_label`` test missed unlabelled links).
+        return any(link.to_node is gc2 for link in gc1.outgoing_links)
 
     return False
 
