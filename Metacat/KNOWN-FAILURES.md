@@ -157,3 +157,38 @@ The separate `newline` shadowing error in the first continuation preflight
 was a collector-wrapper bug, fixed before main continuation. It is archived
 under `aborted-preflight/` for transparency and is not one of these three
 Metacat engine failures.
+
+## Status (lockstep pass)
+
+Added 2026-10-28.  The reconstruction patches and the published study are unchanged; the cases
+were diagnosed with the lockstep recorder (`tests/lockstep/metacat/`) and a Chez continuation
+inspector.  There are **two** causes, not three, and both are in code the patches do not touch.
+
+* **Seeds 20713988 and 20716342 (`abc cba mrrjjj`, same cause).**  The answer-finder translates a
+  rule that swaps the *leftmost letter* and the *rightmost group* of the whole-string group
+  (`m` and the length group `[jjj rr]`; `m` is a singleton group `[m]`).  `apply-string-position-swap`
+  exchanges the two images' states, so the image of the singleton group `[m]` (bond facet
+  letter-category, start letter `m`) now has the length-based group as its only sub-image.
+  `instantiate-as-group` (`images.ss`) calls `make-group` for it; `new-group` computes
+  `initial-letter-category` as the letter-category descriptor of the first object, which is `#f`
+  for a length-based group (`groups.ss:76`); `make-group` (`groups.ss:47-51`) then sends
+  `get-uppercase-name` to `#f` ("attempt to apply non-procedure #f").  Call chain: `answer-finder`
+  -> `make-translated-string` -> `postorder-interior-walk` -> `instantiate-as-group` -> `make-group`.
+* **Seed 20226148 (`abc aabbcc kkjjii`).**  `rule-scout` -> `make-rule` -> `transcribe-to-english`
+  -> `get-change-phrase` (`rules.ss:1870-1874`) evaluates `(3rd BondFacet-change)` with
+  `BondFacet-change` = `#f` (caddr of `#f`).  `change-descriptions->rule-clause-template`
+  (`rules.ss:793-801`) asks only the **first** change description of a reference object for its
+  BondFacet change, but the `(self group-category opposite)` change need not be first (the order
+  follows the bridges and the abstraction coin flips), so the clause carries a group-category
+  change without its bond-facet change.
+
+**Optional fix** (`tests/lockstep/metacat/known-failures.patch`, not applied by the reconstruction
+or the recorder): `make-group` skips the LettCtgy description and the print name when
+`initial-letter-category` does not exist (the group gets none, as a length-based group gets none);
+`change-descriptions->rule-clause-template` takes the first BondFacet change of any of the
+descriptions (`ormap-meth`).  Verified: the three seeds run to an answer (`rrjjjm` after 2835 and
+1981 codelets, `kji` after 2152), and 88 other recordings (`abc abd xyz`, `abc cba mrrjjj` seeds
+1-10; seeds 1-4 of the other 17 demo problems) are byte-identical with and without the patch.
+Any use of it still counts as a changed engine in the sense of item 4 above.  How to apply it:
+`tests/lockstep/metacat/README.md`.  Petacat replays all three recordings: unpatched, in lockstep
+to the crash point (it does not crash and carries on); patched, to the end with no differences.

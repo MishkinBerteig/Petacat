@@ -845,14 +845,22 @@ def _get_constituent_objects(obj: Any) -> list[Any]:
 
 
 def _get_ending_letter_category(group: Any) -> SlipnetNode | None:
-    """Get the ending letter-category of a group (the last sub-object's letter-category)."""
+    """The letter-category descriptor of the last object in direction order.
+
+    Scheme: groups.ss:228 ``get-ending-letter-category`` --
+    ``(tell (last ordered-objects) 'get-descriptor-for plato-letter-category)``, where
+    ``ordered-objects`` is the reverse of the objects for a left-pointing group
+    (groups.ss:68-70).  The object may be a group (its letter-category description),
+    not only a letter.
+    """
     objects = getattr(group, "objects", [])
     if not objects:
         return None
-    # groups.ss:70-73,228-229: the *last of the ordered objects*, and a left-
-    # directed group's ordered objects are its objects reversed.
     left = getattr(getattr(group, "direction", None), "name", "") == "plato-left"
     last = objects[0] if left else objects[-1]
+    for d in getattr(last, "descriptions", []):
+        if getattr(d.description_type, "name", "") == "plato-letter-category":
+            return d.descriptor
     return getattr(last, "letter_category", None)
 
 
@@ -2151,7 +2159,15 @@ def change_descriptions_to_rule_clause_template(
     first = change_descriptions[0]
     if first.is_intrinsic:
         ref_obj = first.reference_object
-        bf_change = first.get_bond_facet_change(slipnet)
+        # rules.ss:793-801 asks only the first description.  Metacat crashes in
+        # transcribe-to-english (caddr of #f, KNOWN-FAILURES.md) when a GroupCtgy self
+        # change is not first; the corrected reference (tests/lockstep/metacat/
+        # known-failures.patch) takes the first BondFacet change of any description.
+        bf_change = next(
+            (bf for bf in (cd.get_bond_facet_change(slipnet) for cd in change_descriptions
+                           if cd.is_intrinsic) if bf is not None),
+            None,
+        )
         templates = [cd.make_change_template() for cd in change_descriptions]
         if bf_change is not None:
             templates = [bf_change] + templates

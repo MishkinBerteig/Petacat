@@ -20,4 +20,46 @@
 #
 # DISC5:A-4 (complemented survival coins) is no longer registered: the lockstep pass
 # changed every such Petacat site to ask the reference's side of the coin, so the
-# replay pairs them directly.  The registry is empty until triage keeps a divergence.
+# replay pairs them directly.
+#
+# REFERENCE CRASHES.  An entry with  match.class = "reference-crash"  names a trace by
+# match.problem (the three strings) and match.seed.  When that trace's Metacat `end` record
+# has reason "error", every finding of the replay at or after the crashing codelet (Petacat
+# carries on where Metacat died) and the end-record mismatch are registered, not counted.
+
+
+# The three Metacat crashes of Metacat/KNOWN-FAILURES.md (cause "reference").  Two reference
+# bugs; see "Status (lockstep pass)" in that file and tests/lockstep/metacat/known-failures.patch.
+
+[[divergence]]
+id = "REF:crash-singleton-letter-swap-20713988"
+cause = "reference"
+effect = "skip"
+name = "make-group: initial-letter-category is #f (abc cba mrrjjj, seed 20713988)"
+note = "A translated rule swaps the letter of a singleton group [m] with a length-based group; make-group (groups.ss:47-51) then sends get-uppercase-name to the #f letter category. Petacat gives the group no letter-category description and finishes with rrjjjm, as the patched Metacat does."
+[divergence.match]
+class = "reference-crash"
+problem = ["abc", "cba", "mrrjjj"]
+seed = 20713988
+
+[[divergence]]
+id = "REF:crash-singleton-letter-swap-20716342"
+cause = "reference"
+effect = "skip"
+name = "make-group: initial-letter-category is #f (abc cba mrrjjj, seed 20716342)"
+note = "Same defect as seed 20713988 (same call chain: answer-finder, make-translated-string, instantiate-as-group, make-group)."
+[divergence.match]
+class = "reference-crash"
+problem = ["abc", "cba", "mrrjjj"]
+seed = 20716342
+
+[[divergence]]
+id = "REF:crash-bondfacet-not-first-20226148"
+cause = "reference"
+effect = "skip"
+name = "change-descriptions->rule-clause-template: BondFacet change taken from the first description only (abc aabbcc kkjjii, seed 20226148)"
+note = "A rule whose GroupCtgy self change is not the first change description of its group has no BondFacet change; transcribe-to-english then takes (3rd #f) (rules.ss:1870-1874). Petacat takes the first BondFacet change of any description, as the patched Metacat does."
+[divergence.match]
+class = "reference-crash"
+problem = ["abc", "aabbcc", "kkjjii"]
+seed = 20226148

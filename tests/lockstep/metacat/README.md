@@ -10,6 +10,7 @@ number of its own and changes nothing Metacat computes.
 | `record.py` | CLI (plain `python3`, stdlib only): builds the patched source, writes a driver per problem and seed, runs Docker, gzips the trace |
 | `recorder.patch` | Unified diff against `Metacat/build/source` (8 files, about 50 added lines) |
 | `decision-trace.ss` | Run-time wrappers, JSON writer, canonical names, `trace-open`, `trace-run`, snapshots, `dump-opening-names` |
+| `known-failures.patch` | Optional fix of the three reference crashes (`Metacat/KNOWN-FAILURES.md`); not applied by default |
 | `random-audit.ss` | Debug only: shadows `random` to find raw draws attributed to no decision |
 | `opening-names.abc-abd-xyz.json` | Canonical names of every letter, description and slipnet node of the opening state (95 names, sorted) |
 
@@ -172,3 +173,31 @@ byte-identical traces.
   gzipped size is 0.10-1.04 MB with snapshots and 0.07-0.73 MB without (raw 4-41 MB; about 12 KB raw and 0.3 KB gzipped per
   codelet).  Codelet-choice and eviction records (whole rack) are about 85% of the raw bytes, snapshots about 6%.  Extrapolating
   to a run that reaches the 100,000-codelet cap: about 1 GB raw, 30 MB gzipped, a few minutes.
+
+
+## The three reference crashes and `known-failures.patch`
+
+`Metacat/KNOWN-FAILURES.md` lists three seeds on which Metacat itself crashes
+(`abc cba mrrjjj` 20713988 and 20716342, `abc aabbcc kkjjii` 20226148).  The reconstruction
+(`Metacat/patches/`, `Metacat/build/source`) is the reference behind published studies and is
+**not** changed.  The recorder records them as they are: the trace ends with an `end` record of
+reason `error` (`tests/lockstep/traces-known-failures/unpatched/`), and the comparer registers
+them as reference crashes (`known_divergences.toml`, `match.class = "reference-crash"`).
+
+`known-failures.patch` is a unified diff against `Metacat/build/source` (`-p1`; two files,
+`groups.ss` and `rules.ss`) that fixes the two causes.  It changes no run that does not crash:
+`abc abd xyz` and `abc cba mrrjjj` seeds 1-10 and seeds 1-4 of every demo problem record
+byte-identical traces with and without it.  To use it on a copy:
+
+```sh
+cp -R Metacat/build/source /tmp/metacat-fixed && patch -p1 -d /tmp/metacat-fixed < tests/lockstep/metacat/known-failures.patch
+# or, to record with it (applies it, then recorder.patch, to Metacat/build/recorder-source-kf):
+python3 tests/lockstep/metacat/record.py --known-failures-patch --problem abc cba mrrjjj \
+    --seeds 20713988,20716342 --out /tmp/kf
+python3 tests/lockstep/metacat/record.py --known-failures-patch --problem abc aabbcc kkjjii \
+    --seeds 20226148 --out /tmp/kf
+```
+
+The patched recordings are in `tests/lockstep/traces-known-failures/patched/`; Petacat replays them
+with full agreement (`PYTHONPATH=. .venv/bin/python scripts/lockstep_corpus.py --traces
+tests/lockstep/traces-known-failures/patched --problem abc-cba-mrrjjj`).

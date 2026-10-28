@@ -31,6 +31,12 @@ id = "DISC5:A-4"
 cause = "deliberate"
 match = { class = "p", petacat_codelet = "breaker" }
 effect = "complement"
+
+[[divergence]]
+id = "REF:crash"
+cause = "reference"
+effect = "skip"
+match = { class = "reference-crash", problem = ["abc", "abd", "xyz"], seed = 1 }
 """
 
 
@@ -267,3 +273,29 @@ def test_ratchet_regression_detection():
     assert len(corpus.ratchet_regressions(old, {"x/1": {"reach": 90, "agreement": 0.9, "unregistered_errors": 3}})) == 1
     assert len(corpus.ratchet_regressions(old, {"x/1": {"reach": 100, "agreement": 0.8, "unregistered_errors": 4}})) == 2
     assert corpus.ratchet_regressions(old, {}) != []
+
+
+def test_reference_crash_registers_what_follows_the_crashing_codelet():
+    # Metacat died inside codelet 5 (end reason "error"); Petacat carried on and answered.
+    m = [prob(0.5, c=4), prob(0.5, c=5)]
+    pets = pair_up(m) + [{**prob(0.5, c=5), "pair": None}, {**prob(0.5, c=6), "pair": None}]
+    rep = run(m, pets, meta_end={"t": "end", "c": 5, "reason": "error", "error": "boom", "codelets": 4},
+              pet_end=end(c=6))
+    assert rep.unregistered_error_count == 0
+    assert rep.registered_counts == {"REF:crash": 3}
+
+
+def test_reference_crash_does_not_hide_an_earlier_divergence():
+    m = [prob(0.5, c=4), prob(0.5, c=5)]
+    pets = pair_up(m, [prob(0.6, c=4), prob(0.5, c=5)])
+    rep = run(m, pets, meta_end={"t": "end", "c": 5, "reason": "error", "error": "boom", "codelets": 4},
+              pet_end=end(c=5))
+    assert rep.counts == {"p": 1}
+
+
+def test_reference_crash_needs_a_matching_trace():
+    m = [prob(0.5, c=5)]
+    meta = ct.Trace.from_records([{**HEADER, "seed": 2}, *m, {"t": "end", "c": 5, "reason": "error"}])
+    pet = ct.Trace.from_records([{**HEADER, "seed": 2}, *pair_up(m), end(c=5)])
+    rep = ct.compare_traces(meta, pet, REGISTRY)
+    assert rep.counts == {"end": 1}

@@ -1,0 +1,39 @@
+--- a/groups.ss
++++ b/groups.ss
+@@ -43,12 +43,17 @@
+       (tell group 'new-bond-description plato-bond-facet group-bond-facet)
+       ;; Attaching LettCtgy descriptions to groups even if they are successor or
+       ;; predecessor groups allows horizontal bridges such as [abc] --> [bcd]:
++      ;; A letter-category group can have no letter category when its first
++      ;; object is a length-based group (a singleton group whose letter was
++      ;; swapped for such a group by a translated rule); it then gets no
++      ;; LettCtgy description, as a length-based group gets none.
+       (if* (eq? group-bond-facet plato-letter-category)
+ 	(let ((initial-letter-category (tell group 'get-initial-letter-category)))
+-	  (tell group 'new-description plato-letter-category initial-letter-category)
+-	  (if* (eq? group-category plato-samegrp)
+-	    (tell group 'set-print-name
+-	      (tell initial-letter-category 'get-uppercase-name)))))
++	  (if* (exists? initial-letter-category)
++	    (tell group 'new-description plato-letter-category initial-letter-category)
++	    (if* (eq? group-category plato-samegrp)
++	      (tell group 'set-print-name
++		(tell initial-letter-category 'get-uppercase-name))))))
+       (tell group 'set-ascii-name)
+       (if* %workspace-graphics%
+ 	(tell group 'set-graphics-parameters))
+--- a/rules.ss
++++ b/rules.ss
+@@ -795,7 +795,11 @@
+     (case (tell (1st change-descriptions) 'object-type)
+       (intrinsic-change-description
+ 	(let ((ref-object (tell (1st change-descriptions) 'get-reference-object))
+-	      (BondFacet-change (tell (1st change-descriptions) 'get-BondFacet-change))
++	      ;; The GroupCtgy change need not be the first change description of
++	      ;; its reference object (the order follows the bridges and the
++	      ;; abstraction coin flips); without its BondFacet change the rule
++	      ;; cannot be transcribed to English (get-change-phrase).
++	      (BondFacet-change (ormap-meth change-descriptions 'get-BondFacet-change))
+ 	      (change-templates (tell-all change-descriptions 'make-change-template)))
+ 	  (if (exists? BondFacet-change)
+ 	    (list 'intrinsic ref-object (cons BondFacet-change change-templates))

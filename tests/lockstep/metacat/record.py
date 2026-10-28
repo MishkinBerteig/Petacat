@@ -51,6 +51,7 @@ SOURCE = METACAT / "build" / "source"
 RECORDER_SOURCE = METACAT / "build" / "recorder-source"
 WORK = METACAT / "build" / "recorder-work"
 PATCH = HERE / "recorder.patch"
+KNOWN_FAILURES_PATCH = HERE / "known-failures.patch"
 IMAGE = "metacat:1.2"
 DEFAULT_OUT = REPO / "tests" / "lockstep" / "traces"
 
@@ -59,27 +60,34 @@ def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def ensure_recorder_source() -> Path:
-    """Copy build/source and apply recorder.patch; redo it if the patch changed."""
+def ensure_recorder_source(known_failures: bool = False) -> Path:
+    """Copy build/source and apply recorder.patch; redo it if the patch changed.
+
+    ``known_failures`` also applies known-failures.patch (the optional fix of the three
+    reference crashes) first, into ``build/recorder-source-kf``; the default tree is never
+    touched by it."""
     if not SOURCE.is_dir():
         sys.exit(f"missing {SOURCE}; run Metacat/tools/reconstruct.py first")
-    marker = RECORDER_SOURCE / ".recorder-patch.sha256"
-    want = sha256(PATCH)
+    patches = [KNOWN_FAILURES_PATCH, PATCH] if known_failures else [PATCH]
+    target = METACAT / "build" / ("recorder-source-kf" if known_failures else "recorder-source")
+    marker = target / ".recorder-patch.sha256"
+    want = "+".join(sha256(p) for p in patches)
     if marker.exists() and marker.read_text().strip() == want \
-            and marker.stat().st_mtime >= PATCH.stat().st_mtime:
-        return RECORDER_SOURCE
-    if RECORDER_SOURCE.exists():
-        shutil.rmtree(RECORDER_SOURCE)
-    shutil.copytree(SOURCE, RECORDER_SOURCE)
-    with PATCH.open("rb") as handle:
-        done = subprocess.run(
-            ["patch", "-p1", "-s", "-d", str(RECORDER_SOURCE)],
-            stdin=handle, capture_output=True, text=True)
-    if done.returncode != 0:
-        shutil.rmtree(RECORDER_SOURCE, ignore_errors=True)
-        sys.exit(f"recorder.patch does not apply:\n{done.stdout}{done.stderr}")
+            and marker.stat().st_mtime >= max(p.stat().st_mtime for p in patches):
+        return target
+    if target.exists():
+        shutil.rmtree(target)
+    shutil.copytree(SOURCE, target)
+    for patch in patches:
+        with patch.open("rb") as handle:
+            done = subprocess.run(
+                ["patch", "-p1", "-s", "-d", str(target)],
+                stdin=handle, capture_output=True, text=True)
+        if done.returncode != 0:
+            shutil.rmtree(target, ignore_errors=True)
+            sys.exit(f"{patch.name} does not apply:\n{done.stdout}{done.stderr}")
     marker.write_text(want + "\n")
-    return RECORDER_SOURCE
+    return target
 
 
 def parse_seeds(text: str) -> list[int]:
@@ -352,6 +360,9 @@ def main() -> None:
     parser.add_argument("--audit", action="store_true",
                         help="debug: shadow `random` and report raw draws attributed to "
                              "no decision (the trace itself is unchanged)")
+    parser.add_argument("--known-failures-patch", action="store_true",
+                        help="record on a copy that also has known-failures.patch applied "
+                             "(fix of the three reference crashes; see README)")
     parser.add_argument("--keep-plain", action="store_true",
                         help="also keep the uncompressed .jsonl next to the .gz")
     parser.add_argument("--keep-work", action="store_true")
@@ -373,7 +384,7 @@ def main() -> None:
                          if args.episode_runs else ""), flush=True)
         return
 
-    source = ensure_recorder_source()
+    source = ensure_recorder_source(args.known_failures_patch)
     if args.names:
         dump_names(args, source, problem)
         return
