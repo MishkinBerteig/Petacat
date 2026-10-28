@@ -1225,12 +1225,13 @@ def _propose_bridge_side_effects(
     if ctx is None or length_node is None:
         return
     urgency = ctx.meta.get_urgency("very_high")
-    # The reference hands each scout a *scope* as well as a node; Petacat's
-    # top-down scouts choose their own scope, so only the node is passed.
-    for _ in (object1, object2):
+    # bridges.ss:1124-1131: each description scout is scoped to one bridge
+    # object's string (object1 first, then object2).
+    for obj in (object1, object2):
         ctx.coderack.post(
             _top_down_codelet(
-                ctx, "top-down-description-scout", urgency, length_node
+                ctx, "top-down-description-scout", urgency, length_node,
+                getattr(obj, "string", None),
             )
         )
 
@@ -1243,19 +1244,29 @@ def _propose_bridge_side_effects(
         if hasattr(category, "activate_from_workspace"):
             category.activate_from_workspace()
         ctx.coderack.post(
+            # bridges.ss:1132-1145: scoped to the letter's string.
             _top_down_codelet(
-                ctx, "top-down-group-scout:category", urgency, category
+                ctx, "top-down-group-scout:category", urgency, category,
+                getattr(letter, "string", None),
             )
         )
 
 
-def _top_down_codelet(ctx: Any, codelet_type: str, urgency: int, node: Any) -> Any:
+def _top_down_codelet(
+    ctx: Any, codelet_type: str, urgency: int, node: Any, scope: Any = None
+) -> Any:
+    """A top-down scout.  *scope* is the workspace-string the scout is aimed at
+    (bridges.ss:1124-1145); omitted, the scout ranges over the whole workspace
+    as the slipnet-posted ones do (slipnet.ss:210-222)."""
     from server.engine.coderack import Codelet
 
+    arguments = {"slipnode": node}
+    if scope is not None:
+        arguments["scope"] = scope
     return Codelet(
         codelet_type,
         urgency,
-        arguments={"slipnode": node},
+        arguments=arguments,
         time_stamp=ctx.codelet_count,
     )
 

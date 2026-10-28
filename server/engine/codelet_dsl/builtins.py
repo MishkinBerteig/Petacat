@@ -16,6 +16,8 @@ Organized by category:
 
 from __future__ import annotations
 
+from fractions import Fraction
+
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -503,7 +505,9 @@ def evaluate_group(ctx: EngineContext, group: Group) -> bool:
     survival = group_evaluation_probability(
         group.strength, ctx.temperature.value, ctx.meta
     )
-    if not ctx.rng.prob(survival):
+    # groups.ss:593 ``(stochastic-if* (1- evaluation-prob) (fizzle))`` -- the
+    # reference's side of the coin (DISCREPANCIES5 A-4).
+    if ctx.rng.prob(1.0 - survival):
         return False
     activate_from_workspace(ctx, group.bond_category, group.direction)
     group.proposal_level = group.EVALUATED
@@ -749,11 +753,14 @@ def evaluate_structure(
         else structure.strength / 100.0
     )
     _read(ctx, structure)
-    if ctx.rng.prob(accept_prob):
-        structure.proposal_level = structure.EVALUATED
-        _wrote(ctx, structure)
-        return True
-    return False
+    # ``(stochastic-if* (1- p) (fizzle))`` (bonds.ss:343, descriptions.ss:149,
+    # bridges.ss:1166, rules.ss:468): the coin is asked the reference's question,
+    # so a replayed trajectory takes Metacat's branch (DISCREPANCIES5 A-4).
+    if ctx.rng.prob(1.0 - accept_prob):
+        return False
+    structure.proposal_level = structure.EVALUATED
+    _wrote(ctx, structure)
+    return True
 
 
 def build_structure(ctx: EngineContext, structure: Any) -> bool:
@@ -901,8 +908,26 @@ def _build_structure_locked(ctx: EngineContext, structure: Any) -> bool:
     # here (groups.ss:697-700) and leaves each flipped bond to be swapped for its
     # reversal one at a time in the consolidation below (groups.ss:774-786), so
     # that the string never passes through a state with the slot empty.
-    for opponent, _, _ in incompatibles:
+    losers = [opp for opp, _, _ in incompatibles]
+    if isinstance(structure, Bond):
+        # bonds.ss:396-402 — a bond breaks its incompatible *groups first*, each
+        # guarded by ``(tell *workspace* 'object-exists? group)`` (the common
+        # groups are nested, so breaking the outer one may already have removed
+        # the inner), then the bonds, then the bridges.  ``break-group`` cascades,
+        # so the order decides which intermediate states the string passes through.
+        losers = (
+            [o for o in losers if isinstance(o, Group)]
+            + [o for o in losers if isinstance(o, Bond)]
+            + [o for o in losers if not isinstance(o, (Group, Bond))]
+        )
+    for opponent in losers:
         if isinstance(structure, Group) and isinstance(opponent, Bond):
+            continue
+        if (
+            isinstance(structure, Bond)
+            and isinstance(opponent, Group)
+            and opponent not in opponent.string.objects
+        ):
             continue
         _break_structure_locked(ctx, opponent)
 
@@ -2110,7 +2135,8 @@ def descriptor_support(ctx: EngineContext, string: Any, descriptor_name: str) ->
             for d in g.get_all_descriptions()
         )
     )
-    return 100.0 * described / len(groups)
+    # 100* rounds (workspace-structure-formulas.ss:44-54, utilities.ss:544).
+    return float(round(Fraction(100 * described, len(groups))))
 
 
 def single_letter_group_probability(ctx: EngineContext, group: Any) -> float:
@@ -2125,11 +2151,10 @@ def single_letter_group_probability(ctx: EngineContext, group: Any) -> float:
     ``mrrjjj`` as 1-2-3 makes sense.
     """
     supporting = group.get_num_of_local_supporting_groups()
+    # workspace-structure-formulas.ss:34-37: case 1 -> 4, 2 -> 2, else -> 1.  Zero
+    # supporting groups takes the ``else`` (exponent 1); that branch may be
+    # unreachable (local support is 0.0 there, and 0.0**n == 0.0), but is kept faithful.
     exponent = {1: 4.0, 2: 2.0}.get(supporting, 1.0)
-    if supporting == 0:
-        exponent = ctx.meta.get_formula_coeff(
-            "single_letter_group_exponent_1_supporting"
-        )
     length_activation = ctx.slipnet.nodes["plato-length"].activation
     base = (group._local_support(ctx.rng) / 100.0) * (length_activation / 100.0)
     return temp_adjusted_probability(
@@ -2443,7 +2468,13 @@ def give_up(ctx: EngineContext) -> None:
     """Stop, gracefully, having recognised a loop it cannot break out of.
 
     §4.5.2: "Metacat simply 'gives up' in a graceful manner and stops."
+
+    ``give-up`` (``answers.ss:86-91``) runs one full ``update-everything`` before
+    it suspends, so the state the run stops in is a freshly updated one.
     """
+    update = getattr(ctx, "on_update_everything", None)
+    if update is not None:
+        update()
     ctx._gave_up = True  # type: ignore[attr-defined]
 
 

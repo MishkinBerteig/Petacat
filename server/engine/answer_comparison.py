@@ -759,11 +759,15 @@ class AnswerComparison:
         self.common_themes = [t for t in self.all_themes1 if t in self.all_themes2]
         common_dimensions = {d for d, _ in self.common_themes}
         dimensions1 = [d for d, _ in self.all_themes1]
-        dimensions2 = {d for d, _ in self.all_themes2}
+        dimensions2 = [d for d, _ in self.all_themes2]
+        # ``intersect`` is ``cross-product-filter-map`` (utilities.ss:795-797): one
+        # element per matching *pair*, so repeated dimensions repeat
+        # (answers.ss:490-495), and ``(length differing-dimensions)`` counts them.
         self.differing_dimensions = [
-            d
-            for d in dict.fromkeys(dimensions1)
-            if d in dimensions2 and d not in common_dimensions
+            d1
+            for d1 in dimensions1
+            for d2 in dimensions2
+            if d1 == d2 and d1 not in common_dimensions
         ]
         self.answer1_only = [t for t in self.all_themes1 if t not in self.common_themes]
         self.answer2_only = [t for t in self.all_themes2 if t not in self.common_themes]

@@ -1034,8 +1034,17 @@ class EngineRunner:
         activations_before = {
             name: node.activation for name, node in ctx.slipnet.nodes.items()
         }
-        ctx.slipnet.update_activations(ctx.rng, threshold=threshold)
-        self._record_concept_activation_events(activations_before)
+        # slipnet.ss:140, 153, 167: the flush and the jump are monitored
+        # separately, so the post-flush activations are captured in between.
+        activations_flushed: dict[str, float] = {}
+        ctx.slipnet.update_activations(
+            ctx.rng,
+            threshold=threshold,
+            on_flushed=lambda: activations_flushed.update(
+                {name: node.activation for name, node in ctx.slipnet.nodes.items()}
+            ),
+        )
+        self._record_concept_activation_events(activations_before, activations_flushed)
 
         # 10. Update temperature.  The rule factor asks whether a rule is both
         #     *possible* and supported — and in justify mode, for both pairs
@@ -1072,7 +1081,9 @@ class EngineRunner:
         rng.trace_restore(outer)
 
     def _record_concept_activation_events(
-        self, activations_before: dict[str, float]
+        self,
+        activations_before: dict[str, float],
+        activations_flushed: dict[str, float] | None = None,
     ) -> None:
         """Note when a deep concept's activation moves substantially.
 
@@ -1094,8 +1105,21 @@ class EngineRunner:
         if ctx is None:
             return
         threshold = self.meta.get_param("concept_activation_importance_threshold", 85)
+        # Two monitored changes per node, each tested on its own delta
+        # (slipnet.ss:140 flush, :153 jump): all the flushes, then all the jumps.
+        stages = [(activations_before, activations_flushed)]
+        if activations_flushed:
+            stages = [
+                (activations_before, activations_flushed),
+                (activations_flushed, None),
+            ]
+        for starts, ends in stages:
+            self._record_stage(ctx, threshold, starts, ends)
+
+    def _record_stage(self, ctx, threshold, starts, ends) -> None:
         for name, node in ctx.slipnet.nodes.items():
-            before = activations_before.get(name, 0.0)
+            before = starts.get(name, 0.0)
+            after = node.activation if ends is None else ends.get(name, node.activation)
             # ``trace.ss:1345-1348``: ``(100* (* (% (abs delta)) (% (cd slipnode))))``
             # — a **product** of the magnitude of the change and the concept's depth,
             # over the **absolute** change.  An average lets a shallow concept through
@@ -1103,7 +1127,7 @@ class EngineRunner:
             # concepts being more important"; and ignoring decreases hid the
             # deactivation of a dominant concept, which is as much a milestone as its
             # activation was.
-            if concept_activation_importance(node, before, node.activation) >= threshold:
+            if concept_activation_importance(node, before, after) >= threshold:
                 ctx.trace.record_event(
                     TraceEvent(
                         event_type=CONCEPT_ACTIVATION,

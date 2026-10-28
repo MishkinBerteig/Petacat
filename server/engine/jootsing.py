@@ -11,6 +11,7 @@ Scheme source: jootsing.ss
 from __future__ import annotations
 
 import logging
+from fractions import Fraction
 from typing import TYPE_CHECKING, Any
 
 from server.engine.formulas import weighted_average
@@ -373,8 +374,9 @@ def attempt_jootsing(
         1.0, 10 * num_snags / 100.0
     )
 
-    # Stochastic check -- note Scheme uses (1 - prob) for "failure to joots"
-    if rng is not None and not rng.prob(jootsing_probability):
+    # jootsing.ss:77 ``(stochastic-if* (1- jootsing-probability) (fizzle))`` --
+    # the reference's side of the coin (DISCREPANCIES5 A-4).
+    if rng is not None and rng.prob(1.0 - jootsing_probability):
         return JootserResult(pattern_detected=False)
 
     # Permission to clamp
@@ -548,7 +550,8 @@ def get_clamp_jootsing_probability(
     for clamp in clamps:
         t = clamp.codelet_count
         if codelet_count > 0:
-            elapsed_time_weights.append(100.0 * t / codelet_count)
+            # 100* rounds (jootsing.ss:127-129, utilities.ss:544).
+            elapsed_time_weights.append(float(round(Fraction(100 * t, codelet_count))))
         else:
             elapsed_time_weights.append(100.0)
 
@@ -676,10 +679,13 @@ def joots_from_justify_clamps(
 
     Everything else in the function is a fizzle.
     """
-    if not clamps or not isinstance(clamps[0], ClampEvent):
+    # ``clamps`` is chronological here, whereas the Scheme's trace conses newest-first
+    # (trace.ss:201, jootsing.ss:144 "last clamp first") and takes ``(1st clamps)``;
+    # the most recent clamp is therefore the *last* element.
+    if not clamps or not isinstance(clamps[-1], ClampEvent):
         return JootserResult(pattern_detected=False)
 
-    most_recent = clamps[0]
+    most_recent = clamps[-1]
     top_rule = None
     bottom_rule = None
 
@@ -1000,7 +1006,8 @@ def _build_theme_overlap_table(
 
     table: list[tuple[dict[str, Any], float]] = []
     for group in equiv_groups:
-        overlap = 100.0 * len(group) / num_events
+        # 100* rounds (jootsing.ss:64-65, utilities.ss:544).
+        overlap = float(round(Fraction(100 * len(group), num_events)))
         table.append((group[0], overlap))
 
     return table

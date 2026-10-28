@@ -1,8 +1,11 @@
 """The engine seam changes nothing for an ordinary run (spec §6.5).
 
-The numbers below were measured on the engine *before* the seam was added (with the
-whole-number ``~`` of A-1 already in place, since that fix deliberately changes the
-stream): same seed, same answer, same codelet count and same number of draws.
+When the seam was added these numbers were measured on the engine *before* it (with
+the whole-number ``~`` of A-1 already in place) and matched exactly after it.  The
+lockstep pass's port fixes then changed the stream on purpose, so they were
+re-measured on the fixed engine; they now pin an ordinary run's draws against any
+later change to the seam.  ``test_replay.py`` separately checks that a tracing RNG
+draws exactly what a plain one does.
 """
 
 from __future__ import annotations
@@ -17,10 +20,10 @@ pytestmark = pytest.mark.lockstep
 
 #: (problem, seed, cap) -> (codelets run, RNG.call_count, answers, status)
 BEFORE_THE_SEAM = {
-    (("abc", "abd", "xyz"), 1, 3000): (683, 5031, ["xyz"], "answer_found"),
-    (("abc", "abd", "xyz"), 2, 3000): (2285, 16758, ["wyz"], "answer_found"),
-    (("abc", "abd", "ijk"), 3, 2000): (467, 3509, ["ijl"], "answer_found"),
-    (("abc", "abd", "mrrjjj"), 4, 2500): (1068, 9038, ["mrrkkk"], "answer_found"),
+    (("abc", "abd", "xyz"), 1, 3000): (3000, 22907, [], "halted"),
+    (("abc", "abd", "xyz"), 2, 3000): (3000, 23591, [], "halted"),
+    (("abc", "abd", "ijk"), 3, 2000): (317, 2520, ["ijl"], "answer_found"),
+    (("abc", "abd", "mrrjjj"), 4, 2500): (550, 4682, ["mrrkkk"], "answer_found"),
 }
 
 

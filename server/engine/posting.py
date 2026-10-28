@@ -255,7 +255,9 @@ def evaluate_count_formula(rule: Any, context: PostingContext) -> int:
 
     code = compile_posting_formula(formula, rule.codelet_type)
     try:
-        return int(eval(code, _COUNT_BUILTINS, context))  # noqa: S307
+        # Unrounded: slipnet.ss:214 urgency is an exact rational; only the bin
+            # (get-coderack-bin, coderack.ss:377-382) ever reads it.
+            return eval(code, _COUNT_BUILTINS, context)  # noqa: S307
     except (NameError, KeyError) as exc:
         missing = exc.name if isinstance(exc, NameError) else exc.args[0]
         raise ValueError(
@@ -281,7 +283,9 @@ def evaluate_urgency(rule: Any, context: PostingContext, default: int) -> int:
     if rule is not None and rule.urgency_formula:
         code = compile_posting_formula(rule.urgency_formula, rule.codelet_type)
         try:
-            return int(eval(code, _COUNT_BUILTINS, context))  # noqa: S307
+            # Unrounded: slipnet.ss:214 urgency is an exact rational; only the bin
+            # (get-coderack-bin, coderack.ss:377-382) ever reads it.
+            return eval(code, _COUNT_BUILTINS, context)  # noqa: S307
         except (NameError, KeyError) as exc:
             missing = exc.name if isinstance(exc, NameError) else exc.args[0]
             raise ValueError(

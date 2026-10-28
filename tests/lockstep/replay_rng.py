@@ -26,6 +26,7 @@ from typing import Any, Callable, Iterable, Sequence
 from server.engine.rng import RNG
 from tests.lockstep.context import ReplayStop
 from tests.lockstep.tracing_rng import (
+    picked_weight,
     LockstepBase, caller_site, choice_fields, name_of, option_name,
 )
 from tests.lockstep.trace_io import TraceWriter, read_records
@@ -326,6 +327,9 @@ class ReplayRNG(LockstepBase):
                 live, [weights[i] for i in idx])
             fields["picked"] = name_of(chosen)
             fields["picked_stamp"] = chosen.time_stamp
+            fields["picked_weight"] = picked_weight(options, weights, chosen)
+            fields["picked_urgency"] = float(chosen.urgency)
+            fields["picked_original_urgency"] = float(chosen.original_urgency)
             self._finish("choice", fields, None, site)
             return chosen
         rec = self.trace.decisions[pair]
@@ -342,10 +346,37 @@ class ReplayRNG(LockstepBase):
             )
         stamp = rec.get("picked_stamp")
         exact = [k for k in found if fields["stamps"][k] == stamp]
-        k = exact[0] if exact else min(found, key=lambda j: fields["stamps"][j])
+        candidates = exact or found
+        # Among same-name, same-stamp codelets prefer the one whose share of the
+        # total weight is closest to the share of the codelet Metacat picked: a
+        # clamp restamps the codelets it moves to another bin, so name and stamp
+        # alone can match codelets in two different bins.
+        # An unclamp restores each codelet's original urgency, so two codelets
+        # alike in name, stamp and bin can still differ there: match both
+        # urgencies first.
+        target_weight = rec.get("picked_weight")
+        if len(candidates) > 1 and "picked_urgency" in rec:
+            want = (rec["picked_urgency"], rec.get("picked_original_urgency"))
+            same = [j for j in candidates
+                    if _close(options[idx[j]].urgency, want[0])
+                    and (want[1] is None
+                         or _close(options[idx[j]].original_urgency, want[1]))]
+            candidates = same or candidates
+        if len(candidates) > 1 and target_weight is not None and weights is not None \
+                and rec.get("weights"):
+            want_share = target_weight / sum(rec["weights"])
+            total = sum(weights[i] for i in idx)
+            candidates = sorted(
+                candidates,
+                key=lambda j: abs(weights[idx[j]] / total - want_share),
+            )
+        k = candidates[0] if exact else min(candidates, key=lambda j: fields["stamps"][j])
         chosen = options[idx[k]]
         fields["picked"] = target
         fields["picked_stamp"] = chosen.time_stamp
+        fields["picked_weight"] = None if weights is None else float(weights[idx[k]])
+        fields["picked_urgency"] = float(chosen.urgency)
+        fields["picked_original_urgency"] = float(chosen.original_urgency)
         self._finish("choice", fields, pair, site)
         return chosen
 
@@ -359,3 +390,7 @@ class ReplayRNG(LockstepBase):
             "metacat_records": len(self.trace.decisions),
             "metacat_unpaired": len(self.trace.decisions) - len(self.used),
         }
+
+
+def _close(a: float, b: float) -> bool:
+    return abs(float(a) - float(b)) <= 1e-9 * max(1.0, abs(float(b)))

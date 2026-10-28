@@ -60,6 +60,24 @@ def test_a_clamp_refiles_codelets_already_on_the_rack(coderack):
     assert coderack.total_count == 2
 
 
+def test_a_codelet_that_changes_bin_is_restamped(coderack):
+    """The bin's ``add-codelet`` ends with ``set-time-stamp`` (``coderack.ss:267-283``),
+    so ``set-urgency`` gives a codelet that moves bin the current ``*codelet-count*``
+    as its stamp, and its removal weight starts again from zero age.  One that stays
+    in its bin keeps its stamp."""
+    moved = Codelet("rule-scout", 7, time_stamp=3)
+    stays = Codelet("breaker", 95, time_stamp=3)
+    coderack.post(moved)
+    coderack.post(stays)
+    coderack.current_time = 40
+
+    coderack.clamp_codelet_type("rule-scout", 91)
+    coderack.clamp_codelet_type("breaker", 96)
+
+    assert moved.time_stamp == 40
+    assert stays.time_stamp == 3, "a same-bin clamp must not restamp"
+
+
 def test_refiling_keeps_the_bins_eviction_aggregates_correct(coderack):
     """The bins maintain ``Σ time_stamp`` for the O(1) eviction weights; a move that
     bypassed ``CoderackBin.remove``/``add`` would silently corrupt them."""

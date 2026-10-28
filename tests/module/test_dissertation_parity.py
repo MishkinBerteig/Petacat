@@ -534,20 +534,35 @@ class TestTraceAndSelfWatching:
         adding new concept-activation events to the Trace whenever sufficiently
         large changes occur in the activations of deep concepts."
 
-        Reachability, not frequency: the Trace records one of these only when a
-        *deep* concept's activation moves far enough to clear the importance
-        threshold, which is genuinely occasional — measured at 2 seeds in 12 on
-        this problem.  Pinning a single seed made the test a hostage to every
-        trajectory change, so it searches instead, and fails only if the
-        mechanism never fires at all.
+        Reachability, not frequency.  Each monitored change is tested on its own
+        delta (``slipnet.ss:140, 153, 167``), so only a single jump of at least
+        ``85 * 100 / cd`` clears the threshold: in practice a dormant deep concept
+        flushed to 100 by a Workspace jolt.  That is genuinely rare in a plain run
+        (1 seed in 30 on this problem, after the flush and the jump stopped being
+        summed), so the mechanism is driven directly: a dormant depth-90 concept
+        takes a ``%workspace-activation%`` and goes through the same update cycle
+        the runner runs.
         """
+        from server.engine.runner import EngineRunner
         from server.engine.trace import CONCEPT_ACTIVATION
 
-        for seed in range(12):
-            runner = _run(meta, "abc", "abd", "xyz", seed=seed, steps=1500)
-            if runner.ctx.trace.get_events_by_type(CONCEPT_ACTIVATION):
-                return
-        pytest.fail("no concept-activation event in 12 runs of abc->abd; xyz")
+        runner = _run(meta, "abc", "abd", "xyz", seed=0, steps=0)
+        ctx = runner.ctx
+        node = next(n for n in ctx.slipnet.nodes.values() if n.conceptual_depth >= 90)
+        node.activation = 0.0
+        node.activation_buffer = 100.0
+        before = {name: n.activation for name, n in ctx.slipnet.nodes.items()}
+        flushed = {}
+        ctx.slipnet.update_activations(
+            ctx.rng,
+            on_flushed=lambda: flushed.update(
+                {name: n.activation for name, n in ctx.slipnet.nodes.items()}
+            ),
+        )
+        runner._record_concept_activation_events(before, flushed)
+        assert any(
+            e.slipnode is node for e in ctx.trace.get_events_by_type(CONCEPT_ACTIVATION)
+        )
 
     def test_the_jootser_receives_everything_it_needs_to_act(self, meta):
         """The jootser was being called without ``rng``, ``slipnet`` or

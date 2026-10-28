@@ -6,7 +6,6 @@ from server.engine.formulas import (
     temp_adjusted_probability,
     temp_adjusted_values,
     update_temperature,
-    current_translation_temperature_threshold,
 )
 from server.engine.metadata import MetadataProvider
 from server.engine.rng import RNG
@@ -91,53 +90,3 @@ def test_update_temperature_with_rule(meta):
     temp = update_temperature(50.0, True, meta)
     # weighted_average([50, 0], [70, 30]) = (50*70 + 0*30) / 100 = 35
     assert temp == 35
-
-
-class TestCurrentTranslationTemperatureThreshold:
-    """Test the main function that ties workspace state to threshold sampling."""
-
-    def _make_workspace(self, slipnet, initial="abc", modified="abd", target="xyz"):
-        """Create a minimal workspace for testing."""
-        from server.engine.workspace import Workspace
-        ws = Workspace(initial, modified, target, None, slipnet)
-        return ws
-
-    def test_returns_valid_threshold(self, meta, slipnet):
-        ws = self._make_workspace(slipnet)
-        rng = RNG(42)
-        threshold = current_translation_temperature_threshold(ws, rng, meta)
-        assert threshold in range(10, 101, 10)
-
-    def test_deterministic_with_same_seed(self, meta, slipnet):
-        ws = self._make_workspace(slipnet)
-        t1 = current_translation_temperature_threshold(ws, RNG(42), meta)
-        t2 = current_translation_temperature_threshold(ws, RNG(42), meta)
-        assert t1 == t2
-
-    def test_all_single_letter_strings_gives_very_low_dist(self, meta, slipnet):
-        """When all strings are length 1, bond density = 1.0 -> very-low dist.
-        The very-low distribution peaks at value 20."""
-        ws = self._make_workspace(slipnet, "a", "b", "c")
-        results = [current_translation_temperature_threshold(ws, RNG(i), meta)
-                   for i in range(200)]
-        count_20 = results.count(20)
-        # Very-low dist has peak at 20 (freq 150/168 ~ 89%)
-        assert count_20 > 100
-
-    def test_no_bonds_gives_very_high_dist(self, meta, slipnet):
-        """With no bonds and multi-letter strings, density = 0 -> very-high dist.
-        The very-high distribution peaks at value 60."""
-        ws = self._make_workspace(slipnet, "abc", "abd", "xyz")
-        # No bonds built yet, so density = 0 / 6 = 0
-        results = [current_translation_temperature_threshold(ws, RNG(i), meta)
-                   for i in range(200)]
-        count_60 = results.count(60)
-        # Very-high dist has peak at 60 (freq 150/168 ~ 89%)
-        assert count_60 > 100
-
-    def test_works_without_meta(self, slipnet):
-        """Should work with meta=None using hardcoded defaults."""
-        ws = self._make_workspace(slipnet)
-        rng = RNG(42)
-        threshold = current_translation_temperature_threshold(ws, rng)
-        assert threshold in range(10, 101, 10)

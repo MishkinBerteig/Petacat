@@ -299,8 +299,24 @@ class TracingRNG(LockstepBase):
         fields["stamps"] = [stamps[i] for i in idx]
         fields["picked"] = name_of(r)
         fields["picked_stamp"] = r.time_stamp
+        fields["picked_weight"] = picked_weight(options, weights, r)
+        fields["picked_urgency"] = float(r.urgency)
+        fields["picked_original_urgency"] = float(r.original_urgency)
         self._emit("choice", fields, site=label if label == "choose" else f"{label}@{caller_site()}")
         return r
+
+
+def picked_weight(options, weights, chosen) -> float | None:
+    """The chosen codelet's own weight.  Name and stamp do not always identify a
+    codelet -- a clamp restamps the codelets it moves to another bin, so a moved one
+    and one posted in the same cycle can share both -- and replay uses the weight to
+    tell them apart."""
+    if weights is None:
+        return None
+    for option, weight in zip(options, weights):
+        if option is chosen:
+            return float(weight)
+    return None
 
 
 def _num(x: float | int) -> float:

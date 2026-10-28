@@ -204,6 +204,8 @@ reference is ever wanted, and in that case it is a blocker at the first evaluato
 | Answer-finder all-zero weights | extra `if not any(weights): fizzle()` | `answers.ss:943-945` — `stochastic-pick` falls to `random-pick` and proceeds | extra branch, one draw; reachability unclear |
 | Sharded coderack | `coderack_shards.py:502` adds a shard-selection `weighted_pick` | `coderack.ss:417-424` — one pick over bins | free-running only |
 
+**Status (lockstep pass, 2026-10-27):** fixed (one row) / not changed (four) — the singleton-group gate now draws the coin first (new DSL builtin `coin_flip`) and then evaluates `single_letter_group_probability`, fizzling iff `coin < 1 - p` exactly as `stochastic-if*` does (this site therefore also takes the A-4 sense of the coin); the empty concept-mapping list, `num_bonds_to_scan` n<2 and answer-finder all-zero rows are single draws on fizzling or trivial decisions and the sharded rack is free-running only, so they are left.
+
 ---
 
 # B. Arithmetic and distribution
@@ -240,6 +242,8 @@ exact. The decay path has **zero** disagreements over all 10,201 pairs. The spre
 did not get the same treatment. `round(scale * assoc * activation / 100.0)` would fix it.
 
 **Confidence: certain** (both sides computed).
+
+**Status (lockstep pass, 2026-10-27):** fixed — `Node.spread_activation_to_neighbors` now rounds `scale * assoc * activation / 100.0`, so the exact half-way cases (assoc 70, act 45/85) round as Metacat's exact rational does; `tests/unit/test_arithmetic_fidelity.py`.
 
 ## B-2. The Themespace materialises every possible theme
 
@@ -304,6 +308,8 @@ tiny — it moves a probability by 0.003.
 
 **Confidence: certain**, marginal by construction.
 
+**Status (lockstep pass, 2026-10-27):** fixed — both `100*` sites (`overlap` in `_build_theme_overlap_table`, elapsed-time weights in `get_clamp_jootsing_probability`) now round the exact `Fraction` half-to-even.
+
 ## B-4. `descriptor_support` drops the reference's rounding
 
 **Petacat** — `builtins.py:2113`: `return 100.0 * described / len(groups)`.
@@ -315,6 +321,19 @@ Feeds the singleton-group direction pick: 33.33 vs 33. Sub-percentage-point.
 imported by nothing — see D-3.
 
 **Confidence: certain**, negligible.
+
+**Status (lockstep pass, 2026-10-27):** fixed — `descriptor_support` (the builtin the DSL calls) returns `round(Fraction(100*described, n))`; the dead `formulas.py` copy was already faithful.
+
+---
+
+## B-5. Posting urgencies rounded before the bin is chosen (found by the lockstep pre-triage)
+
+**Petacat** — `seed_data/posting_rules.json` wrapped the five top-down formulas and the thematic formula in `round(...)`, `posting.evaluate_urgency` applied `int(...)`, and `Coderack._urgency_to_bin` was `int(u * bins / 100)` clamped.
+**Metacat** — `slipnet.ss:214` makes the urgency the exact rational `(% depth) * activation`; `thematic-codelet-urgency` (`coderack.ss:586-591`) is the unrounded theme activation; `get-coderack-bin` (`coderack.ss:377-382`) is `>= 100 -> last`, `<= 0 -> 0`, else `floor((% urgency) * bins)`. Nothing rounds the urgency.
+
+Rounding first moves any value in `[100k/7, 100k/7 + 0.5)` (and its mirror) one bin: depth*activation/100 = 14.4 is bin 1 in Metacat and bin 0 in Petacat. Bottom-up urgencies are integer constants or `100 - temperature` (an integer in Metacat, `formulas.ss:76`), unaffected.
+
+**Status (lockstep pass, 2026-10-27):** fixed — the formulas no longer round, `evaluate_urgency` returns the raw value, and `_urgency_to_bin` follows `get-coderack-bin` (integers exact, floats divide-then-multiply); bin edges for non-integer urgencies are never within float error of an integer except at 100, so floats land on the exact side. `max(1, round(100 - temperature))` kept (urgency 0 and 1 are both bin 0).
 
 ---
 
@@ -339,6 +358,8 @@ does not. This is one difference with several faces:
 **Confidence: certain** on every ordering. The consequences range from "changes rule
 strength on ties" (real) to "changes nothing today" (the link buckets).
 
+**Status (lockstep pass, 2026-10-27):** fixed (behavioural cases only) — `Workspace.add_bridge`/`add_rule` now prepend (newest first, as `cons`), fixing rule-rank ties and bridge-list walks, and `joots_from_justify_clamps` takes the most recent clamp (`clamps[-1]`, the list being chronological). Not changed: the deferred posting batch (harness absorbs it), per-node link buckets (no consumer depends on it), and `_partition_by` cluster order (invasive; needs a replay trace to show it matters).
+
 ## C-2. `remq-duplicates` keeps the last occurrence; Petacat keeps the first
 
 **Metacat** — `utilities.ss:915-927` drops `(1st l)` when it recurs later.
@@ -351,6 +372,8 @@ and so keeps **two** entries for one dimension with different relations, where a
 dict keyed on dimension collapses them.
 
 **Confidence: certain** on the semantics.
+
+**Status (lockstep pass, 2026-10-27):** partially fixed — `_get_all_swaps` now orders the swap descriptors by `remq-duplicates` (last occurrence kept; it previously used an unordered `set`, so the order was hash-dependent), and `_unjustified_themes` now keeps the first entry per dimension (the Scheme's `assq`). Not changed: the dict form still cannot hold two relations for one dimension (it is persisted as JSONB and read by memory/API), and the remaining order-only dedupes (`get_concept_pattern`, `_swap_descriptor_for`'s symmetric pair).
 
 ## C-3. `sort_templates` orders intrinsic clauses enclosing-first
 
@@ -365,6 +388,8 @@ Clause order is read positionally by `rule-clauses-equal?` (`rules.ss:370-373`),
 **Confidence: certain** on the inversion; partly self-consistent inside Petacat, since
 both rules being compared are sorted the same way.
 
+**Status (lockstep pass, 2026-10-27):** fixed — `sort_templates` now uses the Scheme comparator clause for clause (contained object first, disjoint objects by position) in a plain merge sort, since the comparator is not a strict weak order.
+
 ## C-4. `differing_dimensions` is deduplicated; `intersect` is not
 
 **Petacat** — `answer_comparison.py:760-767` uses `dict.fromkeys`.
@@ -378,6 +403,8 @@ keep the duplicate, so Petacat is internally inconsistent here.
 
 **Confidence: certain** on the arithmetic; **needs-checking** on frequency.
 
+**Status (lockstep pass, 2026-10-27):** fixed — `differing_dimensions` is now the pairwise `intersect` (duplicates survive), so `len()` counts them as in `answers.ss:490-495`.
+
 ## C-5. Answer-description theme dimensions are iterated in a different order
 
 `answers.py:98-104` lists String-Position before Alphabetic-Position;
@@ -385,6 +412,8 @@ keep the duplicate, so Petacat is internally inconsistent here.
 result is stored in an insertion-ordered dict that `_lookup` reads first-match.
 
 **Confidence: certain**, low impact.
+
+**Status (lockstep pass, 2026-10-27):** fixed — `answers.py` `_ANSWER_DESCRIPTION_THEME_TYPES` now lists Alphabetic-Position before String-Position as `answers.ss:213-218` does (the seed-data copy already did).
 
 ---
 
@@ -412,6 +441,8 @@ the correct per-object changes via `intrinsic-implies-intrinsic?`.
 
 **Confidence: certain** that the gate is missing.
 
+**Status (lockstep pass, 2026-10-27):** fixed — added `_subobjects_gate` (with `_common_right_enclosing_object`, `_get_right_enclosing_object`, `_spans_right_side`, `_all_subobjects_describable`); the `subobjects_prob` draw now sits inside the gate. Petacat's extra `<2 constituents` guard (in place of `singleton-group?`) was left as is.
+
 ## D-2. `_get_common_change_schemas` drops every schema with no common relation
 
 **Petacat** — `rules.py:3470-3475` filters on `s[2] is not None`.
@@ -428,6 +459,8 @@ relations — `a→d` alongside `c→d`. Metacat abstracts "change letter-catego
 objects to `d`"; Petacat cannot express that rule at all.
 
 **Confidence: certain.**
+
+**Status (lockstep pass, 2026-10-27):** fixed — `_get_common_change_schemas` filters only schemas whose relation is identity; a `None` relation survives.
 
 ## D-3. Dead second implementations that disagree with the live ones
 
@@ -447,6 +480,8 @@ copy is the more faithful. **Recommend deletion rather than reconciliation**, ex
 where the dead copy is right and the live one is wrong.
 
 **Confidence: certain.**
+
+**Status (lockstep pass, 2026-10-27):** fixed — deleted from `formulas.py` the unreferenced `current_translation_temperature_threshold` (also dead in the Scheme: only the distribution is defined, `formulas.ss:38`), `single_letter_group_probability`, `descriptor_support`, `description_type_support` and their private helpers (`_count_local_supporting_groups`, `_get_group_local_*`, `_has_descriptor`, `_has_description_type`); grep over the repo including `seed_data/` showed only the same-named builtins in `codelet_dsl/builtins.py`, which are the live ones. Removed the test class that exercised the dead threshold function.
 
 ## D-4. `single_letter_group_probability`: zero supporting groups takes exponent 4
 
@@ -483,6 +518,8 @@ case it names. That half is tracked in `PHASE 1 PLAN.md` §0.7, slice 9.
 **Confidence: certain** on the divergence. **Conditional** on reachability, and
 deliberately not resolved.
 
+**Status (lockstep pass, 2026-10-27):** fixed — zero supporting groups now takes the `else` exponent 1, with a comment that the branch may be unreachable (local support is 0.0 there); the unused-coefficient half stays with `PHASE 1 PLAN.md` §0.7.
+
 ## D-5. `_attach_length_to_appropriate_groups` reads `if*` as `if`/`else`
 
 **Petacat** — `answers.py:610-621` uses `if`/`else` and `elif`.
@@ -499,6 +536,8 @@ translated rule's theme pattern.
 
 **Confidence: certain** on the semantics of `if*`.
 
+**Status (lockstep pass, 2026-10-27):** fixed — `if*` is `when`: a Length transform attaches to the source group (if it lacks Length) **and** unconditionally to the instantiated group; the BondFacet:Length branch is a separate, independent test; sub-objects are no longer filtered to `Group`. `attach_length_description` now accepts a letter (platonic length `plato-one`, `workspace-objects.ss:57`).
+
 ## D-6. Bond builder breaks bonds before groups, and without the existence guard
 
 **Petacat** — `builtins.py:904-907` iterates a flat list ordered bonds, groups, bridges.
@@ -513,6 +552,8 @@ unconditionally.
 
 **Confidence: certain** on the ordering; **needs-checking** whether Petacat's `_retire`
 is idempotent enough that the missing guard is harmless.
+
+**Status (lockstep pass, 2026-10-27):** fixed — in `build_structure` a bond now breaks its incompatible groups first, then bonds, then bridges, and skips a group that is no longer in its string (`bonds.ss:396-402`); bonds and bridges stay unguarded as in the Scheme, and `_break_bond` is idempotent so that is harmless.
 
 ## D-7. Workspace aggregates include the answer string outside justify mode
 
@@ -532,6 +573,8 @@ back) and for free-running's post-hoc reconciliation.
 **Confidence: certain** on the divergence; **needs-checking** on how much executes after
 the assignment.
 
+**Status (lockstep pass, 2026-10-27):** fixed — new `Workspace.aggregate_strings` adds the answer string only under `justify_mode` (`workspace.ss:124-160`) and drives `all_objects`, `all_structures`, `update_all_object_values` and the batched strength update; `all_strings` (used by serialization, rules, staleness) is unchanged.
+
 ## D-8. `propose_bridge`'s recruitment loses its target
 
 **Petacat** — `bridges.py:1240-1250` posts top-down scouts with a node but no scope; the
@@ -549,6 +592,8 @@ behind `mrrjjj → mrrjjjj`.
 
 **Confidence: certain.**
 
+**Status (lockstep pass, 2026-10-27):** fixed — `bridges._top_down_codelet` takes a `scope` (the object's string) and stores it in `Codelet.arguments['scope']` when given; the four string-choosing scouts use it instead of `choose_string_for`, and the description scout picks from that string (`bridges.ss:1124-1145`); slipnet-posted scouts carry no scope (= `*workspace*`).
+
 ## D-9. Concept-activation events are sampled once over a combined delta
 
 **Petacat** — `runner.py:952-956` snapshots activations, runs the whole update, and tests
@@ -565,6 +610,8 @@ settling test and can zero the justify-clamp jootsing factor.
 
 **Confidence: certain** that the two differ; **narrow** in reach.
 
+**Status (lockstep pass, 2026-10-27):** fixed — `Slipnet.update_activations` takes an `on_flushed` hook and `runner._record_concept_activation_events` now tests the flush delta and the jump delta separately (`slipnet.ss:140, 153, 167`), all flushes then all jumps.
+
 ## D-10. Jootser: four divergences in the snag-theme pipeline — **three now fixed, and they were the give-up divergence**
 
 | | Petacat | Metacat | |
@@ -573,6 +620,8 @@ settling test and can zero the justify-clamp jootsing factor.
 | No matching snag description | substituted the dimension's conceptual depth (30–90) and drew | `average` of the empty list is **0** (`utilities.ss:422-425`), so the weight is 0 | **fixed** |
 | Snag-object descriptions | kept the multiset | `jootsing.ss:86-88` wraps it in `remq-duplicates` (last occurrence — see C-2) | **fixed** |
 | Negated entries | clamped twice — once by `clamp_event.activate`, again by the codelet body at a hard −100 | `jootsing.ss:113-118` — one clamp event, activated once | open |
+
+**Status (lockstep pass, 2026-10-27):** row 4 fixed — the `jootser` body no longer re-clamps the negative pattern (`themespace.clamp_negative_pattern` and a second `coderack.clamp_pattern`); the clamp event's own `activate` inside `attempt_jootsing` is the single activation, as `jootsing.ss:113-118`.
 
 The first row was not in the original survey and is the largest of the four. `Description`
 carries neither `conceptual_depth` nor `get_conceptual_depth` — the depth lives on
@@ -629,6 +678,8 @@ at the top of this document rather than closed.
 | `Bridge.add_concept_mappings` | `bridges.py:126-128` appends | `bridges.ss:210-213` prepends | first-match `CM-type?` lookups after a duplicate merge |
 | `RNG.pick` on empty | raises | `utilities.ss:475-479` returns `#f` | latent; all call sites appear guarded |
 | `probabilistic_jump_to_full` | `slipnet.py:560-566` has no frozen check | `slipnet.ss:387-389` → `update-activation` is wrapped in `(if* (not frozen?) …)` | unreachable with the shipped data — every clamp lands on 0 or 100 — and recorded under the standard above |
+
+**Status (lockstep pass, 2026-10-27):** per row — `is_verbatim_rule` fixed (exactly one verbatim clause); identity rule fixed (`build_rule_from_bridges` no longer returns `None` for no describable bridges and sets the abstracted rule information); `probabilistic_jump_to_full` fixed (frozen node takes the draw but not the jump). Not changed: `Image.new_start_letter` (assigning `None` would raise a non-`ImageFailure` downstream rather than snag, needs its own pass), `translate_rule` precondition (probably unreachable), Group-Category transform (a Scheme error path), slippage log (new feature), `Bridge.add_concept_mappings` prepend (interacts with the C-1 list-order question, to be settled with it), `RNG.pick` on empty (all call sites guarded).
 
 ---
 

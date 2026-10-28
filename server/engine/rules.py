@@ -1046,7 +1046,8 @@ class Rule(WorkspaceStructure):
 
     @property
     def is_verbatim_rule(self) -> bool:
-        return any(c.is_verbatim for c in self.clauses)
+        # rules.ss:206-208: exactly one clause, and that one verbatim.
+        return len(self.clauses) == 1 and self.clauses[0].is_verbatim
 
     @property
     def is_literal_rule(self) -> bool:
@@ -2026,6 +2027,10 @@ def abstract_change_descriptions(
         common_schemas = _get_common_change_schemas(cluster)
         for schema in common_schemas:
             s_dim, s_desc1, s_rel, s_desc2 = schema
+            # Four-way structural gate (rules.ss:619-634); the stochastic-if*
+            # draw sits *inside* it, so a failed gate consumes no draw.
+            if not _subobjects_gate(cluster, left_enclosing, s_dim, s_desc1, s_desc2):
+                continue
             should_add = (rng is None) or (rng is not None and rng.prob(subobjects_prob))
             if should_add:
                 all_cds.append(IntrinsicChangeDescription(
@@ -2132,21 +2137,52 @@ def change_descriptions_to_rule_clause_template(
         return (CLAUSE_EXTRINSIC, ref_objects, dimensions)
 
 
+def _template_less(t1: tuple, t2: tuple) -> bool:
+    """The comparator of ``sort-templates`` (``rules.ss:816-824``), clause for clause.
+
+    Intrinsic clauses precede extrinsic ones; extrinsic clauses with more
+    dimensions come first; between intrinsic clauses the *contained* object comes
+    first (``(tell (2nd t2) 'nested-member? (2nd t1))``), disjoint objects go by
+    left string position.  This is not a strict weak order, so the sort below is a
+    plain merge sort (as Chez's ``sort``) rather than a key function.
+    """
+    i1 = t1[0] == CLAUSE_INTRINSIC
+    i2 = t2[0] == CLAUSE_INTRINSIC
+    if i1 and not i2:
+        return True
+    if not i1 and not i2:
+        return len(t1[2]) > len(t2[2])
+    if i1 and i2:
+        o1, o2 = t1[1], t2[1]
+        if _nested_member(o2, o1):
+            return True
+        return _disjoint_objects(o1, o2) and (
+            getattr(o1, "left_string_pos", 0) < getattr(o2, "left_string_pos", 0))
+    return False
+
+
 def sort_templates(templates: list[tuple]) -> list[tuple]:
-    """Sort rule-clause-templates: intrinsic before extrinsic, by position.
+    """Sort rule-clause-templates: intrinsic before extrinsic, deepest first.
 
     Scheme: sort-templates (rules.ss:814-826).
     """
-    def key(t: tuple) -> tuple:
-        is_intrinsic = (t[0] == CLAUSE_INTRINSIC)
-        if is_intrinsic:
-            pos = getattr(t[1], "left_string_pos", 0)
-            level = _nesting_level(t[1])
-            return (0, level, pos)
-        else:
-            # Extrinsic: sort by number of dimensions (more = first)
-            return (1, -len(t[2]) if len(t) > 2 else 0, 0)
-    return sorted(templates, key=key)
+    def msort(ls: list[tuple]) -> list[tuple]:
+        n = len(ls)
+        if n <= 1:
+            return list(ls)
+        mid = n >> 1
+        left, right = msort(ls[:mid]), msort(ls[mid:])
+        out: list[tuple] = []
+        i = j = 0
+        while i < len(left) and j < len(right):
+            if _template_less(right[j], left[i]):
+                out.append(right[j])
+                j += 1
+            else:
+                out.append(left[i])
+                i += 1
+        return out + left[i:] + right[j:]
+    return msort(list(templates))
 
 
 # ============================================================================
@@ -3375,6 +3411,53 @@ def _get_left_enclosing_object(bridges: list[Bridge]) -> Any:
     return _get_enclosing_object(bridges[0].object1)
 
 
+def _common_right_enclosing_object(bridges: list[Bridge]) -> bool:
+    """Scheme: ``common-right-enclosing-object?`` (``rules.ss:652-654``): ``all-same?`` of
+    each bridge's ``get-enclosing-group2`` (``#f`` counts as a value)."""
+    groups = [getattr(b.object2, "enclosing_group", None) for b in bridges]
+    return _all_same(groups)
+
+
+def _get_right_enclosing_object(bridges: list[Bridge]) -> Any:
+    """Scheme: ``get-right-enclosing-object`` (``rules.ss:661-663``)."""
+    if not bridges:
+        return None
+    return _get_enclosing_object(bridges[0].object2)
+
+
+def _spans_right_side(bridges: list[Bridge]) -> bool:
+    """Scheme: ``spans-right-side?`` (``rules.ss:677-681``)."""
+    enclosing = _get_right_enclosing_object(bridges)
+    if enclosing is None:
+        return False
+    return _sets_equal_by_id(
+        [b.object2 for b in bridges], _get_constituent_objects(enclosing))
+
+
+def _all_subobjects_describable(obj: Any, description_type: Any, descriptor: Any) -> bool:
+    """Scheme: ``all-subobjects-describable?`` (``rules.ss:641-646``)."""
+    if descriptor is None:
+        return False
+    return all(_get_descriptor_for(o, description_type) is descriptor
+               for o in _get_constituent_objects(obj))
+
+
+def _subobjects_gate(cluster: list[Bridge], left_enclosing: Any,
+                     dim: Any, desc1: Any, desc2: Any) -> bool:
+    """The four-clause ``or`` guarding subobject-schema abstraction (``rules.ss:619-634``)."""
+    spans_left = _spans_left_side(cluster)
+    common_right = _common_right_enclosing_object(cluster)
+    if spans_left and not common_right:
+        return True
+    if spans_left and common_right and _spans_right_side(cluster):
+        return True
+    if spans_left and common_right and _all_subobjects_describable(
+            _get_right_enclosing_object(cluster), dim, desc2):
+        return True
+    return bool(common_right and _spans_right_side(cluster)
+                and _all_subobjects_describable(left_enclosing, dim, desc1))
+
+
 def _spans_left_side(bridges: list[Bridge]) -> bool:
     """Check if bridges cover all constituent objects of their enclosing object."""
     enclosing = _get_left_enclosing_object(bridges)
@@ -3407,6 +3490,13 @@ def _find_slipnet_node_in_bridges(bridges: list[Bridge], node_name: str) -> Slip
                 if node is not None and getattr(node, "name", "") == node_name:
                     return node
     return None
+
+
+def _remq_duplicates(items: list) -> list:
+    """Scheme: ``remq-duplicates`` (``utilities.ss:915-927``) — drops an element that
+    recurs *later*, so the **last** occurrence of each survives, in order."""
+    return [x for i, x in enumerate(items)
+            if not any(x is y for y in items[i + 1:])]
 
 
 def _get_all_swaps(cluster: list[Bridge]) -> list[tuple]:
@@ -3442,11 +3532,9 @@ def _get_all_swaps(cluster: list[Bridge]) -> list[tuple]:
             objects.append(obj)
         # Swap exists when from_descriptors == to_descriptors and there are exactly 2
         if from_descs == to_descs and len(from_descs) == 2:
-            desc_nodes = list(set(
-                slip.descriptor1 for slip, _ in group
-            ) | set(
-                slip.descriptor2 for slip, _ in group
-            ))
+            # ``from-descriptors`` is ``remq-duplicates`` of the descriptor1s, which
+            # keeps the *last* occurrence (utilities.ss:915-927, rules.ss:770-777).
+            desc_nodes = _remq_duplicates([slip.descriptor1 for slip, _ in group])
             if len(desc_nodes) == 2:
                 swaps.append((objects, dim, desc_nodes))
 
@@ -3467,11 +3555,13 @@ def _get_common_change_schemas(cluster: list[Bridge]) -> list[tuple]:
     Scheme: get-common-change-schemas (rules.ss:702-706).
     Returns schemas where the relation is not identity.
     """
+    # A schema with no common relation (#f) is not eq? to plato-identity, so it
+    # survives (rules.ss:702-706).
     common = _get_common_schemas(cluster)
     identity_names = {"plato-identity"}
     return [
         s for s in common
-        if s[2] is not None and getattr(s[2], "name", "") not in identity_names
+        if s[2] is None or getattr(s[2], "name", "") not in identity_names
     ]
 
 
@@ -3621,9 +3711,9 @@ def build_rule_from_bridges(
         The constructed rule, or None if construction fails.
     """
     # Filter to describable bridges
+    # rules.ss:417-442: no describable bridge is not a fizzle -- the empty change list
+    # flows through to an identity rule (no clauses), as it does for abc -> abc.
     describable = [b for b in bridges if rule_describable_bridge(b)]
-    if not describable:
-        return None
 
     # 1. Abstract change descriptions from bridges
     all_cds = abstract_change_descriptions(describable, rng=rng)
@@ -3633,6 +3723,7 @@ def build_rule_from_bridges(
     if not final_cds:
         # Identity rule
         rule = Rule(rule_type, [], workspace=workspace)
+        rule.set_abstracted_rule_information([], themespace)  # rules.ss:437
         if meta:
             rule.compute_quality(meta)
         return rule

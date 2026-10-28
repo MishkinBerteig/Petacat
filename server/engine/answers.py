@@ -95,9 +95,12 @@ def get_coherence_phrase(answer: Any, meta: MetadataProvider) -> str:
 # §4.7.1 footnote 18: only these vertical theme categories may appear in an
 # answer description, and Bond-Facet only in its "different" form.  Mirrored in
 # seed_data/theme_dimensions.json as ``answer_description_theme_types``.
+#
+# The order is the reference's (answers.ss:213-218): the pattern is built by
+# iterating this list, in an insertion-ordered dict.
 _ANSWER_DESCRIPTION_THEME_TYPES = (
-    "plato-string-position-category",
     "plato-alphabetic-position-category",
+    "plato-string-position-category",
     "plato-direction-category",
     "plato-group-category",
     "plato-bond-facet",
@@ -454,7 +457,11 @@ def _unjustified_themes(slippages: list[Any]) -> dict[str, Any]:
         dimension = getattr(getattr(cm, "description_type1", None), "name", None)
         if dimension is None:
             continue
-        themes[dimension] = relation_name_for_label(getattr(cm, "label", None))
+        # The Scheme keeps one entry per slippage and reads the Bond-Facet
+        # companions with ``assq`` (answers.ss:239-264), i.e. the *first* entry for
+        # a dimension.  The dict form cannot hold two relations for one dimension
+        # (it is persisted/serialised as a mapping), so the first one is kept.
+        themes.setdefault(dimension, relation_name_for_label(getattr(cm, "label", None)))
 
     if _BOND_FACET in themes:
         # ``answers.ss:261-264`` conses the two entries onto the *front* of the
@@ -607,18 +614,20 @@ def _attach_length_to_appropriate_groups(transforms: Any) -> None:
             continue
         length_transform = _select_transform(object_transforms, "plato-length")
         bond_facet_transform = _select_transform(object_transforms, "plato-bond-facet")
+        # ``if*`` is ``when`` (syntactic-sugar.ss:118-119), so the Length body is two
+        # forms — the source-group attach, then an *unconditional* attach to the
+        # instantiated group — and the BondFacet test is a separate sibling form
+        # (answers.ss:1082-1092).  Sub-objects are not filtered to groups.
         if length_transform is not None:
             if isinstance(obj, Group) and not _has_length(obj):
                 attach_length_description(obj)
-            else:
-                attach_length_description(instantiated)
-        elif (
+            attach_length_description(instantiated)
+        if (
             bond_facet_transform is not None
             and getattr(bond_facet_transform[1], "name", "") == "plato-length"
         ):
             for subobject in _get_constituent_objects(instantiated):
-                if isinstance(subobject, Group):
-                    attach_length_description(subobject)
+                attach_length_description(subobject)
 
 
 def _select_transform(transforms: Any, dimension_name: str) -> Any:

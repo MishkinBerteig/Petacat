@@ -13,6 +13,7 @@ Scheme source: coderack.ss
 
 from __future__ import annotations
 
+import math
 from functools import lru_cache
 from typing import TYPE_CHECKING, Any
 
@@ -260,10 +261,17 @@ class Coderack:
     def is_empty(self) -> bool:
         return self._total_count == 0
 
-    def _urgency_to_bin(self, urgency: int) -> int:
-        """Map an urgency value (0-100) to a bin index (0 to num_bins-1)."""
-        idx = int(urgency * self.num_bins / 100)
-        return max(0, min(self.num_bins - 1, idx))
+    def _urgency_to_bin(self, urgency: float) -> int:
+        """``get-coderack-bin`` (coderack.ss:377-382): >=100 -> last bin, <=0 -> first,
+        else ``floor((% urgency) * bins)``.  Integers stay exact; floats divide first
+        then multiply, as Chez does for flonums."""
+        if urgency >= 100:
+            return self.num_bins - 1
+        if urgency <= 0:
+            return 0
+        if isinstance(urgency, int):
+            return urgency * self.num_bins // 100
+        return math.floor((urgency / 100) * self.num_bins)
 
     def post(
         self,
@@ -627,6 +635,12 @@ class Coderack:
                 if new_index == b.bin_number:
                     continue
                 b.remove(codelet)
+                # The bin's ``add-codelet`` ends with ``set-time-stamp``
+                # (``coderack.ss:267-283``), so a codelet that changes bin is
+                # restamped to the current ``*codelet-count*``; one that stays keeps
+                # its stamp.  Stamped between ``remove`` and ``add`` so
+                # ``sum_time_stamp`` loses the old stamp and gains the new one.
+                codelet.time_stamp = self.current_time
                 self.bins[new_index].add(codelet)
 
     def clamp_pattern(self, pattern: Any, background: str | None = None) -> None:

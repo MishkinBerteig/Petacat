@@ -83,3 +83,19 @@ def test_giving_up_is_reported_on_the_step_result(meta):
 
     # And the flag is consumed, not sticky.
     assert getattr(runner.ctx, "_gave_up", False) is False
+
+
+def test_giving_up_runs_one_update_cycle_first(meta):
+    """``give-up`` (``answers.ss:86-91``) calls ``update-everything`` before it
+    suspends, so the state a give-up stops in has been freshly updated."""
+    from server.engine.codelet_dsl.builtins import give_up
+
+    runner = EngineRunner(meta)
+    runner.init_mcat("abc", "abd", "xyz", seed=42)
+    calls = []
+    runner.ctx.on_update_everything = lambda: calls.append(1)
+
+    give_up(runner.ctx)
+
+    assert calls == [1]
+    assert runner.ctx._gave_up is True

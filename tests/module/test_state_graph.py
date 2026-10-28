@@ -48,12 +48,13 @@ SEED = 42
 #: ``workspace-objects.ss:375-423``), and from 12 to 50 when the group round put a
 #: group's bond factor back on its category's degree of association
 #: (``groups.ss:392-398``), which makes successor groups markedly weaker and so
-#: moves every trajectory.  Each time for the same reason: which answer a given
-#: seed reaches is not a gate — the standard is expected-range agreement — but this
-#: test needs *some* seed whose trace carries all three rich event types.  50
-#: answers, snags *and* clamps under all three numeric backends, at 6,019 codelets.
+#: moves every trajectory, and from 50 to 2 when the lockstep pass's port fixes
+#: (``tests/lockstep/DECISIONS.md``) moved every trajectory again.  Each time for the
+#: same reason: which answer a given seed reaches is not a gate — the standard is
+#: expected-range agreement — but this test needs *some* seed whose trace carries all
+#: three rich event types.  2 answers, snags *and* clamps at 3,875 codelets.
 ANSWERING_PROBLEM = ("abc", "abd", "xyz")
-ANSWERING_SEED = 50
+ANSWERING_SEED = 2
 #: Snag-then-answer takes longer than it did; 3,000 codelets no longer reaches it.
 ANSWERING_MAX_STEPS = 8000
 

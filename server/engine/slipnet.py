@@ -396,7 +396,8 @@ class SlipnetNode:
             if link.to_node.frozen:
                 continue
             assoc = link.intrinsic_degree_of_association()
-            amount = round(scale * (assoc / 100.0) * self.activation)
+            # slipnet.ss:181-186: rounds the exact rational; multiply before dividing.
+            amount = round(scale * assoc * self.activation / 100.0)
             if amount > 0:
                 link.to_node.activation_buffer += amount
 
@@ -573,10 +574,12 @@ class SlipnetNode:
         if not self.partially_active():
             return
         prob = (self.activation / self._max_activation) ** 3
+        # slipnet.ss:387-389: the coin is drawn, then ``update-activation`` is a
+        # no-op on a frozen node.
         previous = rng.trace_about(self)
         jumped = rng.prob(prob)
         rng.trace_about(previous)
-        if jumped:
+        if jumped and not self.frozen:
             self.activation = self._max_activation
 
     @property
@@ -995,7 +998,9 @@ class Slipnet:
         """
         self._numeric = _UNRESOLVED
 
-    def update_activations(self, rng: RNG, threshold: int = 100) -> None:
+    def update_activations(
+        self, rng: RNG, threshold: int = 100, on_flushed: Any = None
+    ) -> None:
         """Spread activation and do probabilistic jumps.
 
         Scheme: slipnet.ss:377-389.
@@ -1011,6 +1016,12 @@ class Slipnet:
         order, and the loop below draws for exactly those.  Same draws, same
         order, same count as the reference — which is what keeps a seeded run
         comparable across the change.
+
+        ``on_flushed``, if given, is called once between the buffer flush and the
+        probabilistic jumps, when every node holds its post-flush activation.
+        The reference monitors the flush (``slipnet.ss:167``) and the jump
+        (``slipnet.ss:153``) as separate changes, so a caller that records
+        concept-activation events needs that intermediate state.
         """
         # The cycle length the *spread scale* is computed against.  This was
         # ``ucl = 15  # Will be parameterized later``, which made the scale exactly
@@ -1023,6 +1034,8 @@ class Slipnet:
         session = self._numeric_session()
         if session is None:
             self.spread_activation(ucl, threshold=threshold)
+            if on_flushed is not None:
+                on_flushed()
             # Probabilistic jump, for partially-active nodes only (50-99).
             for node in self.nodes.values():
                 node.probabilistic_jump_to_full(rng)
@@ -1030,6 +1043,9 @@ class Slipnet:
 
         session.load(SlipnetState.from_slipnet(self))
         session.update(float(threshold), ucl / 15.0)
+        if on_flushed is not None:
+            session.store().apply_to_slipnet(self)
+            on_flushed()
         indices, probabilities = session.jump_candidates()
         session.apply_jumps(
             [i for i, p in zip(indices, probabilities) if rng.prob(p)]

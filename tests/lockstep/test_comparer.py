@@ -17,7 +17,32 @@ import lockstep_corpus as corpus  # noqa: E402
 
 pytestmark = pytest.mark.lockstep
 
-REGISTRY = ct.Registry.load()
+#: A fixture registry, not the shipped one: the shipped registry is emptied as
+#: divergences are fixed, and these tests exercise the matching machinery itself.
+_FIXTURE_TOML = """
+[[divergence]]
+id = "DISC5:A-4"
+cause = "deliberate"
+match = { class = "p", petacat_file = "server/engine/codelet_dsl/builtins.py", petacat_function = "evaluate_group" }
+effect = "complement"
+
+[[divergence]]
+id = "DISC5:A-4"
+cause = "deliberate"
+match = { class = "p", petacat_codelet = "breaker" }
+effect = "complement"
+"""
+
+
+def _fixture_registry():
+    import tempfile
+
+    with tempfile.NamedTemporaryFile("w", suffix=".toml", delete=False) as fh:
+        fh.write(_FIXTURE_TOML)
+    return ct.Registry.load(fh.name)
+
+
+REGISTRY = _fixture_registry()
 HEADER = {"t": "header", "format": 1, "problem": ["abc", "abd", "xyz"], "seed": 1, "cap": 100}
 
 

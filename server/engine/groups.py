@@ -564,13 +564,16 @@ def attach_length_description(group: Group) -> bool:
     stochastically (groups.ss:816-818), the flip (groups.ss:344-345), and the
     builder's two consolidation branches (groups.ss:732-733, 771).
     """
-    length_type = group._node("plato-length")
-    descriptor_node = PLATONIC_LENGTH_NODES.get(group.length)
+    # A letter's platonic length is ``plato-one`` (workspace-objects.ss:57); callers
+    # such as the translated-rule pass may hand one in (answers.ss:1090-1091).
+    node = lambda name: Group._node(group, name)  # noqa: E731 - needs only ``.string``
+    length_type = node("plato-length")
+    descriptor_node = PLATONIC_LENGTH_NODES.get(getattr(group, "length", 1))
     if length_type is None or descriptor_node is None:
         return False
     if group.description_type_present(length_type):
         return False
-    descriptor = group._node(descriptor_node)
+    descriptor = node(descriptor_node)
     if descriptor is None:
         return False
 

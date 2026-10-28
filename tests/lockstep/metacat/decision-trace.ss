@@ -478,6 +478,17 @@
     (set! *tr-depth* (+ *tr-depth* 1))
     0))
 
+;; `picked_weight` is the chosen codelet's own weight.  Name and stamp do not
+;; always identify a codelet: a clamp restamps the codelets it moves to another
+;; bin, so a moved codelet and one posted in the same cycle can share both while
+;; sitting in different bins.  Replay uses the weight to tell them apart.
+(define tr-weight-of
+  (lambda (codelets weights chosen)
+    (cond
+      ((null? codelets) 0)
+      ((eq? (car codelets) chosen) (car weights))
+      (else (tr-weight-of (cdr codelets) (cdr weights) chosen)))))
+
 (define tr-log-codelet-choice
   (lambda (site codelets weights chosen)
     (let ((names (map tr-name codelets))
@@ -487,7 +498,16 @@
           (tr-put ",\"stamps\":")
           (tr-array (tr-keep stamps keep) tr-num)
           (tr-put ",\"picked_stamp\":")
-          (tr-num (tell chosen 'get-time-stamp)))))))
+          (tr-num (tell chosen 'get-time-stamp))
+          (tr-put ",\"picked_weight\":")
+          (tr-num (exact->inexact (tr-weight-of codelets weights chosen)))
+          ;; Two codelets can agree on name, stamp and bin yet differ in the
+          ;; urgency an unclamp restores them to (`reset-urgency`), so the
+          ;; picked codelet's two urgencies are logged as well.
+          (tr-put ",\"picked_urgency\":")
+          (tr-float (tell chosen 'get-relative-urgency))
+          (tr-put ",\"picked_original_urgency\":")
+          (tr-float (tell chosen 'get-original-urgency)))))))
 
 (set! trace-hook-choose-end
   (lambda (codelets chosen mark)

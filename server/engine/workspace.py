@@ -754,16 +754,31 @@ class Workspace:
         return strings
 
     @property
+    def aggregate_strings(self) -> list[WorkspaceString]:
+        """The strings the Workspace-wide aggregates range over.
+
+        Scheme: ``get-bonds`` / ``get-groups`` / ``get-objects`` / ...
+        (``workspace.ss:124-160``) add the answer string only under
+        ``%justify-mode%``.  A discovery run that has *found* an answer holds an
+        ``answer_string`` without being in justify mode, and its letters must not
+        feed unhappiness, ``choose_object`` or the value updates.
+        """
+        strings = [self.initial_string, self.modified_string, self.target_string]
+        if self.justify_mode and self.answer_string:
+            strings.append(self.answer_string)
+        return strings
+
+    @property
     def all_objects(self) -> list[WorkspaceObject]:
         objects = []
-        for s in self.all_strings:
+        for s in self.aggregate_strings:
             objects.extend(s.objects)
         return objects
 
     @property
     def all_structures(self) -> list[Any]:
         structures: list[Any] = []
-        for s in self.all_strings:
+        for s in self.aggregate_strings:
             structures.extend(s.bonds)
             structures.extend(s.groups)
         structures.extend(self.top_bridges)
@@ -774,13 +789,15 @@ class Workspace:
         return structures
 
     def add_bridge(self, bridge: Bridge) -> None:
+        # Newest first, as ``(cons bridge list)`` (workspace.ss:318-329): the order is
+        # read by first-match selection and ``stochastic-pick`` walks.
         from server.engine.bridges import BRIDGE_TOP, BRIDGE_BOTTOM
         if bridge.bridge_type == BRIDGE_TOP:
-            self.top_bridges.append(bridge)
+            self.top_bridges.insert(0, bridge)
         elif bridge.bridge_type == BRIDGE_BOTTOM:
-            self.bottom_bridges.append(bridge)
+            self.bottom_bridges.insert(0, bridge)
         else:
-            self.vertical_bridges.append(bridge)
+            self.vertical_bridges.insert(0, bridge)
         # Set bridge references on objects
         if bridge.is_horizontal:
             bridge.object1.horizontal_bridge = bridge
@@ -813,10 +830,12 @@ class Workspace:
         # strength is asked for (``rules.ss:244-251, 286``); the Scheme reaches for
         # the global ``*workspace*``, Petacat carries the reference on the rule.
         rule.workspace = self
+        # Newest first, as ``(cons rule list)`` (workspace.ss:479-483); this order
+        # decides ties in ``get_relative_quality``'s ranking.
         if rule.is_top_rule:
-            self.top_rules.append(rule)
+            self.top_rules.insert(0, rule)
         else:
-            self.bottom_rules.append(rule)
+            self.bottom_rules.insert(0, rule)
 
     def remove_rule(self, rule: Rule) -> None:
         if rule.is_top_rule:
@@ -1052,7 +1071,7 @@ class Workspace:
         return len(self.get_supported_rules(True)) > 0
 
     def update_all_object_values(self) -> None:
-        for s in self.all_strings:
+        for s in self.aggregate_strings:
             s.update_object_values()
         # The one place object unhappiness changes, so the one place the cache above
         # has to be dropped.
@@ -1087,7 +1106,7 @@ class Workspace:
                     structure.update_strength(rng)
             return
 
-        for s in self.all_strings:
+        for s in self.aggregate_strings:
             self._update_strengths_batched(backend, s.bonds, rng)
             self._update_strengths_batched(backend, s.groups, rng)
         for structure in (

@@ -29,15 +29,16 @@
  			(if* (and %coderack-graphics% *step-mode?* (= %step-cycles% 1))
  			  (pause %codelet-highlight-pause%)
  			  (tell codelet-type 'unhighlight)))
-@@ -240,6 +242,7 @@
+@@ -240,6 +242,8 @@
  				    (tell coderack-bin 'get-urgency)))))
  		      (get-proposed-structure () (1st codelet-arguments))
  		      (get-argument (n) (nth n codelet-arguments))
 +		      (get-arguments () codelet-arguments)
++		      (get-original-urgency () original-urgency)
  		      (get-coderack-bin () coderack-bin)
  		      (get-index-in-bin () index-in-bin)
  		      (get-time-stamp () time-stamp)
-@@ -416,8 +419,10 @@
+@@ -416,8 +420,10 @@
  	      'done)
  	    (choose-codelet ()
  	      ;; Coderack should never be empty here:
@@ -49,7 +50,7 @@
  		(tell bin 'remove-codelet codelet)
  		(set! codelet-list (remq codelet codelet-list))
  		(set! current-num (sub1 current-num))
-@@ -434,9 +439,11 @@
+@@ -434,9 +440,11 @@
  	      'done)
  	    (delete-codelets (num-to-delete)
  	      (repeat* num-to-delete times
@@ -62,7 +63,7 @@
  		  (if* (tell codelet 'proposed-structure-argument?)
  		    (tell *workspace* 'delete-proposed-structure
  		      (tell codelet 'get-proposed-structure)))
-@@ -555,6 +562,7 @@
+@@ -555,6 +563,7 @@
      (for* each node in *top-down-slipnodes* do
        (tell node 'attempt-to-post-top-down-codelets))
      (for* each codelet-type in *thematic-codelet-types* do
@@ -70,7 +71,7 @@
        (stochastic-if* (post-codelet-probability codelet-type)
  	(let ((urgency (thematic-codelet-urgency codelet-type)))
  	  (repeat* (num-of-codelets-to-post codelet-type) times
-@@ -565,6 +573,7 @@
+@@ -565,6 +574,7 @@
  (define add-bottom-up-codelets
    (lambda ()
      (for* each codelet-type in *bottom-up-codelet-types* do
