@@ -109,7 +109,9 @@ def _structures(ctx: Any) -> dict:
 
 def _trace(ctx: Any) -> dict:
     return {
-        "events": dict(sorted(Counter(e.event_type for e in ctx.trace.events).items())),
+        # Metacat's event types are hyphenated (``concept-activation``).
+        "events": dict(sorted(Counter(
+            e.event_type.replace("_", "-") for e in ctx.trace.events).items())),
         "snag": bool(ctx.trace.within_snag_period),
         "clamp": bool(ctx.trace.within_clamp_period),
     }

@@ -341,22 +341,31 @@ class ConceptMapping:
             if node is not None and hasattr(node, "activate_from_workspace"):
                 node.activate_from_workspace()
 
-    def activate_label(self) -> None:
+    def activate_label(self, monitor: Any = None) -> None:
         """Activate the label node, flushing so it shows up immediately.
 
         Scheme: concept-mappings.ss:165-171.  The flush matters because a
         slippage event is recorded in the Trace right after this, and the Trace
         stores the concept activations extant at the time of the event.
+
+        ``flush-activation-buffer`` calls ``monitor-slipnode-activation-change``
+        (``slipnet.ss:164-168``), so a label that jumps -- ``identity`` from 0 to
+        100 on the first identity mapping -- is itself a concept-activation event,
+        recorded mid-codelet.  *monitor*, if given, is called as
+        ``monitor(node, before, after)`` for that flush.
         """
         if self.label is None or not hasattr(self.label, "activate_from_workspace"):
             return
         self.label.activate_from_workspace()
+        before = self.label.activation
         pending = self.label.activation_buffer
         if pending != 0.0:
             self.label.activation = max(
                 0.0, min(100.0, self.label.activation + pending)
             )
             self.label.activation_buffer = 0.0
+        if monitor is not None:
+            monitor(self.label, before, self.label.activation)
 
     def get_concept_pattern(self) -> list[tuple[SlipnetNode, float]]:
         """Return a concept activation pattern suitable for theme computation.

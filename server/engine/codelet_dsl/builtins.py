@@ -1238,8 +1238,9 @@ def _merge_duplicate_bridge(ctx: EngineContext, proposed: Bridge) -> None:
     existing = _existing_equivalent_bridge(ctx, proposed)
     if existing is None:
         return
+    monitor = _label_monitor(ctx)
     for cm in proposed.concept_mappings:
-        cm.activate_label()
+        cm.activate_label(monitor)
     novel = [
         cm for cm in proposed.concept_mappings if not existing.concept_mapping_present(cm)
     ]
@@ -1359,8 +1360,22 @@ def _augment_bridge_at_build(ctx: EngineContext, bridge: Bridge) -> None:
 
     # bridges.ss:1413-1414 — the labels are jolted as the bridge goes in, after
     # every addition above, so the mappings added here warm their concepts too.
+    monitor = _label_monitor(ctx)
     for cm in bridge.concept_mappings:
-        cm.activate_label()
+        cm.activate_label(monitor)
+
+
+def _label_monitor(ctx: EngineContext) -> Any:
+    """The Trace monitor a concept mapping's label flush reports to
+    (``concept-mappings.ss:166-170`` via ``slipnet.ss:164-168``)."""
+    from server.engine.trace import make_concept_activation_monitor
+
+    return make_concept_activation_monitor(
+        ctx.trace,
+        ctx.codelet_count,
+        ctx.temperature.value,
+        ctx.meta.get_param("concept_activation_importance_threshold", 85),
+    )
 
 
 def _apply_group_flips(ctx: EngineContext, bridge: Bridge) -> None:
