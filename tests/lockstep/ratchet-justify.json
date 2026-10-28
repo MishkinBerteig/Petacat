@@ -65,9 +65,9 @@
   "unregistered_errors": 0
  },
  "justify/abc-abd-ijk-abd/4": {
-  "agreement": 0.3033040005572453,
-  "reach": 2182,
-  "unregistered_errors": 943
+  "agreement": 1.0,
+  "reach": 7189,
+  "unregistered_errors": 0
  },
  "justify/abc-abd-ijk-abd/5": {
   "agreement": 1.0,
@@ -315,9 +315,9 @@
   "unregistered_errors": 0
  },
  "justify/rst-rsu-xyz-uyz/4": {
-  "agreement": 0.45166879821774825,
-  "reach": 1905,
-  "unregistered_errors": 510
+  "agreement": 1.0,
+  "reach": 4094,
+  "unregistered_errors": 0
  },
  "justify/rst-rsu-xyz-uyz/5": {
   "agreement": 1.0,
