@@ -1019,7 +1019,11 @@ def _absorb_duplicate_group(
             descriptor.activate_from_workspace()
 
     for description in proposed.descriptions:
-        if existing.description_type_present(description.description_type):
+        # ``description-present?`` is ``descriptions-equal?`` (descriptions.ss:195-197):
+        # the same type *and* descriptor, not merely the same type.
+        if any(d.description_type is description.description_type
+               and d.descriptor is description.descriptor
+               for d in existing.descriptions):
             continue
         transferred = Description(
             existing, description.description_type, description.descriptor

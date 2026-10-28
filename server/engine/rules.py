@@ -1918,6 +1918,7 @@ def _get_slipnet_from_object(obj: Any) -> Any:
 def abstract_change_descriptions(
     bridges: list[Bridge],
     rng: RNG | None = None,
+    slipnet: Any = None,
 ) -> list[IntrinsicChangeDescription | ExtrinsicChangeDescription]:
     """Extract change descriptions from a list of horizontal bridges.
 
@@ -2028,8 +2029,14 @@ def abstract_change_descriptions(
             should_add = (rng is None) or (rng is not None and rng.prob(subobjects_prob))
             if should_add:
                 # Find direction-category and opposite nodes
-                dir_dim = _find_slipnet_node_in_bridges(cluster, "plato-direction-category")
-                opp_rel = _find_slipnet_node_in_bridges(cluster, "plato-opposite")
+                # rules.ss:614-616 uses the slipnet constants directly; the bridges'
+                # concept mappings (string-position:opposite) never hold them.
+                if slipnet is not None:
+                    dir_dim = slipnet.nodes.get("plato-direction-category")
+                    opp_rel = slipnet.nodes.get("plato-opposite")
+                else:
+                    dir_dim = _find_slipnet_node_in_bridges(cluster, "plato-direction-category")
+                    opp_rel = _find_slipnet_node_in_bridges(cluster, "plato-opposite")
                 if dir_dim is not None and opp_rel is not None:
                     all_cds.append(IntrinsicChangeDescription(
                         left_enclosing, SCOPE_SELF, dir_dim, None, opp_rel, None
@@ -2050,6 +2057,10 @@ def abstract_change_descriptions(
                     s_dim, s_desc1, s_rel, s_desc2,
                 ))
 
+    # rules.ss:547-548 conses each change onto the front of the list, so the Scheme
+    # result is in reverse order of addition; later steps (partition, clause order)
+    # depend on it.
+    all_cds.reverse()
     return all_cds
 
 
@@ -2344,6 +2355,25 @@ def _choose_description_for_rule(
 # ============================================================================
 
 
+def _chez_map(fn: Any, items: list) -> list:
+    """``(map fn items)`` with Chez Scheme's application order.
+
+    Chez's single-list ``map`` recurses on ``(cddr ls)`` first, then applies the
+    procedure to the next two elements front-to-back: an odd-length list applies it to
+    the last element first, then to the pairs from the last pair back to the first.
+    The result keeps list order; only the order of side effects (here, random draws)
+    differs.  Measured on the recorded Metacat traces: 2 elements -> 0,1; 3 -> 2,0,1.
+    """
+    if not items:
+        return []
+    if len(items) == 1:
+        return [fn(items[0])]
+    rest = _chez_map(fn, items[2:])
+    a = fn(items[0])
+    b = fn(items[1])
+    return [a, b, *rest]
+
+
 def instantiate_rule_clause_template(
     template: tuple,
     slipnet: Slipnet | None = None,
@@ -2363,10 +2393,11 @@ def instantiate_rule_clause_template(
             ref_object, slipnet, rng, temperature, meta
         )
         sorted_cts = _sort_change_templates(change_templates)
-        changes = [
-            _instantiate_change_template(ct, obj_desc, slipnet, rng, temperature, meta)
-            for ct in sorted_cts
-        ]
+        changes = _chez_map(
+            lambda ct: _instantiate_change_template(
+                ct, obj_desc, slipnet, rng, temperature, meta),
+            sorted_cts,
+        )
         return RuleClause(
             clause_type=CLAUSE_INTRINSIC,
             object_description=obj_desc,
@@ -2377,10 +2408,11 @@ def instantiate_rule_clause_template(
         ref_objects = template[1]
         dimensions = template[2]
         sorted_refs = sorted(ref_objects, key=lambda o: getattr(o, "left_string_pos", 0))
-        obj_descs = [
-            reference_object_to_object_description(r, slipnet, rng, temperature, meta)
-            for r in sorted_refs
-        ]
+        obj_descs = _chez_map(
+            lambda r: reference_object_to_object_description(
+                r, slipnet, rng, temperature, meta),
+            sorted_refs,
+        )
         sorted_dims = sorted(dimensions, key=_dim_sort_key)
         return RuleClause(
             clause_type=CLAUSE_EXTRINSIC,
@@ -3335,21 +3367,22 @@ def _get_non_symmetric_non_bond_slippages(bridge: Bridge) -> list[ConceptMapping
 
 
 def _partition_by(pred: Any, items: list) -> list[list]:
-    """Partition items into clusters where all pairs satisfy pred.
+    """Scheme: ``partition`` (utilities.ss:811-825).
 
-    Simple greedy clustering.
+    The Scheme recurses on the *rest* of the list first and then inserts the head, so
+    elements are placed from the END of the list backwards; each lands at the FRONT of
+    the first class all of whose members it agrees with, else opens a new class at the
+    end.  Class order and in-class order both depend on this.
     """
-    clusters: list[list] = []
-    for item in items:
-        placed = False
-        for cluster in clusters:
-            if all(pred(item, existing) for existing in cluster):
-                cluster.append(item)
-                placed = True
+    classes: list[list] = []
+    for item in reversed(items):
+        for cls in classes:
+            if all(pred(item, other) for other in cls):
+                cls.insert(0, item)
                 break
-        if not placed:
-            clusters.append([item])
-    return clusters
+        else:
+            classes.append([item])
+    return classes
 
 
 def _bounded_random_partition(
@@ -3728,7 +3761,7 @@ def build_rule_from_bridges(
     describable = [b for b in bridges if rule_describable_bridge(b)]
 
     # 1. Abstract change descriptions from bridges
-    all_cds = abstract_change_descriptions(describable, rng=rng)
+    all_cds = abstract_change_descriptions(describable, rng=rng, slipnet=slipnet)
 
     # 2. Remove redundant change descriptions
     final_cds = remove_redundant_change_descriptions(all_cds)
@@ -3755,10 +3788,10 @@ def build_rule_from_bridges(
         return None
 
     # 6. Instantiate templates to clauses
-    clauses = [
-        instantiate_rule_clause_template(t, slipnet, rng, temperature, meta)
-        for t in templates
-    ]
+    clauses = _chez_map(
+        lambda t: instantiate_rule_clause_template(t, slipnet, rng, temperature, meta),
+        templates,
+    )
 
     # 7. Build rule
     rule = Rule(rule_type, clauses, workspace=workspace)

@@ -123,6 +123,16 @@ class WorkspaceString:
     def length(self) -> int:
         return len(self.text)
 
+    # workspace-strings.ss:472-473 -- a string answers the position messages as the
+    # span of its letters, so e.g. disjoint-objects? treats it like any other object.
+    @property
+    def left_string_pos(self) -> int:
+        return 0
+
+    @property
+    def right_string_pos(self) -> int:
+        return len(self.text) - 1
+
     @property
     def letters(self) -> list[Letter]:
         return [o for o in self.objects if isinstance(o, Letter)]

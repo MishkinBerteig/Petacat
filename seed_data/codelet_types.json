@@ -97,7 +97,7 @@
     "description": "Attempts to build an evaluated group.",
     "source_file": "groups.ss",
     "source_line": 622,
-    "execute_body": "# Group builder\n# Scheme: `group-builder` (groups.ss:622-790).  The duplicate branch, the three\n# fights (flipped bonds, incompatible groups, incompatible bridges) and the three\n# consolidation branches all live inside `build_structure`, which is where every\n# builder's fights live and where they can run under one commit.\ngroup = args.get('structure')\nif group is None:\n    fizzle()\n\n# groups.ss:643-650 -- every constituent bond must still be in the string, in one\n# polarity or the other.\nif not bonds_still_available(group):\n    fizzle()\n\nbuild_structure(group)\n"
+    "execute_body": "# Group builder\n# Scheme: `group-builder` (groups.ss:622-790).  The duplicate branch, the three\n# fights (flipped bonds, incompatible groups, incompatible bridges) and the three\n# consolidation branches all live inside `build_structure`, which is where every\n# builder's fights live and where they can run under one commit.\ngroup = args.get('structure')\nif group is None:\n    fizzle()\n\n# groups.ss:643-650 -- every constituent bond must still be in the string, in one\n# polarity or the other.\n# groups.ss:631-642 -- the duplicate branch runs BEFORE the bonds check, so a proposal\n# that duplicates a built group still hands over its new descriptions even if its\n# constituent bonds are gone.\nequivalent = group.string.get_equivalent_group(group)\nis_duplicate = equivalent is not None and equivalent is not group\nif not is_duplicate and not bonds_still_available(group):\n    fizzle()\n\nbuild_structure(group)\n"
   },
   {
     "name": "bottom-up-bridge-scout",
