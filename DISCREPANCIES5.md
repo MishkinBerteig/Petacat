@@ -12,7 +12,11 @@ a cause. This one starts from the source and looks for differences that a run mi
 might not reveal. Nothing here was found by sampling, and nothing here is claimed to
 have been observed in a run unless the entry says so.
 
-**Nothing here is fixed.** This is a catalogue.
+**Nothing here was fixed when it was written.** It was a catalogue. The lockstep pass of
+2026-10-27/28 re-verified each entry against the Scheme and fixed the port bugs: each entry
+now ends with a **Status (lockstep pass)** line. Section **G**, at the end, lists the further
+divergences that replaying Metacat's decisions inside Petacat found
+(`tests/lockstep/README.md`).
 
 ## On "inert"
 
