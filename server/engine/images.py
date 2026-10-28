@@ -732,10 +732,7 @@ class Image:
             bonds=group_bonds,
         )
         self.instantiated_object = group
-        string.groups.append(group)
-        string.objects.append(group)
-        for obj in ordered_objects:
-            obj.enclosing_group = group
+        string.add_group(group)  # also numbers it (workspace-strings.ss:254-267)
         return group
 
     # -- tree walks --------------------------------------------------------

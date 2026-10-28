@@ -37,6 +37,9 @@ class WorkspaceObject:
         right_pos: int,
     ) -> None:
         self.id = next_id(KIND_OBJECT)
+        # The string-local ``id-num`` (``workspace-strings.ss:149-154``): a letter's is
+        # its position, a group's is assigned by ``add_group`` (None until built).
+        self.id_num: int | None = None
         self.string = string
         self.left_string_pos = left_pos
         self.right_string_pos = right_pos
@@ -886,6 +889,7 @@ class Letter(WorkspaceObject):
         letter_category: Any,  # SlipnetNode for the letter (plato-a, etc.)
     ) -> None:
         super().__init__(string, position, position)
+        self.id_num = position
         self.letter_category = letter_category
 
     def __repr__(self) -> str:

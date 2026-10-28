@@ -102,10 +102,17 @@ def _translate_rule_clause(
         translated_ods: list[tuple] = []
         od_slippages: list[Any] = []
         enclosing_slippages: list[Any] = []
-        for od in clause.object_descriptions:
-            new_od, applicable, enclosing = _translate_object_description(
+        # ``(map (translate-object-description ...) object-descriptions)``
+        # (answers.ss:1355-1358) is Chez's ``map``: the application order (and so which
+        # description meets a failure first, or draws its coin first) is not
+        # left-to-right; see ``_chez_map``.
+        results = _chez_map(
+            lambda od: _translate_object_description(
                 od, from_string, to_string, slipnet, rng=rng
-            )
+            ),
+            list(clause.object_descriptions),
+        )
+        for new_od, applicable, enclosing in results:
             translated_ods.append(new_od)
             od_slippages.extend(applicable)
             enclosing_slippages.extend(enclosing)
@@ -141,19 +148,19 @@ def _translate_rule_clause(
             clause_type=CLAUSE_EXTRINSIC,
             object_description=translated_ods[0] if len(translated_ods) == 1 else None,
             extrinsic_objects=translated_ods if len(translated_ods) > 1 else None,
-            dimensions=[
-                _slip(dim, applicable_transform_slippages, rng)
-                for dim in clause.dimensions
-            ],
+            dimensions=_chez_map(
+                lambda dim: _slip(dim, applicable_transform_slippages, rng),
+                list(clause.dimensions),
+            ),
         )
 
     return RuleClause(
         clause_type=CLAUSE_INTRINSIC,
         object_description=translated_ods[0] if translated_ods else None,
-        changes=[
-            _translate_change(change, applicable_transform_slippages, rng)
-            for change in clause.changes
-        ],
+        changes=_chez_map(
+            lambda change: _translate_change(change, applicable_transform_slippages, rng),
+            list(clause.changes),
+        ),
     )
 
 
@@ -1617,14 +1624,21 @@ class Rule(WorkspaceStructure):
         rule during a vertical translation.
         """
         direction = "top-to-bottom" if self.is_top_rule else "bottom-to-top"
-        new_clauses: list[RuleClause] = []
-        for clause in self.clauses:
-            translated_clause = _translate_rule_clause(
+        # ``(map (translate-rule-clause ...) rule-clauses)`` (answers.ss:1297-1298) is
+        # Chez's ``map`` and a failure aborts at once through ``(return #f)``, so the
+        # clauses before it in *application* order have already drawn their coins.
+        def _one(clause: RuleClause) -> RuleClause:
+            translated = _translate_rule_clause(
                 clause, from_string, to_string, slipnet, rng=rng, meta=meta
             )
-            if translated_clause is None:
-                return None
-            new_clauses.append(translated_clause)
+            if translated is None:
+                raise _TranslationFailure("clause")
+            return translated
+
+        try:
+            new_clauses = _chez_map(_one, list(self.clauses))
+        except _TranslationFailure:
+            return None
 
         if not all(_valid_rule_clause(c) for c in new_clauses):
             return None
@@ -2068,7 +2082,10 @@ def abstract_change_descriptions(
             if not _subobjects_gate(cluster, left_enclosing, s_dim, s_desc1, s_desc2):
                 continue
             should_add = (rng is None) or (rng is not None and rng.prob(subobjects_prob))
-            if should_add:
+            # ``add-intrinsic-change-description`` refuses every individual StrPosCtgy
+            # change (rules.ss:557-559), the subobjects ones included -- but only after
+            # the draw above, which is outside it.
+            if should_add and getattr(s_dim, "name", "") != "plato-string-position-category":
                 all_cds.append(IntrinsicChangeDescription(
                     left_enclosing, SCOPE_SUBOBJECTS,
                     s_dim, s_desc1, s_rel, s_desc2,
@@ -3313,17 +3330,9 @@ def _get_equivalent_object(string: WorkspaceString, obj: Any) -> Any:
                 )
         return None
     if isinstance(obj, Group):
-        if any(group is obj for group in string.groups):
-            return obj
-        for group in string.groups:
-            if (
-                group.left_string_pos == obj.left_string_pos
-                and group.group_category is obj.group_category
-                and group.direction is obj.direction
-                and group.length == obj.length
-            ):
-                return group
-        return None
+        # ``get-equivalent-group`` looks the group up by the id-num of its leftmost
+        # object in ``group-vector``, not by position (see WorkspaceString).
+        return string.get_equivalent_group_by_id_num(obj)
     return None
 
 

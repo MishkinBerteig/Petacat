@@ -501,6 +501,7 @@ class Group(WorkspaceObject, WorkspaceStructure):
         # comment gives — the two are the same group seen two ways — and because
         # the builder has to recognise which existing group a flip replaces.
         flipped.id = self.id
+        flipped.id_num = self.id_num  # groups.ss:343
         # groups.ss:344-345 — a Length description is carried across the flip.
         # Now that ``make-group`` no longer attaches one unconditionally (GR-1),
         # this is the only way the reversed reading keeps it.

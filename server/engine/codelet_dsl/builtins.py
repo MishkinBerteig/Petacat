@@ -2155,10 +2155,19 @@ def get_bond_category(ctx: EngineContext, from_desc: Any, to_desc: Any) -> Any:
 def object_has_description_type(
     ctx: EngineContext, obj: Any, description_type_name: str
 ) -> bool:
-    """Does *obj* already carry a description along this dimension?"""
+    """Does *obj* already carry a description along this dimension?
+
+    Scheme: ``description-type-present?`` (``workspace-objects.ss:277-279``) walks
+    ``get-all-descriptions``, which for a group adds its bond descriptions
+    (``:162-165``): a sameness group "has" a bond-facet description, so a
+    bond-facet theme is *applicable* to it and the thematic scout then needs a
+    counterpart carrying one.
+    """
+    get_all = getattr(obj, "get_all_descriptions", None)
+    descriptions = get_all() if get_all else getattr(obj, "descriptions", [])
     return any(
         getattr(d.description_type, "name", "") == description_type_name
-        for d in getattr(obj, "descriptions", [])
+        for d in descriptions
     )
 
 

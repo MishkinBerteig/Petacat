@@ -111,6 +111,11 @@ class WorkspaceString:
         self.objects: list[WorkspaceObject] = []
         self.bonds: list[Bond] = []
         self.groups: list[Group] = []
+        # ``next-id-num`` / ``group-vector`` (``workspace-strings.ss:42, 149-154,
+        # 254-267, 268-279``): the string numbers its letters 0..n-1 and then every
+        # group as it is added, and keeps ONE group per id of its leftmost object.
+        self._next_id_num: int = len(text)
+        self.group_vector: dict[int, Group] = {}
 
         # Create Letter objects
         for i, ch in enumerate(text):
@@ -183,13 +188,51 @@ class WorkspaceString:
             if obj.right_bond is bond:
                 obj.right_bond = None
 
+    @staticmethod
+    def _leftmost_object_id(group: Group) -> int | None:
+        left = min(group.objects, key=lambda o: o.left_string_pos)
+        return getattr(left, "id_num", None)
+
     def add_group(self, group: Group) -> None:
         self.groups.append(group)
         self.objects.append(group)
         for obj in group.objects:
             obj.enclosing_group = group
+        # ``assign-id-num`` then ``(vector-set! group-vector i group)``.
+        group.id_num = self._next_id_num
+        self._next_id_num += 1
+        i = self._leftmost_object_id(group)
+        if i is not None:
+            self.group_vector[i] = group
+
+    def get_equivalent_group_by_id_num(self, group: Group) -> Group | None:
+        """Scheme: ``get-equivalent-group`` (``workspace-strings.ss:227-240``) for a
+        group of *another* string (``Workspace.get-equivalent-bridge``).
+
+        Not a positional search: the slot of ``group-vector`` named by the id-num of
+        the *given* group's leftmost object — an id from the group's own string, which
+        for a group of another (translated) string is a number this string assigned
+        to something else.  Reproduced as is.
+        """
+        if any(g is group for g in self.groups):
+            return group
+        i = self._leftmost_object_id(group)
+        equivalent = self.group_vector.get(i) if i is not None else None
+        if (
+            equivalent is not None
+            and equivalent.group_category is group.group_category
+            and equivalent.direction is group.direction
+            and equivalent.length == group.length
+        ):
+            return equivalent
+        return None
 
     def remove_group(self, group: Group) -> None:
+        # ``delete-group`` clears the slot of its leftmost object's id whether or not
+        # it holds this very group (``workspace-strings.ss:268-279``).
+        i = self._leftmost_object_id(group)
+        if i is not None:
+            self.group_vector.pop(i, None)
         if group in self.groups:
             self.groups.remove(group)
         if group in self.objects:
@@ -319,33 +362,15 @@ class WorkspaceString:
     def get_equivalent_group(self, group: Group) -> Group | None:
         """Find an existing group equivalent to the given one.
 
-        Scheme: ``get-equivalent-group`` (workspace-strings.ss:227-240).  The key
-        is the **leftmost constituent object**, which is what indexes the
-        reference's ``group-vector``; the test is then same group category, same
-        direction, same group *length* (constituent count).
-
-        Not the same as matching spans and object lists.  Two readings that start
-        at the same object and hold the same number of constituents are the same
-        group as far as the builder is concerned even if the constituents are at
-        different nesting levels, and the right edge is implied rather than
-        compared.  Requiring identical object *lists* — as the builder's own
-        duplicate check used to — meant a genuine re-proposal of an existing group
-        was built a second time.
+        Scheme: ``get-equivalent-group`` (workspace-strings.ss:227-240) — the
+        ``group-vector`` slot named by the id-num of the group's leftmost
+        constituent, then same group category, same direction, same group *length*
+        (constituent count); see :meth:`get_equivalent_group_by_id_num`.  The slot
+        holds only the last group added with that leftmost object and is cleared
+        by any ``delete-group`` of one, so a surviving twin can be invisible to
+        the duplicate check — the reference's behaviour, reproduced.
         """
-        from server.engine.groups import Group as GroupClass
-        for existing in self.groups:
-            if not isinstance(existing, GroupClass):
-                continue
-            if existing is group:
-                return existing
-            if (
-                existing.left_object is group.left_object
-                and existing.group_category is group.group_category
-                and existing.direction is group.direction
-                and len(existing.objects) == len(group.objects)
-            ):
-                return existing
-        return None
+        return self.get_equivalent_group_by_id_num(group)
 
     def delete_invalid_string_position_middle_descriptions(
         self, proposed_groups: Any = ()
@@ -1749,7 +1774,13 @@ class Workspace:
         return letters
 
     def _rule_describable_bridge(self, bridge: Bridge) -> bool:
-        """Scheme: rules.ss:528-541 (one implementation, in rules.py)."""
+        """Scheme: ``rule-describable-bridge?`` (``rules.ss:528-541``).
+
+        One implementation, in ``rules.py``: this copy used to omit the
+        ``related?`` test of the group=>group case, so a samegrp=>predgrp bottom
+        bridge counted as covering its letters and made a rule "possible"
+        (dropping the temperature's rule factor) where Metacat's does not.
+        """
         from server.engine.rules import rule_describable_bridge
 
         return rule_describable_bridge(bridge)
