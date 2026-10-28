@@ -81,7 +81,7 @@ The traps that produced most of the bugs:
 | Development: 19 problems × seeds 1–10 (190 runs) | reach 21 % of codelets; 29 traces replay to their end | **all 190 replay to their end with no error** |
 | Held-out: seeds 11–30 (380 runs) | 260 to their end (first run, mid-pass) | **all 380 replay to their end with no error** |
 | Justify mode (85 runs) | 21 to their end (first run, mid-pass) | **all 85 replay to their end with no error** |
-| Episodes, memory carried (536 runs, 6.5 M codelets) | 66 of 200 runs to their end (first run, mid-pass) | 533 of 536 runs replay to their end with no error (95.5 % of codelets); one `zy-x-zy` run diverges at codelet 2,340 of 100,000 |
+| Episodes, memory carried (536 runs, 6.5 M codelets) | 66 of 200 runs to their end (first run, mid-pass) | **all 536 replay to their end with no error** |
 | Metacat's three known crashes | — | Petacat follows Metacat to each crash point with no error |
 
 "No error" means every random decision had the same options with the same weights or
@@ -93,5 +93,5 @@ published support-v1a reference: 200 runs per problem against 20,000 Metacat run
 problem. No significant difference was found on any of the 19 problems
 (`measurements/vs-metacat-support-v1a-lockstep.md`).
 
-The individual fixes are listed in `DISCREPANCIES5.md` section G (G-A1 … G-U1) and in the
+The individual fixes are listed in `DISCREPANCIES5.md` section G (G-A1 … G-W1) and in the
 status lines of A-1 … D-11.

@@ -952,7 +952,10 @@ def concept_activation_importance(node: Any, before: float, after: float) -> flo
     ``(100* (* (% (abs delta)) (% (cd slipnode))))`` — the **product** of the
     magnitude of the change and the concept's depth, over the **absolute** change.
     """
-    return abs(after - before) * node.conceptual_depth / 100.0
+    # ``100*`` is ``(round (* 100 x))`` (``utilities.ss:544``), and Metacat's ``round``
+    # is half-to-even and exact (``utilities.ss:238-252``), so 94 x 90 / 100 = 84.6 is
+    # 85 and reaches the threshold; the unrounded product did not.
+    return float(round(abs(after - before) * node.conceptual_depth / 100.0))
 
 
 def make_concept_activation_monitor(
