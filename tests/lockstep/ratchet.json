@@ -50,14 +50,14 @@
   "unregistered_errors": 88
  },
  "aabb-cc-aabb/1": {
-  "agreement": 0.14724643844354668,
+  "agreement": 0.1667021050393366,
   "reach": 285,
-  "unregistered_errors": 565
+  "unregistered_errors": 20
  },
  "aabb-cc-aabb/10": {
-  "agreement": 0.054761462780768516,
+  "agreement": 0.05624651939855207,
   "reach": 279,
-  "unregistered_errors": 138
+  "unregistered_errors": 19
  },
  "aabb-cc-aabb/2": {
   "agreement": 0.016385647203344494,
@@ -80,9 +80,9 @@
   "unregistered_errors": 7
  },
  "aabb-cc-aabb/6": {
-  "agreement": 0.16844444444444445,
-  "reach": 240,
-  "unregistered_errors": 453
+  "agreement": 0.1774814814814815,
+  "reach": 216,
+  "unregistered_errors": 11
  },
  "aabb-cc-aabb/7": {
   "agreement": 0.05417561075334765,
@@ -95,59 +95,59 @@
   "unregistered_errors": 20
  },
  "aabb-cc-aabb/9": {
-  "agreement": 0.18303204601479048,
+  "agreement": 0.18364831552999178,
   "reach": 177,
-  "unregistered_errors": 16
+  "unregistered_errors": 8
  },
  "aabc-aabd-ijkk/1": {
-  "agreement": 0.10991735537190082,
+  "agreement": 0.11074380165289256,
   "reach": 269,
-  "unregistered_errors": 46
+  "unregistered_errors": 11
  },
  "aabc-aabd-ijkk/10": {
-  "agreement": 0.15494648394518357,
-  "reach": 300,
-  "unregistered_errors": 819
+  "agreement": 0.15644693408022406,
+  "reach": 263,
+  "unregistered_errors": 27
  },
  "aabc-aabd-ijkk/2": {
-  "agreement": 0.3796852646638054,
-  "reach": 430,
-  "unregistered_errors": 50
+  "agreement": 0.9948497854077253,
+  "reach": 1102,
+  "unregistered_errors": 37
  },
  "aabc-aabd-ijkk/3": {
-  "agreement": 0.04543100258971513,
+  "agreement": 0.04562831421876927,
   "reach": 297,
-  "unregistered_errors": 28
+  "unregistered_errors": 5
  },
  "aabc-aabd-ijkk/4": {
-  "agreement": 0.293019308296202,
-  "reach": 216,
-  "unregistered_errors": 13
+  "agreement": 0.9938468067048589,
+  "reach": 711,
+  "unregistered_errors": 34
  },
  "aabc-aabd-ijkk/5": {
-  "agreement": 0.28524563930228836,
-  "reach": 584,
-  "unregistered_errors": 35
+  "agreement": 0.2971675468074892,
+  "reach": 603,
+  "unregistered_errors": 20
  },
  "aabc-aabd-ijkk/6": {
-  "agreement": 0.8286292874319706,
+  "agreement": 0.8287558536894064,
   "reach": 972,
-  "unregistered_errors": 42
+  "unregistered_errors": 40
  },
  "aabc-aabd-ijkk/7": {
-  "agreement": 0.06032200357781753,
-  "reach": 258,
-  "unregistered_errors": 121
+  "agreement": 0.08150268336314848,
+  "reach": 342,
+  "unregistered_errors": 4
  },
  "aabc-aabd-ijkk/8": {
-  "agreement": 0.03330630847777023,
-  "reach": 270,
-  "unregistered_errors": 249
+  "agreement": 0.03319674825251441,
+  "reach": 261,
+  "unregistered_errors": 9
  },
  "aabc-aabd-ijkk/9": {
-  "agreement": 0.1020069758133684,
-  "reach": 300,
-  "unregistered_errors": 99
+  "agreement": 0.10989764995139802,
+  "reach": 324,
+  "unregistered_errors": 19
  },
  "ab-c-ab/1": {
   "agreement": 0.1634274125401386,
@@ -155,54 +155,54 @@
   "unregistered_errors": 27
  },
  "ab-c-ab/10": {
-  "agreement": 0.3181473044798785,
-  "reach": 114,
-  "unregistered_errors": 85
+  "agreement": 0.665907365223994,
+  "reach": 285,
+  "unregistered_errors": 685
  },
  "ab-c-ab/2": {
-  "agreement": 0.4110535405872193,
-  "reach": 237,
-  "unregistered_errors": 124
+  "agreement": 0.8380829015544041,
+  "reach": 541,
+  "unregistered_errors": 1020
  },
  "ab-c-ab/3": {
-  "agreement": 0.5018674136321195,
-  "reach": 250,
-  "unregistered_errors": 79
+  "agreement": 0.5480859010270775,
+  "reach": 276,
+  "unregistered_errors": 109
  },
  "ab-c-ab/4": {
-  "agreement": 0.32309017805858703,
-  "reach": 241,
-  "unregistered_errors": 49
+  "agreement": 0.8394600804135555,
+  "reach": 727,
+  "unregistered_errors": 805
  },
  "ab-c-ab/5": {
-  "agreement": 0.23200728818706348,
-  "reach": 191,
-  "unregistered_errors": 133
+  "agreement": 0.6705132098390525,
+  "reach": 542,
+  "unregistered_errors": 307
  },
  "ab-c-ab/6": {
-  "agreement": 0.26824552924117934,
-  "reach": 127,
-  "unregistered_errors": 72
+  "agreement": 0.8042532624456259,
+  "reach": 423,
+  "unregistered_errors": 652
  },
  "ab-c-ab/7": {
-  "agreement": 0.21365519726175464,
-  "reach": 263,
-  "unregistered_errors": 68
+  "agreement": 0.256170059448748,
+  "reach": 325,
+  "unregistered_errors": 112
  },
  "ab-c-ab/8": {
-  "agreement": 0.26717557251908397,
-  "reach": 293,
-  "unregistered_errors": 65
+  "agreement": 0.4951229855810009,
+  "reach": 571,
+  "unregistered_errors": 284
  },
  "ab-c-ab/9": {
-  "agreement": 0.24414976599063962,
-  "reach": 229,
-  "unregistered_errors": 50
+  "agreement": 0.2826313052522101,
+  "reach": 264,
+  "unregistered_errors": 11
  },
  "abc-aabbcc-kkjjii/1": {
-  "agreement": 0.16696642685851318,
-  "reach": 256,
-  "unregistered_errors": 273
+  "agreement": 0.18924860111910471,
+  "reach": 280,
+  "unregistered_errors": 27
  },
  "abc-aabbcc-kkjjii/10": {
   "agreement": 0.09406120961865436,
@@ -210,9 +210,9 @@
   "unregistered_errors": 19
  },
  "abc-aabbcc-kkjjii/2": {
-  "agreement": 0.10533934636156116,
-  "reach": 304,
-  "unregistered_errors": 157
+  "agreement": 0.10717666054228607,
+  "reach": 315,
+  "unregistered_errors": 156
  },
  "abc-aabbcc-kkjjii/3": {
   "agreement": 0.10019159773821207,
@@ -220,9 +220,9 @@
   "unregistered_errors": 6
  },
  "abc-aabbcc-kkjjii/4": {
-  "agreement": 0.008585269535843742,
-  "reach": 271,
-  "unregistered_errors": 86
+  "agreement": 0.011179240489176463,
+  "reach": 360,
+  "unregistered_errors": 39
  },
  "abc-aabbcc-kkjjii/5": {
   "agreement": 0.14513177159590043,
@@ -230,9 +230,9 @@
   "unregistered_errors": 11
  },
  "abc-aabbcc-kkjjii/6": {
-  "agreement": 0.0025249780527569917,
-  "reach": 265,
-  "unregistered_errors": 149
+  "agreement": 0.002715605534885665,
+  "reach": 274,
+  "unregistered_errors": 14
  },
  "abc-aabbcc-kkjjii/7": {
   "agreement": 0.10875512995896033,
@@ -250,34 +250,34 @@
   "unregistered_errors": 20
  },
  "abc-abd-glz/1": {
-  "agreement": 0.28820644298294507,
+  "agreement": 0.28987849738044813,
   "reach": 813,
-  "unregistered_errors": 93
+  "unregistered_errors": 4
  },
  "abc-abd-glz/10": {
-  "agreement": 0.03166467479023693,
-  "reach": 923,
-  "unregistered_errors": 67
+  "agreement": 0.03303845348249818,
+  "reach": 955,
+  "unregistered_errors": 13
  },
  "abc-abd-glz/2": {
-  "agreement": 0.47364587471858033,
-  "reach": 1136,
-  "unregistered_errors": 637
+  "agreement": 0.6471990464839095,
+  "reach": 1536,
+  "unregistered_errors": 15
  },
  "abc-abd-glz/3": {
-  "agreement": 0.09297662392485885,
-  "reach": 277,
-  "unregistered_errors": 21
+  "agreement": 0.09899213761806765,
+  "reach": 289,
+  "unregistered_errors": 9
  },
  "abc-abd-glz/4": {
-  "agreement": 0.6697132051686101,
-  "reach": 1305,
-  "unregistered_errors": 307
+  "agreement": 0.6552158840214308,
+  "reach": 1269,
+  "unregistered_errors": 28
  },
  "abc-abd-glz/5": {
-  "agreement": 0.3160834738617201,
-  "reach": 509,
-  "unregistered_errors": 21
+  "agreement": 0.5476391231028668,
+  "reach": 884,
+  "unregistered_errors": 223
  },
  "abc-abd-glz/6": {
   "agreement": 0.9983856502242152,
@@ -285,19 +285,19 @@
   "unregistered_errors": 10
  },
  "abc-abd-glz/7": {
-  "agreement": 0.6463516913614761,
-  "reach": 755,
-  "unregistered_errors": 53
+  "agreement": 0.649287112105116,
+  "reach": 758,
+  "unregistered_errors": 17
  },
  "abc-abd-glz/8": {
-  "agreement": 0.3721127194333231,
-  "reach": 1466,
-  "unregistered_errors": 211
+  "agreement": 0.3887434554973822,
+  "reach": 1518,
+  "unregistered_errors": 11
  },
  "abc-abd-glz/9": {
-  "agreement": 0.43827888177837654,
-  "reach": 938,
-  "unregistered_errors": 59
+  "agreement": 0.5322499157965646,
+  "reach": 1125,
+  "unregistered_errors": 15
  },
  "abc-abd-ijk/1": {
   "agreement": 0.9984526112185687,
@@ -310,9 +310,9 @@
   "unregistered_errors": 6
  },
  "abc-abd-ijk/2": {
-  "agreement": 0.5158892875448488,
+  "agreement": 0.5171706817016914,
   "reach": 399,
-  "unregistered_errors": 17
+  "unregistered_errors": 8
  },
  "abc-abd-ijk/3": {
   "agreement": 0.4190834624750941,
@@ -330,9 +330,9 @@
   "unregistered_errors": 3
  },
  "abc-abd-ijk/6": {
-  "agreement": 0.6298009249949729,
-  "reach": 465,
-  "unregistered_errors": 522
+  "agreement": 0.998190227227026,
+  "reach": 783,
+  "unregistered_errors": 9
  },
  "abc-abd-ijk/7": {
   "agreement": 0.9976696766676376,
@@ -400,9 +400,9 @@
   "unregistered_errors": 27
  },
  "abc-abd-xyz/1": {
-  "agreement": 0.35672030288689066,
+  "agreement": 0.36192617132039756,
   "reach": 520,
-  "unregistered_errors": 146
+  "unregistered_errors": 15
  },
  "abc-abd-xyz/10": {
   "agreement": 0.22343006019225586,
@@ -410,14 +410,14 @@
   "unregistered_errors": 132
  },
  "abc-abd-xyz/2": {
-  "agreement": 0.10596026490066225,
+  "agreement": 0.10751588959509312,
   "reach": 411,
-  "unregistered_errors": 117
+  "unregistered_errors": 13
  },
  "abc-abd-xyz/3": {
-  "agreement": 0.4368058215243202,
-  "reach": 1168,
-  "unregistered_errors": 110
+  "agreement": 0.45582790757053493,
+  "reach": 1213,
+  "unregistered_errors": 24
  },
  "abc-abd-xyz/4": {
   "agreement": 0.997907949790795,
@@ -425,9 +425,9 @@
   "unregistered_errors": 5
  },
  "abc-abd-xyz/5": {
-  "agreement": 0.24661458333333333,
+  "agreement": 0.246875,
   "reach": 699,
-  "unregistered_errors": 15
+  "unregistered_errors": 8
  },
  "abc-abd-xyz/6": {
   "agreement": 0.99830866807611,
@@ -440,9 +440,9 @@
   "unregistered_errors": 53
  },
  "abc-abd-xyz/8": {
-  "agreement": 0.8854581673306773,
+  "agreement": 0.8884462151394422,
   "reach": 648,
-  "unregistered_errors": 43
+  "unregistered_errors": 8
  },
  "abc-abd-xyz/9": {
   "agreement": 0.5665084745762712,
@@ -465,9 +465,9 @@
   "unregistered_errors": 11
  },
  "abc-cba-mrrjjj/3": {
-  "agreement": 0.07787946814021758,
-  "reach": 90,
-  "unregistered_errors": 188
+  "agreement": 0.08167846658608185,
+  "reach": 76,
+  "unregistered_errors": 4
  },
  "abc-cba-mrrjjj/4": {
   "agreement": 0.5105740181268882,
@@ -500,19 +500,19 @@
   "unregistered_errors": 15
  },
  "abc-d-abc/1": {
-  "agreement": 0.18957255127467892,
-  "reach": 195,
-  "unregistered_errors": 114
+  "agreement": 0.35230975656507574,
+  "reach": 495,
+  "unregistered_errors": 1389
  },
  "abc-d-abc/10": {
-  "agreement": 0.22245166134785058,
-  "reach": 260,
-  "unregistered_errors": 8
+  "agreement": 0.27801764595457107,
+  "reach": 365,
+  "unregistered_errors": 422
  },
  "abc-d-abc/2": {
-  "agreement": 0.27490712597095573,
-  "reach": 344,
-  "unregistered_errors": 214
+  "agreement": 0.3757176629517055,
+  "reach": 507,
+  "unregistered_errors": 370
  },
  "abc-d-abc/3": {
   "agreement": 0.5872156013001083,
@@ -520,84 +520,84 @@
   "unregistered_errors": 471
  },
  "abc-d-abc/4": {
-  "agreement": 0.8472222222222222,
-  "reach": 403,
-  "unregistered_errors": 37
+  "agreement": 0.8997395833333334,
+  "reach": 427,
+  "unregistered_errors": 27
  },
  "abc-d-abc/5": {
-  "agreement": 0.3236864771748493,
-  "reach": 336,
-  "unregistered_errors": 23
+  "agreement": 0.5826012058570198,
+  "reach": 660,
+  "unregistered_errors": 286
  },
  "abc-d-abc/6": {
-  "agreement": 0.6505032021957914,
-  "reach": 283,
-  "unregistered_errors": 87
+  "agreement": 0.9382433668801464,
+  "reach": 447,
+  "unregistered_errors": 347
  },
  "abc-d-abc/7": {
-  "agreement": 0.3395465994962217,
-  "reach": 159,
-  "unregistered_errors": 77
+  "agreement": 0.6161209068010075,
+  "reach": 279,
+  "unregistered_errors": 46
  },
  "abc-d-abc/8": {
-  "agreement": 0.4336283185840708,
-  "reach": 280,
-  "unregistered_errors": 26
+  "agreement": 0.6893173198482933,
+  "reach": 500,
+  "unregistered_errors": 576
  },
  "abc-d-abc/9": {
-  "agreement": 0.16612863173578346,
-  "reach": 284,
-  "unregistered_errors": 182
+  "agreement": 0.262229947851999,
+  "reach": 497,
+  "unregistered_errors": 566
  },
  "bc-d-bc/1": {
-  "agreement": 0.2738031199569661,
-  "reach": 231,
-  "unregistered_errors": 13
+  "agreement": 0.5860677783754706,
+  "reach": 522,
+  "unregistered_errors": 234
  },
  "bc-d-bc/10": {
-  "agreement": 0.2936756418284283,
-  "reach": 127,
-  "unregistered_errors": 10
+  "agreement": 0.7495303694427051,
+  "reach": 409,
+  "unregistered_errors": 1043
  },
  "bc-d-bc/2": {
-  "agreement": 0.3914996544574983,
-  "reach": 282,
-  "unregistered_errors": 19
+  "agreement": 0.5981340704906704,
+  "reach": 450,
+  "unregistered_errors": 207
  },
  "bc-d-bc/3": {
-  "agreement": 0.22309505106048705,
-  "reach": 146,
-  "unregistered_errors": 58
+  "agreement": 0.3982717989002357,
+  "reach": 259,
+  "unregistered_errors": 89
  },
  "bc-d-bc/4": {
-  "agreement": 0.30623100303951367,
-  "reach": 190,
-  "unregistered_errors": 21
+  "agreement": 0.39475683890577506,
+  "reach": 261,
+  "unregistered_errors": 189
  },
  "bc-d-bc/5": {
-  "agreement": 0.22280701754385965,
-  "reach": 192,
-  "unregistered_errors": 25
+  "agreement": 0.24239766081871345,
+  "reach": 209,
+  "unregistered_errors": 24
  },
  "bc-d-bc/6": {
-  "agreement": 0.373134328358209,
-  "reach": 178,
-  "unregistered_errors": 26
+  "agreement": 0.44776119402985076,
+  "reach": 228,
+  "unregistered_errors": 243
  },
  "bc-d-bc/7": {
   "agreement": 0.19922044174967518,
   "reach": 204,
-  "unregistered_errors": 50
+  "unregistered_errors": 48
  },
  "bc-d-bc/8": {
-  "agreement": 0.14339551535707556,
-  "reach": 195,
-  "unregistered_errors": 274
+  "agreement": 0.215375918598078,
+  "reach": 278,
+  "unregistered_errors": 50
  },
  "bc-d-bc/9": {
-  "agreement": 0.24679089026915113,
-  "reach": 277,
-  "unregistered_errors": 21
+  "agreement": 0.7639751552795031,
+  "reach": 1183,
+  "unregistered_errors": 2857
  },
  "eeqee-qeeq-xxixx/1": {
   "agreement": 0.0894828588030215,
@@ -605,9 +605,9 @@
   "unregistered_errors": 14
  },
  "eeqee-qeeq-xxixx/10": {
-  "agreement": 0.12008942829766847,
-  "reach": 354,
-  "unregistered_errors": 160
+  "agreement": 0.12398594698179495,
+  "reach": 360,
+  "unregistered_errors": 24
  },
  "eeqee-qeeq-xxixx/2": {
   "agreement": 0.058159976560210956,
@@ -620,14 +620,14 @@
   "unregistered_errors": 27
  },
  "eeqee-qeeq-xxixx/4": {
-  "agreement": 0.08757845569989782,
-  "reach": 315,
-  "unregistered_errors": 260
+  "agreement": 0.11842553398530628,
+  "reach": 405,
+  "unregistered_errors": 16
  },
  "eeqee-qeeq-xxixx/5": {
-  "agreement": 0.05397488130913499,
-  "reach": 285,
-  "unregistered_errors": 77
+  "agreement": 0.07289807737634264,
+  "reach": 375,
+  "unregistered_errors": 20
  },
  "eeqee-qeeq-xxixx/6": {
   "agreement": 0.045046776880686916,
@@ -645,9 +645,9 @@
   "unregistered_errors": 16
  },
  "eeqee-qeeq-xxixx/9": {
-  "agreement": 0.07601450695941972,
-  "reach": 285,
-  "unregistered_errors": 17
+  "agreement": 0.08326798666928054,
+  "reach": 315,
+  "unregistered_errors": 22
  },
  "eqe-qeq-abbba/1": {
   "agreement": 0.9919520277733943,
@@ -750,9 +750,9 @@
   "unregistered_errors": 12
  },
  "rst-rsu-xyz/1": {
-  "agreement": 0.8503090567051867,
-  "reach": 1563,
-  "unregistered_errors": 135
+  "agreement": 0.9385469855773537,
+  "reach": 1710,
+  "unregistered_errors": 392
  },
  "rst-rsu-xyz/10": {
   "agreement": 0.3330007759671877,
@@ -760,9 +760,9 @@
   "unregistered_errors": 436
  },
  "rst-rsu-xyz/2": {
-  "agreement": 0.36754039497307,
-  "reach": 951,
-  "unregistered_errors": 29
+  "agreement": 0.3689048473967684,
+  "reach": 956,
+  "unregistered_errors": 12
  },
  "rst-rsu-xyz/3": {
   "agreement": 0.9712785670166769,
@@ -770,9 +770,9 @@
   "unregistered_errors": 163
  },
  "rst-rsu-xyz/4": {
-  "agreement": 0.7445105215004575,
-  "reach": 565,
-  "unregistered_errors": 82
+  "agreement": 0.7941445562671546,
+  "reach": 602,
+  "unregistered_errors": 19
  },
  "rst-rsu-xyz/5": {
   "agreement": 0.984742951907131,
@@ -780,14 +780,14 @@
   "unregistered_errors": 13
  },
  "rst-rsu-xyz/6": {
-  "agreement": 0.1157065283958682,
+  "agreement": 0.1157473563875393,
   "reach": 498,
-  "unregistered_errors": 11
+  "unregistered_errors": 9
  },
  "rst-rsu-xyz/7": {
-  "agreement": 0.21342457631305894,
+  "agreement": 0.21349869064677107,
   "reach": 1354,
-  "unregistered_errors": 35
+  "unregistered_errors": 27
  },
  "rst-rsu-xyz/8": {
   "agreement": 0.24221476510067114,
@@ -795,9 +795,9 @@
   "unregistered_errors": 106
  },
  "rst-rsu-xyz/9": {
-  "agreement": 0.1978148871913306,
+  "agreement": 0.19808136436311957,
   "reach": 414,
-  "unregistered_errors": 14
+  "unregistered_errors": 6
  },
  "xqc-xqd-mrrjjj/1": {
   "agreement": 0.6348039215686274,
@@ -855,49 +855,49 @@
   "unregistered_errors": 12
  },
  "xy-z-xy/10": {
-  "agreement": 0.32057416267942584,
-  "reach": 127,
-  "unregistered_errors": 10
+  "agreement": 0.49077238550922764,
+  "reach": 230,
+  "unregistered_errors": 384
  },
  "xy-z-xy/2": {
-  "agreement": 0.203125,
-  "reach": 180,
-  "unregistered_errors": 27
+  "agreement": 0.33305921052631576,
+  "reach": 315,
+  "unregistered_errors": 239
  },
  "xy-z-xy/3": {
-  "agreement": 0.15058324496288442,
-  "reach": 146,
-  "unregistered_errors": 58
- },
- "xy-z-xy/4": {
-  "agreement": 0.23810930576070902,
-  "reach": 190,
-  "unregistered_errors": 21
- },
- "xy-z-xy/5": {
-  "agreement": 0.06418463611859838,
-  "reach": 192,
+  "agreement": 0.28340402969247086,
+  "reach": 266,
   "unregistered_errors": 25
  },
+ "xy-z-xy/4": {
+  "agreement": 0.3069423929098966,
+  "reach": 261,
+  "unregistered_errors": 189
+ },
+ "xy-z-xy/5": {
+  "agreement": 0.06982816711590296,
+  "reach": 209,
+  "unregistered_errors": 24
+ },
  "xy-z-xy/6": {
-  "agreement": 0.2956886684471576,
-  "reach": 178,
-  "unregistered_errors": 26
+  "agreement": 0.37924456314383825,
+  "reach": 252,
+  "unregistered_errors": 320
  },
  "xy-z-xy/7": {
-  "agreement": 0.20824934098309816,
-  "reach": 319,
-  "unregistered_errors": 181
+  "agreement": 0.3588153202046829,
+  "reach": 654,
+  "unregistered_errors": 1437
  },
  "xy-z-xy/8": {
-  "agreement": 0.14323357801618672,
-  "reach": 195,
-  "unregistered_errors": 274
+  "agreement": 0.3922454357236966,
+  "reach": 664,
+  "unregistered_errors": 1633
  },
  "xy-z-xy/9": {
-  "agreement": 0.4983277591973244,
-  "reach": 277,
-  "unregistered_errors": 21
+  "agreement": 0.7148829431438127,
+  "reach": 449,
+  "unregistered_errors": 487
  },
  "zy-x-zy/1": {
   "agreement": 0.13913669064748202,
@@ -905,48 +905,48 @@
   "unregistered_errors": 27
  },
  "zy-x-zy/10": {
-  "agreement": 0.36434782608695654,
-  "reach": 114,
-  "unregistered_errors": 85
+  "agreement": 0.7773913043478261,
+  "reach": 282,
+  "unregistered_errors": 674
  },
  "zy-x-zy/2": {
-  "agreement": 0.32021527077026574,
-  "reach": 237,
-  "unregistered_errors": 124
+  "agreement": 0.6047763202152707,
+  "reach": 466,
+  "unregistered_errors": 377
  },
  "zy-x-zy/3": {
-  "agreement": 0.5610647181628392,
-  "reach": 250,
-  "unregistered_errors": 79
+  "agreement": 0.6127348643006263,
+  "reach": 276,
+  "unregistered_errors": 109
  },
  "zy-x-zy/4": {
-  "agreement": 0.3330373001776199,
-  "reach": 241,
-  "unregistered_errors": 49
+  "agreement": 0.8653049141503848,
+  "reach": 727,
+  "unregistered_errors": 805
  },
  "zy-x-zy/5": {
-  "agreement": 0.19186338523355098,
-  "reach": 191,
-  "unregistered_errors": 133
+  "agreement": 0.5760924158714213,
+  "reach": 572,
+  "unregistered_errors": 412
  },
  "zy-x-zy/6": {
-  "agreement": 0.1110888710968775,
-  "reach": 127,
-  "unregistered_errors": 72
+  "agreement": 0.32986389111289033,
+  "reach": 420,
+  "unregistered_errors": 629
  },
  "zy-x-zy/7": {
-  "agreement": 0.32439824945295404,
-  "reach": 263,
-  "unregistered_errors": 68
+  "agreement": 0.3889496717724289,
+  "reach": 325,
+  "unregistered_errors": 112
  },
  "zy-x-zy/8": {
-  "agreement": 0.2936378466557912,
-  "reach": 293,
-  "unregistered_errors": 65
+  "agreement": 0.5441621999533908,
+  "reach": 571,
+  "unregistered_errors": 284
  },
  "zy-x-zy/9": {
-  "agreement": 0.23294467873976682,
-  "reach": 229,
-  "unregistered_errors": 50
+  "agreement": 0.26966013396179606,
+  "reach": 264,
+  "unregistered_errors": 11
  }
 }

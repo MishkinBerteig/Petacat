@@ -172,7 +172,9 @@ def rule_name(r: Any) -> str:
 
 def codelet_name(c: Any) -> str:
     """``<type>(<argument>)``, or just the type when it has no argument."""
-    args = [v for v in (c.arguments or {}).values() if v is not None]
+    # The scope a top-down scout is handed is not part of its name; Metacat's
+    # recorder logs it in a separate `scope` field (DECISIONS.md).
+    args = [v for k, v in (c.arguments or {}).items() if v is not None and k != "scope"]
     if not args:
         return c.codelet_type
     return f"{c.codelet_type}({','.join(name_of(a) for a in args)})"

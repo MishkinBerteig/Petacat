@@ -62,11 +62,33 @@ def _proposed(structs: list, namer: Callable[[Any], str]) -> list:
     return sorted(namer(s) for s in structs if not s.is_built)
 
 
+def _rack_proposals(ctx: Any) -> list:
+    """Unbuilt structures the codelets on the rack carry, each once.
+
+    Metacat keeps proposed bonds, groups and bridges in tables of their own
+    (``workspace-strings.ss:49-53``, ``workspace.ss:213``), entered on proposal and
+    left on fizzle, build or eviction (``coderack.ss:428``, ``:441``).  Petacat keeps
+    no such table: a proposal lives on the codelets that will evaluate or build it,
+    which is the same set.
+    """
+    seen: dict[int, Any] = {}
+    for b in ctx.coderack.bins:
+        for c in b.codelets:
+            for v in (c.arguments or {}).values():
+                if getattr(v, "is_built", True) is False:
+                    seen.setdefault(id(v), v)
+    return list(seen.values())
+
+
 def _structures(ctx: Any) -> dict:
     ws = ctx.workspace
     bonds = [b for s in ws.all_strings for b in s.bonds]
     groups = [g for s in ws.all_strings for g in s.groups]
     bridges = ws.top_bridges + ws.bottom_bridges + ws.vertical_bridges
+    proposals = _rack_proposals(ctx)
+    from server.engine.bonds import Bond
+    from server.engine.bridges import Bridge
+    from server.engine.groups import Group
     rules = ws.top_rules + ws.bottom_rules
     descriptions = [d for o in ws.all_objects for d in o.descriptions]
     return {
@@ -78,9 +100,9 @@ def _structures(ctx: Any) -> dict:
         ),
         "rules": _strengths(rules, rule_name),
         "proposed": {
-            "bonds": _proposed(bonds, bond_name),
-            "groups": _proposed(groups, group_name),
-            "bridges": _proposed(bridges, bridge_name),
+            "bonds": _proposed([p for p in proposals if isinstance(p, Bond)], bond_name),
+            "groups": _proposed([p for p in proposals if isinstance(p, Group)], group_name),
+            "bridges": _proposed([p for p in proposals if isinstance(p, Bridge)], bridge_name),
         },
     }
 
