@@ -456,19 +456,22 @@ class MlxBackend(Backend):
             # and ``mx.round`` then took it to 27 where the reference gives 26.
             # Pinning the coefficients to the array's dtype is what makes this
             # backend the float64 one it claims to be.
-            c2 = mx.array(0.2, dtype=dt)
-            c8 = mx.array(0.8, dtype=dt)
-            s_intra = mx.where(clamped, hundred, mx.round(c8 * intra + c2 * rel))
+            # The scheme's 1/5 and 4/5 weights are applied as one division of an
+            # exactly-representable numerator, so x.5 results stay exactly x.5
+            # and round half-to-even as in Metacat (rationals).
+            c4 = mx.array(4.0, dtype=dt)
+            c5 = mx.array(5.0, dtype=dt)
+            s_intra = mx.where(clamped, hundred, mx.round((c4 * intra + rel) / c5))
 
             writes_h = is_initial | is_modified | is_answer | (is_target & justify)
             writes_v = is_initial | is_target
             s_h = mx.where(
                 clamped, hundred,
-                mx.where(writes_h, mx.round(c2 * h + c8 * rel), prev_h),
+                mx.where(writes_h, mx.round((h + c4 * rel) / c5), prev_h),
             )
             s_v = mx.where(
                 clamped, hundred,
-                mx.where(writes_v, mx.round(c2 * v + c8 * rel), prev_v),
+                mx.where(writes_v, mx.round((v + c4 * rel) / c5), prev_v),
             )
 
             s_avg = mx.where(

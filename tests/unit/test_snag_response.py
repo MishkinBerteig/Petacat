@@ -208,7 +208,7 @@ def test_the_snag_theme_pattern_is_derived_from_concept_mappings():
         [
             _FakeConceptMapping("plato-letter-category", identity),
             _FakeConceptMapping("plato-string-position-category", opposite),
-            # A duplicate pair contributes nothing (``remove-duplicates``).
+            # A duplicate pair contributes nothing (``remove-duplicates`` keeps the LAST of equal entries).
             _FakeConceptMapping("plato-letter-category", identity),
             # An unlabelled mapping is the "different" relation, not a dropped one.
             _FakeConceptMapping("plato-object-category", None),
@@ -216,8 +216,8 @@ def test_the_snag_theme_pattern_is_derived_from_concept_mappings():
     )
     assert pattern == [
         "vertical_bridge",
-        ("plato-letter-category", "identity"),
         ("plato-string-position-category", "opposite"),
+        ("plato-letter-category", "identity"),  # remove-duplicates keeps the LAST copy
         ("plato-object-category", "diff"),
     ]
 

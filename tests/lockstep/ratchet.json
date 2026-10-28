@@ -115,9 +115,9 @@
   "unregistered_errors": 0
  },
  "aabc-aabd-ijkk/3": {
-  "agreement": 0.9999506720927365,
+  "agreement": 1.0,
   "reach": 5621,
-  "unregistered_errors": 2
+  "unregistered_errors": 0
  },
  "aabc-aabd-ijkk/4": {
   "agreement": 1.0,
@@ -135,9 +135,9 @@
   "unregistered_errors": 0
  },
  "aabc-aabd-ijkk/7": {
-  "agreement": 0.9999642218246869,
+  "agreement": 1.0,
   "reach": 4098,
-  "unregistered_errors": 1
+  "unregistered_errors": 0
  },
  "aabc-aabd-ijkk/8": {
   "agreement": 1.0,
@@ -470,9 +470,9 @@
   "unregistered_errors": 0
  },
  "abc-cba-mrrjjj/4": {
-  "agreement": 0.9992447129909365,
+  "agreement": 1.0,
   "reach": 691,
-  "unregistered_errors": 4
+  "unregistered_errors": 0
  },
  "abc-cba-mrrjjj/5": {
   "agreement": 1.0,
@@ -500,9 +500,9 @@
   "unregistered_errors": 0
  },
  "abc-d-abc/1": {
-  "agreement": 0.9992332758290206,
+  "agreement": 1.0,
   "reach": 1140,
-  "unregistered_errors": 4
+  "unregistered_errors": 0
  },
  "abc-d-abc/10": {
   "agreement": 1.0,
@@ -580,9 +580,9 @@
   "unregistered_errors": 0
  },
  "bc-d-bc/6": {
-  "agreement": 0.9995185363505056,
+  "agreement": 1.0,
   "reach": 487,
-  "unregistered_errors": 1
+  "unregistered_errors": 0
  },
  "bc-d-bc/7": {
   "agreement": 1.0,
@@ -610,19 +610,19 @@
   "unregistered_errors": 0
  },
  "eeqee-qeeq-xxixx/2": {
-  "agreement": 0.9997070026369763,
+  "agreement": 1.0,
   "reach": 4628,
-  "unregistered_errors": 10
+  "unregistered_errors": 0
  },
  "eeqee-qeeq-xxixx/3": {
-  "agreement": 0.9999752285169313,
+  "agreement": 1.0,
   "reach": 5393,
-  "unregistered_errors": 1
+  "unregistered_errors": 0
  },
  "eeqee-qeeq-xxixx/4": {
-  "agreement": 0.9998053812095558,
+  "agreement": 1.0,
   "reach": 2755,
-  "unregistered_errors": 4
+  "unregistered_errors": 0
  },
  "eeqee-qeeq-xxixx/5": {
   "agreement": 1.0,
@@ -630,9 +630,9 @@
   "unregistered_errors": 0
  },
  "eeqee-qeeq-xxixx/6": {
-  "agreement": 0.999038831218762,
+  "agreement": 1.0,
   "reach": 2175,
-  "unregistered_errors": 15
+  "unregistered_errors": 0
  },
  "eeqee-qeeq-xxixx/7": {
   "agreement": 1.0,
@@ -725,9 +725,9 @@
   "unregistered_errors": 0
  },
  "eqe-qeq-abbbc/5": {
-  "agreement": 0.9962628970671866,
+  "agreement": 1.0,
   "reach": 3995,
-  "unregistered_errors": 92
+  "unregistered_errors": 0
  },
  "eqe-qeq-abbbc/6": {
   "agreement": 1.0,
@@ -780,9 +780,9 @@
   "unregistered_errors": 0
  },
  "rst-rsu-xyz/6": {
-  "agreement": 0.9998366880333156,
+  "agreement": 1.0,
   "reach": 4306,
-  "unregistered_errors": 4
+  "unregistered_errors": 0
  },
  "rst-rsu-xyz/7": {
   "agreement": 1.0,
@@ -930,9 +930,9 @@
   "unregistered_errors": 0
  },
  "zy-x-zy/6": {
-  "agreement": 0.9997998398718975,
+  "agreement": 1.0,
   "reach": 1081,
-  "unregistered_errors": 1
+  "unregistered_errors": 0
  },
  "zy-x-zy/7": {
   "agreement": 1.0,

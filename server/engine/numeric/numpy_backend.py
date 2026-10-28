@@ -292,10 +292,10 @@ class NumpyBackend(Backend):
             ),
         )
 
-        s_intra = np.where(clamped, 100.0, np.rint(0.8 * intra + 0.2 * rel))
+        s_intra = np.where(clamped, 100.0, np.rint((4.0 * intra + rel) / 5.0))
 
-        h_formula = np.rint(0.2 * h + 0.8 * rel)
-        v_formula = np.rint(0.2 * v + 0.8 * rel)
+        h_formula = np.rint((h + 4.0 * rel) / 5.0)
+        v_formula = np.rint((v + 4.0 * rel) / 5.0)
         writes_h = is_initial | is_modified | is_answer | target_justifying
         writes_v = is_initial | is_target
         s_h = np.where(clamped, 100.0, np.where(writes_h, h_formula, prev_h))

@@ -359,7 +359,7 @@ class PythonBackend(Backend):
             if batch.salience_clamped[i]:
                 s_intra.append(100)
             else:
-                s_intra.append(round(0.8 * intra + 0.2 * ri))
+                s_intra.append(round((4 * intra + ri) / 5))
 
             # inter-string salience (workspace-objects.ss:532-559).  Slots the
             # reference leaves alone keep their previous value.
@@ -368,15 +368,15 @@ class PythonBackend(Backend):
             if batch.salience_clamped[i]:
                 new_h, new_v = 100, 100
             elif stype == STRING_INITIAL:
-                new_h = round(0.2 * h + 0.8 * ri)
-                new_v = round(0.2 * v + 0.8 * ri)
+                new_h = round((h + 4 * ri) / 5)
+                new_v = round((v + 4 * ri) / 5)
             elif stype == STRING_MODIFIED:
-                new_h, new_v = round(0.2 * h + 0.8 * ri), prev_v
+                new_h, new_v = round((h + 4 * ri) / 5), prev_v
             elif stype == STRING_TARGET:
-                new_v = round(0.2 * v + 0.8 * ri)
-                new_h = round(0.2 * h + 0.8 * ri) if justify else prev_h
+                new_v = round((v + 4 * ri) / 5)
+                new_h = round((h + 4 * ri) / 5) if justify else prev_h
             elif stype == STRING_ANSWER:
-                new_h, new_v = round(0.2 * h + 0.8 * ri), prev_v
+                new_h, new_v = round((h + 4 * ri) / 5), prev_v
             else:
                 new_h, new_v = prev_h, prev_v
             s_h.append(new_h)

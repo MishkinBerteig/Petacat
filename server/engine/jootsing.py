@@ -1022,12 +1022,18 @@ def _theme_entries_equal(e1: dict[str, Any], e2: dict[str, Any]) -> bool:
 
 
 def _unique_entries(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Deduplicate theme entries."""
-    seen: list[dict[str, Any]] = []
-    for e in entries:
-        if not any(_theme_entries_equal(e, s) for s in seen):
-            seen.append(e)
-    return seen
+    """Deduplicate theme entries, keeping the LAST occurrence of each.
+
+    Scheme: ``remove-duplicates`` (``utilities.ss:915-930``) drops an element when an
+    equal one follows it, so the survivors are the last copies, in their order.  The
+    order matters: ``stochastic-filter`` (``jootsing.ss:76-90``) draws one coin per
+    entry in that order, so keeping the first copies assigned the coins to different
+    entries than Metacat did.
+    """
+    return [
+        e for i, e in enumerate(entries)
+        if not any(_theme_entries_equal(e, later) for later in entries[i + 1:])
+    ]
 
 
 def _lookup_overlap(

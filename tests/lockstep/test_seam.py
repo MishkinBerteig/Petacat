@@ -21,7 +21,7 @@ pytestmark = pytest.mark.lockstep
 #: (problem, seed, cap) -> (codelets run, RNG.call_count, answers, status)
 BEFORE_THE_SEAM = {
     (("abc", "abd", "xyz"), 1, 3000): (3000, 21659, [], "halted"),
-    (("abc", "abd", "xyz"), 2, 3000): (1682, 12434, ["xyd"], "answer_found"),
+    (("abc", "abd", "xyz"), 2, 3000): (3000, 23461, [], "halted"),
     (("abc", "abd", "ijk"), 3, 2000): (391, 3056, ["ijl"], "answer_found"),
     (("abc", "abd", "mrrjjj"), 4, 2500): (511, 4708, ["mrrkkk"], "answer_found"),
 }

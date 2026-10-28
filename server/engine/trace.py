@@ -902,9 +902,10 @@ def get_snag_theme_pattern(concept_mappings: list[Any]) -> list[Any]:
         dimension = getattr(getattr(cm, "description_type1", None), "name", None)
         if dimension is None:
             continue
-        entry = (dimension, relation_name_for_label(getattr(cm, "label", None)))
-        if entry not in entries:
-            entries.append(entry)
+        entries.append((dimension, relation_name_for_label(getattr(cm, "label", None))))
+    # ``remove-duplicates`` (utilities.ss:915-930) keeps the LAST of equal elements, in
+    # list order; the jootser draws one coin per entry in this order (jootsing.ss:84-98).
+    entries = [e for i, e in enumerate(entries) if e not in entries[i + 1:]]
     return [THEME_VERTICAL_BRIDGE, *entries]
 
 

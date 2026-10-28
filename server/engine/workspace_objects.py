@@ -613,8 +613,7 @@ class WorkspaceObject:
             self.salience["intra"] = 100
         else:
             self.salience["intra"] = round(
-                0.8 * self.intra_string_unhappiness
-                + 0.2 * self.relative_importance
+                (4 * self.intra_string_unhappiness + self.relative_importance) / 5
             )
 
     def update_inter_string_salience(self) -> None:
@@ -633,16 +632,16 @@ class WorkspaceObject:
 
         stype = self._string_type()
         if stype == "initial":
-            self.salience["horizontal_inter"] = round(0.2 * h + 0.8 * ri)
-            self.salience["vertical_inter"] = round(0.2 * v + 0.8 * ri)
+            self.salience["horizontal_inter"] = round((h + 4 * ri) / 5)
+            self.salience["vertical_inter"] = round((v + 4 * ri) / 5)
         elif stype == "modified":
-            self.salience["horizontal_inter"] = round(0.2 * h + 0.8 * ri)
+            self.salience["horizontal_inter"] = round((h + 4 * ri) / 5)
         elif stype == "target":
-            self.salience["vertical_inter"] = round(0.2 * v + 0.8 * ri)
+            self.salience["vertical_inter"] = round((v + 4 * ri) / 5)
             if self._justify_mode():
-                self.salience["horizontal_inter"] = round(0.2 * h + 0.8 * ri)
+                self.salience["horizontal_inter"] = round((h + 4 * ri) / 5)
         elif stype == "answer":
-            self.salience["horizontal_inter"] = round(0.2 * h + 0.8 * ri)
+            self.salience["horizontal_inter"] = round((h + 4 * ri) / 5)
 
     def update_average_salience(self) -> None:
         """Combine intra and inter-string salience.
