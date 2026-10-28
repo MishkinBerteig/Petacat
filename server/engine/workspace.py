@@ -1756,27 +1756,15 @@ class Workspace:
 
         Scheme: rules.ss:364-368 (rules-equal?).
         """
+        # G-C2: this used to compare only the changes, so two rules that differ in
+        # which object they describe (``[single]->b`` vs ``[a]->b``) were "equal" and
+        # the rule-builder dropped the newcomer.  ``rules-equal?`` compares the
+        # object-descriptions too (rules.ss:375-391); the faithful port is in rules.py.
+        from server.engine.rules import rules_equal
+
         if rule1.rule_type != rule2.rule_type:
             return False
-        c1 = rule1.clauses
-        c2 = rule2.clauses
-        if len(c1) != len(c2):
-            return False
-        for clause1, clause2 in zip(c1, c2):
-            if clause1.clause_type != clause2.clause_type:
-                return False
-            if len(clause1.changes) != len(clause2.changes):
-                return False
-            for ch1, ch2 in zip(clause1.changes, clause2.changes):
-                if ch1.dimension is not ch2.dimension:
-                    return False
-                if ch1.from_descriptor is not ch2.from_descriptor:
-                    return False
-                if ch1.to_descriptor is not ch2.to_descriptor:
-                    return False
-                if ch1.relation is not ch2.relation:
-                    return False
-        return True
+        return rules_equal(rule1, rule2)
 
     def __repr__(self) -> str:
         ans = f"'{self.answer_string.text}'" if self.answer_string else "?"

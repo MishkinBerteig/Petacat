@@ -1,53 +1,53 @@
 {
  "a-b-z/1": {
-  "agreement": 0.817351598173516,
-  "reach": 768,
-  "unregistered_errors": 1021
+  "agreement": 1.0,
+  "reach": 827,
+  "unregistered_errors": 0
  },
  "a-b-z/10": {
-  "agreement": 0.7941534713763703,
-  "reach": 757,
-  "unregistered_errors": 1368
+  "agreement": 1.0,
+  "reach": 756,
+  "unregistered_errors": 0
  },
  "a-b-z/2": {
-  "agreement": 0.9542974079126876,
+  "agreement": 1.0,
   "reach": 451,
-  "unregistered_errors": 108
+  "unregistered_errors": 0
  },
  "a-b-z/3": {
-  "agreement": 0.9938032532920217,
+  "agreement": 1.0,
   "reach": 396,
-  "unregistered_errors": 19
+  "unregistered_errors": 0
  },
  "a-b-z/4": {
-  "agreement": 0.5537442689760571,
-  "reach": 331,
-  "unregistered_errors": 9
+  "agreement": 1.0,
+  "reach": 586,
+  "unregistered_errors": 0
  },
  "a-b-z/5": {
-  "agreement": 0.9166666666666666,
+  "agreement": 1.0,
   "reach": 591,
-  "unregistered_errors": 299
+  "unregistered_errors": 0
  },
  "a-b-z/6": {
-  "agreement": 0.9726829268292683,
+  "agreement": 1.0,
   "reach": 646,
-  "unregistered_errors": 95
+  "unregistered_errors": 0
  },
  "a-b-z/7": {
-  "agreement": 0.9849624060150376,
+  "agreement": 1.0,
   "reach": 262,
-  "unregistered_errors": 4
+  "unregistered_errors": 0
  },
  "a-b-z/8": {
-  "agreement": 0.8752136752136752,
-  "reach": 694,
-  "unregistered_errors": 803
+  "agreement": 1.0,
+  "reach": 700,
+  "unregistered_errors": 0
  },
  "a-b-z/9": {
-  "agreement": 0.9333333333333333,
+  "agreement": 1.0,
   "reach": 252,
-  "unregistered_errors": 88
+  "unregistered_errors": 0
  },
  "aabb-cc-aabb/1": {
   "agreement": 0.48437167765256217,
@@ -57,17 +57,17 @@
  "aabb-cc-aabb/10": {
   "agreement": 0.9936142565435307,
   "reach": 4684,
-  "unregistered_errors": 176
+  "unregistered_errors": 174
  },
  "aabb-cc-aabb/2": {
-  "agreement": 0.4469893602266648,
-  "reach": 4845,
-  "unregistered_errors": 14308
+  "agreement": 0.9939569257593469,
+  "reach": 8976,
+  "unregistered_errors": 307
  },
  "aabb-cc-aabb/3": {
-  "agreement": 0.44441434608299923,
-  "reach": 3020,
-  "unregistered_errors": 2929
+  "agreement": 0.9992686098168816,
+  "reach": 6433,
+  "unregistered_errors": 27
  },
  "aabb-cc-aabb/4": {
   "agreement": 0.6102742983986047,
@@ -90,9 +90,9 @@
   "unregistered_errors": 157
  },
  "aabb-cc-aabb/8": {
-  "agreement": 0.564680043182072,
-  "reach": 2658,
-  "unregistered_errors": 84
+  "agreement": 0.9987343185794587,
+  "reach": 4640,
+  "unregistered_errors": 36
  },
  "aabb-cc-aabb/9": {
   "agreement": 0.8235414954806902,
@@ -145,9 +145,9 @@
   "unregistered_errors": 52
  },
  "aabc-aabd-ijkk/9": {
-  "agreement": 0.9746697924409629,
+  "agreement": 0.9999428212018984,
   "reach": 2343,
-  "unregistered_errors": 1099
+  "unregistered_errors": 2
  },
  "ab-c-ab/1": {
   "agreement": 0.16359641710326178,
@@ -170,9 +170,9 @@
   "unregistered_errors": 0
  },
  "ab-c-ab/4": {
-  "agreement": 0.9979896611143021,
+  "agreement": 1.0,
   "reach": 790,
-  "unregistered_errors": 19
+  "unregistered_errors": 0
  },
  "ab-c-ab/5": {
   "agreement": 0.9987853021560886,
@@ -195,9 +195,9 @@
   "unregistered_errors": 1
  },
  "ab-c-ab/9": {
-  "agreement": 0.9755590223608944,
+  "agreement": 0.9950598023920957,
   "reach": 903,
-  "unregistered_errors": 244
+  "unregistered_errors": 19
  },
  "abc-aabbcc-kkjjii/1": {
   "agreement": 0.9999000799360511,
@@ -250,9 +250,9 @@
   "unregistered_errors": 68
  },
  "abc-abd-glz/1": {
-  "agreement": 0.9977705941366626,
+  "agreement": 1.0,
   "reach": 2846,
-  "unregistered_errors": 4
+  "unregistered_errors": 0
  },
  "abc-abd-glz/10": {
   "agreement": 0.3676244101376243,
@@ -275,19 +275,19 @@
   "unregistered_errors": 0
  },
  "abc-abd-glz/5": {
-  "agreement": 0.5492200674536256,
-  "reach": 884,
-  "unregistered_errors": 206
+  "agreement": 0.7121627318718381,
+  "reach": 1141,
+  "unregistered_errors": 257
  },
  "abc-abd-glz/6": {
-  "agreement": 0.9996412556053812,
+  "agreement": 1.0,
   "reach": 943,
-  "unregistered_errors": 3
+  "unregistered_errors": 0
  },
  "abc-abd-glz/7": {
-  "agreement": 0.9127760693318423,
-  "reach": 1095,
-  "unregistered_errors": 1225
+  "agreement": 1.0,
+  "reach": 1115,
+  "unregistered_errors": 0
  },
  "abc-abd-glz/8": {
   "agreement": 0.49892208192177395,
@@ -295,9 +295,9 @@
   "unregistered_errors": 257
  },
  "abc-abd-glz/9": {
-  "agreement": 0.9998315931289997,
+  "agreement": 1.0,
   "reach": 1991,
-  "unregistered_errors": 3
+  "unregistered_errors": 0
  },
  "abc-abd-ijk/1": {
   "agreement": 1.0,
@@ -390,9 +390,9 @@
   "unregistered_errors": 0
  },
  "abc-abd-mrrjjj/8": {
-  "agreement": 0.9895370128171593,
+  "agreement": 0.989602406487052,
   "reach": 2080,
-  "unregistered_errors": 162
+  "unregistered_errors": 160
  },
  "abc-abd-mrrjjj/9": {
   "agreement": 0.9946727549467276,
@@ -445,9 +445,9 @@
   "unregistered_errors": 4
  },
  "abc-abd-xyz/9": {
-  "agreement": 0.567864406779661,
-  "reach": 870,
-  "unregistered_errors": 666
+  "agreement": 0.848,
+  "reach": 1211,
+  "unregistered_errors": 99
  },
  "abc-cba-mrrjjj/1": {
   "agreement": 1.0,
@@ -495,9 +495,9 @@
   "unregistered_errors": 44
  },
  "abc-cba-mrrjjj/9": {
-  "agreement": 0.9995200767877139,
+  "agreement": 0.9996000639897616,
   "reach": 1682,
-  "unregistered_errors": 8
+  "unregistered_errors": 6
  },
  "abc-d-abc/1": {
   "agreement": 0.9906076289055012,
@@ -505,9 +505,9 @@
   "unregistered_errors": 91
  },
  "abc-d-abc/10": {
-  "agreement": 0.9746574056692322,
+  "agreement": 1.0,
   "reach": 1221,
-  "unregistered_errors": 319
+  "unregistered_errors": 0
  },
  "abc-d-abc/2": {
   "agreement": 0.39952718676122934,
@@ -545,9 +545,9 @@
   "unregistered_errors": 5
  },
  "abc-d-abc/9": {
-  "agreement": 0.8523714924261236,
+  "agreement": 0.855475540104296,
   "reach": 1812,
-  "unregistered_errors": 3392
+  "unregistered_errors": 3388
  },
  "bc-d-bc/1": {
   "agreement": 0.9986551909628832,
@@ -600,9 +600,9 @@
   "unregistered_errors": 0
  },
  "eeqee-qeeq-xxixx/1": {
-  "agreement": 0.9960294402479178,
+  "agreement": 0.9999515785396088,
   "reach": 2789,
-  "unregistered_errors": 8
+  "unregistered_errors": 1
  },
  "eeqee-qeeq-xxixx/10": {
   "agreement": 0.9978920472692431,
@@ -645,14 +645,14 @@
   "unregistered_errors": 212
  },
  "eeqee-qeeq-xxixx/9": {
-  "agreement": 0.996814350127426,
+  "agreement": 0.9968633601254656,
   "reach": 2803,
-  "unregistered_errors": 66
+  "unregistered_errors": 64
  },
  "eqe-qeq-abbba/1": {
-  "agreement": 0.9921098311503866,
+  "agreement": 1.0,
   "reach": 1190,
-  "unregistered_errors": 5
+  "unregistered_errors": 0
  },
  "eqe-qeq-abbba/10": {
   "agreement": 1.0,
@@ -665,9 +665,9 @@
   "unregistered_errors": 0
  },
  "eqe-qeq-abbba/3": {
-  "agreement": 0.9998703067245963,
+  "agreement": 1.0,
   "reach": 2717,
-  "unregistered_errors": 3
+  "unregistered_errors": 0
  },
  "eqe-qeq-abbba/4": {
   "agreement": 1.0,
@@ -685,9 +685,9 @@
   "unregistered_errors": 0
  },
  "eqe-qeq-abbba/7": {
-  "agreement": 0.9997174183338985,
+  "agreement": 1.0,
   "reach": 2938,
-  "unregistered_errors": 9
+  "unregistered_errors": 0
  },
  "eqe-qeq-abbba/8": {
   "agreement": 1.0,
@@ -695,9 +695,9 @@
   "unregistered_errors": 0
  },
  "eqe-qeq-abbba/9": {
-  "agreement": 0.9964106245513281,
+  "agreement": 1.0,
   "reach": 1249,
-  "unregistered_errors": 4
+  "unregistered_errors": 0
  },
  "eqe-qeq-abbbc/1": {
   "agreement": 1.0,
@@ -705,9 +705,9 @@
   "unregistered_errors": 0
  },
  "eqe-qeq-abbbc/10": {
-  "agreement": 0.31744582420258094,
-  "reach": 915,
-  "unregistered_errors": 6
+  "agreement": 0.9997565132700268,
+  "reach": 2867,
+  "unregistered_errors": 4
  },
  "eqe-qeq-abbbc/2": {
   "agreement": 1.0,
@@ -715,19 +715,19 @@
   "unregistered_errors": 0
  },
  "eqe-qeq-abbbc/3": {
-  "agreement": 0.21337109384455255,
-  "reach": 1476,
-  "unregistered_errors": 289
+  "agreement": 0.9881877375160362,
+  "reach": 6946,
+  "unregistered_errors": 620
  },
  "eqe-qeq-abbbc/4": {
-  "agreement": 0.9997477295660948,
+  "agreement": 1.0,
   "reach": 1297,
-  "unregistered_errors": 3
+  "unregistered_errors": 0
  },
  "eqe-qeq-abbbc/5": {
-  "agreement": 0.17836542367373467,
-  "reach": 748,
-  "unregistered_errors": 8
+  "agreement": 0.9935006905516289,
+  "reach": 3995,
+  "unregistered_errors": 160
  },
  "eqe-qeq-abbbc/6": {
   "agreement": 1.0,
@@ -740,19 +740,19 @@
   "unregistered_errors": 0
  },
  "eqe-qeq-abbbc/8": {
-  "agreement": 0.8486808070356958,
-  "reach": 1653,
-  "unregistered_errors": 4
+  "agreement": 1.0,
+  "reach": 2038,
+  "unregistered_errors": 0
  },
  "eqe-qeq-abbbc/9": {
-  "agreement": 0.9739854318418314,
-  "reach": 1411,
-  "unregistered_errors": 5
+  "agreement": 1.0,
+  "reach": 1457,
+  "unregistered_errors": 0
  },
  "rst-rsu-xyz/1": {
-  "agreement": 0.9408761085729642,
+  "agreement": 0.9409656902266416,
   "reach": 1710,
-  "unregistered_errors": 366
+  "unregistered_errors": 364
  },
  "rst-rsu-xyz/10": {
   "agreement": 0.3334441857887152,
@@ -760,29 +760,29 @@
   "unregistered_errors": 432
  },
  "rst-rsu-xyz/2": {
-  "agreement": 0.6194614003590664,
-  "reach": 1575,
-  "unregistered_errors": 589
+  "agreement": 0.7788868940754039,
+  "reach": 2010,
+  "unregistered_errors": 2405
  },
  "rst-rsu-xyz/3": {
-  "agreement": 0.974366893143916,
+  "agreement": 1.0,
   "reach": 571,
-  "unregistered_errors": 151
+  "unregistered_errors": 0
  },
  "rst-rsu-xyz/4": {
-  "agreement": 0.9993138151875571,
+  "agreement": 0.9995425434583715,
   "reach": 754,
-  "unregistered_errors": 5
+  "unregistered_errors": 3
  },
  "rst-rsu-xyz/5": {
-  "agreement": 0.9877280265339967,
+  "agreement": 1.0,
   "reach": 588,
-  "unregistered_errors": 4
+  "unregistered_errors": 0
  },
  "rst-rsu-xyz/6": {
-  "agreement": 0.5732658310537705,
-  "reach": 2401,
-  "unregistered_errors": 351
+  "agreement": 0.7502960029396154,
+  "reach": 3187,
+  "unregistered_errors": 353
  },
  "rst-rsu-xyz/7": {
   "agreement": 0.3838628390730767,
@@ -790,14 +790,14 @@
   "unregistered_errors": 3775
  },
  "rst-rsu-xyz/8": {
-  "agreement": 0.2430201342281879,
-  "reach": 677,
-  "unregistered_errors": 94
+  "agreement": 0.8579194630872483,
+  "reach": 2220,
+  "unregistered_errors": 629
  },
  "rst-rsu-xyz/9": {
-  "agreement": 0.9998223485521407,
+  "agreement": 1.0,
   "reach": 1804,
-  "unregistered_errors": 3
+  "unregistered_errors": 0
  },
  "xqc-xqd-mrrjjj/1": {
   "agreement": 1.0,
@@ -935,9 +935,9 @@
   "unregistered_errors": 1
  },
  "zy-x-zy/7": {
-  "agreement": 0.9920678336980306,
+  "agreement": 0.9980853391684902,
   "reach": 832,
-  "unregistered_errors": 74
+  "unregistered_errors": 9
  },
  "zy-x-zy/8": {
   "agreement": 0.9993008622698671,
