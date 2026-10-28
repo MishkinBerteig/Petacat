@@ -177,7 +177,7 @@
     "description": "Builds an evaluated description by attaching it to its object.",
     "source_file": "descriptions.ss",
     "source_line": 156,
-    "execute_body": "# Description builder\ndesc = args.get('structure')\nif desc is None:\n    fizzle()\n\nif desc.object is None or desc.object.string is None:\n    fizzle()\n\n# Already present: still worth re-activating the concepts (descriptions.ss:165-168)\nfor d in desc.object.descriptions:\n    if d.description_type is desc.description_type and d.descriptor is desc.descriptor:\n        activate_from_workspace(desc.description_type, desc.descriptor)\n        fizzle()\n\nbuild_structure(desc)\n\n# Scheme: build-description activates type and descriptor (descriptions.ss:189-191)\nactivate_from_workspace(desc.description_type, desc.descriptor)\n"
+    "execute_body": "# Description builder\ndesc = args.get('structure')\nif desc is None:\n    fizzle()\n\n# descriptions.ss:~157 -- (tell *workspace* 'object-exists? object): a group broken since\n# the proposal is no longer in the string's objects.\nif desc.object is None or desc.object.string is None or desc.object not in desc.object.string.objects:\n    fizzle()\n\n# Already present: still worth re-activating the concepts (descriptions.ss:165-168)\nfor d in desc.object.descriptions:\n    if d.description_type is desc.description_type and d.descriptor is desc.descriptor:\n        activate_from_workspace(desc.description_type, desc.descriptor)\n        fizzle()\n\nbuild_structure(desc)\n\n# Scheme: build-description activates type and descriptor (descriptions.ss:189-191)\nactivate_from_workspace(desc.description_type, desc.descriptor)\n"
   },
   {
     "name": "rule-scout",

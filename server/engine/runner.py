@@ -849,6 +849,11 @@ class EngineRunner:
                 ctx, pending, float(getattr(ctx, "_pending_answer_quality", 0) or 0)
             )
             self.finish()
+            # ``answers.ss:~84`` ends the run with ``(suspend)`` from *inside* the
+            # codelet, so the periodic ``(update-everything)`` of ``run.ss:158-159``
+            # never follows -- an answer found on a cycle boundary got a second
+            # update (and its coins) in Petacat only.
+            return result
 
         # Check for update cycle
         ucl = self.meta.get_param("update_cycle_length", 15)

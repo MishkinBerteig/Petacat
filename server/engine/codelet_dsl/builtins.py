@@ -1020,6 +1020,12 @@ def _absorb_duplicate_group(
         )
         transferred.proposal_level = Description.BUILT
         existing.descriptions.append(transferred)
+        # ``build-description`` (descriptions.ss:182-192) jolts the description
+        # type and the descriptor as the description goes in; the duplicate
+        # branch calls it (groups.ss:636-641), so 'length'/'two' are warmed too.
+        for node in (description.description_type, description.descriptor):
+            if node is not None and hasattr(node, "activate_from_workspace"):
+                node.activate_from_workspace()
         ctx.sink.on_structure_change(ctx, transferred, STRUCTURE_BUILT)
     _wrote(ctx, existing)
 
