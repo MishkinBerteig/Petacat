@@ -2650,8 +2650,13 @@ def _report_answer_locked(
         if bottom_rule is not None:
             from server.engine.answers import make_translated_string
 
+            # The bridges it draws are translated-rule bridges, marked for display and
+            # never added to the Workspace (``answers.ss:1121-1126``), so no update or
+            # progress measure may count them: they are registered for the display only
+            # after the update below.
             translated_string = make_translated_string(
-                bottom_rule, ctx.workspace.target_string, ctx.slipnet, ctx.workspace
+                bottom_rule, ctx.workspace.target_string, ctx.slipnet, ctx.workspace,
+                register_bridges=False,
             )
         if translated_string is None:
             translated_string = WorkspaceString(
@@ -2691,6 +2696,8 @@ def _report_answer_locked(
     if build_answer_string:
         ctx.workspace.answer_string = translated_string
         ctx.workspace.answer_string.workspace = ctx.workspace
+        for bridge in getattr(bottom_rule, "supporting_bridges", None) or ():
+            ctx.workspace.add_bridge(bridge)
 
     # Store in episodic memory
     themes = ctx.themespace.get_current_pattern()
