@@ -2636,6 +2636,28 @@ def _report_answer_locked(
     if getattr(ctx, "_pending_answer", None) is not None or ctx.run_ended:
         return
 
+    # The translated string is made *before* ``report-new-answer`` is called (it is one of
+    # its arguments, built by the answer-finder), and ``make-translated-string`` attaches
+    # Length descriptions to the target's groups (``answers.ss:1061,1074-1092``); the
+    # update below must see them, as they count in the workspace's unhappiness and so
+    # in the temperature.  Petacat used to translate after the update (lockstep
+    # abc-aabbcc-kkjjii seed 22: temperature 10 vs Metacat's 11 in the final cycle).
+    build_answer_string = ctx.workspace.answer_string is None or not ctx.justify_mode
+    translated_string = None
+    if build_answer_string:
+        # Built with the structure the translated rule implies, not as bare letters
+        # (``make-translated-string``, ``answers.ss:991``).
+        if bottom_rule is not None:
+            from server.engine.answers import make_translated_string
+
+            translated_string = make_translated_string(
+                bottom_rule, ctx.workspace.target_string, ctx.slipnet, ctx.workspace
+            )
+        if translated_string is None:
+            translated_string = WorkspaceString(
+                answer_string, ctx.slipnet, string_type="answer"
+            )
+
     # ``answers.ss:24-26`` — the first two things ``report-new-answer`` does, before
     # any of the answer is recorded:
     #
@@ -2665,24 +2687,8 @@ def _report_answer_locked(
         )
 
     # Create the answer string on the workspace so it is visible to
-    # serialization and the UI.
-    if ctx.workspace.answer_string is None or not ctx.justify_mode:
-        # Built with the structure the translated rule implies, not as bare letters:
-        # ``make-translated-string`` (``answers.ss:991``) carries the target's
-        # perceptual reading across to the answer, so ``mrrjjj`` seen as three sameness
-        # groups yields ``mrrkkk`` seen as three sameness groups.  A row of unconnected
-        # letters would say the program had no reading of its own answer.
-        translated_string = None
-        if bottom_rule is not None:
-            from server.engine.answers import make_translated_string
-
-            translated_string = make_translated_string(
-                bottom_rule, ctx.workspace.target_string, ctx.slipnet, ctx.workspace
-            )
-        if translated_string is None:
-            translated_string = WorkspaceString(
-                answer_string, ctx.slipnet, string_type="answer"
-            )
+    # serialization and the UI.  (Built above, before the update.)
+    if build_answer_string:
         ctx.workspace.answer_string = translated_string
         ctx.workspace.answer_string.workspace = ctx.workspace
 
