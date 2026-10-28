@@ -12,7 +12,8 @@ writes ``tests/lockstep/ratchet.json``; ``--check-ratchet`` exits non-zero when 
 trace got worse (reach down, agreement down, unregistered errors up).
 
 Assumed CLI contract: ``run_trace replay --metacat PATH --out PATH``.  Use
-``--replay-cmd`` to substitute another command template (``{metacat}`` and ``{out}``
+``--replay-cmd`` to substitute another command template (``{metacat}``, ``{out}`` -- the
+Petacat trace's path -- and ``{outdir}``, its directory
 are filled in).
 """
 
@@ -33,7 +34,7 @@ REPO = ct.REPO_ROOT
 TRACES = REPO / "tests" / "lockstep" / "traces"
 RATCHET = REPO / "tests" / "lockstep" / "ratchet.json"
 DEFAULT_OUT = REPO / "tests" / "lockstep" / "replays"
-DEFAULT_CMD = ".venv/bin/python -m tests.lockstep.run_trace replay --metacat {metacat} --out {out}"
+DEFAULT_CMD = ".venv/bin/python -m tests.lockstep.run_trace replay --metacat {metacat} --out {outdir}"
 EPS = 1e-12
 
 
@@ -55,7 +56,8 @@ def petacat_path(out_dir: Path, slug: str, seed: str) -> Path:
 
 def replay(metacat: Path, out: Path, cmd_template: str) -> tuple[bool, str]:
     out.parent.mkdir(parents=True, exist_ok=True)
-    cmd = shlex.split(cmd_template.format(metacat=shlex.quote(str(metacat)), out=shlex.quote(str(out))))
+    cmd = shlex.split(cmd_template.format(metacat=shlex.quote(str(metacat)), out=shlex.quote(str(out)),
+                                           outdir=shlex.quote(str(out.parent))))
     r = subprocess.run(cmd, cwd=REPO, capture_output=True, text=True)
     return r.returncode == 0 or out.exists(), (r.stderr or r.stdout)[-400:]
 

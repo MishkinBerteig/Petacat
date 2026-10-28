@@ -340,7 +340,8 @@ def diff_snapshots(a: Any, b: Any, rel_tol: float = 1e-9, abs_tol: float = 1e-12
     """First differing field path between two snapshot values, or ``None``.
 
     Dicts: key sets must be equal.  Lists of dicts carrying a ``name`` are keyed by
-    name; lists of scalars are multisets; other lists compare positionally.
+    name; lists of scalars are multisets; lists of rows led by a name are multisets
+    of rows; other lists compare positionally.
     Numbers agree within tolerance.
     """
     skip = {"t"} if not path else set()
@@ -379,6 +380,24 @@ def diff_snapshots(a: Any, b: Any, rel_tol: float = 1e-9, abs_tol: float = 1e-12
             for x, y in zip(sa, sb):
                 if not close(x, y, rel_tol, abs_tol):
                     return (path, a, b)
+            return None
+        if all(isinstance(x, list) and x and isinstance(x[0], str) for x in a + b) and (a or b):
+            # Rows led by a canonical name (coderack codelets, structures) are an
+            # unordered collection: the engines keep them in different orders.  Rows
+            # are matched by name and then by their non-float fields, so a float
+            # that differs is reported against the right row.
+            def row_key(row):
+                return (row[0], [repr(v) for v in row[1:] if not isinstance(v, float)])
+
+            sa, sb = sorted(a, key=row_key), sorted(b, key=row_key)
+            if [r[0] for r in sa] != [r[0] for r in sb]:
+                ca, cb = Counter(r[0] for r in a), Counter(r[0] for r in b)
+                return (path, sorted((ca - cb).elements())[:6] or "<same names>",
+                        sorted((cb - ca).elements())[:6] or "<same names>")
+            for x, y in zip(sa, sb):
+                d = diff_snapshots(x, y, rel_tol, abs_tol, f"{path}[{x[0]}]")
+                if d:
+                    return d
             return None
         if len(a) != len(b):
             return (path, f"<{len(a)} items>", f"<{len(b)} items>")
