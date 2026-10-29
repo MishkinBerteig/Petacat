@@ -103,7 +103,8 @@ export interface RunParametersView {
   defaults: Record<string, RunParameterValue>;
   derived: {
     mode?: string;
-    workers?: number;
+    /** Null when the run was created before the count was stored. */
+    workers?: number | null;
     config_hash?: string | null;
     memory_hash?: string | null;
     session_id?: number | null;
@@ -161,6 +162,12 @@ export interface RunInfo {
   spreading_threshold?: number;
   /** The persistence mode the run was created with. */
   mode?: string;
+  /**
+   * Workers the run executed with: 1 is the serial loop, more is free-running,
+   * under which the seed does not reproduce the run. Null when nothing records
+   * it, as for runs created before the count was stored.
+   */
+  workers?: number | null;
   /**
    * Only the run *listing* carries these: they come from the row, and a Fast Run
    * has no row. Undefined means "not looked up here", null means "no row".
@@ -302,9 +309,15 @@ export interface RuleState {
   succinctness: number;
   clause_count: number;
   verbatim: boolean;
+  /** Metacat's transcribe-to-english: one line per phrase, joined by newlines. */
   english: string;
   built: boolean;
   theme_pattern: string[];
+  /**
+   * Only in an event or description picture: the colour role the rule is drawn in --
+   * `top`, `bottom`, `snag` (the translated rule that failed) or `faded`.
+   */
+  role?: string;
 }
 
 /**
@@ -351,6 +364,37 @@ export type SlipnetState = Record<string, SlipnetNodeState>;
 export interface CoderackState {
   total_count: number;
   type_counts: Record<string, number>;
+  /** Relative selection probability (0-1) of each codelet type, as Metacat's bars. */
+  type_probabilities?: Record<string, number>;
+  /** The type of the codelet most recently run; null before any (or in a capture). */
+  last_codelet_type?: string | null;
+  /** Every codelet type, in the engine's order: the window has a slot for each. */
+  codelet_types?: string[];
+  /** Types whose urgency is clamped, with the urgency they are clamped at. */
+  clamped_urgencies?: Record<string, number>;
+}
+
+// --- EEG types -------------------------------------------------------------
+
+export interface EegSample {
+  cycle: number;
+  codelet_count: number;
+  activity: number;
+  average_activity: number;
+  temperature: number;
+}
+
+export interface EegSeries {
+  key: 'average_activity' | 'temperature';
+  label: string;
+  color: string;
+}
+
+export interface EegHistory {
+  run_id?: number;
+  series: EegSeries[];
+  initial_value: number;
+  samples: EegSample[];
 }
 
 // --- Themespace types ------------------------------------------------------
@@ -380,6 +424,10 @@ export interface ThemespaceState {
   active_theme_types: string[];
   thematic_pressure: boolean;
   dominant_theme_margin: number;
+  /** Metacat's dimension names, keyed by Slipnet node (`dimension-name`). */
+  dimension_labels?: Record<string, { name: string; abbreviation: string }>;
+  /** Metacat's relation names, keyed by relation (`relation-name`). */
+  relation_labels?: Record<string, string>;
 }
 
 // --- Trace types -----------------------------------------------------------
@@ -389,8 +437,92 @@ export interface TraceEvent {
   event_type: string;
   codelet_count: number;
   temperature: number;
+  /** Petacat's longer prose for the event; shown as a tooltip, not as the label. */
   description: string;
+  /**
+   * Metacat's `print-name` for the event (`trace.ss`): `(Id)`, `>a-b-c>`, `<c-b-a<`,
+   * `[a-b-c]`, `T:a=>b` / `V:` / `B:`, `[Top Rule]`, `[Bottom Rule]`, `[Answer ijl]`,
+   * `[Clamp]`, `[Snag]`. Empty for an event stored before it was kept; the label then
+   * falls back to `description`.
+   */
+  print_name?: string;
   theme_pattern?: unknown;
+}
+
+/**
+ * What a colour in a picture means (`%workspace-event-structure-color%`,
+ * `%top-bridge-color%`, ... in Metacat).
+ */
+export type PictureRole =
+  | 'event'
+  | 'top'
+  | 'bottom'
+  | 'vertical'
+  | 'snag'
+  | 'theme_cm'
+  | 'vertical_slippage'
+  | 'vertical_slippage_dim'
+  | 'coattail_slippage'
+  | 'coattail_slippage_dim'
+  | 'faded';
+
+/** A letter, group or (with `left === -1`) a whole string, in a picture's highlights. */
+export interface PictureObjectRef {
+  /** The string's role: `initial`, `modified`, `target` or `answer`. */
+  string: string;
+  left: number;
+  right: number;
+  role: PictureRole;
+}
+
+export interface PictureHighlights {
+  groups: PictureObjectRef[];
+  objects: PictureObjectRef[];
+  /** `key` is `<type>:<obj1 left>-<obj1 right>:<obj2 left>-<obj2 right>`. */
+  bridges: { key: string; role: PictureRole }[];
+  /** A concept-mapping on a bridge, found by the bridge's key and its two short names. */
+  concept_mappings: { bridge: string; from: string; to: string; role: PictureRole }[];
+}
+
+export interface PicturePatternEntry {
+  node?: string;
+  activation?: number;
+  type?: string;
+  urgency?: number;
+}
+
+/**
+ * What redisplaying a Trace event, an answer or a snag shows (Metacat's `display`
+ * methods, `trace.ss:405-1250`, `memory.ss:268-395`). Captured when the thing was
+ * recorded, since the Workspace moves on, and served as it is.
+ */
+export interface DisplayPicture {
+  version: number;
+  /** `event` redraws the Workspace faded under a header; `description` is an answer's or a snag's own picture. */
+  kind: 'event' | 'description';
+  /** The text after "Event N:" -- "Built successor-group", "Made b=>c slippage", "Snag", ... */
+  header: string;
+  codelet_count: number | null;
+  temperature: number;
+  faded: boolean;
+  workspace: WorkspaceState;
+  highlights: PictureHighlights;
+  /** The concept pattern for the Slipnet; `blank` is Metacat's empty Slipnet window. */
+  slipnet: { title: string; entries: PicturePatternEntry[]; blank?: boolean };
+  /** The Coderack: blank ("Coderack") or a clamp's codelet pattern. */
+  coderack: { title: string; entries: PicturePatternEntry[]; blank?: boolean };
+  themes: unknown[];
+  /** Metacat draws "???" on a snag. */
+  question_mark: boolean;
+}
+
+/** What is on show over the live windows: an event, an answer or a snag. */
+export interface DisplayedMoment {
+  kind: 'event' | 'answer' | 'snag';
+  id: number;
+  /** "Event 12" -- shown with the header; empty for answers and snags. */
+  eventNumber: number | null;
+  picture: DisplayPicture;
 }
 
 // --- Memory types ----------------------------------------------------------
@@ -417,6 +549,8 @@ export interface AnswerDescription {
   bottom_rule_abstractness?: number;
   theme_abstractness?: number;
   is_coherent?: boolean;
+  /** Whether a picture was kept for it; only then does `display` redraw the Workspace. */
+  has_picture?: boolean;
 }
 
 export interface AnswerComparison {
@@ -487,7 +621,23 @@ export interface SnagDescription {
   problem: string[];
   codelet_count: number;
   temperature: number;
+  /** English of the rule that was found (`get-english-transcription`, `memory.ss:288`). */
   description: string;
+  /**
+   * English of the translated rule, the one that failed
+   * (`get-translated-rule-phrases`, `memory.ss:331`). Empty for a snag recorded
+   * before it was stored.
+   */
+  translated_rule_description?: string;
+  /**
+   * Metacat's explanation of what went wrong (`get-explanation`, `memory.ss:332`,
+   * written by `trace.ss:1097`), e.g. "changing the letter-category of the letter a to
+   * its predecessor is not possible in abcd". A snag recorded before it was stored
+   * gets the older fallback sentence from the server, so this is always present.
+   */
+  explanation?: string;
+  /** Whether a picture was kept for it; only then does `display` redraw the Workspace. */
+  has_picture?: boolean;
 }
 
 export interface MemoryState {
@@ -751,8 +901,11 @@ export interface TraceEventDetail {
   codelet_count: number;
   temperature: number;
   description: string;
-  strength: number;
+  print_name?: string;
+  strength: number | null;
   theme_pattern: unknown;
+  /** What redisplaying the event shows; null for an event stored before pictures were kept. */
+  picture?: DisplayPicture | null;
   structures: Array<{
     kind: string;
     label: string;
@@ -761,4 +914,23 @@ export interface TraceEventDetail {
     right_index: number | null;
     strength: number | null;
   }>;
+}
+
+/**
+ * `GET /runs/{id}/verbose`: Verbose mode's narration (Metacat's `vprintf` / `say`
+ * output) from the line asked for on. The engine keeps a bounded buffer, so `dropped`
+ * counts the lines the caller asked for that no longer exist.
+ */
+export interface VerboseSnapshot {
+  run_id: number;
+  /** Is Verbose mode on (the Options menu's switch)? */
+  verbose: boolean;
+  capacity: number;
+  lines: string[];
+  /** The line number to ask for next time. */
+  next: number;
+  /** The number of the oldest line the buffer still holds. */
+  first: number;
+  dropped: number;
+  total: number;
 }

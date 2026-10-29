@@ -82,7 +82,9 @@ PROBLEM_SEED = 42
 #: discriminating the moment the predicates were wired up — silently, which is the one
 #: way a guard test fails that nothing reports.
 CLAMP_PROBLEM = ("abc", "abd", "xyz")
-CLAMP_SEED = 42
+#: Seed 44: the list orders of G-Z4 moved seed 42 to a run the two clamp probes cannot
+#: tell apart (both end `xyd` at 587), and 44 separates them.
+CLAMP_SEED = 44
 
 pytestmark = pytest.mark.skipif(
     not _db_available(),
@@ -1042,13 +1044,14 @@ async def test_the_theme_activation_ceiling_comes_from_the_database(db_session):
         meta = await load_metadata_from_db(db_session)
         themespace = Themespace(meta)
         cluster = themespace.clusters[0]
-        theme = cluster.themes[0]
-        theme.activation = 0
+        # The Themespace holds only the themes something has touched (B-2), so the
+        # first boost is what creates this one, at activation 0.
+        relation = cluster.valid_relations[0]
         for _ in range(40):
             themespace.boost_theme(
-                cluster.theme_type, cluster.dimension, theme.relation, 100.0
+                cluster.theme_type, cluster.dimension, relation, 100.0
             )
-        return theme.activation
+        return cluster.get_theme(relation).activation
 
     assert await saturation() == 100
 

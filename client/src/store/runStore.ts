@@ -2,6 +2,7 @@
 // Petacat — Zustand store for run state management
 // ---------------------------------------------------------------------------
 
+import { useDisplayStore } from '@/store/displayStore';
 import { create } from 'zustand';
 
 import type {
@@ -13,6 +14,7 @@ import type {
   WorkspaceState,
   SlipnetState,
   CoderackState,
+  EegHistory,
   ThemespaceState,
   TraceEvent,
   MemoryState,
@@ -29,6 +31,7 @@ import {
   getWorkspace,
   getSlipnet,
   getCoderack,
+  getEeg,
   getThemespace,
   getTrace,
   getTemperature,
@@ -36,6 +39,12 @@ import {
   getMemory,
   getRunMemory,
   setSpreadingThreshold as apiSetSpreadingThreshold,
+  undoLastClamp as apiUndoLastClamp,
+  setSelfWatching as apiSetSelfWatching,
+  setVerbose as apiSetVerbose,
+  getVerbose as apiGetVerbose,
+  clearVerbose as apiClearVerbose,
+  clampThemePattern as apiClampThemePattern,
   deleteAllRuns as apiDeleteAllRuns,
   clearMemory as apiClearMemory,
   describeApiError,
@@ -56,8 +65,30 @@ export type RunStatus =
   /** A jootser gave up: looping with no untried alternatives left (§4.5.2). */
   | 'gave_up';
 
+/**
+ * Metacat's theme-edit mode (`gui.ss:845-926`, "Clamp theme pattern").
+ *
+ * While it is on, the Themespace shows only what the user has chosen. Clicking in a
+ * theme window that has not been edited claims it (`edit-theme-type`); after that a
+ * click selects a theme at +100 and a shift- or right-click at -100, replacing the rest
+ * of its dimension, and clicking a selected theme unselects it. "Clamp Themes" clamps
+ * the selected themes of the claimed types as one pattern; "Cancel" changes nothing.
+ */
+export interface ThemeEditState {
+  /** Theme types claimed so far (`edited-theme-types`). */
+  edited: string[];
+  /** The chosen themes, one per (type, dimension). */
+  selected: Array<{
+    type: string;
+    dimension: string;
+    relation: string | null;
+    activation: number;
+  }>;
+}
+
 export interface RunStore {
   // State
+  themeEdit: ThemeEditState | null;
   runId: number | null;
   /**
    * The problem the loaded run was actually created with. The form inputs can
@@ -80,6 +111,8 @@ export interface RunStore {
   workspace: WorkspaceState | null;
   slipnet: SlipnetState | null;
   coderack: CoderackState | null;
+  /** The EEG's curves for the loaded run (`eeg-graphics.ss`); null if unavailable. */
+  eeg: EegHistory | null;
   themespace: ThemespaceState | null;
   trace: TraceEvent[];
   memory: MemoryState;
@@ -93,6 +126,16 @@ export interface RunStore {
    */
   temperatureClamped: boolean;
   commentary: string;
+  /**
+   * Verbose mode (`%verbose%`, `gui.ss:664`): is the engine narrating, and the lines
+   * heard so far.  The buffer is bounded at `VERBOSE_CLIENT_LINES`, as the server's is;
+   * `verboseNext` is where the next poll resumes, `verboseDropped` how many earlier
+   * lines have fallen off either buffer.
+   */
+  verboseMode: boolean;
+  verboseLines: string[];
+  verboseNext: number;
+  verboseDropped: number;
   elizaMode: boolean;
   codeletCount: number;
   stepDelay: number; // ms between auto-steps (0 = max speed)
@@ -213,11 +256,17 @@ export interface RunStore {
   refreshWorkspace: () => Promise<void>;
   refreshSlipnet: () => Promise<void>;
   refreshCoderack: () => Promise<void>;
+  refreshEeg: () => Promise<void>;
   refreshThemespace: () => Promise<void>;
   refreshTrace: () => Promise<void>;
   refreshMemory: () => Promise<void>;
   refreshTemperature: () => Promise<void>;
   refreshCommentary: () => Promise<void>;
+  /** Poll the narration (only while Verbose mode is on or its panel is shown). */
+  refreshVerbose: () => Promise<void>;
+  /** "Verbose mode" (`gui.ss:664`), toggled in the middle of the loaded run. */
+  setVerboseMode: (enabled: boolean) => Promise<void>;
+  clearVerbose: () => Promise<void>;
 
   // Settings
   setStepDelay: (ms: number) => void;
@@ -225,6 +274,31 @@ export interface RunStore {
   setElizaMode: (enabled: boolean) => void;
   setPollingInterval: (ms: number) => void;
   setSpreadingThreshold: (value: number) => Promise<void>;
+  /** "Undo last clamp" (`gui.ss:595-597`): undo the most recent clamp, and only it. */
+  undoLastClamp: () => Promise<void>;
+  /**
+   * "Self-watching mode" (`gui.ss:607-626`), toggled in the middle of the loaded run.
+   * Turning it off undoes the last clamp and deletes every theme.
+   */
+  setSelfWatching: (enabled: boolean) => Promise<void>;
+  /** Enter theme-edit mode (`theme-edit-mode-on`). */
+  beginThemeEdit: () => void;
+  /** Leave theme-edit mode without clamping (`Cancel`). */
+  cancelThemeEdit: () => void;
+  /** Claim a theme type for editing (`edit-theme-type`). */
+  editThemeType: (themeType: string) => void;
+  /**
+   * Select or unselect a theme in an edited type: `value` is +100 or -100, and a theme
+   * already holding that value is cleared (`theme-graphics.ss:35-63`).
+   */
+  selectTheme: (
+    themeType: string,
+    dimension: string,
+    relation: string | null,
+    value: number,
+  ) => void;
+  /** Clamp the chosen themes as one pattern (`Clamp Themes`) and leave edit mode. */
+  commitThemeEdit: () => Promise<void>;
   setPersistenceMode: (mode: PersistenceMode) => void;
   setParameterOverride: (name: string, value: RunParameterValue) => void;
   clearParameterOverride: (name: string) => void;
@@ -247,6 +321,15 @@ export interface RunStore {
 function freshMemory(): MemoryState {
   return { answers: [], snags: [] };
 }
+/** How many narration lines the client keeps; the server's buffer is the same size. */
+export const VERBOSE_CLIENT_LINES = 5000;
+
+/** Step mode narrates a step of at most this many codelets (`run.ss:47`). */
+export const VERBOSE_STEP_LIMIT = 10;
+
+/** What a run's narration is when the run is new: nothing heard, nothing dropped. */
+const NO_VERBOSE_LINES = { verboseLines: [] as string[], verboseNext: 0, verboseDropped: 0 };
+
 const INITIAL_MEMORY = freshMemory();
 
 /**
@@ -308,6 +391,7 @@ function reportFailure(err: unknown, action: string): void {
 
 export const useRunStore = create<RunStore>((set, get) => ({
   // ---- Default state -----------------------------------------------------
+  themeEdit: null,
   runId: null,
   runParams: null,
   runMode: null,
@@ -315,12 +399,17 @@ export const useRunStore = create<RunStore>((set, get) => ({
   workspace: null,
   slipnet: null,
   coderack: null,
+  eeg: null,
   themespace: null,
   trace: [],
   memory: INITIAL_MEMORY,
   temperature: 100,
   temperatureClamped: false,
   commentary: '',
+  verboseMode: false,
+  verboseLines: [],
+  verboseNext: 0,
+  verboseDropped: 0,
   elizaMode: true,
   codeletCount: 0,
   stepDelay: 0,
@@ -384,6 +473,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
     // problem's workspace, trace and commentary stay on screen until every
     // refresh lands — and stay forever if one of them fails.
     set({
+      themeEdit: null,
       runId: info.run_id,
       runParams: params,
       runMode: info.mode ?? get().persistenceMode,
@@ -401,11 +491,22 @@ export const useRunStore = create<RunStore>((set, get) => ({
       workspace: null,
       slipnet: null,
       coderack: null,
+      eeg: null,
       themespace: null,
       trace: [],
       commentary: '',
+      ...NO_VERBOSE_LINES,
       lastCodeletType: '',
     });
+    // Verbose mode is the program's, not one run's (`%verbose%` outlives `init-mcat`),
+    // so a run created while it is on starts narrating.
+    if (get().verboseMode) {
+      try {
+        await apiSetVerbose(info.run_id, true);
+      } catch {
+        // The run exists; the checkbox can be pressed again.
+      }
+    }
     await get().refreshAll();
   },
 
@@ -422,6 +523,10 @@ export const useRunStore = create<RunStore>((set, get) => ({
       // executing with. A record that carries no threshold reads as 100, which is
       // the value such a run used and the original's behaviour.
       spreadingThreshold: info.spreading_threshold ?? 100,
+      // Fixed for the run like the mode, so the controls can tell whether pressing
+      // Run would continue it. A record from before the count was stored carries
+      // none, and reads as the serial loop the controls assumed before.
+      runWorkers: info.workers ?? 1,
     });
   },
 
@@ -441,7 +546,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
           const state = get();
           if (state.status === 'idle' || state.runId === null) break;
 
-          const results = await apiStepRun(runId, 1);
+          const results = await apiStepRun(runId, 1, count <= VERBOSE_STEP_LIMIT);
           if (results.length > 0) {
             set({
               codeletCount: results[0].codelet_count,
@@ -463,7 +568,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
         });
       } else {
         // Batch mode: step all at once, refresh once at the end
-        const results = await apiStepRun(runId, count);
+        const results = await apiStepRun(runId, count, count <= VERBOSE_STEP_LIMIT);
         if (results.length > 0) {
           const last = results[results.length - 1];
           set({
@@ -703,9 +808,11 @@ export const useRunStore = create<RunStore>((set, get) => ({
       workspace: null,
       slipnet: null,
       coderack: null,
+      eeg: null,
       themespace: null,
       trace: [],
       commentary: '',
+      ...NO_VERBOSE_LINES,
     });
     await get().refreshAll();
   },
@@ -733,12 +840,14 @@ export const useRunStore = create<RunStore>((set, get) => ({
       workspace: null,
       slipnet: null,
       coderack: null,
+      eeg: null,
       themespace: null,
       trace: [],
       memory: freshMemory(),
       temperature: 100,
       temperatureClamped: false,
       commentary: '',
+      ...NO_VERBOSE_LINES,
       codeletCount: 0,
       lastCodeletType: '',
       epoch: get().epoch + 1,
@@ -775,12 +884,14 @@ export const useRunStore = create<RunStore>((set, get) => ({
       workspace: null,
       slipnet: null,
       coderack: null,
+      eeg: null,
       themespace: null,
       trace: [],
       memory: freshMemory(),
       temperature: 100,
       temperatureClamped: false,
       commentary: '',
+      ...NO_VERBOSE_LINES,
       codeletCount: 0,
       lastCodeletType: '',
       epoch: get().epoch + 1,
@@ -821,22 +932,26 @@ export const useRunStore = create<RunStore>((set, get) => ({
       refreshWorkspace,
       refreshSlipnet,
       refreshCoderack,
+      refreshEeg,
       refreshThemespace,
       refreshTrace,
       refreshMemory,
       refreshTemperature,
       refreshCommentary,
+      refreshVerbose,
     } = get();
 
     await Promise.all([
       refreshWorkspace(),
       refreshSlipnet(),
       refreshCoderack(),
+      refreshEeg(),
       refreshThemespace(),
       refreshTrace(),
       refreshMemory(),
       refreshTemperature(),
       refreshCommentary(),
+      refreshVerbose(),
     ]);
   },
 
@@ -854,6 +969,9 @@ export const useRunStore = create<RunStore>((set, get) => ({
   refreshSlipnet: async (): Promise<void> => {
     const { runId } = get();
     if (runId === null) return;
+    // "Slipnet graphics" off (Metacat's Options menu): the window is not redrawn, so
+    // nothing is fetched for it either.
+    if (!useDisplayStore.getState().slipnetGraphics) return;
     try {
       const slipnet = await getSlipnet(runId);
       set({ slipnet });
@@ -865,11 +983,26 @@ export const useRunStore = create<RunStore>((set, get) => ({
   refreshCoderack: async (): Promise<void> => {
     const { runId } = get();
     if (runId === null) return;
+    // "Coderack graphics" off (Metacat's Options menu): the window is not redrawn, so
+    // nothing is fetched for it either.
+    if (!useDisplayStore.getState().coderackGraphics) return;
     try {
       const coderack = await getCoderack(runId);
       set({ coderack });
     } catch {
       // A poll: the panel keeps what it has, and the next refresh reads it again.
+    }
+  },
+
+  refreshEeg: async (): Promise<void> => {
+    const { runId } = get();
+    if (runId === null) return;
+    try {
+      const eeg = await getEeg(runId);
+      set({ eeg });
+    } catch {
+      // A run that is not in memory has no EEG; the panel says so.
+      set({ eeg: null });
     }
   },
 
@@ -976,6 +1109,176 @@ export const useRunStore = create<RunStore>((set, get) => ({
         reportFailure(err, 'apply the spreading threshold to this run');
       }
     }
+  },
+
+  undoLastClamp: async (): Promise<void> => {
+    const { runId } = get();
+    if (runId === null) return;
+    beginAction();
+    try {
+      await apiUndoLastClamp(runId);
+    } catch (err) {
+      reportFailure(err, 'undo the last clamp');
+      return;
+    }
+    // The undo says so in the commentary, adds nothing to the Trace, and lifts the
+    // clamp's themes, concepts and codelet urgencies.
+    await Promise.all([
+      get().refreshThemespace(),
+      get().refreshSlipnet(),
+      get().refreshCoderack(),
+      get().refreshCommentary(),
+    ]);
+  },
+
+  refreshVerbose: async (): Promise<void> => {
+    const { runId, verboseMode, verboseNext } = get();
+    if (runId === null) return;
+    // Nothing is asked of the server unless somebody can see the narration: the mode is
+    // on, or the panel is open (a step of ten codelets or fewer narrates itself even
+    // with the mode off).
+    if (!verboseMode && useDisplayStore.getState().hidden.includes('verbose')) return;
+    try {
+      const snap = await apiGetVerbose(runId, verboseNext);
+      // A reply for a run that is no longer the loaded one is somebody else's narration.
+      if (get().runId !== runId) return;
+      set((s) => {
+        const merged = s.verboseLines.concat(snap.lines);
+        const over = Math.max(0, merged.length - VERBOSE_CLIENT_LINES);
+        return {
+          verboseMode: snap.verbose,
+          verboseLines: over > 0 ? merged.slice(over) : merged,
+          verboseNext: snap.next,
+          verboseDropped: s.verboseDropped + snap.dropped + over,
+        };
+      });
+    } catch {
+      // A poll: the next one reads the same buffer again.
+    }
+  },
+
+  setVerboseMode: async (enabled: boolean): Promise<void> => {
+    const { runId } = get();
+    // With no run loaded the switch is remembered here and sent when a run is created.
+    if (runId === null) {
+      set({ verboseMode: enabled });
+      return;
+    }
+    beginAction();
+    try {
+      await apiSetVerbose(runId, enabled);
+    } catch (err) {
+      reportFailure(err, 'switch verbose mode');
+      return;
+    }
+    set({ verboseMode: enabled });
+    await get().refreshVerbose();
+  },
+
+  clearVerbose: async (): Promise<void> => {
+    const { runId } = get();
+    set({ ...NO_VERBOSE_LINES });
+    if (runId === null) return;
+    try {
+      await apiClearVerbose(runId);
+      // The server's numbering never repeats, so what was cleared stays cleared.
+      const snap = await apiGetVerbose(runId, 0);
+      set({ verboseNext: snap.next, verboseLines: [], verboseDropped: 0 });
+    } catch {
+      // Nothing on the server to clear, or it cannot be reached: the panel is empty anyway.
+    }
+  },
+
+  setSelfWatching: async (enabled: boolean): Promise<void> => {
+    const { runId } = get();
+    if (runId === null) return;
+    beginAction();
+    try {
+      await apiSetSelfWatching(runId, enabled);
+    } catch (err) {
+      reportFailure(err, 'switch self-watching mode');
+      return;
+    }
+    // The warning follows the loaded run's own parameter, which is what the toggle has
+    // just changed under it.
+    set({
+      runParameterOverrides: {
+        ...get().runParameterOverrides,
+        self_watching_enabled_default: enabled,
+      },
+    });
+    await Promise.all([
+      get().refreshThemespace(),
+      get().refreshSlipnet(),
+      get().refreshCoderack(),
+      get().refreshCommentary(),
+    ]);
+  },
+
+  beginThemeEdit: (): void => {
+    if (get().runId === null) return;
+    set({ themeEdit: { edited: [], selected: [] } });
+  },
+
+  cancelThemeEdit: (): void => {
+    set({ themeEdit: null });
+  },
+
+  editThemeType: (themeType: string): void => {
+    const edit = get().themeEdit;
+    if (edit === null || edit.edited.includes(themeType)) return;
+    set({ themeEdit: { ...edit, edited: [...edit.edited, themeType] } });
+  },
+
+  selectTheme: (themeType, dimension, relation, value): void => {
+    const edit = get().themeEdit;
+    if (edit === null || !edit.edited.includes(themeType)) return;
+    const others = edit.selected.filter(
+      (t) => !(t.type === themeType && t.dimension === dimension),
+    );
+    const held = edit.selected.find(
+      (t) => t.type === themeType && t.dimension === dimension && t.relation === relation,
+    );
+    const selected =
+      held !== undefined && held.activation === value
+        ? others
+        : [...others, { type: themeType, dimension, relation, activation: value }];
+    set({ themeEdit: { ...edit, selected } });
+  },
+
+  commitThemeEdit: async (): Promise<void> => {
+    const { runId, themeEdit } = get();
+    if (runId === null || themeEdit === null) return;
+    beginAction();
+    set({ themeEdit: null });
+    if (themeEdit.edited.length === 0) return;
+    try {
+      await apiClampThemePattern(
+        runId,
+        themeEdit.edited.map((type) => ({
+          type,
+          themes: themeEdit.selected
+            .filter((t) => t.type === type)
+            .map(({ dimension, relation, activation }) => ({
+              dimension,
+              relation,
+              activation,
+            })),
+        })),
+      );
+    } catch (err) {
+      reportFailure(err, 'clamp the theme pattern');
+      return;
+    }
+    // The clamp says "Thank you for that interesting suggestion!", adds a manual clamp
+    // to the Trace and changes the Themespace, the Slipnet and the Coderack.
+    await Promise.all([
+      get().refreshThemespace(),
+      get().refreshTrace(),
+      get().refreshSlipnet(),
+      get().refreshCoderack(),
+      get().refreshCommentary(),
+    ]);
   },
 
   setPersistenceMode: (mode: PersistenceMode): void => {

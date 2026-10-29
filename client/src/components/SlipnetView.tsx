@@ -3,10 +3,11 @@
 // ---------------------------------------------------------------------------
 
 import { useState, useEffect, useMemo } from 'react';
+import { useMomentStore } from '@/store/momentStore';
 import { useRunStore } from '@/store/runStore';
 import { api } from '@/api/client';
 import { SlipnetGraphView } from './SlipnetGraphView';
-import type { SlipnetState } from '@/types';
+import type { DisplayPicture, SlipnetState } from '@/types';
 
 interface LinkDef {
   id: number;
@@ -45,9 +46,31 @@ interface SlipnetViewProps {
   readOnly?: boolean;
 }
 
+/**
+ * The Slipnet of a redisplayed moment: every node dark except those in the moment's
+ * concept pattern, each at the pattern's activation -- Metacat's `display-patterns`
+ * (`slipnet-graphics.ss:141`), or `blank-window` when the moment has none.
+ */
+export function momentSlipnet(live: SlipnetState | null, picture: DisplayPicture): SlipnetState {
+  const out: SlipnetState = {};
+  for (const [name, node] of Object.entries(live ?? {})) {
+    out[name] = { activation: 0, conceptual_depth: node.conceptual_depth, frozen: false };
+  }
+  for (const entry of picture.slipnet.entries) {
+    if (entry.node && out[entry.node]) {
+      out[entry.node] = { ...out[entry.node], activation: entry.activation ?? 100 };
+    }
+  }
+  return out;
+}
+
 export function SlipnetView({ slipnet, readOnly = false }: SlipnetViewProps = {}) {
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [focusedNode, setFocusedNode] = useState<string | null>(null);
+  const displayed = useMomentStore((s) => s.displayed);
+  const live = useRunStore((s) => s.slipnet);
+  // A review passes its own recorded Slipnet and is never redisplayed over.
+  const shown = slipnet === undefined && displayed ? momentSlipnet(live, displayed.picture) : slipnet;
 
   // Node focus view (replaces the graph when a node is double-clicked)
   if (focusedNode && !readOnly) {
@@ -62,12 +85,22 @@ export function SlipnetView({ slipnet, readOnly = false }: SlipnetViewProps = {}
   // Graph view (default)
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      {slipnet === undefined && displayed && (
+        <div
+          className="text-xs"
+          style={{ padding: '2px 4px', fontWeight: 600, color: 'var(--text-accent)' }}
+          data-testid="slipnet-pattern-title"
+        >
+          {displayed.picture.slipnet.title}
+          {displayed.picture.slipnet.entries.length === 0 && ' (none)'}
+        </div>
+      )}
       <div style={{ flex: 1, minHeight: 0 }}>
         <SlipnetGraphView
           selectedNode={selectedNode}
           onSelectNode={setSelectedNode}
           onDoubleClickNode={setFocusedNode}
-          slipnet={slipnet}
+          slipnet={shown}
           readOnly={readOnly}
         />
       </div>

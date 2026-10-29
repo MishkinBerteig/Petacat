@@ -253,6 +253,17 @@
     "description": "Implausible rules demo"
   },
   {
+    "name": "fig5.5-top",
+    "section": "5.3.1",
+    "initial": "eeqee",
+    "modified": "qeeq",
+    "target": "xxixx",
+    "answer": null,
+    "seed": 698282038,
+    "mode": "discovery",
+    "description": "Implausible rules demo"
+  },
+  {
     "name": "fig5.4-bottom",
     "section": "5.3.1",
     "initial": "eeqee",

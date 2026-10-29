@@ -240,18 +240,26 @@ def emit_snag(
     explanation: str,
     snag_count: int,
     codelet_count: int,
+    templates: dict[str, Any] | None = None,
 ) -> None:
     """Emit commentary when a snag is encountered.
 
-    Scheme: answers.ss:1164-1172.
+    Scheme: ``process-snag`` (``answers.ss:1164-1172``).  ``explanation`` is already
+    capitalised (``capitalize-string``); "again" and "another" are chosen by whether
+    this is not the run's first snag event.
     """
-    again = " again" if snag_count > 1 else ""
-    eliza = (
-        f"Uh-oh, I seem to have run into a little problem{again}.  "
-        f"{explanation}."
+    section = _reporting(templates, "snag")
+    later = snag_count > 1
+    eliza = _fill(
+        section.get("eliza", ""),
+        again=section.get("again", "") if later else "",
+        explanation=explanation,
     )
-    another = "another" if snag_count > 1 else "a"
-    technical = f"Hit {another} snag:  {explanation}."
+    technical = _fill(
+        section.get("technical", ""),
+        another=section.get("another_article" if later else "first_article", ""),
+        explanation=explanation,
+    )
     commentary.add_comment(
         eliza, technical, codelet_count=codelet_count, event_type="snag"
     )
@@ -280,65 +288,42 @@ def emit_clamp_activate(
     clamp_type: str,
     clamp_count: int,
     codelet_count: int,
+    templates: dict[str, Any] | None = None,
 ) -> None:
     """Emit commentary when a clamp is activated.
 
-    Scheme: trace.ss:592-618.
+    Scheme: the clamp event's ``activate`` (``trace.ss:592-618``).  ``clamp_count`` is the
+    number the Scheme asks for in its "another" test: for a justify clamp the number of
+    clamp events in the Trace (this one included), for a manual clamp the number of
+    manual clamps.
     """
-    another = clamp_count > 1
-
-    if clamp_type == "rule_codelet_clamp":
-        eliza = "I'll just have to try a little harder..."
-        technical = "Clamping rule-codelet pattern..."
-    elif clamp_type == "snag_response_clamp":
-        eliza = (
-            "All right, I've had enough of this!  "
-            "Let's try something different for a change..."
-        )
-        technical = "Clamping snag-response pattern..."
-    elif clamp_type == "justify_clamp":
-        idea = "another" if another else "an"
-        eliza = f"Aha!  I have {idea} idea..."
-        technical = "Clamping justify pattern..."
-    elif clamp_type == "manual_clamp":
-        suggestion = "another interesting" if another else "that"
-        eliza = f"Thank you for {suggestion} suggestion!  Let me think about it..."
-        technical = "Clamping manual pattern..."
-    else:
-        eliza = "Hmm, let me reconsider..."
-        technical = f"Clamping {clamp_type} pattern..."
-
+    section = _reporting(templates, "clamp_activation").get(clamp_type)
+    if not isinstance(section, dict):
+        return
+    word = section.get("another" if clamp_count > 1 else "first", "")
+    eliza = _fill(section.get("eliza", ""), idea=word, suggestion=word)
+    technical = section.get("technical", "")
     commentary.add_comment(
         eliza, technical, codelet_count=codelet_count, event_type="clamp_activate"
     )
 
 
-def _progress_amount_phrase(progress: float) -> str:
-    """Scheme: trace.ss:212-218."""
-    if progress < 10:
-        return "no significant"
-    elif progress < 30:
-        return "a small amount of"
-    elif progress < 60:
-        return "a moderate amount of"
-    elif progress < 80:
-        return "a good deal of"
-    else:
-        return "a great deal of"
+def _progress_key(progress: float) -> str:
+    """Which of Metacat's four progress bands a value falls in (``trace.ss:212-226``)."""
+    if progress == 0:
+        return "zero"
+    if progress < 50:
+        return "little"
+    if progress < 80:
+        return "some"
+    return "a_lot"
 
 
-def _progress_adjective_phrase(progress: float) -> str:
-    """Scheme: trace.ss:220-226."""
-    if progress < 10:
-        return "a bad"
-    elif progress < 30:
-        return "a so-so"
-    elif progress < 60:
-        return "a decent"
-    elif progress < 80:
-        return "a pretty good"
-    else:
-        return "an excellent"
+def format_number(value: float) -> str:
+    """A number as Scheme's ``~a`` prints it: an integer-valued float has no ``.0``."""
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    return str(value)
 
 
 def emit_clamp_expired(
@@ -346,42 +331,69 @@ def emit_clamp_expired(
     clamp_type: str,
     progress: float,
     codelet_count: int,
+    templates: dict[str, Any] | None = None,
 ) -> None:
-    """Emit commentary when a clamp period expires.
+    """Emit commentary when a clamp is undone.
 
-    Scheme: trace.ss:129-173.
+    Scheme: ``undo-last-clamp`` (``trace.ss:129-170``).  Each of the four clamp types
+    has its own wording, built from the same amount and adjective phrases.
     """
-    amount = _progress_amount_phrase(progress)
-    adjective = _progress_adjective_phrase(progress)
-
-    if clamp_type == "rule_codelet_clamp":
-        eliza = (
-            f"Well, my latest effort to think up new rules resulted in "
-            f"{amount} progress.  Guess it was {adjective} idea, in retrospect."
-        )
-    elif clamp_type == "snag_response_clamp":
-        eliza = (
-            f"My attempt to try a new approach resulted in "
-            f"{amount} progress.  Guess it was {adjective} idea, in retrospect."
-        )
-    elif clamp_type == "manual_clamp":
-        eliza = (
-            f"That last suggestion of yours resulted in "
-            f"{amount} progress.  Guess it was {adjective} idea, in retrospect."
-        )
-    else:
-        eliza = (
-            f"That effort resulted in {amount} progress.  "
-            f"Guess it was {adjective} idea, in retrospect."
-        )
-
-    clamp_label = clamp_type.replace("_", "-").removesuffix("-clamp")
-    technical = (
-        f"Unclamping patterns.  Progress achieved by {clamp_label} clamp = "
-        f"{progress:.0f}."
+    block = _reporting(templates, "clamp_expiry")
+    section = block.get(clamp_type)
+    if not isinstance(section, dict):
+        return
+    key = _progress_key(progress)
+    eliza = _fill(
+        section.get("eliza", ""),
+        amount=(block.get("amount_phrases") or {}).get(key, ""),
+        adjective=(block.get("adjective_phrases") or {}).get(key, ""),
+    )
+    technical = _fill(
+        block.get("technical", ""),
+        label=section.get("label", ""),
+        progress=format_number(progress),
     )
     commentary.add_comment(
         eliza, technical, codelet_count=codelet_count, event_type="clamp_expired"
+    )
+
+
+def emit_frustrated(
+    commentary: CommentaryLog,
+    initial: str,
+    modified: str,
+    target: str,
+    answer: str | None,
+    poor_top: bool,
+    poor_bottom: bool,
+    codelet_count: int,
+    templates: dict[str, Any] | None = None,
+) -> None:
+    """The progress-watcher's complaint that the rules are poor (``jootsing.ss:306-325``).
+
+    It names the string pair(s) whose rules are unsatisfactory: the top pair, the bottom
+    pair (justify mode only), or "either ... or ..." when both are.
+    """
+    section = _reporting(templates, "frustrated")
+
+    def how(a: str, b: str) -> str:
+        return _fill(section.get("how_strings_change", ""), from_string=a, to_string=b)
+
+    top = how(initial, modified)
+    bottom = how(target, answer or "")
+    if poor_top and poor_bottom:
+        description = _fill(section.get("both", ""), top=top, bottom=bottom)
+    elif poor_top:
+        description = _fill(section.get("one", ""), how=top)
+    elif poor_bottom:
+        description = _fill(section.get("one", ""), how=bottom)
+    else:
+        return
+    commentary.add_comment(
+        _fill(section.get("eliza", ""), description=description),
+        _fill(section.get("technical", ""), description=description),
+        codelet_count=codelet_count,
+        event_type="frustrated",
     )
 
 
@@ -392,7 +404,7 @@ def emit_jootsing(
 ) -> None:
     """Emit commentary when jootsing occurs.
 
-    Scheme: jootsing.ss:173-186, 315-325.
+    Scheme: jootsing.ss:173-186.
     """
     if jootsing_type == "rule_codelet":
         eliza = "I just can't seem to come up with any better rules."
@@ -400,15 +412,8 @@ def emit_jootsing(
     elif jootsing_type == "snag_response":
         eliza = "This is getting boring.  I can't think of anything else to try."
         technical = "Jootsing from unsuccessful snag-response clamps."
-    elif jootsing_type == "frustrated":
-        eliza = (
-            "I'm getting frustrated.  I still don't see a good way to "
-            "describe how the strings change."
-        )
-        technical = "No satisfactory rules found for describing the transformation."
     else:
-        eliza = "I think I need to try a completely different approach."
-        technical = f"Jootsing: {jootsing_type}."
+        return
 
     commentary.add_comment(
         eliza, technical, codelet_count=codelet_count, event_type="jootsing"
@@ -421,29 +426,49 @@ def emit_reminding(
     problem_text: str,
     strength: float,
     codelet_count: int,
+    templates: dict[str, Any] | None = None,
 ) -> None:
     """Emit commentary when a past answer is reminded.
 
-    Scheme: memory.ss:214-229.
+    Scheme: ``compare`` on an answer description (``memory.ss:214-229``).
+    ``problem_text`` is the description's ``problem-print-name``,
+    ``abc -> abd, mrrjjj -> ?``.
     """
+    section = _reporting(templates, "reminding")
     if strength > 70:
-        how = "strongly reminds me"
+        how = section.get("strongly", "")
     elif strength > 30:
-        how = "reminds me somewhat"
+        how = section.get("somewhat", "")
     else:
-        how = "vaguely reminds me"
+        how = section.get("vaguely", "")
+    problem = _fill(section.get("problem", ""), problem_name=problem_text)
 
-    eliza = (
-        f'This answer {how} of the answer "{answer_text}" '
-        f'to the problem "{problem_text}".'
+    eliza = _fill(
+        section.get("eliza", ""), how=how, answer=answer_text, problem=problem
     )
-    technical = (
-        f'This answer is reminiscent of the answer "{answer_text}" '
-        f'to the problem "{problem_text}".  '
-        f"Reminding strength = {strength:.0f}."
+    technical = _fill(
+        section.get("technical", ""),
+        answer=answer_text,
+        problem=problem,
+        strength=format_number(strength),
     )
     commentary.add_comment(
         eliza, technical, codelet_count=codelet_count, event_type="reminding"
+    )
+
+
+def emit_comparing_answers(
+    commentary: CommentaryLog,
+    codelet_count: int,
+    templates: dict[str, Any] | None = None,
+) -> None:
+    """"Let's see..." — said when a second answer is selected (``memory-graphics.ss:56-64``)."""
+    section = _reporting(templates, "comparing")
+    commentary.add_comment(
+        section.get("eliza", ""),
+        section.get("technical", ""),
+        codelet_count=codelet_count,
+        event_type="comparing",
     )
 
 

@@ -13,6 +13,7 @@ from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.engine import hardware
+from server.engine.coderack import coderack_display
 from server.engine.ids import KIND_ANSWER, KIND_SNAG
 from server.engine.memory import AnswerDescription, EpisodicMemory, SnagDescription
 from server.engine.metadata import MetadataProvider
@@ -22,6 +23,8 @@ from server.engine.serialization import (
     serialize_themespace_state,
     serialize_workspace_state,
 )
+from server.engine.snag_explanation import fallback_explanation, snag_explanation_text
+from server.engine.verbose import VERBOSE_STEP_LIMIT, narrate_event_display
 from server.engine.trace import SNAG
 from server.models.run import (
     _utcnow,
@@ -45,7 +48,22 @@ from server.services.sinks import MODE_AUDIT, MODE_FAST, MODE_NORMAL, sink_for_m
 _global_memory = EpisodicMemory()
 
 
-def _live_answer_fields(problem: Any, top_rule_description: str) -> dict:
+def _memory_row_order(row: Any, identifier: str) -> tuple:
+    """Sort key putting stored rows in the order Episodic Memory found them.
+
+    A row's own ``id`` is the order it reached the database, which a Training Session
+    does not guarantee is the order the memory made its descriptions in (concurrent runs
+    flush in their own time).  The memory's identifier (``answer_id`` / ``snag_id``) is
+    that order.  A row written before the identifier was recorded has none, and is older
+    than any row that has one.
+    """
+    ident = getattr(row, identifier, None)
+    return (ident is not None, ident or 0, row.id)
+
+
+def _live_answer_fields(
+    problem: Any, top_rule_description: str, answer_id: int | None = None
+) -> dict:
     """The parts of an answer description that live only in memory.
 
     Reminding activation, the per-type theme patterns, the unjustified-theme
@@ -60,6 +78,10 @@ def _live_answer_fields(problem: Any, top_rule_description: str) -> dict:
     """
     key = (tuple(problem or ()), top_rule_description or "")
     for a in _global_memory.answers:
+        # Two answers can share a problem and a top rule (reached by different bottom
+        # rules); the identifier tells them apart when the row has one.
+        if answer_id is not None and a.answer_id != answer_id:
+            continue
         if (tuple(a.problem), a.top_rule_description or "") == key:
             return {
                 "activation": a.activation,
@@ -149,6 +171,10 @@ class RunInfo:
     spreading_threshold: int = 100
     #: The persistence mode this run was created with.
     mode: str = "normal"
+    #: Workers the run executes with: 1 is serial, more is free-running.  None when
+    #: neither the row nor a live runner says, as for rows written before it was
+    #: recorded.
+    workers: int | None = None
 
 
 @dataclass
@@ -165,6 +191,16 @@ class StepBatch:
     #: The run reached its breakpoint. The run's status is ``paused`` and the
     #: breakpoint stays set, so it holds the run there until it is moved or cleared.
     breakpoint_hit: bool = False
+
+
+def _stored_snag_explanation(row: Any, templates: dict | None = None) -> str:
+    """A snag row's explanation; rows written before it was stored get the fallback."""
+    if row.explanation:
+        return row.explanation
+    problem = list(row.problem or [])
+    return fallback_explanation(
+        row.description or "", problem[2] if len(problem) > 2 else "", templates
+    )
 
 
 class RunService:
@@ -192,6 +228,12 @@ class RunService:
         self._breakpoints: dict[int, int | None] = {}
         self._step_sizes: dict[int, int] = {}
         self._stop_flags: dict[int, bool] = {}
+        #: What each live run is currently *displaying* over its live state -- an event,
+        #: an answer or a snag, as ``(kind, id)`` -- so clicking the same one again
+        #: restores the live state and clicking another switches to it (Metacat saves
+        #: the live Themespace only if the current state is displayed,
+        #: ``trace.ss:411-413``).
+        self._displaying: dict[int, tuple[str, int]] = {}
         #: Set when an admin write changes the configuration in the database.  The
         #: reload happens at the next ``create_run`` rather than at the write, so a
         #: Run's metadata is fixed for its whole life and an edit made while something
@@ -294,6 +336,7 @@ class RunService:
             justify_mode=answer is not None,
             spreading_threshold=threshold,
             mode=mode,
+            workers=workers,
             session_id=await self._current_session_id(session),
             # Hashed over the Run's *own* metadata, so two Runs that differ only in a
             # parameter override are distinguishable by their config hash alone.
@@ -344,6 +387,7 @@ class RunService:
             justify_mode=answer is not None,
             spreading_threshold=threshold,
             mode=mode,
+            workers=workers,
         )
 
     def _create_fast_run(
@@ -399,6 +443,7 @@ class RunService:
             justify_mode=answer is not None,
             spreading_threshold=threshold,
             mode=MODE_FAST,
+            workers=workers,
         )
 
     def _is_fast(self, run_id: int) -> bool:
@@ -429,8 +474,14 @@ class RunService:
         session: AsyncSession,
         run_id: int,
         n: int = 1,
+        step_mode: bool = False,
     ) -> StepBatch:
         """Step N codelets, stopping at the run's breakpoint.
+
+        ``step_mode`` is Metacat's Step button.  A step of at most ten codelets narrates
+        itself whatever Verbose mode says (``run.ss:44-47``, ``set-verbose-step-mode``,
+        ``gui.ss:793``), for the length of the batch; a bigger step, or any other way of
+        driving the run, leaves the narration to Verbose mode alone.
 
         A breakpoint means one thing however the run is being driven, so this loop
         honours it on the same terms as ``run_to_completion``: it is tested before
@@ -443,6 +494,9 @@ class RunService:
 
         results = []
         breakpoint_hit = False
+        narrate_step = step_mode and n <= VERBOSE_STEP_LIMIT and not runner.ctx.verbose
+        if narrate_step:
+            runner.ctx.set_verbose(step=True)
 
         # The loop is pure engine work now.  Persistence is the attached sink's
         # business: it buffers as the engine emits and is written once, below.  What
@@ -467,6 +521,9 @@ class RunService:
             # Stop stepping if an answer was found, or if the run gave up
             if step_result.answer_found or step_result.gave_up:
                 break
+
+        if narrate_step:
+            runner.ctx.set_verbose(step=False)
 
         # A batch that ran to its end without reaching a terminal status is paused: the
         # run is between steps, waiting for the next request.
@@ -531,6 +588,7 @@ class RunService:
                 justify_mode=runner.ctx.justify_mode,
                 spreading_threshold=runner.ctx.spreading_activation_threshold,
                 mode=MODE_FAST,
+                workers=self._workers.get(run_id),
             )
 
         result = await session.execute(select(Run).where(Run.id == run_id))
@@ -555,6 +613,10 @@ class RunService:
                             run.spreading_threshold)
                 ),
                 mode=run.mode or MODE_NORMAL,
+                workers=(
+                    run.workers if run.workers is not None
+                    else self._workers.get(run_id)
+                ),
             )
 
         return RunInfo(
@@ -571,6 +633,7 @@ class RunService:
                 100 if run.spreading_threshold is None else int(run.spreading_threshold)
             ),
             mode=run.mode or MODE_NORMAL,
+            workers=run.workers,
         )
 
     def get_runner(self, run_id: int) -> EngineRunner | None:
@@ -602,10 +665,17 @@ class RunService:
         runner = self._runners.get(run_id)
         if runner is None or runner.ctx is None:
             return None
-        return {
-            "total_count": runner.ctx.coderack.total_count,
-            "type_counts": runner.ctx.coderack.get_codelet_type_counts(),
-        }
+        ctx = runner.ctx
+        return coderack_display(
+            ctx.coderack, ctx.temperature.value, ctx.last_codelet_type
+        )
+
+    def get_eeg_history(self, run_id: int) -> dict | None:
+        """The EEG's plotted curves for a run held in memory (``eeg-graphics.ss``)."""
+        runner = self._runners.get(run_id)
+        if runner is None or runner.ctx is None:
+            return None
+        return {"run_id": run_id, **runner.ctx.eeg.history()}
 
     def get_temperature_state(self, run_id: int) -> dict | None:
         """The temperature, and whether the engine is holding it clamped.
@@ -657,6 +727,7 @@ class RunService:
                 spreading_threshold=(
                     100 if r.spreading_threshold is None else int(r.spreading_threshold)
                 ),
+                workers=r.workers,
             )
             for r in rows
         ]
@@ -716,6 +787,7 @@ class RunService:
         return RunInfo(
             run_id=run_id,
             mode=self._modes.get(run_id, MODE_NORMAL),
+            workers=self._workers.get(run_id),
             status=status_str,
             codelet_count=runner.ctx.codelet_count,
             temperature=runner.ctx.temperature.value,
@@ -806,6 +878,7 @@ class RunService:
                 justify_mode=runner.ctx.justify_mode,
                 spreading_threshold=runner.ctx.spreading_activation_threshold,
                 mode=MODE_FAST,
+                workers=self._workers.get(run_id),
             )
 
         await self._flush_sink(session, run_id)
@@ -829,6 +902,7 @@ class RunService:
         return RunInfo(
             run_id=run_id,
             mode=self._modes.get(run_id, MODE_NORMAL),
+            workers=self._workers.get(run_id),
             status=status_str,
             codelet_count=runner.ctx.codelet_count,
             temperature=runner.ctx.temperature.value,
@@ -868,6 +942,14 @@ class RunService:
         # metadata default, which silently discarded whatever the user had chosen.
         threshold = getattr(runner.ctx, "spreading_activation_threshold", None)
 
+        # A reset run gets a fresh sink of its own mode: the old one may hold records
+        # buffered from before the reset, and those describe a run that no longer
+        # exists.  The mode is a property of the Run and survives a reset.  It is handed
+        # to ``init_mcat`` rather than attached afterwards, so it sees the run begin:
+        # that is where Normal and Audit take their start capture, and where every
+        # recording sink notes which snags the run inherited.
+        sink = sink_for_mode(self._modes.get(run_id, MODE_NORMAL))
+
         # Re-init engine
         runner.init_mcat(
             params.initial,
@@ -876,7 +958,9 @@ class RunService:
             answer=params.answer,
             seed=params.seed,
             memory=_global_memory,
+            sink=sink,
         )
+        self._sinks[run_id] = sink
         if threshold is not None:
             runner.ctx.spreading_activation_threshold = threshold
 
@@ -914,12 +998,6 @@ class RunService:
 
         await session.commit()
 
-        # A reset run gets a fresh sink of its own mode: the old one may hold records
-        # buffered from before the reset, and those describe a run that no longer
-        # exists.  The mode is a property of the Run and survives a reset.
-        self._sinks[run_id] = sink_for_mode(self._modes.get(run_id, MODE_NORMAL))
-        runner.ctx.sink = self._sinks[run_id]
-
         # Clear control state
         self._breakpoints.pop(run_id, None)
         self._step_sizes.pop(run_id, None)
@@ -939,6 +1017,7 @@ class RunService:
                 getattr(runner.ctx, "spreading_activation_threshold", 100)
             ),
             mode=self._modes.get(run_id, MODE_NORMAL),
+            workers=self._workers.get(run_id),
         )
 
     async def delete_run(self, session: AsyncSession, run_id: int) -> None:
@@ -1056,6 +1135,7 @@ class RunService:
                 "codelet_count": r.codelet_count,
                 "temperature": r.temperature,
                 "description": r.description or "",
+                "print_name": r.print_name or "",
                 "theme_pattern": r.theme_pattern,
             }
             for r in result.scalars().all()
@@ -1150,9 +1230,13 @@ class RunService:
                     "temperature": a.temperature,
                     "themes": a.themes,
                     "unjustified_slippages": a.unjustified_slippages,
-                    **_live_answer_fields(a.problem, a.top_rule_description),
+                    **_live_answer_fields(a.problem, a.top_rule_description, a.answer_id),
+                    "has_picture": a.picture is not None,
                 }
-                for a in answers_result.scalars().all()
+                for a in sorted(
+                    answers_result.scalars().all(),
+                    key=lambda r: _memory_row_order(r, "answer_id"),
+                )
             ],
             "snags": [
                 {
@@ -1167,8 +1251,14 @@ class RunService:
                     "temperature": s.temperature,
                     "theme_pattern": s.theme_pattern,
                     "description": s.description or "",
+                    "translated_rule_description": s.translated_rule_description or "",
+                    "explanation": _stored_snag_explanation(s, self.meta.commentary_templates),
+                    "has_picture": s.picture is not None,
                 }
-                for s in snags_result.scalars().all()
+                for s in sorted(
+                    snags_result.scalars().all(),
+                    key=lambda r: _memory_row_order(r, "snag_id"),
+                )
             ],
         }
 
@@ -1177,7 +1267,11 @@ class RunService:
         answers_result = await session.execute(
             select(AnswerDescriptionRow).order_by(AnswerDescriptionRow.id)
         )
-        for a in answers_result.scalars().all():
+        # Stored oldest first: ``store_answer`` puts each at the front, as Metacat's
+        # ``add-answer-description`` does, so the memory ends newest first.
+        for a in sorted(
+            answers_result.scalars().all(), key=lambda r: _memory_row_order(r, "answer_id")
+        ):
             desc = AnswerDescription(
                 problem=tuple(a.problem),
                 top_rule_description=a.top_rule_description or "",
@@ -1198,6 +1292,7 @@ class RunService:
                 activation=a.activation or 0.0,
                 top_rule_signature=a.top_rule_signature,
                 bottom_rule_signature=a.bottom_rule_signature,
+                picture=a.picture,
             )
             _global_memory.store_answer(desc)
             # Rows written before the identifier was recorded have none; those keep the
@@ -1210,7 +1305,26 @@ class RunService:
         snags_result = await session.execute(
             select(SnagDescriptionRow).order_by(SnagDescriptionRow.id)
         )
-        for s in snags_result.scalars().all():
+        # One row per snag.  Until the sink took only the snags a run added, every run
+        # that snagged wrote all of the session's earlier snags again under its own id,
+        # and loading those copies would put the same snag in memory once per copy.  The
+        # first row is the one the run that found the snag wrote, so it is kept and the
+        # copies are deleted.  Rows from before the identifier was recorded are matched
+        # on what they describe instead.
+        loaded: set[tuple] = set()
+        repeated: list[int] = []
+        for s in sorted(
+            snags_result.scalars().all(), key=lambda r: _memory_row_order(r, "snag_id")
+        ):
+            key = (
+                ("snag", s.snag_id)
+                if s.snag_id is not None
+                else ("row", tuple(s.problem), s.codelet_count, s.description)
+            )
+            if key in loaded:
+                repeated.append(s.id)
+                continue
+            loaded.add(key)
             desc = SnagDescription(
                 problem=tuple(s.problem),
                 codelet_count=s.codelet_count or 0,
@@ -1220,6 +1334,11 @@ class RunService:
                 run_id=s.run_id,
                 rule_signature=s.rule_signature,
                 translated_rule_signature=s.translated_rule_signature,
+                # NULL on rows written before these were stored; the explanation then
+                # falls back (``snag_explanation_text``).
+                explanation=s.explanation or "",
+                translated_rule_description=s.translated_rule_description or "",
+                picture=s.picture,
             )
             _global_memory.store_snag(desc)
             # A restart keeps each snag's identifier, so the id the listing shows before
@@ -1229,6 +1348,11 @@ class RunService:
             if s.snag_id is not None:
                 desc.snag_id = s.snag_id
                 _global_memory.ids.reserve(KIND_SNAG, s.snag_id)
+        if repeated:
+            await session.execute(
+                delete(SnagDescriptionRow).where(SnagDescriptionRow.id.in_(repeated))
+            )
+            await session.commit()
 
     def get_themespace_state(self, run_id: int) -> dict | None:
         """Serialize the current themespace state for the given run."""
@@ -1265,6 +1389,7 @@ class RunService:
                 "codelet_count": e.codelet_count,
                 "temperature": e.temperature,
                 "description": e.description,
+                "print_name": e.print_name,
                 "theme_pattern": e.theme_pattern,
             }
             for e in events
@@ -1300,8 +1425,9 @@ class RunService:
                     "is_coherent": a.is_coherent,
                     # §4.7.5: how strongly the program is currently reminded of it.
                     "activation": a.activation,
+                    "has_picture": a.picture is not None,
                 }
-                for a in _global_memory.answers
+                for a in _global_memory.answers_oldest_first
             ],
             "snags": [
                 {
@@ -1312,8 +1438,11 @@ class RunService:
                     "temperature": s.temperature,
                     "theme_pattern": s.theme_pattern,
                     "description": s.description,
+                    "translated_rule_description": s.translated_rule_description,
+                    "explanation": snag_explanation_text(s, self.meta.commentary_templates),
+                    "has_picture": s.picture is not None,
                 }
-                for s in _global_memory.snags
+                for s in _global_memory.snags_oldest_first
             ],
         }
 
@@ -1442,6 +1571,9 @@ class RunService:
         concept-pattern in the Slipnet.  §2.4.3 is the reason it matters: Trace events
         are "themselves subject to examination", and a log you cannot address is not
         something the program — or the user — can examine.
+
+        ``picture`` is that redisplay, captured when the event was recorded
+        (:mod:`server.engine.trace_display`).
         """
         runner = self._runners.get(run_id)
         if runner is None or runner.ctx is None:
@@ -1455,16 +1587,81 @@ class RunService:
                 "codelet_count": event.codelet_count,
                 "temperature": event.temperature,
                 "description": event.description,
+                "print_name": event.print_name,
                 "strength": event.get_strength(),
                 "theme_pattern": self._event_theme_pattern(event),
                 "structures": [describe_structure(s) for s in (event.structures or [])],
+                "picture": event.picture,
             }
         return None
+
+    async def describe_trace_event_from_db(
+        self, session: AsyncSession, run_id: int, event_number: int
+    ) -> dict | None:
+        """The same detail for a run that is not loaded, from its stored row.
+
+        A row written before pictures were kept has ``picture`` null: it can be read but
+        not redisplayed.
+        """
+        row = (
+            await session.execute(
+                select(TraceEventRow).where(
+                    TraceEventRow.run_id == run_id,
+                    TraceEventRow.event_number == event_number,
+                )
+            )
+        ).scalars().first()
+        if row is None:
+            return None
+        return {
+            "event_number": row.event_number,
+            "event_type": row.event_type,
+            "codelet_count": row.codelet_count,
+            "temperature": row.temperature,
+            "description": row.description or "",
+            "print_name": row.print_name or "",
+            "strength": None,
+            "theme_pattern": row.theme_pattern,
+            "structures": row.structures or [],
+            "picture": row.picture,
+        }
 
     @staticmethod
     def _event_theme_pattern(event: Any) -> Any:
         """A snag carries its own pattern under a different name (``trace.ss:1067``)."""
         return getattr(event, "snag_theme_pattern", None) or event.theme_pattern
+
+    def _display_over_themespace(
+        self,
+        run_id: int,
+        key: tuple[str, int],
+        patterns: list[Any],
+    ) -> int | None:
+        """Show a past episode's theme patterns over the live Themespace, or restore.
+
+        Every ``display`` in Metacat does the same four things to the Themespace
+        (``trace.ss:411-420``): save the live state *if the current state is the one
+        displayed*, delete everything, switch thematic pressure off, impose the
+        episode's pattern(s).  Clicking the one on show again puts the live state back;
+        clicking another switches to it without saving over the first.  Returns the id
+        now on show, or ``None`` once restored.
+        """
+        runner = self._runners.get(run_id)
+        if runner is None or runner.ctx is None:
+            return key[1]
+        themespace = runner.ctx.themespace
+        if themespace.displaying_past_state and self._displaying.get(run_id) == key:
+            themespace.restore_current_state()
+            self._displaying.pop(run_id, None)
+            return None
+        if not themespace.displaying_past_state:
+            themespace.save_current_state()
+        themespace.delete_everything()
+        themespace.thematic_pressure_off()
+        for pattern in patterns:
+            self._impose_pattern(themespace, pattern)
+        self._displaying[run_id] = key
+        return key[1]
 
     def impose_trace_event(self, run_id: int, event_number: int) -> dict:
         """Display a past event: impose its theme-pattern over the live Themespace.
@@ -1472,40 +1669,52 @@ class RunService:
         Scheme: the ``display`` method on every event type, which calls
         ``save-current-state`` then ``impose-theme-pattern``.  A second call restores
         the live state, which is how MetaCat's windows behave when you click again.
+
+        The result carries the event's ``picture`` when it is now on show -- the
+        Workspace as it was, the concept pattern, the codelet pattern and the
+        temperature the other windows redraw (``trace.ss:405-465``).
         """
         runner = self._runners.get(run_id)
         if runner is None or runner.ctx is None:
             raise ValueError(f"Run {run_id} not found or not loaded")
-
-        themespace = runner.ctx.themespace
-        if themespace.displaying_past_state:
-            themespace.restore_current_state()
-            return {"run_id": run_id, "displaying": None}
 
         detail = self.describe_trace_event(run_id, event_number)
         if detail is None:
             raise ValueError(f"Event {event_number} not found in run {run_id}")
 
-        themespace.save_current_state()
-        self._impose_pattern(themespace, detail["theme_pattern"])
-        return {"run_id": run_id, "displaying": event_number}
+        picture = detail.get("picture")
+        patterns = (
+            picture["themes"]
+            if picture is not None
+            else ([detail["theme_pattern"]] if detail["theme_pattern"] else [])
+        )
+        shown = self._display_over_themespace(run_id, ("event", event_number), patterns)
+        if shown is not None and runner.ctx.verbose:
+            # Verbose mode: what the event's ``display`` prints (``trace.ss``).
+            for event in runner.ctx.trace.events:
+                if event.event_number == event_number:
+                    narrate_event_display(runner.ctx.verbose_log, event)
+                    break
+        return {
+            "run_id": run_id,
+            "displaying": shown,
+            "picture": picture if shown is not None else None,
+            "event_number": event_number,
+            "print_name": detail["print_name"],
+        }
 
     def impose_answer(self, run_id: int, answer_id: int) -> dict:
         """Display a stored answer: impose its three theme-patterns.
 
         Scheme: ``memory.ss:268-283`` — clicking an answer icon redraws its Workspace
-        and imposes the vertical, top and bottom patterns (``trace.ss:415-420``).  The
+        and imposes the vertical, top and bottom patterns (``trace.ss:415-420``). The
         three are separate for the reason §4.7.1 gives: they characterise different
-        halves of the analogy and are not interchangeable.
+        halves of the analogy and are not interchangeable.  The Slipnet and Coderack are
+        blanked and the Temperature shows the answer's own.
         """
         runner = self._runners.get(run_id)
         if runner is None or runner.ctx is None:
             raise ValueError(f"Run {run_id} not found or not loaded")
-
-        themespace = runner.ctx.themespace
-        if themespace.displaying_past_state:
-            themespace.restore_current_state()
-            return {"run_id": run_id, "displaying": None}
 
         answer = next(
             (a for a in _global_memory.answers if a.answer_id == answer_id), None
@@ -1513,17 +1722,48 @@ class RunService:
         if answer is None:
             raise ValueError(f"Answer {answer_id} not found")
 
-        themespace.save_current_state()
-        for theme_type, pattern in (
-            ("vertical_bridge", answer.vertical_themes or answer.themes),
-            ("top_bridge", answer.top_themes),
-            ("bottom_bridge", answer.bottom_themes),
-        ):
-            self._impose_pattern(
-                themespace,
-                {"type": theme_type, "entries": pattern},
+        patterns = [
+            {"type": theme_type, "entries": pattern}
+            for theme_type, pattern in (
+                ("vertical_bridge", answer.vertical_themes or answer.themes),
+                ("top_bridge", answer.top_themes),
+                ("bottom_bridge", answer.bottom_themes),
             )
-        return {"run_id": run_id, "displaying": answer_id}
+        ]
+        shown = self._display_over_themespace(run_id, ("answer", answer_id), patterns)
+        return {
+            "run_id": run_id,
+            "displaying": shown,
+            "picture": answer.picture if shown is not None else None,
+            "temperature": answer.temperature,
+        }
+
+    def impose_snag(self, run_id: int, snag_id: int) -> dict:
+        """Display a stored snag: its picture, and its theme pattern on the Themespace.
+
+        Scheme: the snag description's ``display`` (``memory.ss:380-395``): draw the
+        snag's description picture, replace the Themespace with the snag's pattern, blank
+        the Slipnet and Coderack, and show a temperature of 100.
+        """
+        runner = self._runners.get(run_id)
+        if runner is None or runner.ctx is None:
+            raise ValueError(f"Run {run_id} not found or not loaded")
+
+        snag = next((s for s in _global_memory.snags if s.snag_id == snag_id), None)
+        if snag is None:
+            raise ValueError(f"Snag {snag_id} not found")
+
+        pattern = snag.theme_pattern
+        patterns = (
+            [{"type": "vertical_bridge", "entries": pattern}] if pattern else []
+        )
+        shown = self._display_over_themespace(run_id, ("snag", snag_id), patterns)
+        return {
+            "run_id": run_id,
+            "displaying": shown,
+            "picture": snag.picture if shown is not None else None,
+            "temperature": 100.0,
+        }
 
     @staticmethod
     def _impose_pattern(themespace: Any, pattern: Any) -> None:
@@ -1541,7 +1781,7 @@ class RunService:
         elif isinstance(pattern, list) and pattern:
             # List form: ``[theme_type, (dimension, relation), ...]`` (``trace.ss:1401``).
             theme_type = pattern[0]
-            pairs = [tuple(e) for e in pattern[1:] if isinstance(e, (list, tuple))]
+            pairs = [tuple(e[:2]) for e in pattern[1:] if isinstance(e, (list, tuple))]
         else:
             return
 
@@ -1557,94 +1797,221 @@ class RunService:
         if runner is None or runner.ctx is None:
             raise ValueError(f"Run {run_id} not found or not loaded")
         restored = runner.ctx.themespace.restore_current_state()
+        self._displaying.pop(run_id, None)
         return {"run_id": run_id, "restored": restored}
 
     def clamp_themes(self, run_id: int, themes: list[dict]) -> dict:
-        """Clamp themes in the themespace for the given run.
+        """Clamp one or more themes in the Themespace for the given run.
 
         Each theme dict: {type, dimension, relation, activation}.
 
         This is the user's own hand on the Themespace — ``theme-graphics.ss:35-63``,
         where a left-click clamps a theme to +100 and a right-click to −100, and which
-        is how the dissertation produced Figures 4.5 and 4.6.  It performs the whole of
-        ``clamp-theme-pattern``, not just the activation:
-
-        * the rest of the theme's **cluster is zeroed** first, so the clamp names one
-          idea per dimension rather than adding to whatever was already there;
-        * the clamped themes are **frozen**, so ordinary Workspace pressure cannot erode
-          them back (``themes.ss:674-679``);
-        * **thematic pressure is switched on** for the affected types, because a clamp
-          that exerts no pressure changes nothing a codelet can see (§4.2);
-        * a ``manual_clamp`` **Trace event** is recorded, so the user's intervention is
-          part of the program's record of its own behaviour and can be evaluated for
-          progress later (``gui.ss:924-926``).  Jootsers skip manual clamps
-          (``jootsing.ss:38-39``), which the clamp type is what makes possible.
+        is how the dissertation produced Figures 4.5 and 4.6.  The named themes replace
+        whatever their *dimension* held; every other nonzero theme of the same type is
+        carried into the pattern as it stands, because a clamp acts on a whole theme
+        type (``clamp-theme-pattern``, ``trace.ss:1530``) and a type is clamped as one
+        pattern.  To replace a whole type, as Metacat's Clamp Themes dialog does, use
+        :meth:`clamp_theme_pattern`.
         """
         runner = self._runners.get(run_id)
         if runner is None or runner.ctx is None:
             raise ValueError(f"Run {run_id} not found or not loaded")
 
         ctx = runner.ctx
-        themespace = ctx.themespace
-        clamped = []
-        touched_types: list[str] = []
-
+        overrides: dict[str, dict[str, dict]] = {}
         for t in themes:
             theme_type = t.get("type", "")
             dimension = t.get("dimension", "")
-            for cluster in themespace.clusters:
-                if cluster.theme_type != theme_type or cluster.dimension != dimension:
+            if not any(
+                c.theme_type == theme_type and c.dimension == dimension
+                for c in ctx.themespace.clusters
+            ):
+                continue
+            overrides.setdefault(theme_type, {})[dimension] = t
+
+        patterns = []
+        for theme_type, chosen in overrides.items():
+            entries = []
+            for cluster in ctx.themespace.clusters:
+                if cluster.theme_type != theme_type:
                     continue
-                # Zero the cluster before imposing, as the Scheme does.
-                cluster.frozen = False
-                for other in list(cluster.themes):
-                    themespace.delete_theme(other)
+                if cluster.dimension in chosen:
+                    t = chosen[cluster.dimension]
+                    activation = float(t.get("activation", 100.0))
+                    if activation != 0.0:
+                        entries.append({
+                            "dimension": cluster.dimension,
+                            "relation": t.get("relation"),
+                            "activation": activation,
+                        })
+                else:
+                    entries.extend(
+                        {
+                            "dimension": cluster.dimension,
+                            "relation": theme.relation,
+                            "activation": theme.activation,
+                        }
+                        for theme in cluster.themes
+                        if theme.activation != 0
+                    )
+            patterns.append({"type": theme_type, "entries": entries})
 
-                theme = themespace.add_theme(
-                    theme_type, dimension, t.get("relation"), False
-                )
-                if theme is None:
-                    break
-                activation = float(t.get("activation", 100.0))
-                if activation != 0.0:
-                    theme.clamp(activation)
-                    cluster.frozen = True
-                    if theme_type not in touched_types:
-                        touched_types.append(theme_type)
-                clamped.append({
-                    "type": cluster.theme_type,
-                    "dimension": cluster.dimension,
-                    "relation": theme.relation,
-                    "activation": theme.activation,
-                })
-                break
+        clamped = self._manual_theme_clamp(ctx, patterns)
+        return {"run_id": run_id, "clamped_themes": clamped}
 
-        if touched_types:
-            themespace.thematic_pressure_on(touched_types)
-            self._record_manual_clamp(ctx, clamped)
+    def clamp_theme_pattern(self, run_id: int, patterns: list[dict]) -> dict:
+        """Clamp a theme pattern chosen in Metacat's Clamp Themes dialog.
 
+        Scheme: ``theme-edit-mode-off`` (``gui.ss:905-926``).  ``patterns`` has one entry
+        per theme type the user edited, ``{"type": ..., "themes": [{dimension, relation,
+        activation}, ...]}``; the themes are the ones the user selected, at +100 or −100.
+        The edited types are *replaced* by the pattern and every other type is left as
+        it was.  All of them are clamped together by a single manual-clamp event.
+        """
+        runner = self._runners.get(run_id)
+        if runner is None or runner.ctx is None:
+            raise ValueError(f"Run {run_id} not found or not loaded")
+        ctx = runner.ctx
+        valid_types = {c.theme_type for c in ctx.themespace.clusters}
+        built = []
+        for pattern in patterns:
+            theme_type = pattern.get("type", "")
+            if theme_type not in valid_types:
+                raise ValueError(f"Unknown theme type {theme_type!r}")
+            if theme_type not in ctx.themespace.possible_theme_types:
+                raise ValueError(f"Theme type {theme_type!r} is not used in this mode")
+            entries = [
+                {
+                    "dimension": t.get("dimension"),
+                    "relation": t.get("relation"),
+                    "activation": float(t.get("activation", 100.0)),
+                }
+                for t in pattern.get("themes", [])
+                if float(t.get("activation", 100.0)) != 0.0
+            ]
+            built.append({"type": theme_type, "entries": entries})
+        if not built:
+            raise ValueError("No themes were selected")
+        clamped = self._manual_theme_clamp(ctx, built)
         return {"run_id": run_id, "clamped_themes": clamped}
 
     @staticmethod
-    def _record_manual_clamp(ctx: Any, clamped: list[dict]) -> None:
-        """Put the user's clamp into the Temporal Trace (``gui.ss:924-926``)."""
+    def _manual_theme_clamp(ctx: Any, patterns: list[dict]) -> list[dict]:
+        """The user's clamp, as Metacat makes it (``gui.ss:920-926``).
+
+        Make a manual-clamp event holding the theme patterns, undo the last clamp, add
+        the event to the Trace and activate it.  Undoing first is what keeps one
+        clamp in force at a time; activating is what says "Thank you for that
+        interesting suggestion!" and clamps the patterns, switches thematic pressure on
+        and freezes the types.
+        """
         from server.engine.trace import ClampEvent
 
-        entries = ", ".join(
-            f"{c['dimension']}:{c['relation']}={c['activation']:.0f}" for c in clamped
-        )
         event = ClampEvent(
             codelet_count=ctx.codelet_count,
             temperature=ctx.temperature.value,
             clamp_type="manual_clamp",
-            clamped_theme_patterns=[],
+            clamped_theme_patterns=patterns,
             clamped_concept_patterns=[],
             clamped_codelet_patterns=[],
             rules=[],
             progress_focus="workspace",
-            description=f"you suggested {entries}",
+        )
+        ctx.trace.undo_last_clamp(
+            ctx.themespace, ctx.slipnet, ctx.codelet_count, ctx.coderack
         )
         ctx.trace.add_clamp_event(event)
+        event.activate(
+            ctx.trace, ctx.themespace, ctx.slipnet, ctx.coderack, ctx.temperature,
+            ctx.workspace,
+        )
+        return [
+            {
+                "type": p["type"],
+                "dimension": e["dimension"],
+                "relation": e["relation"],
+                "activation": e["activation"],
+            }
+            for p in patterns
+            for e in p["entries"]
+        ]
+
+    def undo_last_clamp(self, run_id: int) -> dict:
+        """Undo the most recent clamp and only that one (``gui.ss:595-597``).
+
+        Metacat's "Undo last clamp" is ``(tell *trace* 'undo-last-clamp)``: when a clamp
+        is in force it books the progress the clamp achieved, says so in the commentary
+        and lifts exactly the patterns that clamp imposed.  With no clamp in force it
+        does nothing.
+        """
+        runner = self._runners.get(run_id)
+        if runner is None or runner.ctx is None:
+            raise ValueError(f"Run {run_id} not found or not loaded")
+        ctx = runner.ctx
+        was_clamped = ctx.trace.within_clamp_period
+        progress = ctx.trace.undo_last_clamp(
+            ctx.themespace, ctx.slipnet, ctx.codelet_count, ctx.coderack
+        )
+        return {
+            "run_id": run_id,
+            "undone": was_clamped,
+            "progress": progress if was_clamped else None,
+        }
+
+    def set_self_watching(self, run_id: int, enabled: bool) -> dict:
+        """Turn self-watching on or off in the middle of a run (``gui.ss:607-626``).
+
+        Turning it off undoes the last clamp and deletes every theme, because without
+        self-watching nothing maintains the Themespace; turning it on only lets the
+        self-watching machinery start working again (the client shows or hides the
+        theme windows, the warning and the clamp controls to match).
+        """
+        runner = self._runners.get(run_id)
+        if runner is None or runner.ctx is None:
+            raise ValueError(f"Run {run_id} not found or not loaded")
+        ctx = runner.ctx
+        ctx.self_watching_enabled = bool(enabled)
+        if not enabled:
+            ctx.trace.undo_last_clamp(
+                ctx.themespace, ctx.slipnet, ctx.codelet_count, ctx.coderack
+            )
+            ctx.themespace.delete_everything()
+        return {"run_id": run_id, "self_watching_enabled": ctx.self_watching_enabled}
+
+    def set_verbose(self, run_id: int, enabled: bool) -> dict:
+        """Turn Verbose mode on or off in the middle of a run (``gui.ss:790-792``).
+
+        The choice belongs to the program rather than to one run, as Metacat's
+        ``%verbose%`` does, so it is kept on the runner and survives a reset.  Turning
+        it off keeps what was narrated; ``clear_verbose`` empties it.
+        """
+        runner = self._runners.get(run_id)
+        if runner is None or runner.ctx is None:
+            raise ValueError(f"Run {run_id} not found or not loaded")
+        runner.verbose_mode = bool(enabled)
+        runner.ctx.set_verbose(mode=bool(enabled))
+        return {"run_id": run_id, "verbose": runner.ctx.verbose_mode}
+
+    def get_verbose(self, run_id: int, since: int = 0) -> dict | None:
+        """The run's narration from line *since* on, with the mode it was made under."""
+        runner = self._runners.get(run_id)
+        if runner is None or runner.ctx is None:
+            return None
+        ctx = runner.ctx
+        return {
+            "run_id": run_id,
+            "verbose": ctx.verbose_mode,
+            "capacity": ctx.verbose_log.capacity,
+            **ctx.verbose_log.since(max(0, since)),
+        }
+
+    def clear_verbose(self, run_id: int) -> dict | None:
+        runner = self._runners.get(run_id)
+        if runner is None or runner.ctx is None:
+            return None
+        runner.ctx.verbose_log.clear()
+        return {"run_id": run_id, "cleared": True}
 
     def unclamp_themes(self, run_id: int) -> dict:
         """Unclamp all themes in the themespace for the given run."""
@@ -1719,30 +2086,64 @@ class RunService:
         }
 
     def clamp_codelet_pattern(self, run_id: int, pattern: str) -> dict:
-        """Clamp every entry of a named codelet pattern.
+        """Clamp every entry of a named codelet pattern, as the Options menu does.
 
-        Scheme: ``clamp-codelet-pattern`` (``trace.ss:1583-1588``).  The urgency each
-        entry names is resolved from the run's own ``urgency_levels``, so a pattern
-        follows the configuration rather than carrying numbers of its own.
+        Scheme: ``clamp-codelets-menu-item`` (``gui.ss:1221-1245``).  Like every manual
+        clamp it is a clamp *event*: the last clamp is undone, the manual-clamp event is
+        added to the Trace and activated (which clamps the pattern and says so in the
+        commentary).  The group, bridge and rule patterns are clamped against a
+        very-low background, so the other codelet types are throttled rather than
+        merely out-shouted; top-down and bottom-up are not.  The urgency each entry
+        names is resolved from the run's own ``urgency_levels``, so a pattern follows
+        the configuration rather than carrying numbers of its own.
         """
         from server.engine.codelet_patterns import pattern_entries
+        from server.engine.trace import ClampEvent
 
         runner = self._runners.get(run_id)
         if runner is None or runner.ctx is None:
             raise ValueError(f"Run {run_id} not found or not loaded")
 
+        ctx = runner.ctx
         entries = pattern_entries(self.meta, pattern)  # KeyError names an unknown pattern
         clamped = []
+        resolved = []
         for codelet_type, level in entries:
             urgency = int(self.meta.get_urgency(level))
-            runner.ctx.coderack.clamp_codelet_type(codelet_type, urgency)
+            resolved.append((codelet_type, urgency))
             clamped.append({"codelet_type": codelet_type, "urgency": urgency})
+        if pattern in ("group", "bridge", "rule"):
+            resolved = ctx.coderack.against_background(
+                int(self.meta.get_urgency("very_low")), resolved
+            )
+        event = ClampEvent(
+            codelet_count=ctx.codelet_count,
+            temperature=ctx.temperature.value,
+            clamp_type="manual_clamp",
+            clamped_theme_patterns=[],
+            clamped_concept_patterns=[],
+            clamped_codelet_patterns=[resolved],
+            rules=[],
+            # ``gui.ss:1237``: the progress a codelet clamp is judged by is the
+            # structure it favours; the general patterns are judged by the Workspace.
+            progress_focus=pattern if pattern in ("rule", "group") else "workspace",
+        )
+        ctx.trace.undo_last_clamp(
+            ctx.themespace, ctx.slipnet, ctx.codelet_count, ctx.coderack
+        )
+        ctx.trace.add_clamp_event(event)
+        event.activate(
+            ctx.trace, ctx.themespace, ctx.slipnet, ctx.coderack, ctx.temperature,
+            ctx.workspace,
+        )
         return {"run_id": run_id, "pattern": pattern, "clamped": clamped}
 
     def unclamp_codelet_pattern(self, run_id: int, pattern: str) -> dict:
-        """Release every entry of a named codelet pattern.
+        """Release a codelet pattern.
 
-        Scheme: ``unclamp-codelet-pattern`` (``trace.ss:1590-1593``).
+        Scheme: ``unclamp-codelet-pattern`` (``trace.ss:1590-1593``).  A pattern clamped
+        from the menu is the last clamp, and releasing it is undoing that clamp; one
+        clamped some other way is released entry by entry.
         """
         from server.engine.codelet_patterns import pattern_entries
 
@@ -1750,9 +2151,19 @@ class RunService:
         if runner is None or runner.ctx is None:
             raise ValueError(f"Run {run_id} not found or not loaded")
 
+        ctx = runner.ctx
         entries = pattern_entries(self.meta, pattern)
+        last = ctx.trace.get_last_event("clamp_start")
+        if (
+            ctx.trace.within_clamp_period
+            and getattr(last, "clamp_type", None) == "manual_clamp"
+            and getattr(last, "clamped_codelet_patterns", None)
+        ):
+            ctx.trace.undo_last_clamp(
+                ctx.themespace, ctx.slipnet, ctx.codelet_count, ctx.coderack
+            )
         for codelet_type, _level in entries:
-            runner.ctx.coderack.unclamp_codelet_type(codelet_type)
+            ctx.coderack.unclamp_codelet_type(codelet_type)
         return {
             "run_id": run_id,
             "pattern": pattern,

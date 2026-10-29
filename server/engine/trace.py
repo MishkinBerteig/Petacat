@@ -116,8 +116,20 @@ class TraceEvent:
         bridge: Any = None,
         group: Any = None,
         slipnode: Any = None,
+        flipped: bool = False,
     ) -> None:
         self.event_number = next_id(KIND_TRACE_EVENT)
+        #: ``print-name`` (``trace.ss``): the label Metacat's Trace window draws for the
+        #: event -- ``(Id)``, ``>a-b-c>``, ``T:a=>b``, ``[Top Rule]``, ``[Answer abd]``,
+        #: ``[Clamp]``, ``[Snag]``.  Set by :meth:`TemporalTrace.record_event`, once, as
+        #: the event is recorded (Metacat names an event when it makes it).
+        self.print_name: str = ""
+        #: What redisplaying the event shows -- see :mod:`server.engine.trace_display`.
+        #: Captured as the event is recorded, because the Workspace moves on.  ``None``
+        #: for an event recorded with no run behind the Trace.
+        self.picture: dict | None = None
+        #: ``make-group-event``'s ``flipped?`` (``trace.ss:837``): a re-perception.
+        self.flipped = flipped
         self.event_type = event_type
         self.codelet_count = codelet_count
         self.temperature = temperature
@@ -386,6 +398,9 @@ class ClampEvent(TraceEvent):
         readout; see :meth:`TemporalTrace.undo_snag_condition`.  ``monitor`` is
         forwarded to :func:`clamp_concept_pattern`.
         """
+        # The first thing ``activate`` does is say so (``trace.ss:592-612``).
+        trace.announce_clamp(self)
+
         trace.undo_snag_condition(themespace, slipnet, temperature, workspace)
 
         # ``slipnet.ss:139-140``: every node a clamp moves reports the change to
@@ -478,6 +493,8 @@ class SnagEvent(TraceEvent):
         structures: list[Any] | None = None,
         workspace_structures: list[Any] | None = None,
         description: str = "",
+        failure_result: Any = None,
+        explanation: str = "",
     ) -> None:
         super().__init__(
             event_type=SNAG,
@@ -488,6 +505,11 @@ class SnagEvent(TraceEvent):
             theme_pattern=theme_pattern if theme_pattern is not None else snag_theme_pattern,
         )
         self.snag_type = snag_type
+        #: ``get-failure-result`` / ``get-explanation`` (``trace.ss:1127-1128``): the
+        #: ``ImageFailure`` (kind, objects, dimension/transform) the rule application
+        #: reported, and the sentence written from it.
+        self.failure_result = failure_result
+        self.explanation = explanation
         self.snag_theme_pattern = snag_theme_pattern
         self.snag_concept_pattern = snag_concept_pattern
         self.snag_rule = snag_rule
@@ -881,20 +903,24 @@ def get_associated_concept_pattern(theme_pattern: Any) -> dict[str, Any]:
     Without this, clamping a theme pattern left the Slipnet untouched, and a whole
     channel of the clamp's influence (§4.2) simply did not exist.
     """
+    pairs: list[tuple[str, float]] = []
+    for dimension, relation, activation in theme_pattern_entries(theme_pattern):
+        pairs.append((dimension, 100.0))
+        if relation == "opposite":
+            pairs.append(("plato-opposite", 100.0 if activation > 0 else 0.0))
+    # ``(remove-duplicates (flatmap ...))`` (``trace.ss:1506``): ``remove-duplicates``
+    # keeps the LAST occurrence (``utilities.ss:915-929``, DISCREPANCIES5 C-2), so a
+    # pair named twice sits where it is named last.  Clamping follows this order and
+    # each clamp can log a concept-activation event, so the order is visible in the
+    # trace: ``rst-rsu-xyz-wyz`` seed 4 logs ObjectCtgy before Opposite.
     entries: list[dict[str, Any]] = []
     seen: set[tuple[str, float]] = set()
-
-    def add(node_name: str, activation: float) -> None:
-        key = (node_name, activation)
-        if key in seen:
-            return
-        seen.add(key)
-        entries.append({"node": node_name, "activation": activation})
-
-    for dimension, relation, activation in theme_pattern_entries(theme_pattern):
-        add(dimension, 100.0)
-        if relation == "opposite":
-            add("plato-opposite", 100.0 if activation > 0 else 0.0)
+    for pair in reversed(pairs):
+        if pair in seen:
+            continue
+        seen.add(pair)
+        entries.append({"node": pair[0], "activation": pair[1]})
+    entries.reverse()
     return {"type": "concepts", "entries": entries}
 
 
@@ -1070,6 +1096,13 @@ class TemporalTrace:
         self.clamp_count: int = 0
         self.snag_count: int = 0
         self._last_significant_event_time: int = 0
+        # Where a clamp says that it has been activated or undone (``*comment-window*``
+        # in the Scheme).  The run wires this up; a bare trace is silent.
+        self.commentary: Any = None
+        self.commentary_templates: dict[str, Any] | None = None
+        #: The run's engine context, so a recorded event can capture the Workspace as
+        #: it stood (:mod:`server.engine.trace_display`).  ``None`` for a bare trace.
+        self.ctx: Any = None
 
     # ------------------------------------------------------------------
     # Basic event recording (preserved from original)
@@ -1077,6 +1110,12 @@ class TemporalTrace:
 
     def record_event(self, event: TraceEvent) -> None:
         """Record a new event."""
+        # Name it and take its picture now, before anything else happens: the Workspace
+        # it redisplays is the one that exists at this moment (``make-generic-event``,
+        # ``trace.ss:233``).  Read-only, so it cannot change what the run does.
+        from server.engine.trace_display import attach_picture
+
+        attach_picture(self.ctx, event)
         self.events.append(event)
         # Every event counts, clamp events included.  §4.5.1: the progress-watcher
         # "examines the most recent event in the Trace (which may or may not be the most
@@ -1268,6 +1307,8 @@ class TemporalTrace:
         if not self.within_clamp_period:
             return 0.0
 
+        if self.ctx is not None and self.ctx.verbose:
+            self.ctx.verbose_log.say("undoing-clamp", self.ctx.codelet_count)
         progress = self.progress_since_last_clamp()
 
         self.within_clamp_period = False
@@ -1277,9 +1318,40 @@ class TemporalTrace:
         last_clamp = self.get_last_event(CLAMP_START)
         if last_clamp is not None and isinstance(last_clamp, ClampEvent):
             last_clamp.progress_achieved = progress
+            # ``trace.ss:136-166``: the comment is made between booking the progress
+            # and deactivating the clamp.
+            if self.commentary is not None:
+                from server.engine.commentary import emit_clamp_expired
+
+                emit_clamp_expired(
+                    self.commentary, last_clamp.clamp_type, progress, codelet_count,
+                    self.commentary_templates,
+                )
             last_clamp.deactivate(self, themespace, slipnet, coderack)
 
         return progress
+
+    def announce_clamp(self, clamp: ClampEvent) -> None:
+        """Say that ``clamp`` is now in force (``trace.ss:592-612``).
+
+        The "another" in the justify and manual wordings counts the clamp events in the
+        Trace, this one already among them (``add-event`` precedes ``activate``).
+        """
+        if self.commentary is None:
+            return
+        from server.engine.commentary import emit_clamp_activate
+
+        if clamp.clamp_type == "manual_clamp":
+            count = sum(
+                1 for e in self.events
+                if isinstance(e, ClampEvent) and e.clamp_type == "manual_clamp"
+            )
+        else:
+            count = len(self.get_events_by_type(CLAMP_START))
+        emit_clamp_activate(
+            self.commentary, clamp.clamp_type, count, clamp.codelet_count,
+            self.commentary_templates,
+        )
 
     def progress_since_last_clamp(self) -> float:
         """Measure how much progress was made during the last clamp.
@@ -1371,6 +1443,8 @@ class TemporalTrace:
         if not self.within_snag_period:
             return
 
+        if self.ctx is not None and self.ctx.verbose:
+            self.ctx.verbose_log.say("undoing-snag", self.ctx.codelet_count)
         self.within_snag_period = False
 
         last_snag = self.get_last_event(SNAG)

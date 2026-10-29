@@ -58,6 +58,12 @@ class AnswerDescription:
     # answer reflects how strongly the program is reminded of it."
     activation: float = 0.0
 
+    #: ``set-answer-description-pexp`` (``memory.ss:438``): the picture of the answer that
+    #: clicking it redraws in the Workspace (``trace.ss:466``).  A JSON-able dict, see
+    #: :mod:`server.engine.trace_display`; ``None`` for an answer stored before pictures
+    #: were kept, which then has nothing to redraw but its theme patterns.
+    picture: dict | None = None
+
     def __post_init__(self) -> None:
         # ``answer_id`` is stamped by :meth:`EpisodicMemory.store_answer`, not here.
         # It numbers an answer's place in a memory, and a description that has not
@@ -111,16 +117,29 @@ class SnagDescription:
     run_id: int | None = None
     snag_id: int = 0
 
+    #: ``get-explanation`` (``memory.ss:332``): Metacat's sentence for what went wrong,
+    #: written from the failure-result when the snag happened (``trace.ss:1097``) --
+    #: "changing the letter-category of the letter a to its predecessor is not possible
+    #: in abcd".  Empty for a snag rehydrated from a row written before it was stored;
+    #: ``snag_explanation_text`` is the one place that case is handled.
+    explanation: str = ""
+    #: ``get-translated-rule-phrases`` (``memory.ss:331``): the English of the
+    #: translated rule, the one that failed.  ``description`` is the rule's own.
+    translated_rule_description: str = ""
+
     # ``memory.ss:289-291`` stores the snag's **rule clause lists**, and ``equal?``
     # (``memory.ss:336-340``) compares them with ``rule-clause-lists-equal?`` — the
     # three problem strings plus a *structural* comparison of the rule.  Petacat
     # compared the rule's English transcription, which collides two ways: two
-    # structurally different rules can transcribe to the same prose, and every rule
-    # that fails to transcribe reads "Unknown transformation" and so matches every
-    # other such rule.  ``rules.py:rule_signature`` documents exactly that hazard for
-    # answers; the snag path had it open.
+    # structurally different rules can transcribe to the same prose.
+    # ``rules.py:rule_signature`` documents exactly that hazard for answers; the snag
+    # path had it open.
     rule_signature: list | None = None
     translated_rule_signature: list | None = None
+
+    #: ``set-snag-description-pexp`` (``memory.ss:477``): the picture of the snag
+    #: (``trace.ss:1212``).  ``None`` for a snag stored before pictures were kept.
+    picture: dict | None = None
 
     def equal(
         self, problem: tuple[str, str, str], signature: list | None
@@ -153,20 +172,40 @@ class EpisodicMemory:
     """
 
     def __init__(self) -> None:
+        #: Newest first, as Metacat keeps them: ``add-answer-description`` and
+        #: ``add-snag-description`` ``cons`` the new description onto the front of
+        #: ``answer-descriptions`` / ``snag-descriptions`` (``memory.ss:101-111``), and
+        #: everything that walks the list sees them in that order -- ``get-answers``,
+        #: ``get-snags``, the reminding loop (the order the reminding comments are said
+        #: in), ``get-equivalent-snag``'s first match.  Keeping the list the other way
+        #: round, as this used to, made every one of them see the reverse.  The Memory
+        #: window draws oldest first (``memory-graphics.ss:145``); that listing is
+        #: :attr:`answers_oldest_first`.
         self.answers: list[AnswerDescription] = []
         self.snags: list[SnagDescription] = []
         self.ids = IdAllocator()
+
+    @property
+    def answers_oldest_first(self) -> list[AnswerDescription]:
+        """The answers in the order the Memory window lists them: the oldest at the top
+        (``(reverse (tell *memory* 'get-all-descriptions))``, ``memory-graphics.ss:145``)."""
+        return list(reversed(self.answers))
+
+    @property
+    def snags_oldest_first(self) -> list[SnagDescription]:
+        """The snags in the order the Memory window lists them (see ``answers_oldest_first``)."""
+        return list(reversed(self.snags))
 
     def store(self, desc: AnswerDescription) -> None:
         self.store_answer(desc)
 
     def store_answer(self, desc: AnswerDescription) -> None:
         desc.answer_id = self.ids.next(KIND_ANSWER)
-        self.answers.append(desc)
+        self.answers.insert(0, desc)
 
     def store_snag(self, desc: SnagDescription) -> None:
         desc.snag_id = self.ids.next(KIND_SNAG)
-        self.snags.append(desc)
+        self.snags.insert(0, desc)
 
     def snag_present(
         self, problem: tuple[str, str, str], rule: Any = None
@@ -234,20 +273,25 @@ class EpisodicMemory:
         """
         remindings = []
         threshold = distance_threshold or 5.0
+        # Newest answer first: ``add-answer-description`` conses the new description onto
+        # the front of the list (``memory.ss:102-104``) and the new answer is compared
+        # with each of the others in that order (``memory.ss:101-103``), so the reminding
+        # commentary lists the most recent answer first.  ``self.answers`` is in that order.
         for past in self.answers:
             if past is new_desc:
                 continue
             distance = self.distance(new_desc, past, meta=meta)
             # ``memory.ss:212``: ``(100- (100* (min 1 (/ distance %distance-threshold%))))``
             # — reaches zero *at* the threshold rather than crossing it linearly.
+            # ``100*`` rounds (``utilities.ss:544``), so the activation is a whole number
+            # and that is the strength the commentary quotes.
             past.activation = max(
-                0.0, 100.0 * (1.0 - min(1.0, distance / threshold))
+                0, 100 - round(100 * min(1.0, distance / threshold))
             )
             # ``memory.ss:214`` reports a reminding only for a non-zero activation.
-            if past.activation > 0.0:
+            if past.activation > 0:
                 remindings.append(past)
         new_desc.activation = 100.0
-        remindings.sort(key=lambda a: a.activation, reverse=True)
         return remindings
 
     def distance(

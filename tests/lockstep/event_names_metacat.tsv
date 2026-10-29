@@ -1,0 +1,136 @@
+# Metacat 1.2's Temporal Trace events: print-name (trace.ss) and the header display-workspace draws.
+# Logged by running Metacat headless (metacat:1.2) and, after each run, asking every event of *trace* for
+# 'print-name and for the header its 'display-workspace sends to draw-event-header.
+# Regenerate: python3 scripts/compare_events.py --table <path>   (runs: tests/lockstep/event_names_runs.txt)
+# Columns: kind (main = traces/, justify = traces/justify/), slug, seed, event number, event type, codelet, print-name, header
+main	abc-abd-xyz	1	1	concept_activation	17	(Identity)	Activation of Identity concept
+main	abc-abd-xyz	1	2	group_built	157	<x-y-z<	Built predecessor-group
+main	abc-abd-xyz	1	3	group_built	217	<a-b-c<	Built predecessor-group
+main	abc-abd-xyz	1	4	rule_built	225	[Top Rule]	Built rule
+main	abc-abd-xyz	1	5	snag	273	[Snag]	Snag
+main	abc-abd-xyz	1	6	rule_built	321	[Top Rule]	Built rule
+main	abc-abd-xyz	1	7	snag	421	[Snag]	Snag
+main	abc-abd-xyz	1	8	snag	569	[Snag]	Snag
+main	abc-abd-xyz	1	9	clamp_start	586	[Clamp]	Clamped patterns
+main	abc-abd-xyz	1	10	concept_activation	763	(Opposite)	Activation of Opposite concept
+main	abc-abd-xyz	1	11	group_built	874	>a-b-c>	Built successor-group
+main	abc-abd-xyz	1	12	concept_mapping_built	950	V:right=>left	Made right=>left slippage
+main	abc-abd-xyz	1	13	concept_mapping_built	950	V:succgrp=>predgrp	Made succgrp=>predgrp slippage
+main	abc-abd-xyz	1	14	answer_found	1331	[Answer xyz]	Found new answer
+justify	abc-abd-mrrjjj-mrrkkk	4	1	concept_activation	72	(Identity)	Activation of Identity concept
+justify	abc-abd-mrrjjj-mrrkkk	4	2	rule_built	393	[Top Rule]	Built rule
+justify	abc-abd-mrrjjj-mrrkkk	4	3	rule_built	485	[Top Rule]	Built rule
+justify	abc-abd-mrrjjj-mrrkkk	4	4	rule_built	498	[Bottom Rule]	Built translated rule
+justify	abc-abd-mrrjjj-mrrkkk	4	5	clamp_start	498	[Clamp]	Clamped patterns
+justify	abc-abd-mrrjjj-mrrkkk	4	6	concept_mapping_built	547	B:j=>k	Made j=>k slippage
+justify	abc-abd-mrrjjj-mrrkkk	4	7	group_built	576	[m]	Built sameness-group
+justify	abc-abd-mrrjjj-mrrkkk	4	8	group_built	727	>a-b-c>	Built successor-group
+justify	abc-abd-mrrjjj-mrrkkk	4	9	answer_found	1183	[Answer mrrkkk]	Justified answer
+main	zy-x-zy	10	1	concept_activation	20	(Identity)	Activation of Identity concept
+main	zy-x-zy	10	2	group_built	53	<z-y<	Built successor-group
+main	zy-x-zy	10	3	group_built	68	<z-y<	Built successor-group
+main	zy-x-zy	10	4	concept_mapping_built	239	T:whole=>lmost	Made whole=>lmost slippage
+main	zy-x-zy	10	5	concept_mapping_built	239	T:whole=>single	Made whole=>single slippage
+main	zy-x-zy	10	6	concept_mapping_built	239	T:group=>letter	Made group=>letter slippage
+main	zy-x-zy	10	7	rule_built	273	[Top Rule]	Built rule
+main	zy-x-zy	10	8	answer_found	281	[Answer x]	Found new answer
+justify	abc-abd-xyz-wyz	1	1	concept_activation	26	(Identity)	Activation of Identity concept
+justify	abc-abd-xyz-wyz	1	2	group_built	184	<a-b-c<	Built predecessor-group
+justify	abc-abd-xyz-wyz	1	3	rule_built	299	[Top Rule]	Built rule
+justify	abc-abd-xyz-wyz	1	4	rule_built	367	[Top Rule]	Built rule
+justify	abc-abd-xyz-wyz	1	5	rule_built	405	[Bottom Rule]	Built rule
+justify	abc-abd-xyz-wyz	1	6	clamp_start	414	[Clamp]	Clamped patterns
+justify	abc-abd-xyz-wyz	1	7	concept_activation	414	(Opposite)	Activation of Opposite concept
+justify	abc-abd-xyz-wyz	1	8	group_built	423	<x-y-z<	Built predecessor-group
+justify	abc-abd-xyz-wyz	1	9	group_built	470	>x-y-z>	Flipped predecessor-group
+justify	abc-abd-xyz-wyz	1	10	concept_mapping_built	470	V:left=>right	Made left=>right slippage
+justify	abc-abd-xyz-wyz	1	11	concept_mapping_built	470	V:predgrp=>succgrp	Made predgrp=>succgrp slippage
+justify	abc-abd-xyz-wyz	1	12	concept_mapping_built	496	V:first=>last	Made first=>last slippage
+justify	abc-abd-xyz-wyz	1	13	concept_mapping_built	496	V:lmost=>rmost	Made lmost=>rmost slippage
+justify	abc-abd-xyz-wyz	1	14	concept_mapping_built	556	V:rmost=>lmost	Made rmost=>lmost slippage
+justify	abc-abd-xyz-wyz	1	15	answer_found	659	[Answer wyz]	Justified answer
+justify	rst-rsu-xyz-wyz	1	1	concept_activation	19	(Identity)	Activation of Identity concept
+justify	rst-rsu-xyz-wyz	1	2	group_built	205	>r-s-t>	Built successor-group
+justify	rst-rsu-xyz-wyz	1	3	group_built	263	>x-y-z>	Built successor-group
+justify	rst-rsu-xyz-wyz	1	4	rule_built	312	[Bottom Rule]	Built rule
+justify	rst-rsu-xyz-wyz	1	5	rule_built	316	[Top Rule]	Built rule
+justify	rst-rsu-xyz-wyz	1	6	clamp_start	318	[Clamp]	Clamped patterns
+justify	rst-rsu-xyz-wyz	1	7	concept_activation	318	(Opposite)	Activation of Opposite concept
+justify	rst-rsu-xyz-wyz	1	8	group_built	428	<r-s-t<	Flipped successor-group
+justify	rst-rsu-xyz-wyz	1	9	concept_mapping_built	428	V:left=>right	Made left=>right slippage
+justify	rst-rsu-xyz-wyz	1	10	concept_mapping_built	428	V:predgrp=>succgrp	Made predgrp=>succgrp slippage
+justify	rst-rsu-xyz-wyz	1	11	concept_mapping_built	441	V:rmost=>lmost	Made rmost=>lmost slippage
+justify	rst-rsu-xyz-wyz	1	12	concept_mapping_built	600	V:lmost=>rmost	Made lmost=>rmost slippage
+justify	rst-rsu-xyz-wyz	1	13	answer_found	704	[Answer wyz]	Justified answer
+justify	abc-cba-mrrjjj-mmmrrj	5	1	concept_activation	112	(Identity)	Activation of Identity concept
+justify	abc-cba-mrrjjj-mmmrrj	5	2	concept_activation	495	(Opposite)	Activation of Opposite concept
+justify	abc-cba-mrrjjj-mmmrrj	5	3	group_built	710	<a-b-c<	Built predecessor-group
+justify	abc-cba-mrrjjj-mmmrrj	5	4	group_built	775	>c-b-a>	Built predecessor-group
+justify	abc-cba-mrrjjj-mmmrrj	5	5	group_built	800	[j]	Built sameness-group
+justify	abc-cba-mrrjjj-mmmrrj	5	6	concept_mapping_built	873	T:left=>right	Made left=>right slippage
+justify	abc-cba-mrrjjj-mmmrrj	5	7	group_built	940	[m]	Built sameness-group
+justify	abc-cba-mrrjjj-mmmrrj	5	8	rule_built	1022	[Top Rule]	Built rule
+justify	abc-cba-mrrjjj-mmmrrj	5	9	group_built	1388	<a-b-c<	Built predecessor-group
+justify	abc-cba-mrrjjj-mmmrrj	5	10	group_built	1402	>3-2-1>	Built predecessor-group
+justify	abc-cba-mrrjjj-mmmrrj	5	11	concept_mapping_built	1493	T:left=>right	Made left=>right slippage
+justify	abc-cba-mrrjjj-mmmrrj	5	12	rule_built	1611	[Top Rule]	Built rule
+justify	abc-cba-mrrjjj-mmmrrj	5	13	rule_built	1682	[Top Rule]	Built rule
+justify	abc-cba-mrrjjj-mmmrrj	5	14	group_built	1898	<1-2-3<	Built predecessor-group
+justify	abc-cba-mrrjjj-mmmrrj	5	15	concept_mapping_built	1921	V:LettCtgy=>Length	Made LettCtgy=>Length slippage
+justify	abc-cba-mrrjjj-mmmrrj	5	16	rule_built	2388	[Bottom Rule]	Built rule
+justify	abc-cba-mrrjjj-mmmrrj	5	17	rule_built	2573	[Bottom Rule]	Built rule
+justify	abc-cba-mrrjjj-mmmrrj	5	18	rule_built	2717	[Bottom Rule]	Built rule
+justify	abc-cba-mrrjjj-mmmrrj	5	19	rule_built	3487	[Top Rule]	Built translated rule
+justify	abc-cba-mrrjjj-mmmrrj	5	20	clamp_start	3487	[Clamp]	Clamped patterns
+justify	abc-cba-mrrjjj-mmmrrj	5	21	group_built	3554	<c-b-a<	Flipped predecessor-group
+justify	abc-cba-mrrjjj-mmmrrj	5	22	concept_mapping_built	3554	T:predgrp=>succgrp	Made predgrp=>succgrp slippage
+justify	abc-cba-mrrjjj-mmmrrj	5	23	group_built	4001	>a-b-c>	Built successor-group
+justify	abc-cba-mrrjjj-mmmrrj	5	24	group_built	4013	>1-2-3>	Flipped predecessor-group
+justify	abc-cba-mrrjjj-mmmrrj	5	25	concept_mapping_built	4013	V:LettCtgy=>Length	Made LettCtgy=>Length slippage
+justify	abc-cba-mrrjjj-mmmrrj	5	26	concept_mapping_built	4061	T:right=>left	Made right=>left slippage
+justify	abc-cba-mrrjjj-mmmrrj	5	27	clamp_start	4776	[Clamp]	Clamped patterns
+justify	abc-cba-mrrjjj-mmmrrj	5	28	group_built	4843	<a-b-c<	Flipped successor-group
+justify	abc-cba-mrrjjj-mmmrrj	5	29	concept_mapping_built	4843	T:predgrp=>succgrp	Made predgrp=>succgrp slippage
+justify	abc-cba-mrrjjj-mmmrrj	5	30	group_built	5049	<a-b-c<	Built predecessor-group
+justify	abc-cba-mrrjjj-mmmrrj	5	31	group_built	5223	<1-2-3<	Flipped successor-group
+justify	abc-cba-mrrjjj-mmmrrj	5	32	concept_mapping_built	5223	V:LettCtgy=>Length	Made LettCtgy=>Length slippage
+justify	abc-cba-mrrjjj-mmmrrj	5	33	concept_mapping_built	5276	T:predgrp=>succgrp	Made predgrp=>succgrp slippage
+justify	abc-cba-mrrjjj-mmmrrj	5	34	concept_mapping_built	5362	V:letter=>group	Made letter=>group slippage
+justify	abc-cba-mrrjjj-mmmrrj	5	35	clamp_start	5637	[Clamp]	Clamped patterns
+justify	abc-cba-mrrjjj-mmmrrj	5	36	concept_mapping_built	5737	V:letter=>group	Made letter=>group slippage
+justify	abc-cba-mrrjjj-mmmrrj	5	37	answer_found	5749	[Answer mmmrrj]	Justified answer
+main	a-b-z	9	1	concept_activation	11	(Identity)	Activation of Identity concept
+main	a-b-z	9	2	rule_built	25	[Top Rule]	Built rule
+main	a-b-z	9	3	snag	30	[Snag]	Snag
+main	a-b-z	9	4	rule_built	40	[Top Rule]	Built rule
+main	a-b-z	9	5	snag	60	[Snag]	Snag
+main	a-b-z	9	6	snag	155	[Snag]	Snag
+main	a-b-z	9	7	rule_built	179	[Top Rule]	Built rule
+main	a-b-z	9	8	snag	180	[Snag]	Snag
+main	a-b-z	9	9	rule_built	188	[Top Rule]	Built rule
+main	a-b-z	9	10	snag	190	[Snag]	Snag
+main	a-b-z	9	11	clamp_start	245	[Clamp]	Clamped patterns
+main	a-b-z	9	12	rule_built	248	[Top Rule]	Built rule
+main	a-b-z	9	13	answer_found	251	[Answer z]	Found new answer
+justify	eqe-qeq-abbbc-aaabccc	4	1	concept_activation	55	(Identity)	Activation of Identity concept
+justify	eqe-qeq-abbbc-aaabccc	4	2	group_built	654	[b]	Built sameness-group
+justify	eqe-qeq-abbbc-aaabccc	4	3	group_built	970	[a]	Built sameness-group
+justify	eqe-qeq-abbbc-aaabccc	4	4	group_built	1550	[a]	Built sameness-group
+justify	eqe-qeq-abbbc-aaabccc	4	5	group_built	1709	[c]	Built sameness-group
+justify	eqe-qeq-abbbc-aaabccc	4	6	rule_built	2500	[Bottom Rule]	Built rule
+justify	eqe-qeq-abbbc-aaabccc	4	7	rule_built	2722	[Bottom Rule]	Built rule
+justify	eqe-qeq-abbbc-aaabccc	4	8	rule_built	2984	[Bottom Rule]	Built rule
+justify	eqe-qeq-abbbc-aaabccc	4	9	rule_built	3111	[Bottom Rule]	Built rule
+justify	eqe-qeq-abbbc-aaabccc	4	10	group_built	3696	>A-B-C>	Built successor-group
+justify	eqe-qeq-abbbc-aaabccc	4	11	rule_built	4354	[Top Rule]	Built rule
+justify	eqe-qeq-abbbc-aaabccc	4	12	rule_built	4467	[Top Rule]	Built rule
+justify	eqe-qeq-abbbc-aaabccc	4	13	clamp_start	4680	[Clamp]	Clamped patterns
+justify	eqe-qeq-abbbc-aaabccc	4	14	clamp_start	5068	[Clamp]	Clamped patterns
+justify	eqe-qeq-abbbc-aaabccc	4	15	clamp_start	5653	[Clamp]	Clamped patterns
+justify	eqe-qeq-abbbc-aaabccc	4	16	clamp_start	6155	[Clamp]	Clamped patterns
+justify	eqe-qeq-abbbc-aaabccc	4	17	clamp_start	6594	[Clamp]	Clamped patterns
+justify	eqe-qeq-abbbc-aaabccc	4	18	rule_built	7140	[Bottom Rule]	Built rule
+justify	eqe-qeq-abbbc-aaabccc	4	19	clamp_start	7201	[Clamp]	Clamped patterns
+justify	eqe-qeq-abbbc-aaabccc	4	20	concept_mapping_built	7287	B:one=>three	Made one=>three slippage
+justify	eqe-qeq-abbbc-aaabccc	4	21	clamp_start	7681	[Clamp]	Clamped patterns
+justify	eqe-qeq-abbbc-aaabccc	4	22	answer_found	8269	[Answer aaabccc]	Settled for unjustified answer

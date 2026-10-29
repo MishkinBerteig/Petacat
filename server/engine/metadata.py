@@ -43,6 +43,18 @@ def default_commentary_templates() -> dict[str, Any]:
         return {}
 
 
+def verbose_messages(meta: Any = None) -> dict[str, str]:
+    """Verbose mode's message catalogue (``seed_data/commentary_templates.json``, ``verbose_messages``).
+
+    The seed data's entries, overlaid with whatever the provider holds -- the database in
+    a served run -- so a database seeded before a message existed still narrates it.
+    """
+    messages = dict(default_commentary_templates().get("verbose_messages") or {})
+    held = getattr(meta, "commentary_templates", None) or {}
+    messages.update(held.get("verbose_messages") or {})
+    return messages
+
+
 @dataclass(frozen=True)
 class SlipnodeSpec:
     name: str

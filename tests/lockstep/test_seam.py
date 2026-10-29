@@ -2,8 +2,9 @@
 
 When the seam was added these numbers were measured on the engine *before* it (with
 the whole-number ``~`` of A-1 already in place) and matched exactly after it.  The
-lockstep pass's port fixes then changed the stream on purpose, so they were
-re-measured on the fixed engine; they now pin an ordinary run's draws against any
+lockstep pass's port fixes then changed the stream on purpose (the last time by the list
+orders of G-Z4: groups, bonds and descriptions newest first, the coderack's bins as
+vectors), so they were re-measured on the fixed engine; they now pin an ordinary run's draws against any
 later change to the seam.  ``test_replay.py`` separately checks that a tracing RNG
 draws exactly what a plain one does.
 """
@@ -20,10 +21,10 @@ pytestmark = pytest.mark.lockstep
 
 #: (problem, seed, cap) -> (codelets run, RNG.call_count, answers, status)
 BEFORE_THE_SEAM = {
-    (("abc", "abd", "xyz"), 1, 3000): (3000, 21659, [], "halted"),
-    (("abc", "abd", "xyz"), 2, 3000): (3000, 23461, [], "halted"),
-    (("abc", "abd", "ijk"), 3, 2000): (391, 3056, ["ijl"], "answer_found"),
-    (("abc", "abd", "mrrjjj"), 4, 2500): (511, 4708, ["mrrkkk"], "answer_found"),
+    (("abc", "abd", "xyz"), 1, 3000): (1235, 8755, ["xyz"], "answer_found"),
+    (("abc", "abd", "xyz"), 2, 3000): (2449, 19428, ["wyz"], "answer_found"),
+    (("abc", "abd", "ijk"), 3, 2000): (757, 7416, ["ijl"], "answer_found"),
+    (("abc", "abd", "mrrjjj"), 4, 2500): (1063, 10309, ["mrrkkk"], "answer_found"),
 }
 
 

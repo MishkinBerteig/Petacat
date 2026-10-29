@@ -22,6 +22,7 @@ from server.engine.commentary import CommentaryLog, CommentaryWriter, emit_new_p
 from server.engine.codelet_dsl.interpreter import CodeletInterpreter, CodeletRegistry
 from server.engine.access import AccessRecorder
 from server.engine.coderack import Codelet, Coderack
+from server.engine.eeg import EEG
 from server.engine.ids import IdAllocator, use_allocator
 from server.engine.memory import EpisodicMemory
 from server.engine.metadata import MetadataProvider, PostingRuleSpec
@@ -37,6 +38,7 @@ from server.engine.sink import STRUCTURE_BUILT, NullSink, RunSink
 from server.engine.slipnet import Slipnet
 from server.engine.staleness import StaleView
 from server.engine.temperature import Temperature
+from server.engine.verbose import VerboseLog
 from server.engine.themes import Themespace
 from server.engine.trace import (
     CONCEPT_ACTIVATION,
@@ -149,6 +151,12 @@ class EngineContext:
         #: is attached (``server/engine/sink.py``).
         self.sink: RunSink = sink if sink is not None else NullSink()
         self.codelet_count: int = 0
+        #: The type of the codelet most recently started -- ``set-last-codelet-type``
+        #: (``coderack.ss:222``), which the coderack window marks.  ``None`` at the
+        #: start of a run (``clear``, ``coderack-graphics.ss:230``).
+        self.last_codelet_type: str | None = None
+        #: The EEG recorder (``eeg-graphics.ss``); see :mod:`server.engine.eeg`.
+        self.eeg = EEG()
         #: Has this run's terminal outcome already been claimed?  Free-running lets a
         #: codelet finish after another has ended the run, and ``report_answer`` would
         #: otherwise write a second ``AnswerDescription`` into a memory that outlives
@@ -157,6 +165,15 @@ class EngineContext:
         self.run_ended: bool = False
         self.justify_mode: bool = False
         self.self_watching_enabled: bool = True
+        #: Verbose mode (``%verbose%``, ``gui.ss:790-794``): the narration of what the
+        #: codelets do.  ``verbose`` is what every guard reads; it is the Options menu's
+        #: switch (``verbose_mode``) or'd with step mode's (``verbose_step``), as
+        #: ``set-verbose-step-mode`` does.  Off, the engine pays one attribute read per
+        #: message site and builds nothing.  See ``server/engine/verbose.py``.
+        self.verbose: bool = False
+        self.verbose_mode: bool = False
+        self.verbose_step: bool = False
+        self.verbose_log: VerboseLog = VerboseLog()
         self.spreading_activation_threshold: int = 100
 
         #: The Workspace objects the most recent rule application failed on — the
@@ -172,6 +189,10 @@ class EngineContext:
         #: type, which is what the snag's own explanation and the memory's
         #: snag-equality test are written against.  Petacat hard-coded ``"change"``.
         self.last_failure_kind: str = "change"
+        #: The whole ``<failure-result>`` (``answers.ss:1145-1150``) of that rule
+        #: application as plain data -- ``("CHANGE", object, transform)`` and so on --
+        #: which the snag's explanation (``trace.ss:1097``) is written from.
+        self.last_failure: tuple | None = None
 
         #: The snag response's restart (``answers.ss:1189-1191``): empty the Coderack,
         #: post the initial codelets afresh, run one full update.  A callable rather
@@ -235,6 +256,17 @@ class EngineContext:
         codelet stream is bound with :meth:`use_codelet_rng` instead."""
         self._rng = value
 
+    def set_verbose(self, mode: bool | None = None, step: bool | None = None) -> None:
+        """Switch Verbose mode (``mode``) or Verbose step mode (``step``) on or off.
+
+        ``gui.ss:790-794``: the effective switch is the menu item's or step mode's.
+        """
+        if mode is not None:
+            self.verbose_mode = bool(mode)
+        if step is not None:
+            self.verbose_step = bool(step)
+        self.verbose = self.verbose_mode or self.verbose_step
+
     @contextmanager
     def use_codelet_rng(self, rng: RNG) -> Iterator[RNG]:
         """Bind *rng* as this thread's generator for the duration of one codelet."""
@@ -282,6 +314,9 @@ class EngineRunner:
 
     def __init__(self, meta: MetadataProvider) -> None:
         self.meta = meta
+        #: Verbose mode is the program's, not one run's (``%verbose%`` is a global that
+        #: ``init-mcat`` leaves alone), so it outlives the context a reset replaces.
+        self.verbose_mode: bool = False
         self.ctx: EngineContext | None = None
         self.status: str = STATUS_INITIALIZED
         self._answers: list[str] = []
@@ -429,6 +464,16 @@ class EngineRunner:
             ids=ids,
             sink=sink,
         )
+        # A clamp announces itself and its undoing in the commentary (``trace.ss``).
+        trace.commentary = commentary
+        trace.commentary_templates = self.meta.commentary_templates
+        trace.ctx = self.ctx
+
+        # Verbose mode carries over from the previous run; the log is this run's own.
+        self.ctx.verbose_log.bind(self.meta)
+        self.ctx.verbose_log.slipnet = slipnet
+        workspace.verbose_ctx = self.ctx
+        self.ctx.set_verbose(mode=self.verbose_mode)
 
         # Set modes
         self.ctx.justify_mode = answer is not None
@@ -529,7 +574,7 @@ class EngineRunner:
                 if obj_cat_node and letter_obj_node:
                     desc = Description(letter, obj_cat_node, letter_obj_node)
                     desc.proposal_level = desc.BUILT
-                    letter.descriptions.append(desc)
+                    letter.descriptions.insert(0, desc)
                     # ``run.ss:227-232`` activates *every* descriptor of every
                     # initial description, which includes ``plato-letter`` — the
                     # descriptor of the object-category description.  Leaving it
@@ -542,7 +587,7 @@ class EngineRunner:
                 if letter_cat_node and letter.letter_category:
                     desc = Description(letter, letter_cat_node, letter.letter_category)
                     desc.proposal_level = desc.BUILT
-                    letter.descriptions.append(desc)
+                    letter.descriptions.insert(0, desc)
                     # Activate the descriptor
                     letter.letter_category.activation = max_act
 
@@ -552,23 +597,23 @@ class EngineRunner:
                     if single_node:
                         desc = Description(letter, str_pos_node, single_node)
                         desc.proposal_level = desc.BUILT
-                        letter.descriptions.append(desc)
+                        letter.descriptions.insert(0, desc)
                         single_node.activation = max_act
                 elif str_pos_node:
                     if letter.left_string_pos == 0 and leftmost_node:
                         desc = Description(letter, str_pos_node, leftmost_node)
                         desc.proposal_level = desc.BUILT
-                        letter.descriptions.append(desc)
+                        letter.descriptions.insert(0, desc)
                         leftmost_node.activation = max_act
                     if letter.right_string_pos == len(letters) - 1 and rightmost_node:
                         desc = Description(letter, str_pos_node, rightmost_node)
                         desc.proposal_level = desc.BUILT
-                        letter.descriptions.append(desc)
+                        letter.descriptions.insert(0, desc)
                         rightmost_node.activation = max_act
                     if len(letters) % 2 == 1 and letter.left_string_pos == len(letters) // 2 and middle_node:
                         desc = Description(letter, str_pos_node, middle_node)
                         desc.proposal_level = desc.BUILT
-                        letter.descriptions.append(desc)
+                        letter.descriptions.insert(0, desc)
                         middle_node.activation = max_act
 
     @staticmethod
@@ -815,6 +860,8 @@ class EngineRunner:
         # ``run.ss:151-154``: the fixed-time initial unclamp, checked right after the
         # codelet and before the rack-empty test below.  Off by default.
         if self._initial_unclamp_time and ctx.codelet_count == self._initial_unclamp_time:
+            if ctx.verbose:
+                ctx.verbose_log.say("unclamping-initial-slipnodes")
             self._unclamp_initial_slipnodes(ctx.slipnet)
 
         self._emit_new_trace_events(ctx)
@@ -915,6 +962,7 @@ class EngineRunner:
         it against the current EngineContext. If no program exists (empty
         execute_body), the codelet is a no-op.
         """
+        self.ctx.last_codelet_type = codelet.codelet_type
         compiled = self._registry.get_compiled(codelet.codelet_type)
         if compiled.is_empty:
             return
@@ -922,6 +970,8 @@ class EngineRunner:
         # Trace seam: the unit is this codelet, and an update cycle run from inside it
         # (answer report, snag) carries its number.  A no-op on an ordinary RNG.
         ctx.rng.trace_unit(ctx.codelet_count + 1, "codelet", codelet.codelet_type)
+        if ctx.verbose:
+            ctx.verbose_log.banner(codelet.codelet_type)
         self._in_codelet = True
         try:
             self._interpreter.execute(compiled, ctx, **codelet.arguments)
@@ -1092,6 +1142,14 @@ class EngineRunner:
         self._post_thematic_codelets(batch)
         rng.trace_unit(c, "update", "post-deferred", u)
         ctx.coderack.post_deferred(batch, ctx.codelet_count, ctx.rng)
+
+        # ``run.ss:320-322``: the EEG samples once per update cycle, after the
+        # temperature has moved and the new codelets are posted.
+        ctx.eeg.record(
+            ctx.workspace.get_activity(ctx.codelet_count, ctx.meta),
+            ctx.temperature.value,
+            ctx.codelet_count,
+        )
 
         # End of the cycle: the snapshot (lockstep spec §8), then back to the codelet
         # this cycle ran inside, if any.

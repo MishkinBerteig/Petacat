@@ -158,7 +158,7 @@ def test_workspace_rules_and_bridges_are_consed_newest_first():
     assert ws.top_rules == [r2, r1]
 
 
-# ---- C-1: the most recent clamp (jootsing.ss:144, trace.ss:201) -----------------------
+# ---- C-1: the most recent clamp, first of a newest-first list (jootsing.ss:144, trace.ss:201) ---
 
 
 def test_joots_from_justify_clamps_reads_the_most_recent_clamp():
@@ -179,7 +179,7 @@ def test_joots_from_justify_clamps_reads_the_most_recent_clamp():
         return c
 
     joots_from_justify_clamps(
-        [clamp("old"), clamp("new")], None, 0, None, None, None, None)
+        [clamp("new"), clamp("old")], None, 0, None, None, None, None)
     assert set(seen) == {"new"}
 
 

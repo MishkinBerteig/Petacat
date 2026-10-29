@@ -11,6 +11,8 @@ Scheme source: justify.ss
 
 from __future__ import annotations
 
+from server.engine.verbose import round_to_100ths
+
 import logging
 from typing import TYPE_CHECKING, Any
 
@@ -51,7 +53,12 @@ class JustificationResult:
         unjustified_slippages: list[Any] | None = None,
         action: str = "",
         clamp_event: ClampEvent | None = None,
+        translation: Any = None,
     ) -> None:
+        #: The ``TranslationResult`` of the translation this justification rests on
+        #: (``justify.ss:46-50``): its slippage log, supporting vertical bridges,
+        #: vertical-mapping groups and the reference objects of both rules.
+        self.translation = translation
         self.justified = justified
         self.top_rule = top_rule
         self.bottom_rule = bottom_rule
@@ -89,6 +96,7 @@ def attempt_justification(
     temperature: float = 50.0,
     coderack: Any = None,
     temperature_control: Any = None,
+    vlog: Any = None,
 ) -> JustificationResult:
     """Attempt to justify the answer by finding matching rules.
 
@@ -101,6 +109,8 @@ def attempt_justification(
     # Step 1 -- Gather all supported rules and pick one by strength
     all_supported = _get_all_supported_rules(workspace)
     if not all_supported:
+        if vlog is not None:
+            vlog.say("could-not-find-supported-rule")
         return JustificationResult(
             justified=False, explanation="No supported rules found"
         )
@@ -111,6 +121,9 @@ def attempt_justification(
     # ``workspace-structures.ss:40``), not its raw quality (G-J1).
     weights = [r.strength for r in all_supported]
     chosen_rule: Rule = rng.weighted_pick(all_supported, weights)
+    if vlog is not None:
+        vlog.say("chose-rule")
+        vlog.print_object(chosen_rule)
 
     rule_type = chosen_rule.rule_type  # "top" or "bottom"
     other_type_top = rule_type != "top"
@@ -125,8 +138,13 @@ def attempt_justification(
         chosen_rule, workspace, slipnet, rng=rng, meta=meta
     )
 
+    if translation_result is None and vlog is not None:
+        vlog.say("could-not-translate-chosen-rule-justify")
     if translation_result is not None:
         translated_rule, slippages, supporting_vbridges = translation_result
+        if vlog is not None:
+            vlog.say("chosen-rule-translated")
+            vlog.print_object(translated_rule, level="unscored")
 
         # ``justify.ss:50-51``: ref-objs1 is always the *initial*-string side and
         # ref-objs2 the target side, whichever rule was chosen.  ref-objs1 is what the
@@ -145,6 +163,9 @@ def attempt_justification(
         matching_rule = _find_matching_rule(other_rules, translated_rule)
 
         if matching_rule is not None:
+            if vlog is not None:
+                vlog.say("found-matching-rule")
+                vlog.print_object(matching_rule)
             # Assign rule1 = top, rule2 = bottom regardless of direction
             rule1, rule2 = _order_rules(chosen_rule, matching_rule, rule_type)
 
@@ -152,6 +173,8 @@ def attempt_justification(
             if memory is not None and _answer_already_found(
                 memory, workspace, rule1, rule2
             ):
+                if vlog is not None:
+                    vlog.say("already-found-answer")
                 return JustificationResult(
                     justified=False,
                     explanation="Already found this answer",
@@ -175,9 +198,12 @@ def attempt_justification(
                     explanation="Rules match via translation",
                     supporting_vertical_bridges=supporting_vbridges,
                     slippage_log=slippages,
+                    translation=translated_rule.translation,
                 )
 
             # Matching rule exists but is unsupported -- clamp to force it
+            if vlog is not None:
+                vlog.say("matching-rule-not-supported")
             return _attempt_clamp_rules(
                 [chosen_rule, matching_rule],
                 trace,
@@ -191,7 +217,11 @@ def attempt_justification(
                 temperature_control=temperature_control,
                 concept_patterns=[_get_concept_pattern_dict(matching_rule)],
                 explanation="Matching rule unsupported, clamping",
+                vlog=vlog,
             )
+
+        if vlog is not None:
+            vlog.say("could-not-find-matching-rule")
 
         # Step 3b -- No matching rule, but translated rule works.
         #
@@ -203,6 +233,8 @@ def attempt_justification(
         if _translated_rule_works(
             translated_rule, workspace, slipnet, rule_type
         ) and ref_objects1:
+            if vlog is not None:
+                vlog.say("translated-rule-works")
             rule1, rule2 = _order_rules(
                 chosen_rule, translated_rule, rule_type
             )
@@ -210,6 +242,8 @@ def attempt_justification(
             if memory is not None and _answer_already_found(
                 memory, workspace, rule1, rule2
             ):
+                if vlog is not None:
+                    vlog.say("already-found-answer")
                 return JustificationResult(
                     justified=False,
                     explanation="Already found this answer",
@@ -237,8 +271,11 @@ def attempt_justification(
                     explanation="Translated rule works",
                     supporting_vertical_bridges=supporting_vbridges,
                     slippage_log=slippages,
+                    translation=translated_rule.translation,
                 )
 
+            if vlog is not None:
+                vlog.say("translated-rule-not-supported")
             return _attempt_clamp_rules(
                 [chosen_rule, translated_rule],
                 trace,
@@ -252,11 +289,18 @@ def attempt_justification(
                 temperature_control=temperature_control,
                 concept_patterns=[_get_concept_pattern_dict(translated_rule)],
                 explanation="Translated rule unsupported, clamping",
+                vlog=vlog,
             )
+        if vlog is not None:
+            vlog.say("translated-rule-does-not-work")
 
     # Step 4 -- Unification section
     #   Attempt to unify chosen_rule with some other existing rule
+    if vlog is not None:
+        vlog.say("attempting-to-unify")
     if not other_rules:
+        if vlog is not None:
+            vlog.say("no-other-rules")
         return JustificationResult(
             justified=False,
             explanation="No other rules exist for unification",
@@ -271,6 +315,8 @@ def attempt_justification(
         codelet_count=codelet_count,
         grace_period=meta.get_param("grace_period", 100),
     ):
+        if vlog is not None:
+            vlog.say("permission-to-clamp-patterns-denied")
         return JustificationResult(
             justified=False,
             explanation="Permission to clamp denied for unification",
@@ -284,16 +330,23 @@ def attempt_justification(
     strength = chosen_rule.strength
     other_weights = [100.0 - abs(strength - r.strength) for r in other_rules]
     other_rule: Rule = rng.weighted_pick(other_rules, other_weights)
+    if vlog is not None:
+        vlog.say("chose-rule-for-unification")
+        vlog.print_object(other_rule)
 
     unifying_pattern = unify_rules(chosen_rule, other_rule, slipnet)
     if unifying_pattern is None:
+        if vlog is not None:
+            vlog.say("could-not-unify-rules")
         return JustificationResult(
             justified=False,
             explanation="Could not unify rules",
         )
+    if vlog is not None:
+        vlog.say("rules-can-be-unified")
 
     vertical_pattern = get_vertical_theme_pattern_to_clamp(
-        unifying_pattern, slipnet, rng=rng
+        unifying_pattern, slipnet, rng=rng, vlog=vlog
     )
     return _attempt_clamp_rules(
         [chosen_rule, other_rule],
@@ -638,6 +691,7 @@ def get_vertical_theme_pattern_to_clamp(
     slipnet: Slipnet | None = None,
     *,
     rng: RNG | None = None,
+    vlog: Any = None,
 ) -> dict[str, Any]:
     """Compute the vertical theme pattern to clamp from a unifying pattern.
 
@@ -665,14 +719,25 @@ def get_vertical_theme_pattern_to_clamp(
 
     # Compute retention probability for each entry and filter
     final_entries: list[tuple[str, str | None]] = []
+    retention: list[float] = []
     for entry in pattern_entries:
         if not isinstance(entry, tuple) or len(entry) < 2:
             continue
         dim, rel = entry[0], entry[1]
         prob = _retention_probability(entry, pattern_entries, slipnet)
+        retention.append(prob)
         retained = rng.prob(prob) if rng is not None else prob >= 0.5
         if retained:
             final_entries.append((dim, rel))
+    if vlog is not None:
+        # justify.ss:301-309 -- "Final pattern:" is followed by "None." whenever the
+        # final pattern *exists*, which is always: the Scheme's test is inverted.
+        vlog.say("unification-banner")
+        vlog.say("rule-unification-possible")
+        vlog.say("retention-probabilities", [round_to_100ths(p) for p in retention])
+        vlog.say("final-pattern")
+        vlog.say("final-pattern-none")
+        vlog.say("unification-banner")
 
     # ``justify.ss:297-299`` nests ``add-direction-entry`` *around*
     # ``replace-bond-category-entry``: the bond-category swap happens first.
@@ -805,7 +870,7 @@ def _translate_rule(
 ) -> tuple[Rule, list[Any], list[Any]] | None:
     """Translate a rule using vertical bridge slippages.
 
-    Returns (translated_rule, slippages, supporting_vertical_bridges) or None.
+    Returns (translated_rule, slippage_log, supporting_vertical_bridges) or None.
 
     ``rng`` is what lets a translation drag an auxiliary slippage along on a coattail
     (``slipnet.py:446-447``): ``apply_slippages`` skips coattails entirely without it,
@@ -814,14 +879,6 @@ def _translate_rule(
     translation is exactly as free as an answer-finding one; passing no RNG made it
     strictly more literal.
     """
-    # Gather slippages from vertical bridges
-    slippages: list[Any] = []
-    supporting_vbridges: list[Any] = []
-    for bridge in workspace.vertical_bridges:
-        if bridge.is_built:
-            slippages.extend(bridge.concept_mappings)
-            supporting_vbridges.append(bridge)
-
     # No early exit when there are no slippages: ``translate`` (``answers.ss:1281-1342``)
     # fails only on a missing reference object or an invalid clause.  A clause whose
     # objects carry no vertical bridge passes through unchanged
@@ -838,7 +895,11 @@ def _translate_rule(
     )
     if translated is None:
         return None
-    return (translated, slippages, supporting_vbridges)
+    # ``(list translated-rule supporting-vertical-bridges slippage-log ...)``
+    # (answers.ss:1334-1340): the slippages are the ones the translation *applied*, and
+    # the bridges the ones that gave rise to them or join the rules' reference objects.
+    translation = translated.translation
+    return (translated, translation.slippage_log, translation.supporting_vertical_bridges)
 
 
 def _reference_objects(
@@ -1006,6 +1067,7 @@ def _attempt_clamp_rules(
     temperature: float = 50.0,
     coderack: Any = None,
     temperature_control: Any = None,
+    vlog: Any = None,
 ) -> JustificationResult:
     """Attempt to clamp rules and return a JustificationResult."""
     if trace is None or themespace is None or slipnet is None:
@@ -1013,6 +1075,14 @@ def _attempt_clamp_rules(
             justified=False,
             explanation="Missing components for clamping",
         )
+    if vlog is not None and explanation != "Clamping rules":
+        # justify.ss:77-85, 122-130: both clamp branches say this much first.
+        vlog.say("attempting-to-clamp-rules")
+        if trace.permission_to_clamp(
+            codelet_count=codelet_count,
+            grace_period=meta.get_param("grace_period", 100),
+        ):
+            vlog.say("permission-granted-clamping-rules")
 
     clamp_event = clamp_rules(
         rules,

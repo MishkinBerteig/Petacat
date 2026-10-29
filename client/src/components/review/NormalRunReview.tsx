@@ -169,7 +169,7 @@ function ComparisonSummary({ comparison }: { comparison: RunComparison }) {
         <Section title="Rules the Run ended holding">
           <ul style={{ margin: 0, paddingLeft: 16, fontSize: 11 }}>
             {[...comparison.rules.top, ...comparison.rules.bottom].map((r: any, i) => (
-              <li key={i} style={{ fontFamily: 'var(--font-mono)' }}>
+              <li key={i} style={{ fontFamily: 'var(--font-mono)', whiteSpace: 'pre-line' }}>
                 <span className="text-muted">{r.type}</span> {r.english}{' '}
                 <span className="text-muted">(q={r.quality})</span>
               </li>

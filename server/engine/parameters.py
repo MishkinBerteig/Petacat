@@ -38,7 +38,7 @@ the difference matters more than the count:
   not yet.  All of them are wired.
 * **Read by another layer.**  ``clampable_codelet_patterns`` is consulted by the
   control API, not by the engine; a run reads it zero times.
-* **Read by nothing at all.**  ``max_temperature``, ``maximum_rule_line_length``,
+* **Read by nothing at all.**  ``max_temperature``,
   ``garbage_collect_cycles``, ``step_cycles``, ``eliza_mode_default``,
   ``justify_mode_default`` and the display timings.  Some are Scheme-era, some are
   features the port does not have, some are overtaken by the run request.

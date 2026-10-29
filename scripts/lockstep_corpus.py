@@ -17,6 +17,10 @@ mode's ``off`` (``python``, ``numpy``, ``mlx``, ``mlx-cpu``), writing under
 ``<out-dir>/numeric-NAME``.  It is checked against the same ratchet, since the backend
 is meant to change nothing, and it never updates one.
 
+``--verbose`` replays with Verbose mode on (``<out-dir>/verbose``).  The narration only
+reads, so the results must equal the verbose-off ones; it is checked against the same
+ratchet and never updates one.
+
 Assumed CLI contract: ``run_trace replay --metacat PATH --out PATH``.  Use
 ``--replay-cmd`` to substitute another command template (``{metacat}``, ``{out}`` -- the
 Petacat trace's path -- and ``{outdir}``, its directory
@@ -44,6 +48,7 @@ DEFAULT_OUT = REPO / "tests" / "lockstep" / "replays"
 DEFAULT_CMD = ".venv/bin/python -m tests.lockstep.run_trace replay --metacat {metacat} --out {outdir}"
 #: Read by ``tests/lockstep/faithful.py`` (the same name is defined there).
 NUMERIC_BACKEND_ENV = "PETACAT_LOCKSTEP_NUMERIC_BACKEND"
+VERBOSE_ENV = "PETACAT_LOCKSTEP_VERBOSE"
 EPS = 1e-12
 
 
@@ -90,11 +95,13 @@ def _header(path: Path) -> dict:
 
 
 def replay(metacat: Path, out: Path, cmd_template: str,
-           numeric_backend: str | None = None) -> tuple[bool, str]:
+           numeric_backend: str | None = None, verbose: bool = False) -> tuple[bool, str]:
     out.parent.mkdir(parents=True, exist_ok=True)
     cmd = shlex.split(cmd_template.format(metacat=shlex.quote(str(metacat)), out=shlex.quote(str(out)),
                                            outdir=shlex.quote(str(out.parent))))
     env = {**os.environ, NUMERIC_BACKEND_ENV: numeric_backend} if numeric_backend else None
+    if verbose:
+        env = {**(env or os.environ), VERBOSE_ENV: "1"}
     r = subprocess.run(cmd, cwd=REPO, capture_output=True, text=True, env=env)
     return r.returncode == 0 or out.exists(), (r.stderr or r.stdout)[-400:]
 
@@ -173,6 +180,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--ratchet", default=None)
     ap.add_argument("--update-ratchet", action="store_true")
     ap.add_argument("--check-ratchet", action="store_true")
+    ap.add_argument("--verbose", action="store_true",
+                    help="replay with Verbose mode on; the results must equal the "
+                         "verbose-off replay (the ratchet checks it)")
     ap.add_argument("--numeric-backend", choices=["python", "numpy", "mlx", "mlx-cpu"],
                     help="replay with this numeric backend instead of faithful mode's 'off'; "
                          "checked against the same ratchet, never written to it")
@@ -180,6 +190,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.episodes and args.justify:
         ap.error("--episodes and --justify are separate corpora; run them one at a time")
+    if args.verbose and args.update_ratchet:
+        ap.error("the ratchet records the reference path (Verbose mode off); "
+                 "use --check-ratchet with --verbose")
     if args.numeric_backend and args.update_ratchet:
         ap.error("the ratchet records the reference path (backend off); "
                  "use --check-ratchet with --numeric-backend")
@@ -194,6 +207,8 @@ def main(argv: list[str] | None = None) -> int:
     out_dir = Path(args.out_dir)
     if args.numeric_backend:
         out_dir = out_dir / f"numeric-{args.numeric_backend}"
+    if args.verbose:
+        out_dir = out_dir / "verbose"
     registry = ct.Registry.load(args.registry)
 
     # A unit of work is one replay command: one trace, or (episodes) all runs of an episode.
@@ -207,7 +222,7 @@ def main(argv: list[str] | None = None) -> int:
         first = group[0]
         if not args.no_replay:
             ok, msg = replay(first[2], petacat_path(out_dir, first[0], first[1]), args.replay_cmd,
-                             args.numeric_backend)
+                             args.numeric_backend, args.verbose)
             if not ok:
                 return [(it, None, f"replay failed: {msg}") for it in group]
         for item in group:

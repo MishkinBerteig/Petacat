@@ -187,6 +187,44 @@ describe('MemoryView — how the session memory was read', () => {
 // this request or the panel would always speak in one of them.
 // ---------------------------------------------------------------------------
 
+describe('MemoryView — what a snag shows', () => {
+  const snag = {
+    snag_id: 1,
+    problem: ['abc', 'abd', 'xyz'],
+    codelet_count: 273,
+    temperature: 100,
+    description: 'Change letter-category of rightmost letter to successor',
+    translated_rule_description: "Change letter-category of letter `z' to its successor",
+    explanation:
+      'changing the letter-category of the letter z to its successor is not possible in xyz',
+  }
+
+  it("shows Metacat's explanation, the rule, and the translated rule that failed", () => {
+    // `get-explanation`, `get-translated-rule-phrases` (`memory.ss:331-332`): the sentence
+    // is shown as stored, not rewritten here.
+    useRunStore.setState({ memory: memory({ scope: 'shared', snags: [snag] }) })
+
+    render(<MemoryView />)
+    expect(screen.getByTestId('snag-explanation').textContent).toBe(
+      'Explanation: changing the letter-category of the letter z to its successor is not possible in xyz',
+    )
+    expect(screen.getByText('Change letter-category of rightmost letter to successor')).toBeTruthy()
+    expect(screen.getByTestId('snag-translated-rule').textContent).toContain(
+      "Change letter-category of letter `z' to its successor",
+    )
+  })
+
+  it('still renders a snag recorded before the explanation was stored', () => {
+    const { explanation, translated_rule_description, ...old } = snag
+    useRunStore.setState({ memory: memory({ scope: 'shared', snags: [old] }) })
+
+    render(<MemoryView />)
+    expect(screen.queryByTestId('snag-explanation')).toBeNull()
+    expect(screen.queryByTestId('snag-translated-rule')).toBeNull()
+    expect(screen.getByText('Change letter-category of rightmost letter to successor')).toBeTruthy()
+  })
+})
+
 describe('MemoryView — explaining one answer', () => {
   it('asks for the explanation in the voice the Eliza switch is set to', async () => {
     handler = async (url) => {

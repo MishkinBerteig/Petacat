@@ -1,0 +1,28 @@
+# The problems and seeds behind tests/seed_unit/rule_english_metacat.tsv.
+# One entry per line: <initial> <modified> <target> <first-last seed>.  Read by
+# tests/lockstep/metacat/record_rule_english.py (--problems) and scripts/compare_rule_english.py.
+# The first nineteen are the problems of the lockstep development corpus (seeds 1-10, the
+# traces tests/lockstep/metacat/record.py records); the last four widen it.
+a b z 1-10
+aabb cc aabb 1-10
+aabc aabd ijkk 1-10
+ab c ab 1-10
+abc aabbcc kkjjii 1-10
+abc abd glz 1-10
+abc abd ijk 1-10
+abc abd mrrjjj 1-10
+abc abd xyz 1-10
+abc cba mrrjjj 1-10
+abc d abc 1-10
+bc d bc 1-10
+eeqee qeeq xxixx 1-10
+eqe qeq abbba 1-10
+eqe qeq abbbc 1-10
+rst rsu xyz 1-10
+xqc xqd mrrjjj 1-10
+xy z xy 1-10
+zy x zy 1-10
+wxyz vxyz abcd 1-10
+abc abd iijjkk 1-10
+abc abd xyz 11-30
+abc abd mrrjjj 11-30

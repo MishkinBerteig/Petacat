@@ -877,6 +877,50 @@ async def test_a_comparison_carries_its_abstractness_and_its_verdict(app_client)
     assert "".join(body["commentary"]["segments"]) == body["commentary"]["text"]
 
 
+@pytest.mark.asyncio
+async def test_comparing_answers_is_said_in_the_runs_commentary(app_client):
+    """Selecting a second answer says "Let's see..." and then the comparison
+    (``memory-graphics.ss:56-64``, ``answers.ss:428-431``)."""
+    from server.services.run_service import _global_memory
+
+    run = await app_client.post(
+        "/api/runs",
+        json={"initial": "abc", "modified": "abd", "target": "xyz", "seed": 0},
+    )
+    run_id = run.json()["run_id"]
+    if len(_global_memory.answers) < 2:
+        for target in ("xyz", "mrrjjj"):
+            create = await app_client.post(
+                "/api/runs",
+                json={"initial": "abc", "modified": "abd", "target": target, "seed": 0},
+            )
+            await app_client.post(
+                f"/api/runs/{create.json()['run_id']}/run", json={"max_steps": 4000}
+            )
+    answers = (await app_client.get("/api/memory")).json()["answers"]
+    if len(answers) < 2:
+        pytest.skip("two stored answers are needed to compare")
+
+    resp = await app_client.post(
+        "/api/memory/compare",
+        json={
+            "answer_id_1": answers[0]["answer_id"],
+            "answer_id_2": answers[1]["answer_id"],
+            "run_id": run_id,
+        },
+    )
+
+    assert resp.status_code == 200, resp.text
+    text = resp.json()["commentary"]["text"]
+    for eliza_mode, intro in (("true", "Let's see..."), ("false", "Comparing answers...")):
+        said = (
+            await app_client.get(
+                f"/api/runs/{run_id}/commentary", params={"eliza_mode": eliza_mode}
+            )
+        ).json()["commentary"]
+        assert said.endswith(f"{intro}\n\n{text}")
+
+
 # --- WS1: Enum table CRUD ---
 
 @pytest.mark.asyncio

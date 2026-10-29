@@ -37,6 +37,17 @@ FAITHFUL_PARAMETERS: dict[str, Any] = {"initial_clamp_fixed_time": True}
 NUMERIC_BACKEND_ENV = "PETACAT_LOCKSTEP_NUMERIC_BACKEND"
 
 
+#: When set, a faithful run has Verbose mode on, so every message site runs.  Narration
+#: reads and never decides, so the trace must come out byte for byte the same as with it
+#: off; ``scripts/lockstep_corpus.py --verbose`` replays the corpus this way and the
+#: ratchet checks it.
+VERBOSE_ENV = "PETACAT_LOCKSTEP_VERBOSE"
+
+
+def verbose_mode() -> bool:
+    return bool(os.environ.get(VERBOSE_ENV))
+
+
 def numeric_backend() -> str:
     return os.environ.get(NUMERIC_BACKEND_ENV) or "off"
 
@@ -128,6 +139,7 @@ def run_faithful(problem: tuple[str, str, str], seed: int, cap: int, rng: Any,
     )
 
     runner = EngineRunner(_metadata())
+    runner.verbose_mode = verbose_mode()
     with use_backend(numeric_backend()):
         try:
             runner.init_mcat(

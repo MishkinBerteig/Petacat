@@ -17,7 +17,7 @@ import threading
 
 import pytest
 
-from server.engine.coderack_shards import WorkerShardedCoderack
+from server.engine.coderack_shards import LockedCoderack
 from server.engine.free_running import FreeRunningEngine, run_free
 from server.engine.metadata import MetadataProvider
 from server.engine.runner import EngineRunner
@@ -176,11 +176,11 @@ def test_identifiers_are_unique_across_workers(meta):
     assert event_numbers == sorted(event_numbers)
 
 
-def test_the_sharded_rack_is_installed_and_drains(meta):
+def test_the_locked_rack_is_installed_and_drains(meta):
     runner = _prepared(meta)
     engine = FreeRunningEngine(runner, workers=4)
     engine.prepare()
-    assert isinstance(runner.ctx.coderack, WorkerShardedCoderack)
+    assert isinstance(runner.ctx.coderack, LockedCoderack)
     # The opening codelets were carried over rather than discarded.
     assert runner.ctx.coderack.total_count > 0
 
@@ -323,13 +323,13 @@ def test_the_density_walk_draws_from_the_codelets_own_stream(meta):
 def test_one_worker_still_uses_the_parallel_path(meta):
     """A one-worker free run is not the serial loop, and should not be mistaken for it.
 
-    It exercises the same sharded rack, the same commit lock and the same per-codelet
+    It exercises the same locked rack, the same commit lock and the same per-codelet
     streams, which is what makes it the right control for the multi-worker numbers.
     """
     runner = _prepared(meta)
     result = run_free(runner, workers=1, max_steps=600)
     assert result.workers == 1
-    assert isinstance(runner.ctx.coderack, WorkerShardedCoderack)
+    assert isinstance(runner.ctx.coderack, LockedCoderack)
     assert runner.ctx.commit_lock is not None
     assert result.codelet_count > 0
 
@@ -343,7 +343,7 @@ def test_the_serial_loop_is_untouched_by_free_running(meta):
     runner = _prepared(meta)
     runner.run_mcat(max_steps=300)
     assert runner.ctx.commit_lock is None
-    assert not isinstance(runner.ctx.coderack, WorkerShardedCoderack)
+    assert not isinstance(runner.ctx.coderack, LockedCoderack)
     assert runner.ctx.access is None
 
 
@@ -397,3 +397,207 @@ def test_a_group_and_a_letter_never_share_an_identifier(meta):
         if len(ids) != len(set(ids)):
             collisions.append(seed)
     assert collisions == []
+
+
+# --- what a snag deletes, and what runs whole -------------------------------
+
+
+def test_the_answer_and_self_watching_codelets_run_under_the_commit_lock(meta):
+    """They clamp, snag, give up and report, which rewrites what the update cycle owns.
+
+    Run beside the scheduled update, a jootser that gave up ran a second update over the
+    same Slipnet session (on MLX, an abort), and a clamp could land between the update
+    reading the Slipnet and writing it back.
+    """
+    from server.engine.free_running import SERIALISED_FAMILIES
+
+    runner = _prepared(meta, seed=3)
+    engine = FreeRunningEngine(runner, workers=4)
+    engine.prepare()
+    lock = runner.ctx.commit_lock
+    execute = runner._execute_codelet
+    held: dict[str, set[bool]] = {}
+
+    def recording(codelet):
+        held.setdefault(codelet.codelet_type, set()).add(lock._is_owned())
+        return execute(codelet)
+
+    runner._execute_codelet = recording
+    engine.run(3000)
+
+    families = {name: spec.family for name, spec in meta.codelet_specs.items()}
+    serialised = {t: owned for t, owned in held.items() if families[t] in SERIALISED_FAMILIES}
+    assert serialised, "no answer or self-watching codelet ran, so this proves nothing"
+    assert all(owned == {True} for owned in serialised.values()), serialised
+
+
+def test_a_codelet_chosen_before_the_rack_is_emptied_does_not_run(meta):
+    """A snag's restart deletes every codelet (``answers.ss:1189``), including one a
+    worker has already taken off the rack.  Serially such a codelet never runs; an
+    answer-finder that did would report an answer from before the snag at the
+    snag's temperature of 100.
+    """
+    runner = _prepared(meta)
+    engine = FreeRunningEngine(runner, workers=2)
+    engine.prepare()
+    rack = runner.ctx.coderack
+    choose = rack.choose_and_remove
+    deleted: list = []
+
+    def choose_then_restart(*args, **kwargs):
+        codelet = choose(*args, **kwargs)
+        if codelet is not None and not deleted:
+            # What a snag on another worker does between this choice and its execution.
+            deleted.append(codelet)
+            rack.clear()
+        return codelet
+
+    rack.choose_and_remove = choose_then_restart
+    execute = runner._execute_codelet
+    ran: list = []
+    runner._execute_codelet = lambda codelet: (ran.append(codelet), execute(codelet))[1]
+
+    result = engine.run(600)
+
+    assert deleted
+    assert all(codelet is not deleted[0] for codelet in ran)
+    assert result.discarded >= 1
+    # The discarded codelet is not counted: the count is the codelets that ran.
+    assert result.codelet_count == len(ran) == sum(result.per_worker)
+
+
+@pytest.mark.parametrize("workers", [1, 4])
+def test_a_run_stopped_by_its_budget_reports_the_codelets_it_ran(meta, workers):
+    """Each worker that reached the budget used to count one codelet it never ran."""
+    runner = _prepared(meta, seed=7)
+    execute = runner._execute_codelet
+    ran: list = []
+    runner._execute_codelet = lambda codelet: (ran.append(codelet), execute(codelet))[1]
+
+    result = run_free(runner, workers=workers, max_steps=300)
+
+    if result.status == "halted":
+        assert result.codelet_count == 300
+    assert result.codelet_count == len(ran) == sum(result.per_worker)
+
+
+def test_giving_up_runs_its_update_under_the_commit_lock():
+    """``give-up`` runs one full update before it stops (``answers.ss:86-91``)."""
+    from types import SimpleNamespace
+
+    from server.engine.codelet_dsl.builtins import give_up
+
+    lock = threading.RLock()
+    owned: list[bool] = []
+    ctx = SimpleNamespace(
+        commit_lock=lock, on_update_everything=lambda: owned.append(lock._is_owned())
+    )
+
+    give_up(ctx)
+
+    assert owned == [True]
+    assert ctx._gave_up is True
+
+
+# --- the free-running loop does what the serial loop does -------------------
+
+
+def _record_in_codelet(runner, probe):
+    """Wrap ``_execute_codelet`` so *probe* runs, in the worker's thread, just before it."""
+    execute = runner._execute_codelet
+
+    def wrapped(codelet):
+        probe(codelet)
+        return execute(codelet)
+
+    runner._execute_codelet = wrapped
+
+
+def test_a_codelet_sees_the_count_of_those_finished_before_it(meta):
+    """``step-mcat`` runs a codelet and *then* increments (``run.ss:178-183``).
+
+    Free-running incremented first, so every event, clamp and answer a codelet stamped
+    was one higher than serially.
+    """
+    runner = _prepared(meta, seed=7)
+    ctx = runner.ctx
+    seen: list[tuple[int, int]] = []
+    _record_in_codelet(
+        runner, lambda c: seen.append((ctx.codelet_count, ctx.coderack.current_time))
+    )
+
+    result = run_free(runner, workers=1, max_steps=200)
+
+    n = result.codelet_count
+    assert n > 20
+    assert [count for count, _ in seen] == list(range(n))
+    assert [time for _, time in seen] == list(range(n))
+    assert ctx.coderack.current_time == n
+
+
+def test_structures_built_by_workers_are_stamped_with_the_clock(meta):
+    """``set_structure_clock`` is thread-local, so the workers have to set it.
+
+    Left unset, every structure made in a worker had ``time_stamp`` 0 and the
+    progress-watcher's activity (the age of the youngest structure) was wrong.
+    """
+    from server.engine.workspace_structures import _clock
+
+    runner = _prepared(meta, seed=7)
+    ctx = runner.ctx
+    clocks: list[tuple[int, int]] = []
+    _record_in_codelet(
+        runner, lambda c: clocks.append((getattr(_clock, "now", 0), ctx.codelet_count))
+    )
+
+    run_free(runner, workers=1, max_steps=200)
+
+    assert all(now == count for now, count in clocks)
+    assert clocks[-1][0] > 0
+    stamps = [s.time_stamp for s in ctx.workspace.all_structures]
+    assert stamps and max(stamps) > 0
+
+
+def test_the_initial_unclamp_time_is_honoured(meta):
+    """``run.ss:151-154``: the fixed-time release of the initial clamp, off by default."""
+    runner = _prepared(meta, seed=7)
+    ctx = runner.ctx
+    released: list[int] = []
+    runner._initial_unclamp_time = 20
+    runner._unclamp_initial_slipnodes = lambda slipnet: released.append(ctx.codelet_count)
+
+    run_free(runner, workers=1, max_steps=80)
+
+    assert released == [20]
+
+
+def test_a_pending_answer_is_not_collected_by_another_workers_codelet(meta):
+    """The hand-off is per codelet: one worker's answer cannot vanish under it.
+
+    ``_collect_outcome`` ran after every codelet and cleared ``ctx._pending_answer``
+    whichever worker had set it, so an answer-family codelet that had just reported
+    could find it gone while other workers finished their own codelets.
+    """
+    import time
+
+    from server.engine.free_running import SERIALISED_FAMILIES
+
+    runner = _prepared(meta, seed=7)
+    ctx = runner.ctx
+    observed: list = []
+
+    def probe(codelet):
+        spec = ctx.meta.codelet_specs.get(codelet.codelet_type)
+        if observed or spec is None or spec.family not in SERIALISED_FAMILIES:
+            return
+        ctx._pending_answer = "zzz"
+        ctx._pending_answer_quality = 50
+        time.sleep(0.3)  # the other workers keep finishing codelets meanwhile
+        observed.append(ctx._pending_answer)
+
+    _record_in_codelet(runner, probe)
+    result = run_free(runner, workers=4, max_steps=3000)
+
+    assert observed == ["zzz"]
+    assert result.status == "answer_found"
+    assert result.answers == ["zzz"]

@@ -2,7 +2,7 @@
 
 > **Auto-generated.** Run `python scripts/generate_api_docs.py` to regenerate from the FastAPI application.
 
-127 HTTP routes, plus `WS /ws/runs/{run_id}` for live state push.
+135 HTTP routes, plus `WS /ws/runs/{run_id}` for live state push.
 
 Interactive documentation is served at `/docs` while the API is running.
 
@@ -28,16 +28,19 @@ Creating, driving and reading a run.
 | `DELETE` | `/api/runs/{run_id}/clamp-node` | Unclamp Node |
 | `POST` | `/api/runs/{run_id}/clamp-temperature` | Clamp Temperature |
 | `DELETE` | `/api/runs/{run_id}/clamp-temperature` | Unclamp Temperature |
+| `POST` | `/api/runs/{run_id}/clamp-theme-pattern` | Clamp Theme Pattern |
 | `POST` | `/api/runs/{run_id}/clamp-themes` | Clamp Themes |
 | `DELETE` | `/api/runs/{run_id}/clamp-themes` | Unclamp Themes |
 | `GET` | `/api/runs/{run_id}/codelet-patterns` | List Codelet Patterns |
 | `GET` | `/api/runs/{run_id}/coderack` | Get Coderack |
 | `GET` | `/api/runs/{run_id}/commentary` | Get Commentary |
+| `GET` | `/api/runs/{run_id}/eeg` | Get Eeg |
 | `GET` | `/api/runs/{run_id}/identity` | Get Run Identity |
 | `GET` | `/api/runs/{run_id}/memory` | Get Memory |
 | `GET` | `/api/runs/{run_id}/parameters` | Get Run Parameters |
 | `POST` | `/api/runs/{run_id}/reset` | Reset Run |
 | `POST` | `/api/runs/{run_id}/run` | Run To Completion |
+| `PUT` | `/api/runs/{run_id}/self-watching` | Set Self Watching |
 | `GET` | `/api/runs/{run_id}/slipnet` | Get Slipnet |
 | `GET` | `/api/runs/{run_id}/spreading-threshold` | Get Spreading Threshold |
 | `POST` | `/api/runs/{run_id}/spreading-threshold` | Set Spreading Threshold |
@@ -52,6 +55,10 @@ Creating, driving and reading a run.
 | `GET` | `/api/runs/{run_id}/trace/export` | Export Trace |
 | `GET` | `/api/runs/{run_id}/trace/{event_number}` | Get Trace Event |
 | `POST` | `/api/runs/{run_id}/trace/{event_number}/display` | Display Trace Event |
+| `POST` | `/api/runs/{run_id}/undo-last-clamp` | Undo Last Clamp |
+| `GET` | `/api/runs/{run_id}/verbose` | Get Verbose |
+| `PUT` | `/api/runs/{run_id}/verbose` | Set Verbose |
+| `DELETE` | `/api/runs/{run_id}/verbose` | Clear Verbose |
 | `GET` | `/api/runs/{run_id}/workspace` | Get Workspace |
 
 ## Episodic Memory
@@ -66,6 +73,7 @@ The Training Session's memory, shared by every run.
 | `POST` | `/api/memory/answers/{answer_id}/display` | Display Answer |
 | `GET` | `/api/memory/answers/{answer_id}/explanation` | Explain Answer |
 | `POST` | `/api/memory/compare` | Compare Answers |
+| `POST` | `/api/memory/snags/{snag_id}/display` | Display Snag |
 
 ## Review
 

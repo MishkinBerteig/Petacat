@@ -141,48 +141,117 @@ def test_snag_repeat():
 
 
 # ---- emit_clamp_activate ----
+#
+# Expected strings are Metacat's own (trace.ss:592-612), as logged from Metacat 1.2.
+
+
+def _both(log):
+    return log.render(eliza_mode=True), log.render(eliza_mode=False)
 
 
 def test_clamp_activate_rule_codelet():
     log = CommentaryLog()
     emit_clamp_activate(log, "rule_codelet_clamp", 1, 100)
-    eliza = log.render(eliza_mode=True)
-    assert "harder" in eliza
+    assert _both(log) == (
+        "I'll just have to try a little harder...",
+        "Clamping rule-codelet pattern...",
+    )
 
 
 def test_clamp_activate_snag_response():
     log = CommentaryLog()
     emit_clamp_activate(log, "snag_response_clamp", 1, 100)
-    eliza = log.render(eliza_mode=True)
-    assert "different" in eliza
+    assert _both(log) == (
+        "All right, I've had enough of this!  Let's try something different for a change...",
+        "Clamping negative theme pattern...",
+    )
 
 
-def test_clamp_activate_justify():
+def test_clamp_activate_justify_first_and_another():
     log = CommentaryLog()
     emit_clamp_activate(log, "justify_clamp", 1, 100)
-    eliza = log.render(eliza_mode=True)
-    assert "idea" in eliza
+    assert _both(log) == ("Aha!  I have an idea...", "Clamping theme patterns...")
+    log = CommentaryLog()
+    emit_clamp_activate(log, "justify_clamp", 2, 100)
+    assert _both(log)[0] == "Aha!  I have another idea..."
+
+
+def test_clamp_activate_manual_first_and_another():
+    log = CommentaryLog()
+    emit_clamp_activate(log, "manual_clamp", 1, 100)
+    assert _both(log) == (
+        "Thank you for that interesting suggestion!  Let me think about it...",
+        "Manually clamping patterns...",
+    )
+    log = CommentaryLog()
+    emit_clamp_activate(log, "manual_clamp", 2, 100)
+    assert _both(log)[0].startswith("Thank you for another interesting suggestion!")
+
+
+def test_clamp_activate_says_nothing_for_an_unknown_type():
+    log = CommentaryLog()
+    emit_clamp_activate(log, "mystery_clamp", 1, 100)
+    assert log.count == 0
 
 
 # ---- emit_clamp_expired ----
+#
+# trace.ss:129-170 and the progress phrases at trace.ss:212-226.
 
 
-def test_clamp_expired_no_progress():
+def test_clamp_expired_rule_codelet_zero():
     log = CommentaryLog()
-    emit_clamp_expired(log, "rule_codelet_clamp", 5.0, 200)
-    eliza = log.render(eliza_mode=True)
-    tech = log.render(eliza_mode=False)
-    assert "no significant" in eliza
-    assert "a bad" in eliza
-    assert "Unclamping" in tech
+    emit_clamp_expired(log, "rule_codelet_clamp", 0, 200)
+    assert _both(log) == (
+        "Well, my latest effort to think up new rules resulted in zero progress."
+        "  Guess it was a pretty useless effort, in retrospect.",
+        "Unclamping patterns.  Progress achieved by rule-codelet clamp = 0.",
+    )
 
 
-def test_clamp_expired_good_progress():
+def test_clamp_expired_rule_codelet_a_lot():
     log = CommentaryLog()
-    emit_clamp_expired(log, "rule_codelet_clamp", 75.0, 200)
-    eliza = log.render(eliza_mode=True)
-    assert "a good deal of" in eliza
-    assert "a pretty good" in eliza
+    emit_clamp_expired(log, "rule_codelet_clamp", 100, 200)
+    assert _both(log) == (
+        "Well, my latest effort to think up new rules resulted in a lot of progress."
+        "  Guess it was a pretty good effort, in retrospect.",
+        "Unclamping patterns.  Progress achieved by rule-codelet clamp = 100.",
+    )
+
+
+def test_clamp_expired_snag_response_matches_metacat_log():
+    # Logged from Metacat 1.2, abc -> abd, xyz -> ?, seed 2.
+    log = CommentaryLog()
+    emit_clamp_expired(log, "snag_response_clamp", 79, 1976)
+    assert _both(log) == (
+        "Looks like I made some headway in coming up with new ideas.",
+        "Unclamping patterns.  Progress achieved by snag-response clamp = 79.",
+    )
+
+
+def test_clamp_expired_justify_and_manual():
+    log = CommentaryLog()
+    emit_clamp_expired(log, "justify_clamp", 30, 5)
+    assert _both(log) == (
+        "Looks like that last brilliant idea I had resulted in very little progress."
+        "  Guess it was not such a great idea, in retrospect.",
+        "Unclamping patterns.  Progress achieved by justify clamp = 30.",
+    )
+    log = CommentaryLog()
+    emit_clamp_expired(log, "manual_clamp", 50, 5)
+    assert _both(log) == (
+        "That last suggestion of yours resulted in some progress."
+        "  Guess it was an okay idea, in retrospect.",
+        "Unclamping patterns.  Progress achieved by manual clamp = 50.",
+    )
+
+
+def test_clamp_progress_bands_are_metacats():
+    from server.engine.commentary import _progress_key
+
+    assert [_progress_key(p) for p in (0, 1, 49, 50, 79, 80, 100)] == [
+        "zero", "little", "little", "some", "some", "a_lot", "a_lot",
+    ]
 
 
 # ---- emit_jootsing ----
@@ -204,11 +273,32 @@ def test_jootsing_snag_response():
     assert "boring" in eliza
 
 
-def test_jootsing_frustrated():
+def test_jootsing_has_no_invented_fallback():
     log = CommentaryLog()
     emit_jootsing(log, "frustrated", 300)
-    eliza = log.render(eliza_mode=True)
-    assert "frustrated" in eliza
+    assert log.count == 0
+
+
+# ---- emit_frustrated (jootsing.ss:306-325) ----
+
+
+def test_frustrated_names_the_poor_string_pairs():
+    from server.engine.commentary import emit_frustrated
+
+    both = CommentaryLog()
+    emit_frustrated(both, "abc", "abd", "xyz", "xyd", True, True, 10)
+    assert _both(both) == (
+        "I'm getting frustrated.  I still don't see a good way to describe either "
+        'how "abc" changes to "abd" or how "xyz" changes to "xyd".',
+        "No satisfactory rules yet exist for describing either "
+        'how "abc" changes to "abd" or how "xyz" changes to "xyd".',
+    )
+    top = CommentaryLog()
+    emit_frustrated(top, "abc", "abd", "xyz", None, True, False, 10)
+    assert _both(top)[0].endswith('describe how "abc" changes to "abd".')
+    bottom = CommentaryLog()
+    emit_frustrated(bottom, "abc", "abd", "xyz", "xyd", False, True, 10)
+    assert _both(bottom)[1].endswith('describing how "xyz" changes to "xyd".')
 
 
 # ---- emit_reminding ----
@@ -216,16 +306,16 @@ def test_jootsing_frustrated():
 
 def test_reminding_strong():
     log = CommentaryLog()
-    emit_reminding(log, "xyd", "abc -> abd; xyz -> ?", 85.0, 100)
-    eliza = log.render(eliza_mode=True)
-    tech = log.render(eliza_mode=False)
-    assert "strongly reminds" in eliza
-    assert '"xyd"' in eliza
-    assert "85" in tech
+    emit_reminding(log, "xyd", "abc -> abd, xyz -> ?", 85, 100)
+    assert _both(log) == (
+        'This answer strongly reminds me of the answer xyd to the problem "abc -> abd, xyz -> ?".',
+        'This answer is reminiscent of the answer xyd to the problem "abc -> abd, xyz -> ?".'
+        "  Reminding strength = 85.",
+    )
 
 
 def test_reminding_weak():
     log = CommentaryLog()
-    emit_reminding(log, "xyd", "abc -> abd; xyz -> ?", 20.0, 100)
+    emit_reminding(log, "xyd", "abc -> abd, xyz -> ?", 20, 100)
     eliza = log.render(eliza_mode=True)
     assert "vaguely reminds" in eliza

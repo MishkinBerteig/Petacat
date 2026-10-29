@@ -255,7 +255,10 @@ async def test_both_captures_render_in_the_shapes_the_views_read(review_client):
         assert set(next(iter(view["slipnet"].values()))) == {
             "activation", "conceptual_depth", "frozen",
         }
-        assert set(view["coderack"]) == {"total_count", "type_counts"}
+        assert set(view["coderack"]) == {
+        "total_count", "type_counts", "type_probabilities", "last_codelet_type",
+        "codelet_types", "clamped_urgencies",
+    }
         assert view["themespace"]["clusters"]
         assert isinstance(view["trace"], list)
 
@@ -274,7 +277,10 @@ async def test_the_end_capture_of_a_run_that_answered_still_renders(review_clien
     what keeps this working, and this is the test that would notice if the review
     surface ever started restoring.
     """
-    run_id = await _run(review_client, MODE_NORMAL, max_steps=2500)
+    # The list orders of G-Z4 (``DISCREPANCIES5.md``) changed the random stream, and the
+    # shared seed 12345 stopped answering within the budget, so this test skipped every
+    # time. 12347 answers at codelet 534.
+    run_id = await _run(review_client, MODE_NORMAL, max_steps=2500, seed=12347)
 
     info = (await review_client.get(f"/api/runs/{run_id}")).json()
     if info["status"] != "answer_found":
@@ -461,7 +467,10 @@ async def test_the_inspector_shows_the_state_at_a_tick(review_client):
     assert at["codelet"] is not None
     assert isinstance(at["structure_changes"], list)
     assert len(at["slipnet"]) == 59
-    assert set(at["coderack"]) == {"total_count", "type_counts"}
+    assert set(at["coderack"]) == {
+        "total_count", "type_counts", "type_probabilities", "last_codelet_type",
+        "codelet_types", "clamped_urgencies",
+    }
     assert at["themespace"]["clusters"]
     assert at["workspace"]["initial"] == PROBLEM["initial"]
     assert 0 <= at["temperature"] <= 100

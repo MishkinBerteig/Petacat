@@ -5,6 +5,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 
 import { displayTraceEvent } from '@/api/client';
+import { useMomentStore } from '@/store/momentStore';
 import { useRunStore } from '@/store/runStore';
 import type { TraceEvent } from '@/types';
 
@@ -27,6 +28,15 @@ const EVENT_LABELS: Record<string, { icon: string; label: string; color: string 
 /** Event type to a short icon prefix for compact display. */
 function eventIcon(eventType: string): string {
   return EVENT_LABELS[eventType]?.icon ?? '[.]';
+}
+
+/**
+ * The label Metacat's Trace window draws for an event: its `print-name` (`(Id)`,
+ * `>a-b-c>`, `T:a=>b`, `[Top Rule]`, `[Answer ijl]`, `[Clamp]`, `[Snag]`). An event stored
+ * before the name was kept shows Petacat's own prose instead.
+ */
+export function eventPrintName(evt: TraceEvent): string {
+  return evt.print_name || evt.description;
 }
 
 /** Human-readable name for an event type. */
@@ -87,6 +97,7 @@ export function TraceList({
   if (search) {
     const q = search.toLowerCase();
     filtered = filtered.filter(e =>
+      eventPrintName(e).toLowerCase().includes(q) ||
       e.description.toLowerCase().includes(q) ||
       e.event_type.toLowerCase().includes(q)
     );
@@ -207,8 +218,9 @@ export function TraceList({
                 whiteSpace: 'nowrap',
               }}
               title={evt.description}
+              data-testid="event-print-name"
             >
-              {evt.description}
+              {eventPrintName(evt)}
             </span>
           </div>
         ))}
@@ -221,21 +233,27 @@ export function TraceList({
  * The live Trace: `TraceList` fed from the run store, and interrogable.
  *
  * §2.4.3 makes Trace events "themselves subject to examination"; MetaCat's Trace window
- * makes them examinable by the user as well, and clicking one re-imposes the theme
- * pattern that was current when it happened (`trace-graphics.ss:66-79`). Clicking the
- * same event again restores the live Themespace, as it does in MetaCat.
+ * makes them examinable by the user as well. Clicking one redisplays that moment
+ * (`trace-graphics.ss:66-79` -> the event's `display`): the Workspace as it was, under
+ * an "Event N: ..." header with the event's structures highlighted, the event's concept
+ * pattern in the Slipnet, a blank Coderack, the event's temperature, and the theme
+ * pattern that was current when it happened. Clicking the same event again restores the
+ * live windows, as it does in MetaCat.
  */
 export function TraceView() {
   const trace = useRunStore((s) => s.trace);
   const runId = useRunStore((s) => s.runId);
   const refreshThemespace = useRunStore((s) => s.refreshThemespace);
-  const [displaying, setDisplaying] = useState<number | null>(null);
+  const onShow = useMomentStore((s) => s.onShow);
+  const displaying = onShow?.kind === 'event' ? onShow.id : null;
 
   const handleSelect = useCallback(
     async (event: TraceEvent) => {
       if (runId == null) return;
       const res = await displayTraceEvent(runId, event.event_number);
-      setDisplaying(res.displaying);
+      // The picture goes to the Workspace, Slipnet, Coderack and Temperature windows,
+      // which read it from the moment store; the Themespace is the server's to impose.
+      useMomentStore.getState().show('event', event.event_number, res, event.event_number);
       await refreshThemespace();
     },
     [runId, refreshThemespace],

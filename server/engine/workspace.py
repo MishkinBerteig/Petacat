@@ -169,7 +169,8 @@ class WorkspaceString:
                 f"the builder must break incompatible bonds before building {bond}"
             )
 
-        self.bonds.append(bond)
+        # ``(set! bond-list (cons bond bond-list))`` (``workspace-strings.ss:173``): newest first.
+        self.bonds.insert(0, bond)
         # A bond's left/right pointers are *positional*, independent of which
         # object the bond happens to run from.  Keying off from/to instead meant
         # a right-to-left bond (say the predecessor bond y->x in "xyz") set
@@ -194,8 +195,12 @@ class WorkspaceString:
         return getattr(left, "id_num", None)
 
     def add_group(self, group: Group) -> None:
-        self.groups.append(group)
-        self.objects.append(group)
+        # ``(set! group-list (cons group group-list))`` (``workspace-strings.ss:266``):
+        # the newest group heads the list, and ``get-objects`` is ``(append letter-list
+        # group-list)`` (``:114``), so ``objects`` keeps the letters first and then the
+        # groups newest first.  ``groups`` is always the tail of ``objects``.
+        self.objects.insert(len(self.objects) - len(self.groups), group)
+        self.groups.insert(0, group)
         for obj in group.objects:
             obj.enclosing_group = group
         # ``assign-id-num`` then ``(vector-set! group-vector i group)``.
@@ -427,6 +432,11 @@ class WorkspaceString:
         workspace = getattr(self, "workspace", None)
         if workspace is None:
             return
+        # Verbose mode: this is ``break-bridge``, which says so (bridges.ss:1439).
+        ctx = getattr(workspace, "verbose_ctx", None)
+        if ctx is not None and ctx.verbose:
+            ctx.verbose_log.say("breaking-bridge")
+            ctx.verbose_log.print_object(bridge, level="built")
         bridge.proposal_level = bridge.PROPOSED
         workspace.remove_bridge(bridge)
 
@@ -1261,37 +1271,26 @@ class Workspace:
         return self.get_equivalent_bridge(bridge) is not None
 
     def get_equivalent_bridge(self, bridge: Bridge) -> Bridge | None:
-        """Find an existing bridge equivalent to the given one.
+        """Find the Workspace bridge equivalent to *bridge*.
 
-        Scheme: workspace.ss:268-301.
-        Equivalence: same bridge type, and connects equivalent objects
-        in the same orientation.
+        Scheme: ``get-equivalent-bridge`` (workspace.ss:268-301): the bridge itself if
+        it is in the list; otherwise the bridge already built from the *equivalent*
+        object of the first string to the equivalent object of the second
+        (``get-equivalent-letter`` / ``get-equivalent-group``: same group category,
+        direction and length, found through the ``group-vector`` slot).
+
+        This used to accept any existing bridge whose two objects merely sat at the
+        same string positions.  A group re-perceived in the other direction (or as
+        another category) over the same span is *not* equivalent in the Scheme, so a
+        broken bridge whose twin had been rebuilt on such a group counted as still
+        present, and ``relevant-for-answer-description?`` kept its slippage events
+        (lockstep ``aabc-aabd-ijkk`` episode 1, run 7: Petacat's ``ijll`` answer carried
+        ``Direction: opposite`` themes that Metacat's does not).  One implementation now
+        serves both this and the rule-support test.
         """
-        bridge_list = self.get_bridges(bridge.bridge_type)
+        from server.engine.rules import _get_equivalent_bridge
 
-        # If bridge is already in the list, return it directly
-        if bridge in bridge_list:
-            return bridge
-
-        # Look for a built bridge between equivalent objects
-        for existing in bridge_list:
-            if (
-                existing.object1 is bridge.object1
-                and existing.object2 is bridge.object2
-            ):
-                return existing
-            # Also check if bridge objects have equivalents
-            # (e.g. same position letters in translated strings)
-            if (
-                existing.object1.left_string_pos == bridge.object1.left_string_pos
-                and existing.object1.right_string_pos == bridge.object1.right_string_pos
-                and existing.object1.string is bridge.object1.string
-                and existing.object2.left_string_pos == bridge.object2.left_string_pos
-                and existing.object2.right_string_pos == bridge.object2.right_string_pos
-                and existing.object2.string is bridge.object2.string
-            ):
-                return existing
-        return None
+        return _get_equivalent_bridge(self, bridge)
 
     def spanning_bridge_exists(self, bridge_type: str) -> bool:
         """Check if a bridge between spanning objects exists.

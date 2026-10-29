@@ -39,6 +39,31 @@ class ClampThemesRequest(BaseModel):
     themes: list[ThemeClampItem]
 
 
+class PatternThemeItem(BaseModel):
+    dimension: str
+    relation: str | None = None
+    activation: float = 100.0
+
+
+class ThemePatternItem(BaseModel):
+    """One theme type of a pattern, with the themes the user selected in it."""
+
+    type: str
+    themes: list[PatternThemeItem]
+
+
+class ClampThemePatternRequest(BaseModel):
+    patterns: list[ThemePatternItem]
+
+
+class SelfWatchingRequest(BaseModel):
+    enabled: bool
+
+
+class VerboseRequest(BaseModel):
+    enabled: bool
+
+
 class ClampCodeletsRequest(BaseModel):
     codelet_type: str
     urgency: int
@@ -161,6 +186,63 @@ async def clamp_themes(run_id: int, req: ClampThemesRequest):
     except ValueError as e:
         raise HTTPException(404, str(e))
     return result
+
+
+@router.post("/clamp-theme-pattern")
+async def clamp_theme_pattern(run_id: int, req: ClampThemePatternRequest):
+    """Clamp several themes together as one pattern (Metacat's "Clamp theme pattern").
+
+    Scheme: ``theme-edit-mode-off`` (``gui.ss:905-926``).  Each theme type listed is
+    replaced by the selected themes; one manual-clamp event covers them all.
+    """
+    svc = get_run_service()
+    try:
+        return svc.clamp_theme_pattern(
+            run_id,
+            [
+                {
+                    "type": p.type,
+                    "themes": [t.model_dump() for t in p.themes],
+                }
+                for p in req.patterns
+            ],
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/undo-last-clamp")
+async def undo_last_clamp(run_id: int):
+    """Undo the most recent clamp only (Metacat's "Undo last clamp")."""
+    svc = get_run_service()
+    try:
+        return svc.undo_last_clamp(run_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.put("/self-watching")
+async def set_self_watching(run_id: int, req: SelfWatchingRequest):
+    """Toggle self-watching mode mid-run (Metacat's "Self-watching mode" menu item)."""
+    svc = get_run_service()
+    try:
+        return svc.set_self_watching(run_id, req.enabled)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.put("/verbose")
+async def set_verbose(run_id: int, req: VerboseRequest):
+    """Turn Verbose mode on or off mid-run (Metacat's "Verbose mode" menu item).
+
+    On, the engine narrates what its codelets do; read the narration from
+    ``GET /runs/{id}/verbose``.  Off, the engine builds nothing.
+    """
+    svc = get_run_service()
+    try:
+        return svc.set_verbose(run_id, req.enabled)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 
 @router.delete("/clamp-themes")

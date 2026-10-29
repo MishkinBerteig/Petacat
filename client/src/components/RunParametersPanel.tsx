@@ -40,6 +40,7 @@ import {
   parameterErrors,
   useParameterCatalogue,
 } from '@/hooks/useParameterCatalogue';
+import { SelfWatchingWarning } from '@/components/SelfWatchingWarning';
 import type { RunParameterSpec, RunParameterValue } from '@/types';
 
 /** Are these the same value, for the purpose of "has it been changed?" */
@@ -118,6 +119,7 @@ export function RunParametersPanel() {
 
   return (
     <div style={groupStyle}>
+      <SelfWatchingWarning which="next" />
       <button
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}

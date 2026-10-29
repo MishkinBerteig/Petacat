@@ -256,9 +256,11 @@ async def test_answer_appears_in_workspace(app_client):
     # ``test_a_fast_run_contributes_its_answer_to_the_session``: ``xyz``/12345 now gives
     # up. The ``pytest.skip`` below is meant to be the rare safety net for a run that
     # happens not to converge, not the branch every run takes — a test that always skips
-    # asserts nothing, and this one had gone quiet.
+    # asserts nothing, and this one had gone quiet.  It went quiet again after the
+    # lockstep pass (``DISCREPANCIES5.md`` section G): 12346 no longer answers within 3000
+    # codelets, and 12347 answers at codelet 333.
     resp = await app_client.post("/api/runs", json={
-        "initial": "abc", "modified": "abd", "target": "xyz", "seed": 12346,
+        "initial": "abc", "modified": "abd", "target": "xyz", "seed": 12347,
     })
     run_id = resp.json()["run_id"]
 
@@ -507,7 +509,7 @@ async def test_a_fast_run_contributes_its_answer_to_the_session(app_client):
     # random stream, and ``xyz``/12345 now gives up at 3790 codelets.  Giving up is a
     # legitimate outcome, so the seed moves rather than the assertion.
     created = await app_client.post("/api/runs", json={
-        "initial": "abc", "modified": "abd", "target": "xyz", "seed": 12346,
+        "initial": "abc", "modified": "abd", "target": "xyz", "seed": 12347,
         "mode": "fast",
     })
     run_id = created.json()["run_id"]

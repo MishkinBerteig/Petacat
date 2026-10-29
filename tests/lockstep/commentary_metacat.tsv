@@ -1,0 +1,230 @@
+# Every comment-window paragraph Metacat 1.2 added, as logged by tests/lockstep/metacat/record_comments.py.
+# corpus directory<TAB>problem<TAB>run<TAB>codelet count<TAB>Eliza voice<TAB>technical voice
+traces	abc-abd-xyz	1	273	Uh-oh, I seem to have run into a little problem.  Changing the letter-category of the letter z to its successor is not possible in xyz.	Hit a snag:  Changing the letter-category of the letter z to its successor is not possible in xyz.
+traces	abc-abd-xyz	1	421	Uh-oh, I seem to have run into a little problem again.  Changing the letter-category of the letter z to its successor is not possible in xyz.	Hit another snag:  Changing the letter-category of the letter z to its successor is not possible in xyz.
+traces	abc-abd-xyz	1	569	Uh-oh, I seem to have run into a little problem again.  Changing the letter-category of the letter z to its successor is not possible in xyz.	Hit another snag:  Changing the letter-category of the letter z to its successor is not possible in xyz.
+traces	abc-abd-xyz	1	586	All right, I've had enough of this!  Let's try something different for a change...	Clamping negative theme pattern...
+traces	abc-abd-xyz	1	1249	Looks like I made a lot of headway in coming up with new ideas.	Unclamping patterns.  Progress achieved by snag-response clamp = 85.
+traces	abc-abd-xyz	1	1331	The answer "xyz" occurs to me.  I think this answer is pretty dumb.	Found the answer "xyz".  Answer quality = 60.
+traces	abc-abd-xyz	2	417	Uh-oh, I seem to have run into a little problem.  Changing the letter-category of the letter z to its successor is not possible in xyz.	Hit a snag:  Changing the letter-category of the letter z to its successor is not possible in xyz.
+traces	abc-abd-xyz	2	832	Uh-oh, I seem to have run into a little problem again.  Changing the letter-category of the letter z to its successor is not possible in xyz.	Hit another snag:  Changing the letter-category of the letter z to its successor is not possible in xyz.
+traces	abc-abd-xyz	2	1401	Uh-oh, I seem to have run into a little problem again.  Changing the letter-category of the letter z to its successor is not possible in xyz.	Hit another snag:  Changing the letter-category of the letter z to its successor is not possible in xyz.
+traces	abc-abd-xyz	2	1637	All right, I've had enough of this!  Let's try something different for a change...	Clamping negative theme pattern...
+traces	abc-abd-xyz	2	1976	Looks like I made some headway in coming up with new ideas.	Unclamping patterns.  Progress achieved by snag-response clamp = 79.
+traces	abc-abd-xyz	2	2109	All right, I've had enough of this!  Let's try something different for a change...	Clamping negative theme pattern...
+traces	abc-abd-xyz	2	2865	Looks like I made a lot of headway in coming up with new ideas.	Unclamping patterns.  Progress achieved by snag-response clamp = 92.
+traces	abc-abd-xyz	2	3514	The answer "xyd" occurs to me.  I think this answer is pretty mediocre.	Found the answer "xyd".  Answer quality = 74.
+traces	abc-abd-xyz	3	495	Uh-oh, I seem to have run into a little problem.  Changing the letter-category of the letter z to its successor is not possible in xyz.	Hit a snag:  Changing the letter-category of the letter z to its successor is not possible in xyz.
+traces	abc-abd-xyz	3	750	Uh-oh, I seem to have run into a little problem again.  Changing the letter-category of the letter z to its successor is not possible in xyz.	Hit another snag:  Changing the letter-category of the letter z to its successor is not possible in xyz.
+traces	abc-abd-xyz	3	990	Uh-oh, I seem to have run into a little problem again.  Changing the letter-category of the letter z to its successor is not possible in xyz.	Hit another snag:  Changing the letter-category of the letter z to its successor is not possible in xyz.
+traces	abc-abd-xyz	3	1090	Uh-oh, I seem to have run into a little problem again.  Changing the letter-category of the letter z to its successor is not possible in xyz.	Hit another snag:  Changing the letter-category of the letter z to its successor is not possible in xyz.
+traces	abc-abd-xyz	3	1173	All right, I've had enough of this!  Let's try something different for a change...	Clamping negative theme pattern...
+traces	abc-abd-xyz	3	1786	Looks like I made some headway in coming up with new ideas.	Unclamping patterns.  Progress achieved by snag-response clamp = 67.
+traces	abc-abd-xyz	3	2187	All right, I've had enough of this!  Let's try something different for a change...	Clamping negative theme pattern...
+traces	abc-abd-xyz	3	2427	Looks like I made a lot of headway in coming up with new ideas.	Unclamping patterns.  Progress achieved by snag-response clamp = 92.
+traces	abc-abd-xyz	3	2427	The answer "yyz" occurs to me.  I think this answer is very good!	Found the answer "yyz".  Answer quality = 88.
+traces	abc-abd-xyz	4	361	The answer "xyz" occurs to me.  I think this answer is pretty dumb.	Found the answer "xyz".  Answer quality = 60.
+traces	abc-abd-xyz	5	362	Uh-oh, I seem to have run into a little problem.  Changing the letter-category of the letter z to its successor is not possible in xyz.	Hit a snag:  Changing the letter-category of the letter z to its successor is not possible in xyz.
+traces	abc-abd-xyz	5	682	Uh-oh, I seem to have run into a little problem again.  Changing the letter-category of the letter z to its successor is not possible in xyz.	Hit another snag:  Changing the letter-category of the letter z to its successor is not possible in xyz.
+traces	abc-abd-xyz	5	871	Uh-oh, I seem to have run into a little problem again.  Changing the letter-category of the letter z to its successor is not possible in xyz.	Hit another snag:  Changing the letter-category of the letter z to its successor is not possible in xyz.
+traces	abc-abd-xyz	5	876	All right, I've had enough of this!  Let's try something different for a change...	Clamping negative theme pattern...
+traces	abc-abd-xyz	5	1470	Looks like I made zero headway in coming up with new ideas.	Unclamping patterns.  Progress achieved by snag-response clamp = 0.
+traces	abc-abd-xyz	5	1841	Uh-oh, I seem to have run into a little problem again.  Changing the letter-category of the letter z to its successor is not possible in xyz.	Hit another snag:  Changing the letter-category of the letter z to its successor is not possible in xyz.
+traces	abc-abd-xyz	5	1846	All right, I've had enough of this!  Let's try something different for a change...	Clamping negative theme pattern...
+traces	abc-abd-xyz	5	2201	Looks like I made zero headway in coming up with new ideas.	Unclamping patterns.  Progress achieved by snag-response clamp = 0.
+traces	abc-abd-xyz	5	2624	The answer "xyz" occurs to me, but that's really terrible.	Found the answer "xyz".  Answer quality = 47.
+traces	abc-abd-xyz	6	385	The answer "xyd" occurs to me.  I think this answer is halfway decent.	Found the answer "xyd".  Answer quality = 75.
+traces	abc-abd-xyz	7	587	Uh-oh, I seem to have run into a little problem.  Changing the letter-category of the letter z to its successor is not possible in xyz.	Hit a snag:  Changing the letter-category of the letter z to its successor is not possible in xyz.
+traces	abc-abd-xyz	7	820	Uh-oh, I seem to have run into a little problem again.  Changing the letter-category of the letter z to its successor is not possible in xyz.	Hit another snag:  Changing the letter-category of the letter z to its successor is not possible in xyz.
+traces	abc-abd-xyz	7	952	Uh-oh, I seem to have run into a little problem again.  Changing the letter-category of the letter z to its successor is not possible in xyz.	Hit another snag:  Changing the letter-category of the letter z to its successor is not possible in xyz.
+traces	abc-abd-xyz	7	1072	All right, I've had enough of this!  Let's try something different for a change...	Clamping negative theme pattern...
+traces	abc-abd-xyz	7	1709	Looks like I made a lot of headway in coming up with new ideas.	Unclamping patterns.  Progress achieved by snag-response clamp = 92.
+traces	abc-abd-xyz	7	1709	The answer "wyz" occurs to me.  I think this answer is very good!	Found the answer "wyz".  Answer quality = 87.
+traces	abc-abd-xyz	8	450	Uh-oh, I seem to have run into a little problem.  Changing the letter-category of the letter z to its successor is not possible in xyz.	Hit a snag:  Changing the letter-category of the letter z to its successor is not possible in xyz.
+traces	abc-abd-xyz	8	736	The answer "xyz" occurs to me, but that's pretty bad.	Found the answer "xyz".  Answer quality = 57.
+traces	abc-abd-xyz	9	258	Uh-oh, I seem to have run into a little problem.  Changing the letter-category of the letter z to its successor is not possible in xyz.	Hit a snag:  Changing the letter-category of the letter z to its successor is not possible in xyz.
+traces	abc-abd-xyz	9	372	Uh-oh, I seem to have run into a little problem again.  Changing the letter-category of the letter z to its successor is not possible in xyz.	Hit another snag:  Changing the letter-category of the letter z to its successor is not possible in xyz.
+traces	abc-abd-xyz	9	660	Uh-oh, I seem to have run into a little problem again.  Changing the letter-category of the letter z to its successor is not possible in xyz.	Hit another snag:  Changing the letter-category of the letter z to its successor is not possible in xyz.
+traces	abc-abd-xyz	9	1422	The answer "xyd" occurs to me.  I think this answer is pretty dumb.	Found the answer "xyd".  Answer quality = 62.
+traces	abc-abd-xyz	10	383	Uh-oh, I seem to have run into a little problem.  Changing the letter-category of the letter z to its successor is not possible in xyz.	Hit a snag:  Changing the letter-category of the letter z to its successor is not possible in xyz.
+traces	abc-abd-xyz	10	588	Uh-oh, I seem to have run into a little problem again.  Changing the letter-category of the letter z to its successor is not possible in xyz.	Hit another snag:  Changing the letter-category of the letter z to its successor is not possible in xyz.
+traces	abc-abd-xyz	10	945	Uh-oh, I seem to have run into a little problem again.  Changing the letter-category of the letter z to its successor is not possible in xyz.	Hit another snag:  Changing the letter-category of the letter z to its successor is not possible in xyz.
+traces	abc-abd-xyz	10	1137	All right, I've had enough of this!  Let's try something different for a change...	Clamping negative theme pattern...
+traces	abc-abd-xyz	10	1477	Looks like I made some headway in coming up with new ideas.	Unclamping patterns.  Progress achieved by snag-response clamp = 79.
+traces	abc-abd-xyz	10	1958	The answer "xyz" occurs to me, but that's pretty bad.	Found the answer "xyz".  Answer quality = 57.
+traces	a-b-z	1	48	Uh-oh, I seem to have run into a little problem.  Changing the letter-category of the letter z to its successor is not possible in z.	Hit a snag:  Changing the letter-category of the letter z to its successor is not possible in z.
+traces	a-b-z	1	90	Uh-oh, I seem to have run into a little problem again.  Changing the letter-category of the letter z to its successor is not possible in z.	Hit another snag:  Changing the letter-category of the letter z to its successor is not possible in z.
+traces	a-b-z	1	152	Uh-oh, I seem to have run into a little problem again.  Changing the letter-category of the letter z to its successor is not possible in z.	Hit another snag:  Changing the letter-category of the letter z to its successor is not possible in z.
+traces	a-b-z	1	154	All right, I've had enough of this!  Let's try something different for a change...	Clamping negative theme pattern...
+traces	a-b-z	1	190	Uh-oh, I seem to have run into a little problem again.  Changing the letter-category of the letter z to its successor is not possible in z.	Hit another snag:  Changing the letter-category of the letter z to its successor is not possible in z.
+traces	a-b-z	1	190	Looks like I made zero headway in coming up with new ideas.	Unclamping patterns.  Progress achieved by snag-response clamp = 0.
+traces	a-b-z	1	247	Uh-oh, I seem to have run into a little problem again.  Changing the letter-category of the letter z to its successor is not possible in z.	Hit another snag:  Changing the letter-category of the letter z to its successor is not possible in z.
+traces	a-b-z	1	274	Uh-oh, I seem to have run into a little problem again.  Changing the letter-category of the letter z to its successor is not possible in z.	Hit another snag:  Changing the letter-category of the letter z to its successor is not possible in z.
+traces	a-b-z	1	332	Uh-oh, I seem to have run into a little problem again.  Changing the letter-category of the letter z to its successor is not possible in z.	Hit another snag:  Changing the letter-category of the letter z to its successor is not possible in z.
+traces	a-b-z	1	334	All right, I've had enough of this!  Let's try something different for a change...	Clamping negative theme pattern...
+traces	a-b-z	1	752	Looks like I made a lot of headway in coming up with new ideas.	Unclamping patterns.  Progress achieved by snag-response clamp = 100.
+traces	a-b-z	1	826	The answer "z" occurs to me.  I think this answer is great!	Found the answer "z".  Answer quality = 96.
+traces	a-b-z	3	46	Uh-oh, I seem to have run into a little problem.  Changing the letter-category of the letter z to its successor is not possible in z.	Hit a snag:  Changing the letter-category of the letter z to its successor is not possible in z.
+traces	a-b-z	3	150	Uh-oh, I seem to have run into a little problem again.  Changing the letter-category of the letter z to its successor is not possible in z.	Hit another snag:  Changing the letter-category of the letter z to its successor is not possible in z.
+traces	a-b-z	3	195	Uh-oh, I seem to have run into a little problem again.  Changing the letter-category of the letter z to its successor is not possible in z.	Hit another snag:  Changing the letter-category of the letter z to its successor is not possible in z.
+traces	a-b-z	3	292	Uh-oh, I seem to have run into a little problem again.  Changing the letter-category of the letter z to its successor is not possible in z.	Hit another snag:  Changing the letter-category of the letter z to its successor is not possible in z.
+traces	a-b-z	3	372	All right, I've had enough of this!  Let's try something different for a change...	Clamping negative theme pattern...
+traces	a-b-z	3	395	Looks like I made zero headway in coming up with new ideas.	Unclamping patterns.  Progress achieved by snag-response clamp = 0.
+traces	a-b-z	3	395	The answer "b" occurs to me.  I think this answer is pretty good.	Found the answer "b".  Answer quality = 81.
+traces	aabb-cc-aabb	2	4172	I'm getting frustrated.  I still don't see a good way to describe how "aabb" changes to "cc".	No satisfactory rules yet exist for describing how "aabb" changes to "cc".
+traces	aabb-cc-aabb	2	4172	I'll just have to try a little harder...	Clamping rule-codelet pattern...
+traces	aabb-cc-aabb	2	4695	Well, my latest effort to think up new rules resulted in some progress.  Guess it was an okay effort, in retrospect.	Unclamping patterns.  Progress achieved by rule-codelet clamp = 67.
+traces	aabb-cc-aabb	2	4887	I'm getting frustrated.  I still don't see a good way to describe how "aabb" changes to "cc".	No satisfactory rules yet exist for describing how "aabb" changes to "cc".
+traces	aabb-cc-aabb	2	4887	I'll just have to try a little harder...	Clamping rule-codelet pattern...
+traces	aabb-cc-aabb	2	5181	Well, my latest effort to think up new rules resulted in some progress.  Guess it was an okay effort, in retrospect.	Unclamping patterns.  Progress achieved by rule-codelet clamp = 71.
+traces	aabb-cc-aabb	2	6806	I'm getting frustrated.  I still don't see a good way to describe how "aabb" changes to "cc".	No satisfactory rules yet exist for describing how "aabb" changes to "cc".
+traces	aabb-cc-aabb	2	6806	I'll just have to try a little harder...	Clamping rule-codelet pattern...
+traces	aabb-cc-aabb	2	7059	Well, my latest effort to think up new rules resulted in zero progress.  Guess it was a pretty useless effort, in retrospect.	Unclamping patterns.  Progress achieved by rule-codelet clamp = 0.
+traces	aabb-cc-aabb	2	8061	I'm getting frustrated.  I still don't see a good way to describe how "aabb" changes to "cc".	No satisfactory rules yet exist for describing how "aabb" changes to "cc".
+traces	aabb-cc-aabb	2	8061	I'll just have to try a little harder...	Clamping rule-codelet pattern...
+traces	aabb-cc-aabb	2	8320	Well, my latest effort to think up new rules resulted in zero progress.  Guess it was a pretty useless effort, in retrospect.	Unclamping patterns.  Progress achieved by rule-codelet clamp = 0.
+traces	aabb-cc-aabb	2	8428	I'm getting frustrated.  I still don't see a good way to describe how "aabb" changes to "cc".	No satisfactory rules yet exist for describing how "aabb" changes to "cc".
+traces	aabb-cc-aabb	2	8428	I'll just have to try a little harder...	Clamping rule-codelet pattern...
+traces	aabb-cc-aabb	2	8792	Well, my latest effort to think up new rules resulted in zero progress.  Guess it was a pretty useless effort, in retrospect.	Unclamping patterns.  Progress achieved by rule-codelet clamp = 0.
+traces	aabb-cc-aabb	2	8975	I just can't seem to come up with any better rules.	Jootsing from unsuccessful rule-codelet clamps.
+traces	aabb-cc-aabb	2	8975	Excuse me -- I think I'll go get some more punch.	Run terminated.
+traces	aabb-cc-aabb	3	2196	I'm getting frustrated.  I still don't see a good way to describe how "aabb" changes to "cc".	No satisfactory rules yet exist for describing how "aabb" changes to "cc".
+traces	aabb-cc-aabb	3	2196	I'll just have to try a little harder...	Clamping rule-codelet pattern...
+traces	aabb-cc-aabb	3	2453	Well, my latest effort to think up new rules resulted in zero progress.  Guess it was a pretty useless effort, in retrospect.	Unclamping patterns.  Progress achieved by rule-codelet clamp = 0.
+traces	aabb-cc-aabb	3	2613	I'm getting frustrated.  I still don't see a good way to describe how "aabb" changes to "cc".	No satisfactory rules yet exist for describing how "aabb" changes to "cc".
+traces	aabb-cc-aabb	3	2613	I'll just have to try a little harder...	Clamping rule-codelet pattern...
+traces	aabb-cc-aabb	3	3019	Well, my latest effort to think up new rules resulted in zero progress.  Guess it was a pretty useless effort, in retrospect.	Unclamping patterns.  Progress achieved by rule-codelet clamp = 0.
+traces	aabb-cc-aabb	3	3496	I'm getting frustrated.  I still don't see a good way to describe how "aabb" changes to "cc".	No satisfactory rules yet exist for describing how "aabb" changes to "cc".
+traces	aabb-cc-aabb	3	3496	I'll just have to try a little harder...	Clamping rule-codelet pattern...
+traces	aabb-cc-aabb	3	3768	Well, my latest effort to think up new rules resulted in zero progress.  Guess it was a pretty useless effort, in retrospect.	Unclamping patterns.  Progress achieved by rule-codelet clamp = 0.
+traces	aabb-cc-aabb	3	3909	I'm getting frustrated.  I still don't see a good way to describe how "aabb" changes to "cc".	No satisfactory rules yet exist for describing how "aabb" changes to "cc".
+traces	aabb-cc-aabb	3	3909	I'll just have to try a little harder...	Clamping rule-codelet pattern...
+traces	aabb-cc-aabb	3	4191	Well, my latest effort to think up new rules resulted in zero progress.  Guess it was a pretty useless effort, in retrospect.	Unclamping patterns.  Progress achieved by rule-codelet clamp = 0.
+traces	aabb-cc-aabb	3	4306	I'm getting frustrated.  I still don't see a good way to describe how "aabb" changes to "cc".	No satisfactory rules yet exist for describing how "aabb" changes to "cc".
+traces	aabb-cc-aabb	3	4306	I'll just have to try a little harder...	Clamping rule-codelet pattern...
+traces	aabb-cc-aabb	3	4574	Well, my latest effort to think up new rules resulted in zero progress.  Guess it was a pretty useless effort, in retrospect.	Unclamping patterns.  Progress achieved by rule-codelet clamp = 0.
+traces	aabb-cc-aabb	3	4887	I'm getting frustrated.  I still don't see a good way to describe how "aabb" changes to "cc".	No satisfactory rules yet exist for describing how "aabb" changes to "cc".
+traces	aabb-cc-aabb	3	4887	I'll just have to try a little harder...	Clamping rule-codelet pattern...
+traces	aabb-cc-aabb	3	5202	Well, my latest effort to think up new rules resulted in zero progress.  Guess it was a pretty useless effort, in retrospect.	Unclamping patterns.  Progress achieved by rule-codelet clamp = 0.
+traces	aabb-cc-aabb	3	5912	I'm getting frustrated.  I still don't see a good way to describe how "aabb" changes to "cc".	No satisfactory rules yet exist for describing how "aabb" changes to "cc".
+traces	aabb-cc-aabb	3	5912	I'll just have to try a little harder...	Clamping rule-codelet pattern...
+traces	aabb-cc-aabb	3	6357	Well, my latest effort to think up new rules resulted in zero progress.  Guess it was a pretty useless effort, in retrospect.	Unclamping patterns.  Progress achieved by rule-codelet clamp = 0.
+traces	aabb-cc-aabb	3	6432	I just can't seem to come up with any better rules.	Jootsing from unsuccessful rule-codelet clamps.
+traces	aabb-cc-aabb	3	6432	Excuse me -- I think I'll go get some more punch.	Run terminated.
+traces/justify	aabc-aabd-ijkk-hjkk	1	4850	Aha!  I have an idea...	Clamping theme patterns...
+traces/justify	aabc-aabd-ijkk-hjkk	1	5189	Looks like that last brilliant idea I had resulted in zero progress.  Guess it was a pretty useless idea, in retrospect.	Unclamping patterns.  Progress achieved by justify clamp = 0.
+traces/justify	aabc-aabd-ijkk-hjkk	1	5485	Aha!  I have another idea...	Clamping theme patterns...
+traces/justify	aabc-aabd-ijkk-hjkk	1	6240	Looks like that last brilliant idea I had resulted in some progress.  Guess it was an okay idea, in retrospect.	Unclamping patterns.  Progress achieved by justify clamp = 79.
+traces/justify	aabc-aabd-ijkk-hjkk	1	6468	Aha!  I have another idea...	Clamping theme patterns...
+traces/justify	aabc-aabd-ijkk-hjkk	1	6848	Looks like that last brilliant idea I had resulted in zero progress.  Guess it was a pretty useless idea, in retrospect.	Unclamping patterns.  Progress achieved by justify clamp = 0.
+traces/justify	aabc-aabd-ijkk-hjkk	1	6961	Aha!  I have another idea...	Clamping theme patterns...
+traces/justify	aabc-aabd-ijkk-hjkk	1	7347	Looks like that last brilliant idea I had resulted in some progress.  Guess it was an okay idea, in retrospect.	Unclamping patterns.  Progress achieved by justify clamp = 67.
+traces/justify	aabc-aabd-ijkk-hjkk	1	7347	Aha!  I see why this answer makes sense.  I think it's a great answer!	Successfully justified answer.  Answer quality = 90.
+traces/justify	aabc-aabd-ijkk-hjkk	2	1244	Aha!  I have an idea...	Clamping theme patterns...
+traces/justify	aabc-aabd-ijkk-hjkk	2	1627	Looks like that last brilliant idea I had resulted in some progress.  Guess it was an okay idea, in retrospect.	Unclamping patterns.  Progress achieved by justify clamp = 79.
+traces/justify	aabc-aabd-ijkk-hjkk	2	1795	Aha!  I have another idea...	Clamping theme patterns...
+traces/justify	aabc-aabd-ijkk-hjkk	2	2193	Looks like that last brilliant idea I had resulted in some progress.  Guess it was an okay idea, in retrospect.	Unclamping patterns.  Progress achieved by justify clamp = 79.
+traces/justify	aabc-aabd-ijkk-hjkk	2	2193	Aha!  I see why this answer makes sense.  I think it's a very good answer!	Successfully justified answer.  Answer quality = 86.
+traces/justify	abc-abd-ijk-abd	3	3138	I'm getting frustrated.  I still don't see a good way to describe how "ijk" changes to "abd".	No satisfactory rules yet exist for describing how "ijk" changes to "abd".
+traces/justify	abc-abd-ijk-abd	3	3138	I'll just have to try a little harder...	Clamping rule-codelet pattern...
+traces/justify	abc-abd-ijk-abd	3	3447	Well, my latest effort to think up new rules resulted in zero progress.  Guess it was a pretty useless effort, in retrospect.	Unclamping patterns.  Progress achieved by rule-codelet clamp = 0.
+traces/justify	abc-abd-ijk-abd	3	3857	I'm getting frustrated.  I still don't see a good way to describe how "ijk" changes to "abd".	No satisfactory rules yet exist for describing how "ijk" changes to "abd".
+traces/justify	abc-abd-ijk-abd	3	3857	I'll just have to try a little harder...	Clamping rule-codelet pattern...
+traces/justify	abc-abd-ijk-abd	3	4109	Well, my latest effort to think up new rules resulted in zero progress.  Guess it was a pretty useless effort, in retrospect.	Unclamping patterns.  Progress achieved by rule-codelet clamp = 0.
+traces/justify	abc-abd-ijk-abd	3	4301	I'm getting frustrated.  I still don't see a good way to describe how "ijk" changes to "abd".	No satisfactory rules yet exist for describing how "ijk" changes to "abd".
+traces/justify	abc-abd-ijk-abd	3	4301	I'll just have to try a little harder...	Clamping rule-codelet pattern...
+traces/justify	abc-abd-ijk-abd	3	4948	Well, my latest effort to think up new rules resulted in a lot of progress.  Guess it was a pretty good effort, in retrospect.	Unclamping patterns.  Progress achieved by rule-codelet clamp = 100.
+traces/justify	abc-abd-ijk-abd	3	5008	I just can't seem to come up with any better rules.	Jootsing from unsuccessful rule-codelet clamps.
+traces/justify	abc-abd-ijk-abd	3	5008	Excuse me -- I think I'll go get some more punch.	Run terminated.
+traces/justify	abc-abd-ijk-abd	4	1724	I'm getting frustrated.  I still don't see a good way to describe either how "abc" changes to "abd" or how "ijk" changes to "abd".	No satisfactory rules yet exist for describing either how "abc" changes to "abd" or how "ijk" changes to "abd".
+traces/justify	abc-abd-ijk-abd	4	1724	I'll just have to try a little harder...	Clamping rule-codelet pattern...
+traces/justify	abc-abd-ijk-abd	4	1978	Well, my latest effort to think up new rules resulted in zero progress.  Guess it was a pretty useless effort, in retrospect.	Unclamping patterns.  Progress achieved by rule-codelet clamp = 0.
+traces/justify	abc-abd-ijk-abd	4	4184	I'm getting frustrated.  I still don't see a good way to describe how "ijk" changes to "abd".	No satisfactory rules yet exist for describing how "ijk" changes to "abd".
+traces/justify	abc-abd-ijk-abd	4	4184	I'll just have to try a little harder...	Clamping rule-codelet pattern...
+traces/justify	abc-abd-ijk-abd	4	4450	Well, my latest effort to think up new rules resulted in zero progress.  Guess it was a pretty useless effort, in retrospect.	Unclamping patterns.  Progress achieved by rule-codelet clamp = 0.
+traces/justify	abc-abd-ijk-abd	4	4810	I'm getting frustrated.  I still don't see a good way to describe how "ijk" changes to "abd".	No satisfactory rules yet exist for describing how "ijk" changes to "abd".
+traces/justify	abc-abd-ijk-abd	4	4810	I'll just have to try a little harder...	Clamping rule-codelet pattern...
+traces/justify	abc-abd-ijk-abd	4	5328	Well, my latest effort to think up new rules resulted in some progress.  Guess it was an okay effort, in retrospect.	Unclamping patterns.  Progress achieved by rule-codelet clamp = 50.
+traces/justify	abc-abd-ijk-abd	4	5764	I'm getting frustrated.  I still don't see a good way to describe how "ijk" changes to "abd".	No satisfactory rules yet exist for describing how "ijk" changes to "abd".
+traces/justify	abc-abd-ijk-abd	4	5764	I'll just have to try a little harder...	Clamping rule-codelet pattern...
+traces/justify	abc-abd-ijk-abd	4	6064	Well, my latest effort to think up new rules resulted in very little progress.  Guess it was not such a great effort, in retrospect.	Unclamping patterns.  Progress achieved by rule-codelet clamp = 25.
+traces/justify	abc-abd-ijk-abd	4	6208	I'm getting frustrated.  I still don't see a good way to describe how "ijk" changes to "abd".	No satisfactory rules yet exist for describing how "ijk" changes to "abd".
+traces/justify	abc-abd-ijk-abd	4	6208	I'll just have to try a little harder...	Clamping rule-codelet pattern...
+traces/justify	abc-abd-ijk-abd	4	6469	Well, my latest effort to think up new rules resulted in zero progress.  Guess it was a pretty useless effort, in retrospect.	Unclamping patterns.  Progress achieved by rule-codelet clamp = 0.
+traces/justify	abc-abd-ijk-abd	4	6828	I'm getting frustrated.  I still don't see a good way to describe how "ijk" changes to "abd".	No satisfactory rules yet exist for describing how "ijk" changes to "abd".
+traces/justify	abc-abd-ijk-abd	4	6828	I'll just have to try a little harder...	Clamping rule-codelet pattern...
+traces/justify	abc-abd-ijk-abd	4	7116	Well, my latest effort to think up new rules resulted in zero progress.  Guess it was a pretty useless effort, in retrospect.	Unclamping patterns.  Progress achieved by rule-codelet clamp = 0.
+traces/justify	abc-abd-ijk-abd	4	7188	I just can't seem to come up with any better rules.	Jootsing from unsuccessful rule-codelet clamps.
+traces/justify	abc-abd-ijk-abd	4	7188	Excuse me -- I think I'll go get some more punch.	Run terminated.
+traces/justify	abc-cba-mrrjjj-mmmrrj	3	8728	Aha!  I have an idea...	Clamping theme patterns...
+traces/justify	abc-cba-mrrjjj-mmmrrj	3	9205	Looks like that last brilliant idea I had resulted in a lot of progress.  Guess it was a pretty good idea, in retrospect.	Unclamping patterns.  Progress achieved by justify clamp = 85.
+traces/justify	abc-cba-mrrjjj-mmmrrj	3	9326	Aha!  I have another idea...	Clamping theme patterns...
+traces/justify	abc-cba-mrrjjj-mmmrrj	3	10080	Looks like that last brilliant idea I had resulted in a lot of progress.  Guess it was a pretty good idea, in retrospect.	Unclamping patterns.  Progress achieved by justify clamp = 85.
+traces/justify	abc-cba-mrrjjj-mmmrrj	3	10230	Aha!  I have another idea...	Clamping theme patterns...
+traces/justify	abc-cba-mrrjjj-mmmrrj	3	10505	Looks like that last brilliant idea I had resulted in zero progress.  Guess it was a pretty useless idea, in retrospect.	Unclamping patterns.  Progress achieved by justify clamp = 0.
+traces/justify	abc-cba-mrrjjj-mmmrrj	3	10891	Aha!  I have another idea...	Clamping theme patterns...
+traces/justify	abc-cba-mrrjjj-mmmrrj	3	11280	Looks like that last brilliant idea I had resulted in zero progress.  Guess it was a pretty useless idea, in retrospect.	Unclamping patterns.  Progress achieved by justify clamp = 0.
+traces/justify	abc-cba-mrrjjj-mmmrrj	3	11505	Aha!  I have another idea...	Clamping theme patterns...
+traces/justify	abc-cba-mrrjjj-mmmrrj	3	12270	Looks like that last brilliant idea I had resulted in zero progress.  Guess it was a pretty useless idea, in retrospect.	Unclamping patterns.  Progress achieved by justify clamp = 0.
+traces/justify	abc-cba-mrrjjj-mmmrrj	3	12390	Aha!  I have another idea...	Clamping theme patterns...
+traces/justify	abc-cba-mrrjjj-mmmrrj	3	12999	Looks like that last brilliant idea I had resulted in zero progress.  Guess it was a pretty useless idea, in retrospect.	Unclamping patterns.  Progress achieved by justify clamp = 0.
+traces/justify	abc-cba-mrrjjj-mmmrrj	3	13322	Aha!  I have another idea...	Clamping theme patterns...
+traces/justify	abc-cba-mrrjjj-mmmrrj	3	13703	Looks like that last brilliant idea I had resulted in zero progress.  Guess it was a pretty useless idea, in retrospect.	Unclamping patterns.  Progress achieved by justify clamp = 0.
+traces/justify	abc-cba-mrrjjj-mmmrrj	3	13846	Aha!  I have another idea...	Clamping theme patterns...
+traces/justify	abc-cba-mrrjjj-mmmrrj	3	14265	Looks like that last brilliant idea I had resulted in zero progress.  Guess it was a pretty useless idea, in retrospect.	Unclamping patterns.  Progress achieved by justify clamp = 0.
+traces/justify	abc-cba-mrrjjj-mmmrrj	3	14446	Aha!  I have another idea...	Clamping theme patterns...
+traces/justify	abc-cba-mrrjjj-mmmrrj	3	14787	Looks like that last brilliant idea I had resulted in zero progress.  Guess it was a pretty useless idea, in retrospect.	Unclamping patterns.  Progress achieved by justify clamp = 0.
+traces/justify	abc-cba-mrrjjj-mmmrrj	3	14925	Aha!  I have another idea...	Clamping theme patterns...
+traces/justify	abc-cba-mrrjjj-mmmrrj	3	15690	Looks like that last brilliant idea I had resulted in zero progress.  Guess it was a pretty useless idea, in retrospect.	Unclamping patterns.  Progress achieved by justify clamp = 0.
+traces/justify	abc-cba-mrrjjj-mmmrrj	3	15843	Okay, I'm stumped.  This answer makes no sense to me.  I see no way to make the necessary letter-category <=> length slippage here.	Run terminated.  Unable to make the necessary letter-category <=> length slippage.
+traces/justify	eqe-qeq-abbba-aaabaaa	3	5567	Aha!  I have an idea...	Clamping theme patterns...
+traces/justify	eqe-qeq-abbba-aaabaaa	3	6330	Looks like that last brilliant idea I had resulted in very little progress.  Guess it was not such a great idea, in retrospect.	Unclamping patterns.  Progress achieved by justify clamp = 5.
+traces/justify	eqe-qeq-abbba-aaabaaa	3	6486	Aha!  I have another idea...	Clamping theme patterns...
+traces/justify	eqe-qeq-abbba-aaabaaa	3	7245	Looks like that last brilliant idea I had resulted in some progress.  Guess it was an okay idea, in retrospect.	Unclamping patterns.  Progress achieved by justify clamp = 77.
+traces/justify	eqe-qeq-abbba-aaabaaa	3	8112	Aha!  I have another idea...	Clamping theme patterns...
+traces/justify	eqe-qeq-abbba-aaabaaa	3	8646	Looks like that last brilliant idea I had resulted in very little progress.  Guess it was not such a great idea, in retrospect.	Unclamping patterns.  Progress achieved by justify clamp = 5.
+traces/justify	eqe-qeq-abbba-aaabaaa	3	9469	Aha!  I have another idea...	Clamping theme patterns...
+traces/justify	eqe-qeq-abbba-aaabaaa	3	9772	Looks like that last brilliant idea I had resulted in zero progress.  Guess it was a pretty useless idea, in retrospect.	Unclamping patterns.  Progress achieved by justify clamp = 0.
+traces/justify	eqe-qeq-abbba-aaabaaa	3	9878	Aha!  I have another idea...	Clamping theme patterns...
+traces/justify	eqe-qeq-abbba-aaabaaa	3	10134	Looks like that last brilliant idea I had resulted in zero progress.  Guess it was a pretty useless idea, in retrospect.	Unclamping patterns.  Progress achieved by justify clamp = 0.
+traces/justify	eqe-qeq-abbba-aaabaaa	3	10882	Aha!  I have another idea...	Clamping theme patterns...
+traces/justify	eqe-qeq-abbba-aaabaaa	3	11640	Looks like that last brilliant idea I had resulted in very little progress.  Guess it was not such a great idea, in retrospect.	Unclamping patterns.  Progress achieved by justify clamp = 12.
+traces/justify	eqe-qeq-abbba-aaabaaa	3	12069	Aha!  I have another idea...	Clamping theme patterns...
+traces/justify	eqe-qeq-abbba-aaabaaa	3	12350	Looks like that last brilliant idea I had resulted in zero progress.  Guess it was a pretty useless idea, in retrospect.	Unclamping patterns.  Progress achieved by justify clamp = 0.
+traces/justify	eqe-qeq-abbba-aaabaaa	3	14429	Aha!  I have another idea...	Clamping theme patterns...
+traces/justify	eqe-qeq-abbba-aaabaaa	3	14743	Looks like that last brilliant idea I had resulted in zero progress.  Guess it was a pretty useless idea, in retrospect.	Unclamping patterns.  Progress achieved by justify clamp = 0.
+traces/justify	eqe-qeq-abbba-aaabaaa	3	17384	Aha!  I have another idea...	Clamping theme patterns...
+traces/justify	eqe-qeq-abbba-aaabaaa	3	17795	Looks like that last brilliant idea I had resulted in zero progress.  Guess it was a pretty useless idea, in retrospect.	Unclamping patterns.  Progress achieved by justify clamp = 0.
+traces/justify	eqe-qeq-abbba-aaabaaa	3	19194	Aha!  I have another idea...	Clamping theme patterns...
+traces/justify	eqe-qeq-abbba-aaabaaa	3	19472	Looks like that last brilliant idea I had resulted in zero progress.  Guess it was a pretty useless idea, in retrospect.	Unclamping patterns.  Progress achieved by justify clamp = 0.
+traces/justify	eqe-qeq-abbba-aaabaaa	3	20619	Aha!  I have another idea...	Clamping theme patterns...
+traces/justify	eqe-qeq-abbba-aaabaaa	3	21375	Looks like that last brilliant idea I had resulted in very little progress.  Guess it was not such a great idea, in retrospect.	Unclamping patterns.  Progress achieved by justify clamp = 5.
+traces/justify	eqe-qeq-abbba-aaabaaa	3	30594	Aha!  I have another idea...	Clamping theme patterns...
+traces/justify	eqe-qeq-abbba-aaabaaa	3	30873	Looks like that last brilliant idea I had resulted in zero progress.  Guess it was a pretty useless idea, in retrospect.	Unclamping patterns.  Progress achieved by justify clamp = 0.
+traces/justify	eqe-qeq-abbba-aaabaaa	3	34655	Okay, I'm stumped.  This answer makes no sense to me.  I see no way to make the necessary letter-category <=> length slippage here.	Run terminated.  Unable to make the necessary letter-category <=> length slippage.
+traces/justify	rst-rsu-xyz-xyu	5	1318	I'm getting frustrated.  I still don't see a good way to describe either how "rst" changes to "rsu" or how "xyz" changes to "xyu".	No satisfactory rules yet exist for describing either how "rst" changes to "rsu" or how "xyz" changes to "xyu".
+traces/justify	rst-rsu-xyz-xyu	5	1318	I'll just have to try a little harder...	Clamping rule-codelet pattern...
+traces/justify	rst-rsu-xyz-xyu	5	1430	Well, my latest effort to think up new rules resulted in a lot of progress.  Guess it was a pretty good effort, in retrospect.	Unclamping patterns.  Progress achieved by rule-codelet clamp = 100.
+traces/justify	rst-rsu-xyz-xyu	5	1430	Aha!  I see why this answer makes sense, but it's a pretty bad answer, in my opinion.	Successfully justified answer.  Answer quality = 57.
+traces-snags	a-b-xyz	5	240	Uh-oh, I seem to have run into a little problem.  Changing the letter-category of the xyz group to its successor is not possible in xyz.	Hit a snag:  Changing the letter-category of the xyz group to its successor is not possible in xyz.
+traces-snags	a-b-xyz	5	408	Uh-oh, I seem to have run into a little problem again.  Changing the letter-category of the xyz group to `b' is not possible in xyz.	Hit another snag:  Changing the letter-category of the xyz group to `b' is not possible in xyz.
+traces-snags	a-b-xyz	5	570	The answer "wxy" occurs to me.  I think this answer is great!	Found the answer "wxy".  Answer quality = 95.
+traces-snags	ab-ba-xyz	2	303	Uh-oh, I seem to have run into a little problem.  No string-position-category swap is possible between the letter x, the letter y, and the letter z in xyz.	Hit a snag:  No string-position-category swap is possible between the letter x, the letter y, and the letter z in xyz.
+traces-snags	ab-ba-xyz	2	379	The answer "zyx" occurs to me.  I think this answer is great!	Found the answer "zyx".  Answer quality = 97.
+traces-snags	abc-abcd-xyz	4	466	Uh-oh, I seem to have run into a little problem.  Changing the length of the xyz group to its successor is not possible in xyz.	Hit a snag:  Changing the length of the xyz group to its successor is not possible in xyz.
+traces-snags	abc-abcd-xyz	4	570	Uh-oh, I seem to have run into a little problem again.  Changing the length of the xyz group to its successor is not possible in xyz.	Hit another snag:  Changing the length of the xyz group to its successor is not possible in xyz.
+traces-snags	abc-abcd-xyz	4	795	The answer "xyz" occurs to me.  I think this answer is great!	Found the answer "xyz".  Answer quality = 96.
+traces-snags	abc-cba-abcabc	3	1217	Uh-oh, I seem to have run into a little problem.  Reversing the starting and ending letter-category of the string "abcabc" is not possible in abcabc.	Hit a snag:  Reversing the starting and ending letter-category of the string "abcabc" is not possible in abcabc.
+traces-snags	abc-cba-abcabc	3	1897	The answer "abcabc" occurs to me.  I think this answer is very good!	Found the answer "abcabc".  Answer quality = 89.
+traces-snags	abc-zyx-xyz	9	825	Uh-oh, I seem to have run into a little problem.  Changing the group-category of the xyz group conflicts with changing the letter-category of the xyz group in xyz.	Hit a snag:  Changing the group-category of the xyz group conflicts with changing the letter-category of the xyz group in xyz.
+traces-snags	abc-zyx-xyz	9	1095	Uh-oh, I seem to have run into a little problem again.  Changing the group-category of the xyz group conflicts with changing the letter-category of the xyz group in xyz.	Hit another snag:  Changing the group-category of the xyz group conflicts with changing the letter-category of the xyz group in xyz.
+traces-snags	abc-zyx-xyz	9	1621	Uh-oh, I seem to have run into a little problem again.  Changing the group-category of the xyz group conflicts with changing the letter-category of the xyz group in xyz.	Hit another snag:  Changing the group-category of the xyz group conflicts with changing the letter-category of the xyz group in xyz.
+traces-snags	abc-zyx-xyz	9	1665	All right, I've had enough of this!  Let's try something different for a change...	Clamping negative theme pattern...
+traces-snags	abc-zyx-xyz	9	1946	Looks like I made zero headway in coming up with new ideas.	Unclamping patterns.  Progress achieved by snag-response clamp = 0.
+traces-snags	abc-zyx-xyz	9	1984	Uh-oh, I seem to have run into a little problem again.  Changing the group-category of the xyz group conflicts with changing the letter-category of the xyz group in xyz.	Hit another snag:  Changing the group-category of the xyz group conflicts with changing the letter-category of the xyz group in xyz.
+traces-snags	abc-zyx-xyz	9	2085	The answer "xyz" occurs to me.  I think this answer is great!	Found the answer "xyz".  Answer quality = 94.
+traces-snags	eqe-qeq-mrrjjj	3	630	Uh-oh, I seem to have run into a little problem.  No letter-category swap is possible between the letter m, the rr group, and the jjj group in mrrjjj.	Hit a snag:  No letter-category swap is possible between the letter m, the rr group, and the jjj group in mrrjjj.
+traces-snags	eqe-qeq-mrrjjj	3	1029	Uh-oh, I seem to have run into a little problem again.  No letter-category swap is possible between the m group, the rr group, and the jjj group in mrrjjj.	Hit another snag:  No letter-category swap is possible between the m group, the rr group, and the jjj group in mrrjjj.
+traces-snags	eqe-qeq-mrrjjj	3	1680	The answer "qrrqqq" occurs to me, but that's pretty bad.	Found the answer "qrrqqq".  Answer quality = 57.
+traces-snags	wxyz-vxyz-abcd	3	575	Uh-oh, I seem to have run into a little problem.  Changing the letter-category of the letter a to its predecessor is not possible in abcd.	Hit a snag:  Changing the letter-category of the letter a to its predecessor is not possible in abcd.
+traces-snags	wxyz-vxyz-abcd	3	799	The answer "vbcd" occurs to me.  I think this answer is halfway decent.	Found the answer "vbcd".  Answer quality = 75.

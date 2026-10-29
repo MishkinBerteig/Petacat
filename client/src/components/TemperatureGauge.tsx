@@ -16,10 +16,15 @@
 
 import { useState, useCallback } from 'react';
 import { clampTemperature, unclampTemperature, describeApiError } from '@/api/client';
+import { useMomentStore } from '@/store/momentStore';
 import { useRunStore } from '@/store/runStore';
 
 export function TemperatureGauge() {
-  const temperature = useRunStore((s) => s.temperature);
+  const liveTemperature = useRunStore((s) => s.temperature);
+  // A redisplayed Trace event, answer or snag shows its own temperature
+  // (`(tell *temperature-window* 'update-graphics ...)`, `trace.ss:411-465`, `memory.ss:281`).
+  const displayed = useMomentStore((s) => s.displayed);
+  const temperature = displayed ? displayed.picture.temperature : liveTemperature;
   const clamped = useRunStore((s) => s.temperatureClamped);
   const runId = useRunStore((s) => s.runId);
   const refreshTemperature = useRunStore((s) => s.refreshTemperature);

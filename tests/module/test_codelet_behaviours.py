@@ -271,7 +271,7 @@ class TestTopDownBondScoutCategory:
         from server.engine.codelet_dsl.builtins import choose_bond_facet
 
         target = ctx.workspace.target_string
-        first, second = target.groups[0], target.groups[1]
+        first, second = target.groups[-1], target.groups[-2]
         facets = set()
         for try_seed in range(40):
             ctx.rng = RNG(SEED + try_seed)
@@ -308,7 +308,7 @@ class TestBondDescriptionRouting:
         self, ctx_abc_abd_xyz_with_group
     ):
         ctx = ctx_abc_abd_xyz_with_group
-        group = ctx.workspace.target_string.groups[0]
+        group = ctx.workspace.target_string.groups[-1]
         facet_type = ctx.slipnet.nodes["plato-bond-facet"]
 
         description = Description(
@@ -327,7 +327,7 @@ class TestBondDescriptionRouting:
         self, ctx_abc_abd_xyz_with_group
     ):
         ctx = ctx_abc_abd_xyz_with_group
-        group = ctx.workspace.target_string.groups[0]
+        group = ctx.workspace.target_string.groups[-1]
 
         description = Description(
             group,
@@ -492,7 +492,7 @@ class TestBondBuilder:
         ctx = ctx_abc_abd_xyz_with_group
         target = ctx.workspace.target_string
         slipnet = ctx.slipnet
-        first, second = target.groups[0], target.groups[1]
+        first, second = target.groups[-1], target.groups[-2]
         sameness = slipnet.nodes["plato-sameness"]
 
         def _bond(facet_name, d1, d2):
@@ -782,7 +782,7 @@ class TestGroupHierarchy:
         """
         ctx = ctx_abc_abd_xyz_with_group
         target = ctx.workspace.target_string
-        rr, jjj = target.groups[0], target.groups[1]
+        rr, jjj = target.groups[-1], target.groups[-2]
         m = _sameness_group(ctx, target, [target.letters[0]])
         assert build_structure(ctx, m) is True
 
@@ -793,7 +793,7 @@ class TestGroupHierarchy:
         assert build_structure(ctx, supergroup) is True
 
         # The subgroups are still in the string, and are now nested members.
-        assert [g for g in target.groups if g is not supergroup] == [rr, jjj, m]
+        assert [g for g in target.groups if g is not supergroup] == [m, jjj, rr]
         assert m.enclosing_group is supergroup
         assert rr.enclosing_group is supergroup
         assert jjj.enclosing_group is supergroup
@@ -811,7 +811,7 @@ class TestGroupHierarchy:
         """
         ctx = ctx_abc_abd_xyz_with_group
         target = ctx.workspace.target_string
-        rr, jjj = target.groups[0], target.groups[1]
+        rr, jjj = target.groups[-1], target.groups[-2]
         m = _sameness_group(ctx, target, [target.letters[0]])
         build_structure(ctx, m)
         supergroup = _sameness_group(ctx, target, [m, rr, jjj], facet="plato-length")
@@ -836,7 +836,7 @@ class TestBreakGroupCascade:
         slipnet = ctx.slipnet
         target = ctx.workspace.target_string
         initial = ctx.workspace.initial_string
-        rr, jjj = target.groups[0], target.groups[1]
+        rr, jjj = target.groups[-1], target.groups[-2]
 
         # A bond *incident* to [rr]: m -> [rr] on the length facet.
         m = target.letters[0]
@@ -896,7 +896,7 @@ class TestBreakGroupCascade:
         ctx = ctx_abc_abd_xyz_with_group
         slipnet = ctx.slipnet
         target = ctx.workspace.target_string
-        rr = target.groups[0]
+        rr = target.groups[-1]
 
         constituent = Bond(
             target.letters[1],
@@ -2112,7 +2112,7 @@ class TestDuplicateGroup:
 
         ctx = ctx_abc_abd_xyz_with_group
         target = ctx.workspace.target_string
-        incumbent = target.groups[0]
+        incumbent = target.groups[-1]
         length = ctx.slipnet.nodes["plato-length"]
         incumbent.descriptions = [
             d for d in incumbent.descriptions if d.description_type is not length

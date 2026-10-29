@@ -38,11 +38,12 @@ from __future__ import annotations
 
 import threading
 import time
+from contextlib import nullcontext
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from server.engine import hardware
-from server.engine.coderack_shards import WorkerShardedCoderack
+from server.engine.coderack_shards import LockedCoderack
 from server.engine.ids import use_allocator
 from server.engine.runner import (
     STATUS_ANSWER_FOUND,
@@ -51,9 +52,25 @@ from server.engine.runner import (
     STATUS_RUNNING,
 )
 from server.engine.splittable_rng import SplittableRNG
+from server.engine.workspace_structures import set_structure_clock
 
 if TYPE_CHECKING:
     from server.engine.runner import EngineRunner
+
+#: Codelet families that run whole, under the commit lock, like the update cycle.
+#:
+#: ``meta`` is the progress-watcher and the jootser, and ``answer`` the answer-finder
+#: and the answer-justifier.  They clamp and unclamp, snag, give up and report answers:
+#: in one step they rewrite theme activations, Slipnet clamps, coderack patterns and the
+#: Trace's clamp state, and the snag response and giving up each run an update cycle of
+#: their own.  Not all of that goes through the builtins that take the lock, and all of
+#: it is state the scheduled update reads and writes back.  Run beside an update, a
+#: clamp could land between the update reading the Slipnet and writing it back and be
+#: overwritten; on MLX two updates at once abort the process.  Run beside each other,
+#: one answer-finder could snag and empty the rack while another, already chosen, went
+#: on to report an answer.  They are rare, and an answer-finder holds the lock for most
+#: of its work anyway, so serialising them costs nothing measurable.
+SERIALISED_FAMILIES = frozenset({"meta", "answer"})
 
 
 @dataclass
@@ -70,6 +87,9 @@ class FreeRunResult:
     #: Codelets that produced no structure — the architecture's own outcome, which a
     #: lost race is folded into.
     fizzles: int = 0
+    #: Codelets dropped unrun because the rack they were chosen from was emptied before
+    #: they could start — by a snag's restart, which serially deletes them all.
+    discarded: int = 0
     update_cycles: int = 0
     per_worker: list[int] = field(default_factory=list)
 
@@ -91,6 +111,7 @@ class FreeRunResult:
             "codelets_per_second": round(self.codelets_per_second),
             "conflicts": self.conflicts,
             "conflict_rate": round(self.conflict_rate, 4),
+            "discarded": self.discarded,
             "update_cycles": self.update_cycles,
             "per_worker": self.per_worker,
         }
@@ -143,42 +164,28 @@ class FreeRunningEngine:
         #: by the owner rather than a ``Barrier`` a dying worker could break.
         self._all_started = threading.Event()
         self._conflicts = 0
+        self._discarded = 0
         self._update_cycles = 0
         self._per_worker: list[int] = []
+        #: Codelets started, which the budget is checked against.
+        self._claimed = 0
 
     # -- preparation ---------------------------------------------------
 
     def prepare(self) -> None:
-        """Install the sharded rack and the shared commit lock.
+        """Install the locked rack and the shared commit lock.
 
-        Codelets already carried over from ``init_mcat`` are moved across rather than
-        discarded: they are the run's opening bottom-up scouts, and dropping them would
-        start the run somewhere the serial engine never starts.
+        The serial rack is adopted as it stands, wrapped in a mutex
+        (:class:`~server.engine.coderack_shards.LockedCoderack`), so the opening
+        codelets carry over exactly and every draw and every eviction is the serial
+        rack's own.  It was previously split into per-worker shards, which drew each
+        worker from its own shard; the draw is urgency-weighted, so that is not the
+        serial distribution (see the README's free-running section).
         """
         ctx = self.runner.ctx
-        if isinstance(ctx.coderack, WorkerShardedCoderack):
+        if isinstance(ctx.coderack, LockedCoderack):
             return
-
-        sharded = WorkerShardedCoderack(ctx.meta, self.shards)
-        sharded.rng = ctx.rng
-        sharded.current_time = ctx.coderack.current_time
-        # As a *batch*, not one at a time.  ``post`` routes to the posting thread's own
-        # shard, and this runs on the main thread, so posting them individually put the
-        # entire opening population into shard 0 — where a shard holds
-        # ``max_coderack_size // shards`` and the rest were evicted on the way in.
-        # Measured before this: 56 codelets in, ``[25, 0, 0, 0]`` out, 31 discarded,
-        # and three of the four workers starting with nothing to draw.
-        #
-        # ``post_deferred`` deals round-robin across the shards and its own docstring
-        # names this hazard — "keeps a 36-codelet opening batch from overflowing one
-        # 25-codelet shard while the others sit empty".  It is also the right call on
-        # its own terms: these are one batch, and ``post-initial-codelets``
-        # (``run.ss:275-283``) lands them through ``post-deferred-codelets``.
-        carried = [
-            codelet for b in ctx.coderack.bins for codelet in list(b.codelets)
-        ]
-        sharded.post_deferred(carried, ctx.coderack.current_time, ctx.rng)
-        ctx.coderack = sharded
+        ctx.coderack = LockedCoderack(ctx.meta, ctx.coderack)
 
         # The commit lock is read by the mutating builtins through the context, so the
         # engine needs no knowledge of whether it is running in parallel — a serial run
@@ -196,8 +203,10 @@ class FreeRunningEngine:
         ctx.run_ended = False
         self._stop.clear()
         self._conflicts = 0
+        self._discarded = 0
         self._update_cycles = 0
         self._per_worker = [0] * self.workers
+        self._claimed = ctx.codelet_count
 
         self._all_started.clear()
         threads = [
@@ -231,6 +240,7 @@ class FreeRunningEngine:
             workers=self.workers,
             seconds=elapsed,
             conflicts=self._conflicts,
+            discarded=self._discarded,
             update_cycles=self._update_cycles,
             per_worker=list(self._per_worker),
         )
@@ -256,6 +266,12 @@ class FreeRunningEngine:
                 if runner.status != STATUS_RUNNING:
                     break
 
+                # Noted before choosing, so a rack emptied after this point is seen as
+                # emptied: a codelet chosen from it is one the restart deleted.  A rack
+                # emptied just before the choice can make a freshly posted codelet look
+                # deleted too, which drops one opening codelet; the other order would
+                # run a deleted one.
+                generation = getattr(ctx.coderack, "generation", 0)
                 codelet = ctx.coderack.choose_and_remove(
                     ctx.temperature.value, ctx.rng, worker=index
                 )
@@ -269,42 +285,75 @@ class FreeRunningEngine:
                             ctx.slipnet.clamp_initially_relevant(ctx.meta)
                     continue
 
-                with self._count_lock:
-                    ctx.codelet_count += 1
-                    step = ctx.codelet_count
-                    ctx.coderack.current_time = step
-                    # Counted under the same lock as ``codelet_count``, because
-                    # ``list[i] += 1`` is a read-modify-write and losing one makes the
-                    # telemetry disagree with the run: observed as 900 worker-codelets
-                    # against a codelet_count of 901.
-                    self._per_worker[index] += 1
-                if max_steps > 0 and step > max_steps:
-                    self._stop.set()
-                    break
+                spec = ctx.meta.codelet_specs.get(codelet.codelet_type)
+                serialised = spec is not None and spec.family in SERIALISED_FAMILIES
+                with self._commit_lock if serialised else nullcontext():
+                    # A snag's restart empties the rack (``delete-all-codelets``,
+                    # ``answers.ss:1189``), and a codelet chosen before that would never
+                    # have run serially.  Checked under the lock the restart holds for the
+                    # serialised families, so an answer-finder waiting on a snag's
+                    # restart sees it; for the rest it narrows the window rather than
+                    # closing it, since a codelet already executing cannot be recalled.
+                    if getattr(ctx.coderack, "generation", 0) != generation:
+                        with self._count_lock:
+                            self._discarded += 1
+                        continue
 
-                # Each codelet draws from a stream of its own, addressed by where it ran
-                # rather than by what ran before it — which is the property that survives
-                # an execution order that is not determined (WP4.1).
-                #
-                # Bound **per thread**.  Assigning ``ctx.rng`` and restoring it, as this
-                # did, is a shared attribute: worker A's assignment was visible to worker
-                # B, so B ran its codelet against A's stream, and whichever worker
-                # restored last left ``ctx.rng`` holding some finished codelet's stream.
-                # That defeated the entire purpose of the per-codelet streams and put the
-                # run's ``random.Random`` — an object with 19,937 bits of mutable state —
-                # in reach of two threads at once.
-                codelet_rng = local_rng.for_codelet(worker=index, slot=step)
-                with ctx.use_codelet_rng(codelet_rng):
-                    ctx.access.begin()
-                    try:
-                        runner._execute_codelet(codelet)
-                    finally:
-                        if not ctx.access.validate():
-                            with self._count_lock:
-                                self._conflicts += 1
-                        ctx.access.end()
+                    with self._count_lock:
+                        # The budget is checked against the codelets *claimed*, before
+                        # the claim is made, so a run that stops on it reports the
+                        # codelets it ran.  ``ctx.codelet_count`` is the number
+                        # *finished*, as it is serially: ``step-mcat`` runs a codelet
+                        # and then increments, so a codelet sees (and stamps its events,
+                        # clamps and posts with) the count of those before it.
+                        exhausted = 0 < max_steps <= self._claimed
+                        if not exhausted:
+                            self._claimed += 1
+                            slot = self._claimed
+                            ctx.coderack.current_time = ctx.codelet_count
+                            set_structure_clock(ctx.codelet_count)
+                            # Counted under the same lock, because ``list[i] += 1`` is a
+                            # read-modify-write and losing one makes the telemetry
+                            # disagree with the run.
+                            self._per_worker[index] += 1
+                    if exhausted:
+                        self._stop.set()
+                        break
 
-                self._collect_outcome(step)
+                    # Each codelet draws from a stream of its own, addressed by where it
+                    # ran rather than by what ran before it — which is the property that
+                    # survives an execution order that is not determined (WP4.1).
+                    #
+                    # Bound **per thread**.  Assigning ``ctx.rng`` and restoring it, as
+                    # this did, is a shared attribute: worker A's assignment was visible
+                    # to worker B, so B ran its codelet against A's stream, and whichever
+                    # worker restored last left ``ctx.rng`` holding some finished
+                    # codelet's stream.  That defeated the entire purpose of the
+                    # per-codelet streams and put the run's ``random.Random`` — an object
+                    # with 19,937 bits of mutable state — in reach of two threads at once.
+                    codelet_rng = local_rng.for_codelet(worker=index, slot=slot)
+                    with ctx.use_codelet_rng(codelet_rng):
+                        ctx.access.begin()
+                        try:
+                            runner._execute_codelet(codelet)
+                        finally:
+                            if not ctx.access.validate():
+                                with self._count_lock:
+                                    self._conflicts += 1
+                            ctx.access.end()
+
+                    # Counted, then collected, under the lock that serialised the
+                    # codelet.  Only the families that can report an answer or give up
+                    # (the answer-finder, the answer-justifier, the jootser) are
+                    # serialised.  Collected by whichever worker finished next, as it
+                    # once was, one worker's collection cleared another's answer while
+                    # that codelet was still running.
+                    if serialised:
+                        step = self._finish_codelet()
+                        self._collect_outcome()
+
+                if not serialised:
+                    step = self._finish_codelet()
 
                 # The update cycle runs *without stopping the other workers*, which is
                 # the staleness WP0.5 bounded at five codelets. Whichever worker crosses
@@ -315,7 +364,28 @@ class FreeRunningEngine:
                         self._update_cycles += 1
                     runner._emit_new_trace_events(ctx)
 
-    def _collect_outcome(self, step: int) -> None:
+    def _finish_codelet(self) -> int:
+        """Count a finished codelet, as ``step_mcat`` does after running it.
+
+        ``run.ss:182`` — the increment is the last thing a step does — and
+        ``run.ss:151-154``, the fixed-time initial unclamp, checked right after it.
+        Returns the new count.
+        """
+        runner = self.runner
+        ctx = runner.ctx
+        with self._count_lock:
+            ctx.codelet_count += 1
+            step = ctx.codelet_count
+            ctx.coderack.current_time = step
+            set_structure_clock(step)
+        if runner._initial_unclamp_time and step == runner._initial_unclamp_time:
+            with self._commit_lock:
+                if ctx.verbose:
+                    ctx.verbose_log.say("unclamping-initial-slipnodes")
+                runner._unclamp_initial_slipnodes(ctx.slipnet)
+        return step
+
+    def _collect_outcome(self) -> None:
         """Claim the run's terminal outcome, once, whichever worker produced it.
 
         Serially a run has exactly one ending: ``report_answer`` sets the pending answer

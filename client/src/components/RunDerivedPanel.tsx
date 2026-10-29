@@ -110,11 +110,13 @@ export function RunDerivedPanel() {
                 <Row label="Persistence mode" value={derived.mode} />
                 <Row
                   label="Workers"
-                  value={derived.workers}
+                  value={derived.workers === null ? 'not recorded' : derived.workers}
                   hint={
-                    (derived.workers ?? 1) > 1
-                      ? 'Free-running: codelets across CPU cores with no global barrier. A seed no longer reproduces this run.'
-                      : 'Serial — the reference mode. Seed and problem reproduce the run exactly.'
+                    derived.workers === null
+                      ? 'This run was created before the worker count was stored, so whether its seed reproduces it is not known.'
+                      : (derived.workers ?? 1) > 1
+                        ? 'Free-running: codelets across CPU cores with no global barrier. A seed no longer reproduces this run.'
+                        : 'Serial — the reference mode. Seed and problem reproduce the run exactly.'
                   }
                 />
                 <Row label="Status" value={derived.status} />

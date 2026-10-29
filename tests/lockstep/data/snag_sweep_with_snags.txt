@@ -1,0 +1,30 @@
+# The 28 problems of the snag sweep on which Metacat hit at least one snag within seeds 1-12 and
+# cap 6000 (the ones recorded as full traces and replayed in Petacat).  Subset of snag_sweep_problems.txt.
+a b xyz
+aaa bbb xyz
+aab aac xyzz
+aabb aabc xyz
+ab ba xyz
+abbc abcc xyz
+abc aab mrrjjj
+abc abcd aabbcc
+abc abcd xyz
+abc abd bba
+abc abd cba
+abc abd wxyz
+abc abd xyyz
+abc abd xyzz
+abc abd zzz
+abc abd zzzaaa
+abc bcd xyz
+abc d xyz
+abc zyx xyz
+abcd abc xyzw
+eqe qeq mrrjjj
+eqe qeq xyz
+wxyz vxyz abcd
+xyz xya abc
+abc abd xyzyx
+abc cbd xyz
+abc dcb xyz
+abc cba abcabc

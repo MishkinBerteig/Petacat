@@ -55,3 +55,10 @@ tests/lockstep/replays/
 tests/lockstep/traces/*
 !tests/lockstep/traces/abc-abd-xyz/
 tests/lockstep/traces-heldout/
+
+# Agents' working files (scripts, Metacat recordings, logs): kept on disk, never committed.
+agents-workspace/
+
+# Default output of the wrap-and-log recorders and sweeps (tests/lockstep/metacat/record_*.py,
+# scripts/sweep_*.py): regenerated on demand.
+tests/lockstep/out/

@@ -96,10 +96,18 @@ class TraceRecordingSink:
         #: memory about how many snags there were — ten rows against one description on
         #: an ordinary run, with the rows' descriptions empty.
         self._snags: list[Any] = []
+        #: The memory's snags this run has already accounted for, by identifier: the
+        #: ones it inherited, and the ones it has taken since.  The memory is the whole
+        #: Training Session's, and ``flush`` empties ``_snags``, so neither the memory's
+        #: length nor the buffer's says which snags are new.  Comparing the two lengths
+        #: wrote every earlier snag again under each later run that snagged, and again
+        #: after each flush, relabelled with that run's id.
+        self._seen_snags: set[int] = set()
 
     # -- engine-facing events ------------------------------------------
 
-    def on_run_created(self, ctx: EngineContext) -> None: ...
+    def on_run_created(self, ctx: EngineContext) -> None:
+        self._seen_snags = {s.snag_id for s in ctx.memory.snags}
 
     def on_codelet(
         self, ctx: EngineContext, codelet: Any, result: StepResult
@@ -108,12 +116,15 @@ class TraceRecordingSink:
     def on_trace_event(self, ctx: EngineContext, event: TraceEvent) -> None:
         self._trace_events.append(event)
         if event.event_type == SNAG:
-            # Take whatever snag descriptions the memory has gained.  It gains none for
-            # a snag it already knows (``snag_present?``, ``answers.ss:1162``), which is
-            # exactly the deduplication the rows should inherit.
-            known = len(self._snags)
-            if len(ctx.memory.snags) > known:
-                self._snags.extend(ctx.memory.snags[known:])
+            # Take the snag descriptions the memory has gained during this run.  It
+            # gains none for a snag it already knows (``snag_present?``,
+            # ``answers.ss:1162``), which is exactly the deduplication the rows should
+            # inherit.
+            # Oldest first, so the rows are written in the order the snags were found.
+            for snag in ctx.memory.snags_oldest_first:
+                if snag.snag_id not in self._seen_snags:
+                    self._seen_snags.add(snag.snag_id)
+                    self._snags.append(snag)
 
     def on_structure_change(
         self, ctx: EngineContext, structure: Any, change: str
@@ -121,9 +132,9 @@ class TraceRecordingSink:
 
     def on_answer(self, ctx: EngineContext, answer: str, quality: float) -> None:
         # The engine has already stored the description in Episodic Memory by the time
-        # this fires; the last one is the answer just found.
+        # this fires; the newest (the first) is the answer just found.
         if ctx.memory.answers:
-            self._answers.append(ctx.memory.answers[-1])
+            self._answers.append(ctx.memory.answers[0])
 
     def on_valence(self, ctx: EngineContext, signal: str, strength: float) -> None: ...
 
@@ -163,6 +174,8 @@ class TraceRecordingSink:
                         describe_structure(s) for s in (event.structures or [])
                     ],
                     theme_pattern=event.theme_pattern,
+                    print_name=event.print_name or None,
+                    picture=event.picture,
                 )
             )
 
@@ -179,6 +192,9 @@ class TraceRecordingSink:
                     description=snag.description,
                     rule_signature=snag.rule_signature,
                     translated_rule_signature=snag.translated_rule_signature,
+                    explanation=snag.explanation,
+                    translated_rule_description=snag.translated_rule_description,
+                    picture=snag.picture,
                 )
             )
 
@@ -205,6 +221,7 @@ class TraceRecordingSink:
                 activation=answer.activation,
                 top_rule_signature=answer.top_rule_signature,
                 bottom_rule_signature=answer.bottom_rule_signature,
+                picture=answer.picture,
             )
             session.add(row)
 
@@ -238,6 +255,7 @@ class NormalSink(TraceRecordingSink):
         self._captures: list[tuple[str, int, dict]] = []
 
     def on_run_created(self, ctx: EngineContext) -> None:
+        super().on_run_created(ctx)
         self._captures.append(("start", ctx.codelet_count, capture_run_state(ctx)))
 
     def on_turn_end(self, ctx: EngineContext) -> None:
@@ -303,6 +321,7 @@ class AuditSink(TraceRecordingSink):
         )
 
     def on_run_created(self, ctx: EngineContext) -> None:
+        super().on_run_created(ctx)
         self._start_capture = capture_run_state(ctx)
 
     def on_codelet(

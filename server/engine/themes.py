@@ -982,9 +982,17 @@ def pick_theme_type(themespace: Themespace, workspace: Any, rng: Any) -> str | N
     themes are, which is what stops thematic pressure from re-scouting a
     correspondence the program has already settled.
     """
-    active = themespace.get_active_bridge_theme_types()
+    active, weights = theme_type_weights(themespace, workspace)
     if not active:
         return None
+    return rng.weighted_pick(active, weights)
+
+
+def theme_type_weights(themespace: Themespace, workspace: Any) -> tuple[list[str], list[float]]:
+    """The active bridge theme types and the weight each has in :func:`pick_theme_type`
+    (themes.ss:756-761).  A pure read: Verbose mode asks for it again to say what the
+    choice was made from."""
+    active = themespace.get_active_bridge_theme_types()
     weights = [
         themespace.get_max_positive_theme_activation(theme_type)
         * (
@@ -993,7 +1001,7 @@ def pick_theme_type(themespace: Themespace, workspace: Any, rng: Any) -> str | N
         )
         for theme_type in active
     ]
-    return rng.weighted_pick(active, weights)
+    return active, weights
 
 
 def pick_theme_conjunction(
@@ -1025,7 +1033,7 @@ def pick_theme_conjunction(
 
 
 def propose_description_based_on_theme(
-    obj: Any, theme: Theme, slipnet: Any, rng: Any
+    obj: Any, theme: Theme, slipnet: Any, rng: Any, vlog: Any = None
 ) -> Any:
     """Describe *obj* along the theme's dimension, so a bridge becomes expressible.
 
@@ -1045,6 +1053,8 @@ def propose_description_based_on_theme(
         return None
     candidates = dimension.get_possible_descriptors(obj)
     if not candidates:
+        if vlog is not None:
+            vlog.say("no-description-possible", dimension)
         return None
     # No floor: ``stochastic-pick-by-method possible-descriptors 'get-activation``
     # (``themes.ss:962``) leaves a dormant descriptor unreachable
@@ -1143,7 +1153,9 @@ def conditions_for_bridge(
     return conditions
 
 
-def look_for_auxiliary_slippages(bridge: Any, slipnet: Any, rng: Any) -> Any:
+def look_for_auxiliary_slippages(
+    bridge: Any, slipnet: Any, rng: Any, vlog: Any = None
+) -> Any:
     """Drag further slippages along on the coattails of the ones a bridge has.
 
     Scheme: ``look-for-auxiliary-slippages`` (themes.ss:893-952), called on every
@@ -1166,7 +1178,10 @@ def look_for_auxiliary_slippages(bridge: Any, slipnet: Any, rng: Any) -> Any:
     """
     from server.engine.concept_mappings import ConceptMapping
     from server.engine.descriptions import Description
+    from server.engine.verbose import ascii_name, exact, label_name
 
+    if vlog is not None:
+        vlog.say("looking-for-auxiliary-slippages")
     # ``(tell proposed-bridge 'get-slippages)`` (themes.ss:896) — which is the
     # non-symmetric slippages *plus the symmetric ones* (bridges.ss:167-170).
     # Reading only the forward list halved the coattail search: ``rightmost =>
@@ -1198,25 +1213,40 @@ def look_for_auxiliary_slippages(bridge: Any, slipnet: Any, rng: Any) -> Any:
                 continue
             if not related_node.possible_descriptor(object2):
                 continue
-            if not rng.prob(label.degree_of_assoc() / 100.0):
+            if vlog is not None:
+                vlog.say("auxiliary-slippage-possible", node, related_node, slippage)
+                vlog.say("label-degree-of-assoc", label_name(label), exact(label.degree_of_assoc()))
+            made = rng.prob(label.degree_of_assoc() / 100.0)
+            if vlog is not None:
+                if made:
+                    vlog.say("making-slippage")
+                else:
+                    vlog.say("not-making-slippage")
+            if not made:
                 continue
 
             if not _has_description_type(object1, new_cm_type):
+                if vlog is not None:
+                    vlog.say("added-description-to", ascii_name(object1))
                 return Description(object1, new_cm_type, node)
             if not _has_description_type(object2, new_cm_type):
+                if vlog is not None:
+                    vlog.say("added-description-to", ascii_name(object2))
                 return Description(object2, new_cm_type, related_node)
 
-            bridge.add_concept_mapping(
-                ConceptMapping(
-                    new_cm_type,
-                    node,
-                    new_cm_type,
-                    related_node,
-                    label=slipnet.get_label(node, related_node),
-                    object1=object1,
-                    object2=object2,
-                )
+            new_slippage = ConceptMapping(
+                new_cm_type,
+                node,
+                new_cm_type,
+                related_node,
+                label=slipnet.get_label(node, related_node),
+                object1=object1,
+                object2=object2,
             )
+            bridge.add_concept_mapping(new_slippage)
+            if vlog is not None:
+                vlog.say("added-new-slippage", new_slippage)
+                vlog.print_object(bridge)
     return None
 
 

@@ -59,6 +59,7 @@ vi.mock('@/api/client', async (importOriginal) => ({
   getWorkspace: vi.fn().mockResolvedValue(null),
   getSlipnet: vi.fn().mockResolvedValue(null),
   getCoderack: vi.fn().mockResolvedValue(null),
+  getEeg: vi.fn().mockResolvedValue(null),
   getThemespace: vi.fn().mockResolvedValue(null),
   getTrace: vi.fn().mockResolvedValue([]),
   getTemperature: vi.fn().mockResolvedValue({
@@ -211,6 +212,18 @@ describe('runStore — the threshold belongs to the run on screen', () => {
 
     expect(store.getState().runId).toBe(5)
     expect(store.getState().spreadingThreshold).toBe(30)
+  })
+
+  it('takes the worker count the loaded run was created with', async () => {
+    const store = await freshStore()
+
+    store.getState().adoptRun(runInfo({ run_id: 23, workers: 6 }))
+    expect(store.getState().runWorkers).toBe(6)
+
+    // A record from before the count was stored reads as the serial loop the
+    // controls assumed before.
+    store.getState().adoptRun(runInfo({ run_id: 9, workers: null }))
+    expect(store.getState().runWorkers).toBe(1)
   })
 
   it('reads a run with no recorded threshold as the 100 such a run used', async () => {

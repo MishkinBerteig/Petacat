@@ -127,7 +127,7 @@ describe('ThemespaceGrid — releasing thematic pressure', () => {
         onRelease={release}
       />,
     )
-    expect(screen.queryByRole('button', { name: /Release clamps/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Undo last clamp/i })).toBeNull()
 
     rerender(
       <ThemespaceGrid
@@ -135,10 +135,10 @@ describe('ThemespaceGrid — releasing thematic pressure', () => {
         onRelease={release}
       />,
     )
-    expect(screen.getByRole('button', { name: /Release clamps/i })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Undo last clamp/i })).toBeTruthy()
   })
 
-  it('releases every clamp when pressed', () => {
+  it('undoes the last clamp when pressed', () => {
     const release = vi.fn()
     render(
       <ThemespaceGrid
@@ -147,7 +147,7 @@ describe('ThemespaceGrid — releasing thematic pressure', () => {
       />,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /Release clamps/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Undo last clamp/i }))
 
     expect(release).toHaveBeenCalledTimes(1)
   })
@@ -155,6 +155,90 @@ describe('ThemespaceGrid — releasing thematic pressure', () => {
   it('withholds the release from a recorded run', () => {
     render(<ThemespaceGrid themespace={{ ...themespace(), thematic_pressure: true, active_theme_types: ['vertical_bridge'] }} />)
 
-    expect(screen.queryByRole('button', { name: /Release clamps/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Undo last clamp/i })).toBeNull()
   })
 })
+
+describe('ThemespaceGrid — Metacat\'s dimension and relation names', () => {
+  const labelled = (): ThemespaceState => ({
+    ...themespace(),
+    dimension_labels: {
+      'plato-string-position-category': { name: 'String Position', abbreviation: 'String Pos.' },
+    },
+    relation_labels: { identity: 'iden', opposite: 'opp' },
+  })
+
+  it('names the dimension and its relations as theme-graphics.ss does', () => {
+    const topCluster = { ...CLUSTER, theme_type: 'top_bridge' }
+    render(<ThemespaceGrid themespace={{ ...labelled(), clusters: [topCluster], possible_theme_types: ['top_bridge'] }} />)
+    expect(screen.getByText('String Position')).toBeTruthy()
+    expect(screen.getByText('iden')).toBeTruthy()
+    expect(screen.getByText('opp')).toBeTruthy()
+  })
+
+  it('abbreviates in the narrow vertical-bridge column, as Metacat does', () => {
+    render(<ThemespaceGrid themespace={labelled()} />)
+    // The fixture cluster is a vertical bridge, so the abbreviation is what shows
+    // there; the full name is for the wider top and bottom columns.
+    expect(screen.queryByText('String Pos.')).toBeTruthy()
+  })
+
+  it('holds no domain names of its own: without served labels it shows the raw ones', () => {
+    render(<ThemespaceGrid themespace={themespace()} />)
+    expect(screen.queryByText('StrPos')).toBeNull()
+    expect(screen.getByText('string-position-category')).toBeTruthy()
+    expect(screen.getByText('identity')).toBeTruthy()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Theme-edit mode — Metacat's "Clamp theme pattern" (`gui.ss:845-926`)
+// ---------------------------------------------------------------------------
+
+describe('ThemespaceGrid — theme-edit mode', () => {
+  it('says "Click to select themes" in a window that has not been claimed', () => {
+    const { rerender } = render(
+      <ThemespaceGrid themespace={themespace()} onClamp={vi.fn()} editing={{ edited: [] }} />,
+    );
+    expect(screen.getByText('Click to select themes')).toBeTruthy();
+
+    rerender(
+      <ThemespaceGrid
+        themespace={themespace()}
+        onClamp={vi.fn()}
+        editing={{ edited: ['vertical_bridge'] }}
+      />,
+    );
+    expect(screen.queryByText('Click to select themes')).toBeNull();
+  });
+
+  it('selects +100 on a click and -100 on a shift-click or right-click', () => {
+    const onClamp = vi.fn();
+    render(
+      <ThemespaceGrid
+        themespace={themespace()}
+        onClamp={onClamp}
+        editing={{ edited: ['vertical_bridge'] }}
+      />,
+    );
+    const rows = screen.getAllByTitle(/^(identity|opposite): /);
+
+    fireEvent.click(rows[0]);
+    expect(onClamp).toHaveBeenLastCalledWith(expect.anything(), expect.anything(), 100);
+
+    fireEvent.click(rows[0], { shiftKey: true });
+    expect(onClamp).toHaveBeenLastCalledWith(expect.anything(), expect.anything(), -100);
+
+    fireEvent.contextMenu(rows[1]);
+    expect(onClamp).toHaveBeenLastCalledWith(expect.anything(), expect.anything(), -100);
+  });
+
+  it('leaves clicking inert outside edit mode, where only the buttons clamp', () => {
+    const onClamp = vi.fn();
+    render(<ThemespaceGrid themespace={themespace()} onClamp={onClamp} />);
+
+    fireEvent.click(screen.getAllByTitle(/^(identity|opposite): /)[0]);
+
+    expect(onClamp).not.toHaveBeenCalled();
+  });
+});

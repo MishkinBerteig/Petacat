@@ -28,7 +28,7 @@ license change was authorised by Dr. Marshall directly (see
 > end-to-end. Episodic Memory shapes the runs that inherit it: a run declines an
 > answer already held for the same problem and rules, so repeating a problem
 > within a [Training Session](#persistence-modes-and-training-sessions) explores
-> a different answer each time. It ships with 2,405 test cases covering the engine, the API, and the
+> a different answer each time. It ships with 2,863 test cases covering the engine, the API, and the
 > help/config system, run on both the CPU and the GPU numeric backends. Underneath the seven components sits an execution
 > substrate — three [persistence modes](#persistence-modes-and-training-sessions),
 > a [GPU numeric substrate](#the-numeric-substrate), and
@@ -277,6 +277,13 @@ the run is created, so changing it starts a new run.
 **Manual stepping** (Step N) is independent of both: it advances a fixed number
 of codelets and stops.
 
+**Verbose mode** (the *Verbose mode* checkbox beside Self-watching, or the Verbose
+panel from the Windows menu) is Metacat's menu item of the same name: the engine
+narrates what every codelet does, in Metacat's own words, and the panel shows it.
+It slows a run down, as Metacat's help warns, and changes nothing the run does.
+The Step button follows Metacat's step mode: a step of ten codelets or fewer is
+narrated even with Verbose mode off.
+
 **Settings** holds a breakpoint control for fine-grained debugging, the Eliza
 commentary toggle, and a **Spreading threshold** slider — leave that at its
 default of 100 for faithful Metacat behaviour, see
@@ -349,8 +356,8 @@ Petacat has two test suites:
   `integration` (the repository's artifacts agreeing), `lockstep` (Petacat's decision
   traces against Metacat's), and `e2e` (full HTTP
   stack against a running database). All seven run in a single command against
-  the local Postgres — 2,405 cases, which includes the numeric matrix's second
-  pass over the 449 backend-sensitive tests. See
+  the local Postgres — 2,863 cases, which includes the numeric matrix's second
+  pass over the 486 backend-sensitive tests. See
   [TESTING.md](TESTING.md) for the layer breakdown, the numeric backend matrix,
   the session ceiling, the unit-test rules, determinism requirements, test-double
   conventions, how to run the suite under the free-threaded interpreter, and what
@@ -637,6 +644,13 @@ API asks for that count without first having to look it up. The benchmarks
 (`scripts/bench_free_running.py`) and the tests
 (`tests/module/test_free_running.py`) drive it directly.
 
+A free-running run is a different draw: its seed does not reproduce it. So the
+count it executed with is stored on the run (`runs.workers`), reported by the API,
+and shown in the Run History **W** column. Without it, two recorded runs with the
+same seed, configuration and memory that end differently have nothing to explain
+them. Runs created before the count was stored have none, and the API and the
+column say so rather than assuming one.
+
 Three things had to exist first, and each is useful on its own:
 
 - **Counter-based random streams** (`splittable_rng.py`). A Mersenne Twister has
@@ -652,13 +666,24 @@ Three things had to exist first, and each is useful on its own:
   engine unusually well because a lost race is not a retry — it is a **fizzle**,
   an outcome the architecture already has and the temperature already accounts
   for.
-- **A sharded coderack** (`coderack_shards.py`). Per-worker racks with work
-  stealing, chosen by measurement over the two alternatives. Sharding by codelet
-  family distorts selection badly at low temperature — up to 0.354 total-variation
-  distance from the unsharded rack, precisely where selection is supposed to
-  become greedy — because families are not evenly spread across urgency bins.
-  Per-worker sharding stays within 0.006–0.016 at every temperature, because a
-  codelet's shard is independent of both its type and its urgency.
+- **A coderack that can be shared** (`coderack_shards.py`). Three candidates were
+  built and measured: one rack behind a mutex, shards by codelet family, and
+  per-worker shards with work stealing. The free-running engine installs the
+  first, `LockedCoderack`, around the serial rack itself.
+
+  Per-worker shards were installed first and were wrong, and the reason is worth
+  keeping. Selection is a two-stage draw weighted by temperature-adjusted bin
+  urgency, so choosing a shard by size and then a codelet within it is *not*
+  uniform over the whole rack's membership: each shard weighs its own bins. A
+  worker confined to its shard also drew from a shard the poster had not filled
+  evenly, and the capacity was divided between shards, so one worker's posts
+  evicted at a quarter of the rack's size. Measured on `wxyz → vxyz; abcd → ?`:
+  one worker through `FreeRunningEngine` found `abce` in 11.4% of runs against
+  14.5% with a single shard and 15.0% serially. The locked rack is the serial
+  rack, so every draw and every eviction is exactly the serial one
+  (`test_a_threaded_draw_has_the_serial_racks_exact_distribution` and
+  `test_a_threaded_rack_evicts_exactly_as_the_serial_rack_does`). The sharded
+  classes remain for `scripts/bench_shards.py` and are not used by a run.
 
 Measured throughput against the serial loop, free-threaded, best of three:
 1.33× at 8 workers on `mrrjjj`, 1.35× at 4 on `iijjkk`. Against a ceiling of
@@ -667,11 +692,30 @@ interpreter costs single-threaded, the realistic maximum is about 1.52× — so
 1.35× is roughly 89% of what parallelising codelets *can* give. The remainder is
 serial by nature: coderack maintenance and the numeric substrate.
 
-Worker count follows the machine, and the shard count follows the Coderack:
-`max_coderack_size // MIN_SHARD_CAPACITY` is 4 at the default rack of 100, so a
-machine offering more workers than that runs several against one shard.
-`PHASE 1 PLAN.md` carries what a larger rack would take and where parallelism
-past this bound may come from.
+Worker count follows the machine. The shard count (`PETACAT_CODERACK_SHARDS`,
+`MIN_SHARD_CAPACITY`) now only configures the benchmark candidates; a free-running
+run has one rack. `PHASE 1 PLAN.md` carries where parallelism past a single rack
+may come from.
+
+**What free-running does not yet match.** Five defects were fixed so that a
+one-worker run through the free-running engine behaves like the serial loop: the
+draw above; the structure clock (`set_structure_clock` is thread-local and was never
+set in workers, so every structure built there had `time_stamp` 0); the codelet count
+(a codelet saw, and stamped its events with, a count one higher than serially,
+because the increment came before the codelet ran rather than after); the lockstep
+fixed initial-unclamp time (`initial_clamp_fixed_time`), which workers ignored; and
+the pending-answer hand-off, which any worker could clear from another's codelet and
+is now collected by the serialised codelet that set it, under its lock. What
+remains is inherent to overlapping codelets: with several workers, a codelet decides
+against a Workspace that others are changing, which lowers the rate at which the
+deep answer `abce` is found. See "Statistical check" below for the measured size.
+
+**Statistical check.** 1,000 runs of `wxyz → vxyz; abcd → ?` (seeds 101–1100,
+budget 100,000, numpy backend), counting the deep answer `abce`: serial 150
+(15.0%); one worker through `FreeRunningEngine` 128 (12.8%, z = −1.42 against
+serial, not significant); six workers 93 (9.3%, z = −3.90). Before the fixes the
+same measurement gave 11.4% at one worker and 7.3% at six. The six-worker gap that
+remains is the overlap effect, which these fixes do not address.
 
 Two things are deliberately still serialised. The update cycle is not stopped
 for — whichever worker crosses the boundary runs it while the others carry on,
@@ -679,6 +723,18 @@ which is exactly the staleness the design budgets for. Committing a structure
 *is* serialised, because `build_structure`'s duplicate check and its fights are
 read-modify-write sequences over shared lists, and running two at once corrupts
 the lists rather than producing a conflict the model could read as a fizzle.
+
+The answer codelets and the self-watching codelets (the `answer` and `meta`
+families) run whole under the same lock. They snag, give up, clamp and report
+answers, and those rewrite the Slipnet, the Themespace, the coderack and the
+Trace, which the update cycle reads and writes back. A jootser giving up used to
+run a second update cycle beside the scheduled one. On the GPU backend that
+aborted the process, because MLX's streams belong to the thread that made them.
+And a snag's restart empties the rack, as Metacat's `delete-all-codelets` does,
+so a codelet a worker had already taken off it is dropped rather than run
+(`discarded` in the run's telemetry). Before that, an answer-finder chosen just
+before another worker's snag went on to report an answer from before the snag,
+at the snag's temperature of 100.
 
 **How much staleness cognition tolerates was measured before any of this was
 written**, by making the serial loop read state as it stood N codelets ago:
@@ -742,11 +798,18 @@ The tables below cover the routes a user drives.
 |--------|----------|---------|
 | GET | `/api/runs/{id}/workspace` | Strings, bonds, groups, bridges |
 | GET | `/api/runs/{id}/slipnet` | Node activations |
-| GET | `/api/runs/{id}/coderack` | Codelet pool |
+| GET | `/api/runs/{id}/coderack` | Codelet pool: counts, each type's selection probability, the last type run, clamps |
+| GET | `/api/runs/{id}/eeg` | The EEG's curves: average Workspace activity and temperature, one point per update cycle |
 | GET | `/api/runs/{id}/themespace` | Theme clusters |
 | GET | `/api/runs/{id}/temperature` | Temperature value |
-| GET | `/api/runs/{id}/trace` | Event log |
+| GET | `/api/runs/{id}/trace` | Event log: each event with Metacat's print name (`(Id)`, `>a-b-c>`, `T:a=>b`, `[Top Rule]`, `[Answer ijl]`) |
+| GET | `/api/runs/{id}/trace/{n}` | One event in full, with the picture that redisplays it (from the stored row once the run is unloaded) |
+| POST | `/api/runs/{id}/trace/{n}/display` | Display that event over the live windows, or restore them; the reply carries the picture |
+| POST | `/api/memory/answers/{id}/display`, `/api/memory/snags/{id}/display` | Display a stored answer or snag (its description picture and theme patterns); again to restore |
 | GET | `/api/runs/{id}/commentary` | Natural-language summary |
+| GET | `/api/runs/{id}/verbose?since=N` | Verbose mode's narration (Metacat's `vprintf`/`say` output: what each codelet chose, tried and gave up on), from line `N`; the buffer is bounded |
+| PUT | `/api/runs/{id}/verbose` | Switch Verbose mode on or off mid-run (`{"enabled": true}`); with it off the engine builds none of the text |
+| DELETE | `/api/runs/{id}/verbose` | Empty the narration buffer |
 | GET | `/api/runs/{id}/identity` | Mode, seed, spreading threshold, config hash, memory hash, session |
 | GET | `/api/runs/parameters/catalogue` | The settable run parameters: kind, bounds, default, what each does |
 | GET | `/api/runs/{id}/parameters` | What a Run was: `fixed` (all of them, resolved), `overridden`, `defaults`, `derived` |
@@ -924,7 +987,7 @@ All domain knowledge lives in `seed_data/*.json`:
 | `theme_dimensions.json` | 9 conceptual dimensions across 3 cluster types |
 | `demo_problems.json` | 34 pre-configured analogy problems |
 | `posting_rules.json` | Codelet posting rules |
-| `commentary_templates.json` | Natural-language output templates |
+| `commentary_templates.json` | Natural-language output templates, and Verbose mode's 200-odd message texts (`verbose_messages`) |
 | `enums.json` | Enum tables (bond categories, proposal levels, …) |
 | `slipnet_layout.json` | Grid positions for the Slipnet visualisation |
 | `help_topics.en.json` | Help popover text for every dashboard panel + glossary (English) |

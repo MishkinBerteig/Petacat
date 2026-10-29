@@ -10,6 +10,7 @@ number of its own and changes nothing Metacat computes.
 | `record.py` | CLI (plain `python3`, stdlib only): builds the patched source, writes a driver per problem and seed, runs Docker, gzips the trace |
 | `recorder.patch` | Unified diff against `Metacat/build/source` (8 files, about 50 added lines) |
 | `decision-trace.ss` | Run-time wrappers, JSON writer, canonical names, `trace-open`, `trace-run`, snapshots, `dump-opening-names` |
+| `record_verbose.py` | CLI: the console output of runs with Metacat's Verbose mode (`%verbose%`) on, one `@@RUN` ... `@@END` block per run; compared with Petacat's narration by `scripts/compare_verbose.py` (`python3 tests/lockstep/metacat/record_verbose.py abc abd xyz 1-5 [--answer A] [--episode N]`) |
 | `random-audit.ss` | Debug only: shadows `random` to find raw draws attributed to no decision |
 | `opening-names.abc-abd-xyz.json` | Canonical names of every letter, description and slipnet node of the opening state (95 names, sorted) |
 
@@ -215,3 +216,111 @@ python3 tests/lockstep/metacat/record.py --known-failures-patch --problem abc cb
 Every other recorded run, across the development, held-out and justify corpora, gives a
 byte-identical trace with and without the fixes, apart from the header's `revision`
 (`Metacat/VALIDATION.md`).
+
+## Translation logs: `record_translation.py`
+
+`record_translation.py I M T LO-HI [--answer A] [--cap N] [--out DIR]` runs the seeds in the
+container (justify mode with `--answer`) and, for every answer and snag event, reads the
+slippage log Metacat's rule translation made (`answers.ss:1198`), the supporting vertical
+bridges, the rules' reference objects and, for an answer, the supporting groups.  It draws
+nothing.  `scripts/compare_translation_log.py` records with it, replays the same runs in
+Petacat and compares field by field; `scripts/compare_translation_log.py --fixture`
+regenerates `tests/lockstep/translation_log_metacat.tsv`, which
+`tests/lockstep/test_translation_log.py` checks.
+
+```sh
+scripts/compare_translation_log.py abc-abd-xyz 1-10
+scripts/compare_translation_log.py abc-abd-xyz-wyz 1-5 --justify
+scripts/compare_translation_log.py --fixture
+```
+
+## Rule English and event names
+
+Two more wrap-and-log recorders, built on `wrap.py` (the shared driver prelude and container
+runner).  Each runs the *unpatched* `Metacat/build/source`, wraps Metacat procedures from the
+driver, prints tab-separated records and changes nothing Metacat computes.  The comparers are in
+`scripts/`; both need Docker and the `metacat:1.2` image, and read the lockstep traces
+(`record.py`) to replay the same runs in Petacat.
+
+| Recorder | Wraps | Comparer | Fixture it regenerates |
+| --- | --- | --- | --- |
+| `record_rule_english.py I M T LO-HI` | `transcribe-to-english` (`rules.ss`), once per rule built | `scripts/compare_rule_english.py` | `tests/seed_unit/rule_english_metacat.tsv` |
+| `record_events.py I M T LO-HI [--answer A]` | nothing is wrapped: after each run, asks every event of `*trace*` for `'print-name` and for the header its `'display-workspace` sends to `draw-event-header` | `scripts/compare_events.py` | `tests/lockstep/event_names_metacat.tsv` |
+
+**Rule English** (463 rows; 12,582 Metacat rules over the 19 development problems, seeds 1-10;
+the list, with four widening entries, is `tests/seed_unit/rule_english_problems.txt`).
+
+```sh
+python3 tests/lockstep/metacat/record_rule_english.py --problems tests/seed_unit/rule_english_problems.txt \
+    --jobs 2 --table tests/lockstep/out/rule_english_metacat.tsv     # about 40 s, byte-identical to the fixture
+.venv/bin/python scripts/compare_rule_english.py --jobs 2              # Petacat against Metacat, about 7 min
+```
+
+Expected: every replayed run reports `N/N Metacat rules matched (0 text mismatches, 0 unpaired,
+0 Petacat extra)`.  Runs with no committed trace (the problems `wxyz vxyz abcd`, `abc abd iijjkk`
+and seeds 11-30 of two others) are run live in Petacat instead, and are compared by structure
+(the set of texts for each rule structure both sides built), because a live run does not
+reproduce Metacat's rules one for one (a weak check: only a handful of structures coincide).  Result: 12,582 of 12,582 matched, 23 problem entries.  The recorder's clause key spells a rule's clauses as
+`V[letters]`, `X[object-descriptions][dimensions]`, `I[object-description][referent:dimension:relation;...]`
+joined by `&&`; the table drops `plato-`.
+
+**Event names and headers** (131 events in the eight runs of `tests/lockstep/event_names_runs.txt`).
+
+```sh
+.venv/bin/python scripts/compare_events.py --jobs 2 --table tests/lockstep/out/event_names_metacat.tsv   # about 30 s
+.venv/bin/python scripts/compare_events.py --corpus --jobs 2                                              # every committed trace, about 13 min
+.venv/bin/python scripts/compare_events.py --corpus --pick 3500 30000 --table tests/lockstep/out/picked.tsv   # re-choose the runs
+```
+
+Expected: `8 runs: 8 identical, 131/131 events identical`, and a table byte-identical to the
+fixture.  Metacat runs a few codelets past an answer before the driver's suspend lands, so the
+comparison keeps Metacat's events up to the codelet Petacat's replay ended at.  `--corpus`
+compares the discovery corpus (seeds 1-10) and justify corpus (seeds 1-5) in full: 275 runs, 3,757 of 3,757 events identical.  `--pick 3500 30000` re-chooses exactly the fixture's eight runs.
+
+## Answer-frequency study: `record_frequencies.py`
+
+Metacat's answer, codelet count and final temperature for many seeds of one problem, many
+seeds per container (`wrap.py` supplies the driver prelude and the Docker call).  This is
+the Metacat side of the 1,000-run study of `wxyz -> vxyz; abcd -> ?` (seeds 101-1100) and of
+the fidelity net's single runs; `scripts/compare_frequencies.py` is the other half.
+
+```sh
+python3 tests/lockstep/metacat/record_frequencies.py wxyz vxyz abcd 101-1100 --jobs 4   # cap 100000
+python3 tests/lockstep/metacat/record_frequencies.py abc abd aabbcc 1-10 --cap 4000     # fidelity-net runs
+```
+
+Output `tests/lockstep/out/frequencies/<i>-<m>-<t>.<lo>-<hi>.cap<cap>.metacat.tsv` (git-ignored; `--out`
+changes the root): `#` header lines, then `seed answer codelets temperature clamped since_snag`
+per seed.  `answer` is the print name, `*CAP*`, `*NONE*` or `*ERROR*`.  Byte-identical for a
+given problem, seed and cap, and independent of `--jobs`.
+
+Expected (checked): `abc abd aabbcc` seeds 1-10 cap 4000 give `aabbdd` 9 times (the tenth hits
+the cap), as the fidelity net recorded; `abc cba abcd` seeds 1-5 give `dcba` 5 of 5.  For
+`wxyz vxyz abcd` 101-1100 the recorded study frequencies are `vbcd` 33.6%, no answer 24.3%,
+`abce` 14.1%, `abcd` 13.8%, `vxyz` 6.6%, `abcc` 4.4%, `abcv` 2.7%.  Runtime: about 0.45 s per
+`wxyz` run per container (40 runs 18 s), so the 1,000-run study is about 7 minutes with
+`--jobs 1`, 2-3 minutes with `--jobs 4`.
+
+## Snag explanations, snag sweep and fidelity net: `record_snags.py`, `record_answers.py`
+
+Two more "wrap and log" recorders (they share `wrap.py`: the driver prelude, the container run,
+seed and problem-list parsing).  Both run the *unpatched* `Metacat/build/source`, wrap Metacat
+procedures from the driver, and print tab-separated lines; nothing is drawn or changed.  Output of
+equal arguments is byte-identical.
+
+| File | What it logs | Compared by |
+| --- | --- | --- |
+| `record_snags.py I M T SEEDS [--cap N]` | per snag: `SNAG` (failure kind and the event's `get-explanation`, wrapping `make-snag-event`) and `CMT` (the two `process-snag` comment lines, via the comment window); `END` per run; memory cleared before each run | `scripts/compare_snags.py` |
+| `record_answers.py I M T LO-HI [--cap N]` | one episode (memory cleared once, runs `LO..HI`): per answer in memory `ANS` (`get-snag-explanation`) and `EXPL` (what `explain` writes in both voices), per ordered pair `CMP` (`get-answer-comparison-text`) | `scripts/compare_episode_answers.py` |
+
+```sh
+python3 tests/lockstep/metacat/record_snags.py abc zyx xyz 9 --cap 6000          # 4 snags, 1 s
+python3 tests/lockstep/metacat/record_answers.py abc abd xyz 1-8                  # 5 answers, 20 comparisons, ~10 s
+```
+
+`scripts/compare_snags.py --regenerate-fixture --out DIR` re-records the 8 runs of
+`tests/lockstep/snag_explanations_metacat.tsv` with `record_snags.py --cap 6000` and rebuilds
+the file byte for byte (apart from the `#` header); see `tests/lockstep/README.md`, "Snag
+explanations, snag sweep and fidelity net", for the sweeps built on them.  Both write under
+`tests/lockstep/out/` (git-ignored) unless told otherwise.  Unit tests (no Docker):
+`tests/lockstep/test_snag_and_answer_tools.py`.

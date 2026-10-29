@@ -24,6 +24,16 @@ if TYPE_CHECKING:
     from server.engine.runner import EngineContext
 
 
+#: The builtins that exist only for Verbose mode's narration.  They are bound into a
+#: codelet's namespace only when Verbose mode is on, so a run with it off pays nothing
+#: for them -- not even the closure each ``_bind_ctx`` would build per codelet.  A body
+#: calls them behind ``if verbose:``, which is false in exactly the runs where they
+#: are absent.
+VERBOSE_ONLY = frozenset({
+    "say", "vprint", "ascii_name", "generic_name", "print_name", "round_to_100ths", "exact",
+})
+
+
 class CodeletFizzle(Exception):
     """Raised when a codelet decides not to proceed (normal flow control)."""
     pass
@@ -55,7 +65,8 @@ class CodeletInterpreter:
     """
 
     def __init__(self, builtins: dict[str, Callable] | None = None) -> None:
-        self._builtins = builtins or {}
+        # Held by reference, not copied: a caller (the tests) may swap an entry afterwards.
+        self._builtins = builtins if builtins is not None else {}
 
     def compile(self, source: str, name: str = "<codelet>") -> CompiledCodelet:
         """Compile Python source to a code object. Called once at startup."""
@@ -107,11 +118,21 @@ class CodeletInterpreter:
             "codelet_count": ctx.codelet_count,
             "justify_mode": ctx.justify_mode,
             "self_watching": ctx.self_watching_enabled,
+            # Verbose mode's switch: a message site reads this local and builds nothing
+            # when it is false (``server/engine/verbose.py``).
+            "verbose": ctx.verbose,
         }
 
         # Add built-in functions, each pre-bound to ctx
         for name, fn in self._builtins.items():
-            namespace[name] = _bind_ctx(fn, ctx)
+            if name not in VERBOSE_ONLY:
+                namespace[name] = _bind_ctx(fn, ctx)
+
+        if ctx.verbose:
+            for name in VERBOSE_ONLY:
+                fn = self._builtins.get(name)
+                if fn is not None:
+                    namespace[name] = _bind_ctx(fn, ctx)
 
         # Add safe Python builtins
         import math

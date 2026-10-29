@@ -669,6 +669,7 @@ class SlipnetNode:
         self,
         slippages: list[object],
         rng: RNG | None = None,
+        sliplog: Any = None,
     ) -> SlipnetNode:
         """Apply a list of slippages (ConceptMappings) to this node.
 
@@ -689,6 +690,9 @@ class SlipnetNode:
         for slippage in slippages:
             # Direct match: this node is the one being slipped
             if slippage.descriptor1 is self:
+                # ``(tell sliplog 'applied (1st slippages))`` (slipnet.ss:261).
+                if sliplog is not None:
+                    sliplog.applied(slippage)
                 return slippage.descriptor2
 
             # Attempt coattail slippage
@@ -725,6 +729,10 @@ class SlipnetNode:
                 if rng.prob(prob):
                     related = self.get_related_node(label)
                     if related is not None:
+                        # ``(tell sliplog 'coattail self label node2 (1st slippages))``
+                        # (slipnet.ss:275).
+                        if sliplog is not None:
+                            sliplog.coattail(self, label, related, slippage)
                         return related
 
         # No slippage applied

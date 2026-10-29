@@ -134,7 +134,7 @@ def test_age_multisets():
     assert bad.counts == {"age": 1}
 
 
-SITE_REG = "server/engine/codelet_dsl/builtins.py:506"  # inside evaluate_group
+SITE_REG = "server/engine/codelet_dsl/builtins.py:572"  # the survival coin inside evaluate_group (moved by the narration lines above it)
 SITE_OTHER = "server/engine/rules.py:10"
 
 

@@ -656,3 +656,45 @@ describe('RunHistory — an action the server refuses', () => {
     expect(useRunStore.getState().runId).toBeNull()
   })
 })
+
+describe('RunHistory — columns line up with their headings', () => {
+  it('gives the Problem heading and the Problem cells one width rule', async () => {
+    // A narrow panel squeezed the cells to nothing and left the heading at the width
+    // of its word, so every value sat one column to the left of its heading.
+    mockedListRuns.mockResolvedValue({ runs: [runInfo({ run_id: 23 })], total: 1 })
+
+    render(<RunHistory />)
+    await waitFor(() => expect(screen.getByText('#23')).toBeTruthy())
+
+    const heading = screen.getByText('Problem')
+    const cell = screen.getByText('abc->abd; xyz')
+    for (const property of ['flex', 'minWidth'] as const) {
+      expect(cell.style[property]).toBe(heading.style[property])
+    }
+    expect(heading.style.minWidth).not.toBe('')
+  })
+})
+
+describe('RunHistory — how many workers ran each run', () => {
+  it('shows the count, marking a free-running run as one its seed does not reproduce', async () => {
+    mockedListRuns.mockResolvedValue({
+      runs: [runInfo({ run_id: 23, workers: 6 }), runInfo({ run_id: 17, workers: 1 })],
+      total: 2,
+    })
+
+    render(<RunHistory />)
+    await waitFor(() => expect(screen.getByText('#23')).toBeTruthy())
+
+    expect(screen.getByText('6').title).toMatch(/free-running, so the seed does not reproduce/)
+    expect(screen.getByText('1').title).toMatch(/serial loop/)
+  })
+
+  it('says a run from before the count was stored has none recorded', async () => {
+    mockedListRuns.mockResolvedValue({ runs: [runInfo({ run_id: 9, workers: null })], total: 1 })
+
+    render(<RunHistory />)
+    await waitFor(() => expect(screen.getByText('#9')).toBeTruthy())
+
+    expect(screen.getByText('—').title).toMatch(/not recorded/)
+  })
+})

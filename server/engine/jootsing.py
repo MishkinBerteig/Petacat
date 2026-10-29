@@ -10,7 +10,10 @@ Scheme source: jootsing.ss
 
 from __future__ import annotations
 
+from server.engine.verbose import exact, round_to_100ths
+
 import logging
+from dataclasses import replace
 from fractions import Fraction
 from typing import TYPE_CHECKING, Any
 
@@ -84,7 +87,10 @@ class JootserResult:
         bottom_rule: Any = None,
         unjustified_slippages: list[Any] | None = None,
         answer_quality: float = 0.0,
+        translation: Any = None,
     ) -> None:
+        #: ``jootsing.ss:205-211``: the translation's slippage log and supporting bridges.
+        self.translation = translation
         self.pattern_detected = pattern_detected
         self.negative_pattern = negative_pattern
         self.action = action
@@ -118,6 +124,7 @@ def check_progress(
     slipnet: Slipnet | None = None,
     coderack: Any = None,
     temperature_control: Any = None,
+    vlog: Any = None,
 ) -> ProgressWatcherResult:
     """Progress-watcher logic.
 
@@ -141,6 +148,8 @@ def check_progress(
 
         if time_since_last <= settling:
             # Too soon to draw conclusions
+            if vlog is not None:
+                vlog.say("too-soon-since-last-event")
             return ProgressWatcherResult(progress_detected=True)
 
         # Enough time has elapsed -- undo the clamp
@@ -156,6 +165,8 @@ def check_progress(
         ) if themespace is not None and slipnet is not None else 0.0
 
         # Stochastically post answer-finder/justifier based on progress
+        if vlog is not None:
+            vlog.say("progress-achieved", exact(progress))
         action = ""
         if rng is not None and progress > 0:
             prob = progress / 100.0
@@ -181,6 +192,8 @@ def check_progress(
 
     # Activity is zero -- nothing much is happening
     # Check on current rule quality
+    if vlog is not None:
+        vlog.say("nothing-much-happening")
     top_rules = workspace.top_rules
     bottom_rules = workspace.bottom_rules
 
@@ -199,6 +212,8 @@ def check_progress(
     poor_bottom = justify_mode and max_bottom_quality < satisfactory_quality
 
     if not poor_top and not poor_bottom:
+        if vlog is not None:
+            vlog.say("rules-decent-quality")
         # "The rules seem to be of decent quality. Fizzling." (``jootsing.ss:337``).
         # The Scheme posts nothing here.  Posting an answer-finder with probability 1
         # gave the program a channel to the answer stage that the reference does not
@@ -210,11 +225,16 @@ def check_progress(
         )
 
     # Current rules are not good enough -- attempt to clamp codelet pattern
+    if vlog is not None:
+        vlog.say("rules-not-good-enough")
+        vlog.say("attempting-to-clamp-codelet-pattern")
     if not trace.permission_to_clamp(
         self_watching_enabled=self_watching_enabled,
         codelet_count=codelet_count,
         grace_period=meta.get_param("grace_period", _GRACE_PERIOD),
     ):
+        if vlog is not None:
+            vlog.say("permission-to-clamp-pattern-denied")
         return ProgressWatcherResult(
             stall_detected=True,
             action="clamp_denied",
@@ -226,20 +246,35 @@ def check_progress(
     else:
         clamp_probability = 1.0 - max_top_quality / 100.0
 
+    if vlog is not None:
+        vlog.say("max-top-rule-quality", exact(max_top_quality) if top_rules else 0)
+        vlog.say("max-bottom-rule-quality", exact(max_bottom_quality) if bottom_rules else 0)
+        vlog.say("clamp-probability", round_to_100ths(clamp_probability))
+
     # Stochastic check
     if rng is not None and not rng.prob(clamp_probability):
+        if vlog is not None:
+            vlog.say("permission-granted-attempt-failed")
         return ProgressWatcherResult(
             stall_detected=True,
             action="clamp_attempt_failed",
         )
 
-    # Emit commentary about frustration
+    # "I'm getting frustrated." (``jootsing.ss:306-325``) — said before the clamp, which
+    # then speaks for itself when it activates.
     if commentary is not None:
-        from server.engine.commentary import emit_clamp_activate
+        from server.engine.commentary import emit_frustrated
 
-        clamp_count = trace.clamp_count + 1
-        emit_clamp_activate(
-            commentary, "rule_codelet_clamp", clamp_count, codelet_count
+        emit_frustrated(
+            commentary,
+            workspace.initial_string.text,
+            workspace.modified_string.text,
+            workspace.target_string.text,
+            workspace.answer_string.text if workspace.answer_string is not None else None,
+            poor_top,
+            poor_bottom,
+            codelet_count,
+            meta.commentary_templates,
         )
 
     # Create and activate a rule-codelet clamp.  ``Workspace`` has no ``temperature``
@@ -290,6 +325,7 @@ def attempt_jootsing(
     memory: Any = None,
     coderack: Any = None,
     temperature_control: Any = None,
+    vlog: Any = None,
 ) -> JootserResult:
     """Jootser logic.
 
@@ -300,11 +336,21 @@ def attempt_jootsing(
     if not self_watching_enabled:
         return JootserResult(pattern_detected=False)
 
+    # ``jootsing.ss:28-31`` -- with nothing in the Trace there is nothing to notice.
+    if trace.get_last_event() is None:
+        if vlog is not None:
+            vlog.say("no-last-event")
+        return JootserResult(pattern_detected=False)
+
     # Don't check during a clamp period
     if trace.within_clamp_period:
+        if vlog is not None:
+            vlog.say("currently-within-clamp-period")
         return JootserResult(pattern_detected=False)
 
     # ── Check for recurring clamps ──
+    if vlog is not None:
+        vlog.say("checking-recurring-clamps")
     clamps = get_most_recent_event_set(trace, "clamp")
     # Filter out manual clamps
     clamps = [
@@ -313,11 +359,19 @@ def attempt_jootsing(
         if isinstance(c, ClampEvent) and c.clamp_type != "manual_clamp"
     ]
 
+    if len(clamps) < 3 and vlog is not None:
+        vlog.say("no-recurring-clamps")
     if len(clamps) >= 3:
         clamp_type = clamps[0].clamp_type if isinstance(clamps[0], ClampEvent) else ""
-        jootsing_prob = get_clamp_jootsing_probability(clamps, codelet_count, trace)
+        jootsing_prob = get_clamp_jootsing_probability(
+            clamps, codelet_count, trace, vlog=vlog
+        )
+        if vlog is not None:
+            vlog.say("noticing-clamping-pattern")
 
         if rng is not None and rng.prob(jootsing_prob):
+            if vlog is not None:
+                vlog.say("jootsing-from-clamps", clamp_type.replace("_", "-"))
             # Jootsing from clamps
             if clamp_type == "rule_codelet_clamp":
                 return joots_from_rule_codelet_clamps(
@@ -339,12 +393,19 @@ def attempt_jootsing(
                     codelet_count,
                     memory=memory,
                     meta=meta,
+                    vlog=vlog,
                 )
+        if vlog is not None:
+            vlog.say("jootsing-from-clamps-failed")
 
     # ── Check for recurring snags ──
+    if vlog is not None:
+        vlog.say("checking-recurring-snags")
     snags = get_most_recent_event_set(trace, "snag")
 
     if len(snags) < 3:
+        if vlog is not None:
+            vlog.say("no-recurring-snags")
         return JootserResult(pattern_detected=False)
 
     # Build theme overlap table
@@ -374,9 +435,18 @@ def attempt_jootsing(
         1.0, 10 * num_snags / 100.0
     )
 
+    if vlog is not None:
+        vlog.say("noticing-snag-pattern")
+        vlog.say("theme-overlap-table")
+        vlog.say("max-theme-overlap", exact(max_overlap))
+        vlog.say("number-of-snags", num_snags)
+        vlog.say("snag-jootsing-probability", round_to_100ths(jootsing_probability))
+
     # jootsing.ss:77 ``(stochastic-if* (1- jootsing-probability) (fizzle))`` --
     # the reference's side of the coin (DISCREPANCIES5 A-4).
     if rng is not None and rng.prob(1.0 - jootsing_probability):
+        if vlog is not None:
+            vlog.say("jootsing-from-snags-failed")
         return JootserResult(pattern_detected=False)
 
     # Permission to clamp
@@ -385,6 +455,8 @@ def attempt_jootsing(
         codelet_count=codelet_count,
         grace_period=meta.get_param("grace_period", _GRACE_PERIOD),
     ):
+        if vlog is not None:
+            vlog.say("permission-to-clamp-themes-denied")
         return JootserResult(pattern_detected=False)
 
     # Build negative theme pattern stochastically
@@ -401,6 +473,11 @@ def attempt_jootsing(
             entry, snag_descriptions, slipnet
         )
         inclusion_prob = (overlap_val / 100.0) * (avg_depth / 100.0)
+        if vlog is not None:
+            vlog.say(
+                "theme-entry-weight", vlog.reveal(entry), exact(overlap_val), exact(avg_depth),
+                round_to_100ths(inclusion_prob),
+            )
 
         if rng is not None:
             if rng.prob(inclusion_prob):
@@ -409,6 +486,8 @@ def attempt_jootsing(
             chosen_entries.append(entry)
 
     if not chosen_entries:
+        if vlog is not None:
+            vlog.say("could-not-make-negative-theme-pattern")
         # "Couldn't make negative theme pattern. Fizzling." (``jootsing.ss:110-112``).
         # The Scheme simply fizzles here and lets a later jootser try again; there was
         # an added ``num_snags > 5`` branch that ended the run instead, a termination
@@ -456,12 +535,6 @@ def attempt_jootsing(
             trace, themespace, slipnet, coderack, temperature_control, workspace
         )
 
-    # Emit commentary
-    if commentary is not None:
-        from server.engine.commentary import emit_jootsing
-
-        emit_jootsing(commentary, "frustrated", codelet_count)
-
     # Build a simple negative_pattern dict for backward compatibility
     simple_pattern: dict[str, str] = {}
     for entry in chosen_entries:
@@ -493,10 +566,17 @@ def get_most_recent_event_set(
     For clamps: get all events.
     Then partition into equivalence sets and pick the youngest set.
     """
+    # The Scheme's event list is consed, newest first (``trace.ss:201``), and
+    # ``get-new-events-since-last`` takes the first N of it (``trace.ss:89-95``); the
+    # Trace here is chronological, so the list is reversed to the Scheme's order.  The
+    # order is the result's: ``partition`` (``utilities.ss:811-825``) puts the newest
+    # event first in its class, and ``stochastic-filter`` flips a coin for the snag
+    # pattern's entries in that order (``jootsing.ss:76-90``).
     if event_type == "snag":
         all_recent = trace.get_new_events_since_last(ANSWER_FOUND)
     else:
         all_recent = list(trace.events)
+    all_recent = list(reversed(all_recent))
 
     # Filter to the requested event type
     type_map = {"snag": SNAG, "clamp": CLAMP_START}
@@ -512,12 +592,11 @@ def get_most_recent_event_set(
     if not equiv_sets:
         return []
 
-    # Pick the set with the youngest (most recent / smallest age) event
-    # Age = codelet_count; most recent = highest codelet_count
+    # ``select-extreme min`` of each set's minimum age (``jootsing.ss:160-163``,
+    # ``utilities.ss:583-588``): the first set holding the youngest event.
     def max_time(events: list[TraceEvent]) -> int:
         return max(e.codelet_count for e in events)
 
-    # Select the most recent set (highest max codelet_count)
     return max(equiv_sets, key=max_time)
 
 
@@ -530,6 +609,7 @@ def get_clamp_jootsing_probability(
     clamps: list[TraceEvent],
     codelet_count: int = 0,
     trace: TemporalTrace | None = None,
+    vlog: Any = None,
 ) -> float:
     """Compute jootsing probability from clamp history.
 
@@ -594,6 +674,13 @@ def get_clamp_jootsing_probability(
     progress_factor = 1.0 - average_progress / 100.0
     count_factor = min(1.0, 10 * num_clamps / 100.0)
     jootsing_probability = progress_factor * count_factor * clamp_type_factor
+
+    if vlog is not None:
+        # "last clamp first" (``jootsing.ss:144-148``): ``clamps`` is newest first.
+        vlog.say("progress-values", [exact(p) for p in progress_values])
+        vlog.say("progress-weights", [exact(p) for p in elapsed_time_weights])
+        vlog.say("average-progress", average_progress)
+        vlog.say("clamp-jootsing-probability", round_to_100ths(jootsing_probability))
 
     return jootsing_probability
 
@@ -662,6 +749,7 @@ def joots_from_justify_clamps(
     *,
     memory: Any = None,
     meta: Any = None,
+    vlog: Any = None,
 ) -> JootserResult:
     """Break out of justify clamp patterns.
 
@@ -679,13 +767,12 @@ def joots_from_justify_clamps(
 
     Everything else in the function is a fizzle.
     """
-    # ``clamps`` is chronological here, whereas the Scheme's trace conses newest-first
-    # (trace.ss:201, jootsing.ss:144 "last clamp first") and takes ``(1st clamps)``;
-    # the most recent clamp is therefore the *last* element.
-    if not clamps or not isinstance(clamps[-1], ClampEvent):
+    # ``clamps`` is newest first, as the Scheme's (trace.ss:201, jootsing.ss:144 "last
+    # clamp first"), and the Scheme takes ``(1st clamps)``.
+    if not clamps or not isinstance(clamps[0], ClampEvent):
         return JootserResult(pattern_detected=False)
 
-    most_recent = clamps[-1]
+    most_recent = clamps[0]
     top_rule = None
     bottom_rule = None
 
@@ -711,14 +798,18 @@ def joots_from_justify_clamps(
     if memory is not None and _answer_already_in_memory(
         memory, workspace, top_rule, bottom_rule
     ):
+        if vlog is not None:
+            vlog.say("already-justified-answer")
         return JootserResult(pattern_detected=False)
 
     # Check if rules currently work
     if slipnet is not None:
         try:
-            if not top_rule.currently_works(workspace, slipnet):
-                return JootserResult(pattern_detected=False)
-            if not bottom_rule.currently_works(workspace, slipnet):
+            if not top_rule.currently_works(workspace, slipnet) or not (
+                bottom_rule.currently_works(workspace, slipnet)
+            ):
+                if vlog is not None:
+                    vlog.say("cannot-give-up-rules-do-not-work")
                 return JootserResult(pattern_detected=False)
         except Exception:
             return JootserResult(pattern_detected=False)
@@ -727,11 +818,14 @@ def joots_from_justify_clamps(
         get_unifying_slippages,
         _translate_rule,
     )
+    from server.engine.rules import _reference_objects_with_repeats
 
     translation_result = _translate_rule(
         top_rule, workspace, slipnet, rng=rng, meta=meta
     )
     if translation_result is None:
+        if vlog is not None:
+            vlog.say("cannot-give-up-could-not-translate")
         return JootserResult(pattern_detected=False)
 
     translated_rule, slippages, supporting_vbridges = translation_result
@@ -740,6 +834,8 @@ def joots_from_justify_clamps(
     unjustified = get_unifying_slippages(translated_rule, bottom_rule, slipnet)
 
     if not unjustified:
+        if vlog is not None:
+            vlog.say("no-unjustified-slippages")
         # "No unjustified slippages. Posting answer-justifier." (``jootsing.ss:216-219``)
         return JootserResult(
             pattern_detected=True,
@@ -750,6 +846,8 @@ def joots_from_justify_clamps(
     if rng is not None and len(unjustified) > 1:
         give_up_prob = 1.0 - 1.0 / len(unjustified)
         if rng.prob(give_up_prob):
+            if vlog is not None:
+                vlog.say("too-many-unjustified-slippages")
             return JootserResult(pattern_detected=False)
 
     # "Time to give up" (``jootsing.ss:223``) — settle for the unjustified answer.
@@ -763,6 +861,14 @@ def joots_from_justify_clamps(
         unjustified_slippages=unjustified,
         # ``trace.ss:392-396`` — an answer's quality rests on the top rule's quality.
         answer_quality=float(getattr(top_rule, "quality", 0.0)),
+        # ``jootsing.ss:229-231``: the bottom rule's reference objects are looked up afresh
+        # in the target string; the top side's are the translation's.
+        translation=replace(
+            translated_rule.translation,
+            to_ref_objects=_reference_objects_with_repeats(
+                bottom_rule, workspace.target_string, slipnet
+            ),
+        ),
     )
 
 
@@ -799,17 +905,17 @@ def _partition_events(
     if not events:
         return []
 
+    # Scheme: ``partition`` (``utilities.ss:811-825``), which places the elements from
+    # the END of the list backwards, each at the FRONT of the first class whose members
+    # it agrees with (all of them, not just the first), else in a class of its own after
+    # the others.  ``events`` is newest first, so a class lists its newest event first.
     sets: list[list[TraceEvent]] = []
-    for event in events:
-        placed = False
+    for event in reversed(events):
         for s in sets:
-            # Scheme: ``partition`` (``utilities.ss:743-757``) admits an event to a
-            # set only when it is equivalent to *every* member, not just the first.
             if all(_events_equivalent(member, event) for member in s):
-                s.append(event)
-                placed = True
+                s.insert(0, event)
                 break
-        if not placed:
+        else:
             sets.append([event])
 
     return sets

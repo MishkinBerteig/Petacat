@@ -13,7 +13,7 @@
 // ---------------------------------------------------------------------------
 
 import { describe, it, expect, beforeEach } from 'vitest'
-import { render } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 
 import { WorkspaceView } from './WorkspaceView'
 import { useRunStore } from '@/store/runStore'
@@ -160,5 +160,39 @@ describe('WorkspaceView — labels stay legible', () => {
     // centre of its leftmost letter.
     const dots = Array.from(container.querySelectorAll('circle'))
     expect(dots.length).toBeGreaterThan(0)
+  })
+})
+
+describe('WorkspaceView — rules (rule-graphics.ss)', () => {
+  const rule = (english: string, quality = 80) => ({
+    type: 'top', quality, uniformity: 70, abstractness: 60, succinctness: 50,
+    clause_count: 2, verbatim: false, english, built: true, theme_pattern: [],
+  })
+
+  it('shows every rule, each in full with one clause to a line', () => {
+    useRunStore.setState({
+      workspace: {
+        ...abcWyz,
+        top_rules: [
+          rule('Replace letter-category of rightmost letter\nwith successor, always, and in every case'),
+          rule('Change the letter'),
+          rule('Another rule'),
+        ],
+        bottom_rules: [rule('Bottom rule line one\nBottom rule line two', 60)],
+      } as any,
+    })
+    render(<WorkspaceView />)
+    const boxes = screen.getAllByTestId('rule-box')
+    expect(boxes).toHaveLength(4)
+    // Nothing clipped to 60 characters, and nothing past the second rule dropped.
+    expect(screen.getByText('with successor, always, and in every case')).toBeTruthy()
+    expect(screen.getByText('Another rule')).toBeTruthy()
+    expect(screen.getByText('Bottom rule line two')).toBeTruthy()
+  })
+
+  it('draws no rule boxes when there are no rules', () => {
+    useRunStore.setState({ workspace: { ...abcWyz, top_rules: [], bottom_rules: [] } as any })
+    render(<WorkspaceView />)
+    expect(screen.queryByTestId('rule-box')).toBeNull()
   })
 })

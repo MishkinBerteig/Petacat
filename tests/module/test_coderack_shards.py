@@ -379,3 +379,88 @@ def test_the_sharded_rack_can_be_captured(meta):
     assert rack.max_size == Coderack(meta).max_size
     rack.clamp_codelet_type("breaker", 90)
     assert rack.clamped_urgencies["breaker"] == 90
+
+
+# --- the free-running draw is the serial draw -------------------------------
+
+
+def _free_running_rack(meta, workers: int = 6):
+    """The rack ``FreeRunningEngine`` installs, emptied, with the serial engine's own
+    capacity -- what a threaded draw actually goes through."""
+    from server.engine.free_running import FreeRunningEngine
+
+    runner = EngineRunner(meta)
+    runner.init_mcat("abc", "abd", "mrrjjj", seed=1)
+    FreeRunningEngine(runner, workers=workers).prepare()
+    rack = runner.ctx.coderack
+    rack.clear()
+    return rack
+
+
+def test_a_threaded_draw_has_the_serial_racks_exact_distribution(meta):
+    """Every codelet is drawn with the serial probability, whichever worker draws.
+
+    Analytic: the serial draw picks a bin with probability ``n_b * table[b][T]`` over the
+    sum of that, then a codelet in it uniformly.  The previous free-running rack drew
+    worker ``i`` only from shard ``i``, which is urgency-weighted *within that shard*,
+    so a codelet's chance depended on which shard it sat in (``abce`` fell from 14.5% to
+    11.4% with one worker).  Each (type, time-stamp mod 4) group's observed frequency over 60,000
+    draws is held to 5 standard errors of its analytic probability.
+    """
+    workers, temperature, draws = 6, 40.0, 60_000
+    rack = _free_running_rack(meta, workers)
+    rng = RNG(11)
+    rack.rng = rng
+    _fill(rack, 90, rng)  # below capacity: nothing is evicted by the refill below
+    codelets = [c for b in rack.bins for c in b.codelets]
+    assert len(codelets) == 90
+
+    table = Coderack(meta).urgency_table
+    bins = rack.bins
+    weights = [len(b.codelets) * table.value(b.bin_number, temperature) for b in bins]
+    total = sum(weights)
+    def group(c) -> tuple:
+        return (c.codelet_type, c.time_stamp % 4)
+
+    expected: Counter = Counter()
+    for b in bins:
+        for c in b.codelets:
+            expected[group(c)] += weights[b.bin_number] / total / len(b.codelets)
+
+    seen: Counter = Counter()
+    for draw in range(draws):
+        codelet = rack.choose_and_remove(temperature, rng, worker=draw % workers)
+        seen[group(codelet)] += 1
+        rack.post(codelet, 500, rng)  # back to the same bin: the population is fixed
+
+    for key, p in expected.items():
+        sigma = (p * (1 - p) / draws) ** 0.5
+        assert abs(seen[key] / draws - p) < 5 * sigma + 1e-9, (p, seen[key] / draws)
+
+
+def test_a_threaded_rack_evicts_exactly_as_the_serial_rack_does(meta):
+    """Capacity and eviction are the serial rack's, wherever the poster runs.
+
+    The previous rack divided the capacity between shards and posted into the poster's
+    own, so a poster's shard overflowed at a quarter of the rack.  Posted identically
+    from another thread under the same generator, the survivors are the same codelets.
+    """
+    def survivors(rack) -> list:
+        return sorted(
+            (c.codelet_type, c.urgency, c.time_stamp)
+            for b in rack.bins
+            for c in b.codelets
+        )
+
+    serial = Coderack(meta)
+    serial.rng = RNG(5)
+    _fill(serial, 260, serial.rng)
+
+    threaded = _free_running_rack(meta)
+    threaded.rng = RNG(5)
+    poster = threading.Thread(target=_fill, args=(threaded, 260, threaded.rng))
+    poster.start()
+    poster.join()
+
+    assert threaded.total_count == serial.total_count == serial.max_size
+    assert survivors(threaded) == survivors(serial)

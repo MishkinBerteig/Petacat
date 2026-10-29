@@ -171,7 +171,8 @@ export function ProblemInputPanel() {
           disabled={isRunning}
         />
         <span className="text-xs text-muted">
-          Same problem and seed reproduces a run exactly. Blank or 0 = seed 0.
+          With one worker, the same problem, seed and memory reproduce a run
+          exactly. Blank or 0 = seed 0.
         </span>
       </div>
 

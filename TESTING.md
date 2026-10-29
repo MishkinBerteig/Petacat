@@ -121,17 +121,17 @@ outside the matrix take it too and the run is entirely what it says it is.
 
 ```
 ============================= petacat test matrix ==============================
-  cpu  numpy    float64    449 tests
-  gpu  mlx      float32    449 tests
+  cpu  numpy    float64    486 tests
+  gpu  mlx      float32    486 tests
   whole suite requested: the full matrix is required of this run
 
-  unit           557 collected    557 run    557 passed      0 failed      0 skipped  complete
-  seed_unit      460 collected    460 run    460 passed      0 failed      0 skipped  complete
-  module         927 collected    927 run    927 passed      0 failed      0 skipped  complete
+  unit           732 collected    732 run    732 passed      0 failed      0 skipped  complete
+  seed_unit      494 collected    494 run    494 passed      0 failed      0 skipped  complete
+  module        1025 collected   1025 run   1025 passed      0 failed      0 skipped  complete
   architecture    34 collected     34 run     34 passed      0 failed      0 skipped  complete
   integration     68 collected     68 run     68 passed      0 failed      0 skipped  complete
-  lockstep      100 collected    100 run    100 passed      0 failed      0 skipped  complete
-  e2e            259 collected    259 run    259 passed      0 failed      0 skipped  complete
+  lockstep      223 collected    223 run    223 passed      0 failed      0 skipped  complete
+  e2e            287 collected    287 run    287 passed      0 failed      0 skipped  complete
 
   run complete in 14.2 min against a 60 min ceiling
 ```
@@ -179,7 +179,7 @@ A truncated run reports itself as truncated, and the difference from a clean run
 visible three ways:
 
 ```
-  module         927 collected    198 run    198 passed      0 failed      0 skipped  INCOMPLETE
+  module         1025 collected    198 run    198 passed      0 failed      0 skipped  INCOMPLETE
 
   RUN TRUNCATED: the 60 min ceiling was reached after 60.4 min. Everything above is
   what the run produced before it stopped; the tests it had not reached never ran.
@@ -203,16 +203,16 @@ that allowance.
 
 | Layer | Directory | Scope | May depend on | Cases |
 |-------|-----------|-------|---------------|-------|
-| **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 557 |
-| **seed unit** | `tests/seed_unit/` | One class or function, measured against the values Petacat ships with | Real `seed_data/*.json`, and the machine the process is running on | 460 |
-| **module** | `tests/module/` | Several real components assembled and driven | Real engine objects and `seed_data/*.json`; no DB, no HTTP | 927 |
+| **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 732 |
+| **seed unit** | `tests/seed_unit/` | One class or function, measured against the values Petacat ships with | Real `seed_data/*.json`, and the machine the process is running on | 494 |
+| **module** | `tests/module/` | Several real components assembled and driven | Real engine objects and `seed_data/*.json`; no DB, no HTTP | 1025 |
 | **architecture** | `tests/architecture/` | How the source tree is allowed to depend on itself | The repository's source, `seed_data/*.json`, child interpreters | 34 |
 | **integration** | `tests/integration/` | Agreement between the repository's artifacts, and the harness's own rules | Real `seed_data/*.json`, the ORM declarations, the generated client files, the documentation, a real pytest session | 68 |
-| **lockstep** | `tests/lockstep/` | Petacat's decision traces against Metacat's: naming, helper conformance, tracing/replay RNGs, determinism guards, the comparer | Real engine in faithful mode (numeric backend off, or a named backend); recorded Metacat traces | 100 |
-| **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 259 |
+| **lockstep** | `tests/lockstep/` | Petacat's decision traces against Metacat's: naming, helper conformance, tracing/replay RNGs, determinism guards, the comparer | Real engine in faithful mode (numeric backend off, or a named backend); recorded Metacat traces | 223 |
+| **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 287 |
 
 Those counts are cases, so they include the second pass the numeric matrix makes
-over the 449 backend-sensitive tests.
+over the 486 backend-sensitive tests.
 
 One line decides each layer. Read them as a question about what a new test's
 subject is, and write the test where the answer lands:
@@ -240,7 +240,7 @@ first**, then move up toward the API and GUI.
 
 All seven layers run in one command — the
 [required command](#the-required-command) — and, since Petacat runs natively, all
-seven actually run: **2,405 cases**, every one of them executed. A layer that is
+seven actually run: **2,863 cases**, every one of them executed. A layer that is
 normally skipped is not a layer that is normally green, and none of these is.
 
 Wall-clock time depends heavily on the machine and on what else it is doing. The
@@ -340,23 +340,28 @@ the number of endpoints taking `Depends(get_session)`, the size of
 | `test_bonds.py` | 25 | `Bond`: direction, facet, strength, flipping |
 | `test_bridge_types.py` | 2 | The bridge-type and orientation constants |
 | `test_codelet_dsl.py` | 3 | Compiling a codelet body: what the interpreter accepts and refuses |
-| `test_commentary.py` | 23 | The `CommentaryLog`, and the emit helpers whose English is written in Python |
+| `test_clamp_commentary.py` | 12 | A clamp announces itself and its undoing in Metacat's words; remindings newest first with a whole-number strength; the "stumped" answer |
+| `test_commentary.py` | 29 | The `CommentaryLog`, and the emit helpers whose English is written in Python |
 | `test_compare_harness.py` | 18 | The oracle comparison's decision logic: what gets flagged, and how, and its engine-parameter passthrough; the shipped reference sets in `measurements/reference/` |
 | `test_concept_mappings.py` | 37 | `ConceptMapping`: identity, slippage, distinguishing descriptors |
 | `test_descriptions.py` | 23 | `Description`: relevance, strength, descriptor predicates |
-| `test_episodic_memory.py` | 13 | `EpisodicMemory`: identifier scoping, theme distance, `answer_present` |
+| `test_episodic_memory.py` | 16 | `EpisodicMemory`: identifier scoping, theme distance, `answer_present`; the list kept newest first as Metacat conses it, the oldest-first window listing, remindings newest first |
 | `test_formulas.py` | 25 | Averaging, the sigmoid, and the five translation-temperature distributions |
 | `test_groups.py` | 22 | `Group`: length, spanning, membership, internal and external strength |
 | `test_jootsing_outcomes.py` | 7 | The jootser's outcomes: what counts as the same clamp, and when it gives up |
 | `test_object_choice.py` | 8 | Weighted object choice: the temperature exponent, and the absence of floors |
+| `test_order_fidelity.py` | 10 | The list orders `cons` and vectors fix: Chez Scheme's `sort` (80 cases from the Metacat image), a string's groups, the rule's subobject bridges, the coderack bin and deferred batch, the jootser's event set, and the display-time prints (DISCREPANCIES5 C-1, G-Z4, G-Z5, I-3…I-5) |
 | `test_rng.py` | 17 | The deterministic RNG wrapper |
 | `test_rule_bond_facet_change.py` | 1 | A GroupCtgy self change's BondFacet change is found wherever it sits (KNOWN-FAILURES, G-Q1) |
 | `test_rule_types.py` | 9 | `Rule` and `RuleClause` predicates and translation |
 | `test_rules_lockstep_ordering.py` | 12 | Rule construction in Metacat's order: subobject gate, common change schemas, `sort-templates`, swaps, list order (DISCREPANCIES5 C-1…C-4, D-1…D-5) |
 | `test_runner_status.py` | 1 | The runner's status constants |
 | `test_scout_counts.py` | 14 | The scout-count aggregates that decide how many codelets a cycle posts |
+| `test_eeg.py` | 5 | The EEG recorder: ring buffer, the average that excludes the current reading |
+| `test_coderack_display.py` | 4 | The coderack window's selection probabilities, from hand-computed racks |
 | `test_sink.py` | 8 | The `RunSink` port: its event vocabulary and `NullSink` |
 | `test_slipnet_node.py` | 30 | Nodes and links built directly: degree of association, probabilistic jump |
+| `test_slippage_log.py` | 4 | `SlippageLog`: applied and coattail slippages recorded newest first, bridges deduplicated keeping the last, the slippage to highlight |
 | `test_snag_response.py` | 21 | The snag response and the clamp machinery, one piece at a time |
 | `test_splittable_rng.py` | 21 | Counter-based per-codelet random streams |
 | `test_structure_fights.py` | 13 | `wins-fight?` and the weights the builders bring to a fight |
@@ -365,6 +370,8 @@ the number of endpoints taking `Depends(get_session)`, the size of
 | `test_theme_types.py` | 6 | `Theme` and `Themespace` type constants |
 | `test_themespace.py` | 31 | Themespace self-watching dynamics: cluster spreading, dominance |
 | `test_trace_event.py` | 6 | `TemporalTrace` event recording |
+| `test_trace_display.py` | 16 | A Trace event's print name and display header against `trace.ss`: every event type, the three group directions, the bridge prefixes, flipped groups, the answer headers; a picture that cannot be taken never stops the trace |
+| `test_verbose.py` | 15 | Scheme's display of values, the bounded narration log (capture and replay, dropped lines), the message-catalogue overlay, and that the narration builtins exist in a codelet's namespace only when Verbose mode is on |
 | `test_workspace_object.py` | 40 | `WorkspaceObject` and `Letter`: geometry, importance, unhappiness |
 | `test_workspace_string.py` | 28 | `WorkspaceString`: bond and group management, spanning, relevance |
 | `test_workspace_structure.py` | 10 | The base structure class and its proposal levels |
@@ -384,8 +391,11 @@ the number of endpoints taking `Depends(get_session)`, the size of
 | `test_episodic_memory.py` | 20 | Reminding, comparison and the reminding distance, which resolve the seeded templates and the seeded conceptual depths |
 | `test_formulas.py` | 10 | The temperature-dependent formulas against the seeded coefficients |
 | `test_hardware.py` | 21 | The machine description and the sizes derived from it: real probes, faked probes, environment overrides |
+| `test_metacat_display_seed.py` | 5 | Seed data that exists so a display can match Metacat: every Metacat demo, the Themespace's dimension and relation names |
 | `test_metadata_provider.py` | 25 | `MetadataProvider` loading every seed collection |
 | `test_numeric_backends.py` | 27 | The numeric backends against the reference (decay and spreading against exact rationals, including spreading's halfway cases), and the engine without them |
+| `test_rule_english.py` | 10 | A rule's English against Metacat 1.2's own `transcribe-to-english` output: 463 recorded rule shapes, each string state, wrapping, articles, and the text kept from the moment the rule was made |
+| `test_snag_explanation.py` | 19 | A snag's explanation against Metacat 1.2's `get-explanation` (`trace.ss:1097-1125`): every branch of the failure-result, the object phrases, the commentary lines, the template-driven wording, and the fallback for a snag with no stored explanation |
 | `test_rule_quality.py` | 13 | Rule uniformity, abstractness and succinctness against the Scheme's formulas, hand-computed from the seeded depths |
 | `test_slipnet_link_lengths.py` | 6 | The Slipnet's link lengths against the reference Scheme |
 | `test_slipnet_node.py` | 23 | The 59-node Slipnet: its nodes, its links, its clamps and its spreading |
@@ -396,15 +406,17 @@ the number of endpoints taking `Depends(get_session)`, the size of
 | File | Fns | Covers |
 |------|----:|--------|
 | `test_access_sets.py` | 19 | Read-set / write-set discipline and commit-time validation |
+| `test_lockstep_desync_fixes.py` | 5 | Fixes found by replaying runs beyond the lockstep corpus, as small hand-built states: `get-equivalent-bridge`, rule clauses `self` vs `subobjects`, any-descriptor reference objects, both-order internal coherence, `remove-duplicates` keeping the last entry (G-Y1…G-Y3, G-Y5, G-Y8) |
 | `test_answer_description_pattern.py` | 13 | The vertical theme-pattern an answer description is indexed by |
 | `test_bridge_scouting.py` | 25 | The bridge scouts' probabilistic gates, the build-time mapping augmentation, the incompatibility refinements, and the deferred posting batch |
 | `test_capture_projection.py` | 9 | A recorded capture renders exactly as the same state renders live, including the unbuilt translated rule justify mode adds |
+| `test_coderack_eeg_display.py` | 8 | The coderack window's figures and the EEG's samples from a real run, serial and free-running |
 | `test_codelet_behaviours.py` | 79 | What each of the 27 codelet types does to a live workspace |
 | `test_codelet_dsl.py` | 7 | Codelet bodies executed against a live engine context |
-| `test_coderack_shards.py` | 13 | The candidate sharded coderacks: fidelity and contention |
+| `test_coderack_shards.py` | 15 | The candidate sharded coderacks: fidelity and contention; the free-running rack's draw and eviction are exactly the serial rack's |
 | `test_commentary_writer.py` | 8 | Commentary is an injected writer, and every Run gets a real one |
 | `test_dissertation_parity.py` | 45 | The dissertation's claims, encoded as tests |
-| `test_free_running.py` | 15 | Free-running execution across worker threads |
+| `test_free_running.py` | 23 | Free-running execution across worker threads, and the loop matching the serial one (codelet count, structure clock, initial unclamp, per-codelet answer hand-off) |
 | `test_group_image_direction.py` | 6 | A group's image is built in the group's own direction |
 | `test_image_relations.py` | 4 | The relations a group's image is built with, and what happens when they are wrong |
 | `test_justify_and_jootsing.py` | 14 | Justify mode's verdicts and the jootser's justify outcomes |
@@ -419,13 +431,16 @@ the number of endpoints taking `Depends(get_session)`, the size of
 | `test_runner_status.py` | 7 | The status an `EngineRunner` reports as a run moves through it |
 | `test_singleton_group_images.py` | 3 | Every object a rule names owns an image, singleton groups included |
 | `test_sink_emission.py` | 9 | The engine emits a complete run record to its sink |
+| `test_snag_records.py` | 4 | A run records the snags it adds to the session's memory, once each |
 | `test_snag_response.py` | 7 | The snag response driven end to end through a real run |
 | `test_staleness.py` | 8 | The staleness probe reads a Workspace that lags the live one |
-| `test_state_graph.py` | 11 | A captured run restores to a state that continues identically |
+| `test_state_graph.py` | 12 | A captured run restores to a state that continues identically; memory captured oldest first and restored newest first, with the slippage logs of its events |
 | `test_swaps_and_translation.py` | 14 | Extrinsic (swap) rules end to end, the conflict battery, the per-dimension slippage ignore, and the ways a translation fails |
 | `test_thematic_bridge_scout.py` | 9 | The thematic-bridge-scout inside an assembled engine |
 | `test_themespace.py` | 14 | Themespace driven by a real run's bridges |
 | `test_trace_persistence.py` | 7 | Trace event persistence logic |
+| `test_trace_pictures.py` | 8 | What a real run keeps for redisplay: print names and pictures on every event, the Workspace as it was, answer and snag description pictures, and that taking a picture changes nothing the run does |
+| `test_verbose_mode.py` | 11 | Verbose mode on a real run: every codelet's banner, a run identical with the mode on or off, the mode switched mid-run, step mode, the bounded buffer, and the message catalogue agreeing with the call sites |
 | `test_workspace.py` | 19 | Workspace aggregation across its four strings |
 
 **`tests/architecture/` — properties of the source tree**
@@ -450,29 +465,42 @@ the number of endpoints taking `Depends(get_session)`, the size of
 
 | File | Fns | Covers |
 |------|----:|--------|
+| `test_commentary.py` | 1 | Every comment-window paragraph (both voices) of 28 Metacat runs -- snags, all four clamps and their undoing, "I'm getting frustrated", answers, "Okay, I'm stumped" -- replayed in Petacat and compared as Metacat 1.2 logged them |
 | `test_comparer.py` | 29 | The trace comparer: hand-made trace pairs with known faults give the expected classes; the registry's reference-crash class; proposed structures counted apart from state snapshots, and the ratchet on both |
+| `test_desync_fixes.py` | 1 | Prefixes of three Metacat runs beyond the corpus that used to desynchronise the replay (`traces-desync/`) replay to their end with no error and no differing state (DISCREPANCIES5 G-Y2…G-Y4) |
 | `test_episodes.py` | 8 | Episodes and justify mode: recorder driver text, corpus globs, an episode's self-replay with memory carried, a forced fatal, justify self-replay |
+| `test_event_names.py` | 2 | Every Trace event in eight Metacat runs (all event types, all three group directions, flips, slippages on all three bridges, translated rules, the three answer headers) named and headed exactly as Metacat 1.2 logged them |
 | `test_helpers.py` | 11 | Helper conformance: `prob`, `~`, `weighted_pick` and `pick` give Metacat's results for the same draws |
 | `test_naming.py` | 9 | Canonical names for plain values and every kind of object, and the opening state against Metacat's |
 | `test_replay.py` | 15 | Tracing rules, trace shape, self-replay, Guard 1, fatal and surplus paths, Guard 2 (slow); a committed Metacat trace replayed with the numeric backend on |
 | `test_seam.py` | 6 | The engine's trace seam changes nothing for an ordinary run; the faithful clamp-expiry switch |
+| `test_translation_log.py` | 2 | The slippage log, supporting vertical bridges, reference objects and supporting groups of every answer and snag in six Metacat runs (coattail slippages, a justify-mode answer, a snag with an applied slippage), equal to what Metacat 1.2 logged |
+| `test_verbose.py` | 2 | Nine Metacat runs (six discovery, three justify) with `%verbose%` on, narrated line for line by Petacat's replay; and the replayed trace is the same with Verbose mode off |
+| `test_snag_explanations.py` | 2 | Every snag in eight Metacat runs (CHANGE, SWAP, CONFLICT, group-category reversal) explained, and its two comment lines worded, exactly as Metacat 1.2 logged them |
+| `test_rule_english_tools.py` | 8 | The rule-English recorder and comparer (no Docker): problem-list and Metacat-record parsing, clause-structure keys, exact pairing, fixture-table rows |
+| `test_event_tools.py` | 6 | The event-name recorder and comparer (no Docker): record parsing, run-list reading, per-run comparison, fixture-table rows, `--pick` selection |
+| `test_snag_and_answer_tools.py` | 26 | The snag and episode-answer recorders, comparers and the snag and fidelity sweep drivers (no Docker): record parsing, order-sensitive and order-insensitive answer comparison, problem-list data files, sweep stage selection |
+| `test_frequencies.py` | 17 | The answer-frequency tools (no Docker): recording parsing, frequency tables, total variation, pooled two-sample chi-square, the support-v1a reference counts against the committed measurement |
 
 **`tests/e2e/` — the HTTP API against a real database**
 
 | File | Fns | Covers |
 |------|----:|--------|
-| `test_api_controls.py` | 20 | Breakpoints, clamping and the threshold endpoints |
+| `test_api_controls.py` | 29 | Breakpoints, clamping, Clamp theme pattern, Undo last clamp, the mid-run self-watching toggle, and the threshold endpoints |
+| `test_api_displays.py` | 5 | The coderack, EEG and Themespace-name data the Metacat windows need |
 | `test_api_docs.py` | 11 | The documentation endpoints |
-| `test_api_extended.py` | 56 | Extended runs, memory, docs and admin endpoints |
+| `test_api_extended.py` | 57 | Extended runs, memory, docs and admin endpoints |
 | `test_api_review.py` | 19 | The review surfaces read back what the persistence modes wrote |
 | `test_api_runs.py` | 26 | The runs API with persistence |
 | `test_api_system.py` | 8 | The system endpoints: what is executing, not what was recorded |
 | `test_help_api.py` | 7 | The help topics API |
 | `test_persistence.py` | 4 | Snapshot save/restore and the DB metadata round-trip |
-| `test_persistence_modes.py` | 30 | The three persistence modes: Fast, Normal, Audit |
+| `test_persistence_modes.py` | 32 | The three persistence modes: Fast, Normal, Audit |
 | `test_run_parameters.py` | 13 | Run parameters are settable per Run, stored, and readable back |
 | `test_run_to_answer.py` | 8 | The Run-to-Answer feature over HTTP |
-| `test_snag_identity.py` | 2 | A snag is the same snag whichever endpoint served it |
+| `test_memory_order.py` | 2 | A restart puts stored answers back newest first by the memory's own identifier, both projections list them oldest first, and forgetting one keeps the rest in order |
+| `test_snag_identity.py` | 5 | A snag is the same snag whichever endpoint served it, and is written once |
+| `test_moment_display.py` | 6 | Event, answer and snag redisplay over the API: print names in the listing, the picture served live and from the stored row, the toggle and the switch, rows with no picture |
 | `test_step0_config_from_db.py` | 50 | Step 0's guard tests: a shipped value reproduces the run and a changed one moves it |
 
 **Collected by no layer**
@@ -574,8 +602,8 @@ nothing consults them now.
 
 `client/` carries a Vitest suite covering the store, the panels, the admin
 editors and the review surfaces. Run it with `cd client && npx vitest run`, and
-`npx tsc --noEmit` alongside it. **316 cases across 23 files**, all passing, in
-3.2 s on an Apple M2 Max.
+`npx tsc --noEmit` alongside it. **420 cases across 32 files**, all passing, in
+3.3 s on an Apple M2 Max.
 
 | File (`client/src/`) | Cases | Covers |
 |----------------------|------:|--------|
@@ -584,10 +612,12 @@ editors and the review surfaces. Run it with `cd client && npx vitest run`, and
 | `store/runStore.test.ts` | 39 | The spreading threshold outliving a page reload, and the store's run lifecycle |
 | `components/AdminPanel.test.tsx` | 5 | The Admin panel's operations report what became of them |
 | `components/CoderackView.test.tsx` | 6 | The Coderack panel's codelet-pattern clamps |
+| `components/ClampControls.test.tsx` | 5 | Clamp theme pattern, Undo last clamp and the mid-run Self-watching toggle, as Metacat's Options menu has them |
 | `components/CommentaryPanel.test.tsx` | 3 | An empty commentary panel has two different causes |
 | `components/HelpPopover.test.tsx` | 3 | The popover shows a glossary term, and says when it cannot |
 | `components/LastErrorBanner.test.tsx` | 3 | The error channel is rendered where it can be seen |
 | `components/MemoryView.test.tsx` | 16 | The Memory panel shows the memory the run is thinking against |
+| `components/MomentDisplay.test.tsx` | 21 | Clicking a Trace event, answer or snag redisplays the moment: the Workspace header and highlights, the Slipnet pattern, the Coderack, the Temperature, the Trace window's print-name labels |
 | `components/ProblemInputPanel.test.tsx` | 7 | The problem panel owns the problem's identity |
 | `components/RunControlsPanel.test.tsx` | 40 | A run starts on the problem the form actually shows |
 | `components/RunHistory.test.tsx` | 31 | Run History stays current as runs finish |
@@ -597,7 +627,8 @@ editors and the review surfaces. Run it with `cd client && npx vitest run`, and
 | `components/SlipnetView.test.tsx` | 8 | The node-focus Edit button's visibility |
 | `components/SubstrateBadge.test.tsx` | 5 | The header says which processor the arithmetic runs on |
 | `components/TemperatureGauge.test.tsx` | 8 | The gauge reports the engine's temperature clamp |
-| `components/ThemespaceView.test.tsx` | 8 | The Themespace grid is clampable, as MetaCat's theme windows are |
+| `components/ThemespaceView.test.tsx` | 14 | The Themespace grid is clampable, as MetaCat's theme windows are; its theme-edit mode |
+| `components/VerbosePanel.test.tsx` | 11 | The Verbose panel and the store's narration: polled from where the last reply ended, bounded on both sides, the Step button sent as step mode, the mode remembered with no run loaded |
 | `components/WorkspaceView.test.tsx` | 10 | Workspace labels do not print on top of each other |
 | `components/admin/AdminEditors.test.tsx` | 42 | Every Configuration tab edits the collection it shows |
 | `components/admin/AdminHttpFailures.test.tsx` | 11 | The Configuration screen reports what the server refused |

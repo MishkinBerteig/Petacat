@@ -222,7 +222,7 @@ class WorkspaceObject:
 
         Scheme: workspace-objects.ss:293-301.
         """
-        self.descriptions.append(description)
+        self.descriptions.insert(0, description)
 
     def get_descriptions(self) -> list[Any]:
         """Return all descriptions.  For groups this includes bond

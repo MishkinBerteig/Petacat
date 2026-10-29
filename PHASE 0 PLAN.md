@@ -20,7 +20,7 @@ count every engine-size figure in this document uses. Seed data: 59 slipnet node
 integration + 8 module files run locally; 9 e2e files currently require Docker, which
 WP2.1 removes).
 
-> **As built.** `server/engine/` holds 51 modules and 34,923 lines.
+> **As built.** `server/engine/` holds 56 modules and 38,666 lines.
 
 ---
 
@@ -104,7 +104,7 @@ incidental.
 The database boundary is confined to twelve files:
 
 > **As built.** The database boundary spans `api/`, `services/`, `models/` and `db.py`,
-> with 93 endpoints taking `Depends(get_session)`.
+> with 95 endpoints taking `Depends(get_session)`.
 
 | Module | Role at the boundary |
 |--------|----------------------|
@@ -1065,7 +1065,7 @@ introduce the delta-and-commit split the commit protocol needs.
 *Files:* `engine/codelet_dsl/builtins.py`, `engine/workspace_structures.py`.
 *Verify:* serial behaviour unchanged; read/write sets recorded and inspectable.
 
-> **As built.** `builtins.py` holds 2,878 lines across 93 top-level functions.
+> **As built.** `builtins.py` holds 3,271 lines across 106 top-level functions.
 
 **Done**, as `server/engine/access.py`. Ten of the 33 public builtins mutate state; each
 now records what it read and what it wrote, and each codelet is validated at its own
@@ -1141,6 +1141,8 @@ distribution in expectation.
 
 Per-worker sharding is the only candidate that *gains* from a second worker, and it is
 **1.50× the locked rack at eight**.
+
+*(Superseded: the free-running engine no longer installs the sharded rack; see the correction under open question 2 below.)*
 
 **Expected range unchanged**: 13 problems × 100 runs with the sharded rack installed —
 **0 novel, 0 missing**.
@@ -1530,6 +1532,10 @@ look the same from outside and are not the same thing.
    worsens as the engine cools; region sharding is not buildable, since a codelet chooses
    its region during execution. Selection is preserved because a codelet's shard is
    independent of its type and urgency, so each shard is an unbiased sample. See WP4.3.
+   **Corrected later:** that selection argument was wrong. The draw is urgency-weighted
+   within a shard, so a per-worker draw is not the serial distribution (one worker found
+   `abce` 11.4% against 14.5%). The free-running engine now installs a single rack behind
+   a lock (`LockedCoderack`), whose draw and eviction are the serial rack's exactly.
 3. **Read-set granularity** (B4) — the coarse/fine tradeoff between false conflicts and
    missed conflicts, tuned empirically against the serial reference.
 4. ~~**Staleness tolerance** (WP0.5) — how much stale state cognition absorbs before the

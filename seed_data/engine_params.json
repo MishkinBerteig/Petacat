@@ -37,6 +37,32 @@
   "verbatim_rule_probability": 0.01,
   "slippage_ignore_probability": 0.4,
   "maximum_rule_line_length": 60,
+  "rule_english_dimension_phrases": {
+    "plato-direction-category": ["direction", "directions"],
+    "plato-group-category": ["group-type", "group-types"],
+    "plato-alphabetic-position-category": ["alphabetic-position", "alphabetic-positions"],
+    "plato-letter-category": ["letter-category", "letter-categories"],
+    "plato-length": ["length", "lengths"],
+    "plato-object-category": ["object-type", "object-types"],
+    "plato-string-position-category": ["position", "positions"]
+  },
+  "theme_dimension_labels": {
+    "plato-letter-category": ["Letter Category", "Letter Ctgy."],
+    "plato-alphabetic-position-category": ["Alphabetic Position", "Alpha. Pos."],
+    "plato-direction-category": ["Direction", "Direction"],
+    "plato-object-category": ["Object Type", "Object Type"],
+    "plato-string-position-category": ["String Position", "String Pos."],
+    "plato-group-category": ["Group Type", "Group Type"],
+    "plato-bond-category": ["Bond Type", "Bond Type"],
+    "plato-bond-facet": ["Bond Facet", "Bond Facet"]
+  },
+  "theme_relation_labels": {
+    "identity": "iden",
+    "opposite": "opp",
+    "successor": "succ",
+    "predecessor": "pred",
+    "diff": "diff"
+  },
   "concept_mapping_importance_threshold": 65,
   "concept_activation_importance_threshold": 85,
   "group_importance_threshold": 100,

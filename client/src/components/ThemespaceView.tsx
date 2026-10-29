@@ -2,33 +2,12 @@
 // ThemespaceView -- Three-column grid of theme clusters
 // ---------------------------------------------------------------------------
 
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 
-import { clampThemes, unclampThemes } from '@/api/client';
-import { useRunStore } from '@/store/runStore';
+import { clampThemes } from '@/api/client';
+import { useSelfWatchingDisabled } from '@/components/SelfWatchingWarning';
+import { useRunStore, type ThemeEditState } from '@/store/runStore';
 import type { ClusterState, ThemespaceState, ThemeState } from '@/types';
-
-/** Human-readable short names for dimensions. */
-const DIM_LABELS: Record<string, string> = {
-  'plato-letter-category': 'Letter',
-  'plato-string-position-category': 'StrPos',
-  'plato-alphabetic-position-category': 'AlphaPos',
-  'plato-direction-category': 'Direction',
-  'plato-bond-category': 'BondCtgy',
-  'plato-group-category': 'GroupCtgy',
-  'plato-length': 'Length',
-  'plato-object-category': 'ObjCtgy',
-  'plato-bond-facet': 'BondFacet',
-};
-
-/** Human-readable short names for relations. */
-const REL_LABELS: Record<string, string> = {
-  identity: 'id',
-  successor: 'succ',
-  predecessor: 'pred',
-  opposite: 'opp',
-  diff: 'diff',
-};
 
 /** Map a theme type key to a column heading. */
 function columnLabel(themeType: string): string {
@@ -59,10 +38,19 @@ function isDominant(theme: ThemeState, _cluster: ClusterState): boolean {
 function ActivationBar({
   theme,
   dominant,
+  relationLabels,
   onClamp,
+  clickSelect,
 }: {
   theme: ThemeState;
   dominant: boolean;
+  /**
+   * Theme-edit mode: the bar itself takes the click (`theme-graphics.ss:35-63`), a
+   * plain click selecting +100 and a shift- or right-click selecting -100.
+   */
+  clickSelect?: boolean;
+  /** Metacat's relation names ("iden", "opp", ...), served with the state. */
+  relationLabels?: Record<string, string>;
   /** Absent in the review surfaces, which show a recorded state and cannot steer it. */
   onClamp?: (activation: number) => void;
 }) {
@@ -82,11 +70,25 @@ function ActivationBar({
   return (
     <div
       title={`${theme.relation ?? 'base'}: ${theme.activation.toFixed(1)}`}
+      onClick={
+        clickSelect && onClamp
+          ? (e) => clampTo(e.shiftKey ? -100 : 100)
+          : undefined
+      }
+      onContextMenu={
+        clickSelect && onClamp
+          ? (e) => {
+              e.preventDefault();
+              clampTo(-100);
+            }
+          : undefined
+      }
       style={{
         display: 'flex',
         alignItems: 'center',
         gap: 4,
         height: 18,
+        cursor: clickSelect && onClamp ? 'pointer' : undefined,
       }}
     >
       {/* Relation label */}
@@ -101,7 +103,7 @@ function ActivationBar({
           flexShrink: 0,
         }}
       >
-        {REL_LABELS[theme.relation ?? ''] ?? theme.relation ?? ''}
+        {relationLabels?.[theme.relation ?? ''] ?? theme.relation ?? ''}
       </div>
       {/* Bar container */}
       <div
@@ -159,7 +161,10 @@ function ActivationBar({
           something is undiscoverable, and clamping a theme negatively is the whole
           point of the affordance (§2.4.2) rather than a secondary gesture. */}
       {onClamp && (
-        <div style={{ display: 'flex', gap: 3, flexShrink: 0 }}>
+        <div
+          style={{ display: 'flex', gap: 3, flexShrink: 0 }}
+          onClick={(e) => e.stopPropagation()}
+        >
           <ClampButton
             label="Clamp +100"
             active={held(100)}
@@ -233,12 +238,22 @@ function ClampButton({
 /** One dimension row showing the dimension label and all its relation bars. */
 function DimensionPanel({
   cluster,
+  labels,
+  relationLabels,
+  abbreviate,
   onClamp,
+  clickSelect,
 }: {
   cluster: ClusterState;
+  clickSelect?: boolean;
+  /** The vertical column is the narrow one: Metacat abbreviates there. */
+  abbreviate?: boolean;
+  /** Metacat's full and abbreviated dimension names, served with the state. */
+  labels?: { name: string; abbreviation: string };
+  relationLabels?: Record<string, string>;
   onClamp?: (theme: ThemeState, activation: number) => void;
 }) {
-  const dimLabel = DIM_LABELS[cluster.dimension] ?? cluster.dimension.replace('plato-', '');
+  const dimLabel = (abbreviate ? labels?.abbreviation : labels?.name) ?? cluster.dimension.replace('plato-', '');
   const hasDominant = cluster.themes.some(t => isDominant(t, cluster));
 
   return (
@@ -260,7 +275,7 @@ function DimensionPanel({
           color: hasDominant ? '#ffd700' : 'var(--text-accent)',
           marginBottom: 2,
         }}
-        title={cluster.dimension}
+        title={labels && labels.abbreviation !== labels.name ? `${cluster.dimension} (${labels.abbreviation})` : cluster.dimension}
       >
         {dimLabel}
       </div>
@@ -270,7 +285,9 @@ function DimensionPanel({
           key={i}
           theme={theme}
           dominant={isDominant(theme, cluster)}
+          relationLabels={relationLabels}
           onClamp={onClamp ? (a) => onClamp(theme, a) : undefined}
+          clickSelect={clickSelect}
         />
       ))}
     </div>
@@ -288,11 +305,17 @@ export function ThemespaceGrid({
   themespace,
   onClamp,
   onRelease,
+  editing,
 }: {
   themespace: ThemespaceState | null;
+  /**
+   * Theme-edit mode: the theme types claimed so far. A window not yet claimed says
+   * "Click to select themes" (`display-edit-mode-message`, `theme-graphics.ss:373`).
+   */
+  editing?: { edited: string[] };
   /** Omitted by the review surfaces: a recorded Themespace is not steerable. */
   onClamp?: (theme: ThemeState, cluster: ClusterState, activation: number) => void;
-  /** Release every clamp, as the Options menu's "Undo last clamp" does. */
+  /** Undo the last clamp, as the Options menu's "Undo last clamp" does. */
   onRelease?: () => void;
 }) {
   if (!themespace) {
@@ -355,7 +378,7 @@ export function ThemespaceGrid({
           {onRelease && themespace.thematic_pressure && (
             <button
               onClick={onRelease}
-              title="Release every clamped theme and switch thematic pressure off, so the run goes back to building on evidence alone."
+              title="Undo the most recent clamp: its themes, concepts and codelet urgencies are released, and the run goes back to building on evidence alone."
               style={{
                 fontSize: 10,
                 padding: '0 4px',
@@ -366,7 +389,7 @@ export function ThemespaceGrid({
                 cursor: 'pointer',
               }}
             >
-              Release clamps
+              Undo last clamp
             </button>
           )}
           <span>dominance margin {themespace.dominant_theme_margin ?? 90}</span>
@@ -421,11 +444,24 @@ export function ThemespaceGrid({
               <DimensionPanel
                 key={i}
                 cluster={cluster}
+                labels={themespace.dimension_labels?.[cluster.dimension]}
+                relationLabels={themespace.relation_labels}
+                abbreviate={key === 'vertical_bridge'}
+                clickSelect={editing !== undefined}
                 onClamp={
                   onClamp ? (theme, a) => onClamp(theme, cluster, a) : undefined
                 }
               />
             ))}
+            {editing !== undefined && !editing.edited.includes(key) && possible.some((at) => at.toLowerCase().replace(/[-\s]/g, '_') === key) && (
+              <div
+                className="text-xs text-muted"
+                style={{ textAlign: 'center', padding: 4 }}
+                data-testid={`theme-edit-message-${key}`}
+              >
+                Click to select themes
+              </div>
+            )}
             {!grouped[key]?.length && (
               <div className="text-xs text-muted" style={{ textAlign: 'center', padding: 8 }}>
                 No clusters
@@ -451,8 +487,13 @@ export function ThemespaceGrid({
 export function ThemespaceView() {
   const themespace = useRunStore((s) => s.themespace);
   const runId = useRunStore((s) => s.runId);
+  const themeEdit = useRunStore((s) => s.themeEdit);
   const refreshThemespace = useRunStore((s) => s.refreshThemespace);
   const refreshTrace = useRunStore((s) => s.refreshTrace);
+  const undoLastClamp = useRunStore((s) => s.undoLastClamp);
+  const editThemeType = useRunStore((s) => s.editThemeType);
+  const selectTheme = useRunStore((s) => s.selectTheme);
+  const selfWatchingOff = useSelfWatchingDisabled('loaded');
 
   const handleClamp = useCallback(
     async (theme: ThemeState, cluster: ClusterState, activation: number) => {
@@ -472,18 +513,74 @@ export function ThemespaceView() {
     [runId, refreshThemespace, refreshTrace],
   );
 
-  const handleRelease = useCallback(async () => {
-    if (runId == null) return;
-    await unclampThemes(runId);
-    await refreshThemespace();
-    await refreshTrace();
-  }, [runId, refreshThemespace, refreshTrace]);
+  // In theme-edit mode a click only chooses (`theme-graphics.ss:35-63`): the first
+  // click in a window claims its theme type, and the ones after select themes in it.
+  // Nothing reaches the server until Clamp Themes.
+  const handleEditClick = useCallback(
+    (theme: ThemeState, cluster: ClusterState, activation: number) => {
+      // The bottom bridge has themes only when there is an answer to justify
+      // (`ready-to-edit?`, `gui.ss:840-843`).
+      if (!(themespace?.possible_theme_types ?? []).includes(cluster.theme_type)) return;
+      editThemeType(cluster.theme_type);
+      // `activation` is what the grid would set (0 when toggling the same value off);
+      // selectTheme does its own toggling from the +100 / -100 the gesture means.
+      const value = activation === 0 ? (theme.activation === 100 ? 100 : -100) : activation;
+      selectTheme(cluster.theme_type, cluster.dimension, theme.relation ?? null, value);
+    },
+    [editThemeType, selectTheme, themespace],
+  );
+
+  const displayed = useMemo(
+    () => (themeEdit && themespace ? editView(themespace, themeEdit) : themespace),
+    [themespace, themeEdit],
+  );
+
+  // With self-watching off the theme windows are hidden (`gui.ss:625-626`).
+  if (selfWatchingOff) {
+    return (
+      <div className="text-muted text-sm" style={{ padding: 16, textAlign: 'center' }}>
+        The Themespace is hidden while self-watching is disabled.
+      </div>
+    );
+  }
 
   return (
     <ThemespaceGrid
-      themespace={themespace}
-      onClamp={runId == null ? undefined : handleClamp}
-      onRelease={runId == null ? undefined : handleRelease}
+      themespace={displayed}
+      onClamp={runId == null ? undefined : themeEdit ? handleEditClick : handleClamp}
+      onRelease={runId == null || themeEdit ? undefined : () => void undoLastClamp()}
+      editing={themeEdit ? { edited: themeEdit.edited } : undefined}
     />
   );
+}
+
+/**
+ * What the Themespace looks like in theme-edit mode: everything blank except the
+ * types the user has claimed, which show the chosen themes (`gui.ss:861-866`).
+ */
+function editView(themespace: ThemespaceState, edit: ThemeEditState): ThemespaceState {
+  return {
+    ...themespace,
+    thematic_pressure: false,
+    active_theme_types: [],
+    clusters: themespace.clusters.map((cluster) => ({
+      ...cluster,
+      frozen: false,
+      dominant_relation: null,
+      themes: cluster.themes.map((theme) => {
+        const chosen = edit.selected.find(
+          (t) =>
+            t.type === cluster.theme_type &&
+            t.dimension === cluster.dimension &&
+            t.relation === (theme.relation ?? null),
+        );
+        return {
+          ...theme,
+          activation: chosen ? chosen.activation : 0,
+          frozen: false,
+          dominant: false,
+        };
+      }),
+    })),
+  };
 }

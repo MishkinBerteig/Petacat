@@ -32,6 +32,21 @@ def _recomputed_label(descriptor1: Any, descriptor2: Any) -> Any:
     return None
 
 
+def slippage_english_name(slippage: Any) -> str:
+    """``english-name`` of a concept mapping (``concept-mappings.ss:41``): the two
+    descriptors' lowercase names around ``<=>``.  Accepts a :class:`ConceptMapping` or
+    the ``{"descriptor1": ..., "descriptor2": ...}`` record the unifier returns."""
+    if isinstance(slippage, dict):
+        first, second = slippage["descriptor1"], slippage["descriptor2"]
+    else:
+        first, second = slippage.descriptor1, slippage.descriptor2
+
+    def lowercase(node: Any) -> str:
+        return str(getattr(node, "name", node))[6:].lower()
+
+    return f"{lowercase(first)} <=> {lowercase(second)}"
+
+
 class ConceptMapping:
     """A mapping between two conceptual descriptions."""
 
@@ -64,6 +79,11 @@ class ConceptMapping:
     def is_slippage(self) -> bool:
         """Descriptors differ — a conceptual substitution."""
         return not self.is_identity
+
+    @property
+    def english_name(self) -> str:
+        """``a <=> b`` in the nodes' lowercase names (``concept-mappings.ss:41``)."""
+        return slippage_english_name(self)
 
     def strength(self) -> float:
         """Concept mapping strength.
@@ -420,3 +440,115 @@ class ConceptMapping:
         d2 = getattr(self.descriptor2, "short_name", "?")
         lbl = getattr(self.label, "short_name", "?") if self.label else "none"
         return f"CM({d1}->{d2}, {lbl})"
+
+
+class SlippageLog:
+    """The slippages a rule translation actually applied.
+
+    Scheme: ``make-slippage-log`` (``answers.ss:1198-1272``).  ``translate`` makes one
+    per rule translation and hands it down to every ``apply-slippages`` call
+    (``slipnet.ss:257-277``); a slippage that *replaces* a concept is recorded with
+    ``applied``, and a coattail slippage that drags a related concept along with it
+    with ``coattail``.  Both lists are built with ``cons``, so they are **newest
+    first**, exactly as in the Scheme.
+
+    Recording draws no random number and changes no decision: it is bookkeeping
+    beside ``apply_slippages``, kept so that a snag or an answer can say which
+    slippages the translation really used (``trace.ss:497``, ``trace.ss:1235``).
+    """
+
+    def __init__(self, rule_type: str = "top") -> None:
+        self.rule_type = rule_type
+        #: ``directly-applied-slippages``: newest first.
+        self.directly_applied_slippages: list[ConceptMapping] = []
+        #: ``coattail-slippage-table``: ``(coattail-slippage, inducing-slippage)``, newest first.
+        self.coattail_slippage_table: list[tuple[ConceptMapping, ConceptMapping]] = []
+        #: ``slippage-bridges``: newest first, may repeat (``get-slippage-bridges`` dedups).
+        self._slippage_bridges: list[Any] = []
+
+    def applied(self, slippage: ConceptMapping) -> None:
+        """``(applied slippage)`` (``answers.ss:1262``)."""
+        self.directly_applied_slippages.insert(0, slippage)
+        self._slippage_bridges.insert(0, _vertical_bridge_of(slippage))
+
+    def coattail(self, node1: Any, label: Any, node2: Any, inducing: ConceptMapping) -> None:
+        """``(coattail node1 label node2 inducing-slippage)`` (``answers.ss:1267``)."""
+        category = node1.category
+        coattail_slippage = ConceptMapping(
+            description_type1=category,
+            descriptor1=node1,
+            description_type2=category,
+            descriptor2=node2,
+            label=_recomputed_label(node1, node2),
+        )
+        coattail_slippage.object1 = "coattail"
+        coattail_slippage.object2 = "coattail"
+        self.coattail_slippage_table.insert(0, (coattail_slippage, inducing))
+        self._slippage_bridges.insert(0, _vertical_bridge_of(inducing))
+
+    def verbose_text(self) -> str:
+        """``(print slippage-log)`` (``answers.ss:1210-1228``)."""
+        from server.engine.trace_display import concept_mapping_print_name
+
+        text = "\nTranslation direction: "
+        text += "top-to-bottom\n" if self.rule_type == "top" else "bottom-to-top\n"
+        text += "Directly-applied slippages:\n"
+        if not self.directly_applied_slippages:
+            text += "  None\n"
+        for slippage in self.directly_applied_slippages:
+            text += f"  {concept_mapping_print_name(slippage)}\n"
+        text += "Coattail-slippages:\n"
+        if not self.coattail_slippage_table:
+            text += "  None\n"
+        for coattail, inducing in self.coattail_slippage_table:
+            text += (f"  {concept_mapping_print_name(coattail)} induced by "
+                     f"{concept_mapping_print_name(inducing)}\n")
+        return text + "\n"
+
+    def get_coattail_slippages(self) -> list[ConceptMapping]:
+        return [entry[0] for entry in self.coattail_slippage_table]
+
+    def get_coattail_inducing_slippages(self) -> list[ConceptMapping]:
+        return [entry[1] for entry in self.coattail_slippage_table]
+
+    def get_applied_slippages(self) -> list[ConceptMapping]:
+        """``get-applied-slippages``: the direct ones then the inducing ones, the
+        *last* occurrence of each kept (``remq-duplicates``)."""
+        combined = list(self.directly_applied_slippages) + self.get_coattail_inducing_slippages()
+        return [x for i, x in enumerate(combined) if not any(x is y for y in combined[i + 1:])]
+
+    def coattail_inducing_slippage(self, slippage: ConceptMapping) -> bool:
+        return any(slippage is entry[1] for entry in self.coattail_slippage_table)
+
+    def get_slippage_bridges(self) -> list[Any]:
+        """``get-slippage-bridges``: ``remq-duplicates`` of the recorded bridges.
+
+        A slippage whose object has no vertical bridge (only a hand-made one in a test:
+        Metacat would fail on it) records none."""
+        bridges = [b for b in self._slippage_bridges if b is not None]
+        return [x for i, x in enumerate(bridges) if not any(x is y for y in bridges[i + 1:])]
+
+    def get_bridge(self, slippage: ConceptMapping) -> Any:
+        """The first recorded bridge whose slippages include *slippage*."""
+        for bridge in self._slippage_bridges:
+            if bridge is not None and any(slippage is s for s in bridge.get_slippages()):
+                return bridge
+        return None
+
+    def get_slippage_to_highlight(self, slippage: ConceptMapping) -> ConceptMapping | None:
+        """``get-slippage-to-highlight``: the forward slippage a drawing shows for *slippage*."""
+        bridge = self.get_bridge(slippage)
+        if bridge is None:
+            return None
+        forward = bridge.get_non_symmetric_slippages()
+        if any(slippage is s for s in forward):
+            return slippage
+        for s in forward:
+            if s.is_symmetric(slippage):
+                return s
+        return None
+
+
+def _vertical_bridge_of(slippage: ConceptMapping) -> Any:
+    """``(tell (tell slippage 'get-object1) 'get-bridge 'vertical)``."""
+    return getattr(getattr(slippage, "object1", None), "vertical_bridge", None)

@@ -1,0 +1,11 @@
+# Fidelity net, episodes (8 problems): "initial modified target" per line.
+# Episodes of 8 runs, episode seeds 1-3, cap 5000 per run, memory carried (24 episodes, 192 runs).
+# Used by scripts/sweep_fidelity.py (net "episodes"), which also runs the answer explanation and comparison check.
+abc abd ijkk
+abc cba xyz
+aabc aabd mrrjjj
+abc abd kji
+abc aabbcc ijk
+abcd abce ijkl
+abc bcd ijk
+aab abb xyz

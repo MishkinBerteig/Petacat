@@ -578,7 +578,7 @@ def _real_rule(nodes, position="plato-rightmost", relation="plato-successor"):
 
 
 def _changeless_rule(nodes, position="plato-rightmost"):
-    """A clause with no changes — the shape that transcribes to "Unknown transformation"."""
+    """A clause with no changes: it has nothing to say in English at all."""
     from server.engine.rules import CLAUSE_INTRINSIC, RULE_TOP, Rule, RuleClause
 
     clause = RuleClause(
@@ -589,6 +589,27 @@ def _changeless_rule(nodes, position="plato-rightmost"):
             nodes[position],
         ),
         changes=[],
+    )
+    return Rule(rule_type=RULE_TOP, clauses=[clause])
+
+
+def _same_prose_rule(nodes, position, description_type):
+    """A rule whose clause names its object by ``description_type``.
+
+    The English never mentions the description type, only the descriptor, so these
+    read alike whichever type is given.
+    """
+    from server.engine.rules import CLAUSE_INTRINSIC, RULE_TOP, Rule, RuleChange, RuleClause
+
+    clause = RuleClause(
+        clause_type=CLAUSE_INTRINSIC,
+        object_description=(nodes["plato-letter"], nodes[description_type], nodes[position]),
+        changes=[
+            RuleChange(
+                dimension=nodes["plato-letter-category"],
+                relation=nodes["plato-successor"],
+            )
+        ],
     )
     return Rule(rule_type=RULE_TOP, clauses=[clause])
 
@@ -617,30 +638,29 @@ def test_snag_present_matches_the_same_rule_on_the_same_problem(nodes):
 def test_two_structurally_different_rules_with_identical_prose_do_not_collide(nodes):
     """The first of the two collisions a prose comparison has.
 
-    ``transcribe_to_english`` renders the *changes* and says nothing about which object
-    a clause names, so "change the leftmost letter by successor" and "change the
-    rightmost letter by successor" come out as the same sentence.  As prose they were
-    one snag episode; as clause lists they are two.
+    The English of a clause names the descriptor of its object but never the
+    description type it was found under, so two clauses that differ only in that type
+    read alike.  As prose they were one snag episode; as clause lists they are two.
     """
     memory = EpisodicMemory()
-    rightmost = _real_rule(nodes, position="plato-rightmost")
-    leftmost = _real_rule(nodes, position="plato-leftmost")
-    assert rightmost.transcribe_to_english() == leftmost.transcribe_to_english()
+    by_position = _same_prose_rule(nodes, "plato-rightmost", "plato-string-position-category")
+    by_length = _same_prose_rule(nodes, "plato-rightmost", "plato-length")
+    assert by_position.transcribe_to_english() == by_length.transcribe_to_english()
 
-    memory.store_snag(_snag_for(rightmost))
-    assert memory.snag_present(("abc", "abd", "xyz"), leftmost) is False
+    memory.store_snag(_snag_for(by_position))
+    assert memory.snag_present(("abc", "abd", "xyz"), by_length) is False
 
 
-def test_two_untranscribable_rules_do_not_collide(nodes):
-    """The second: every rule that fails to transcribe reads "Unknown transformation",
-    so under a prose comparison the first such snag matched *every* later one and no
-    further impasse was ever recorded.  ``rules.py:rule_signature`` documents exactly
-    this hazard for answers; the snag path had it open."""
+def test_two_rules_with_nothing_to_say_do_not_collide(nodes):
+    """The second: a clause with no changes transcribes to nothing, so under a prose
+    comparison the first such snag matched *every* later one and no further impasse was
+    ever recorded.  ``rules.py:rule_signature`` documents exactly this hazard for
+    answers; the snag path had it open."""
     memory = EpisodicMemory()
     first = _changeless_rule(nodes, position="plato-rightmost")
     second = _changeless_rule(nodes, position="plato-leftmost")
-    assert first.transcribe_to_english() == "Unknown transformation"
-    assert second.transcribe_to_english() == "Unknown transformation"
+    assert first.transcribe_to_english() == ""
+    assert second.transcribe_to_english() == ""
 
     memory.store_snag(_snag_for(first))
     assert memory.snag_present(("abc", "abd", "xyz"), second) is False

@@ -17,6 +17,7 @@ Scheme source: rules.ss
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from server.engine.workspace_structures import WorkspaceStructure
@@ -90,6 +91,7 @@ def _translate_rule_clause(
     slipnet: Any,
     rng: Any = None,
     meta: MetadataProvider | None = None,
+    slippage_log: Any = None,
 ) -> RuleClause | None:
     """Scheme: ``translate-rule-clause`` (``answers.ss:1350-1389``).
 
@@ -108,7 +110,7 @@ def _translate_rule_clause(
         # left-to-right; see ``_chez_map``.
         results = _chez_map(
             lambda od: _translate_object_description(
-                od, from_string, to_string, slipnet, rng=rng
+                od, from_string, to_string, slipnet, rng=rng, slippage_log=slippage_log
             ),
             list(clause.object_descriptions),
         )
@@ -149,7 +151,7 @@ def _translate_rule_clause(
             object_description=translated_ods[0] if len(translated_ods) == 1 else None,
             extrinsic_objects=translated_ods if len(translated_ods) > 1 else None,
             dimensions=_chez_map(
-                lambda dim: _slip(dim, applicable_transform_slippages, rng),
+                lambda dim: _slip(dim, applicable_transform_slippages, rng, slippage_log),
                 list(clause.dimensions),
             ),
         )
@@ -158,13 +160,17 @@ def _translate_rule_clause(
         clause_type=CLAUSE_INTRINSIC,
         object_description=translated_ods[0] if translated_ods else None,
         changes=_chez_map(
-            lambda change: _translate_change(change, applicable_transform_slippages, rng),
+            lambda change: _translate_change(
+                change, applicable_transform_slippages, rng, slippage_log
+            ),
             list(clause.changes),
         ),
     )
 
 
-def _translate_change(change: RuleChange, slippages: list[Any], rng: Any) -> RuleChange:
+def _translate_change(
+    change: RuleChange, slippages: list[Any], rng: Any, slippage_log: Any = None
+) -> RuleChange:
     """Scheme: ``apply-to-change`` (``answers.ss:1513-1518``).
 
     A Scheme change is ``(<scope> <dimension> <descriptor>)`` and both the
@@ -172,8 +178,10 @@ def _translate_change(change: RuleChange, slippages: list[Any], rng: Any) -> Rul
     descriptor's *kind* is re-read after slipping rather than assumed, since a
     slippage is free to hand back a literal where a relation stood.
     """
-    dimension = _slip(change.dimension, slippages, rng)
-    descriptor = _slip(change.relation or change.to_descriptor, slippages, rng)
+    dimension = _slip(change.dimension, slippages, rng, slippage_log)
+    descriptor = _slip(change.relation or change.to_descriptor, slippages, rng, slippage_log)
+    # Petacat's own ``from_descriptor`` has no counterpart in Metacat's
+    # ``(<scope> <dimension> <descriptor>)`` change, so it is not logged.
     from_descriptor = _slip(change.from_descriptor, slippages, rng)
     if descriptor is not None and is_platonic_relation(descriptor):
         return RuleChange(
@@ -196,6 +204,7 @@ def _translate_object_description(
     to_string: Any,
     slipnet: Any,
     rng: Any = None,
+    slippage_log: Any = None,
 ) -> tuple[tuple, list[Any], list[Any]]:
     """Scheme: ``translate-object-description`` (``answers.ss:1432-1494``).
 
@@ -244,7 +253,7 @@ def _translate_object_description(
         if not (any(s is d for d in directional) and getattr(s, "label", None) is not opposite)
     ]
 
-    translated_od = _apply_to_object_description(applicable, od, rng)
+    translated_od = _apply_to_object_description(applicable, od, rng, slippage_log)
 
     # ``answers.ss:1478-1490`` — the bond slippages of the bridge between the two
     # enclosing groups, if such a bridge exists.
@@ -293,17 +302,23 @@ def _spanning_group_exists(string: Any) -> bool:
     return False
 
 
-def _apply_to_object_description(slippages: list[Any], od: tuple, rng: Any) -> tuple:
+def _apply_to_object_description(
+    slippages: list[Any], od: tuple, rng: Any, slippage_log: Any = None
+) -> tuple:
     """Scheme: ``apply-to-object-description`` (``answers.ss:1527-1533``).
 
     The ``'string`` token is a symbol rather than a slipnode and passes through;
     the object-category node, the attribute and the descriptor are all slipped.
     """
-    object_type = od[0] if od[0] == "string" else _slip(od[0], slippages, rng)
-    return (object_type, _slip(od[1], slippages, rng), _slip(od[2], slippages, rng))
+    object_type = od[0] if od[0] == "string" else _slip(od[0], slippages, rng, slippage_log)
+    return (
+        object_type,
+        _slip(od[1], slippages, rng, slippage_log),
+        _slip(od[2], slippages, rng, slippage_log),
+    )
 
 
-def _slip(node: Any, slippages: list[Any], rng: Any = None) -> Any:
+def _slip(node: Any, slippages: list[Any], rng: Any = None, slippage_log: Any = None) -> Any:
     """Apply slippages to a Slipnet node.
 
     ``rng`` matters: ``SlipnetNode.apply_slippages`` only makes a *coattail*
@@ -314,6 +329,8 @@ def _slip(node: Any, slippages: list[Any], rng: Any = None) -> Any:
     if node is None:
         return None
     if hasattr(node, "apply_slippages"):
+        if slippage_log is not None:
+            return node.apply_slippages(slippages, rng=rng, sliplog=slippage_log)
         return node.apply_slippages(slippages, rng=rng)
     return node
 
@@ -1030,6 +1047,8 @@ class Rule(WorkspaceStructure):
         self.succinctness: float = 0.0
         self.quality: float = 0.0
         self.english_transcription: str = ""
+        #: Scheme's ``english-transcription``: a list of lines (``rules.ss:98``).
+        self.english_lines: list[str] | None = None
         # Rule clause templates (the intermediate form before instantiation)
         self.rule_clause_templates: list[tuple] = []
         # Tagged supporting horizontal bridges: list of (unsupported_self_change?, [bridges])
@@ -1045,6 +1064,8 @@ class Rule(WorkspaceStructure):
         # Vertical slippages that were *not* applied when translating this rule
         # (S4.7.1 "unjustified slippages").
         self.unjustified_slippages: list[Any] = []
+        #: What ``translate`` made this rule with (``TranslationResult``), else ``None``.
+        self.translation: Any = None
 
     @property
     def is_top_rule(self) -> bool:
@@ -1124,14 +1145,19 @@ class Rule(WorkspaceStructure):
             for dimension in clause.dimensions:
                 if hasattr(dimension, "activation"):
                     nodes.append(dimension)
-        # Deduplicate
+        # ``remq-duplicates`` keeps the LAST occurrence (``utilities.ss:915-927``,
+        # DISCREPANCIES5 C-2), so a node named twice sits where it is named last.  The
+        # order is observable: a justify clamp applies the pattern in this order and
+        # the concept-activation events follow it (``rst-rsu-xyz-wyz`` seed 4: Metacat
+        # logs ObjectCtgy before Opposite).
         seen: set[int] = set()
         unique: list[SlipnetNode] = []
-        for n in nodes:
+        for n in reversed(nodes):
             nid = id(n)
             if nid not in seen:
                 seen.add(nid)
                 unique.append(n)
+        unique.reverse()
         # ``%max-activation%`` off the nodes rather than written here; see
         # ``rules.ss:268``, which maps ``%max-activation%`` over exactly this list.
         return [(n, n.max_activation) for n in unique]
@@ -1494,12 +1520,11 @@ class Rule(WorkspaceStructure):
                 for old, new in zip(old_tags, new_tags)
             ]
             self.tagged_supporting_horizontal_bridges = merged
-            bridges: list[Any] = []
-            for _tag, tag_bridges in merged:
-                for bridge in tag_bridges:
-                    if not any(bridge is b for b in bridges):
-                        bridges.append(bridge)
-            self.supporting_bridges = bridges
+            # ``(remq-duplicates (apply append (map 2nd ...)))`` (``rules.ss:281-283``):
+            # a bridge named twice keeps its LAST place, not its first (``utilities.ss:915``).
+            self.supporting_bridges = _remq_duplicates(
+                [bridge for _tag, tag_bridges in merged for bridge in tag_bridges]
+            )
         self.theme_pattern = proposed_rule.theme_pattern
 
     def get_descriptors_to_activate(self) -> list[SlipnetNode]:
@@ -1624,12 +1649,18 @@ class Rule(WorkspaceStructure):
         rule during a vertical translation.
         """
         direction = "top-to-bottom" if self.is_top_rule else "bottom-to-top"
+        # ``(slippage-log (make-slippage-log rule-type))`` (answers.ss:1296): a record of
+        # the slippages this translation applies.  It draws nothing.
+        from server.engine.concept_mappings import SlippageLog
+
+        slippage_log = SlippageLog("top" if self.is_top_rule else "bottom")
         # ``(map (translate-rule-clause ...) rule-clauses)`` (answers.ss:1297-1298) is
         # Chez's ``map`` and a failure aborts at once through ``(return #f)``, so the
         # clauses before it in *application* order have already drawn their coins.
         def _one(clause: RuleClause) -> RuleClause:
             translated = _translate_rule_clause(
-                clause, from_string, to_string, slipnet, rng=rng, meta=meta
+                clause, from_string, to_string, slipnet, rng=rng, meta=meta,
+                slippage_log=slippage_log,
             )
             if translated is None:
                 raise _TranslationFailure("clause")
@@ -1661,35 +1692,123 @@ class Rule(WorkspaceStructure):
             translated.abstractness = self.abstractness
             translated.succinctness = self.succinctness
         translated.mark_as_translated(self, direction)
+        translated.transcribe_to_english(meta)  # rules.ss:98, at make-rule
+        translated.translation = _translation_result(
+            self, translated, from_string, to_string, slipnet, slippage_log
+        )
         return translated
 
-    def transcribe_to_english(self) -> str:
-        """Generate English description of this rule.
+    def transcribe_to_english(self, meta: MetadataProvider | None = None) -> str:
+        """The rule in English, lines joined by newlines.
 
-        Scheme: answers.ss template-based transcription.
+        Scheme: ``transcribe-to-english`` (``rules.ss:1723``), called once from
+        ``make-rule`` (``rules.ss:98``) -- so the text is fixed when the rule is made,
+        against the strings as they were then.  Here the first call computes and keeps
+        it (the construction sites call it straight away); later calls return the
+        stored text.  Display only: nothing compares it (``rules_equal`` and
+        ``rule_signature`` are structural).  See ``server/engine/rule_english.py``.
         """
-        if self.is_identity_rule:
-            return "No change"
-        if self.is_verbatim_rule:
-            return "Verbatim copy"
+        if self.english_lines is None:
+            from server.engine.rule_english import transcribe_rule_to_english_lines
 
-        parts = []
-        for clause in self.clauses:
-            for change in clause.changes:
-                dim = getattr(change.dimension, "short_name", "?")
-                if change.relation:
-                    rel = getattr(change.relation, "short_name", "?")
-                    parts.append(f"change {dim} by {rel}")
-                elif change.from_descriptor and change.to_descriptor:
-                    frm = getattr(change.from_descriptor, "short_name", "?")
-                    to = getattr(change.to_descriptor, "short_name", "?")
-                    parts.append(f"change {dim} from {frm} to {to}")
-        self.english_transcription = "; ".join(parts) if parts else "Unknown transformation"
+            self.english_lines = transcribe_rule_to_english_lines(self, meta)
+            self.english_transcription = "\n".join(self.english_lines)
         return self.english_transcription
 
     def __repr__(self) -> str:
         rt = "top" if self.is_top_rule else "bottom"
         return f"Rule({rt}, {len(self.clauses)} clauses, quality={self.quality:.0f})"
+
+
+@dataclass
+class TranslationResult:
+    """What Metacat's ``translate`` returns besides the rule (``answers.ss:1334-1340``).
+
+    ``(list translated-rule supporting-vertical-bridges slippage-log
+    vertical-mapping-supporting-groups from-string-ref-objects to-string-ref-objects)``.
+    """
+
+    supporting_vertical_bridges: list[Any]
+    slippage_log: Any
+    vertical_mapping_supporting_groups: list[Any]
+    from_ref_objects: list[Any]
+    to_ref_objects: list[Any]
+
+
+def _reference_objects_with_repeats(rule: Rule, string: Any, slipnet: Any) -> list[Any]:
+    """``(filter-out workspace-string? (tell string 'get-all-reference-objects rule))``.
+
+    Unlike ``get_all_reference_objects`` it keeps repeats, as the Scheme's ``apply append``
+    does: the order that ``remq-duplicates`` later leaves depends on them.
+    """
+    result: list[Any] = []
+    for clause in rule.clauses:
+        if clause.is_verbatim:
+            continue
+        result.extend(
+            o for o in _get_reference_objects_for_clause(clause, string, slipnet)
+            if not _is_workspace_string(o)
+        )
+    return result
+
+
+def get_all_nested_groups(obj: Any) -> list[Any]:
+    """``get-all-nested-groups`` (``groups.ss:1063``): the group itself, then its
+    constituents' groups, depth first.  A letter has none."""
+    from server.engine.groups import Group
+
+    if not isinstance(obj, Group):
+        return []
+    found: list[Any] = [obj]
+    for sub in obj.objects:
+        found.extend(get_all_nested_groups(sub))
+    return found
+
+
+def _translation_result(
+    rule: Rule, translated: Rule, from_string: Any, to_string: Any, slipnet: Any,
+    slippage_log: Any,
+) -> TranslationResult:
+    """The tail of ``translate`` (``answers.ss:1308-1340``)."""
+    from_refs = _reference_objects_with_repeats(rule, from_string, slipnet)
+    to_refs = _reference_objects_with_repeats(translated, to_string, slipnet)
+    from_bridges = [b for b in (getattr(o, "vertical_bridge", None) for o in from_refs) if b is not None]
+    to_bridges = [b for b in (getattr(o, "vertical_bridge", None) for o in to_refs) if b is not None]
+    # ``intersect`` (eq?): each element of the first list once per match in the second.
+    shared = [x for x in from_bridges for y in to_bridges if x is y]
+    supporting = _remq_duplicates(list(slippage_log.get_slippage_bridges()) + shared)
+    groups = _remq_duplicates([
+        g for b in supporting
+        for g in get_all_nested_groups(b.object1) + get_all_nested_groups(b.object2)
+    ])
+    return TranslationResult(supporting, slippage_log, groups, from_refs, to_refs)
+
+
+def get_rule_supporting_groups(top_rule: Rule, bottom_rule: Rule, workspace: Any, slipnet: Any) -> list[Any]:
+    """``get-rule-supporting-groups`` (``answers.ss:1009-1030``).
+
+    The groups (not the letters) the two rules refer to, then those on the
+    horizontal bridges that support either rule and their nested groups.
+    """
+    from server.engine.groups import Group
+
+    horizontal = list(top_rule.supporting_bridges) + list(bottom_rule.supporting_bridges)
+    top_refs = list(get_all_reference_objects_with_strings(top_rule, workspace.initial_string, slipnet))
+    bottom_refs = list(get_all_reference_objects_with_strings(bottom_rule, workspace.target_string, slipnet))
+    groups: list[Any] = [o for o in top_refs + bottom_refs if isinstance(o, Group)]
+    for b in horizontal:
+        groups.extend(get_all_nested_groups(b.object1))
+        groups.extend(get_all_nested_groups(b.object2))
+    return _remq_duplicates(groups)
+
+
+def get_all_reference_objects_with_strings(rule: Rule, string: Any, slipnet: Any) -> list[Any]:
+    """``get-all-reference-objects`` (``workspace-strings.ss:481``) as it is, repeats and all."""
+    result: list[Any] = []
+    for clause in rule.clauses:
+        if not clause.is_verbatim:
+            result.extend(_get_reference_objects_for_clause(clause, string, slipnet))
+    return result
 
 
 # ============================================================================
@@ -1751,8 +1870,13 @@ def _clauses_equal(c1: RuleClause, c2: RuleClause) -> bool:
 
 
 def _changes_equal(ch1: RuleChange, ch2: RuleChange) -> bool:
+    # ``(equal? (3rd rc1) (3rd rc2))`` (``rules.ss:381``) compares whole change
+    # templates, ``(self <dim> <desc>)`` against ``(subobjects <dim> <desc>)`` included:
+    # "change the whole group to successor" and "change each of its letters to
+    # successor" are different rules (lockstep ``abc-bcd-xyz`` seeds 1, 12 ...).
     return (
-        ch1.dimension is ch2.dimension
+        ch1.referent == ch2.referent
+        and ch1.dimension is ch2.dimension
         and ch1.from_descriptor is ch2.from_descriptor
         and ch1.to_descriptor is ch2.to_descriptor
         and ch1.relation is ch2.relation
@@ -1772,7 +1896,7 @@ def rule_signature(rule: Rule | None) -> list | None:
     (``memory.ss:117``) precisely so that ``answer-present?`` can compare them
     (``memory.ss:190-196``), so a stored answer needs a structural key rather than the
     English transcription — two genuinely different rules can transcribe to the same
-    prose, and one that fails to transcribe reads "Unknown transformation".
+    prose, and two genuinely different rules can transcribe to the same prose.
 
     The signature honours the same equivalences ``_clauses_equal`` does, including
     group/string interchangeability.
@@ -1803,6 +1927,10 @@ def _clause_signature(clause: RuleClause) -> list:
                 _descriptor_key(change.from_descriptor),
                 _descriptor_key(change.to_descriptor),
                 _descriptor_key(change.relation),
+                # ``self`` vs ``subobjects`` (``rules.ss:381``).  Written only for the
+                # non-default scope, so signatures already stored in a database for
+                # ``self`` changes keep matching.
+                *(["subobjects"] if change.changes_components else []),
             ]
             for change in clause.changes
         ],
@@ -2210,8 +2338,8 @@ def _template_less(t1: tuple, t2: tuple) -> bool:
     Intrinsic clauses precede extrinsic ones; extrinsic clauses with more
     dimensions come first; between intrinsic clauses the *contained* object comes
     first (``(tell (2nd t2) 'nested-member? (2nd t1))``), disjoint objects go by
-    left string position.  This is not a strict weak order, so the sort below is a
-    plain merge sort (as Chez's ``sort``) rather than a key function.
+    left string position.  This is not a strict weak order, so the sort is :func:`chez_sort`
+    (Chez's own merge steps) rather than a key function.
     """
     i1 = t1[0] == CLAUSE_INTRINSIC
     i2 = t2[0] == CLAUSE_INTRINSIC
@@ -2228,28 +2356,39 @@ def _template_less(t1: tuple, t2: tuple) -> bool:
     return False
 
 
+def chez_sort(less: Any, items: list) -> list:
+    """Chez Scheme's ``sort``: a merge sort whose steps are fixed, for a predicate that need not be a
+    strict order.
+
+    The list splits at ``n >> 1``, each half is sorted, and the merge takes the right head when
+    ``(less right left)`` and the left head otherwise.  For a strict weak order that is a stable
+    sort; for ``sort-templates``' predicate it is not, and the result is whatever these steps
+    give.  Checked against ``sort`` in the Metacat image on 300 random relations of 2-8 elements
+    (``tests/unit/test_order_fidelity.py`` holds 80 of them).
+    """
+    n = len(items)
+    if n <= 1:
+        return list(items)
+    mid = n >> 1
+    left, right = chez_sort(less, items[:mid]), chez_sort(less, items[mid:])
+    out: list = []
+    i = j = 0
+    while i < len(left) and j < len(right):
+        if less(right[j], left[i]):
+            out.append(right[j])
+            j += 1
+        else:
+            out.append(left[i])
+            i += 1
+    return out + left[i:] + right[j:]
+
+
 def sort_templates(templates: list[tuple]) -> list[tuple]:
     """Sort rule-clause-templates: intrinsic before extrinsic, deepest first.
 
     Scheme: sort-templates (rules.ss:814-826).
     """
-    def msort(ls: list[tuple]) -> list[tuple]:
-        n = len(ls)
-        if n <= 1:
-            return list(ls)
-        mid = n >> 1
-        left, right = msort(ls[:mid]), msort(ls[mid:])
-        out: list[tuple] = []
-        i = j = 0
-        while i < len(left) and j < len(right):
-            if _template_less(right[j], left[i]):
-                out.append(right[j])
-                j += 1
-            else:
-                out.append(left[i])
-                i += 1
-        return out + left[i:] + right[j:]
-    return msort(list(templates))
+    return chez_sort(_template_less, list(templates))
 
 
 # ============================================================================
@@ -2593,8 +2732,20 @@ def _get_bridge(obj: Any, orientation: str) -> Any:
 
 
 def _get_subobject_bridges(obj: Any, orientation: str) -> list:
-    """Get bridges from all sub-objects of an object."""
-    sub_objects = _get_constituent_objects(obj)
+    """Get bridges from all sub-objects of an object.
+
+    Scheme: ``get-subobject-bridges`` (``groups.ss:248-249``; for a string
+    ``workspace-strings.ss:468-471``).  A string asks for its *top-level* objects, which
+    ``get-top-level-objects`` (``:458-461``) leaves as ``(append letter-list
+    group-list)`` -- letters first, then the groups newest first -- not in the
+    left-to-right order ``get-constituent-objects`` sorts them into.  The order is that
+    of a rule's supporting horizontal bridges, and so of the supporting groups an answer
+    lists.
+    """
+    if _is_workspace_string(obj):
+        sub_objects = [o for o in obj.objects if getattr(o, "enclosing_group", None) is None]
+    else:
+        sub_objects = _get_constituent_objects(obj)
     bridges = []
     for sub in sub_objects:
         b = _get_bridge(sub, orientation)
@@ -2787,6 +2938,7 @@ def _get_extrinsic_transforms(
                 "Swap objects are not disjoint",
                 objects=list(denoted),
                 kind=ImageFailure.SWAP,
+                dimension=dimensions[0] if dimensions else None,
             )
 
         for dim in dimensions:
@@ -2799,6 +2951,7 @@ def _get_extrinsic_transforms(
                         "String-position swap needs exactly two objects",
                         objects=list(denoted),
                         kind=ImageFailure.SWAP,
+                        dimension=dim,
                     )
                 result.append((dim, denoted[0], denoted[1]))
                 # Also add StrPosCtgy transforms for each object
@@ -2820,6 +2973,7 @@ def _get_extrinsic_transforms(
                         f"No {dim_name} descriptor for every swap object",
                         objects=list(denoted),
                         kind=ImageFailure.SWAP,
+                        dimension=dim,
                     )
                 unique_descs: list[Any] = []
                 for d in descs:
@@ -2830,6 +2984,7 @@ def _get_extrinsic_transforms(
                         f"More than two {dim_name} descriptors to swap",
                         objects=list(denoted),
                         kind=ImageFailure.SWAP,
+                        dimension=dim,
                     )
                 sd1 = unique_descs[0]
                 sd2 = unique_descs[1] if len(unique_descs) > 1 else unique_descs[0]
@@ -2988,7 +3143,14 @@ def _find_matching_objects(
         if obj_type_name == "plato-group" and not isinstance(obj, Group):
             continue
         if desc_type is not None and descriptor is not None:
-            if _get_descriptor_for(obj, desc_type) is descriptor:
+            # ``(filter-meth ... 'descriptor-present? descriptor)``
+            # (``workspace-strings.ss:456-458``): ANY description of the object carrying
+            # this descriptor matches.  An object can hold several descriptors of one
+            # type -- a one-letter string's letter is both ``single`` and ``rightmost`` --
+            # and asking only for the type's first descriptor missed the second, so
+            # "change the rightmost letter" found no object and the rule "did not work"
+            # (lockstep ``a-b-xyz`` seed 1, c=226: no rule-builder, desync at c=227).
+            if obj.descriptor_present(descriptor):
                 candidates.append(obj)
 
     # ``workspace-strings.ss:449-458``: when a String-Position description matches
@@ -3084,6 +3246,8 @@ def _check_for_conflicts(transforms: list[tuple]) -> None:
                     f"{_ascii_name(ic2.reference_object)}",
                     objects=[ic1.reference_object, ic2.reference_object],
                     kind=ImageFailure.CONFLICT,
+                    dimension=ic1.dimension,
+                    dimension2=ic2.dimension,
                 )
 
 
@@ -3095,18 +3259,16 @@ def _group_transforms_by_object(
     Scheme: rules.ss:1291-1298.
     Returns list of (object, [(dim, desc), ...]).
     """
-    from collections import OrderedDict
-    groups: dict[int, tuple] = OrderedDict()
-    for t in transforms:
-        if len(t) != 2:
-            continue
-        obj, transform = t
-        oid = id(obj)
-        if oid not in groups:
-            groups[oid] = (obj, [])
-        groups[oid][1].append(transform)
-
-    result = list(groups.values())
+    pairs = [t for t in transforms if len(t) == 2]
+    # ``(partition (lambda (ot1 ot2) (eq? (1st ot1) (1st ot2))) all-object-transform-pairs)``
+    # (rules.ss:1291-1296).  Scheme's ``partition`` fills its classes from the end of the
+    # list backwards, so the objects come out in the *reverse* of the order they first
+    # appear in (``_partition_by``); the stable sort below keeps that order among
+    # objects at the same nesting level.  That is the order the transforms are applied in,
+    # which decides which object a failure is reported on, and the order the translated
+    # rule's horizontal bridges are made in.
+    classes = _partition_by(lambda a, b: a[0] is b[0], pairs)
+    result = [(cls[0][0], [p[1] for p in cls]) for cls in classes]
     # Sort deepest-first
     result.sort(key=lambda x: -_nesting_level(x[0]))
     return result
@@ -3124,7 +3286,27 @@ def _apply_transforms(
 
     for transform in ordered:
         dim, desc = transform
-        _transform_image(image, dim, desc, slipnet, transforms)
+        try:
+            _transform_image(image, dim, desc, slipnet, transforms)
+        except ImageFailure as e:
+            # ``apply-transforms`` hands ``transform-image`` a ``fail`` that closes over
+            # the transform (``rules.ss:1341-1350``), and that transform is the CHANGE
+            # failure-result's second element.  A group-category transform is first
+            # augmented with the bond-facet: (GroupCtgy Opposite medium).
+            if e.transform is None:
+                if getattr(dim, "name", "") == "plato-group-category":
+                    medium = next(
+                        (
+                            d
+                            for td, d in transforms
+                            if getattr(td, "name", "") == "plato-bond-facet"
+                        ),
+                        None,
+                    )
+                    e.transform = (dim, slipnet.nodes.get("plato-opposite"), medium)
+                else:
+                    e.transform = (dim, desc)
+            raise
 
 
 def _apply_before_key(
@@ -3805,6 +3987,7 @@ def build_rule_from_bridges(
         rule.set_abstracted_rule_information([], themespace)  # rules.ss:437
         if meta:
             rule.compute_quality(meta)
+        rule.transcribe_to_english(meta)  # rules.ss:98, at make-rule
         return rule
 
     # 3. Partition change descriptions by type and reference objects
@@ -3832,6 +4015,7 @@ def build_rule_from_bridges(
     rule.set_abstracted_rule_information(templates, themespace)
     if meta:
         rule.compute_quality(meta)
+    rule.transcribe_to_english(meta)  # rules.ss:98, at make-rule
 
     return rule
 

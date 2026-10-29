@@ -166,7 +166,19 @@ class CoderackBin:
             self.newest_time_stamp = time_stamp
 
     def remove(self, codelet: Codelet) -> None:
-        self.codelets.remove(codelet)
+        """Take *codelet* out the way the Scheme's bin does (``coderack.ss:309-318``).
+
+        The bin is a vector with a fill index: removal moves the LAST codelet into the
+        vacated slot (``(vector-set! codelet-vector index swap-codelet)``) rather than
+        closing the gap.  ``choose-random-codelet`` is ``(vector-ref codelet-vector
+        (random current-index))`` (``:307-308``), so which codelet an index names depends
+        on every removal before it.
+        """
+        codelets = self.codelets
+        index = codelets.index(codelet)
+        last = codelets.pop()
+        if index < len(codelets):
+            codelets[index] = last
         self.sum_time_stamp -= codelet.time_stamp
 
     def age_sum(self, current_time: int) -> int:
@@ -218,6 +230,67 @@ class CoderackBin:
 
     def __repr__(self) -> str:
         return f"CoderackBin({self.bin_number}, count={self.count})"
+
+
+def _bin_type_counts(bin_: CoderackBin) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for c in bin_.codelets:
+        counts[c.codelet_type] = counts.get(c.codelet_type, 0) + 1
+    return counts
+
+
+def type_selection_probabilities(
+    bin_type_counts: Any, row: Any
+) -> dict[str, float]:
+    """Relative selection probability of each codelet type, in ``[0, 1]``.
+
+    ``update-all-selection-probabilities`` (``coderack.ss:362-368``) feeds each bin's
+    ``update-selection-probabilities`` (``coderack.ss:283-291``): a bin with ``n``
+    codelets has urgency sum ``n x table[bin][T]`` and gives every codelet in it
+    ``(bin urgency sum / total urgency sum) / n``, i.e. ``table[bin][T] / total``, and
+    each codelet adds that to its type's running probability.  So a type's probability
+    is the sum, over its codelets, of their bin's rounded urgency value, over the total
+    urgency sum.  That is exactly the chance the two-stage choice picks a codelet of
+    that type, and what the coderack window draws as the bar
+    (``coderack-graphics.ss:100-107``).  An empty rack has no probabilities (the Scheme
+    skips the update when the total is zero).
+
+    ``bin_type_counts`` is one ``{type: count}`` mapping per bin; ``row`` the urgency
+    table's row at the current temperature.
+    """
+    total = 0
+    weighted: dict[str, int] = {}
+    for bin_number, counts in enumerate(bin_type_counts):
+        value = row[bin_number]
+        for name, n in counts.items():
+            weighted[name] = weighted.get(name, 0) + n * value
+            total += n * value
+    if total <= 0:
+        return {}
+    return {name: w / total for name, w in weighted.items()}
+
+
+def coderack_display(coderack: Any, temperature: float, last_codelet_type: str | None) -> dict:
+    """The coderack window's data: counts, selection probabilities, last codelet type.
+
+    Works on the serial rack and on every sharded one: it reads only ``bins`` (merged
+    across shards), ``urgency_table`` and ``total_count``, which they all offer.
+    """
+    probabilities = type_selection_probabilities(
+        [_bin_type_counts(b) for b in coderack.bins],
+        coderack.urgency_table.row(temperature),
+    )
+    return {
+        "total_count": coderack.total_count,
+        "type_counts": coderack.get_codelet_type_counts(),
+        "type_probabilities": probabilities,
+        "last_codelet_type": last_codelet_type,
+        # Metacat's window has a slot for every codelet type, empty or not
+        # (``*codelet-types*``, ``coderack-graphics.ss:100``), and shades the slot of
+        # a type whose urgency is clamped.
+        "codelet_types": list(coderack.meta.codelet_specs),
+        "clamped_urgencies": dict(coderack.clamped_urgencies),
+    }
 
 
 class Coderack:
@@ -339,7 +412,10 @@ class Coderack:
         if current_time is None:
             current_time = self.current_time
 
-        batch = list(batch)
+        # ``deferred-codelets`` is consed (``add-deferred-codelet``, ``coderack.ss:383-385``),
+        # so the Scheme's batch is newest first: ``random-pick`` over it, and the order the
+        # codelets land in their bins, are the reverse of the order they were added in.
+        batch = list(reversed(batch))
         if len(batch) >= self.max_size:
             excess = len(batch) - self.max_size
             for _ in range(excess):
@@ -781,6 +857,13 @@ class Coderack:
             for c in b.codelets:
                 counts[c.codelet_type] = counts.get(c.codelet_type, 0) + 1
         return counts
+
+    def get_type_selection_probabilities(self, temperature: float) -> dict[str, float]:
+        """Each codelet type's selection probability, as Metacat's display computes it."""
+        return type_selection_probabilities(
+            [_bin_type_counts(b) for b in self.bins],
+            self.urgency_table.row(temperature),
+        )
 
     def __repr__(self) -> str:
         return f"Coderack({self._total_count} codelets in {self.num_bins} bins)"

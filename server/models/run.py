@@ -128,6 +128,12 @@ class Run(Base):
     #: setting: later phases want a Fast corpus-training population and a Normal live
     #: dialogue in the same process.
     mode = Column(String(8), nullable=False, default="normal", server_default="normal")
+    #: How many workers executed the Run: 1 is the serial loop, more is free-running
+    #: (WP4.4), under which a seed no longer reproduces a run.  Without it the record
+    #: shows two Runs with the same seed, configuration and memory ending differently
+    #: and nothing to say why.  Null on rows written before it was recorded, and no
+    #: server default: guessing 1 for those would state something nobody knows.
+    workers = Column(Integer, nullable=True)
     #: Hash of the MetadataProvider this Run executed under (WP3.5).
     config_hash = Column(String(64), nullable=True)
     #: Identifies the Episodic Memory state the Run executed against (WP3.5). Two runs
@@ -185,6 +191,13 @@ class TraceEventRow(Base):
     description = Column(Text, default="")
     structures = Column(JSONB, nullable=True)
     theme_pattern = Column(JSONB, nullable=True)
+    # Metacat's print name for the event -- ``(Id)``, ``>a-b-c>``, ``T:a=>b``,
+    # ``[Top Rule]``, ``[Answer abd]`` (``trace.ss``) -- and the picture clicking the
+    # event redisplays (:mod:`server.engine.trace_display`).  Added after the table
+    # existed, so the startup reconcile adds them nullable; NULL means a row written
+    # before they were kept, which then shows its description and cannot be redisplayed.
+    print_name = Column(String(255), nullable=True)
+    picture = Column(JSONB, nullable=True)
     created_at = Column(DateTime, default=_utcnow)
 
 
@@ -229,6 +242,9 @@ class AnswerDescriptionRow(Base):
     # The structural clause keys ``answer_present`` compares (``memory.ss:117``).
     top_rule_signature = Column(JSONB, nullable=True)
     bottom_rule_signature = Column(JSONB, nullable=True)
+    # The picture clicking the answer redraws (``set-answer-description-pexp``,
+    # ``memory.ss:438``).  NULL for a row written before pictures were kept.
+    picture = Column(JSONB, nullable=True)
     created_at = Column(DateTime, default=_utcnow)
 
 
@@ -258,4 +274,14 @@ class SnagDescriptionRow(Base):
     # matched on its English prose, which is what the structural comparison replaced.
     rule_signature = Column(JSONB, nullable=True)
     translated_rule_signature = Column(JSONB, nullable=True)
+    # ``get-explanation`` and ``get-translated-rule-phrases`` of Metacat's snag
+    # description (``memory.ss:331-332``): the sentence for what went wrong and the
+    # English of the rule that failed.  Added after the table existed, so the startup
+    # reconcile adds them nullable; NULL means a row written before they were stored,
+    # and the explanation then falls back (``snag_explanation_text``).
+    explanation = Column(Text, nullable=True)
+    translated_rule_description = Column(Text, nullable=True)
+    # The picture clicking the snag redraws (``set-snag-description-pexp``,
+    # ``memory.ss:477``).  NULL for a row written before pictures were kept.
+    picture = Column(JSONB, nullable=True)
     created_at = Column(DateTime, default=_utcnow)

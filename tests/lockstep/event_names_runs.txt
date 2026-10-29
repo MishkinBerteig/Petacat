@@ -1,0 +1,13 @@
+# The runs behind tests/lockstep/event_names_metacat.tsv: <kind> <slug> <seed>.
+# kind main = tests/lockstep/traces/<slug>/<seed>.metacat.jsonl.gz (discovery),
+# kind justify = tests/lockstep/traces/justify/<slug>/... (slug ends with the justified answer).
+# Chosen by scripts/compare_events.py --pick 3500 30000: the smallest runs that between them contain
+# every event type and header kind (greedy cover over the committed corpus).
+main abc-abd-xyz 1
+justify abc-abd-mrrjjj-mrrkkk 4
+main zy-x-zy 10
+justify abc-abd-xyz-wyz 1
+justify rst-rsu-xyz-wyz 1
+justify abc-cba-mrrjjj-mmmrrj 5
+main a-b-z 9
+justify eqe-qeq-abbbc-aaabccc 4

@@ -13,12 +13,14 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   describeApiError,
   displayAnswer,
+  displaySnag,
   explainAnswer,
   forgetAnswer,
   getMemory,
   getRunMemory,
   request,
 } from '@/api/client';
+import { useMomentStore } from '@/store/momentStore';
 import { useRunStore } from '@/store/runStore';
 import type { AnswerComparisonResult, AnswerExplanation, MemoryState } from '@/types';
 
@@ -84,7 +86,11 @@ export function MemoryView() {
   const runId = useRunStore((s) => s.runId);
   const elizaMode = useRunStore((s) => s.elizaMode);
   const refreshThemespace = useRunStore((s) => s.refreshThemespace);
-  const [displaying, setDisplaying] = useState<number | null>(null);
+  // What is redisplayed over the live windows (Workspace, Slipnet, Coderack, Temperature
+  // and Themespace) is shared with the Trace panel, which can redisplay events.
+  const onShow = useMomentStore((s) => s.onShow);
+  const displaying = onShow?.kind === 'answer' ? onShow.id : null;
+  const displayingSnag = onShow?.kind === 'snag' ? onShow.id : null;
   const [explanation, setExplanation] = useState<AnswerExplanation | null>(null);
   /** Why the memory on screen is not the memory the server holds. */
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -125,9 +131,30 @@ export function MemoryView() {
       try {
         const res = await displayAnswer(runId, answerId);
         setActionError(null);
-        setDisplaying(res.displaying);
+        useMomentStore.getState().show('answer', answerId, res);
       } catch (err) {
         setActionError(describeApiError(err, "impose the answer's theme patterns"));
+        return;
+      }
+      await refreshThemespace();
+    },
+    [runId, refreshThemespace],
+  );
+
+  /**
+   * Re-enter a stored snag (`memory.ss:380-395`): redraw its description picture
+   * ("Snag Description", the failed translation, "???"), impose its theme pattern,
+   * blank the Slipnet and Coderack and show a temperature of 100.
+   */
+  const onDisplaySnag = useCallback(
+    async (snagId: number) => {
+      if (runId == null) return;
+      try {
+        const res = await displaySnag(runId, snagId);
+        setActionError(null);
+        useMomentStore.getState().show('snag', snagId, res);
+      } catch (err) {
+        setActionError(describeApiError(err, "impose the snag's theme pattern"));
         return;
       }
       await refreshThemespace();
@@ -193,17 +220,24 @@ export function MemoryView() {
     try {
       const res = await request<AnswerComparisonResult>('/memory/compare', {
         method: 'POST',
-        body: JSON.stringify({ answer_id_1: selected[0], answer_id_2: selected[1] }),
+        body: JSON.stringify({
+          answer_id_1: selected[0],
+          answer_id_2: selected[1],
+          // So the comparison is said in the commentary of the run on screen.
+          run_id: runId,
+        }),
       });
       setComparison(res);
       setActionError(null);
+      // "Let's see..." and the comparison are now in the run's commentary.
+      void useRunStore.getState().refreshCommentary();
     } catch (err) {
       setComparison(null);
       setActionError(describeApiError(err, 'compare the two answers'));
     } finally {
       setComparing(false);
     }
-  }, [selected]);
+  }, [selected, runId]);
 
   const handleClear = useCallback(async () => {
     if (!window.confirm('Clear all episodic memory? This cannot be undone.')) return;
@@ -426,12 +460,12 @@ export function MemoryView() {
 
           {/* Rule descriptions */}
           {ans.top_rule_description && (
-            <div className="text-xs" style={{ color: 'var(--text-secondary)', marginBottom: 2 }}>
+            <div className="text-xs" style={{ color: 'var(--text-secondary)', marginBottom: 2, whiteSpace: 'pre-line' }}>
               Top: {ans.top_rule_description}
             </div>
           )}
           {ans.bottom_rule_description && (
-            <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+            <div className="text-xs" style={{ color: 'var(--text-secondary)', whiteSpace: 'pre-line' }}>
               Bottom: {ans.bottom_rule_description}
             </div>
           )}
@@ -447,7 +481,7 @@ export function MemoryView() {
             <button
               onClick={(e) => { e.stopPropagation(); onDisplay(ans.answer_id); }}
               disabled={runId == null}
-              title="Impose this answer's vertical, top and bottom theme-patterns on the Themespace; again to restore (memory.ss:275-277)"
+              title="Redraw this answer's description in the Workspace and impose its vertical, top and bottom theme-patterns; again to restore (memory.ss:268-283)"
               className="text-xs"
               style={{
                 background: 'transparent',
@@ -540,12 +574,50 @@ export function MemoryView() {
                 borderLeftWidth: 3,
               }}
             >
-              <div className="mono text-xs" style={{ color: 'var(--error)' }}>
-                Snag @ codelet {snag.codelet_count} (T: {snag.temperature.toFixed(0)})
+              <div
+                className="mono text-xs"
+                style={{ color: 'var(--error)', display: 'flex', gap: 6, alignItems: 'center' }}
+              >
+                <span style={{ flex: 1 }}>
+                  Snag @ codelet {snag.codelet_count} (T: {snag.temperature.toFixed(0)})
+                </span>
+                <button
+                  onClick={() => onDisplaySnag(snag.snag_id)}
+                  disabled={runId == null}
+                  title="Redraw this snag's description in the Workspace and impose its theme pattern; again to restore (memory.ss:380-395)"
+                  className="text-xs"
+                  data-testid="snag-display"
+                  style={{
+                    background: 'transparent',
+                    border: '1px solid var(--border)',
+                    borderRadius: 3,
+                    color: displayingSnag === snag.snag_id ? '#ffd700' : 'var(--text-secondary)',
+                    cursor: runId == null ? 'default' : 'pointer',
+                    padding: '1px 6px',
+                  }}
+                >
+                  {displayingSnag === snag.snag_id ? 'restore' : 'display'}
+                </button>
               </div>
-              <div className="text-xs text-muted" style={{ marginTop: 2 }}>
+              {snag.explanation && (
+                <div className="text-xs" style={{ marginTop: 2 }} data-testid="snag-explanation">
+                  {'Explanation: '}
+                  {snag.explanation}
+                </div>
+              )}
+              <div className="text-xs text-muted" style={{ marginTop: 2, whiteSpace: 'pre-line' }}>
                 {snag.description}
               </div>
+              {snag.translated_rule_description && (
+                <div
+                  className="text-xs text-muted"
+                  style={{ marginTop: 2, whiteSpace: 'pre-line' }}
+                  data-testid="snag-translated-rule"
+                >
+                  {'Translated rule (failed): '}
+                  {snag.translated_rule_description}
+                </div>
+              )}
             </div>
           ))}
         </div>

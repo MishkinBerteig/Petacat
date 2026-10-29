@@ -217,6 +217,27 @@ async def test_a_normal_run_resets_from_its_stored_row(app_client, db_session):
 
 
 @pytest.mark.asyncio
+async def test_a_reset_normal_run_records_its_start_state_again(app_client, db_session):
+    """A reset run is recorded like a new one: a start capture and an end capture.
+
+    The reset used to attach the fresh sink after ``init_mcat`` had already announced
+    the run, so the sink never saw it begin and the reset run had an end capture only:
+    nothing to re-execute it from.
+    """
+    run = await _create(app_client, MODE_NORMAL)
+    run_id = run["run_id"]
+    await app_client.post(f"/api/runs/{run_id}/run", json={"max_steps": 600})
+    await app_client.post(f"/api/runs/{run_id}/reset")
+
+    await app_client.post(f"/api/runs/{run_id}/run", json={"max_steps": 300})
+
+    captures = await db_session.execute(
+        select(RunStateCapture.boundary).where(RunStateCapture.run_id == run_id)
+    )
+    assert sorted(captures.scalars().all()) == ["end", "start"]
+
+
+@pytest.mark.asyncio
 async def test_a_reset_normal_run_starts_before_the_answer_it_found(app_client, db_session):
     """A discovered answer belongs to the run that found it.
 
@@ -229,8 +250,10 @@ async def test_a_reset_normal_run_starts_before_the_answer_it_found(app_client, 
     # the shared ``SEED`` no longer produces one on this problem: correcting the
     # snag-jootser's inclusion weight (D-10 in ``DISCREPANCIES5.md``) shifted the random
     # stream, and ``xyz``/12345 now gives up at 3790 codelets.  Giving up is a legitimate
-    # outcome, so the seed moves rather than the assertion.
-    run = await _create(app_client, MODE_NORMAL, seed=12346)
+    # outcome, so the seed moves rather than the assertion.  The lockstep pass (section G)
+    # shifted it again: 12346 finds nothing in 2000 codelets, and 12347 answers ``xyz``,
+    # one of Metacat's own answers here, at codelet 333.
+    run = await _create(app_client, MODE_NORMAL, seed=12347)
     run_id = run["run_id"]
     finished = (
         await app_client.post(f"/api/runs/{run_id}/run", json={"max_steps": 2000})
@@ -502,8 +525,9 @@ async def test_a_mid_session_normal_run_records_the_memory_it_inherited(
     # ``SEED`` no longer does on this problem — see
     # ``test_a_reset_normal_run_starts_before_the_answer_it_found``.  The ``pytest.skip``
     # below is the safety net for a run that happens not to converge; with 12345 it had
-    # become the only path, so this test was asserting nothing at all.
-    first = await _create(app_client, MODE_NORMAL, seed=12346)
+    # become the only path, so this test was asserting nothing at all.  After the
+    # lockstep pass 12346 had too, and 12347 is the seed that test now uses.
+    first = await _create(app_client, MODE_NORMAL, seed=12347)
     await app_client.post(f"/api/runs/{first['run_id']}/run", json={"max_steps": 2500})
 
     second = await _create(app_client, MODE_NORMAL, seed=SEED + 1)
@@ -794,6 +818,42 @@ async def test_a_free_running_run_is_persisted_like_any_other(app_client, db_ses
     row = (await db_session.execute(select(Run).where(Run.id == run_id))).scalars().one()
     assert row.status in {"answer_found", "halted", "gave_up"}
     assert row.codelet_count > 0
+
+
+@pytest.mark.asyncio
+async def test_a_run_records_how_many_workers_executed_it(app_client, db_session):
+    """The worker count is part of the record, because it decides what the seed means.
+
+    Free-running runs with one seed, configuration and memory end differently, and the
+    record has to say why.  The count was held only by the live service, so a restart
+    lost it and the listing never had it.
+    """
+    from server.api import runs as runs_module
+    from server.services.run_service import RunService
+
+    free = await _create(app_client, MODE_NORMAL, workers=4)
+    serial = await _create(app_client, MODE_NORMAL)
+
+    rows = {
+        r.id: r.workers
+        for r in (await db_session.execute(select(Run))).scalars().all()
+    }
+    assert (rows[free["run_id"]], rows[serial["run_id"]]) == (4, 1)
+    assert (free["workers"], serial["workers"]) == (4, 1)
+    listed = {r["run_id"]: r["workers"] for r in (await app_client.get("/api/runs")).json()["runs"]}
+    assert (listed[free["run_id"]], listed[serial["run_id"]]) == (4, 1)
+
+    # After a restart only the row knows, and a row from before the count was stored
+    # says nothing rather than claiming the serial loop.
+    await db_session.execute(
+        Run.__table__.update().where(Run.id == serial["run_id"]).values(workers=None)
+    )
+    await db_session.commit()
+    runs_module._run_service = RunService(runs_module._run_service.meta)
+    restarted = (await app_client.get(f"/api/runs/{free['run_id']}")).json()
+    assert restarted["workers"] == 4
+    unknown = (await app_client.get(f"/api/runs/{serial['run_id']}/parameters")).json()
+    assert unknown["derived"]["workers"] is None
 
 
 @pytest.mark.asyncio

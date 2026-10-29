@@ -376,15 +376,23 @@ _READ_BY_THE_ENGINE_BUT_NOT_OFFERED = {
     # (``false``) is Petacat's own update-cycle countdown, ``true`` is Metacat's fixed
     # unclamp time (``run.ss:151-154``).
     "initial_clamp_fixed_time",
+    # Read when a rule is described in English (``server/engine/rule_english.py``;
+    # ``rules.ss:1723``): the wrap width, and ``get-dimension-phrase``'s name table.
+    "maximum_rule_line_length",
+    "rule_english_dimension_phrases",
 }
 
 #: Read by the control API, never by a run.
-_READ_BY_ANOTHER_LAYER = {"clampable_codelet_patterns"}
+_READ_BY_ANOTHER_LAYER = {
+    "clampable_codelet_patterns",
+    # Display names served with the Themespace state (serialization.py).
+    "theme_dimension_labels",
+    "theme_relation_labels",
+}
 
 #: Read by nothing: Scheme-era, unported, superseded by the run request, or display.
 _READ_BY_NOTHING = {
     "max_temperature",
-    "maximum_rule_line_length",
     "garbage_collect_cycles",
     "step_cycles",
     "eliza_mode_default",

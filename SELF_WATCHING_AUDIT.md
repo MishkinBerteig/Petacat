@@ -309,3 +309,30 @@ pay Metal startup, and a Metal dispatch costs ~0.2 ms whether it carries 200 edg
   is what `review_service.advance_inspector` actually does. Whether the log should also
   be sufficient without replay is a question about what Audit is for; nothing in MetaCat
   corresponds to it, since MetaCat has no recorded-run review at all.
+
+### Clamp and self-watching controls, brought up to Metacat's Options menu
+
+The clamp controls were the last place Petacat's self-watching differed from the menu it
+copies (`gui.ss:594-626, 860-930`). Three things changed, and the commentary that goes
+with them (see the lockstep commentary comparison in `tests/lockstep/README.md`):
+
+- **Undo last clamp** undoes the most recent clamp and only that one
+  (`POST /api/runs/{id}/undo-last-clamp`, `RunService.undo_last_clamp`). It books the
+  progress the clamp achieved, says so in the commentary, and lifts exactly the patterns
+  that clamp imposed; the old "Release clamps" freed every theme at once and was silent.
+- **Clamp theme pattern** chooses several themes in several theme windows and clamps
+  them as one pattern (`POST /api/runs/{id}/clamp-theme-pattern`). The edited types are
+  replaced wholesale, one manual-clamp event covers them, and the last clamp is undone
+  first (`theme-edit-mode-off`, `gui.ss:905-926`). The client's edit mode
+  (`ClampControls`, `ThemespaceView`) follows the dialog text of `gui.ss:881-894`.
+  Clamping one theme from its +100 / -100 buttons is the same operation with the
+  type's other themes carried along.
+- **Self-watching mode** can be toggled in the middle of a run
+  (`PUT /api/runs/{id}/self-watching`). Off: the last clamp is undone, every theme is
+  deleted, the clamp controls are disabled, the Themespace is hidden and the red warning
+  shown. On: the machinery runs again; the themes start afresh, as in Metacat.
+
+The menu's codelet-pattern items (`gui.ss:1221-1245`) are manual clamps too, so
+`POST /clamp-codelet-pattern` now makes the manual-clamp event (undoing the last clamp
+first, clamping the group, bridge and rule patterns against a very-low background),
+and Undo last clamp lifts it.

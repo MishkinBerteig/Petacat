@@ -67,7 +67,7 @@ from typing import Any
 from server.engine.bonds import Bond
 from server.engine.bridges import Bridge
 from server.engine.coderack import Codelet
-from server.engine.concept_mappings import ConceptMapping
+from server.engine.concept_mappings import ConceptMapping, SlippageLog
 from server.engine.descriptions import Description
 from server.engine.groups import Group
 from server.engine.images import Image, StringImage
@@ -78,6 +78,7 @@ from server.engine.rules import (
     Rule,
     RuleChange,
     RuleClause,
+    TranslationResult,
 )
 from server.engine.trace import AnswerEvent, ClampEvent, SnagEvent, TraceEvent
 from server.engine.workspace import WorkspaceString
@@ -101,6 +102,10 @@ GRAPH_TYPES: tuple[type, ...] = (
     IntrinsicChangeDescription,
     ExtrinsicChangeDescription,
     ConceptMapping,
+    # What a rule translation left behind (``answers.ss:1334``): kept on the translated
+    # rule and in the answer and snag events.
+    SlippageLog,
+    TranslationResult,
     Image,
     StringImage,
     Codelet,
@@ -383,8 +388,10 @@ def capture_run_state(ctx: Any) -> dict:
     }
 
     memory_state = {
-        "answers": [writer.ref(a) for a in ctx.memory.answers],
-        "snags": [writer.ref(s) for s in ctx.memory.snags],
+        # Oldest first, which is how a capture has always listed them (and how the review
+        # UI shows them); ``restore`` puts them back in the memory's own newest-first order.
+        "answers": [writer.ref(a) for a in ctx.memory.answers_oldest_first],
+        "snags": [writer.ref(s) for s in ctx.memory.snags_oldest_first],
         "ids": ctx.memory.ids.snapshot(),
     }
 
@@ -586,8 +593,8 @@ def restore_run_state(runner: Any, state: dict) -> None:
     ctx.trace._last_significant_event_time = trace_state["last_significant_event_time"]
 
     # -- Memory -------------------------------------------------------
-    ctx.memory.answers = [reader.resolve(a) for a in state["memory"]["answers"]]
-    ctx.memory.snags = [reader.resolve(s) for s in state["memory"]["snags"]]
+    ctx.memory.answers = [reader.resolve(a) for a in reversed(state["memory"]["answers"])]
+    ctx.memory.snags = [reader.resolve(s) for s in reversed(state["memory"]["snags"])]
     ctx.memory.ids.restore(state["memory"]["ids"])
 
     # -- Slipnet ------------------------------------------------------

@@ -100,9 +100,9 @@ class Group(WorkspaceObject, WorkspaceStructure):
             desc = Description(self, dt, descriptor)
             desc.proposal_level = Description.BUILT
             if bond_description:
-                self.bond_descriptions.append(desc)
+                self.bond_descriptions.insert(0, desc)
             else:
-                self.descriptions.append(desc)
+                self.descriptions.insert(0, desc)
 
         describe("plato-object-category", node("plato-group"))
         describe("plato-group-category", self.group_category)
@@ -589,7 +589,7 @@ def attach_length_description(group: Group) -> bool:
 
     description = Description(group, length_type, descriptor)
     description.proposal_level = Description.BUILT
-    group.descriptions.append(description)
+    group.descriptions.insert(0, description)
     return True
 
 

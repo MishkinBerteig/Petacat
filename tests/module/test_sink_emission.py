@@ -190,11 +190,13 @@ def test_descriptions_built_by_codelets_are_reported(meta):
     # ``workspace.ss:581-585``), so the run explores for longer before any
     # proposal survives its evaluator.
     #
-    # Seed 8 rather than the file's 42: the whole-number ``~`` delta (A-1) changed which
-    # seeds reach a description builder, and seed 42 answers ``mrrjjj`` at codelet 412
-    # without ever building one.
+    # Seed 42, the file's own: the whole-number ``~`` delta (A-1) had moved this test to
+    # seed 8, since 42 answered ``mrrjjj`` at codelet 412 without building a description.
+    # The list orders of G-Z4 (groups, bonds and descriptions newest first, the coderack's
+    # bins as vectors) changed which seeds reach a builder again: seed 8 builds none in
+    # 1500 codelets, and 42 builds one.
     sink = RecordingSink()
-    _run(meta, sink, steps=1500, seed=8)
+    _run(meta, sink, steps=1500, seed=42)
     described = [
         e for e in sink.events
         if e[0] == "structure" and e[2] == "Description"

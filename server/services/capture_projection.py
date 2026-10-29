@@ -353,12 +353,21 @@ def project_slipnet(state: dict, meta: Any) -> dict:
     return out
 
 
-def project_coderack(state: dict) -> dict:
-    """Codelet counts by type, in the shape ``GET /api/runs/{id}/coderack`` serves."""
+def project_coderack(state: dict, meta: Any = None) -> dict:
+    """Codelet counts by type, in the shape ``GET /api/runs/{id}/coderack`` serves.
+
+    The selection probabilities come from the captured bins and the captured
+    temperature, through the same function the live display uses.  The last codelet
+    type is not part of a capture, so it is ``None``.
+    """
+    from server.engine.coderack import type_selection_probabilities
+
     g = _Graph(state)
     counts: dict[str, int] = {}
+    per_bin: list[dict[str, int]] = []
     total = 0
     for bin_refs in state["coderack"]["bins"]:
+        bin_counts: dict[str, int] = {}
         for ref in bin_refs:
             fields = g.record(ref)
             if fields is None:
@@ -366,7 +375,28 @@ def project_coderack(state: dict) -> dict:
             total += 1
             name = fields.get("codelet_type", "?")
             counts[name] = counts.get(name, 0) + 1
-    return {"total_count": total, "type_counts": counts}
+            bin_counts[name] = bin_counts.get(name, 0) + 1
+        per_bin.append(bin_counts)
+    probabilities: dict[str, float] = {}
+    if meta is not None:
+        from server.engine.coderack import urgency_value_table
+
+        table = urgency_value_table(
+            meta.get_param("num_coderack_bins", 7),
+            meta.get_formula_coeff("coderack_bin_urgency_exponent_offset"),
+            meta.get_formula_coeff("coderack_bin_urgency_exponent_divisor"),
+        )
+        probabilities = type_selection_probabilities(
+            per_bin, table.row(state["temperature"]["value"])
+        )
+    return {
+        "total_count": total,
+        "type_counts": counts,
+        "type_probabilities": probabilities,
+        "last_codelet_type": None,
+        "codelet_types": list(meta.codelet_specs) if meta is not None else list(counts),
+        "clamped_urgencies": dict(state["coderack"].get("clamped_urgencies", {})),
+    }
 
 
 def project_themespace(state: dict, meta: Any) -> dict:
@@ -426,8 +456,11 @@ def project_themespace(state: dict, meta: Any) -> dict:
         })
 
     active = list(state["themespace"]["active_theme_types"])
+    from server.engine.serialization import theme_display_labels
+
     return {
         "clusters": clusters,
+        **theme_display_labels(meta),
         # ``Themespace.possible_theme_types`` is a function of justify mode, which the
         # capture records under ``runner``.
         "possible_theme_types": (
@@ -548,7 +581,7 @@ def project_capture(state: dict, meta: Any) -> dict:
         "runner": state["runner"],
         "workspace": project_workspace(state, meta),
         "slipnet": project_slipnet(state, meta),
-        "coderack": project_coderack(state),
+        "coderack": project_coderack(state, meta),
         "themespace": project_themespace(state, meta),
         "trace": project_trace(state),
         "memory": project_memory(state),

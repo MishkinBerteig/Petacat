@@ -608,8 +608,7 @@ def _attach_length_to_appropriate_groups(transforms: Any) -> None:
         if len(entry) != 2:
             continue
         obj, object_transforms = entry
-        image = getattr(obj, "image", None)
-        instantiated = getattr(image, "instantiated_object", None) if image else None
+        instantiated = get_instantiated_image_object(obj)
         if not isinstance(instantiated, Group):
             continue
         length_transform = _select_transform(object_transforms, "plato-length")
@@ -730,8 +729,7 @@ def _bridge_to_translation(
     identity = slipnet.nodes.get("plato-identity")
     bridges = []
     for obj in subjects:
-        image = getattr(obj, "image", None)
-        counterpart = getattr(image, "instantiated_object", None) if image else None
+        counterpart = get_instantiated_image_object(obj)
         if counterpart is None:
             continue
         bridge = Bridge(
@@ -747,6 +745,27 @@ def _bridge_to_translation(
         if workspace is not None:
             workspace.add_bridge(bridge)
     return bridges
+
+
+def get_instantiated_image_object(obj: Any) -> Any:
+    """The object of the translated string that *obj*'s image became.
+
+    Scheme: ``get-instantiated-image-object`` (``workspace-objects.ss:143-148``).  An
+    object whose image was swapped with another's (``apply-string-position-swap``,
+    ``rules.ss:1402-1415``) is read through the *swapped* image: the two images exchange
+    their contents, so the slot an object's own image instantiates holds the OTHER
+    object's content, and the object's content is what its partner's slot became.  Without
+    this the horizontal bridge of ``m`` in ``[m][rr][jjj] -> [[jjj]][rr]m`` joined it to
+    ``jjj``, and the rule's supporting bridges (and with them the order of the answer's
+    supporting groups) came out wrong.
+    """
+    image = getattr(obj, "image", None)
+    if image is None:
+        return None
+    swapped = getattr(image, "swapped_image", None)
+    if swapped is not None:
+        return getattr(swapped, "instantiated_object", None)
+    return getattr(image, "instantiated_object", None)
 
 
 def _describe_letters(string: Any, slipnet: Any) -> None:
@@ -766,12 +785,14 @@ def _describe_letters(string: Any, slipnet: Any) -> None:
         return
 
     for letter in string.letters:
-        if not letter.description_type_present(letter_category):
-            letter.add_description(
-                Description(letter, letter_category, letter.letter_category)
-            )
+        # ``make-letter`` (``workspace-objects.ss:24-25``) describes the object
+        # category first and the letter category second.
         if object_category is not None and letter_node is not None:
             if not letter.description_type_present(object_category):
                 letter.add_description(
                     Description(letter, object_category, letter_node)
                 )
+        if not letter.description_type_present(letter_category):
+            letter.add_description(
+                Description(letter, letter_category, letter.letter_category)
+            )

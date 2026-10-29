@@ -199,8 +199,46 @@ def test_clearing_memory_resets_the_identifier_counter():
     mem = EpisodicMemory()
     mem.store_answer(_stored(("abc", "abd", "xyz", "xyd"), None))
     mem.store_answer(_stored(("abc", "abd", "xyz", "wyz"), None))
-    assert [a.answer_id for a in mem.answers] == [1, 2]
+    assert [a.answer_id for a in mem.answers_oldest_first] == [1, 2]
 
     mem.clear()
     mem.store_answer(_stored(("abc", "abd", "xyz", "xyd"), None))
     assert [a.answer_id for a in mem.answers] == [1]
+
+
+# --- the order Metacat keeps its descriptions in ---------------------------
+
+def test_answers_are_kept_newest_first_as_metacat_conses_them():
+    """``add-answer-description`` conses the new description onto the front
+    (``memory.ss:101-104``), so ``get-answers`` -- and everything that walks the list --
+    sees the newest first; the Memory window lists them oldest first
+    (``memory-graphics.ss:145``), which is ``answers_oldest_first``."""
+    mem = EpisodicMemory()
+    for letter in "abc":
+        desc = _answer({"a": "1"})
+        desc.problem = ("abc", "abd", "xyz", letter)
+        mem.store_answer(desc)
+    assert [a.problem[3] for a in mem.answers] == ["c", "b", "a"]
+    assert [a.problem[3] for a in mem.answers_oldest_first] == ["a", "b", "c"]
+    assert [a.answer_id for a in mem.answers_oldest_first] == [1, 2, 3]
+
+
+def test_snags_are_kept_newest_first_too():
+    mem = EpisodicMemory()
+    first, second = _snag({"d": "left"}), _snag({"d": "right"})
+    mem.store_snag(first)
+    mem.store_snag(second)
+    assert mem.snags == [second, first]
+    assert mem.snags_oldest_first == [first, second]
+
+
+def test_remindings_are_reported_newest_first():
+    """The new answer is compared with each stored one in list order
+    (``memory.ss:101-103``), and each reminding adds a comment as it is found."""
+    mem = EpisodicMemory()
+    older, newer = _answer({"a": "1"}), _answer({"a": "1"})
+    mem.store_answer(older)
+    mem.store_answer(newer)
+    new = _answer({"a": "1"})
+    mem.store_answer(new)
+    assert mem.find_remindings(new) == [newer, older]

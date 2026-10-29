@@ -162,19 +162,18 @@ def snag_explanation_for(
 ) -> str:
     """Scheme: ``get-snag-explanation`` (``answers.ss:302-307``).
 
-    The sentence is rebuilt from what a ``SnagDescription`` stores — the rule and the
-    target string — through ``caveat_templates.snag_explanation``, the same template the
-    snag commentary uses, so the caveat quotes the wording the user saw when the snag
-    happened.
+    Returns the explanation the snag description stored when the snag happened
+    (``SnagDescription.explanation``, Metacat's sentence from ``trace.ss:1097``) -- the
+    very wording the commentary showed.  A snag with none recorded (a row written before
+    it was stored) falls back to ``caveat_templates.snag_explanation``; see
+    ``snag_explanation.snag_explanation_text``.
     """
+    from server.engine.snag_explanation import snag_explanation_text
+
     snag = memory.get_equivalent_snag(answer) if memory is not None else None
     if snag is None:
         return ""
-    return _fill(
-        _text(templates, "caveat_templates", "snag_explanation"),
-        rule=snag.description,
-        target=snag.problem[2] if len(snag.problem) > 2 else "",
-    )
+    return snag_explanation_text(snag, templates)
 
 
 def snag_justified_themes(

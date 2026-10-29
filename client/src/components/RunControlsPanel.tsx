@@ -56,6 +56,7 @@ import {
 } from '@/api/client';
 import { ModeBadge, MODE_DESCRIPTIONS } from '@/components/ModeBadge';
 import { RunParametersPanel } from '@/components/RunParametersPanel';
+import { ClampControls } from '@/components/ClampControls';
 import { RunDerivedPanel } from '@/components/RunDerivedPanel';
 import { useMachine } from '@/hooks/useMachine';
 import {
@@ -805,6 +806,8 @@ export function RunControlsPanel() {
             </button>
           </div>
         </div>
+
+        <ClampControls />
 
         {hasRun && (
           <div

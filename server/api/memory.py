@@ -24,6 +24,9 @@ router = APIRouter(prefix="/api/memory", tags=["memory"])
 class CompareRequest(BaseModel):
     answer_id_1: int
     answer_id_2: int
+    #: The run whose commentary window the comparison is said in.  Metacat has one
+    #: window; here each run has its own, so the client names the one on screen.
+    run_id: int | None = None
 
 
 # ------------------------------------------------------------------
@@ -95,6 +98,21 @@ async def display_answer(answer_id: int, run_id: int):
         raise HTTPException(404, str(exc)) from None
 
 
+@router.post("/snags/{snag_id}/display")
+async def display_snag(snag_id: int, run_id: int):
+    """Display a stored snag: its picture, with its theme-pattern over the Themespace.
+
+    Scheme: the snag description's ``display`` (``memory.ss:380-395``) -- draw the snag
+    description (``trace.ss:1212``), impose the snag's theme-pattern, blank the Slipnet
+    and Coderack and show a temperature of 100.  Calling again restores the live state.
+    """
+    svc = get_run_service()
+    try:
+        return svc.impose_snag(run_id, snag_id)
+    except ValueError as exc:
+        raise HTTPException(404, str(exc)) from None
+
+
 def _find_answer(answer_id: int):
     from server.services.run_service import _global_memory
 
@@ -125,17 +143,33 @@ async def compare_answers(req: CompareRequest):
     comparison = _global_memory.compare_answers(
         answer_a, answer_b, templates=templates, meta=svc.meta
     )
+    commentary = describe_answer_comparison(
+        answer_a,
+        answer_b,
+        memory=_global_memory,
+        templates=templates,
+        meta=svc.meta,
+    )
+
+    # Selecting a second answer says "Let's see..." and then the comparison, in the
+    # commentary window (``memory-graphics.ss:56-64``, ``answers.ss:428-431``).  The
+    # paragraph is the same in both voices.
+    runner = svc.get_runner(req.run_id) if req.run_id is not None else None
+    if runner is not None and runner.ctx is not None:
+        from server.engine.commentary import emit_comparing_answers
+
+        log = runner.ctx.commentary
+        emit_comparing_answers(log, runner.ctx.codelet_count, templates)
+        text = commentary.get("text", "")
+        log.add_comment(
+            text, text, codelet_count=runner.ctx.codelet_count, event_type="comparison"
+        )
+
     return {
         "answer_id_1": req.answer_id_1,
         "answer_id_2": req.answer_id_2,
         "comparison": comparison,
-        "commentary": describe_answer_comparison(
-            answer_a,
-            answer_b,
-            memory=_global_memory,
-            templates=templates,
-            meta=svc.meta,
-        ),
+        "commentary": commentary,
     }
 
 

@@ -64,6 +64,10 @@ class CreateRunRequest(BaseModel):
 
 class StepRequest(BaseModel):
     n: int = 1
+    #: The request is Metacat's Step button (step mode).  With a step of ten codelets
+    #: or fewer it narrates them even when Verbose mode is off (``set-verbose-step-mode``,
+    #: ``gui.ss:793``, ``run.ss:44-47``); the Run and Go paths leave this false.
+    step_mode: bool = False
 
 
 class RunToCompletionRequest(BaseModel):
@@ -84,6 +88,10 @@ class RunResponse(BaseModel):
     justify_mode: bool = False
     #: Which Slipnet nodes were allowed to spread; 100 is the original.
     spreading_threshold: int = 100
+    #: Workers the run executes with: 1 is the serial loop, more is free-running, under
+    #: which the seed does not reproduce the run.  Null when nothing records it, as
+    #: for runs created before the count was stored.
+    workers: int | None = None
 
 
 class RunListItem(RunResponse):
@@ -181,6 +189,7 @@ async def create_run(
         justify_mode=info.justify_mode,
         spreading_threshold=info.spreading_threshold,
         mode=info.mode,
+        workers=info.workers,
     )
 
 
@@ -205,6 +214,7 @@ async def get_run(
         justify_mode=info.justify_mode,
         spreading_threshold=info.spreading_threshold,
         mode=info.mode,
+        workers=info.workers,
     )
 
 
@@ -216,7 +226,7 @@ async def step_run(
 ):
     svc = get_run_service()
     try:
-        batch = await svc.step(session, run_id, req.n)
+        batch = await svc.step(session, run_id, req.n, step_mode=req.step_mode)
     except ValueError as e:
         raise HTTPException(404, str(e))
     # The breakpoint stopped the batch after its final codelet, so that entry carries
@@ -260,6 +270,18 @@ async def get_coderack(run_id: int):
     if state is None:
         raise HTTPException(404, f"Run {run_id} not found")
     return state
+
+
+@router.get("/{run_id}/eeg")
+async def get_eeg(run_id: int):
+    """The EEG window's curves: average Workspace activity and temperature, one point
+    per update cycle (``eeg-graphics.ss``).  Held for a run that is in memory, live or
+    finished; a run only in the database has no record of its Workspace activity."""
+    svc = get_run_service()
+    history = svc.get_eeg_history(run_id)
+    if history is None:
+        raise HTTPException(404, f"Run {run_id} not found")
+    return history
 
 
 @router.get("/{run_id}/temperature")
@@ -328,6 +350,7 @@ async def list_runs(
                 justify_mode=r.justify_mode,
                 spreading_threshold=r.spreading_threshold,
                 mode=mode,
+                workers=r.workers,
                 config_hash=config,
                 memory_hash=memory,
             )
@@ -432,7 +455,13 @@ async def get_run_parameters(
 
     derived: dict = {
         "mode": (row.mode if row is not None else svc._modes.get(run_id, "fast")),
-        "workers": svc._workers.get(run_id, 1),
+        # The record first, then the live runner.  A run with neither — created before
+        # the count was stored, and not executing in this process — has no known count,
+        # and says so rather than claiming the serial loop.
+        "workers": (
+            row.workers if row is not None and row.workers is not None
+            else svc._workers.get(run_id)
+        ),
         "config_hash": row.config_hash if row is not None else None,
         "memory_hash": row.memory_hash if row is not None else None,
         "session_id": row.session_id if row is not None else None,
@@ -527,6 +556,7 @@ async def run_to_completion(
         justify_mode=info.justify_mode,
         spreading_threshold=info.spreading_threshold,
         mode=info.mode,
+        workers=info.workers,
     )
 
 
@@ -564,6 +594,7 @@ async def reset_run(
         justify_mode=info.justify_mode,
         spreading_threshold=info.spreading_threshold,
         mode=info.mode,
+        workers=info.workers,
     )
 
 
@@ -647,7 +678,9 @@ async def export_trace(run_id: int, session: AsyncSession = Depends(get_session)
 # registration order, so the literal path has to be declared before the parameterised
 # one that would otherwise swallow it.
 @router.get("/{run_id}/trace/{event_number}")
-async def get_trace_event(run_id: int, event_number: int):
+async def get_trace_event(
+    run_id: int, event_number: int, session: AsyncSession = Depends(get_session)
+):
     """One Trace event in full — its structures, theme-pattern and strength.
 
     §2.4.3: Trace events are "themselves subject to examination by codelets"; MetaCat's
@@ -657,22 +690,42 @@ async def get_trace_event(run_id: int, event_number: int):
     svc = get_run_service()
     detail = svc.describe_trace_event(run_id, event_number)
     if detail is None:
+        # A run that is not loaded keeps its events (and their pictures) in the rows.
+        detail = await svc.describe_trace_event_from_db(session, run_id, event_number)
+    if detail is None:
         raise HTTPException(404, f"Event {event_number} not found in run {run_id}")
     return detail
 
 
 @router.post("/{run_id}/trace/{event_number}/display")
-async def display_trace_event(run_id: int, event_number: int):
-    """Impose that event's theme-pattern over the live Themespace, or restore it.
+async def display_trace_event(
+    run_id: int, event_number: int, session: AsyncSession = Depends(get_session)
+):
+    """Display that event: impose its theme-pattern over the live Themespace, or restore.
 
     The ``display`` message every MetaCat event answers, which saves the live state and
-    imposes the episode's own pattern; calling it again puts the live state back.
+    imposes the episode's own pattern; calling it again puts the live state back.  The
+    reply carries the event's ``picture`` -- the Workspace as it was, with the event's
+    structures highlighted, the concept pattern, the blank or clamped Coderack and the
+    event's temperature -- for the other windows to draw.
+
+    A run that is not loaded has no Themespace to impose anything over, but its
+    recorded events can still be shown: the picture is served from the stored row.
     """
     svc = get_run_service()
     try:
         return svc.impose_trace_event(run_id, event_number)
     except ValueError as exc:
-        raise HTTPException(404, str(exc)) from None
+        detail = await svc.describe_trace_event_from_db(session, run_id, event_number)
+        if detail is None:
+            raise HTTPException(404, str(exc)) from None
+        return {
+            "run_id": run_id,
+            "displaying": event_number,
+            "picture": detail["picture"],
+            "event_number": event_number,
+            "print_name": detail["print_name"],
+        }
 
 
 @router.post("/{run_id}/themespace/restore")
@@ -693,6 +746,11 @@ def _project_memory(memory) -> dict:
     small and the alternative — a parameter on the service method — would have to be
     added in ``server/services``, which this change does not touch.
     """
+    from server.engine.snag_explanation import snag_explanation_text
+
+    # The fallback wording for a snag with no stored explanation is a template, so it
+    # comes from whatever the service currently holds (the database in a served run).
+    _templates = getattr(getattr(get_run_service(), "meta", None), "commentary_templates", None)
     return {
         "answers": [
             {
@@ -716,8 +774,9 @@ def _project_memory(memory) -> dict:
                 "bottom_rule_abstractness": a.bottom_rule_abstractness,
                 "theme_abstractness": a.theme_abstractness,
                 "is_coherent": a.is_coherent,
+                "has_picture": a.picture is not None,
             }
-            for a in memory.answers
+            for a in memory.answers_oldest_first
         ],
         "snags": [
             {
@@ -728,8 +787,11 @@ def _project_memory(memory) -> dict:
                 "temperature": s.temperature,
                 "theme_pattern": s.theme_pattern,
                 "description": s.description,
+                "translated_rule_description": s.translated_rule_description,
+                "explanation": snag_explanation_text(s, _templates),
+                "has_picture": s.picture is not None,
             }
-            for s in memory.snags
+            for s in memory.snags_oldest_first
         ],
     }
 
@@ -766,6 +828,31 @@ async def get_memory(run_id: int, session: AsyncSession = Depends(get_session)):
         "run_id": run_id,
         "mode": mode,
     }
+
+
+@router.get("/{run_id}/verbose")
+async def get_verbose(run_id: int, since: int = 0):
+    """Verbose mode's narration of the run, from line number *since* on.
+
+    The buffer is bounded; ``dropped`` says how many lines before ``first`` the caller
+    asked for and no longer exist.  Ask again with ``since`` set to the ``next`` of the
+    previous reply to read only what is new.
+    """
+    svc = get_run_service()
+    result = svc.get_verbose(run_id, since=since)
+    if result is None:
+        raise HTTPException(404, f"Run {run_id} not found")
+    return result
+
+
+@router.delete("/{run_id}/verbose")
+async def clear_verbose(run_id: int):
+    """Empty the narration buffer (the Interaction window's Clear)."""
+    svc = get_run_service()
+    result = svc.clear_verbose(run_id)
+    if result is None:
+        raise HTTPException(404, f"Run {run_id} not found")
+    return result
 
 
 @router.get("/{run_id}/commentary")

@@ -42,6 +42,7 @@ from server.engine.serialization import (
     serialize_themespace_state,
     serialize_workspace_state,
 )
+from server.engine.coderack import coderack_display
 from server.engine.state_graph import (
     StateGraphError,
     capture_run_state,
@@ -192,10 +193,11 @@ def test_a_projected_capture_matches_the_live_serializer(meta, mid_run_capture):
         }
         for name, node in live.ctx.slipnet.nodes.items()
     }
-    assert project_coderack(mid_run_capture) == {
-        "total_count": live.ctx.coderack.total_count,
-        "type_counts": live.ctx.coderack.get_codelet_type_counts(),
-    }
+    # Counts, selection probabilities and clamps are all recomputed from the record;
+    # the last codelet type is not part of a capture, so it is None on both sides.
+    assert project_coderack(mid_run_capture, meta) == coderack_display(
+        live.ctx.coderack, live.ctx.temperature.value, None
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────

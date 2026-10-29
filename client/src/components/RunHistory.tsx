@@ -12,6 +12,28 @@ import type { RunInfo } from '@/types';
 /** How many runs one window of the list holds. */
 const PAGE_SIZE = 50;
 
+/**
+ * The Problem column, in the header and in every row alike.
+ *
+ * Every other column has a fixed width, so in a narrow panel this is the one that
+ * gives way. With plain `flex: 1` it gave way differently in the two places: a row's
+ * cell clips its text and could shrink to nothing, while the heading kept the width
+ * of its word, which put every value one column to the left of its heading. One
+ * floor for both keeps them aligned, and below it the table scrolls sideways rather
+ * than losing the problem.
+ */
+const PROBLEM_COLUMN = { flex: '1 1 0', minWidth: 96 } as const;
+
+/** What a run's worker count means for reading its record. */
+function workersTitle(workers: number | null | undefined): string {
+  if (workers === null || workers === undefined) {
+    return 'Workers not recorded: the run was created before the count was stored';
+  }
+  return workers > 1
+    ? `${workers} workers: free-running, so the seed does not reproduce this run`
+    : '1 worker: the serial loop, so problem, seed and memory reproduce this run';
+}
+
 function statusColor(status: string): string {
   switch (status.toLowerCase()) {
     case 'completed':
@@ -56,6 +78,7 @@ export function RunHistory() {
   const liveWorkspace = useRunStore((s) => s.workspace);
   const liveParams = useRunStore((s) => s.runParams);
   const liveThreshold = useRunStore((s) => s.spreadingThreshold);
+  const liveWorkers = useRunStore((s) => s.runWorkers);
   const store = useRunStore();
 
   const fetchRuns = useCallback(async () => {
@@ -216,6 +239,7 @@ export function RunHistory() {
           answer: liveAnswer,
           mode: currentRunMode ?? undefined,
           spreading_threshold: liveThreshold,
+          workers: liveWorkers,
         }
       : null;
 
@@ -302,7 +326,7 @@ export function RunHistory() {
         }}
       >
         <span style={{ width: 36, flexShrink: 0 }}>ID</span>
-        <span style={{ flex: 1 }}>Problem</span>
+        <span style={PROBLEM_COLUMN}>Problem</span>
         {/* What the run wrote down, which decides what the Review browser can show
             of it. Only Normal and Audit can appear at all — see fastRunNote. */}
         <span
@@ -310,6 +334,12 @@ export function RunHistory() {
           title="Persistence mode: what the run recorded. Fast runs write no row and so are never listed."
         >
           Mode
+        </span>
+        <span
+          style={{ width: 16, flexShrink: 0, textAlign: 'right' }}
+          title="Workers: 1 is the serial loop, which a seed reproduces; more is free-running, which it does not."
+        >
+          W
         </span>
         <span style={{ width: 64, flexShrink: 0 }}>Status</span>
         <span style={{ width: 48, flexShrink: 0, textAlign: 'right' }}>Cdlts</span>
@@ -368,7 +398,7 @@ export function RunHistory() {
             <span
               className="mono"
               style={{
-                flex: 1,
+                ...PROBLEM_COLUMN,
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
@@ -399,6 +429,22 @@ export function RunHistory() {
             </span>
             <span style={{ width: 54, flexShrink: 0 }}>
               <ModeBadge mode={run.mode ?? 'normal'} />
+            </span>
+            {/* A free-running run is a different draw: its seed does not reproduce
+                it, so the count belongs in the record of the run, as the spreading
+                threshold does. */}
+            <span
+              className="mono"
+              style={{
+                width: 16,
+                flexShrink: 0,
+                textAlign: 'right',
+                color:
+                  (run.workers ?? 1) > 1 ? 'var(--warning)' : 'var(--text-secondary)',
+              }}
+              title={workersTitle(run.workers)}
+            >
+              {run.workers ?? '—'}
             </span>
             <span
               style={{

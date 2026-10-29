@@ -330,6 +330,40 @@ def test_an_end_of_run_capture_restores_after_the_run_answered(meta):
     assert {type(e).__name__ for e in restored.ctx.trace.events} == event_types
 
 
+def test_a_capture_lists_memory_oldest_first_and_restores_it_newest_first(meta):
+    """Episodic Memory keeps its answers newest first, as Metacat conses them
+    (``memory.ss:101-104``); a capture has always listed them oldest first (the review
+    UI shows that order), so restoring reverses the list, and an old capture, written
+    the same way, restores into the same order.  It also carries the slippage log and
+    supporting structure the translation recorded for each answer and snag."""
+    from server.engine.memory import AnswerDescription
+
+    runner = _fresh_answering(meta)
+    result = runner.run_mcat(max_steps=ANSWERING_MAX_STEPS)
+    assert result.status == "answer_found"
+    memory = runner.ctx.memory
+    earlier = AnswerDescription(
+        problem=("abc", "abd", "xyz", "zzz"), top_rule_description="t",
+        bottom_rule_description="b", top_rule_quality=0, bottom_rule_quality=0,
+        quality=1, temperature=1, themes={}, unjustified_slippages=[],
+    )
+    memory.store_answer(earlier)
+    assert memory.answers[0] is earlier
+
+    state = json.loads(json.dumps(capture_run_state(runner.ctx)))
+    assert len(state["memory"]["answers"]) == len(memory.answers)
+    restored = EngineRunner(meta)
+    restored.init_mcat(*ANSWERING_PROBLEM, seed=ANSWERING_SEED)
+    restore_run_state(restored, state)
+    assert [a.answer_id for a in restored.ctx.memory.answers] == [
+        a.answer_id for a in memory.answers
+    ]
+    assert restored.ctx.memory.answers[0].problem[3] == "zzz"
+    answer_event = next(e for e in restored.ctx.trace.events if type(e).__name__ == "AnswerEvent")
+    assert answer_event.slippage_log is not None
+    assert answer_event.slippage_log.rule_type == "top"
+
+
 def test_every_trace_event_subclass_is_a_known_graph_type(meta):
     """Guards the same gap structurally, so a *new* event subclass cannot reopen it.
 

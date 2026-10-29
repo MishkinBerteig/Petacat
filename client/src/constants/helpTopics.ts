@@ -19,6 +19,7 @@ export const COMPONENT_HELP_KEYS = [
   'coderack',
   'commentary',
   'configuration',
+  'eeg',
   'memory',
   'problem_input',
   'review',
@@ -28,6 +29,7 @@ export const COMPONENT_HELP_KEYS = [
   'temperature',
   'themespace',
   'trace',
+  'verbose',
   'workspace',
 ] as const;
 
@@ -64,6 +66,7 @@ export const GLOSSARY_HELP_KEYS = [
   'training_session',
   'update_cycle',
   'urgency',
+  'windows_menu',
   'workspace_structure',
 ] as const;
 

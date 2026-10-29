@@ -271,10 +271,23 @@ class ImageFailure(Exception):
         message: str = "",
         objects: list | None = None,
         kind: str = CHANGE,
+        dimension: Any = None,
+        transform: tuple | None = None,
+        dimension2: Any = None,
     ) -> None:
         super().__init__(message)
         self.objects: list = objects or []
         self.kind: str = kind
+        #: The rest of the Scheme's ``<failure-result>`` (``answers.ss:1145-1150``),
+        #: which the snag's explanation is written from (``trace.ss:1097-1125``):
+        #: ``SWAP`` carries ``dimension``; ``CONFLICT`` carries ``dimension`` (the
+        #: first object's) and ``dimension2`` (the second's); ``CHANGE`` carries the
+        #: ``transform`` -- ``(dimension, descriptor)`` or, for a group-category
+        #: reversal, ``(GroupCtgy, Opposite, bond-facet)``.  ``None`` where the raise
+        #: site does not know, in which case the explanation falls back.
+        self.dimension: Any = dimension
+        self.dimension2: Any = dimension2
+        self.transform: tuple | None = transform
 
 
 # ---------------------------------------------------------------------------

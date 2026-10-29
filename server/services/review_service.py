@@ -641,6 +641,7 @@ class ReviewService:
             "workspace": _live_workspace(ctx),
             "slipnet": _live_slipnet(ctx),
             "coderack": _live_coderack(ctx),
+            "eeg": ctx.eeg.history(),
             "themespace": _live_themespace(ctx),
             "trace": _live_trace(ctx),
         }
@@ -688,10 +689,11 @@ def _live_slipnet(ctx: Any) -> dict:
 
 
 def _live_coderack(ctx: Any) -> dict:
-    return {
-        "total_count": ctx.coderack.total_count,
-        "type_counts": ctx.coderack.get_codelet_type_counts(),
-    }
+    from server.engine.coderack import coderack_display
+
+    return coderack_display(
+        ctx.coderack, ctx.temperature.value, ctx.last_codelet_type
+    )
 
 
 def _live_trace(ctx: Any) -> list[dict]:

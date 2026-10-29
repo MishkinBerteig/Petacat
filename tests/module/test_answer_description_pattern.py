@@ -338,7 +338,12 @@ def test_a_slippage_whose_bridge_is_gone_does_not_enter(meta):
         [(STRING_POSITION, "plato-leftmost", "plato-rightmost")],
     )
     _slippage_event(ctx, bridge, bridge.concept_mappings[0])
+    # Break it as ``break-bridge`` does: out of the list AND off its objects.  Metacat's
+    # ``get-equivalent-bridge`` (``workspace.ss:268-301``) ends in ``(get-bridge ...)`` of
+    # the equivalent object, so a bridge left hanging on its letters is still found.
     ctx.workspace.vertical_bridges.remove(bridge)
+    left_initial.vertical_bridge = None
+    right_target.vertical_bridge = None
 
     pattern = _distil_vertical_pattern({}, ctx.workspace, ctx.trace, ALLOWED)
     # Branch 1 finds nothing, so String-Position falls all the way to identity.

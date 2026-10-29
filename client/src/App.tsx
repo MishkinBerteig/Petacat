@@ -18,6 +18,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRunStore } from '@/store/runStore';
 import { useHelp } from '@/hooks/useHelp';
+import { useWorkspaceClick } from '@/hooks/useWorkspaceClick';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { getRun } from '@/api/client';
 
@@ -27,6 +28,8 @@ import { SubstrateBadge } from '@/components/SubstrateBadge';
 import { SearchPalette } from '@/components/SearchPalette';
 import { HelpPopover } from '@/components/HelpPopover';
 import { HamburgerMenu } from '@/components/HamburgerMenu';
+import { WindowsMenu } from '@/components/WindowsMenu';
+import { useDisplayStore, type PanelKey } from '@/store/displayStore';
 import { LastErrorBanner } from '@/components/LastErrorBanner';
 import type { AppView } from '@/components/HamburgerMenu';
 import { AdminLayout } from '@/components/admin/AdminLayout';
@@ -37,11 +40,13 @@ import { WorkspaceView } from '@/components/WorkspaceView';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { SlipnetView } from '@/components/SlipnetView';
 import { CoderackView } from '@/components/CoderackView';
+import { EegView } from '@/components/EegView';
 import { ThemespaceView } from '@/components/ThemespaceView';
 import { TraceView } from '@/components/TraceView';
 import { MemoryView } from '@/components/MemoryView';
 import { TemperatureGauge } from '@/components/TemperatureGauge';
 import { CommentaryPanel } from '@/components/CommentaryPanel';
+import { VerbosePanel } from '@/components/VerbosePanel';
 import { RunHistory } from '@/components/RunHistory';
 import { ReviewPanel } from '@/components/review/ReviewPanel';
 import type { ComponentHelpKey } from '@/constants/helpTopics';
@@ -83,6 +88,21 @@ function PanelHelpButton({ componentName }: { componentName: ComponentHelpKey })
     >
       ?
     </button>
+  );
+}
+
+/** The grid track list for a row of panels, leaving out the ones that are hidden. */
+function columns(tracks: [boolean, string][]): string {
+  const kept = tracks.filter(([on]) => on).map(([, width]) => width);
+  return kept.length > 0 ? kept.join(' ') : '1fr';
+}
+
+/** What a panel shows with its graphics switched off, as Metacat blanks the window. */
+function GraphicsOff({ name }: { name: string }) {
+  return (
+    <div className="text-muted text-sm" style={{ padding: 16, textAlign: 'center' }}>
+      {name} graphics are off (Windows menu). The panel is not being updated.
+    </div>
   );
 }
 
@@ -141,6 +161,11 @@ function parseReviewRunFromHash(): number | null {
 export default function App() {
   const { status, codeletCount, temperature, runId, runMode, refreshAll, isProcessing } =
     useRunStore();
+  const hidden = useDisplayStore((s) => s.hidden);
+  const slipnetGraphics = useDisplayStore((s) => s.slipnetGraphics);
+  const coderackGraphics = useDisplayStore((s) => s.coderackGraphics);
+  const onWorkspaceClick = useWorkspaceClick();
+  const shown = (k: PanelKey) => !hidden.includes(k);
   const [searchOpen, setSearchOpen] = useState(false);
   const [view, setView] = useState<AppView>(parseViewFromHash);
   const [configEditNode, setConfigEditNode] = useState<string | null>(parseConfigNodeFromHash);
@@ -229,6 +254,7 @@ export default function App() {
       {/* ---- Header ---- */}
       <div className="app-header">
         <HamburgerMenu activeView={view} onSelect={handleViewChange} disabled={isProcessing} />
+        {view === 'dashboard' && <WindowsMenu />}
         <h1>Petacat</h1>
         <span className="text-muted text-sm">
           {view === 'config' ? (
@@ -361,146 +387,216 @@ export default function App() {
 
       {/* ---- Main row: Workspace (1/3) + Slipnet (2/3) ---- */}
       <div className="main-row">
-        <div className="panel workspace-panel">
-          <div className="panel-header">
-            {isProcessing ? (
-              <>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span className="processing-spinner-sm" />
-                  <span style={{ color: 'var(--text-accent)', fontWeight: 700 }}>PROCESSING</span>
-                </span>
-                <button
-                  onClick={() => useRunStore.getState().stop()}
-                  style={{
-                    background: 'var(--error)',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: 3,
-                    padding: '1px 8px',
-                    fontSize: 10,
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    marginLeft: 'auto',
-                  }}
-                >
-                  STOP
-                </button>
-              </>
-            ) : (
-              <>
-                Workspace
-                <PanelHelpButton componentName="workspace" />
-              </>
-            )}
+        {shown('workspace') && (
+          <div className="panel workspace-panel">
+            <div className="panel-header">
+              {isProcessing ? (
+                <>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span className="processing-spinner-sm" />
+                    <span style={{ color: 'var(--text-accent)', fontWeight: 700 }}>PROCESSING</span>
+                  </span>
+                  <button
+                    onClick={() => useRunStore.getState().stop()}
+                    style={{
+                      background: 'var(--error)',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: 3,
+                      padding: '1px 8px',
+                      fontSize: 10,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      marginLeft: 'auto',
+                    }}
+                  >
+                    STOP
+                  </button>
+                </>
+              ) : (
+                <>
+                  Workspace
+                  <PanelHelpButton componentName="workspace" />
+                </>
+              )}
+            </div>
+            <div className="panel-content" onClick={onWorkspaceClick}>
+              <ErrorBoundary fallback="Workspace">
+                <WorkspaceView />
+              </ErrorBoundary>
+            </div>
           </div>
-          <div className="panel-content">
-            <ErrorBoundary fallback="Workspace">
-              <WorkspaceView />
-            </ErrorBoundary>
-          </div>
-        </div>
+        )}
 
-        <div className="panel slipnet-panel">
-          <div className="panel-header">
-            Slipnet
-            <PanelHelpButton componentName="slipnet" />
+        {shown('slipnet') && (
+          <div className="panel slipnet-panel">
+            <div className="panel-header">
+              Slipnet
+              <PanelHelpButton componentName="slipnet" />
+            </div>
+            <div className="panel-content">
+              <ErrorBoundary fallback="Slipnet">
+                {slipnetGraphics ? <SlipnetView /> : <GraphicsOff name="Slipnet" />}
+              </ErrorBoundary>
+            </div>
           </div>
-          <div className="panel-content">
-            <ErrorBoundary fallback="Slipnet">
-              <SlipnetView />
-            </ErrorBoundary>
-          </div>
-        </div>
+        )}
       </div>
 
       {/* ---- Bottom row ---- */}
-      <div className="bottom-row">
-        <div className="panel">
-          <div className="panel-header">
-            Coderack
-            <PanelHelpButton componentName="coderack" />
+      <div
+        className="bottom-row"
+        style={{
+          gridTemplateColumns: columns([
+            [shown('coderack'), '1fr'],
+            [shown('temperature'), '120px'],
+            [shown('themespace'), '1fr'],
+            [shown('trace'), '1fr'],
+          ]),
+        }}
+      >
+        {shown('coderack') && (
+          <div className="panel">
+            <div className="panel-header">
+              Coderack
+              <PanelHelpButton componentName="coderack" />
+            </div>
+            <div className="panel-content">
+              <ErrorBoundary fallback="Coderack">
+                {coderackGraphics ? <CoderackView /> : <GraphicsOff name="Coderack" />}
+              </ErrorBoundary>
+            </div>
           </div>
-          <div className="panel-content">
-            <ErrorBoundary fallback="Coderack">
-              <CoderackView />
-            </ErrorBoundary>
-          </div>
-        </div>
+        )}
 
-        <div className="panel">
-          <div className="panel-header">
-            Temperature
-            <PanelHelpButton componentName="temperature" />
+        {shown('temperature') && (
+          <div className="panel">
+            <div className="panel-header">
+              Temperature
+              <PanelHelpButton componentName="temperature" />
+            </div>
+            <div className="panel-content">
+              <ErrorBoundary fallback="Temperature">
+                <TemperatureGauge />
+              </ErrorBoundary>
+            </div>
           </div>
-          <div className="panel-content">
-            <ErrorBoundary fallback="Temperature">
-              <TemperatureGauge />
-            </ErrorBoundary>
-          </div>
-        </div>
+        )}
 
-        <div className="panel">
-          <div className="panel-header">
-            Themespace
-            <PanelHelpButton componentName="themespace" />
+        {shown('themespace') && (
+          <div className="panel">
+            <div className="panel-header">
+              Themespace
+              <PanelHelpButton componentName="themespace" />
+            </div>
+            <div className="panel-content">
+              <ErrorBoundary fallback="Themespace">
+                <ThemespaceView />
+              </ErrorBoundary>
+            </div>
           </div>
-          <div className="panel-content">
-            <ErrorBoundary fallback="Themespace">
-              <ThemespaceView />
-            </ErrorBoundary>
-          </div>
-        </div>
+        )}
 
-        <div className="panel">
-          <div className="panel-header">
-            Trace
-            <PanelHelpButton componentName="trace" />
+        {shown('trace') && (
+          <div className="panel">
+            <div className="panel-header">
+              Trace
+              <PanelHelpButton componentName="trace" />
+            </div>
+            <div className="panel-content">
+              <ErrorBoundary fallback="Trace">
+                <TraceView />
+              </ErrorBoundary>
+            </div>
           </div>
-          <div className="panel-content">
-            <ErrorBoundary fallback="Trace">
-              <TraceView />
-            </ErrorBoundary>
-          </div>
-        </div>
+        )}
       </div>
 
       {/* ---- Footer row: Memory + Commentary + History ---- */}
-      <div className="bottom-row">
-        <div className="panel">
-          <div className="panel-header">
-            Memory
-            <PanelHelpButton componentName="memory" />
+      <div
+        className="bottom-row"
+        style={{
+          gridTemplateColumns: columns([
+            [shown('memory'), '1fr'],
+            [shown('commentary'), '2fr'],
+            [shown('verbose'), '2fr'],
+            [shown('run_history') || shown('eeg'), '1fr'],
+          ]),
+        }}
+      >
+        {shown('memory') && (
+          <div className="panel">
+            <div className="panel-header">
+              Memory
+              <PanelHelpButton componentName="memory" />
+            </div>
+            <div className="panel-content">
+              <ErrorBoundary fallback="Memory">
+                <MemoryView />
+              </ErrorBoundary>
+            </div>
           </div>
-          <div className="panel-content">
-            <ErrorBoundary fallback="Memory">
-              <MemoryView />
-            </ErrorBoundary>
-          </div>
-        </div>
+        )}
 
-        <div className="panel" style={{ gridColumn: 'span 2' }}>
-          <div className="panel-header">
-            Commentary
-            <PanelHelpButton componentName="commentary" />
+        {shown('commentary') && (
+          <div className="panel">
+            <div className="panel-header">
+              Commentary
+              <PanelHelpButton componentName="commentary" />
+            </div>
+            <div className="panel-content">
+              <ErrorBoundary fallback="Commentary">
+                <CommentaryPanel />
+              </ErrorBoundary>
+            </div>
           </div>
-          <div className="panel-content">
-            <ErrorBoundary fallback="Commentary">
-              <CommentaryPanel />
-            </ErrorBoundary>
-          </div>
-        </div>
+        )}
 
-        <div className="panel">
-          <div className="panel-header">
-            Run History
-            <PanelHelpButton componentName="run_history" />
+        {shown('verbose') && (
+          <div className="panel">
+            <div className="panel-header">
+              Verbose
+              <PanelHelpButton componentName="verbose" />
+            </div>
+            <div className="panel-content">
+              <ErrorBoundary fallback="Verbose">
+                <VerbosePanel />
+              </ErrorBoundary>
+            </div>
           </div>
-          <div className="panel-content">
-            <ErrorBoundary fallback="Run History">
-              <RunHistory />
-            </ErrorBoundary>
+        )}
+
+        {(shown('run_history') || shown('eeg')) && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minHeight: 0 }}>
+            {shown('run_history') && (
+              <div className="panel" style={{ flex: 1, minHeight: 0 }}>
+                <div className="panel-header">
+                  Run History
+                  <PanelHelpButton componentName="run_history" />
+                </div>
+                <div className="panel-content">
+                  <ErrorBoundary fallback="Run History">
+                    <RunHistory />
+                  </ErrorBoundary>
+                </div>
+              </div>
+            )}
+
+            {shown('eeg') && (
+              <div className="panel" style={{ flex: 1, minHeight: 0 }}>
+                <div className="panel-header">
+                  EEG
+                  <PanelHelpButton componentName="eeg" />
+                </div>
+                <div className="panel-content">
+                  <ErrorBoundary fallback="EEG">
+                    <EegView />
+                  </ErrorBoundary>
+                </div>
+              </div>
+            )}
           </div>
-        </div>
+        )}
       </div>
 
       </>}

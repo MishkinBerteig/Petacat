@@ -39,8 +39,11 @@ by an environment variable so a particular run can be pinned:
     are fastest.
 
 ``PETACAT_CODERACK_SHARDS``
-    Coderack shards under free-running.  Default: one per worker, floor of two.
-    The rack's capacity is divided across shards rather than replicated, so the
+    Coderack shards for the sharded benchmark candidates
+    (``scripts/bench_shards.py``).  A free-running run does not use them: it
+    installs one rack behind a lock, because a per-worker shard draw is not the
+    serial draw (the draw is urgency-weighted).  Default: one per worker, floor of
+    two.  A sharded rack's capacity is divided across shards rather than replicated, so the
     effective count is additionally bounded by
     ``server.engine.coderack_shards.MIN_SHARD_CAPACITY``.
 
@@ -362,7 +365,8 @@ def worker_count() -> int:
 def shard_count(workers: int | None = None) -> int:
     """Coderack shards for a run with ``workers`` workers.
 
-    One shard per worker, floor of two, so a worker draws from a rack of its own.
+    One shard per worker, floor of two, for the benchmark candidates.  (Free-running
+    does not shard: see :class:`~server.engine.coderack_shards.LockedCoderack`.)
     ``server.engine.coderack_shards`` bounds this further by the capacity a shard
     needs to hold a full jootsing sequence.
     """

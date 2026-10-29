@@ -279,9 +279,16 @@ class Bridge(WorkspaceStructure):
         Supporting CMs: equal, or share related descriptors with same label.
         """
         rel_dist_cms = self.get_relevant_distinguishing_concept_mappings()
-        for i, cm1 in enumerate(rel_dist_cms):
-            for cm2 in rel_dist_cms[i + 1:]:
-                if _supporting_cms(cm1, cm2):
+        # ``cross-product-ormap`` over the list with itself, skipping ``eq?`` pairs
+        # (bridges.ss:365-370, 768-773): BOTH orders of every pair.  ``related?`` is
+        # directional (``linked?`` reads the first node's outgoing links), so
+        # ``a=>a`` supports ``first=>first`` (the letter ``a`` links to the property
+        # ``first``) and not the other way round; testing each unordered pair once, in
+        # list order, missed it half the time (lockstep ``abbc-abcc-xyz`` seed 4,
+        # c=3885: internal strength 12 instead of 30, bridge strength 89 vs 79).
+        for cm1 in rel_dist_cms:
+            for cm2 in rel_dist_cms:
+                if cm1 is not cm2 and _supporting_cms(cm1, cm2):
                     return True
         return False
 
@@ -1084,12 +1091,12 @@ def make_concept_mappings(
 
     cms: list[ConceptMapping] = []
     seen: set[tuple[int, int, int]] = set()
-    # The Scheme's description lists are built by ``cons`` (workspace-objects.ss:
-    # 294), newest first; this port appends.  ``cross-product-filter-map``
-    # (utilities.ss:689-701) emits in list order, and that order decides which
-    # schema the rule abstraction's draws fall on (rules.ss:709-722).
-    for d1 in reversed(descriptions1):
-        for d2 in reversed(descriptions2):
+    # The description lists are newest first, as the Scheme's ``cons`` builds them
+    # (workspace-objects.ss:294).  ``cross-product-filter-map`` (utilities.ss:689-701)
+    # emits in list order, and that order decides which schema the rule abstraction's
+    # draws fall on (rules.ss:709-722).
+    for d1 in descriptions1:
+        for d2 in descriptions2:
             if not mappable_descriptions(d1, d2, object1, object2, bridge_type):
                 continue
             key = (id(d1.description_type), id(d1.descriptor), id(d2.descriptor))
@@ -1244,6 +1251,20 @@ def propose_bridge(
 
     for cm in bridge.concept_mappings:
         cm.activate_descriptions()
+
+    if ctx is not None and ctx.verbose:
+        # bridges.ss:1111-1119
+        orientation = "vertical" if bridge_type == BRIDGE_VERTICAL else "horizontal"
+        if flip1 and flip2:
+            key = "proposing-bridge-both-flipped"
+        elif flip1:
+            key = "proposing-bridge-flipped-group1"
+        elif flip2:
+            key = "proposing-bridge-flipped-group2"
+        else:
+            key = "proposing-bridge"
+        ctx.verbose_log.say(key, orientation)
+        ctx.verbose_log.print_object(bridge)
 
     _propose_bridge_side_effects(bridge_type, object1, object2, ctx)
     return bridge

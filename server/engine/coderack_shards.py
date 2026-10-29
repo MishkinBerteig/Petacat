@@ -105,11 +105,15 @@ class LockedCoderack(ShardedCoderack):
     ``acquire(False)`` succeeds and costs the same as a plain acquire.
     """
 
-    def __init__(self, meta: MetadataProvider) -> None:
-        self._rack = Coderack(meta)
+    def __init__(self, meta: MetadataProvider, rack: Coderack | None = None) -> None:
+        #: ``rack`` adopts an existing serial rack (and its contents) rather than
+        #: building an empty one: this is how the free-running engine installs it.
+        self._rack = rack if rack is not None else Coderack(meta)
         self._lock = threading.Lock()
         self.contended_acquisitions = 0
         self.steals = 0
+        #: How many times the rack has been emptied (see ``_ShardBase.generation``).
+        self.generation = 0
 
     def _acquire(self) -> None:
         if not self._lock.acquire(blocking=False):
@@ -124,12 +128,50 @@ class LockedCoderack(ShardedCoderack):
         finally:
             self._lock.release()
 
-    def choose_and_remove(self, temperature: float, rng: RNG) -> Codelet | None:
+    def post_deferred(self, batch: list[Codelet], current_time: int | None = None,
+                      rng: RNG | None = None, temperature: float | None = None) -> None:
+        self._acquire()
+        try:
+            self._rack.post_deferred(batch, current_time, rng, temperature)
+        finally:
+            self._lock.release()
+
+    def choose_and_remove(self, temperature: float, rng: RNG,
+                          worker: int | None = None) -> Codelet | None:
+        # ``worker`` is accepted and ignored: there is one rack, so there is nothing
+        # for a worker to be affine to, and every draw is the serial draw.
         self._acquire()
         try:
             return self._rack.choose_and_remove(temperature, rng)
         finally:
             self._lock.release()
+
+    def clear(self) -> None:
+        self._acquire()
+        try:
+            self.generation += 1
+            self._rack.clear()
+        finally:
+            self._lock.release()
+
+    def _locked(self, name: str, *args: Any, **kwargs: Any) -> Any:
+        self._acquire()
+        try:
+            return getattr(self._rack, name)(*args, **kwargs)
+        finally:
+            self._lock.release()
+
+    def clamp_codelet_type(self, codelet_type: str, urgency: int) -> None:
+        self._locked("clamp_codelet_type", codelet_type, urgency)
+
+    def unclamp_codelet_type(self, codelet_type: str) -> None:
+        self._locked("unclamp_codelet_type", codelet_type)
+
+    def clamp_pattern(self, pattern: Any, background: str | None = None) -> None:
+        self._locked("clamp_pattern", pattern, background)
+
+    def unclamp_all(self) -> None:
+        self._locked("unclamp_all")
 
     @property
     def total_count(self) -> int:
@@ -248,6 +290,11 @@ class _ShardBase(ShardedCoderack):
                 1 if index < whole % self.num_shards else 0
             )
         self._locks = [threading.Lock() for _ in range(self.num_shards)]
+        #: How many times the rack has been emptied.  A free-running worker notes it
+        #: before choosing, so it can tell that the codelet it holds was on a rack a
+        #: snag's restart has since emptied (``delete-all-codelets``,
+        #: ``answers.ss:1189``): one that, serially, would never have run.
+        self.generation = 0
         self.contended_acquisitions = 0
         self.steals = 0
         self._post_cursor = 0
@@ -402,6 +449,11 @@ class _ShardBase(ShardedCoderack):
         return merged
 
     @property
+    def urgency_table(self):
+        """The shared urgency table (every shard holds an identical one)."""
+        return self._racks[0].urgency_table
+
+    @property
     def max_size(self) -> int:
         """The rack's capacity, summed across shards.
 
@@ -431,6 +483,7 @@ class _ShardBase(ShardedCoderack):
         return counts
 
     def clear(self) -> None:
+        self.generation += 1
         for rack in self._racks:
             rack.clear()
 
@@ -535,14 +588,17 @@ class WorkerShardedCoderack(_ShardBase):
     the earlier draft of ``prepare`` did, and it discarded 31 of 56 opening codelets
     into shard 0 while three workers started empty.
 
-    **The fidelity argument.** Because a codelet's shard is independent of its type and of
-    its urgency, each shard's bin occupancy is an unbiased sample of the whole rack's. So
-    a shard's two-stage draw has the *same* distribution as the whole rack's in
-    expectation, and the temperature response is preserved. The variance is higher, which
-    is a real difference — a shard with 12 codelets is a noisier draw than a rack with
-    100 — and reads as slightly more exploration than the serial engine at the same
-    temperature. Whether the expected range notices is exactly what the comparison
-    measures.
+    **This is not the serial distribution, and the free-running engine does not use it.**
+    An earlier version of this docstring argued that choosing a shard by size and then a
+    codelet within it is uniform over membership.  It is not: the within-shard draw is
+    urgency-weighted (temperature-adjusted bin weights), so a shard's bins are weighed
+    against each other and not against the other shards' bins, and a worker drawing only
+    from its own shard is further biased by where posts landed.  Measured, it cost the
+    deep answer ``abce`` 11.4% against 14.5% with one worker.  It also divides the
+    capacity, so worker-affine posting evicts at a fraction of the rack's size.  It is
+    kept as a benchmark candidate (``scripts/bench_shards.py``);
+    :class:`LockedCoderack` is what runs.  The serial-caller path below (an
+    occupancy-weighted shard choice) is likewise only approximate.
     """
 
     def post(self, codelet: Codelet, current_time: int | None = None,

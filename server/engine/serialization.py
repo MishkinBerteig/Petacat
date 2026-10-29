@@ -78,6 +78,31 @@ def serialize_coderack_state(ctx: EngineContext) -> dict:
     }
 
 
+def theme_display_labels(meta: Any) -> dict:
+    """Metacat's names for the Themespace's dimensions and relations.
+
+    ``dimension-name`` / ``abbreviated-dimension-name`` / ``relation-name``
+    (``theme-graphics.ss:740-771``).  The names are seed data (``theme_dimension_labels``
+    and ``theme_relation_labels`` engine parameters) so the client holds no domain
+    vocabulary.  A dimension without an entry falls back to its Slipnet node's short
+    name, as the Scheme's ``else`` branch does (``(tell dimension 'get-short-name)``).
+    """
+    configured = meta.get_param("theme_dimension_labels", {}) or {}
+    dimensions: dict[str, dict[str, str]] = {}
+    for spec in meta.theme_dimensions:
+        entry = configured.get(spec.slipnet_node)
+        if entry:
+            name, abbreviation = entry[0], entry[1] if len(entry) > 1 else entry[0]
+        else:
+            node = meta.slipnet_node_specs.get(spec.slipnet_node)
+            name = abbreviation = node.short_name if node is not None else spec.slipnet_node
+        dimensions[spec.slipnet_node] = {"name": name, "abbreviation": abbreviation}
+    return {
+        "dimension_labels": dimensions,
+        "relation_labels": dict(meta.get_param("theme_relation_labels", {}) or {}),
+    }
+
+
 def serialize_themespace_state(ctx: EngineContext) -> dict:
     """Serialize themespace activations, dominance and thematic pressure.
 
@@ -112,6 +137,7 @@ def serialize_themespace_state(ctx: EngineContext) -> dict:
         })
     return {
         "clusters": clusters,
+        **theme_display_labels(ctx.meta),
         "possible_theme_types": list(ctx.themespace.possible_theme_types),
         # Theme types currently exerting top-down pressure (empty most of the
         # time — themes are passive until a pattern is clamped).

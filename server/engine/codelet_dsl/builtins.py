@@ -16,6 +16,7 @@ Organized by category:
 
 from __future__ import annotations
 
+import logging
 from fractions import Fraction
 
 from typing import TYPE_CHECKING, Any
@@ -50,7 +51,10 @@ from server.engine.trace import (
     SNAG,
     TraceEvent,
 )
+from server.engine import verbose as _verbose
 from server.engine.workspace_objects import Letter
+
+logger = logging.getLogger(__name__)
 
 
 def get_builtins() -> dict[str, Any]:
@@ -105,6 +109,14 @@ def get_builtins() -> dict[str, Any]:
         "get_built_bridges": get_built_bridges,
         "mapping_strength": mapping_strength,
         "has_supported_rule": has_supported_rule,
+        # Verbose mode's narration -- call only behind ``if verbose:``
+        "say": say,
+        "vprint": vprint,
+        "ascii_name": ascii_name,
+        "generic_name": generic_name,
+        "print_name": print_name,
+        "round_to_100ths": round_to_100ths,
+        "exact": exact,
         # Codelet posting
         "post_codelet": post_codelet,
         # Trace
@@ -118,6 +130,41 @@ def get_builtins() -> dict[str, Any]:
         "translate_rule": translate_rule,
         "apply_rule": apply_rule,
     }
+
+
+def say(ctx: EngineContext, key: str, *args: Any) -> None:
+    """Metacat's ``say`` / ``vprintf``: narrate the message *key* (``verbose_messages``)."""
+    ctx.verbose_log.say(key, *args)
+
+
+def ascii_name(ctx: EngineContext, obj: Any) -> str:
+    """``(tell obj 'ascii-name)``."""
+    return _verbose.ascii_name(obj)
+
+
+def generic_name(ctx: EngineContext, string: Any) -> str:
+    """``(tell string 'generic-name)``."""
+    return _verbose.generic_name(string)
+
+
+def print_name(ctx: EngineContext, obj: Any) -> str:
+    """``(tell obj 'print-name)``, which ``say`` applies to every object it is given."""
+    return _verbose.object_print_name(obj)
+
+
+def round_to_100ths(ctx: EngineContext, n: float) -> float:
+    """``round-to-100ths`` (``utilities.ss:258``)."""
+    return _verbose.round_to_100ths(n)
+
+
+def exact(ctx: EngineContext, x: Any) -> Any:
+    """A value Metacat holds as an exact integer, shown as one (see ``verbose.exact``)."""
+    return _verbose.exact(x)
+
+
+def vprint(ctx: EngineContext, *objects: Any, level: str | None = None) -> None:
+    """Metacat's ``(print obj ...)`` under ``%verbose%``: each object's own print text."""
+    ctx.verbose_log.print_object(*objects, level=level)
 
 
 # ── Read/write-set tracking (WP4.2) ──
@@ -414,10 +461,14 @@ def propose_bond(
     """
     from server.engine.formulas import bond_degree_of_assoc
 
+    if ctx.verbose:
+        ctx.verbose_log.say("proposing-bond")
     activate_from_workspace(ctx, from_descriptor, to_descriptor, bond_facet)
     bond = Bond(from_obj, to_obj, bond_category, bond_facet,
                 from_descriptor, to_descriptor, direction)
     bond.time_stamp = ctx.codelet_count
+    if ctx.verbose:
+        ctx.verbose_log.print_object(bond, level="new")
     # The proposal rests on both objects; the bond itself is new and so cannot conflict.
     _read(ctx, from_obj, to_obj)
     post_codelet(
@@ -459,6 +510,9 @@ def propose_group(
 
     objects = list(objects)
     bonds = list(bonds)
+    if ctx.verbose:
+        ctx.verbose_log.say("proposing-group")
+        ctx.verbose_log.print_object(objects)
     string = objects[0].string
     related = getattr(group_category, "get_related_node", None)
     bond_category = related("plato-bond-category") if related else None
@@ -475,6 +529,8 @@ def propose_group(
             group, length_node, ctx.temperature.value, ctx.meta
         )
         if ctx.rng.prob(probability):
+            if ctx.verbose:
+                ctx.verbose_log.say("attaching-length-description", len(objects))
             attach_length_description(group)
 
     activate_from_workspace(ctx, bond_category, direction)
@@ -505,9 +561,17 @@ def evaluate_group(ctx: EngineContext, group: Group) -> bool:
     survival = group_evaluation_probability(
         group.strength, ctx.temperature.value, ctx.meta
     )
+    if ctx.verbose:
+        say_ = ctx.verbose_log.say
+        say_("evaluating-group")
+        ctx.verbose_log.print_object(group)
+        say_("group-strength", group.strength)
+        say_("group-survival-probability", f"{round(100 * survival)}%")
     # groups.ss:593 ``(stochastic-if* (1- evaluation-prob) (fizzle))`` -- the
     # reference's side of the coin (DISCREPANCIES5 A-4).
     if ctx.rng.prob(1.0 - survival):
+        if ctx.verbose:
+            ctx.verbose_log.say("group-not-strong-enough")
         return False
     activate_from_workspace(ctx, group.bond_category, group.direction)
     group.proposal_level = group.EVALUATED
@@ -746,9 +810,17 @@ def evaluate_structure(
     # either *original* object has left the Workspace; a bridge proposed against a
     # flipped reading of a group points at a copy that was never in the string, so
     # its premise is the group it replaces (a broken original orphans the proposal).
-    if isinstance(structure, Bridge) and not _premises_still_hold(ctx, structure):
-        return False
+    if isinstance(structure, Bridge):
+        # bridges.ss:1152 -- the evaluator prints the bridge before anything else.
+        if ctx.verbose:
+            ctx.verbose_log.print_object(structure)
+        if not _premises_still_hold(ctx, structure):
+            if ctx.verbose:
+                ctx.verbose_log.say("bridge-objects-no-longer-exist")
+            return False
     structure.update_strength(ctx.rng)
+    if ctx.verbose and isinstance(structure, Bridge):
+        ctx.verbose_log.say("bridge-strength", round(structure.strength))
     accept_prob = (
         temp_adjusted_probability(
             structure.strength / 100.0,
@@ -763,10 +835,21 @@ def evaluate_structure(
     # bridges.ss:1166, rules.ss:468): the coin is asked the reference's question,
     # so a replayed trajectory takes Metacat's branch (DISCREPANCIES5 A-4).
     if ctx.rng.prob(1.0 - accept_prob):
+        if ctx.verbose:
+            ctx.verbose_log.say(_NOT_STRONG_ENOUGH.get(type(structure).__name__, "not-strong-enough"))
         return False
     structure.proposal_level = structure.EVALUATED
     _wrote(ctx, structure)
     return True
+
+
+#: Which message an evaluator says when its structure fails the survival test.
+_NOT_STRONG_ENOUGH = {
+    "Bond": "bond-not-strong-enough",
+    "Bridge": "bridge-not-strong-enough",
+    "Description": "description-not-strong-enough",
+    "Rule": "rule-not-strong-enough",
+}
 
 
 def build_structure(ctx: EngineContext, structure: Any) -> bool:
@@ -836,7 +919,25 @@ def _build_structure_locked(ctx: EngineContext, structure: Any) -> bool:
     covers the duplicate check and the fights as well as the mutation, because those read
     the same lists the mutation writes.
     """
+    # ``group-builder`` asks for an equivalent group FIRST (groups.ss:632, 636-647), before
+    # it looks at anything else, and a duplicate hands its descriptions to the incumbent
+    # whatever has become of the proposal's own constituents.  A proposal [a0, [a1a2]]
+    # whose inner group has since been broken is still "equivalent" to the two-letter
+    # group (same category, direction and constituent COUNT, found through the slot of
+    # its leftmost object's id), and the descriptions it carries -- ``whole`` -- go onto
+    # that group (lockstep ``aaa-bbb-xyz`` seed 3, c=450).  The premise check below is
+    # Petacat's own guard against stale proposals and must not pre-empt that branch.
+    if isinstance(structure, Group) and structure.string is not None:
+        equivalent = structure.string.get_equivalent_group(structure)
+        if equivalent is not None and equivalent is not structure:
+            _absorb_duplicate_group(ctx, structure, equivalent)
+            return False
     if not _premises_still_hold(ctx, structure):
+        if ctx.verbose and isinstance(structure, (Bond, Bridge)):
+            ctx.verbose_log.say(
+                "bond-objects-no-longer-exist" if isinstance(structure, Bond)
+                else "bridge-objects-no-longer-exist"
+            )
         return False
     # Descriptions and rules don't fight
     if isinstance(structure, Description):
@@ -852,7 +953,7 @@ def _build_structure_locked(ctx: EngineContext, structure: Any) -> bool:
         if structure.bond_description and hasattr(structure.object, "bond_descriptions"):
             target = structure.object.bond_descriptions
         if structure not in target:
-            target.append(structure)
+            target.insert(0, structure)
         ctx.sink.on_structure_change(ctx, structure, STRUCTURE_BUILT)
         _wrote(ctx, structure, structure.object)
         return True
@@ -873,6 +974,8 @@ def _build_structure_locked(ctx: EngineContext, structure: Any) -> bool:
         # bridges.ss:1200-1207 — "This is necessary because StrPosCtgy:middle
         # descriptions can now be deleted": a bridge may not be built on a
         # description type one of its objects no longer carries.
+        if ctx.verbose:
+            ctx.verbose_log.say("not-all-descriptions-exist")
         return False
 
     if isinstance(structure, Group):
@@ -884,6 +987,8 @@ def _build_structure_locked(ctx: EngineContext, structure: Any) -> bool:
         _merge_duplicate_bridge(ctx, structure)
         return False
     elif _equivalent_structure_exists(ctx, structure):
+        if ctx.verbose and isinstance(structure, Bond):
+            ctx.verbose_log.say("bond-already-exists")
         if isinstance(structure, Bond):
             # Scheme: ``bond-builder`` (bonds.ss:364-369) jolts the bond category —
             # and the direction, if the bond has one — on its way out of the
@@ -901,19 +1006,33 @@ def _build_structure_locked(ctx: EngineContext, structure: Any) -> bool:
         # program is attending to, and by the time the builder runs one of them
         # may have decayed below relevance.  A live gate at high temperature,
         # where the Slipnet moves fastest.
+        if ctx.verbose:
+            ctx.verbose_log.say("not-all-cms-relevant")
         return False
 
     # For bonds, groups, bridges: fight incompatibles first
+    verbose = ctx.verbose
+    if verbose and isinstance(structure, Bridge):
+        ctx.verbose_log.say("about-to-fight")
     incompatibles = _get_incompatible_structures(ctx, structure)
+    if verbose:
+        _say_fights = _FightNarration(ctx, structure, incompatibles)
     for opponent, proposer_weight, opponent_weight in incompatibles:
+        if verbose:
+            _say_fights.before(opponent)
         if not _wins_fight(ctx, structure, proposer_weight, opponent, opponent_weight):
+            if verbose:
+                _say_fights.lost(opponent)
             return False  # Lost a fight — don't build
+    if verbose:
+        ctx.verbose_log.say("won-all-fights")
 
     # Won all fights — break incompatibles and build.  A group's beaten *bonds*
     # are the exception: ``group-builder`` breaks only the groups and the bridges
     # here (groups.ss:697-700) and leaves each flipped bond to be swapped for its
     # reversal one at a time in the consolidation below (groups.ss:774-786), so
     # that the string never passes through a state with the slot empty.
+    held_breaks: dict[int, list[str]] = {}
     losers = [opp for opp, _, _ in incompatibles]
     if isinstance(structure, Bond):
         # bonds.ss:396-402 — a bond breaks its incompatible *groups first*, each
@@ -935,16 +1054,42 @@ def _build_structure_locked(ctx: EngineContext, structure: Any) -> bool:
             and opponent not in opponent.string.objects
         ):
             continue
+        if (
+            verbose
+            and isinstance(structure, Bridge)
+            and (opponent is structure.flipped_group1 or opponent is structure.flipped_group2)
+        ):
+            # bridges.ss:1320-1337 -- the flipped originals are broken *inside* the flip,
+            # after the incompatible bridge, bond and group, so their narration waits
+            # for it.  The break itself stays where it is.
+            held_breaks[id(opponent)] = ctx.verbose_log.capture(
+                lambda opponent=opponent: _break_structure_locked(ctx, opponent)
+            )
+            continue
         _break_structure_locked(ctx, opponent)
 
+    consolidated = False
     if isinstance(structure, Group):
+        proposed_group = structure
         structure = _consolidate_group(ctx, structure)
         if structure is None:
             return False
+        consolidated = structure is not proposed_group
 
     if isinstance(structure, Bridge):
-        _apply_group_flips(ctx, structure)
+        _apply_group_flips(ctx, structure, held_breaks)
 
+    if verbose:
+        if isinstance(structure, Bond):
+            ctx.verbose_log.say("building-bond")
+            ctx.verbose_log.print_object(structure)
+        elif isinstance(structure, Group):
+            ctx.verbose_log.say("building-group", "")
+            ctx.verbose_log.print_object(structure, level="new" if consolidated else None)
+        elif isinstance(structure, Bridge):
+            ctx.verbose_log.say("building-bridge")
+            ctx.verbose_log.print_object(structure)
+        ctx.verbose_log.mark_built(structure)
     structure.proposal_level = structure.BUILT
     if isinstance(structure, Bond):
         structure.string.add_bond(structure)
@@ -1015,6 +1160,8 @@ def _absorb_duplicate_group(
     proposal of the same group is how a group usually acquires one.  Returning a
     bare "already exists" threw both away.
     """
+    if ctx.verbose:
+        ctx.verbose_log.say("group-already-exists")
     for description in existing.descriptions:
         descriptor = getattr(description, "descriptor", None)
         if descriptor is not None and hasattr(descriptor, "activate_from_workspace"):
@@ -1033,7 +1180,7 @@ def _absorb_duplicate_group(
             existing, description.description_type, description.descriptor
         )
         transferred.proposal_level = Description.BUILT
-        existing.descriptions.append(transferred)
+        existing.descriptions.insert(0, transferred)
         # ``build-description`` (descriptions.ss:182-192) jolts the description
         # type and the descriptor as the description goes in; the duplicate
         # branch calls it (groups.ss:636-641), so 'length'/'two' are warmed too.
@@ -1142,6 +1289,8 @@ def _consolidate_group(ctx: EngineContext, group: Group) -> Group | None:
         if len({getattr(o, "length", 1) for o in spliced}) > 1:
             # groups.ss:748-751 — a length-sameness group whose new constituents
             # are not all the same length is not a group at all.
+            if ctx.verbose:
+                ctx.verbose_log.say("new-constituent-groups-different-lengths")
             return None
         bonds = _adjacent_bonds(
             ctx,
@@ -1181,6 +1330,10 @@ def _consolidate_group(ctx: EngineContext, group: Group) -> Group | None:
             # that check is made outside the commit lock, so another worker may
             # have replaced the bond in between.  Conflict resolves as a fizzle.
             return None
+        if ctx.verbose:
+            ctx.verbose_log.say("building-bond")
+            ctx.verbose_log.print_object(bond, level=ctx.verbose_log.fresh(bond))
+            ctx.verbose_log.mark_built(bond)
         bond.proposal_level = bond.BUILT
         string.add_bond(bond)
         activate_from_workspace(ctx, bond.bond_category, bond.direction)
@@ -1238,6 +1391,10 @@ def _adjacent_bonds(
             None,
         )
         bond.time_stamp = ctx.codelet_count
+        if ctx.verbose:
+            ctx.verbose_log.say("building-bond")
+            ctx.verbose_log.print_object(bond, level="new")
+            ctx.verbose_log.mark_built(bond)
         bond.proposal_level = bond.BUILT
         left.string.add_bond(bond)
         activate_from_workspace(ctx, bond_category)
@@ -1280,6 +1437,9 @@ def _merge_duplicate_bridge(ctx: EngineContext, proposed: Bridge) -> None:
     existing = _existing_equivalent_bridge(ctx, proposed)
     if existing is None:
         return
+    if ctx.verbose:
+        ctx.verbose_log.say("bridge-already-exists")
+        ctx.verbose_log.say("adding-new-cms")
     monitor = _label_monitor(ctx)
     for cm in proposed.concept_mappings:
         cm.activate_label(monitor)
@@ -1290,6 +1450,8 @@ def _merge_duplicate_bridge(ctx: EngineContext, proposed: Bridge) -> None:
         return
     existing.add_concept_mappings(novel)
     _record_slippage_events(ctx, existing, novel)
+    if ctx.verbose:
+        ctx.verbose_log.print_object(novel)
     _wrote(ctx, existing)
 
 
@@ -1420,7 +1582,9 @@ def _label_monitor(ctx: EngineContext) -> Any:
     )
 
 
-def _apply_group_flips(ctx: EngineContext, bridge: Bridge) -> None:
+def _apply_group_flips(
+    ctx: EngineContext, bridge: Bridge, held_breaks: dict[int, list[str]] | None = None
+) -> None:
     """Put the reversed reading of a spanning group into the Workspace.
 
     Scheme: the two flip branches of ``build-bridge`` (bridges.ss:1322-1345).  The
@@ -1432,20 +1596,34 @@ def _apply_group_flips(ctx: EngineContext, bridge: Bridge) -> None:
     Reading ``>abc>`` as ``<cba<`` is not a different parse of the string — the
     same letters, the same span — so it is a *replacement*, not a competitor.
     """
-    for new_group, original in (
-        (bridge.object1, bridge.flipped_group1),
-        (bridge.object2, bridge.flipped_group2),
+    for number, (new_group, original) in enumerate(
+        (
+            (bridge.object1, bridge.flipped_group1),
+            (bridge.object2, bridge.flipped_group2),
+        ),
+        start=1,
     ):
         if original is None:
             continue
+        if ctx.verbose:
+            ctx.verbose_log.say("flipping-group", number)
+            if held_breaks is not None:
+                ctx.verbose_log.replay(held_breaks.pop(id(original), ()))
         for bond in list(getattr(original, "group_bonds", ())):
             break_structure(ctx, bond)
         for bond in getattr(new_group, "group_bonds", ()):
+            if ctx.verbose:
+                ctx.verbose_log.say("building-bond")
+                ctx.verbose_log.print_object(bond, level=ctx.verbose_log.fresh(bond))
+                ctx.verbose_log.mark_built(bond)
             bond.proposal_level = bond.BUILT
             new_group.string.add_bond(bond)
             # ``build-bond`` (bonds.ss:419-421) jolts the category and the direction.
             activate_from_workspace(ctx, bond.bond_category, bond.direction)
             ctx.sink.on_structure_change(ctx, bond, STRUCTURE_BUILT)
+        if ctx.verbose:
+            ctx.verbose_log.say("building-group", "flipped ")
+            ctx.verbose_log.print_object(new_group, level="new")
         new_group.proposal_level = new_group.BUILT
         new_group.string.add_group(new_group)
         # ``build-group`` (groups.ss:925-930) claims the bonds and jolts every
@@ -1525,6 +1703,7 @@ def _record_group_event(
             # ``abstract-answer-description-theme-pattern`` asks it for
             # (``answers.ss:173, 177``) when it looks for the two spanning groups.
             group=group,
+            flipped=flipped,
         )
 
 
@@ -1903,6 +2082,59 @@ def _at_string_edge(obj: Any) -> bool:
     return False
 
 
+class _FightNarration:
+    """What a builder says around each of its fights (``bridges.ss:1240-1315``).
+
+    Petacat fights every opponent in one loop; Metacat's builders each spell out their
+    own sequence.  The opponents arrive in the same order, so what is said before and
+    after a fight depends only on the kinds of the structure and its opponent.
+    """
+
+    def __init__(self, ctx: EngineContext, structure: Any, incompatibles: list) -> None:
+        self.ctx = ctx
+        self.log = ctx.verbose_log
+        self.structure = structure
+        self.bridges = [o for o, _, _ in incompatibles if isinstance(o, Bridge)]
+        self.said_bridges = False
+
+    def _group_role(self, opponent: Any) -> str:
+        structure = self.structure
+        if isinstance(structure, Bridge):
+            if opponent is structure.flipped_group1:
+                return "existing-group1"
+            if opponent is structure.flipped_group2:
+                return "existing-group2"
+        return "incompatible-group"
+
+    def before(self, opponent: Any) -> None:
+        if not isinstance(self.structure, Bridge):
+            return
+        log = self.log
+        if isinstance(opponent, Bridge):
+            if not self.said_bridges:
+                self.said_bridges = True
+                log.say("fighting-incompatible-bridges")
+                log.print_object(self.bridges)
+                log.say("bridge-weight", self.structure.get_letter_span())
+                log.say("bridge-opposing-weights", [b.get_letter_span() for b in self.bridges])
+        elif isinstance(opponent, Bond):
+            log.say("fighting-incompatible-bond")
+            log.print_object(opponent)
+        else:
+            log.say("fighting-" + self._group_role(opponent))
+            log.print_object(opponent)
+
+    def lost(self, opponent: Any) -> None:
+        structure = self.structure
+        if isinstance(opponent, Bridge):
+            key = "lost-to-incompatible-bridge"
+        elif isinstance(opponent, Bond):
+            key = "lost-to-existing-bond" if isinstance(structure, Group) else "lost-to-incompatible-bond"
+        else:
+            key = "lost-to-" + self._group_role(opponent)
+        self.log.say(key)
+
+
 def _wins_fight(
     ctx: EngineContext,
     proposer: Any,
@@ -2004,6 +2236,9 @@ def _break_bond(ctx: EngineContext, bond: Bond) -> None:
     Leaves the string, and clears the two positional slots and the from/to
     bond lists.  ``remove_bond`` does the slot half; the lists are its own.
     """
+    if ctx.verbose:
+        ctx.verbose_log.say("breaking-bond")
+        ctx.verbose_log.print_object(bond, level="built")
     bond.string.remove_bond(bond)
     bond.from_object.remove_outgoing_bond(bond)
     bond.to_object.remove_incoming_bond(bond)
@@ -2013,6 +2248,9 @@ def _break_bond(ctx: EngineContext, bond: Bond) -> None:
 
 def _break_bridge(ctx: EngineContext, bridge: Bridge) -> None:
     """Scheme: ``break-bridge`` (bridges.ss:1437-1449)."""
+    if ctx.verbose:
+        ctx.verbose_log.say("breaking-bridge")
+        ctx.verbose_log.print_object(bridge, level="built")
     ctx.workspace.remove_bridge(bridge)
     _retire(ctx, bridge)
 
@@ -2043,6 +2281,9 @@ def _break_group(ctx: EngineContext, group: Group) -> None:
     horizontal = group.horizontal_bridge
     enclosing = group.enclosing_group
 
+    if ctx.verbose:
+        ctx.verbose_log.say("breaking-group")
+        ctx.verbose_log.print_object(group, level="built")
     if enclosing is not None and enclosing is not group:
         _break_group(ctx, enclosing)
 
@@ -2315,6 +2556,7 @@ def record_event(
     bridge: Any = None,
     group: Any = None,
     theme_pattern: Any = None,
+    flipped: bool = False,
 ) -> None:
     """Record an event to the temporal trace.
 
@@ -2337,6 +2579,7 @@ def record_event(
         bridge=bridge,
         group=group,
         theme_pattern=theme_pattern,
+        flipped=flipped,
     )
     with _committing(ctx):
         ctx.trace.record_event(event)
@@ -2347,22 +2590,6 @@ def record_event(
         snag_count = ctx.trace.snag_count
         explanation = description or "The rule could not be applied"
         emit_snag(ctx.commentary, explanation, snag_count, ctx.codelet_count)
-
-    # Emit commentary for clamp events (Scheme: trace.ss:592-618)
-    if event_type == CLAMP_START:
-        from server.engine.commentary import emit_clamp_activate
-        clamp_count = len(ctx.trace.get_events_by_type(CLAMP_START))
-        clamp_type = description or "clamp"
-        emit_clamp_activate(
-            ctx.commentary, clamp_type, clamp_count, ctx.codelet_count,
-        )
-
-    if event_type == CLAMP_END:
-        from server.engine.commentary import emit_clamp_expired
-        clamp_type = description or "clamp"
-        emit_clamp_expired(
-            ctx.commentary, clamp_type, 0.0, ctx.codelet_count,
-        )
 
 
 def record_snag(ctx: EngineContext, top_rule: Any, translated_rule: Any) -> None:
@@ -2417,20 +2644,50 @@ def record_snag(ctx: EngineContext, top_rule: Any, translated_rule: Any) -> None
         for b in (getattr(o, "vertical_bridge", None) for o in snag_objects)
         if b is not None
     ]
+    # ``get-all-concept-mappings`` (``bridges.ss:161, 556``), the bond mappings included:
+    # without them a snag's pattern lacked the BondCtgy and BondFacet entries of a
+    # bridge between groups, so the jootser's overlap table and its coins were over a
+    # shorter list than Metacat's.
     if snag_bridges:
         snag_concept_mappings = [
-            cm for bridge in snag_bridges for cm in bridge.concept_mappings
+            cm for bridge in snag_bridges for cm in bridge.get_all_concept_mappings()
         ]
     else:
         snag_concept_mappings = [
-            cm for bridge in workspace.vertical_bridges for cm in bridge.concept_mappings
+            cm for bridge in workspace.vertical_bridges for cm in bridge.get_all_concept_mappings()
         ]
 
     theme_pattern = get_snag_theme_pattern(snag_concept_mappings)
 
+    # ``trace.ss:1097-1125``: the explanation is written from the failure-result, once,
+    # now, while the objects are as they were when the rule failed.  A failure that
+    # carries no dimension or transform (Petacat-only: an object with no image) has no
+    # Metacat sentence, so it falls back to the older wording
+    # (``caveat_templates.snag_explanation``).
+    from server.engine.snag_explanation import (
+        capitalize_string,
+        explain_failure,
+        fallback_explanation,
+    )
+
+    templates = ctx.meta.commentary_templates
+    failure = getattr(ctx, "last_failure", None)
+    explanation = explain_failure(failure, templates)
+    if explanation is None:
+        explanation = fallback_explanation(
+            top_rule.transcribe_to_english(), workspace.target_string.text, templates
+        )
+
+    # ``process-snag`` (``answers.ss:1145-1160``) is handed what ``translate`` returned: the
+    # supporting vertical bridges, the slippage log and the rule's reference objects.
+    translation = getattr(translated_rule, "translation", None)
+
     event = SnagEvent(
         codelet_count=ctx.codelet_count,
         temperature=ctx.temperature.value,
+        failure_result=failure,
+        explanation=explanation,
+        description=explanation,
         snag_type=getattr(ctx, "last_failure_kind", "change"),
         snag_objects=snag_objects,
         snag_bridges=snag_bridges,
@@ -2439,14 +2696,32 @@ def record_snag(ctx: EngineContext, top_rule: Any, translated_rule: Any) -> None
         snag_concept_pattern=get_snag_concept_pattern(snag_objects),
         snag_rule=top_rule,
         translated_rule=translated_rule,
-        supporting_vertical_bridges=[
-            b for b in workspace.vertical_bridges if b.is_built
-        ],
+        supporting_vertical_bridges=(
+            list(translation.supporting_vertical_bridges)
+            if translation is not None
+            else [b for b in workspace.vertical_bridges if b.is_built]
+        ),
+        slippage_log=translation.slippage_log if translation is not None else None,
+        rule_ref_objects=list(translation.from_ref_objects) if translation is not None else None,
         # The Workspace as it stood at the snag, so progress since it can be measured
         # against the live list (``trace.ss:96-103, 182-187``).
         workspace_structures=list(workspace.all_structures),
     )
     ctx.trace.add_snag_event(event)
+
+    from server.engine.commentary import emit_snag
+
+    # ``answers.ss:1162-1172``: "Uh-oh, I seem to have run into a little problem[ again].
+    # <Explanation>." and "Hit a/another snag:  <Explanation>.", the explanation
+    # capitalised by ``capitalize-string``.  Said before the snag event is activated
+    # (``answers.ss:1186-1187``), so a clamp the snag cuts short reports itself after.
+    emit_snag(
+        ctx.commentary,
+        capitalize_string(explanation),
+        ctx.trace.snag_count,
+        ctx.codelet_count,
+        templates,
+    )
 
     # ``answers.ss:1183-1184``: temperature goes to **100** and is clamped there.  A
     # snag happens precisely when a strong rule was about to apply — at low
@@ -2478,9 +2753,8 @@ def record_snag(ctx: EngineContext, top_rule: Any, translated_rule: Any) -> None
     )
     # ``answers.ss:1162`` consults ``snag-present?`` (``memory.ss:78-83``), which
     # compares the three problem strings and the rule's **clause lists**, structurally.
-    # Two structurally different rules can transcribe to the same English, and a rule
-    # that fails to transcribe reads "Unknown transformation" and would otherwise
-    # match every other such rule.
+    # Two structurally different rules can transcribe to the same English, and
+    # would otherwise match one another.
     from server.engine.rules import rule_signature
 
     if not ctx.memory.snag_present(problem, top_rule):
@@ -2491,22 +2765,19 @@ def record_snag(ctx: EngineContext, top_rule: Any, translated_rule: Any) -> None
                 temperature=ctx.temperature.value,
                 theme_pattern=_theme_pattern_dict(theme_pattern),
                 description=top_rule.transcribe_to_english(),
+                # ``abstract-snag-description`` (``memory.ss:474-477``) also hands over
+                # the translated rule's English and the explanation.
+                translated_rule_description=translated_rule.transcribe_to_english(),
+                explanation=explanation,
                 # ``make-snag-description`` (``memory.ss:289-291``) is given both clause
                 # lists: the rule that was found and the translation that failed.
                 rule_signature=rule_signature(top_rule),
                 translated_rule_signature=rule_signature(translated_rule),
+                # ``abstract-snag-description`` (``memory.ss:478``): the picture, made
+                # now, while the Workspace is the one the snag happened in.
+                picture=_snag_description_picture(ctx, event, theme_pattern),
             )
         )
-
-    from server.engine.commentary import emit_snag
-
-    emit_snag(
-        ctx.commentary,
-        f"the rule {top_rule.transcribe_to_english()!r} cannot be applied to "
-        f"{workspace.target_string.text}",
-        ctx.trace.snag_count,
-        ctx.codelet_count,
-    )
 
     # ``answers.ss:1189-1191``: empty the rack, post the initial codelets afresh, run
     # one full update.  Last, so the event, the temperature and the activation are all
@@ -2514,6 +2785,58 @@ def record_snag(ctx: EngineContext, top_rule: Any, translated_rule: Any) -> None
     restart = getattr(ctx, "on_snag_restart", None)
     if restart is not None:
         restart()
+
+
+def _snag_description_picture(ctx: EngineContext, event: Any, theme_pattern: Any) -> dict | None:
+    """The snag's description picture; never allowed to stop a run."""
+    from server.engine.trace_display import build_snag_description_picture
+
+    try:
+        return build_snag_description_picture(
+            ctx, event=event, theme_pattern=_theme_pattern_dict_for_picture(theme_pattern)
+        )
+    except Exception:  # pragma: no cover - a display aid must not break cognition
+        logger.exception("could not picture the snag")
+        return None
+
+
+def _theme_pattern_dict_for_picture(pattern: Any) -> dict | None:
+    if not isinstance(pattern, list) or not pattern:
+        return None
+    return {
+        "type": pattern[0],
+        "entries": [{"dimension": d, "relation": r} for d, r in pattern[1:]],
+    }
+
+
+def _answer_ref_objects(translation: Any, top: bool) -> list:
+    """The reference objects of the answer's top (or bottom) rule: the translated rule's
+    source side is the *top* when a top rule was translated (``justify.ss:50-51``)."""
+    from_is_top = translation.slippage_log.rule_type == "top"
+    return list(
+        translation.from_ref_objects if from_is_top == top else translation.to_ref_objects
+    )
+
+
+def _answer_description_picture(
+    ctx: EngineContext, top_rule: Any, bottom_rule: Any, description: Any, unjustified: bool,
+    event: Any = None,
+) -> dict | None:
+    """The answer's description picture; never allowed to stop a run."""
+    from server.engine.trace_display import build_answer_description_picture
+
+    try:
+        return build_answer_description_picture(
+            ctx,
+            top_rule=top_rule,
+            bottom_rule=bottom_rule,
+            description=description,
+            unjustified=unjustified,
+            event=event,
+        )
+    except Exception:  # pragma: no cover - a display aid must not break cognition
+        logger.exception("could not picture the answer")
+        return None
 
 
 def _snag_objects(ctx: EngineContext, translated_rule: Any) -> list:
@@ -2550,7 +2873,13 @@ def give_up(ctx: EngineContext) -> None:
     """
     update = getattr(ctx, "on_update_everything", None)
     if update is not None:
-        update()
+        # Under the commit lock, as the scheduled update and the snag restart are.  A
+        # free-running worker giving up otherwise ran a whole update cycle beside the
+        # scheduled one, over the same Slipnet session: a data race on the Python and
+        # NumPy backends, and on MLX an abort of the whole process, because MLX's
+        # streams belong to the thread that made them.
+        with _committing(ctx):
+            update()
     ctx._gave_up = True  # type: ignore[attr-defined]
 
 
@@ -2591,9 +2920,13 @@ def report_answer(
     top_rule: Any = None,
     bottom_rule: Any = None,
     unjustified_slippages: Any = None,
+    translation: Any = None,
 ) -> None:
     with _committing(ctx):
-        return _report_answer_locked(ctx, answer_string, quality, top_rule, bottom_rule, unjustified_slippages)
+        return _report_answer_locked(
+            ctx, answer_string, quality, top_rule, bottom_rule, unjustified_slippages,
+            translation,
+        )
 
 
 def _report_answer_locked(
@@ -2603,6 +2936,7 @@ def _report_answer_locked(
     top_rule: Any = None,
     bottom_rule: Any = None,
     unjustified_slippages: Any = None,
+    translation: Any = None,
 ) -> None:
     """Report a found answer — stores in episodic memory and signals runner.
 
@@ -2610,9 +2944,11 @@ def _report_answer_locked(
     it) and sets ctx._pending_answer so step_mcat can detect the answer.
     """
     from server.engine.answers import create_answer_description, get_quality_phrase
+    from server.engine.concept_mappings import slippage_english_name
     from server.engine.commentary import (
         emit_answer_discovered,
         emit_answer_justified,
+        emit_answer_unjustified,
         emit_reminding,
     )
     from server.engine.memory import AnswerDescription
@@ -2663,6 +2999,25 @@ def _report_answer_locked(
                 answer_string, ctx.slipnet, string_type="answer"
             )
 
+    # What the rule translation left behind (``answers.ss:962-1000``, ``justify.ss:46-120``,
+    # ``jootsing.ss:205-235``): the slippage log, the supporting vertical bridges, the
+    # groups the vertical mapping and the two rules rest on, and the rules' reference
+    # objects.  Read off the translated rule when the caller did not pass it (the
+    # answer-finder reports the rule it translated).
+    if translation is None:
+        translation = getattr(bottom_rule, "translation", None)
+    answer_supporting_groups = None
+    if translation is not None and top_rule is not None and bottom_rule is not None:
+        from server.engine.rules import _remq_duplicates, get_rule_supporting_groups
+
+        # ``(remq-duplicates (append vertical-mapping-supporting-groups
+        # (get-rule-supporting-groups rule translated-rule)))`` (``answers.ss:992-996``),
+        # read after ``make-translated-string`` has given the translated rule its bridges.
+        answer_supporting_groups = _remq_duplicates(
+            list(translation.vertical_mapping_supporting_groups)
+            + get_rule_supporting_groups(top_rule, bottom_rule, ctx.workspace, ctx.slipnet)
+        )
+
     # ``answers.ss:24-26`` — the first two things ``report-new-answer`` does, before
     # any of the answer is recorded:
     #
@@ -2712,31 +3067,54 @@ def _report_answer_locked(
         trace=ctx.trace,
         meta=ctx.meta,
     )
-    ctx.memory.store(answer_desc)
-
+    # ``abstract-answer-description`` (``memory.ss:437``): the picture clicking the
+    # answer redraws, made now while the Workspace is the one the answer came from.
     from server.engine.trace import AnswerEvent
 
-    ctx.trace.add_answer_event(
-        AnswerEvent(
-            codelet_count=ctx.codelet_count,
-            temperature=ctx.temperature.value,
-            initial_string=ctx.workspace.initial_string,
-            modified_string=ctx.workspace.modified_string,
-            target_string=ctx.workspace.target_string,
-            answer_string=answer_string,
-            top_rule=top_rule,
-            bottom_rule=bottom_rule,
-            unjustified_slippages=list(unjustified_slippages or []),
-            description=f"Answer '{answer_string}' found with quality {quality:.0f}",
-        )
+    # ``make-answer-event`` (``trace.ss:335``) keeps all of it, and the description's picture
+    # is drawn from the event, so the event is made first and recorded after the description.
+    logged = translation is not None and answer_supporting_groups is not None
+    answer_event = AnswerEvent(
+        codelet_count=ctx.codelet_count,
+        temperature=ctx.temperature.value,
+        initial_string=ctx.workspace.initial_string,
+        modified_string=ctx.workspace.modified_string,
+        target_string=ctx.workspace.target_string,
+        answer_string=answer_string,
+        top_rule=top_rule,
+        bottom_rule=bottom_rule,
+        supporting_vertical_bridges=(
+            list(translation.supporting_vertical_bridges) if logged else None
+        ),
+        supporting_groups=answer_supporting_groups if logged else None,
+        top_rule_ref_objects=_answer_ref_objects(translation, True) if logged else None,
+        bottom_rule_ref_objects=_answer_ref_objects(translation, False) if logged else None,
+        slippage_log=translation.slippage_log if logged else None,
+        unjustified_slippages=list(unjustified_slippages or []),
+        description=f"Answer '{answer_string}' found with quality {quality:.0f}",
     )
+    answer_desc.picture = _answer_description_picture(
+        ctx, top_rule, bottom_rule, answer_desc, bool(unjustified_slippages), answer_event
+    )
+    ctx.memory.store(answer_desc)
+    ctx.trace.add_answer_event(answer_event)
 
     # Emit commentary (Scheme: answers.ss:36-75)
     quality_phrase = get_quality_phrase(quality, ctx.meta)
     templates = ctx.meta.commentary_templates
 
     prior_answers = len(ctx.trace.get_events_by_type(ANSWER_FOUND)) - 1
-    if ctx.justify_mode:
+    if unjustified_slippages:
+        # Checked before the justify-mode branch (``answers.ss:35-45``): an answer the
+        # program cannot account for is reported as such whichever mode it is in.
+        emit_answer_unjustified(
+            ctx.commentary,
+            _punctuate([slippage_english_name(cm) for cm in unjustified_slippages]),
+            ctx.codelet_count,
+            templates,
+            len(unjustified_slippages),
+        )
+    elif ctx.justify_mode:
         emit_answer_justified(
             ctx.commentary, quality, quality_phrase, ctx.codelet_count, templates,
         )
@@ -2762,26 +3140,36 @@ def _report_answer_locked(
         meta=ctx.meta,
     )
     for past_answer in remindings:
-        problem_text = (
-            f"{past_answer.problem[0]} -> {past_answer.problem[1]}; "
-            f"{past_answer.problem[2]} -> ?"
-        )
         # The reminding strength *is* the activation ``find_remindings`` just stored
         # (``memory.ss:210-217`` computes one number and reports that same number).
         # Recomputing a second figure from a different distance made the Memory panel,
         # which renders activation, disagree with the commentary, which quoted this.
-        strength = past_answer.activation
         emit_reminding(
             ctx.commentary,
             past_answer.problem[3],
-            problem_text,
-            strength,
+            problem_print_name(past_answer.problem),
+            past_answer.activation,
             ctx.codelet_count,
+            templates,
         )
 
     # Signal to runner via a pending-answer attribute
     ctx._pending_answer = answer_string  # type: ignore[attr-defined]
     ctx._pending_answer_quality = quality  # type: ignore[attr-defined]
+
+
+def _punctuate(items: list[str]) -> str:
+    """``punctuate`` (``rules.ss:1824``): "a", "a and b", "a, b, and c"."""
+    if len(items) <= 1:
+        return "".join(items)
+    if len(items) == 2:
+        return f"{items[0]} and {items[1]}"
+    return ", ".join(items[:-1]) + f", and {items[-1]}"
+
+
+def problem_print_name(problem: tuple) -> str:
+    """``problem-print-name`` (``memory.ss:148-150``): ``abc -> abd, mrrjjj -> ?``."""
+    return f"{problem[0]} -> {problem[1]}, {problem[2]} -> ?"
 
 
 # ── Rule operations ──
@@ -2852,6 +3240,7 @@ def _apply_rule_locked(ctx: EngineContext, rule: Any, string: Any = None) -> str
     """
     from server.engine.rules import apply_rule as apply_rule_to_string
     from server.engine.rules import _generate_image_letters
+    from server.engine.snag_explanation import failure_result_of
 
     target = string if string is not None else ctx.workspace.target_string
 
@@ -2861,8 +3250,12 @@ def _apply_rule_locked(ctx: EngineContext, rule: Any, string: Any = None) -> str
     # names what actually failed rather than re-resolving every clause.
     ctx.last_failure_objects = []
     ctx.last_failure_kind = "change"
+    ctx.last_failure = None
 
     def _remember(failure: Any) -> None:
+        # The whole failure-result (``answers.ss:1145-1150``), which the snag's
+        # explanation is written from, as plain data.
+        ctx.last_failure = failure_result_of(failure)
         ctx.last_failure_objects = list(getattr(failure, "objects", []) or [])
         # And *which* of the three failure shapes it was, which decides the snag type
         # (``trace.ss:1053``) and hence the snag's explanation.

@@ -9,6 +9,7 @@ import type {
   WorkspaceState,
   SlipnetState,
   CoderackState,
+  EegHistory,
   ThemespaceState,
   TraceEvent,
   MemoryState,
@@ -30,6 +31,8 @@ import type {
   TraceEventDetail,
   AnswerExplanation,
   TemperatureState,
+  DisplayPicture,
+  VerboseSnapshot,
 } from '../types';
 
 const API_BASE = '/api';
@@ -204,13 +207,18 @@ export async function getRunParameters(runId: number): Promise<RunParametersView
   return request<RunParametersView>(`/runs/${runId}/parameters`);
 }
 
+/**
+ * `stepMode` is Metacat's Step button: with ten codelets or fewer the engine narrates
+ * them even when Verbose mode is off (`set-verbose-step-mode`, `gui.ss:793`).
+ */
 export async function stepRun(
   runId: number,
   n?: number,
+  stepMode = false,
 ): Promise<StepResult[]> {
   return request<StepResult[]>(`/runs/${runId}/step`, {
     method: 'POST',
-    body: JSON.stringify({ n: n ?? 1 }),
+    body: JSON.stringify({ n: n ?? 1, ...(stepMode ? { step_mode: true } : {}) }),
   });
 }
 
@@ -260,6 +268,10 @@ export async function getSlipnet(runId: number): Promise<SlipnetState> {
 
 export async function getCoderack(runId: number): Promise<CoderackState> {
   return request<CoderackState>(`/runs/${runId}/coderack`);
+}
+
+export async function getEeg(runId: number): Promise<EegHistory> {
+  return request<EegHistory>(`/runs/${runId}/eeg`);
 }
 
 export async function getThemespace(runId: number): Promise<ThemespaceState> {
@@ -394,6 +406,68 @@ export async function unclampThemes(runId: number): Promise<void> {
   });
 }
 
+/** One theme type of a pattern, with the themes selected in it. */
+export interface ThemePatternSelection {
+  type: string;
+  themes: Array<{ dimension: string; relation: string | null; activation: number }>;
+}
+
+/**
+ * Clamp several themes together as one pattern ("Clamp theme pattern", `gui.ss:881-926`).
+ * Each listed theme type is replaced by the selected themes; one manual clamp covers
+ * them all.
+ */
+export async function clampThemePattern(
+  runId: number,
+  patterns: ThemePatternSelection[],
+): Promise<void> {
+  return request<void>(`/runs/${runId}/clamp-theme-pattern`, {
+    method: 'POST',
+    body: JSON.stringify({ patterns }),
+  });
+}
+
+/** "Undo last clamp" (`gui.ss:595-597`): undoes the most recent clamp, and only that one. */
+export async function undoLastClamp(
+  runId: number,
+): Promise<{ undone: boolean; progress: number | null }> {
+  return request<{ undone: boolean; progress: number | null }>(
+    `/runs/${runId}/undo-last-clamp`,
+    { method: 'POST' },
+  );
+}
+
+/** "Self-watching mode" (`gui.ss:607-626`), toggled in the middle of a run. */
+export async function setSelfWatching(
+  runId: number,
+  enabled: boolean,
+): Promise<{ self_watching_enabled: boolean }> {
+  return request<{ self_watching_enabled: boolean }>(`/runs/${runId}/self-watching`, {
+    method: 'PUT',
+    body: JSON.stringify({ enabled }),
+  });
+}
+
+/** "Verbose mode" (`gui.ss:664`), toggled in the middle of a run. */
+export async function setVerbose(
+  runId: number,
+  enabled: boolean,
+): Promise<{ verbose: boolean }> {
+  return request<{ verbose: boolean }>(`/runs/${runId}/verbose`, {
+    method: 'PUT',
+    body: JSON.stringify({ enabled }),
+  });
+}
+
+/** The narration from line `since` on; `next` is what to ask for next time. */
+export async function getVerbose(runId: number, since = 0): Promise<VerboseSnapshot> {
+  return request<VerboseSnapshot>(`/runs/${runId}/verbose${qs({ since })}`);
+}
+
+export async function clearVerbose(runId: number): Promise<void> {
+  await request<unknown>(`/runs/${runId}/verbose`, { method: 'DELETE' });
+}
+
 /** One of the five clampable codelet patterns (`gui.ss:599-603`). */
 export interface CodeletPattern {
   name: string;
@@ -437,24 +511,54 @@ export async function unclampCodeletPattern(
  * "themselves subject to examination", and a log you cannot address is exactly what the
  * Trace display exists not to be.
  */
-/** Impose that event's theme-pattern over the live Themespace, or restore it. */
+export async function getTraceEvent(
+  runId: number,
+  eventNumber: number,
+): Promise<TraceEventDetail> {
+  return request<TraceEventDetail>(`/runs/${runId}/trace/${eventNumber}`);
+}
+
+/**
+ * What a `display` call answers: which thing is now on show (`null` once the live state
+ * is restored) and the picture the other windows redraw (`trace.ss:405-465`,
+ * `memory.ss:268-283, 380-395`). `picture` is null when none was kept -- an event, answer
+ * or snag stored before pictures were -- and then only the Themespace changes.
+ */
+export interface DisplayResult {
+  displaying: number | null;
+  picture?: DisplayPicture | null;
+  print_name?: string;
+}
+
+/** Display that event: its picture, and its theme-pattern over the live Themespace; again to restore. */
 export async function displayTraceEvent(
   runId: number,
   eventNumber: number,
-): Promise<{ displaying: number | null }> {
-  return request<{ displaying: number | null }>(
+): Promise<DisplayResult> {
+  return request<DisplayResult>(
     `/runs/${runId}/trace/${eventNumber}/display`,
     { method: 'POST' },
   );
 }
 
-/** Impose a stored answer's three theme-patterns (`memory.ss:275-277`), or restore. */
+/** Display a stored answer (`memory.ss:268-283`): its picture and three theme-patterns; again to restore. */
 export async function displayAnswer(
   runId: number,
   answerId: number,
-): Promise<{ displaying: number | null }> {
-  return request<{ displaying: number | null }>(
+): Promise<DisplayResult> {
+  return request<DisplayResult>(
     `/memory/answers/${answerId}/display?run_id=${runId}`,
+    { method: 'POST' },
+  );
+}
+
+/** Display a stored snag (`memory.ss:380-395`): its picture and theme pattern; again to restore. */
+export async function displaySnag(
+  runId: number,
+  snagId: number,
+): Promise<DisplayResult> {
+  return request<DisplayResult>(
+    `/memory/snags/${snagId}/display?run_id=${runId}`,
     { method: 'POST' },
   );
 }
@@ -741,10 +845,14 @@ export const api = {
   getWorkspace,
   getSlipnet,
   getCoderack,
+  getEeg,
   getThemespace,
   getTrace,
   getTemperature,
   getCommentary,
+  setVerbose,
+  getVerbose,
+  clearVerbose,
   getMemory,
   getRunMemory,
   clearMemory,

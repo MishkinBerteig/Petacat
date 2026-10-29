@@ -3,12 +3,16 @@
 // groups, and bridges, inspired by the original Scheme workspace-graphics.ss
 // ---------------------------------------------------------------------------
 
+import { useMomentStore } from '@/store/momentStore';
 import { useRunStore } from '@/store/runStore';
 import type {
   BondState,
   BridgeState,
   ConceptMappingState,
+  DisplayPicture,
   GroupState,
+  PictureHighlights,
+  PictureRole,
   RuleState,
   WorkspaceState,
 } from '@/types';
@@ -58,7 +62,54 @@ const TOP_Y = TOP_CHROME + HEAD_BAND;
 const BRIDGE_COLORS = { top: '#4fc3f7', vertical: '#ab47bc', bottom: '#66bb6a' };
 type BridgeKind = keyof typeof BRIDGE_COLORS;
 
+/**
+ * What the colours of a redisplayed moment mean (`%workspace-event-structure-color%`,
+ * `%top-bridge-color%`, `%vertical-bridge-color%`, `%snag-color%`, ... in Metacat).
+ */
+const ROLE_COLORS: Record<PictureRole, string> = {
+  event: '#ffd700',
+  top: BRIDGE_COLORS.top,
+  bottom: BRIDGE_COLORS.bottom,
+  vertical: BRIDGE_COLORS.vertical,
+  snag: '#ef5350',
+  theme_cm: '#ffa726',
+  vertical_slippage: '#ec407a',
+  // `get-highlight-color` (answers.ss:1233): the dimmed form of a colour marks a slippage a
+  // bridge holds besides the applied one; a slippage that drew a coattail along has its own.
+  vertical_slippage_dim: '#ec407a80',
+  coattail_slippage: '#26c6da',
+  coattail_slippage_dim: '#26c6da80',
+  faded: 'var(--text-secondary)',
+};
+
+/** The draw state of a redisplayed moment: what is highlighted, and whether the rest is faded. */
+interface Moment {
+  faded: boolean;
+  highlights: PictureHighlights;
+  questionMark: boolean;
+}
+
+/** A bridge's key as the server writes it (`trace_display.bridge_key`). */
+function bridgeKeyOf(kind: BridgeKind, br: BridgeData): string {
+  return `${kind}:${br.obj1_pos}-${br.obj1_right_pos ?? br.obj1_pos}:${br.obj2_pos}-${
+    br.obj2_right_pos ?? br.obj2_pos
+  }`;
+}
+
+/** The strongest role named for a bridge, or undefined. */
+function bridgeRole(moment: Moment | undefined, key: string): PictureRole | undefined {
+  return moment?.highlights.bridges.find((b) => b.key === key)?.role;
+}
+
 /** Long labels are clipped on screen; the full text stays in a <title>. */
+/** A rule's English is Metacat's list of lines joined by newlines; the SVG label is one line. */
+function oneLine(english: string): string {
+  return english
+    .split('\n')
+    .map((l) => l.trim())
+    .join('; ');
+}
+
 function clip(text: string, max: number): string {
   return text.length > max ? text.slice(0, max - 1) + '…' : text;
 }
@@ -133,6 +184,11 @@ function bridgeLabel(br: BridgeData): { short: string; full: string } {
 
 /** §3.3.5's three independent measures travel with the rule and combine into `quality`. */
 type RuleData = RuleState;
+
+/** A rule's colour: the role a redisplayed moment draws it in, else the live default. */
+function ruleColor(r: RuleData, fallback: string): string {
+  return r.role ? ROLE_COLORS[r.role as PictureRole] ?? fallback : fallback;
+}
 
 /** "q=72 u=100 a=61 s=80" — quality plus the measures it is built from. */
 function ruleMeasures(r: RuleData): string {
@@ -233,7 +289,7 @@ function BondArcs({ s }: { s: StringLayoutResult }) {
 }
 
 /** Render group enclosures as rounded rectangles */
-function GroupBoxes({ s }: { s: StringLayoutResult }) {
+function GroupBoxes({ s, moment }: { s: StringLayoutResult; moment?: Moment }) {
   // Lane-pack the category labels up front, so overlapping ones step upward
   // instead of printing on top of each other.
   const labelText = (g: GroupData) =>
@@ -261,7 +317,16 @@ function GroupBoxes({ s }: { s: StringLayoutResult }) {
         const gw = (g.right_pos - g.left_pos + 1) * LETTER_W + pad * 2;
         const gy = s.y - pad - 2;
         const gh = LETTER_H + pad * 2 + 4;
-        const opacity = Math.max(0.3, g.strength / 100);
+        // A redisplayed moment draws every group faded except the ones it names.
+        const role = moment?.highlights.groups.find(
+          (h) => h.string === s.label && h.left === g.left_pos && h.right === g.right_pos,
+        )?.role;
+        const stroke = role
+          ? ROLE_COLORS[role]
+          : moment?.faded
+            ? 'var(--text-secondary)'
+            : 'var(--warning)';
+        const opacity = role ? 1 : moment?.faded ? 0.45 : Math.max(0.3, g.strength / 100);
         return (
           <g key={`group-${s.label}-${i}`}>
             <rect
@@ -270,8 +335,8 @@ function GroupBoxes({ s }: { s: StringLayoutResult }) {
               width={gw}
               height={gh}
               fill="none"
-              stroke="var(--warning)"
-              strokeWidth={1.5}
+              stroke={stroke}
+              strokeWidth={role ? 3 : 1.5}
               strokeDasharray={g.built ? 'none' : '4 2'}
               rx={5}
               opacity={opacity}
@@ -281,7 +346,7 @@ function GroupBoxes({ s }: { s: StringLayoutResult }) {
               x={gx + 1}
               y={s.y - 6 - lanes[i] * GROUP_LANE_H}
               fontSize={8}
-              fill="var(--warning)"
+              fill={stroke}
               opacity={opacity}
               stroke="var(--bg-secondary)"
               strokeWidth={2.5}
@@ -330,10 +395,15 @@ function BridgeLines({
   countOfKind,
   gap,
   band,
+  kind,
+  moment,
 }: {
   bridges: BridgeData[];
   layouts: StringLayoutResult[];
   color: string;
+  /** Which of the three bridge types these are, for finding them in a moment's highlights. */
+  kind?: BridgeKind;
+  moment?: Moment;
   firstNumber: number;
   countOfKind: number;
   /** Centre of the row's arrow gap — the one column on a row with no text in it. */
@@ -363,7 +433,9 @@ function BridgeLines({
           ? s2.y + LETTER_H / 2
           : s2.y + (s2.y < s1.y ? LETTER_H + BRIDGE_Y_OFFSET : -BRIDGE_Y_OFFSET);
 
-        const opacity = Math.max(0.35, br.strength / 100);
+        const role = kind ? bridgeRole(moment, bridgeKeyOf(kind, br)) : undefined;
+        const drawColor = role ? ROLE_COLORS[role] : moment?.faded ? 'var(--text-secondary)' : color;
+        const opacity = role ? 1 : moment?.faded ? 0.4 : Math.max(0.35, br.strength / 100);
         const { full } = bridgeLabel(br);
         const number = firstNumber + i;
 
@@ -411,19 +483,19 @@ function BridgeLines({
             <path
               d={`M ${x1} ${y1} Q ${cx} ${cy} ${x2} ${y2}`}
               fill="none"
-              stroke={color}
-              strokeWidth={1.5}
+              stroke={drawColor}
+              strokeWidth={role ? 3 : 1.5}
               strokeDasharray={br.built ? 'none' : '3 3'}
               opacity={opacity}
             />
             {/* Dots make it unambiguous which two objects are bridged. */}
-            <circle cx={x1} cy={y1} r={2.5} fill={color} opacity={opacity} />
-            <circle cx={x2} cy={y2} r={2.5} fill={color} opacity={opacity} />
+            <circle cx={x1} cy={y1} r={2.5} fill={drawColor} opacity={opacity} />
+            <circle cx={x2} cy={y2} r={2.5} fill={drawColor} opacity={opacity} />
             {/* The badge, keyed to the legend row below the diagram. */}
             <circle
               cx={bx} cy={by} r={6}
               fill="var(--bg-secondary)"
-              stroke={color}
+              stroke={drawColor}
               strokeWidth={1.5}
               opacity={Math.max(0.6, opacity)}
             />
@@ -431,7 +503,7 @@ function BridgeLines({
               x={bx} y={by + 2.6}
               textAnchor="middle"
               fontSize={7.5}
-              fill={color}
+              fill={drawColor}
               fontFamily="var(--font-mono)"
             >
               {number}
@@ -453,10 +525,12 @@ function BridgeKey({
   entries,
   y,
   width,
+  moment,
 }: {
   entries: NumberedBridge[];
   y: number;
   width: number;
+  moment?: Moment;
 }) {
   if (entries.length === 0) return null;
   return (
@@ -486,9 +560,43 @@ function BridgeKey({
             <text x={SIDE_PAD + 17} y={ly} fontSize={8.5} fill={color} fontFamily="var(--font-mono)">
               {endpoints}
             </text>
-            <text x={SIDE_PAD + 92} y={ly} fontSize={8.5} fill="var(--text-secondary)">
-              {short ? clip(short, Math.max(20, Math.floor((width - SIDE_PAD - 100) / 4.8))) : '—'}
-            </text>
+            {(() => {
+              // A redisplayed moment names concept-mappings to highlight (the slippage an
+              // event made, the ones supporting a theme, the ones a translation applied).
+              const key = bridgeKeyOf(kind, bridge);
+              const named = (moment?.highlights.concept_mappings ?? []).filter(
+                (h) => h.bridge === key,
+              );
+              if (named.length === 0) {
+                return (
+                  <text x={SIDE_PAD + 92} y={ly} fontSize={8.5} fill="var(--text-secondary)">
+                    {short
+                      ? clip(short, Math.max(20, Math.floor((width - SIDE_PAD - 100) / 4.8)))
+                      : '—'}
+                  </text>
+                );
+              }
+              return (
+                <text x={SIDE_PAD + 92} y={ly} fontSize={8.5} fill="var(--text-secondary)">
+                  {bridge.concept_mappings
+                    .filter((cm) => cm.is_slippage || named.some((h) => h.from === cm.from && h.to === cm.to))
+                    .map((cm, n) => {
+                      const hit = named.find((h) => h.from === cm.from && h.to === cm.to);
+                      return (
+                        <tspan
+                          key={n}
+                          fill={hit ? ROLE_COLORS[hit.role] : undefined}
+                          fontWeight={hit ? 700 : 400}
+                          data-highlight={hit ? hit.role : undefined}
+                        >
+                          {n > 0 ? ', ' : ''}
+                          {cm.from}⇒{cm.to}
+                        </tspan>
+                      );
+                    })}
+                </text>
+              );
+            })()}
           </g>
         );
       })}
@@ -505,7 +613,28 @@ function BridgeKey({
  * that tied it to a live run was the store read, which now happens in the thin
  * wrapper underneath.
  */
-export function WorkspaceDiagram({ workspace }: { workspace: WorkspaceState | null }) {
+export function WorkspaceDiagram({
+  workspace,
+  picture,
+  eventNumber,
+}: {
+  workspace: WorkspaceState | null;
+  /**
+   * A redisplayed moment (an event, an answer or a snag): drawn under its header with
+   * its highlighted structures, the rest faded (`trace.ss:300-325`). Absent for the
+   * live Workspace.
+   */
+  picture?: DisplayPicture | null;
+  /** The "N" of "Event N:" for a redisplayed Trace event; absent for answers and snags. */
+  eventNumber?: number | null;
+}) {
+  const moment: Moment | undefined = picture
+    ? {
+        faded: picture.faded,
+        highlights: picture.highlights,
+        questionMark: picture.question_mark,
+      }
+    : undefined;
   if (!workspace) {
     return (
       <div className="text-muted text-sm" style={{ padding: 16, textAlign: 'center' }}>
@@ -597,10 +726,10 @@ export function WorkspaceDiagram({ workspace }: { workspace: WorkspaceState | nu
   const arrowY2 = botRowY + LETTER_H / 2;
 
   return (
+    <div style={{ height: '100%', overflowY: 'auto' }}>
     <svg
       viewBox={`0 0 ${SVG_W} ${SVG_H}`}
       width="100%"
-      height="100%"
       preserveAspectRatio="xMidYMin meet"
       style={{ maxHeight: SVG_H, display: 'block' }}
     >
@@ -608,7 +737,7 @@ export function WorkspaceDiagram({ workspace }: { workspace: WorkspaceState | nu
 
       {/* Group enclosures (behind letters) */}
       {allStrings.map((s) => (
-        <GroupBoxes key={`groups-${s.label}`} s={s} />
+        <GroupBoxes key={`groups-${s.label}`} s={s} moment={moment} />
       ))}
 
       {/* Strings: letters */}
@@ -654,6 +783,46 @@ export function WorkspaceDiagram({ workspace }: { workspace: WorkspaceState | nu
         </g>
       ))}
 
+      {/* The objects a redisplayed moment names: letters, groups, whole strings. */}
+      {moment &&
+        moment.highlights.objects.map((h, i) => {
+          const layout = allStrings.find((l) => l.label === h.string);
+          if (!layout) return null;
+          const color = ROLE_COLORS[h.role];
+          if (h.left < 0) {
+            // A whole string is outlined at its label.
+            return (
+              <rect
+                key={`hl-${i}`}
+                data-highlight={h.role}
+                x={layout.x - 3}
+                y={layout.y - GROUP_LABEL_BAND - 14}
+                width={layout.text.length * LETTER_W + 4}
+                height={14}
+                fill="none"
+                stroke={color}
+                strokeWidth={2}
+                rx={3}
+              />
+            );
+          }
+          return (
+            <rect
+              key={`hl-${i}`}
+              data-highlight={h.role}
+              x={layout.x + h.left * LETTER_W - 2}
+              y={layout.y - 2}
+              width={(h.right - h.left + 1) * LETTER_W + 2}
+              height={LETTER_H + 4}
+              fill={color}
+              fillOpacity={0.18}
+              stroke={color}
+              strokeWidth={2}
+              rx={4}
+            />
+          );
+        })}
+
       {/* Bond arcs (below letters) */}
       {allStrings.map((s) => (
         <BondArcs key={`bonds-${s.label}`} s={s} />
@@ -675,7 +844,7 @@ export function WorkspaceDiagram({ workspace }: { workspace: WorkspaceState | nu
           stroke="var(--text-accent)" strokeWidth={1.5}
           markerEnd="url(#arrowhead)"
         />
-      ) : (
+      ) : moment?.questionMark ? null : (
         <text
           x={botPair.arrowX2 + ARROW_PAD + 10}
           y={arrowY2 + 5}
@@ -691,11 +860,13 @@ export function WorkspaceDiagram({ workspace }: { workspace: WorkspaceState | nu
       {/* Bridges, numbered continuously so each badge has one legend row */}
       <BridgeLines
         bridges={topBridges} layouts={allStrings} color={BRIDGE_COLORS.top}
+        kind="top" moment={moment}
         firstNumber={1} countOfKind={topBridges.length}
         gap={{ x: (topPair.arrowX1 + topPair.arrowX2) / 2, y: arrowY1 }}
       />
       <BridgeLines
         bridges={vertBridges} layouts={allStrings} color={BRIDGE_COLORS.vertical}
+        kind="vertical" moment={moment}
         firstNumber={1 + topBridges.length} countOfKind={vertBridges.length}
         band={{
           y1: topPair.left.y + LETTER_H + FOOT_BAND + 6,
@@ -704,6 +875,7 @@ export function WorkspaceDiagram({ workspace }: { workspace: WorkspaceState | nu
       />
       <BridgeLines
         bridges={bottomBridges} layouts={allStrings} color={BRIDGE_COLORS.bottom}
+        kind="bottom" moment={moment}
         firstNumber={1 + topBridges.length + vertBridges.length}
         countOfKind={bottomBridges.length}
         gap={{ x: (botPair.arrowX1 + botPair.arrowX2) / 2, y: arrowY2 }}
@@ -723,11 +895,41 @@ export function WorkspaceDiagram({ workspace }: { workspace: WorkspaceState | nu
           strokeWidth={3}
           paintOrder="stroke"
         >
-          B:{bondCountFor(s.text)} G:{groupCountFor(s.text)}
+          {moment ? '' : `B:${bondCountFor(s.text)} `}G:{groupCountFor(s.text)}
         </text>
       ))}
 
-      <BridgeKey entries={bridgeKey} y={KEY_Y} width={SVG_W} />
+      <BridgeKey entries={bridgeKey} y={KEY_Y} width={SVG_W} moment={moment} />
+
+      {/* Metacat's `draw-event-header` ("Event N:  Built successor-group") or an
+          answer's or snag's description title. */}
+      {picture && (
+        <text
+          x={SVG_W / 2}
+          y={24}
+          textAnchor="middle"
+          fontSize={13}
+          fontWeight={700}
+          fill="var(--text-primary)"
+          data-testid="moment-header"
+        >
+          {eventNumber != null ? `Event ${eventNumber}:  ${picture.header}` : picture.header}
+        </text>
+      )}
+      {moment?.questionMark && (
+        <text
+          x={botPair.arrowX2 + ARROW_PAD + 10}
+          y={arrowY2 + 6}
+          textAnchor="middle"
+          fontSize={22}
+          fontWeight={700}
+          fill={ROLE_COLORS.snag}
+          fontFamily="var(--font-mono)"
+          data-testid="snag-question-marks"
+        >
+          ???
+        </text>
+      )}
 
       {/* Bridge counts */}
       <text x={SVG_W - 12} y={12} textAnchor="end" fill="var(--text-secondary)" fontSize={9}>
@@ -742,12 +944,12 @@ export function WorkspaceDiagram({ workspace }: { workspace: WorkspaceState | nu
           key={`top-rule-${i}`}
           x={SVG_W / 2} y={TOP_CHROME + RULE_H - 2 + i * RULE_H}
           textAnchor="middle"
-          fill="var(--success)"
+          fill={ruleColor(r, 'var(--success)')}
           fontSize={9}
           opacity={Math.max(0.4, r.quality / 100)}
         >
-          <title>{`Top rule: ${r.english} (${ruleMeasures(r)})`}</title>
-          Top: {clip(r.english, 60)} ({ruleMeasures(r)})
+          <title>{`Top rule: ${oneLine(r.english)} (${ruleMeasures(r)})`}</title>
+          Top: {clip(oneLine(r.english), 60)} ({ruleMeasures(r)})
         </text>
       ))}
       {bottomRules.slice(0, 2).map((r, i) => (
@@ -756,12 +958,12 @@ export function WorkspaceDiagram({ workspace }: { workspace: WorkspaceState | nu
           x={SVG_W / 2}
           y={botPair.left.y - HEAD_BAND + RULE_H - 2 + i * RULE_H}
           textAnchor="middle"
-          fill="var(--success)"
+          fill={ruleColor(r, 'var(--success)')}
           fontSize={9}
           opacity={Math.max(0.4, r.quality / 100)}
         >
-          <title>{`Bottom rule: ${r.english} (${ruleMeasures(r)})`}</title>
-          Bot: {clip(r.english, 60)} ({ruleMeasures(r)})
+          <title>{`Bottom rule: ${oneLine(r.english)} (${ruleMeasures(r)})`}</title>
+          Bot: {clip(oneLine(r.english), 60)} ({ruleMeasures(r)})
         </text>
       ))}
 
@@ -788,11 +990,82 @@ export function WorkspaceDiagram({ workspace }: { workspace: WorkspaceState | nu
         </marker>
       </defs>
     </svg>
+    <RuleBoxes topRules={topRules} bottomRules={bottomRules} />
+    </div>
+  );
+}
+
+/**
+ * Every rule in the Workspace, each in a box of its English transcription, one clause
+ * to a line -- Metacat's rule box (`rule-graphics.ss`, drawn by `draw-rule`,
+ * `workspace-graphics.ss:350`). The diagram's band above each row has room for one
+ * line of the leading rule; Metacat's box is the whole rule, and this is it: nothing is
+ * clipped and no rule is left out.
+ */
+function RuleBoxes({
+  topRules,
+  bottomRules,
+}: {
+  topRules: RuleData[];
+  bottomRules: RuleData[];
+}) {
+  if (topRules.length === 0 && bottomRules.length === 0) return null;
+  const group = (label: string, rules: RuleData[]) =>
+    rules.length === 0 ? null : (
+      <div data-testid={`rules-${label.toLowerCase()}`} style={{ flex: 1, minWidth: 160 }}>
+        <div className="text-xs text-muted" style={{ marginBottom: 2 }}>
+          {label} rule{rules.length > 1 ? `s (${rules.length})` : ''}
+        </div>
+        {rules.map((r, i) => (
+          <div
+            key={i}
+            data-testid="rule-box"
+            title={ruleMeasures(r)}
+            style={{
+              background: '#fff',
+              color: '#111',
+              border: r.role ? `2px solid ${ruleColor(r, '#888')}` : '1px solid #888',
+              borderRadius: 2,
+              padding: '2px 8px',
+              marginBottom: 3,
+              fontFamily: 'var(--font-serif, serif)',
+              fontStyle: 'italic',
+              fontSize: 12,
+              opacity: Math.max(0.6, r.quality / 100),
+            }}
+          >
+            {r.english.split('\n').map((line, j) => (
+              <div key={j}>{line.trim()}</div>
+            ))}
+            <div className="mono" style={{ fontSize: 9, fontStyle: 'normal', color: '#666' }}>
+              {ruleMeasures(r)}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  return (
+    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', padding: '4px 4px 0' }}>
+      {group('Top', topRules)}
+      {group('Bottom', bottomRules)}
+    </div>
   );
 }
 
 /** The live workspace: `WorkspaceDiagram` fed from the run store. */
 export function WorkspaceView() {
   const workspace = useRunStore((s) => s.workspace);
+  // Clicking a Trace event, an answer or a snag redraws the Workspace for that moment
+  // (`trace.ss:405-516`, `memory.ss:268-283, 380-395`) until it is clicked again.
+  const displayed = useMomentStore((s) => s.displayed);
+  if (displayed) {
+    return (
+      <WorkspaceDiagram
+        workspace={displayed.picture.workspace}
+        picture={displayed.picture}
+        eventNumber={displayed.eventNumber}
+      />
+    );
+  }
   return <WorkspaceDiagram workspace={workspace} />;
 }

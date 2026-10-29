@@ -98,23 +98,25 @@ for a in json.load(sys.stdin)['answers']:
     print(' ', a['problem'][-1], '| quality', a['quality'], '|', a['top_rule_description'])"
 ```
 
-**Expect** each run to work harder than the last, then give up:
+**Expect** each run to work harder than the last, until the good answers run out:
 
 ```
-run 1: answer_found 777
-run 2: answer_found 2377
-run 3: answer_found 8666
-run 4: halted       20000
+run 1: answer_found 587
+run 2: answer_found 1728
+run 3: answer_found 6628
+run 4: answer_found 7105
 
-  mrrkkk  | quality 84 | change LetterCtgy by succ
-  mrrjjj  | quality 54 | Unknown transformation
-  mrrjjjj | quality 86 | change LetterCtgy by succ
+  mrrkkk  | quality 83 | Change letter-category of rightmost letter to successor
+  mrrddd  | quality 68 | Change letter-category of rightmost letter to `d'
+  mrrjjjj | quality 87 | Change letter-category of rightmost letter to successor
+  abd     | quality 45 | Change string to "abd"
 ```
 
 **What you are watching.** Run 1 finds the obvious answer. Run 2 may not repeat it, so it
-pays 3× the codelets. Run 3 pays 11× the first run's, for a poor answer
-(quality 54). Run 4 has nothing new left and halts at the cap. The exact answers may vary
-with load; the *shape* — rising cost, falling quality, eventual exhaustion — is the test.
+pays 3× the codelets, for the literal answer `mrrddd`. Run 3 pays 11× the first run's to
+find `mrrjjjj`. Run 4, with those taken, settles for copying `abd` verbatim (quality 45),
+and later runs halt at the cap. The exact answers may vary with load; the *shape* — rising
+cost, then worse answers, then exhaustion — is the test.
 
 **In the GUI:** run the same problem four times without clearing the Training Session,
 and watch the memory panel fill.

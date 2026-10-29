@@ -350,6 +350,13 @@ class ReplayRNG(LockstepBase):
         stamp = rec.get("picked_stamp")
         exact = [k for k in found if fields["stamps"][k] == stamp]
         candidates = exact or found
+        # Codelets alike in everything the record names (G-T3: two proposals of one
+        # structure, restamped by a clamp) are told apart by nothing Metacat logged, and
+        # which of them its uniform index chose is not recorded.  They are tried in the
+        # order they were made, not in the order a bin's vector happens to hold them
+        # (swap-removal, ``coderack.ss:309-318``, which the engine now follows), so the
+        # outcome does not depend on the coderack's internal layout.
+        candidates = sorted(candidates, key=lambda j: options[idx[j]].id)
         # Among same-name, same-stamp codelets prefer the one whose share of the
         # total weight is closest to the share of the codelet Metacat picked: a
         # clamp restamps the codelets it moves to another bin, so name and stamp
