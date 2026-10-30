@@ -43,7 +43,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from server.engine import hardware
-from server.engine.coderack_shards import LockedCoderack
+from server.parallel.coderack_shards import LockedCoderack
 from server.engine.ids import use_allocator
 from server.engine.runner import (
     STATUS_ANSWER_FOUND,
@@ -176,7 +176,7 @@ class FreeRunningEngine:
         """Install the locked rack and the shared commit lock.
 
         The serial rack is adopted as it stands, wrapped in a mutex
-        (:class:`~server.engine.coderack_shards.LockedCoderack`), so the opening
+        (:class:`~server.parallel.coderack_shards.LockedCoderack`), so the opening
         codelets carry over exactly and every draw and every eviction is the serial
         rack's own.  It was previously split into per-worker shards, which drew each
         worker from its own shard; the draw is urgency-weighted, so that is not the

@@ -57,7 +57,7 @@ def _commit_guard(ctx: Any) -> Iterator[None]:
     """Hold the free-running commit lock, if there is one.
 
     ``FreeRunningLoop`` publishes its ``RLock`` as ``ctx.commit_lock``
-    (``free_running.py:158``) and takes it around every scheduled update cycle.
+    (``server/parallel/free_running.py``) and takes it around every scheduled update cycle.
     Anything else that mutates shared engine state from inside a codelet has to
     take the same lock, and this is the seam for it. Serially the attribute is
     ``None`` and this costs a branch.
@@ -764,8 +764,8 @@ class EngineRunner:
         # free-running worker is concurrently reading and writing: the coderack is
         # emptied and refilled, and ``_update_everything`` runs a whole update
         # cycle.  ``FreeRunningLoop`` takes the same lock around its scheduled
-        # update (``free_running.py:271``) and publishes it as ``ctx.commit_lock``
-        # (``free_running.py:158``); this path is reached from ``record_snag``
+        # update (``server/parallel/free_running.py``) and publishes it as ``ctx.commit_lock``
+        # (``server/parallel/free_running.py``); this path is reached from ``record_snag``
         # inside a codelet, which does not hold it.
         #
         # Two workers therefore ran the update cycle at once — one on the schedule,

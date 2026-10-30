@@ -16,7 +16,7 @@ from functools import lru_cache
 from typing import Any
 
 #: The repository's ``seed_data/`` directory, derived the same way
-#: ``population.py`` derives it.
+#: ``server/parallel/population.py`` derives it.
 DEFAULT_SEED_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
     "seed_data",

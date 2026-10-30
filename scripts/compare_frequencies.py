@@ -277,7 +277,7 @@ def petacat_run(task: tuple) -> tuple:
         params = _CONTEXT["parameters"]
         runner.init_mcat(*problem, seed=seed, **({"parameters": dict(params)} if params else {}))
         if workers > 1:
-            from server.engine.free_running import FreeRunningEngine
+            from server.parallel.free_running import FreeRunningEngine
             FreeRunningEngine(runner, workers=workers).run(cap)
         else:
             runner.run_mcat(max_steps=cap)

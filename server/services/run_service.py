@@ -38,10 +38,16 @@ from server.models.run import (
     TrainingSession,
 )
 from server.engine.commentary import CommentaryLog
-from server.engine.free_running import FreeRunningEngine
 from server.engine.hashing import config_hash, memory_hash
 from server.engine.parameters import resolved_parameters, validate_overrides
 from server.services.sinks import MODE_AUDIT, MODE_FAST, MODE_NORMAL, sink_for_mode
+
+# The multi-core subsystem is a plugin (``server/parallel/``): reached through
+# ``load()`` so that a checkout without it still serves every serial Run.
+try:
+    from server import parallel as _parallel
+except ImportError:  # detached
+    _parallel = None
 
 
 # Shared cross-run episodic memory (per-process)
@@ -305,6 +311,9 @@ class RunService:
         # Run records the number it actually executed with.
         workers = int(workers)
         workers = hardware.worker_count() if workers == 0 else max(1, workers)
+        if _parallel is None:
+            # Detached plugin: every Run is the serial Run, and records that it was.
+            workers = 1
         if workers > 1 and mode == MODE_AUDIT:
             raise ValueError(
                 "Audit mode is serial by definition and cannot run free-running: it "
@@ -761,7 +770,12 @@ class RunService:
             )
             await session.commit()
 
-        engine = FreeRunningEngine(runner, workers=workers)
+        if _parallel is None:
+            raise RuntimeError(
+                "workers > 1 needs the parallel subsystem (server/parallel/), which is "
+                "not installed in this checkout"
+            )
+        engine = _parallel.get_executor("free")(runner, workers=workers)
         result = await asyncio.to_thread(engine.run, max_steps)
         self._free_run_telemetry[run_id] = result.summary()
 

@@ -14,8 +14,8 @@ import os
 import pytest
 
 from server.engine.coderack import coderack_display
-from server.engine.coderack_shards import LockedCoderack
-from server.engine.free_running import run_free
+from server.parallel.coderack_shards import LockedCoderack
+from server.parallel.free_running import run_free
 from server.engine.metadata import MetadataProvider
 from server.engine.runner import EngineRunner
 

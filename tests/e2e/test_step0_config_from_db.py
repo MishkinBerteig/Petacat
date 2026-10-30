@@ -494,7 +494,7 @@ async def test_min_shard_capacity_bounds_the_shard_count_from_the_database(db_se
     the floor while it is a module constant, so "changing it changes the engine" is the
     assertion that makes that measurement expressible.
     """
-    from server.engine.coderack_shards import WorkerShardedCoderack
+    from server.parallel.coderack_shards import WorkerShardedCoderack
 
     db_meta = await load_metadata_from_db(db_session)
     assert WorkerShardedCoderack(db_meta, 8).num_shards == 4

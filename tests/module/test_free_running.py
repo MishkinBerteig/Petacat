@@ -17,8 +17,8 @@ import threading
 
 import pytest
 
-from server.engine.coderack_shards import LockedCoderack
-from server.engine.free_running import FreeRunningEngine, run_free
+from server.parallel.coderack_shards import LockedCoderack
+from server.parallel.free_running import FreeRunningEngine, run_free
 from server.engine.metadata import MetadataProvider
 from server.engine.runner import EngineRunner
 from server.engine.splittable_rng import SplittableRNG
@@ -409,7 +409,7 @@ def test_the_answer_and_self_watching_codelets_run_under_the_commit_lock(meta):
     same Slipnet session (on MLX, an abort), and a clamp could land between the update
     reading the Slipnet and writing it back.
     """
-    from server.engine.free_running import SERIALISED_FAMILIES
+    from server.parallel.free_running import SERIALISED_FAMILIES
 
     runner = _prepared(meta, seed=3)
     engine = FreeRunningEngine(runner, workers=4)
@@ -580,7 +580,7 @@ def test_a_pending_answer_is_not_collected_by_another_workers_codelet(meta):
     """
     import time
 
-    from server.engine.free_running import SERIALISED_FAMILIES
+    from server.parallel.free_running import SERIALISED_FAMILIES
 
     runner = _prepared(meta, seed=7)
     ctx = runner.ctx

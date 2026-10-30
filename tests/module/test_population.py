@@ -17,7 +17,7 @@ import os
 import pytest
 
 from server.engine.metadata import MetadataProvider
-from server.engine.population import (
+from server.parallel.population import (
     BATCHING_MIN_NODES,
     batching_is_worthwhile,
     run_population,

@@ -80,7 +80,8 @@ ROLE_PREFERENCES: dict[str, tuple[str, ...]] = {
 #: The suite's layers, bottom-up.  The per-layer summary is printed in this order,
 #: and a directory under ``tests/`` is a layer exactly when it appears here.
 LAYERS = (
-    "unit", "seed_unit", "module", "architecture", "integration", "lockstep", "e2e",
+    "unit", "seed_unit", "module", "architecture", "integration", "parallel",
+    "lockstep", "e2e",
 )
 
 #: Layers whose tests must declare their relationship to the substrate.  A test
@@ -90,6 +91,11 @@ LAYERS = (
 #:
 #: ``e2e`` is outside it: its subject is the HTTP and persistence stack, it adds no
 #: numeric path of its own, and it runs on the policy the application ships with.
+#:
+#: ``parallel`` is outside it as well: the plugin's tests compare executors against a
+#: serial reference *on the same backend*, so each one pins the backend it compares on
+#: (CPU, because Metal streams belong to the thread that made them) rather than taking
+#: a matrix role.
 #:
 #: ``lockstep`` is outside it too, for the opposite reason to the matrix: its runs are
 #: *faithful mode* (``tests/lockstep/faithful.py``), which pins the numeric backend off

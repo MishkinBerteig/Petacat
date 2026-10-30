@@ -45,7 +45,7 @@ by an environment variable so a particular run can be pinned:
     serial draw (the draw is urgency-weighted).  Default: one per worker, floor of
     two.  A sharded rack's capacity is divided across shards rather than replicated, so the
     effective count is additionally bounded by
-    ``server.engine.coderack_shards.MIN_SHARD_CAPACITY``.
+    ``server.parallel.coderack_shards.MIN_SHARD_CAPACITY``.
 
 ``PETACAT_POPULATION_WORKERS``
     Processes in a population pool.  Default: every logical core but one.  The
@@ -366,8 +366,8 @@ def shard_count(workers: int | None = None) -> int:
     """Coderack shards for a run with ``workers`` workers.
 
     One shard per worker, floor of two, for the benchmark candidates.  (Free-running
-    does not shard: see :class:`~server.engine.coderack_shards.LockedCoderack`.)
-    ``server.engine.coderack_shards`` bounds this further by the capacity a shard
+    does not shard: see :class:`~server.parallel.coderack_shards.LockedCoderack`.)
+    ``server.parallel.coderack_shards`` bounds this further by the capacity a shard
     needs to hold a full jootsing sequence.
     """
     override = _int_from_environment(ENV_SHARDS, 0)

@@ -39,7 +39,7 @@ sys.path.insert(0, REPO)
 
 from server.engine.coderack import Codelet, Coderack  # noqa: E402
 from server.engine import hardware  # noqa: E402
-from server.engine.coderack_shards import (  # noqa: E402
+from server.parallel.coderack_shards import (  # noqa: E402
     MIN_SHARD_CAPACITY,
     build_candidate,
 )

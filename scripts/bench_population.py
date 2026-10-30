@@ -25,7 +25,7 @@ sys.path.insert(0, REPO)
 
 from server.engine import hardware  # noqa: E402
 from server.engine.metadata import MetadataProvider  # noqa: E402
-from server.engine.population import (  # noqa: E402
+from server.parallel.population import (  # noqa: E402
     batching_is_worthwhile,
     batching_min_nodes,
     run_population,

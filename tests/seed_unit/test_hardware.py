@@ -351,7 +351,7 @@ def test_overrides_in_force_reports_exactly_what_is_set(no_overrides, monkeypatc
 
 def test_the_free_running_engine_sizes_itself_from_the_machine(no_overrides):
     """``workers=None`` is the machine's count, and the shards follow it."""
-    from server.engine.free_running import FreeRunningEngine
+    from server.parallel.free_running import FreeRunningEngine
     from server.engine.metadata import MetadataProvider
     from server.engine.runner import EngineRunner
     import os as _os

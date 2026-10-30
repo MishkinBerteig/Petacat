@@ -633,7 +633,7 @@ every change in this layer is held to.
 
 ## Free-running: codelets across CPU cores
 
-`server/engine/free_running.py` executes codelets on several worker threads with
+`server/parallel/free_running.py` executes codelets on several worker threads with
 no global barrier. It wraps a prepared runner, which keeps the serial reference
 exactly the shape it has.
 
@@ -666,7 +666,7 @@ Three things had to exist first, and each is useful on its own:
   engine unusually well because a lost race is not a retry — it is a **fizzle**,
   an outcome the architecture already has and the temperature already accounts
   for.
-- **A coderack that can be shared** (`coderack_shards.py`). Three candidates were
+- **A coderack that can be shared** (`server/parallel/coderack_shards.py`). Three candidates were
   built and measured: one rack behind a mutex, shards by codelet family, and
   per-worker shards with work stealing. The free-running engine installs the
   first, `LockedCoderack`, around the serial rack itself.

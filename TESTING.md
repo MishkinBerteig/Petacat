@@ -269,7 +269,7 @@ across a process pool. Reach for the tight loop when you want a fast loop rather
 than a number to compare, and for the required command when you want the number.
 
 > **If `tests/module/test_free_running.py` fails, read
-> `server/engine/coderack_shards.py` before reaching for `--numeric-backends`.**
+> `server/parallel/coderack_shards.py` before reaching for `--numeric-backends`.**
 > That file is the one place the suite runs *codelets* concurrently —
 > `test_coderack_shards`, `test_access_sets`, `test_run_identifiers` and
 > `test_splittable_rng` thread over engine state without executing codelets — so

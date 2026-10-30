@@ -18,7 +18,7 @@ from collections import Counter
 import pytest
 
 from server.engine.coderack import Codelet, Coderack
-from server.engine.coderack_shards import (
+from server.parallel.coderack_shards import (
     CANDIDATES,
     MIN_SHARD_CAPACITY,
     FamilyShardedCoderack,
@@ -387,7 +387,7 @@ def test_the_sharded_rack_can_be_captured(meta):
 def _free_running_rack(meta, workers: int = 6):
     """The rack ``FreeRunningEngine`` installs, emptied, with the serial engine's own
     capacity -- what a threaded draw actually goes through."""
-    from server.engine.free_running import FreeRunningEngine
+    from server.parallel.free_running import FreeRunningEngine
 
     runner = EngineRunner(meta)
     runner.init_mcat("abc", "abd", "mrrjjj", seed=1)

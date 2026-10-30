@@ -32,7 +32,7 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, REPO)
 
 from server.engine import hardware  # noqa: E402
-from server.engine.free_running import FreeRunningEngine  # noqa: E402
+from server.parallel.free_running import FreeRunningEngine  # noqa: E402
 from server.engine.metadata import MetadataProvider  # noqa: E402
 from server.engine.runner import EngineRunner  # noqa: E402
 
