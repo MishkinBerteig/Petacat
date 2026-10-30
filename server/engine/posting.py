@@ -24,7 +24,6 @@ metric only when the expression actually mentions it, and only once per context.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from functools import lru_cache
 from typing import Any, Callable, Iterator
 
 #: Name -> how to obtain it from a `PostingContext`.
@@ -157,7 +156,10 @@ class PostingContext(Mapping):
         return len(_PRODUCERS)
 
 
-@lru_cache(maxsize=256)
+_FORMULA_CODE: dict[tuple[str, str], Any] = {}
+_FORMULA_CODE_LIMIT = 256
+
+
 def compile_posting_formula(source: str, rule_name: str) -> Any:
     """Compile a posting formula, raising on a bad expression rather than at run time.
 
@@ -165,13 +167,27 @@ def compile_posting_formula(source: str, rule_name: str) -> Any:
     process however many runs consult them.  `rule_name` is part of the key only so
     that it can appear in the error and in the code object's filename; two rules
     sharing a formula is ordinary and costs one extra entry.
+
+    A plain dict rather than ``functools.lru_cache``: this is consulted on every posting
+    decision, and under free-threaded CPython the LRU wrapper takes a lock per call, which
+    every thread in the process then queues on.  A dict read takes none, and two threads
+    that miss together simply compile the same code twice -- harmless, the code objects
+    are equal.  A failed compile is not cached, as ``lru_cache`` did not.  Past
+    ``_FORMULA_CODE_LIMIT`` entries it stops adding, which is its old ``maxsize``.
     """
+    key = (source, rule_name)
+    code = _FORMULA_CODE.get(key)
+    if code is not None:
+        return code
     try:
-        return compile(source, f"<posting-formula:{rule_name}>", "eval")
+        code = compile(source, f"<posting-formula:{rule_name}>", "eval")
     except SyntaxError as exc:
         raise ValueError(
             f"posting formula for {rule_name} does not compile: {source!r} — {exc}"
         ) from exc
+    if len(_FORMULA_CODE) < _FORMULA_CODE_LIMIT:
+        _FORMULA_CODE[key] = code
+    return code
 
 
 def evaluate_posting_formula(source: str, rule_name: str, context: PostingContext) -> float:

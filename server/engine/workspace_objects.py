@@ -8,10 +8,29 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from server.engine.ids import KIND_OBJECT, next_id
+from fractions import Fraction
 
 if TYPE_CHECKING:
     from server.engine.descriptions import Description
     from server.engine.rng import RNG
+
+_TWO_THIRDS = Fraction(2, 3)
+
+
+def exact_fraction(value: Any) -> Fraction:
+    """``Fraction(value)`` without ``numbers.Rational`` in the way.
+
+    ``Fraction.__new__`` tests a float argument against the ``numbers.Rational`` ABC
+    before it reaches its float branch, and under free-threaded CPython every such
+    ``isinstance`` takes the ABC's weak-set lock -- a lock all threads share, hit
+    thousands of times per run.  A float's exact value is ``as_integer_ratio()``, which
+    is precisely what the float branch uses, so this returns the same ``Fraction``.
+    """
+    if type(value) is float:
+        numerator, denominator = value.as_integer_ratio()
+        return Fraction(numerator, denominator)
+    return Fraction(value)
+
 
 # Names of slipnet nodes considered non-distinguishing for the
 # ``distinguishing_descriptor`` predicate.  Matches *slipnet-numbers*
@@ -485,20 +504,20 @@ class WorkspaceObject:
         Recomputed rather than stored: a ``Fraction`` attribute would be run state the
         capture format has no type for.
         """
-        from fractions import Fraction
-
-        exact = min(
-            Fraction(max_raw),
-            sum(
-                (
-                    Fraction(getattr(d, "descriptor_activation", 0))
-                    for d in self.get_relevant_descriptions()
-                ),
-                Fraction(0),
-            ),
+        total = Fraction(0)
+        for d in self.get_relevant_descriptions():
+            total = total + exact_fraction(getattr(d, "descriptor_activation", 0))
+        cap = exact_fraction(max_raw)
+        # ``min(cap, total)``: *cap* unless *total* is strictly smaller.  Compared by
+        # cross-multiplication of the (positive) denominators, which is what
+        # ``Fraction.__lt__`` does -- without the ``numbers.Rational`` check it makes first.
+        exact = (
+            total
+            if total.numerator * cap.denominator < cap.numerator * total.denominator
+            else cap
         )
         if self.enclosing_group is not None:
-            exact *= Fraction(2, 3)
+            exact *= _TWO_THIRDS
         return exact
 
     def update_importance(
@@ -831,7 +850,7 @@ def distinguishing_descriptor(obj: Any, descriptor: Any) -> bool:
     if string is None:
         return True
 
-    from server.engine.groups import Group
+    Group = _groups.Group
 
     if isinstance(obj, Letter):
         others = [
@@ -895,3 +914,9 @@ class Letter(WorkspaceObject):
     def __repr__(self) -> str:
         name = getattr(self.letter_category, "short_name", "?")
         return f"Letter({name}, pos={self.left_string_pos})"
+
+
+# ``groups`` imports this module for ``WorkspaceObject``, so it cannot be imported at the top;
+# bound here, after every name above exists, it costs one module-global lookup per call where a
+# function-level ``import`` cost an import-machinery round trip (a measured thread-scaling hazard).
+from server.engine import groups as _groups  # noqa: E402

@@ -56,6 +56,7 @@ rebuild cost to amortise.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from fractions import Fraction
 from typing import TYPE_CHECKING, Any, Sequence
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -510,9 +511,25 @@ def relative_importances(objects: Sequence[Any]) -> list[int]:
     if objects and all(hasattr(o, "exact_raw_importance") for o in objects):
         # Exact rationals, as the reference computes them (utilities.ss:544).
         exacts = [o.exact_raw_importance() for o in objects]
-        total_exact = sum(exacts)
-        if total_exact != 0:
-            return [round(100 * e / total_exact) for e in exacts]
+        if all(type(e) is Fraction for e in exacts):
+            total_exact = exacts[0]
+            for e in exacts[1:]:
+                total_exact = total_exact + e
+            if total_exact != 0:
+                # ``round(100 * e / total_exact)`` over exact rationals, as one integer
+                # ratio: the same value, but ``int * Fraction`` and ``Fraction / Fraction``
+                # each test their operand against the ``numbers.Rational`` ABC, whose
+                # weak-set lock every thread contends for under free-threaded CPython.
+                total_n, total_d = total_exact.numerator, total_exact.denominator
+                return [
+                    round(Fraction(100 * e.numerator * total_d, e.denominator * total_n))
+                    for e in exacts
+                ]
+        else:
+            # Anything else (a test double) takes the general arithmetic.
+            total_exact = sum(exacts)
+            if total_exact != 0:
+                return [round(100 * e / total_exact) for e in exacts]
     total_raw = sum(o.raw_importance for o in objects)
     if total_raw == 0:
         # Scheme: ``update-all-relative-importances`` (workspace-strings.ss:326-329)
