@@ -85,22 +85,29 @@ class Description(WorkspaceStructure):
         Mapped to 0-100 scale: 0->0, 1->20, 2->60, 3->90, >=4->100.
         Excludes objects that contain or are contained by this object.
         """
-        if self.object is None or self.object.string is None:
+        obj = self.object
+        if obj is None or obj.string is None:
             return 0.0
 
-        string = self.object.string
+        string = obj.string
         objects = getattr(string, "objects", [])
+        dtype = self.description_type
+        # Behaviour-neutral reordering (WP9): the containment test is pure, so it is
+        # asked only of the siblings that carry a description of this type -- the
+        # same siblings are counted, in the same order, with the same result.
         count = 0
         for other in objects:
-            if other is self.object:
+            if other is obj:
                 continue
-            # Skip objects where one contains the other
-            if _contains(self.object, other) or _contains(other, self.object):
-                continue
-            # Check if other has a description with the same description_type
             for d in getattr(other, "descriptions", []):
-                if d.description_type is self.description_type:
-                    count += 1
+                if d.description_type is dtype:
+                    # Skip objects where one contains the other.  A letter has no
+                    # ``objects``, so ``_contains`` is False for it without a call.
+                    if not (
+                        (hasattr(obj, "objects") and _contains(obj, other))
+                        or (hasattr(other, "objects") and _contains(other, obj))
+                    ):
+                        count += 1
                     break
 
         if count == 0:
@@ -163,6 +170,11 @@ class Description(WorkspaceStructure):
         return self.get_max_theme_support()
 
     def get_max_theme_support(self) -> float:
+        themespace = WorkspaceStructure.get_themespace()
+        if themespace is None or not themespace.active_theme_types:
+            # No theme type is under pressure: every ``get_active_themes`` is ``[]``,
+            # so ``get_theme_support_values`` would be ``[]`` and the answer 0.0.
+            return 0.0
         values = self.get_theme_support_values()
         return max(values) if values else 0.0
 

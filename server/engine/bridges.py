@@ -372,11 +372,28 @@ class Bridge(WorkspaceStructure):
 
         same_type_bridges = _get_bridges_of_type(workspace, self.bridge_type)
         total = 0.0
+        orientation = self.orientation
+        # ``_supporting_bridges(self, other, ...)`` inlined (WP9): its first operand is
+        # always this bridge, and the distinguishing-CM list is a pure function of the
+        # workspace, which this loop never writes, so it is computed once -- on first
+        # use, exactly as often as before it was needed at all -- instead of per peer.
+        mine = None
         for other in same_type_bridges:
             if other is self:
                 continue
-            if _supporting_bridges(self, other, self.orientation):
-                total += other.strength
+            if _incompatible_bridges(self, other, orientation):
+                continue
+            if mine is None:
+                mine = self.get_distinguishing_concept_mappings()
+            theirs = other.get_distinguishing_concept_mappings()
+            for cm1 in mine:
+                for cm2 in theirs:
+                    if _supporting_cms(cm1, cm2):
+                        total += other.strength
+                        break
+                else:
+                    continue
+                break
         return total
 
     @property

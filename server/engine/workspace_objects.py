@@ -406,7 +406,7 @@ class WorkspaceObject:
         string = self.string
         if string is None:
             return False
-        return self.span == getattr(string, "length", 0)
+        return self.right_string_pos - self.left_string_pos + 1 == getattr(string, "length", 0)
 
     def string_spanning_group(self) -> bool:
         """Scheme: ``string-spanning-group?`` (workspace-objects.ss:353-354)."""
@@ -519,6 +519,40 @@ class WorkspaceObject:
         if self.enclosing_group is not None:
             exact *= _TWO_THIRDS
         return exact
+
+    def exact_raw_ratio(self, max_raw: float = 300.0) -> tuple[int, int]:
+        """``exact_raw_importance`` as an integer ratio ``(numerator, denominator)``.
+
+        The same exact rational, left unreduced and never wrapped in a ``Fraction``
+        (WP9): ``relative_importances`` runs this for every object on every update
+        cycle, and a ``Fraction`` per descriptor plus a gcd-normalised sum per object
+        was the bulk of that cost.  A float's exact value is ``as_integer_ratio()``,
+        so summing ``n/m`` pairs by cross-multiplication yields the identical number
+        as summing Fractions.  The denominator is always positive.
+        """
+        num, den = 0, 1
+        for d in self.descriptions:
+            if not _description_is_relevant(d):
+                continue
+            value = getattr(d, "descriptor_activation", 0)
+            kind = type(value)
+            if kind is float:
+                n, m = value.as_integer_ratio()
+            elif kind is int:
+                n, m = value, 1
+            else:
+                f = Fraction(value)
+                n, m = f.numerator, f.denominator
+            num = num * m + n * den
+            den = den * m
+        cap = exact_fraction(max_raw)
+        cap_n, cap_d = cap.numerator, cap.denominator
+        # ``min(cap, total)``: *cap* unless *total* is strictly smaller.
+        if not num * cap_d < cap_n * den:
+            num, den = cap_n, cap_d
+        if self.enclosing_group is not None:
+            num, den = num * 2, den * 3
+        return num, den
 
     def update_importance(
         self, max_raw: float = 300.0, enclosed_factor: float = 2.0 / 3.0
@@ -842,38 +876,53 @@ def distinguishing_descriptor(obj: Any, descriptor: Any) -> bool:
     — never distinguish anything, and a group's siblings exclude its own enclosing
     group and its own subgroups, both as in the Scheme.
     """
-    name = getattr(descriptor, "name", "")
+    try:
+        name = descriptor.name
+    except AttributeError:
+        name = ""
     if name in _NON_DISTINGUISHING_NAMES:
         return False
 
-    string = getattr(obj, "string", None)
+    try:
+        string = obj.string
+    except AttributeError:
+        string = None
     if string is None:
         return True
 
-    Group = _groups.Group
-
+    # Written without the intermediate ``others`` list (WP9): the answer is "does any
+    # sibling carry the descriptor", a boolean over the same set, so the order in which
+    # siblings are visited cannot matter.
     if isinstance(obj, Letter):
-        others = [
-            o for o in getattr(string, "objects", [])
-            if isinstance(o, Letter) and o is not obj
-        ]
-    elif isinstance(obj, Group):
+        for o in getattr(string, "objects", []):
+            if o is obj or not isinstance(o, Letter):
+                continue
+            for d in o.descriptions:
+                if d.descriptor is descriptor:
+                    return False
+        return True
+
+    Group = _groups.Group
+    if isinstance(obj, Group):
         supergroup = obj.enclosing_group
         subgroups = [o for o in getattr(obj, "objects", []) if isinstance(o, Group)]
-        others = [
-            g for g in getattr(string, "groups", [])
-            if g is not obj and g is not supergroup and g not in subgroups
-        ]
-    else:
-        # Not a reference path: the Scheme's object is always a letter or a group.
-        # Kept so the predicate is total, and reading every sibling the string
-        # knows about is the conservative choice for anything else.
-        others = [o for o in getattr(string, "objects", []) if o is not obj]
-        seen = {id(o) for o in others} | {id(obj)}
-        for o in getattr(string, "letters", []):
-            if id(o) not in seen:
-                others.append(o)
-                seen.add(id(o))
+        for g in getattr(string, "groups", []):
+            if g is obj or g is supergroup or g in subgroups:
+                continue
+            for d in g.descriptions:
+                if d.descriptor is descriptor:
+                    return False
+        return True
+
+    # Not a reference path: the Scheme's object is always a letter or a group.
+    # Kept so the predicate is total, and reading every sibling the string
+    # knows about is the conservative choice for anything else.
+    others = [o for o in getattr(string, "objects", []) if o is not obj]
+    seen = {id(o) for o in others} | {id(obj)}
+    for o in getattr(string, "letters", []):
+        if id(o) not in seen:
+            others.append(o)
+            seen.add(id(o))
 
     for other in others:
         for d in getattr(other, "descriptions", []):

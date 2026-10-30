@@ -8,7 +8,6 @@ from __future__ import annotations
 import threading
 from typing import TYPE_CHECKING
 
-from server.engine.formulas import weighted_average
 from server.engine.ids import KIND_STRUCTURE, next_id
 
 if TYPE_CHECKING:
@@ -109,10 +108,16 @@ class WorkspaceStructure:
         internal = self.calculate_internal_strength()
         external = self.calculate_external_strength(rng)
 
-        intrinsic_strength = weighted_average(
-            [internal, external],
-            [internal, 100.0 - internal],
-        )
+        # ``weighted_average([internal, external], [internal, 100.0 - internal])`` written
+        # out for two terms (WP9): the same operations in the same order, minus the
+        # two list builds, the ``zip`` and the generator.  ``sum`` of two floats is
+        # ``a + b`` (its compensated summation only matters from three terms on).
+        w2 = 100.0 - internal
+        total = internal + w2
+        if total == 0:
+            intrinsic_strength = 0.0
+        else:
+            intrinsic_strength = (internal * internal + external * w2) / total
 
         compatibility = self.get_thematic_compatibility()
         thematic_weight = abs(compatibility)
@@ -120,12 +125,13 @@ class WorkspaceStructure:
             self.strength = round(intrinsic_strength)
             return
 
-        self.strength = round(
-            weighted_average(
-                [100.0 if compatibility > 0 else 0.0, intrinsic_strength],
-                [thematic_weight, 1.0 - thematic_weight],
-            )
-        )
+        w2 = 1.0 - thematic_weight
+        total = thematic_weight + w2
+        if total == 0:
+            self.strength = round(0.0)
+            return
+        pole = 100.0 if compatibility > 0 else 0.0
+        self.strength = round((pole * thematic_weight + intrinsic_strength * w2) / total)
 
     def calculate_internal_strength(self) -> float:
         return 0.0

@@ -55,6 +55,7 @@ rebuild cost to amortise.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from fractions import Fraction
 from typing import TYPE_CHECKING, Any, Sequence
@@ -508,6 +509,29 @@ def relative_importances(objects: Sequence[Any]) -> list[int]:
     (``WorkspaceString.update_object_values``).  Kept out of the backends for the
     dynamic-range reason given on ``ObjectValueBatch``.
     """
+    if objects and all(hasattr(o, "exact_raw_ratio") for o in objects):
+        # The engine's own objects: the same exact rationals as the branch below, held
+        # as integer ratios (see ``WorkspaceObject.exact_raw_ratio``) and rounded
+        # half-to-even exactly as ``Fraction.__round__`` does.
+        ratios = [o.exact_raw_ratio() for o in objects]
+        total_n, total_d = 0, 1
+        for n, d in ratios:
+            common = math.lcm(total_d, d)
+            total_n = total_n * (common // total_d) + n * (common // d)
+            total_d = common
+        if total_n != 0:
+            out = []
+            for n, d in ratios:
+                num = 100 * n * total_d
+                den = d * total_n
+                if den < 0:
+                    num, den = -num, -den
+                q, r = divmod(num, den)
+                r2 = r * 2
+                if r2 > den or (r2 == den and q % 2 == 1):
+                    q += 1
+                out.append(q)
+            return out
     if objects and all(hasattr(o, "exact_raw_importance") for o in objects):
         # Exact rationals, as the reference computes them (utilities.ss:544).
         exacts = [o.exact_raw_importance() for o in objects]
