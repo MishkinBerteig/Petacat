@@ -132,7 +132,7 @@ outside the matrix take it too and the run is entirely what it says it is.
   integration     68 collected     68 run     68 passed      0 failed      0 skipped  complete
   parallel       244 collected    244 run    244 passed      0 failed      0 skipped  complete
   lockstep       223 collected    223 run    223 passed      0 failed      0 skipped  complete
-  e2e            325 collected    325 run    325 passed      0 failed      0 skipped  complete
+  e2e            326 collected    326 run    326 passed      0 failed      0 skipped  complete
 
   run complete in 12.5 min against a 60 min ceiling
 ```
@@ -211,7 +211,7 @@ that allowance.
 | **integration** | `tests/integration/` | Agreement between the repository's artifacts, and the harness's own rules | Real `seed_data/*.json`, the ORM declarations, the generated client files, the documentation, a real pytest session | 68 |
 | **parallel** | `tests/parallel/` | The detachable multi-core plugin (`server/parallel/`): each executor against the serial run it claims to equal | Real engine objects and `seed_data/*.json`, worker processes and threads; each test pins the backend it compares on | 244 |
 | **lockstep** | `tests/lockstep/` | Petacat's decision traces against Metacat's: naming, helper conformance, tracing/replay RNGs, determinism guards, the comparer | Real engine in faithful mode (numeric backend off, or a named backend); recorded Metacat traces | 223 |
-| **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 325 |
+| **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 326 |
 
 Those counts are cases, so they include the second pass the numeric matrix makes
 over the 498 backend-sensitive tests.
@@ -246,7 +246,7 @@ first**, then move up toward the API and GUI.
 
 All eight layers run in one command — the
 [required command](#the-required-command) — and, since Petacat runs natively, all
-eight actually run: **3,149 cases**, every one of them executed. A layer that is
+eight actually run: **3,150 cases**, every one of them executed. A layer that is
 normally skipped is not a layer that is normally green, and none of these is.
 
 Wall-clock time depends heavily on the machine and on what else it is doing. The
@@ -509,7 +509,7 @@ the number of endpoints taking `Depends(get_session)`, the size of
 | `test_snag_identity.py` | 5 | A snag is the same snag whichever endpoint served it, and is written once |
 | `test_moment_display.py` | 6 | Event, answer and snag redisplay over the API: print names in the listing, the picture served live and from the stored row, the toggle and the switch, rows with no picture |
 | `test_swarm_api.py` | 5 | `POST /api/swarm` equals the serial runs, persists nothing, and rejects bad requests; `GET /api/swarm` reports the pool |
-| `test_trainings_api.py` | 31 | Trainings over HTTP: every stored run is the serial run; the 25 + 5 workflow (problems added while it runs); the finished long-poll; pause, resume, close, cancel, delete; the database written only when a problem finishes; a restart redoes what was cut off to the identical result and rebuilds the shared memory exactly; one worker is a serial episode and many replay from the merge log; fair sharing of the cores; every error policy; worker-failure retries, charged only to the run that broke the pool; a policy pause survives a concurrent status change; live counts never step backwards; seed ranges fit the database; configuration change stalls or is adopted; validation, export, defaults and fixed settings |
+| `test_trainings_api.py` | 32 | Trainings over HTTP: every stored run is the serial run; the 25 + 5 workflow (problems added while it runs); the finished long-poll; pause, resume, close, cancel, delete; the database written only when a problem finishes; a restart redoes what was cut off to the identical result and rebuilds the shared memory exactly; one worker is a serial episode and many replay from the merge log; fair sharing of the cores; every error policy; worker-failure retries, charged only to the run that broke the pool; a policy pause survives a concurrent status change; live counts never step backwards; a summary's finished cursor comes from the same snapshot as its counts; seed ranges fit the database; configuration change stalls or is adopted; validation, export, defaults and fixed settings |
 | `test_step0_config_from_db.py` | 50 | Step 0's guard tests: a shipped value reproduces the run and a changed one moves it |
 
 **`tests/parallel/` — the multi-core plugin against the serial runs it claims to equal**

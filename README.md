@@ -29,7 +29,7 @@ license change was authorised by Dr. Marshall directly (see
 > declines an answer already held for the same problem and rules, so repeating a
 > problem within one of Metacat Mode's sessions (the UI's
 > [Training Session](#persistence-modes-and-training-sessions), which is Metacat
-> Mode and not Training Mode) explores a different answer each time. It ships with 3,149 test cases covering the engine, the API, and the
+> Mode and not Training Mode) explores a different answer each time. It ships with 3,150 test cases covering the engine, the API, and the
 > help/config system, run on both the CPU and the GPU numeric backends. Underneath the seven components sits an execution
 > substrate — three [persistence modes](#persistence-modes-and-training-sessions),
 > a [GPU numeric substrate](#the-numeric-substrate), and
@@ -438,7 +438,7 @@ Petacat has two test suites:
   plugin against the serial runs it claims to equal), `lockstep` (Petacat's decision
   traces against Metacat's), and `e2e` (full HTTP
   stack against a running database). All eight run in a single command against
-  the local Postgres — 3,149 cases, which includes the numeric matrix's second
+  the local Postgres — 3,150 cases, which includes the numeric matrix's second
   pass over the 498 backend-sensitive tests. See
   [TESTING.md](TESTING.md) for the layer breakdown, the numeric backend matrix,
   the session ceiling, the unit-test rules, determinism requirements, test-double

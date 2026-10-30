@@ -1006,3 +1006,20 @@ async def test_live_counts_never_step_backwards(app_client, trainings):
         await asyncio.sleep(0.03)
     done = await until_state(app_client, tid, "idle")
     assert done["runs"]["done"] == 120
+
+
+@pytest.mark.asyncio
+async def test_a_summary_takes_its_finished_cursor_from_the_snapshot_of_its_counts(app_client, trainings):
+    """Training Mode: the caller's Training row may be older than the counts' snapshot.  A summary
+    that counts every problem finished must then still report the matching finished_cursor."""
+    made = await create(app_client, 3)
+    bid = made["training"]["id"]
+    await app_client.post(f"/api/trainings/{bid}/close")
+    await until_state(app_client, bid, "finished")
+    async with trainings._factory() as s:
+        stale = await trainings._get_training(s, bid)
+        s.expunge(stale)
+        stale.finished_count = 0  # the row as loaded before the last milestone writes
+        summary = (await trainings._summaries(s, [stale]))[0]
+    assert summary["state"] == "finished" and summary["problems"]["finished"] == 3
+    assert summary["finished_cursor"] == 3

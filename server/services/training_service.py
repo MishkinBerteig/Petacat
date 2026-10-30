@@ -1069,6 +1069,11 @@ class TrainingService:
         if live_ids:
             written = set((await s.execute(
                 select(P.id).where(P.id.in_(live_ids), P.status != "queued"))).scalars())
+        # The cursor comes from the same snapshot as the counts: the Training rows the caller
+        # loaded may predate it, and a summary must not count a problem as finished while
+        # its finished_seq is still beyond finished_cursor.
+        cursors = dict((await s.execute(
+            select(Training.id, Training.finished_count).where(Training.id.in_(ids)))).all())
         await s.close()
         zero = (0,) * 7
         out = []
@@ -1139,7 +1144,7 @@ class TrainingService:
                 "runs_per_second": round(rate, 3) if rate else None,
                 "eta_seconds": round(remaining / rate, 1) if rate and remaining else None,
                 "memory_version": (lt.version if lt is not None else 0) if shared else None,
-                "finished_cursor": t.finished_count,
+                "finished_cursor": cursors.get(t.id, t.finished_count),
                 "last_event": (lt.last_event if lt is not None else None) or t.last_event,
             })
         return out
