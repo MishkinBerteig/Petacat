@@ -130,7 +130,7 @@ outside the matrix take it too and the run is entirely what it says it is.
   module        1025 collected   1025 run   1025 passed      0 failed      0 skipped  complete
   architecture    37 collected     37 run     37 passed      0 failed      0 skipped  complete
   integration     68 collected     68 run     68 passed      0 failed      0 skipped  complete
-  parallel       211 collected    211 run    211 passed      0 failed      0 skipped  complete
+  parallel       232 collected    232 run    232 passed      0 failed      0 skipped  complete
   lockstep       223 collected    223 run    223 passed      0 failed      0 skipped  complete
   e2e            294 collected    294 run    294 passed      0 failed      0 skipped  complete
 
@@ -209,7 +209,7 @@ that allowance.
 | **module** | `tests/module/` | Several real components assembled and driven | Real engine objects and `seed_data/*.json`; no DB, no HTTP | 1025 |
 | **architecture** | `tests/architecture/` | How the source tree is allowed to depend on itself | The repository's source, `seed_data/*.json`, child interpreters | 37 |
 | **integration** | `tests/integration/` | Agreement between the repository's artifacts, and the harness's own rules | Real `seed_data/*.json`, the ORM declarations, the generated client files, the documentation, a real pytest session | 68 |
-| **parallel** | `tests/parallel/` | The detachable multi-core plugin (`server/parallel/`): each executor against the serial run it claims to equal | Real engine objects and `seed_data/*.json`, worker processes and threads; each test pins the backend it compares on | 211 |
+| **parallel** | `tests/parallel/` | The detachable multi-core plugin (`server/parallel/`): each executor against the serial run it claims to equal | Real engine objects and `seed_data/*.json`, worker processes and threads; each test pins the backend it compares on | 232 |
 | **lockstep** | `tests/lockstep/` | Petacat's decision traces against Metacat's: naming, helper conformance, tracing/replay RNGs, determinism guards, the comparer | Real engine in faithful mode (numeric backend off, or a named backend); recorded Metacat traces | 223 |
 | **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 294 |
 
@@ -246,7 +246,7 @@ first**, then move up toward the API and GUI.
 
 All eight layers run in one command — the
 [required command](#the-required-command) — and, since Petacat runs natively, all
-eight actually run: **3,084 cases**, every one of them executed. A layer that is
+eight actually run: **3,105 cases**, every one of them executed. A layer that is
 normally skipped is not a layer that is normally green, and none of these is.
 
 Wall-clock time depends heavily on the machine and on what else it is doing. The
@@ -518,9 +518,9 @@ the number of endpoints taking `Depends(get_session)`, the size of
 | `test_swarm.py` | 17 | A swarm outcome is the serial run's, byte for byte: demo problems × seeds, justification, episodes, parameter overrides, both CPU backends; errors come back as outcomes; configuration changes re-initialise workers |
 | `test_placement.py` | 13 | The measured backend policy: the CPU by default, never the GPU on its own, the environment overrides |
 | `test_update_cycle.py` | 9 | The plugin's update cycle: faithful is bit-identical to the engine's, stream is identical at every thread count |
-| `test_clock_rack.py` | 10 | The exponential-race coderack draws each codelet with the faithful two-stage draw's probability, and a later post never disturbs an earlier choice it does not beat |
+| `test_clock_rack.py` | 12 | The exponential-race coderack draws each codelet with the faithful two-stage draw's probability, and a later post never disturbs an earlier choice it does not beat; the prediction cached for an epoch stays exact until a post passes it |
 | `test_effects.py` | 8 | The builtin effects table is complete, and no speculated read prefix writes shared state (the hidden-write detector) |
-| `test_speculative_exact.py` | 10 | The speculative executor is bit-identical to the stream-serial reference at every worker count, with forced aborts too; the slow sweep (`PETACAT_SPECULATIVE_SWEEP_SEEDS`) widens it |
+| `test_speculative_exact.py` | 17 | The speculative executor is bit-identical to the stream-serial reference at every worker count, with forced aborts too; which codelets run ahead, and how far, never changes a result; one worker is the reference itself; the slow sweep (`PETACAT_SPECULATIVE_SWEEP_SEEDS`) widens it |
 
 **Collected by no layer**
 

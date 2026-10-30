@@ -28,7 +28,7 @@ license change was authorised by Dr. Marshall directly (see
 > end-to-end. Episodic Memory shapes the runs that inherit it: a run declines an
 > answer already held for the same problem and rules, so repeating a problem
 > within a [Training Session](#persistence-modes-and-training-sessions) explores
-> a different answer each time. It ships with 3,084 test cases covering the engine, the API, and the
+> a different answer each time. It ships with 3,105 test cases covering the engine, the API, and the
 > help/config system, run on both the CPU and the GPU numeric backends. Underneath the seven components sits an execution
 > substrate — three [persistence modes](#persistence-modes-and-training-sessions),
 > a [GPU numeric substrate](#the-numeric-substrate), and
@@ -366,7 +366,7 @@ Petacat has two test suites:
   plugin against the serial runs it claims to equal), `lockstep` (Petacat's decision
   traces against Metacat's), and `e2e` (full HTTP
   stack against a running database). All eight run in a single command against
-  the local Postgres — 3,084 cases, which includes the numeric matrix's second
+  the local Postgres — 3,105 cases, which includes the numeric matrix's second
   pass over the 498 backend-sensitive tests. See
   [TESTING.md](TESTING.md) for the layer breakdown, the numeric backend matrix,
   the session ceiling, the unit-test rules, determinism requirements, test-double
@@ -787,33 +787,43 @@ reproducible by its seed.
   on the same stream, so it draws the same numbers.
 - **Some codelets run on the coordinator,** with nothing in flight: the `meta` and
   `answer` families, the three rule codelets (because `Rule.currently_works` writes
-  image caches onto shared objects), and every update cycle.
+  image caches onto shared objects), every update cycle, six codelet types too short
+  to repay a hand-off (the effects table's `profitable` flag), and whatever follows a
+  step that may write. These are scheduling choices only. Which thread runs a step
+  never changes what the step computes, and the tests vary them to prove it.
 - **The evidence is zero divergence.** About 1,100 compared runs at 1–16 workers on
   both interpreters showed none; neither did 9 runs on the Metal backend, nor a
   per-seed sweep through the swarm of 580 seed pairs (every demo problem × 20
-  seeds, run to the end, 3 threads, the free-threaded interpreter).
+  seeds, run to the end, 3 threads, the free-threaded interpreter), repeated after
+  the second pass described below.
 
-**It is not faster yet, and the reasons are measured.**
-- A run is about half update cycle, and the update cycle is serial.
-- Codelets average about 25 µs.
-- Rule codelets must run inline.
-- Coordinating a step costs about 20 µs.
-- At 4 or more workers, 20–35% of speculations conflict and re-run.
+**It is not faster than the stream reference, and the reasons are measured.**
+- **The update cycle is serial and is 57% of a run.** Codelets are about a third of it.
+- **Codelets are small,** 6–40 µs and about 20 µs on average.
+- **A prefix run on a worker costs about 1.7× the CPU** of the same codelet run inline.
+  Reference counts are writes on the free-threaded interpreter, so every object a worker
+  touches has to come back across the cores, and the update cycle slows by a few
+  microseconds for each codelet speculated.
+- **Net, nothing is left over.** Speculation saves 2–5 ms of codelet time in a 180 ms run
+  and costs about 4 ms in the update cycle.
 
 On a quiet machine:
 
-| Workers | Against the stream reference (median) | Speculations aborted (median) |
-|---:|---:|---:|
-| 1 | 0.78× | 0% |
-| 2 | 0.82× | 9% |
-| 4 | 0.79× | 21% |
-| 8 | 0.56× | 41% |
+| Workers | Against the stream reference (median) | Speculations aborted (median) | First version |
+|---:|---:|---:|---:|
+| 1 | 1.01× | 0% | 0.78× |
+| 2 | 0.92× | 3% | 0.82× |
+| 4 | 0.91× | 5% | 0.79× |
+| 8 | 0.85× | 5% | 0.56× |
 
 This is `scripts/bench_speculative.py` under `.venv-ft` on an M5 Max: five problems × 3
-seeds, 3,000 codelets, best of 3, every run exact
-(`measurements/parallel/speculative-bench.json`). The single-worker row is the cost
-of the machinery itself. Each extra worker wins back part of it, until conflicts
-outgrow the gain.
+seeds, 3,000 codelets, the best of 3 rounds that interleave the reference with each
+worker count, every run exact (`measurements/parallel/speculative-bench.json`).
+- **One worker is the reference itself,** with no machinery and no threads.
+- **The second pass** cut the machinery's fixed cost from about 20% to about 1%. It ran
+  ahead only the codelet types that repay a hand-off and nothing past a step that may
+  write, which cut aborts from 20–40% to 5%. It also made one prediction per epoch and
+  parked idle workers during update cycles.
 
 `measurements/parallel/speculative-engine.md` lists the engine seams that would let
 more codelets speculate: call-private image maps in `Rule.currently_works`, a

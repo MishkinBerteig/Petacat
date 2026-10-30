@@ -542,7 +542,7 @@ The result is exact. For any worker count of 2 or more the run is identical -- t
 
 A parallel run is not the same run as the serial loop with the same seed. To make exact parallelism possible, each codelet draws from its own random stream and the coderack chooses by an exponential race instead of two draws; both give every codelet exactly the same probability of being chosen as Metacat's rule, so the distribution of answers is the same, but an individual seed lands on a different run. Use Workers 1 when you want the faithful serial loop.
 
-It is also not yet faster than serial. Codelets are small, the update cycle (about half of a run) is serial, and conflicts are frequent, so at today's sizes the coordination costs about as much as it saves. To get answers sooner, use the Swarm, which runs many seeds at once on every core and is faster in proportion to the cores.
+It is also not yet faster than serial. Codelets are small, the update cycle (more than half of a run) is serial, and handing a codelet to another core costs about as much as running it there saves, so at today's sizes a parallel run is about a tenth slower than the same run on one thread. To get answers sooner, use the Swarm, which runs many seeds at once on every core and is faster in proportion to the cores.
 
 An older free-running engine, which let codelets act on a moving Workspace, lowered the rate of some answers and is no longer reachable from Run Controls.
 
