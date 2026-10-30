@@ -325,13 +325,19 @@ def main():
                     help="override an engine parameter, repeatable. The sweep "
                          "PHASE 1 PLAN.md asks for is "
                          "--param max_coderack_size=200")
-    ap.add_argument("-j", "--jobs", type=int, default=8)
+    ap.add_argument("-j", "--jobs", type=int, default=0,
+                    help="worker processes (default: every logical core but one, from "
+                         "server.engine.hardware; results do not depend on it)")
     ap.add_argument("--only")
     ap.add_argument("-o", "--out", default="measurements/vs-metacat.json")
     ap.add_argument("--reference", default=REFERENCE,
                     help="directory holding the reference sets "
                          "(default: measurements/reference)")
     args = ap.parse_args()
+    if args.jobs <= 0:
+        from server.engine import hardware
+
+        args.jobs = hardware.population_worker_count()
 
     single_files = ("single-run-sets.json", "single-run-p50.json")
     episodic_files = ("convergence-sets.json", "convergence-p50.json")

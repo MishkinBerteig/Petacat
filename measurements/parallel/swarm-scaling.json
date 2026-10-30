@@ -1,0 +1,594 @@
+{
+  "benchmark": "swarm scaling",
+  "date": "2026-10-29 23:10:12",
+  "machine": {
+    "platform": "darwin",
+    "cpu": {
+      "logical_cores": 18,
+      "performance_cores": 6,
+      "efficiency_cores": 12,
+      "chip": "Apple M5 Max",
+      "memory_bytes": 137438953472,
+      "probe": "sysctl hw.perflevel"
+    },
+    "gpu": {
+      "cores": 40,
+      "name": "Apple M5 Max",
+      "metal_available": true,
+      "probe": "system_profiler SPDisplaysDataType"
+    }
+  },
+  "core_tiers": {
+    "logical_cores": 18,
+    "probe": "sysctl hw.perflevel",
+    "tiers": [
+      {
+        "level": 0,
+        "name": "Super",
+        "logical_cpus": 6
+      },
+      {
+        "level": 1,
+        "name": "Performance",
+        "logical_cpus": 12
+      }
+    ]
+  },
+  "python": "3.14.9",
+  "problem_mix": [
+    [
+      "abc",
+      "abd",
+      "ijk",
+      null
+    ],
+    [
+      "abc",
+      "abd",
+      "mrrjjj",
+      null
+    ],
+    [
+      "abc",
+      "abd",
+      "xyz",
+      null
+    ],
+    [
+      "aabc",
+      "aabd",
+      "ijkk",
+      null
+    ],
+    [
+      "xqc",
+      "xqd",
+      "mrrjjj",
+      "mrrjjjj"
+    ],
+    [
+      "wxyz",
+      "vxyz",
+      "abcd",
+      null
+    ]
+  ],
+  "max_steps": 6000,
+  "ladder": [
+    1,
+    2,
+    4,
+    8,
+    16,
+    17
+  ],
+  "backends": {
+    "off": {
+      "runs": 288,
+      "rows": [
+        {
+          "workers": 1,
+          "runs": 288,
+          "seconds": 80.837,
+          "runs_per_second": 3.56,
+          "codelets": 661169,
+          "codelets_per_second": 8179,
+          "startup_seconds": 0.104,
+          "errors": [],
+          "load_average_1m": 12.76,
+          "per_process_codelets_per_second": [
+            8187
+          ],
+          "identical_to_serial": true,
+          "speedup_vs_1_worker": 1.0,
+          "efficiency_vs_1_worker": 1.0,
+          "speedup_vs_serial": 0.99
+        },
+        {
+          "workers": 2,
+          "runs": 288,
+          "seconds": 41.347,
+          "runs_per_second": 6.97,
+          "codelets": 661169,
+          "codelets_per_second": 15991,
+          "startup_seconds": 0.084,
+          "errors": [],
+          "load_average_1m": 9.27,
+          "per_process_codelets_per_second": [
+            8406,
+            7645
+          ],
+          "identical_to_serial": true,
+          "speedup_vs_1_worker": 1.96,
+          "efficiency_vs_1_worker": 0.979,
+          "speedup_vs_serial": 1.94
+        },
+        {
+          "workers": 4,
+          "runs": 288,
+          "seconds": 22.392,
+          "runs_per_second": 12.86,
+          "codelets": 661169,
+          "codelets_per_second": 29527,
+          "startup_seconds": 0.105,
+          "errors": [],
+          "load_average_1m": 9.47,
+          "per_process_codelets_per_second": [
+            7933,
+            7796,
+            7231,
+            7035
+          ],
+          "identical_to_serial": true,
+          "speedup_vs_1_worker": 3.61,
+          "efficiency_vs_1_worker": 0.903,
+          "speedup_vs_serial": 3.57
+        },
+        {
+          "workers": 8,
+          "runs": 288,
+          "seconds": 13.194,
+          "runs_per_second": 21.83,
+          "codelets": 661169,
+          "codelets_per_second": 50111,
+          "startup_seconds": 0.133,
+          "errors": [],
+          "load_average_1m": 9.43,
+          "per_process_codelets_per_second": [
+            7230,
+            6537,
+            6514,
+            6414,
+            6392,
+            6312,
+            6188,
+            6065
+          ],
+          "identical_to_serial": true,
+          "speedup_vs_1_worker": 6.13,
+          "efficiency_vs_1_worker": 0.767,
+          "speedup_vs_serial": 6.06
+        },
+        {
+          "workers": 16,
+          "runs": 288,
+          "seconds": 8.642,
+          "runs_per_second": 33.33,
+          "codelets": 661169,
+          "codelets_per_second": 76508,
+          "startup_seconds": 0.17,
+          "errors": [],
+          "load_average_1m": 10.45,
+          "per_process_codelets_per_second": [
+            5918,
+            5883,
+            5648,
+            5617,
+            5547,
+            5289,
+            5222,
+            5158,
+            4898,
+            4849,
+            4809,
+            4795,
+            4735,
+            4676,
+            4382,
+            4219
+          ],
+          "identical_to_serial": true,
+          "speedup_vs_1_worker": 9.36,
+          "efficiency_vs_1_worker": 0.585,
+          "speedup_vs_serial": 9.26
+        },
+        {
+          "workers": 17,
+          "runs": 288,
+          "seconds": 14.787,
+          "runs_per_second": 19.48,
+          "codelets": 661169,
+          "codelets_per_second": 44712,
+          "startup_seconds": 0.172,
+          "errors": [],
+          "load_average_1m": 14.39,
+          "per_process_codelets_per_second": [
+            3265,
+            3099,
+            3007,
+            2991,
+            2968,
+            2891,
+            2887,
+            2847,
+            2811,
+            2803,
+            2739,
+            2726,
+            2692,
+            2666,
+            2624,
+            2602,
+            2385
+          ],
+          "identical_to_serial": true,
+          "speedup_vs_1_worker": 5.47,
+          "efficiency_vs_1_worker": 0.322,
+          "speedup_vs_serial": 5.41
+        }
+      ],
+      "serial_inprocess": {
+        "runs": 288,
+        "seconds": 79.955,
+        "runs_per_second": 3.6,
+        "codelets_per_second": 8269
+      }
+    },
+    "numpy": {
+      "runs": 288,
+      "rows": [
+        {
+          "workers": 1,
+          "runs": 288,
+          "seconds": 100.049,
+          "runs_per_second": 2.88,
+          "codelets": 661169,
+          "codelets_per_second": 6608,
+          "startup_seconds": 0.026,
+          "errors": [],
+          "load_average_1m": 16.0,
+          "per_process_codelets_per_second": [
+            6616
+          ],
+          "identical_to_serial": true,
+          "speedup_vs_1_worker": 1.0,
+          "efficiency_vs_1_worker": 1.0,
+          "speedup_vs_serial": 1.16
+        },
+        {
+          "workers": 2,
+          "runs": 288,
+          "seconds": 43.882,
+          "runs_per_second": 6.56,
+          "codelets": 661169,
+          "codelets_per_second": 15067,
+          "startup_seconds": 0.081,
+          "errors": [],
+          "load_average_1m": 12.94,
+          "per_process_codelets_per_second": [
+            7712,
+            7428
+          ],
+          "identical_to_serial": true,
+          "speedup_vs_1_worker": 2.28,
+          "efficiency_vs_1_worker": 1.139,
+          "speedup_vs_serial": 2.65
+        },
+        {
+          "workers": 4,
+          "runs": 288,
+          "seconds": 24.727,
+          "runs_per_second": 11.65,
+          "codelets": 661169,
+          "codelets_per_second": 26738,
+          "startup_seconds": 0.098,
+          "errors": [],
+          "load_average_1m": 9.93,
+          "per_process_codelets_per_second": [
+            7098,
+            6756,
+            6717,
+            6566
+          ],
+          "identical_to_serial": true,
+          "speedup_vs_1_worker": 4.05,
+          "efficiency_vs_1_worker": 1.011,
+          "speedup_vs_serial": 4.7
+        },
+        {
+          "workers": 8,
+          "runs": 288,
+          "seconds": 14.251,
+          "runs_per_second": 20.21,
+          "codelets": 661169,
+          "codelets_per_second": 46395,
+          "startup_seconds": 0.132,
+          "errors": [],
+          "load_average_1m": 9.49,
+          "per_process_codelets_per_second": [
+            6437,
+            6340,
+            6286,
+            5982,
+            5916,
+            5639,
+            5578,
+            5454
+          ],
+          "identical_to_serial": true,
+          "speedup_vs_1_worker": 7.02,
+          "efficiency_vs_1_worker": 0.877,
+          "speedup_vs_serial": 8.15
+        },
+        {
+          "workers": 16,
+          "runs": 288,
+          "seconds": 8.949,
+          "runs_per_second": 32.18,
+          "codelets": 661169,
+          "codelets_per_second": 73883,
+          "startup_seconds": 0.163,
+          "errors": [],
+          "load_average_1m": 10.24,
+          "per_process_codelets_per_second": [
+            5861,
+            5262,
+            5147,
+            5085,
+            5065,
+            5060,
+            5022,
+            4941,
+            4860,
+            4753,
+            4743,
+            4741,
+            4660,
+            4505,
+            4422,
+            4367
+          ],
+          "identical_to_serial": true,
+          "speedup_vs_1_worker": 11.17,
+          "efficiency_vs_1_worker": 0.698,
+          "speedup_vs_serial": 12.98
+        },
+        {
+          "workers": 17,
+          "runs": 288,
+          "seconds": 9.212,
+          "runs_per_second": 31.26,
+          "codelets": 661169,
+          "codelets_per_second": 71776,
+          "startup_seconds": 0.168,
+          "errors": [],
+          "load_average_1m": 11.51,
+          "per_process_codelets_per_second": [
+            5505,
+            5001,
+            4932,
+            4864,
+            4764,
+            4598,
+            4533,
+            4503,
+            4434,
+            4392,
+            4392,
+            4331,
+            4324,
+            4309,
+            4306,
+            4301,
+            4110
+          ],
+          "identical_to_serial": true,
+          "speedup_vs_1_worker": 10.85,
+          "efficiency_vs_1_worker": 0.638,
+          "speedup_vs_serial": 12.6
+        }
+      ],
+      "serial_inprocess": {
+        "runs": 288,
+        "seconds": 116.045,
+        "runs_per_second": 2.48,
+        "codelets_per_second": 5698
+      }
+    }
+  },
+  "note": "Measured on a machine that may be shared; see load_average_1m per row.",
+  "mlx_and_small_sample": {
+    "note": "12-run sample (6 problems x 2 seeds) at 1 and 17 workers, for the GPU-backend comparison; the sample is small so scaling here is tail-limited, but the backends are compared on identical tasks.",
+    "backends": {
+      "off": {
+        "runs": 12,
+        "rows": [
+          {
+            "workers": 1,
+            "runs": 12,
+            "seconds": 2.841,
+            "runs_per_second": 4.22,
+            "codelets": 27907,
+            "codelets_per_second": 9824,
+            "startup_seconds": 0.09,
+            "errors": [],
+            "load_average_1m": 12.67,
+            "per_process_codelets_per_second": [
+              9836
+            ],
+            "identical_to_serial": true,
+            "speedup_vs_1_worker": 1.0,
+            "efficiency_vs_1_worker": 1.0,
+            "speedup_vs_serial": 0.94
+          },
+          {
+            "workers": 17,
+            "runs": 12,
+            "seconds": 0.713,
+            "runs_per_second": 16.83,
+            "codelets": 27907,
+            "codelets_per_second": 39146,
+            "startup_seconds": 0.167,
+            "errors": [],
+            "load_average_1m": 12.46,
+            "per_process_codelets_per_second": [
+              10452,
+              9855,
+              9765,
+              9634,
+              9440,
+              9216,
+              8562,
+              8406,
+              8371,
+              8251,
+              6318,
+              6221
+            ],
+            "identical_to_serial": true,
+            "speedup_vs_1_worker": 3.99,
+            "efficiency_vs_1_worker": 0.235,
+            "speedup_vs_serial": 3.75
+          }
+        ],
+        "serial_inprocess": {
+          "runs": 12,
+          "seconds": 2.671,
+          "runs_per_second": 4.49,
+          "codelets_per_second": 10450
+        }
+      },
+      "numpy": {
+        "runs": 12,
+        "rows": [
+          {
+            "workers": 1,
+            "runs": 12,
+            "seconds": 3.268,
+            "runs_per_second": 3.67,
+            "codelets": 27907,
+            "codelets_per_second": 8539,
+            "startup_seconds": 0.021,
+            "errors": [],
+            "load_average_1m": 12.1,
+            "per_process_codelets_per_second": [
+              8548
+            ],
+            "identical_to_serial": true,
+            "speedup_vs_1_worker": 1.0,
+            "efficiency_vs_1_worker": 1.0,
+            "speedup_vs_serial": 0.99
+          },
+          {
+            "workers": 17,
+            "runs": 12,
+            "seconds": 0.826,
+            "runs_per_second": 14.53,
+            "codelets": 27907,
+            "codelets_per_second": 33788,
+            "startup_seconds": 0.166,
+            "errors": [],
+            "load_average_1m": 11.69,
+            "per_process_codelets_per_second": [
+              8350,
+              7764,
+              6994,
+              6957,
+              6405,
+              6288,
+              5451,
+              5390,
+              5126,
+              4765,
+              4667,
+              3060
+            ],
+            "identical_to_serial": true,
+            "speedup_vs_1_worker": 3.96,
+            "efficiency_vs_1_worker": 0.233,
+            "speedup_vs_serial": 3.92
+          }
+        ],
+        "serial_inprocess": {
+          "runs": 12,
+          "seconds": 3.239,
+          "runs_per_second": 3.71,
+          "codelets_per_second": 8617
+        }
+      },
+      "mlx": {
+        "runs": 12,
+        "rows": [
+          {
+            "workers": 1,
+            "runs": 12,
+            "seconds": 17.453,
+            "runs_per_second": 0.69,
+            "codelets": 27907,
+            "codelets_per_second": 1599,
+            "startup_seconds": 0.02,
+            "errors": [],
+            "load_average_1m": 12.77,
+            "per_process_codelets_per_second": [
+              1599
+            ],
+            "identical_to_serial": true,
+            "speedup_vs_1_worker": 1.0,
+            "efficiency_vs_1_worker": 1.0,
+            "speedup_vs_serial": 0.96
+          },
+          {
+            "workers": 17,
+            "runs": 12,
+            "seconds": 4.848,
+            "runs_per_second": 2.48,
+            "codelets": 27907,
+            "codelets_per_second": 5756,
+            "startup_seconds": 0.182,
+            "errors": [],
+            "load_average_1m": 16.86,
+            "per_process_codelets_per_second": [
+              1238,
+              1175,
+              1020,
+              1003,
+              977,
+              872,
+              767,
+              736,
+              679,
+              547,
+              525,
+              333
+            ],
+            "identical_to_serial": true,
+            "speedup_vs_1_worker": 3.59,
+            "efficiency_vs_1_worker": 0.211,
+            "speedup_vs_serial": 3.44
+          }
+        ],
+        "serial_inprocess": {
+          "runs": 12,
+          "seconds": 16.734,
+          "runs_per_second": 0.72,
+          "codelets_per_second": 1668
+        }
+      }
+    },
+    "date": "2026-10-29 23:20:00"
+  },
+  "analysis": {
+    "shared_machine": "Other agents were running throughout (1-minute load average 9-16 on 18 logical cores), so absolute figures and the 17-worker rows are depressed and noisy. A quiet pass (WP8) should re-measure.",
+    "cores": "6 Super + 12 Performance; swarm = 17 workers (population_worker_count)"
+  }
+}

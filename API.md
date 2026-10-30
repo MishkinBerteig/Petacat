@@ -2,7 +2,7 @@
 
 > **Auto-generated.** Run `python scripts/generate_api_docs.py` to regenerate from the FastAPI application.
 
-135 HTTP routes, plus `WS /ws/runs/{run_id}` for live state push.
+137 HTTP routes, plus `WS /ws/runs/{run_id}` for live state push.
 
 Interactive documentation is served at `/docs` while the API is running.
 
@@ -186,4 +186,6 @@ What the process resolved at startup.
 
 | Method | Path | Purpose |
 |---|---|---|
+| `GET` | `/api/swarm` | Swarm Status |
+| `POST` | `/api/swarm` | Run Swarm |
 | `GET` | `/healthz` | Healthz |

@@ -297,6 +297,11 @@ def run_petacat(problem: list[str], seeds: list[int], cap: int, jobs: int, faith
                 workers: int = 1) -> dict[int, dict]:
     """Run every seed; ``workers`` > 1 uses the free-running engine (the multi-worker study)."""
     tasks = [(tuple(problem), s, cap, workers) for s in seeds]
+    if jobs <= 0:
+        # Every logical core but one; a free-running run uses ``workers`` cores itself.
+        from server.engine import hardware
+
+        jobs = max(1, hardware.population_worker_count() // max(1, workers))
     with Pool(max(1, jobs), initializer=_init, initargs=(faithful,)) as pool:
         out = pool.map(petacat_run, tasks, chunksize=4)
     return {s: {"answer": a, "codelets": c, "temperature": t} for s, a, c, t in out}
@@ -420,7 +425,8 @@ def main() -> int:
     st.add_argument("problem", nargs=3, metavar=("INITIAL", "MODIFIED", "TARGET"))
     st.add_argument("seeds", help="seed list/range, e.g. 101-1100")
     st.add_argument("--cap", type=int, default=100000)
-    st.add_argument("--jobs", type=int, default=4, help="Petacat processes (default 4)")
+    st.add_argument("--jobs", type=int, default=0,
+                    help="Petacat processes (default: every logical core but one, divided by --workers)")
     st.add_argument("--metacat-jobs", type=int, default=1, help="Metacat containers at once (default 1)")
     st.add_argument("--metacat", help="use this Metacat recording instead of recording")
     st.add_argument("--petacat", help="use this Petacat recording instead of running")
@@ -434,7 +440,8 @@ def main() -> int:
     sv = sub.add_parser("support-v1a", help="Petacat vs the published support-v1a observations")
     sv.add_argument("--runs", type=int, default=200, help="Petacat runs per problem (default 200)")
     sv.add_argument("--cap", type=int, default=100000)
-    sv.add_argument("--jobs", type=int, default=4, help="Petacat processes (default 4)")
+    sv.add_argument("--jobs", type=int, default=0,
+                    help="Petacat processes (default: every logical core but one)")
     sv.add_argument("--faithful", action="store_true")
     sv.add_argument("--only", help="comma-separated problem names (default all 19)")
     sv.add_argument("--json", help="write the results here")

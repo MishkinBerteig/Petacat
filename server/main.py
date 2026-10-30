@@ -334,6 +334,7 @@ from server.api.docs import router as docs_router
 from server.api.ws import router as ws_router
 from server.api.review import router as review_router
 from server.api.system import router as system_router
+from server.api.swarm import router as swarm_router
 
 _CONFIG_WRITE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
@@ -371,6 +372,7 @@ app.include_router(docs_router)
 app.include_router(ws_router)
 app.include_router(review_router)
 app.include_router(system_router)
+app.include_router(swarm_router)
 
 
 @app.get("/healthz")

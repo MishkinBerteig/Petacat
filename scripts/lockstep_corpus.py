@@ -170,7 +170,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--seed", action="append", help="restrict to a seed (repeatable)")
     ap.add_argument("--no-replay", action="store_true", help="compare existing Petacat traces in --out-dir")
     ap.add_argument("--replay-cmd", default=DEFAULT_CMD)
-    ap.add_argument("--jobs", type=int, default=1)
+    ap.add_argument("--jobs", type=int, default=0,
+                    help="replays at once (default: every logical core but one, from "
+                         "server.engine.hardware; replays are independent subprocesses and "
+                         "the ratchet is identical at any --jobs)")
     ap.add_argument("--registry", default=str(ct.DEFAULT_REGISTRY))
     ap.add_argument("--episodes", action="store_true",
                     help="replay the episode traces (traces/episodes/<slug>/<S>.r<k>...) instead: one "
@@ -187,6 +190,10 @@ def main(argv: list[str] | None = None) -> int:
                     help="replay with this numeric backend instead of faithful mode's 'off'; "
                          "checked against the same ratchet, never written to it")
     args = ap.parse_args(argv)
+    if args.jobs <= 0:
+        from server.engine import hardware
+
+        args.jobs = hardware.population_worker_count()
 
     if args.episodes and args.justify:
         ap.error("--episodes and --justify are separate corpora; run them one at a time")
