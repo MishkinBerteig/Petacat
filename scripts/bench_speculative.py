@@ -8,8 +8,11 @@ Run under the free-threaded interpreter (the GIL build cannot run codelets in pa
 
 For each problem it times ``run_mcat`` (faithful), the SSR, and the speculative engine at
 each worker count, best of ``--repeats``, over a fixed codelet cap so the three do the same
-amount of work; and it checks that every speculative run is bit-identical to the SSR.  The
-JSON records the hardware, the interpreter, per-run telemetry (speculated / committed /
+amount of work; and it checks that every speculative run is bit-identical to the SSR.
+One worker is the SSR itself (the engine installs nothing), so its ratio is 1.0 up to noise.
+The runs of one (problem, seed) are *interleaved* -- faithful, SSR, then each worker count,
+``--repeats`` times round -- and the best of each is kept, so that load on a shared machine
+falls on the SSR and the speculative runs alike.  The JSON records the hardware, the interpreter, per-run telemetry (speculated / committed /
 aborted by reason / re-executed / barriers / time in update cycles vs codelets) and the
 Amdahl inputs.  The machine is shared during development: treat interim numbers as noisy.
 """
@@ -44,15 +47,6 @@ PROBLEMS = [
 ]
 
 
-def timed(meta, problem, seed, mode, workers, steps, repeats, **opts):
-    best = None
-    for _ in range(repeats):
-        rec = run_record(meta, problem, seed, mode, workers=workers, max_steps=steps, **opts)
-        if best is None or rec.seconds < best.seconds:
-            best = rec
-    return best
-
-
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--workers", default="1,2,4,6,8,12,16")
@@ -80,14 +74,23 @@ def main() -> None:
         entry = {"problem": label, "seeds": []}
         print(label)
         for seed in seeds:
-            faithful = timed(meta, problem, seed, "faithful", 1, args.steps, args.repeats)
-            ssr = timed(meta, problem, seed, "ssr", 1, args.steps, args.repeats)
+            faithful = ssr = None
+            specs: dict[int, object] = {}
+            for _ in range(args.repeats):
+                f = run_record(meta, problem, seed, "faithful", workers=1, max_steps=args.steps)
+                faithful = f if faithful is None or f.seconds < faithful.seconds else faithful
+                r = run_record(meta, problem, seed, "ssr", workers=1, max_steps=args.steps)
+                ssr = r if ssr is None or r.seconds < ssr.seconds else ssr
+                for w in workers:
+                    r = run_record(meta, problem, seed, "spec", workers=w, max_steps=args.steps,
+                                   use_qos=not args.no_qos)
+                    if w not in specs or r.seconds < specs[w].seconds:
+                        specs[w] = r
             row = {"seed": seed, "codelets": ssr.codelet_count,
                    "faithful_s": faithful.seconds, "ssr_s": ssr.seconds, "spec": {}}
             line = f"  seed {seed}: faithful {faithful.seconds*1e3:7.0f} ms  ssr {ssr.seconds*1e3:7.0f} ms"
             for w in workers:
-                rec = timed(meta, problem, seed, "spec", w, args.steps, args.repeats,
-                            use_qos=not args.no_qos)
+                rec = specs[w]
                 exact = diff(ssr, rec) == []
                 t = rec.telemetry
                 row["spec"][str(w)] = {
