@@ -424,6 +424,46 @@
   },
   {
     "topic_type": "component",
+    "topic_key": "swarm",
+    "title": "Swarm",
+    "short_desc": "Runs the current problem over many seeds on every core and shows the answer distribution.",
+    "full_desc": "Petacat's behaviour on a problem is a *distribution* of answers over random seeds, not any single run. The Swarm group runs the problem in Problem Input across N seeds on a warm pool of worker processes covering every core of the machine, and shows how often each answer was reached, with its mean quality (Metacat's answer quality, 0-100), the count of runs by final status, and a telemetry line such as '1,000 runs in 3.1 s on 17 cores, 320 runs/s'.\n\nEach swarm run is byte-for-byte the serial run with the same seed: the same answer, the same codelet count. Parallelism here is across runs, never inside one, so it cannot change what Petacat thinks; it only delivers the distribution sooner. If the problem has an answer in Problem Input, the swarm runs in justification mode, otherwise in discovery mode. Engine parameters you have changed in Run Controls apply to every swarm run.\n\nA swarm persists nothing: no Run row, no Run History entry, no Review record, no contribution to episodic memory, and it does not disturb the run on screen. The parallel subsystem is a detachable plugin; when it is not installed the Swarm group disables itself and says so. The same service is available as POST /api/swarm.",
+    "metadata": {}
+  },
+  {
+    "topic_type": "component",
+    "topic_key": "swarm_seed_count",
+    "title": "Swarm: Seeds",
+    "short_desc": "How many runs the swarm makes (1 to 10,000).",
+    "full_desc": "The number of runs, one per seed. More seeds give a smoother estimate of each answer's frequency: with 200 seeds an answer seen 15% of the time is known to within about 5 percentage points, with 2,000 to within about 1.5. The default is 200; the maximum per request is 10,000. A thousand runs take a few seconds on a many-core machine.",
+    "metadata": {}
+  },
+  {
+    "topic_type": "component",
+    "topic_key": "swarm_first_seed",
+    "title": "Swarm: First seed",
+    "short_desc": "The seed of the first run; the others follow in sequence.",
+    "full_desc": "The swarm uses seeds first, first+1, ... first+N-1. Run again with the same first seed and count and you get exactly the same distribution; change it to draw an independent sample. Seed 1 of the swarm is identical to a serial Run with seed 1.",
+    "metadata": {}
+  },
+  {
+    "topic_type": "component",
+    "topic_key": "swarm_max_steps",
+    "title": "Swarm: Max steps",
+    "short_desc": "The most codelets any one swarm run may execute before it is stopped.",
+    "full_desc": "A run that has not found an answer after this many codelets is stopped and counted under the answer '*NONE*', with its status shown in the status line. The default of 20,000 is generous for the demo problems; raise it for hard problems, lower it to see quickly which seeds settle early. Limit: 200,000.",
+    "metadata": {}
+  },
+  {
+    "topic_type": "component",
+    "topic_key": "swarm_run",
+    "title": "Swarm: Run",
+    "short_desc": "Starts the swarm on the problem in Problem Input.",
+    "full_desc": "Runs the problem over the chosen seeds on every core. The button is disabled, with the reason beneath it, when Problem Input is incomplete, a number is out of range, or the parallel subsystem is not installed. The request holds the worker pool until it finishes, so a very large swarm delays another one started at the same time.",
+    "metadata": {}
+  },
+  {
+    "topic_type": "component",
     "topic_key": "commentary",
     "title": "Commentary",
     "short_desc": "Natural-language narration of what Metacat is doing and why, generated as the run unfolds.",

@@ -29,7 +29,8 @@
 // Group 4: Engine parameters — the 25 the run is fixed with (collapsed)
 // Group 5: What this run is — the derived, read-only half (collapsed)
 // Group 6: Manual stepping — step size + Step N (orthogonal to both)
-// Group 7: Settings — spreading threshold, Eliza toggle, breakpoint, status
+// Group 7: Swarm — the answer distribution over many seeds, on every core
+// Group 8: Settings — spreading threshold, Eliza toggle, breakpoint, status
 //
 // Groups 1, 3 and 4 are all *fixed at creation*: the execution strategy is not, but
 // the worker count, the persistence mode and every engine parameter are read before
@@ -58,6 +59,7 @@ import { ModeBadge, MODE_DESCRIPTIONS } from '@/components/ModeBadge';
 import { RunParametersPanel } from '@/components/RunParametersPanel';
 import { ClampControls } from '@/components/ClampControls';
 import { RunDerivedPanel } from '@/components/RunDerivedPanel';
+import { SwarmPanel } from '@/components/SwarmPanel';
 import { useMachine } from '@/hooks/useMachine';
 import {
   parameterErrors,
@@ -732,7 +734,12 @@ export function RunControlsPanel() {
       </div>
 
       {/* ------------------------------------------------------------ */}
-      {/* GROUP 7: Settings                                            */}
+      {/* GROUP 7: Swarm -- the problem over many seeds, on every core */}
+      {/* ------------------------------------------------------------ */}
+      <SwarmPanel />
+
+      {/* ------------------------------------------------------------ */}
+      {/* GROUP 8: Settings                                            */}
       {/* ------------------------------------------------------------ */}
       <div style={groupStyle}>
         <div style={groupLabelStyle}>Settings</div>

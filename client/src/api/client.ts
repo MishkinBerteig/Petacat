@@ -33,6 +33,9 @@ import type {
   TemperatureState,
   DisplayPicture,
   VerboseSnapshot,
+  SwarmStatus,
+  SwarmRequest,
+  SwarmResult,
 } from '../types';
 
 const API_BASE = '/api';
@@ -894,3 +897,17 @@ export const api = {
   advanceInspector,
   closeInspector,
 } as const;
+
+// ---------------------------------------------------------------------------
+// Swarm — the answer distribution over many seeds, on every core
+// ---------------------------------------------------------------------------
+
+/** Pool status and capabilities; never starts the pool. `available: false` when detached. */
+export async function getSwarmStatus(): Promise<SwarmStatus> {
+  return request<SwarmStatus>('/swarm');
+}
+
+/** Run a problem over `count` seeds. Persists nothing (Fast-mode semantics). */
+export async function runSwarm(req: SwarmRequest): Promise<SwarmResult> {
+  return request<SwarmResult>('/swarm', { method: 'POST', body: JSON.stringify(req) });
+}

@@ -49,6 +49,7 @@ RUN_CONTROL_PANELS = (
     REPO_ROOT / "client" / "src" / "components" / "RunControlsPanel.tsx",
     REPO_ROOT / "client" / "src" / "components" / "RunParametersPanel.tsx",
     REPO_ROOT / "client" / "src" / "components" / "RunDerivedPanel.tsx",
+    REPO_ROOT / "client" / "src" / "components" / "SwarmPanel.tsx",
 )
 
 #: A rendered group heading: ``<div style={groupLabelStyle}>Run</div>``.

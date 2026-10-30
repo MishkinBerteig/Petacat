@@ -24,6 +24,12 @@ API_MD_PATH = os.path.join(REPO_ROOT, "API.md")
 #: Order the sections appear in, and what each one is for.
 GROUPS: list[tuple[str, str, str]] = [
     ("/api/runs", "Runs", "Creating, driving and reading a run."),
+    (
+        "/api/swarm",
+        "Swarm",
+        "One problem over many seeds on every core: the answer distribution, plus pool status "
+        "(a detachable plugin; 503 when absent).",
+    ),
     ("/api/memory", "Episodic Memory", "The Training Session's memory, shared by every run."),
     ("/api/review", "Review", "Reading back what a Normal or Audit run recorded."),
     ("/api/admin", "Configuration", "The editable copy of the seed data."),

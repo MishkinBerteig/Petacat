@@ -934,3 +934,54 @@ export interface VerboseSnapshot {
   dropped: number;
   total: number;
 }
+
+// ---------------------------------------------------------------------------
+// Swarm (POST /api/swarm): one problem over many seeds, on every core
+// ---------------------------------------------------------------------------
+
+export interface SwarmStatus {
+  available: boolean;
+  reason: string | null;
+  started: boolean;
+  workers: number;
+  default_backend: string | null;
+  limits: Record<string, number>;
+}
+
+export interface SwarmRequest {
+  initial: string;
+  modified: string;
+  target: string;
+  answer?: string | null;
+  count: number;
+  seed_start: number;
+  max_steps: number;
+  include_runs: boolean;
+  /** Engine-parameter overrides, as for POST /api/runs. */
+  parameters?: Record<string, unknown>;
+}
+
+export interface SwarmDistributionEntry {
+  answer: string;
+  count: number;
+  fraction: number;
+  mean_quality: number | null;
+}
+
+export interface SwarmTelemetry {
+  workers: number;
+  runs: number;
+  seconds: number;
+  runs_per_second: number;
+  codelets: number;
+  codelets_per_second: number;
+  backend: string;
+  config_hash: string;
+  errors: number;
+}
+
+export interface SwarmResult {
+  distribution: SwarmDistributionEntry[];
+  statuses: Record<string, number>;
+  telemetry: SwarmTelemetry;
+}

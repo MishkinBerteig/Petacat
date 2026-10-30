@@ -61,6 +61,15 @@ Creating, driving and reading a run.
 | `DELETE` | `/api/runs/{run_id}/verbose` | Clear Verbose |
 | `GET` | `/api/runs/{run_id}/workspace` | Get Workspace |
 
+## Swarm
+
+One problem over many seeds on every core: the answer distribution, plus pool status (a detachable plugin; 503 when absent).
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/api/swarm` | Swarm Status |
+| `POST` | `/api/swarm` | Run Swarm |
+
 ## Episodic Memory
 
 The Training Session's memory, shared by every run.
@@ -186,6 +195,4 @@ What the process resolved at startup.
 
 | Method | Path | Purpose |
 |---|---|---|
-| `GET` | `/api/swarm` | Swarm Status |
-| `POST` | `/api/swarm` | Run Swarm |
 | `GET` | `/healthz` | Healthz |

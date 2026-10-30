@@ -244,7 +244,7 @@ view. The two left-hand panels split along *what* versus *how*:
 Modified, Target, and optionally Answer — supplying an Answer switches the
 engine into justification mode), the **Seed**, and the demo dropdown.
 
-**Run Controls** (below it) decides how that problem executes, in seven groups: Run, Training Session, Recording, Engine parameters, What this run is, Manual stepping, and Settings.
+**Run Controls** (below it) decides how that problem executes, in eight groups: Run, Training Session, Recording, Engine parameters, What this run is, Manual stepping, Swarm, and Settings.
 
 **Run** picks between the two mutually exclusive execution strategies, and the
 action button and pacing control follow the choice:
