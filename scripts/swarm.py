@@ -75,7 +75,7 @@ def main() -> int:
     ap.add_argument("--seed-start", type=int, default=1)
     ap.add_argument("--seeds", help="explicit seeds, e.g. 1-50,99 (overrides -n / --seed-start)")
     ap.add_argument("--max-steps", type=int, default=20_000)
-    ap.add_argument("--backend", help="numeric backend (default: the swarm's, numpy)")
+    ap.add_argument("--backend", help="numeric backend (default: the placement policy -- off at today's Slipnet size)")
     ap.add_argument("--param", action="append", type=parse_param, default=[], metavar="NAME=VALUE")
     ap.add_argument("-j", "--workers", type=int, default=0,
                     help="processes (default: every logical core but one)")

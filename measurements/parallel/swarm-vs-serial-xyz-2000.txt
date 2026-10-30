@@ -1,0 +1,33 @@
+xyd                  730   36.5%          71.3           1544
+wyz                  474   23.7%          88.0           2240
+xyz                  325   16.2%          54.9           1316
+*NONE*               190    9.5%           nan           3820
+dyz                  119    6.0%          72.4           2457
+yyz                  108    5.4%          87.3           2309
+... and 2 more distinct answers
+
+2000 runs in 19.09s = 104.8 runs/s, 215,526 codelets/s  (worker start-up 0.21s)
+real 19.38
+user 0.58
+sys 0.18
+usage: swarm.py [-h] [--answer ANSWER] [-n COUNT] [--seed-start SEED_START]
+                [--seeds SEEDS] [--max-steps MAX_STEPS] [--backend BACKEND]
+                [--param NAME=VALUE] [-j WORKERS] [--serial] [--verify K]
+                [--top TOP] [--json JSON]
+                INITIAL MODIFIED TARGET
+swarm.py: error: argument -n/--count: invalid int value: ' 2000 --serial'
+real 0.03
+user 0.02
+sys 0.00
+xyd                  730   36.5%          71.3           1544
+wyz                  474   23.7%          88.0           2240
+xyz                  325   16.2%          54.9           1316
+*NONE*               190    9.5%           nan           3820
+dyz                  119    6.0%          72.4           2457
+yyz                  108    5.4%          87.3           2309
+... and 2 more distinct answers
+
+2000 runs in 239.40s = 8.4 runs/s, 17,188 codelets/s
+real 239.49
+user 237.03
+sys 2.14
