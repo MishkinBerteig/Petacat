@@ -139,10 +139,12 @@ def _source_keys():
             os.path.join(REPO, "server", "engine", name)
             for name in (
                 "codelet_dsl/builtins.py", "jootsing.py", "justify.py", "themes.py",
-                "bridges.py", "trace.py", "runner.py", "free_running.py", "workspace.py",
+                "bridges.py", "trace.py", "runner.py", "workspace.py",
                 "verbose.py",  # the display-time messages of ``narrate_event_display``
             )
         ),
+        # The free-running engine narrates too; it lives in the parallel plugin.
+        os.path.join(REPO, "server", "parallel", "free_running.py"),
     ]
     for path in sources:
         text = open(path, encoding="utf-8").read()
