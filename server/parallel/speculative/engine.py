@@ -990,13 +990,18 @@ class SpeculativeEngine:
             # their locks until the cycle is over.
             self._flags.parking = True
         self._bump(fx.ALL)
-        # (The per-call guards on ids, trace and the rack stay on: swapping an object's
-        # ``__class__`` is a stop-the-world pause on free-threaded CPython, far dearer than
-        # the guards themselves.)
+        # The rack's guard is a plain attribute, so it can come off while every worker is
+        # quiesced.  (The guards that are *classes* -- ids, trace, Slipnet nodes -- stay on:
+        # assigning an object's ``__class__`` is a stop-the-world pause on free-threaded
+        # CPython, far dearer than the guards themselves.)
+        rack = ctx.coderack
+        if eligible:
+            rack.guard = None
         try:
             self._ssr_update(ctx)
         finally:
             if eligible:
+                rack.guard = _rack_guard
                 self._unpark()
             self._bump(fx.ALL)
             self._t_update += time.perf_counter() - t0
@@ -1297,8 +1302,9 @@ class SpeculativeEngine:
             self._pq_gen = rack.gen
             self._pq_head = self._pq_scan = 0
             tele["repredicts"] += 1
-        if not satisfied:
-            self._skip = 2  # nothing (more) to speculate on right now: don't rescan every step
+        # Either nothing (more) to speculate on right now (don't rescan every step), or the
+        # window is full: the next step moves it by one codelet, so look every other step.
+        self._skip = 1 if satisfied else 2
 
     def _compiled(self, codelet_type: str) -> Any:
         c = self._registry_get(codelet_type)

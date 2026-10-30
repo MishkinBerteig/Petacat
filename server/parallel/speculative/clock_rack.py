@@ -249,29 +249,43 @@ class ClockCoderack(Coderack):
         self.floor_f = _INF
         return self._predict(temperature, count)
 
+    def _smallest_valid(self, count: int) -> list[tuple[float, int]]:
+        """The *count* smallest live ``(F, id)`` pairs, in order, read off the heap.
+
+        A best-first walk of the heap array from its root: a node's children sort after
+        it, so popping a small frontier yields the heap's entries in increasing order
+        having looked at about ``2 * count`` of them, not all (``heapq.nsmallest`` scans
+        every entry).  Stale entries (lazily deleted ones) are walked through and skipped.
+        """
+        heap = self._heap
+        n = len(heap)
+        entries: list[tuple[float, int]] = []
+        if not n:
+            return entries
+        clock = self._clock
+        pop, push = heapq.heappop, heapq.heappush
+        frontier = [(heap[0], 0)]
+        while frontier:
+            (f, cid), i = pop(frontier)
+            ent = clock.get(cid)
+            if ent is not None and ent[0] == f and (not entries or entries[-1] != (f, cid)):
+                entries.append((f, cid))
+                if len(entries) == count:
+                    break
+            j = 2 * i + 1
+            if j < n:
+                push(frontier, (heap[j], j))
+                if j + 1 < n:
+                    push(frontier, (heap[j + 1], j + 1))
+        return entries
+
     def _predict(self, temperature: float, count: int) -> list[tuple[float, int]]:
         row = self.urgency_table.row(temperature)
         if self._row is not None and row != self._row:
             clock = self._rescaled(row)
             entries = heapq.nsmallest(count, ((f, cid) for cid, (f, _) in clock.items()))
         else:
-            # The heap's own list, C speed; stale (lazily deleted) entries are filtered
-            # out, asking for a little slack so they cannot crowd the answer.
-            clock = self._clock
-            heap = self._heap
-            want = count + 4
-            while True:
-                cand = heapq.nsmallest(want, heap)
-                entries = []
-                for f, cid in cand:
-                    ent = clock.get(cid)
-                    if ent is not None and ent[0] == f:
-                        entries.append((f, cid))
-                        if len(entries) == count:
-                            break
-                if len(entries) >= count or len(cand) < want:
-                    break
-                want *= 2
+            entries = self._smallest_valid(count)
         if entries and entries[0][0] == _INF:
             return []  # the all-zero fallback is not predictable without a step
         return [(f, cid) for f, cid in entries if f != _INF]
