@@ -133,6 +133,16 @@ describe('MemoryView — how the session memory was read', () => {
     expect(screen.getByText(/shares this memory and is reminded from it/)).toBeTruthy()
   })
 
+  it("says this is Metacat Mode's Episodic Memory, not a Training's", () => {
+    useRunStore.setState({
+      memory: memory({ scope: 'live', mode: 'fast', answers: [answer()] }),
+    })
+    render(<MemoryView />)
+    expect(screen.getByTestId('memory-mode-note')).toHaveTextContent(
+      /Metacat Mode's Episodic Memory — Metacat-Mode learning/,
+    )
+  })
+
   it('offers Clear Memory for a live read', () => {
     useRunStore.setState({
       memory: memory({ scope: 'live', mode: 'fast', answers: [answer()] }),
@@ -304,7 +314,7 @@ describe('MemoryView — a memory that would not load', () => {
 
     await waitFor(() =>
       expect(
-        screen.getByText(/Could not load episodic memory: the server failed to complete it/),
+        screen.getByText(/Could not load Metacat Mode's Episodic Memory: the server failed to complete it/),
       ).toBeTruthy(),
     )
     expect(screen.getByText(/the database is not accepting connections/)).toBeTruthy()
@@ -329,7 +339,7 @@ describe('MemoryView — a memory that would not load', () => {
 
     await waitFor(() =>
       expect(
-        screen.getByText(/Could not load episodic memory: the server is unreachable/),
+        screen.getByText(/Could not load Metacat Mode's Episodic Memory: the server is unreachable/),
       ).toBeTruthy(),
     )
   })
@@ -446,7 +456,7 @@ describe('MemoryView — an action the server refuses', () => {
 
     await waitFor(() =>
       expect(
-        screen.getByText(/Could not clear episodic memory: the server failed to complete it/),
+        screen.getByText(/Could not clear Metacat Mode's Episodic Memory: the server failed to complete it/),
       ).toBeTruthy(),
     )
     // The answers are still stored, and the panel still shows them.

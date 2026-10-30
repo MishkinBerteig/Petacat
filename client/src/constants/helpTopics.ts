@@ -21,6 +21,7 @@ export const COMPONENT_HELP_KEYS = [
   'configuration',
   'eeg',
   'memory',
+  'modes',
   'problem_input',
   'review',
   'run_controls',

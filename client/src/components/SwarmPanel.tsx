@@ -137,8 +137,8 @@ export function SwarmPanel() {
         <ControlHelp topic="swarm" label="Swarm" />
       </div>
       <div className="text-xs text-muted" style={{ margin: '4px 0 8px' }}>
-        Run this problem over many seeds on every core and see the answer
-        distribution.{' '}
+        Run mode: multi-core across runs. Run this problem over many seeds on every core and see
+        the answer distribution.{' '}
         {justification ? 'Justification mode: the problem has an answer.' : 'Discovery mode.'}
         {status?.available && status.workers > 0 ? ` ${status.workers} cores.` : ''}
       </div>

@@ -669,6 +669,14 @@ describe('RunControlsPanel — worker count', () => {
     formInputs: { initial: 'abc', modified: 'abd', target: 'xyz', answer: '', seed: '7' },
   }
 
+  it('labels the workers as the run mode and keeps it apart from Recording', () => {
+    setup({ ...LOADED, createRun, runToAnswer })
+    render(<RunControlsPanel />)
+    expect(screen.getByLabelText(/Run mode — Workers/)).toHaveValue(1)
+    expect(screen.getByTestId('run-mode-note')).toHaveTextContent(/separate from\s+Recording/)
+    expect(screen.getByText(/persistence mode, not run mode/)).toBeTruthy()
+  })
+
   it('defaults to the serial loop and says that is the reference mode', () => {
     setup({ ...LOADED, createRun, runToAnswer })
 

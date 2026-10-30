@@ -5,10 +5,16 @@
 import type { TrainingExecutorInfo, TrainingSummary } from '@/types';
 import { fmtInt, ProgressBar, StateBadge } from './shared';
 
-/** "swarm, 17 cores, 34 runs in flight, 12,000 queued" or "serial (parallel plugin not installed)". */
+/**
+ * The run mode the server's executor gives Trainings, as the user's two words and the
+ * server's own:
+ * "Run mode: multi-core (swarm, 17 workers; 34 runs in flight, 12,000 queued)" or
+ * "Run mode: single-threaded (serial; parallel plugin not installed)".
+ * Run mode is orthogonal to Training Mode and Metacat Mode; this only reports it.
+ */
 export function describeExecutor(e: TrainingExecutorInfo): string {
-  if (e.kind === 'serial') return 'serial (parallel plugin not installed)';
-  return `swarm, ${fmtInt(e.workers)} cores, ${fmtInt(e.in_flight)} runs in flight, ${fmtInt(e.queued_runs)} queued`;
+  if (e.kind === 'serial') return 'Run mode: single-threaded (serial; parallel plugin not installed)';
+  return `Run mode: multi-core (swarm, ${fmtInt(e.workers)} workers; ${fmtInt(e.in_flight)} runs in flight, ${fmtInt(e.queued_runs)} queued)`;
 }
 
 interface Props {

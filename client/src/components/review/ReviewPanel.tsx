@@ -79,7 +79,7 @@ export function ReviewPanel({ initialRunId = null }: ReviewPanelProps) {
             not in it. Somebody who has just run one and comes looking needs to be
             told that on the page rather than in the plan. */}
         <div className="text-xs text-muted" style={{ marginBottom: 6 }}>
-          A Training Session is a sequence of Runs sharing one Episodic Memory. It
+          Metacat Mode&apos;s Training Session is a sequence of Runs sharing one Episodic Memory. It
           ends when the memory is cleared. Fast Runs do not appear: they write
           nothing, including the row that would list them.
         </div>

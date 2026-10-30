@@ -209,8 +209,8 @@ export function TrainingDetail({ training, limits, notice, onTrainingChanged, on
 
         <div className="text-xs mono" style={{ marginTop: 4 }} data-testid="training-memory-line">
           {shared && training.memory
-            ? `Memory: ${fmtInt(training.memory.answers)} answers, ${fmtInt(training.memory.snags)} snags, version ${fmtInt(training.memory_version ?? 0)}`
-            : 'Memory: independent runs (nothing shared)'}
+            ? `Training episode memory: ${fmtInt(training.memory.answers)} answers, ${fmtInt(training.memory.snags)} snags, version ${fmtInt(training.memory_version ?? 0)}`
+            : 'Training episode memory: independent runs (nothing shared)'}
         </div>
         <div className="text-xs text-muted" style={{ marginTop: 4 }} data-testid="training-settings-line">
           Settings (fixed): {shared ? 'shared memory' : 'independent runs'} · backend {s.backend} ·{' '}
@@ -284,6 +284,7 @@ export function TrainingDetail({ training, limits, notice, onTrainingChanged, on
               role="tab"
               aria-selected={tab === t}
               onClick={() => setTab(t)}
+              title={t === 'memory' ? "This Training's own episode memory (Training Mode), not Metacat Mode's Episodic Memory" : undefined}
               style={{
                 fontSize: 11,
                 padding: '2px 10px',

@@ -630,7 +630,7 @@ nothing consults them now.
 
 `client/` carries a Vitest suite covering the store, the panels, the admin
 editors and the review surfaces. Run it with `cd client && npx vitest run`, and
-`npx tsc --noEmit` alongside it. **525 cases across 36 files**, all passing, in
+`npx tsc --noEmit` alongside it. **543 cases across 37 files**, all passing, in
 3.1 s on an Apple M-series machine.
 
 | File (`client/src/`) | Cases | Covers |
@@ -640,7 +640,7 @@ editors and the review surfaces. Run it with `cd client && npx vitest run`, and
 | `store/displayStore.test.ts` | 7 | Panel visibility (an entry for every panel including the EEG, Verbose hidden by default, toggling, show or hide all, remembered in localStorage, and surviving storage that throws) and the graphics switches that stop and resume the Slipnet and Coderack polls independently |
 | `store/runStore.test.ts` | 44 | The spreading threshold outliving a page reload, and the store's run lifecycle |
 | `hooks/useWorkspaceClick.test.ts` | 3 | Clicking the Workspace steps when idle, stops a running run and resumes it on the next click, and ignores other buttons and a missing run |
-| `components/AdminPanel.test.tsx` | 5 | The Admin panel's operations report what became of them |
+| `components/AdminPanel.test.tsx` | 6 | The Admin panel's operations report what became of them, and it says it edits the global configuration Metacat Mode uses |
 | `components/CoderackBars.test.tsx` | 9 | The Coderack window as Metacat draws it: a slot per codelet type in engine order, bars at the engine's selection probability and never derived from a type's name, counts and total, the last-run marker, a recorded coderack without probabilities, and the Options-menu switches for the count column and the last-type marker |
 | `components/CoderackView.test.tsx` | 6 | The Coderack panel's codelet-pattern clamps |
 | `components/ClampControls.test.tsx` | 5 | Clamp theme pattern, Undo last clamp and the mid-run Self-watching toggle, as Metacat's Options menu has them |
@@ -649,10 +649,11 @@ editors and the review surfaces. Run it with `cd client && npx vitest run`, and
 | `components/HamburgerMenu.test.tsx` | 3 | Training is a view of its own, between Review and Configuration, and choosing it reports the view to the app |
 | `components/HelpPopover.test.tsx` | 3 | The popover shows a glossary term, and says when it cannot |
 | `components/LastErrorBanner.test.tsx` | 3 | The error channel is rendered where it can be seen |
-| `components/MemoryView.test.tsx` | 18 | The Memory panel shows the memory the run is thinking against |
+| `components/MemoryView.test.tsx` | 19 | The Memory panel shows the memory the run is thinking against, labelled as Metacat Mode's Episodic Memory |
+| `components/ModeSwitch.test.tsx` | 15 | The header's switch between Metacat Mode and Training Mode: which mode each view belongs to, moving between them, the help link, and staying put while a run is processing |
 | `components/MomentDisplay.test.tsx` | 21 | Clicking a Trace event, answer or snag redisplays the moment: the Workspace header and highlights, the Slipnet pattern, the Coderack, the Temperature, the Trace window's print-name labels |
 | `components/ProblemInputPanel.test.tsx` | 7 | The problem panel owns the problem's identity |
-| `components/RunControlsPanel.test.tsx` | 55 | A run starts on the problem the form actually shows |
+| `components/RunControlsPanel.test.tsx` | 56 | A run starts on the problem the form actually shows, and the Workers control is labelled as the run mode |
 | `components/RunHistory.test.tsx` | 34 | Run History stays current as runs finish |
 | `components/RunParametersPanel.test.tsx` | 14 | The twenty-six run parameters, settable before a run |
 | `components/SearchPalette.test.tsx` | 7 | Cmd+K search reaches every kind of help topic |

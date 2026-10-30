@@ -28,6 +28,7 @@ import { SubstrateBadge } from '@/components/SubstrateBadge';
 import { SearchPalette } from '@/components/SearchPalette';
 import { HelpPopover } from '@/components/HelpPopover';
 import { HamburgerMenu } from '@/components/HamburgerMenu';
+import { ModeSwitch, modeOfView, MODE_ACCENTS, MODE_LABELS } from '@/components/ModeSwitch';
 import { WindowsMenu } from '@/components/WindowsMenu';
 import { useDisplayStore, type PanelKey } from '@/store/displayStore';
 import { LastErrorBanner } from '@/components/LastErrorBanner';
@@ -265,19 +266,26 @@ export default function App() {
       <HelpPopover />
 
       {/* ---- Header ---- */}
-      <div className="app-header">
+      <div
+        className="app-header"
+        data-mode={modeOfView(view)}
+        // The mode's accent runs along the header's lower edge, so the mode can be
+        // read without reading the switch.
+        style={{ borderBottom: `3px solid ${MODE_ACCENTS[modeOfView(view)]}` }}
+      >
         <HamburgerMenu activeView={view} onSelect={handleViewChange} disabled={isProcessing} />
         {view === 'dashboard' && <WindowsMenu />}
         <h1>Petacat</h1>
+        <ModeSwitch view={view} onSelectView={handleViewChange} disabled={isProcessing} />
         <span className="text-muted text-sm">
           {view === 'config' ? (
-            'Configuration'
+            "Configuration — the global configuration Metacat Mode uses"
           ) : view === 'admin' ? (
-            'Admin'
+            'Admin — the global configuration Metacat Mode uses'
           ) : view === 'review' ? (
-            'Review — recorded Training Sessions'
+            "Review — recorded Training Sessions (Metacat Mode's sessions)"
           ) : view === 'training' ? (
-            'Training — episodes of many problems over many seeds'
+            `${MODE_LABELS.training} — Trainings: episodes of many problems over many seeds`
           ) : (
             <>
               {runId ? `Run #${runId}` : 'No run'}

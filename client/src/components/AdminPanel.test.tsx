@@ -70,6 +70,15 @@ afterEach(() => {
 })
 
 describe('AdminPanel — clearing Episodic Memory', () => {
+  it("says it edits the global configuration Metacat Mode uses, which a Training copies", async () => {
+    render(<AdminPanel />)
+    const note = await screen.findByTestId('admin-mode-note')
+    expect(note).toHaveTextContent('Metacat Mode')
+    expect(note).toHaveTextContent(/global configuration that Metacat Mode uses/)
+    expect(note).toHaveTextContent(/copies the global configuration when it is created/)
+    expect(note).toHaveTextContent(/never changes it/)
+  })
+
   it('reports the reason when the clear does not land', async () => {
     handler = async (url, init) => {
       const match = /\/api\/docs\/components\/(.+)$/.exec(url)
@@ -87,7 +96,7 @@ describe('AdminPanel — clearing Episodic Memory', () => {
 
     await waitFor(() =>
       expect(
-        screen.getByText(/Could not clear episodic memory: the server failed to complete it/),
+        screen.getByText(/Could not clear Metacat Mode's Episodic Memory: the server failed to complete it/),
       ).toBeTruthy(),
     )
     expect(screen.getByText(/the session rows are locked/)).toBeTruthy()
@@ -113,7 +122,7 @@ describe('AdminPanel — clearing Episodic Memory', () => {
     fireEvent.click(screen.getByRole('button', { name: /Clear Episodic Memory/i }))
 
     await waitFor(() =>
-      expect(screen.getByText(/this Training Session is closed/)).toBeTruthy(),
+      expect(screen.getByText(/this Training Session .* is closed/)).toBeTruthy(),
     )
     expect(useRunStore.getState().epoch).toBe(ORIGINAL.epoch + 1)
 

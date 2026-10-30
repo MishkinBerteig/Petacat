@@ -25,10 +25,11 @@ license change was authorised by Dr. Marshall directly (see
 > **Status.** Petacat implements all seven of Metacat's core components
 > (Workspace, Slipnet, Coderack, Themespace, Temporal Trace, Episodic Memory,
 > Temperature) and generates answers to letter-string analogy problems
-> end-to-end. Episodic Memory shapes the runs that inherit it: a run declines an
-> answer already held for the same problem and rules, so repeating a problem
-> within a [Training Session](#persistence-modes-and-training-sessions) explores
-> a different answer each time. It ships with 3,149 test cases covering the engine, the API, and the
+> end-to-end. Episodic Memory (Metacat-Mode learning) shapes the runs that inherit it: a run
+> declines an answer already held for the same problem and rules, so repeating a
+> problem within one of Metacat Mode's sessions (the UI's
+> [Training Session](#persistence-modes-and-training-sessions), which is Metacat
+> Mode and not Training Mode) explores a different answer each time. It ships with 3,149 test cases covering the engine, the API, and the
 > help/config system, run on both the CPU and the GPU numeric backends. Underneath the seven components sits an execution
 > substrate — three [persistence modes](#persistence-modes-and-training-sessions),
 > a [GPU numeric substrate](#the-numeric-substrate), and
@@ -39,15 +40,74 @@ license change was authorised by Dr. Marshall directly (see
 
 ## Two modes
 
-Petacat works in two modes, and the line between them is a principle, not a convenience.
+Petacat works in two modes, written as proper names, and the line between them is a
+principle, not a convenience. Every feature belongs to exactly one of them, except the
+run mode, which is separate from both (below).
 
-- **Metacat mode** is every ordinary run: the dashboard's Fast, Normal and Audit
-  runs, Run History, Review, and the one-problem [Swarm](#the-swarm-every-core-exactly).
-  It is permanently faithful to Metacat, and Petacat is its functional equivalent there.
-- **Training mode** is where all machine-learning work happens: the
-  [Training](#training-many-problems-on-every-core) view and `/api/trainings`.
-  Nothing a Training does changes the global configuration or the Slipnet that
-  Metacat mode uses.
+### Metacat Mode
+
+**Metacat Mode** is Petacat's v1.2 features, exactly as they are. Petacat is the
+functional equivalent of Metacat here, permanently, and **nothing in Training Mode
+affects it in any way**. It comprises:
+
+- ordinary runs: the dashboard's Fast, Normal and Audit runs (the
+  [persistence modes](#persistence-modes-and-training-sessions)), with Run to answer
+  and Live updates;
+- Run History and Review;
+- the one-problem [Swarm](#the-swarm-every-core-exactly);
+- the Admin view, which edits the global configuration;
+- **Metacat's own episodic features**: the **Episodic Memory** that successive runs
+  share, with reminding, snags and answer and snag descriptions, and the **session**
+  those runs form. The UI and this README call that session the **Training Session**,
+  but it is *Metacat Mode's* session, it shares *Metacat Mode's* Episodic Memory, and
+  it has nothing to do with Training Mode. (The name is under review and may change.)
+
+Episodic Memory is a very minimal kind of learning: **Metacat-Mode learning**.
+
+### Training Mode
+
+**Training Mode** is every extension since v1.2 that makes Petacat a novel
+machine-learning platform:
+
+- **Trainings** (today): named, database-backed Training episodes of many problems,
+  each run over many seeds, extendable while they run, each with its own episode memory.
+  See [Training](#training-many-problems-on-every-core) and `/api/trainings`.
+- **Planned, not yet built:** a Training's own evolving Slipnet, learners, and an
+  external delta route.
+
+A Training copies the global configuration when it is created and never reads or
+writes Metacat Mode's Episodic Memory, Slipnet or configuration.
+
+### The word "learning"
+
+"Learning" (learn, learned, learner) is ambiguous now, so this README always qualifies it:
+**Metacat-Mode learning** is Episodic Memory; **Training-Mode learning** is everything
+new. "Episode" is qualified the same way: a **Training episode** belongs to Training
+Mode, and **Metacat's** episodic memory belongs to Metacat Mode. "Training" on its own
+means Training Mode, and "Workspace" always means the engine's perceptual system.
+
+### Run mode is separate from both modes
+
+**Run mode** is how runs execute: single-threaded, or multi-core. Multi-core *within*
+one run is the exact speculative executor (`workers` > 1); multi-core *across* runs is
+the swarm. Run mode is independent of the two modes and is meant to be viable in both.
+It is not the **persistence mode** (Fast, Normal or Audit), which decides how a
+Metacat Mode run is recorded and is the `mode` field of `POST /api/runs`, a v1.2 name
+that stays as it is. Nor is it a Training's `memory` setting (`shared` or `independent`).
+
+What is available today:
+
+| Run mode | Metacat Mode | Training Mode |
+|---|---|---|
+| Single-threaded | Yes: the default run (`workers` 1) | Partly: the serial executor, one run at a time in a child process, chosen for the whole server rather than per Training (when the plugin is absent, or by `PETACAT_TRAINING_EXECUTOR=serial`) |
+| Multi-core across runs (swarm) | Yes: the one-problem Swarm, `POST /api/swarm` | Yes: a Training's own swarm pool, process-wide (chosen when the plugin is present, or by `PETACAT_TRAINING_EXECUTOR=swarm`). Each run is single-threaded inside its worker |
+| Multi-core within one run (speculative executor) | Yes: `workers` > 1 on `POST /api/runs`, Run to answer only. Bit-for-bit the [stream-serial reference](#exact-parallelism-inside-one-run), which has the serial run's probability law but is not the same run for a given seed; not yet faster than serial | Not yet: a Training's runs are single-threaded; a plan to extend it is under review |
+
+### The v2.0 milestone
+
+**v2.0** is the first major milestone: Petacat recognizing new concepts and
+incorporating them into the Slipnet, by modelling a learning feedback loop and
+perceptual processes. That is **Training-Mode learning**, and it is not built yet.
 
 [metacat]: http://science.slc.edu/~jmarshall/metacat/
 [marshall]: http://science.slc.edu/~jmarshall/
@@ -265,7 +325,7 @@ view. The two left-hand panels split along *what* versus *how*:
 Modified, Target, and optionally Answer — supplying an Answer switches the
 engine into justification mode), the **Seed**, and the demo dropdown.
 
-**Run Controls** (below it) decides how that problem executes, in eight groups: Run, Training Session, Recording, Engine parameters, What this run is, Manual stepping, Swarm, and Settings.
+**Run Controls** (below it) decides how that problem executes, in eight groups: Run, Training Session (Metacat Mode's session), Recording, Engine parameters, What this run is, Manual stepping, Swarm, and Settings.
 
 **Run** picks between the two mutually exclusive execution strategies, and the
 action button and pacing control follow the choice:
@@ -280,7 +340,7 @@ action button and pacing control follow the choice:
   after each one — raise it to follow the run by eye. Much slower, but every
   structure-build is visible as it happens.
 
-**Training Session** names the sequence the next run joins, and offers the one
+**Training Session** names the sequence of runs the next run joins: Metacat Mode's session, sharing Metacat Mode's Episodic Memory (it is not Training Mode). It offers the one
 control that ends it: **Start a new Training Session**, which clears Episodic
 Memory. That clear *is* the boundary — Episodic Memory is the only thing a run
 hands to the next — so there is nothing to start, only something to end. Runs
@@ -466,14 +526,15 @@ are shared with the production build), and global test setup lives in
 ## Persistence modes and Training Sessions
 
 A **Run** is one letter-analogy problem plus Petacat's response. A **Training
-Session** is a sequence of Runs that share one Episodic Memory — and Episodic
-Memory is the *only* thing that crosses a Run boundary. Everything else (the
+Session** is a sequence of Runs that share one Episodic Memory. It is Metacat
+Mode's session, not Training Mode (see [Two modes](#two-modes)), and Episodic
+Memory (Metacat-Mode learning) is the *only* thing that crosses a Run boundary. Everything else (the
 Slipnet, the Themespace, the Workspace, the Coderack, the Trace, the
 temperature, the random stream) is rebuilt for each Run, exactly as in the
 original Metacat.
 
 Sessions are not something you create. One opens by itself when a Run needs it,
-and every Run afterwards joins it. Clearing episodic memory is what a session
+and every Run afterwards joins it. Clearing Episodic Memory is what a session
 boundary means — after a clear, no Run inherits anything from the Runs before it.
 Two controls do it, and they are the same action under two names: **Start a new
 Training Session** in the Run Controls panel, and **Clear Episodic Memory** in
@@ -527,7 +588,7 @@ about 190 ms.
 Three things worth drawing out.
 
 **Cognition is identical across the modes.** That is the rule the design rests
-on, and it is tested rather than assumed: the engine never learns which mode is
+on, and it is tested rather than assumed: the engine is never told which mode is
 in force. There is no `if mode == "fast"` anywhere under `server/engine/`. A
 `RunSink` port (`server/engine/sink.py`) receives the same events in the same
 order in every mode, and the mode is entirely a question of which
@@ -537,8 +598,8 @@ implementation (`server/services/sinks.py`) is attached.
 takes its identifier as a negative number from an in-process counter. The fast
 sink is a no-op, and its `__slots__` is empty.
 
-**Mode chooses where a run is recorded.** All three modes share the Training
-Session's Episodic Memory and write real commentary. A Fast Run's answers are
+**Mode chooses where a run is recorded.** All three modes share the Metacat Mode
+Training Session's Episodic Memory and write real commentary. A Fast Run's answers are
 available to the runs that follow, it is reminded of theirs, and
 `answer_present` stops a later run rediscovering one of them.
 
@@ -588,7 +649,7 @@ recorded state instead of a running engine.
 ### Reproducibility is by re-execution, not replay
 
 A Normal Run records the *complete* state at both boundaries, and the reason is
-the Training Session invariant: a Run inherits the Episodic Memory of everything
+the Training Session invariant (Metacat Mode's session): a Run inherits the Episodic Memory of everything
 before it, and declines an answer that memory already holds for the same problem
 and the same rules. `(complete starting state, problem, seed)` determines a Run's
 behaviour. Reload the recorded start state, re-run, and the recorded end state
@@ -679,8 +740,8 @@ meet that standard, and they solve different problems.
 ### The swarm: every core, exactly
 
 Research is many runs, not one: an answer distribution over seeds, the
-[oracle comparison](#6-run-the-tests) against Metacat, a parameter sweep, an episode
-corpus, the lockstep corpus. Runs share nothing, so the exact way to use a whole
+[oracle comparison](#6-run-the-tests) against Metacat, a parameter sweep, a corpus
+of Metacat episodes (runs sharing one Episodic Memory), the lockstep corpus. Runs share nothing, so the exact way to use a whole
 machine on them is one engine per core. `server/parallel/swarm.py` keeps a pool of
 worker processes warm and hands each the next run.
 
@@ -700,7 +761,7 @@ worker processes warm and hands each the next run.
 - **Each run's outcome is the serial run's,** byte for byte: same stopping state,
   codelet count, answers, final temperature and answer quality. `tests/parallel/test_swarm.py`
   checks this problem by problem, seed by seed, for justification mode and for
-  episodes (several runs sharing one Episodic Memory). A run that raises comes back as
+  Metacat episodes (several runs sharing one Episodic Memory). A run that raises comes back as
   an outcome carrying its traceback, so one bad seed cannot sink a 10,000-run sweep.
 
 Measured on an Apple M5 Max (6 Super + 12 Performance cores), with the substrate
@@ -960,11 +1021,12 @@ making the serial loop read state as it stood N codelets ago:
 
 ## Training: many problems on every core
 
-A **Training** is a named, long-lived **episode**: many different letter-string
-problems, each run over a number of seeds, spread across every core. It is the mode
-the machine-learning layer drives. It is not the "Training Sessions" of Review, which
-are recordings of dashboard runs; a Training is a job Petacat runs by itself, and it
-lives in its own tables (`alembic/versions/017_trainings.py`, `server/models/training.py`).
+A **Training** is a named, long-lived **Training episode**: many different letter-string
+problems, each run over a number of seeds, spread across every core. It belongs to
+**Training Mode**, which the machine-learning layer drives. It is not the "Training
+Sessions" of Review, which are Metacat Mode's sessions of dashboard runs and share
+Metacat Mode's Episodic Memory; a Training is a job Petacat runs by itself, with its own
+episode memory, and it lives in its own tables (`alembic/versions/017_trainings.py`, `server/models/training.py`).
 
 **Problems can be added while it runs.** Create a Training with 25 problems; whenever
 five have finished, add five more. A Training stays `open` until it is closed, and is
@@ -975,9 +1037,10 @@ seed: the same answer, the same codelet count.
 
 ### Shared versus independent memory
 
-- **`shared` (the default).** The Training is one episode with one Episodic Memory.
+- **`shared` (the default).** The Training is one Training episode with one episode memory
+  (the same kind of structure as Metacat's Episodic Memory, but the Training's own).
   - A run takes a **copy of the episode memory as it is when the run starts** and
-    holds it static for its whole duration. What other runs learn never reaches a run
+    holds it static for its whole duration. What other runs add to the episode memory never reaches a run
     in flight. The run's own additions go into its own copy, as in any run.
   - **When the copy is taken.** The copy is made when the run is handed to a worker.
     The Training has its own process pool and never has more runs in flight than it
@@ -985,13 +1048,14 @@ seed: the same answer, the same codelet count.
     come back is merged before the next run is handed out.
   - When the run finishes, its additions are **merged** into the episode memory. They
     affect **only runs that start after the merge**. The merge applies Metacat's own
-    presence checks (`answer_present`, `snag_present`), so the episode never holds the
+    presence checks (`answer_present`, `snag_present`), so the Training episode never holds the
     same description twice.
   - The episode memory has a **version**, the number of merges so far. Each run records
     `memory_version` (the version it started with) and `seq` (its merge order). That
     record makes a Training reproducible: the stored merges rebuild the memory exactly.
-  - **One worker is Metacat's serial episode:** each run starts after the previous one
-    merged. With many workers it is the same idea with runs overlapping.
+  - **One worker reproduces Metacat's serial episode:** each run starts after the previous one
+    merged. That is a reference for tests, not a link to Metacat Mode. With many workers it is
+    the same idea with runs overlapping.
 - **`independent`.** Every run gets a fresh memory: the answer-distribution mode, with
   no cross-run state.
 
@@ -1044,6 +1108,11 @@ submits runs to a swarm pool of its own, separate from the one `POST /api/swarm`
 in a child process. The API is the same and the results are identical, run for run
 (`tests/architecture/test_parallel_detachable.py` checks this in an interpreter that
 cannot import the plugin). `GET /api/trainings` reports which executor is in use.
+
+The executor is chosen once per process: `PETACAT_TRAINING_EXECUTOR` (`serial` or `swarm`) forces
+it, otherwise the swarm is used when the plugin imports and the serial child process when it does
+not. This is run mode (see [Two modes](#two-modes)); each run is single-threaded inside its
+worker, and the speculative executor is not yet available to Trainings.
 
 ### Routes
 
@@ -1140,7 +1209,7 @@ The tables below cover the routes a user drives.
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| POST | `/api/runs` | Create a new run — takes `mode` (`fast`/`normal`/`audit`), `workers` (1–16; above 1 runs the exact speculative executor), `spreading_threshold`, and `parameters` for per-run overrides |
+| POST | `/api/runs` | Create a new run — takes `mode` (the persistence mode: `fast`/`normal`/`audit`; a v1.2 name), `workers` (1–16; above 1 runs the exact speculative executor), `spreading_threshold`, and `parameters` for per-run overrides |
 | GET | `/api/runs/{id}` | Get run info |
 | POST | `/api/runs/{id}/step` | Step N codelets |
 | POST | `/api/runs/{id}/run` | Run to completion |
@@ -1170,7 +1239,7 @@ The tables below cover the routes a user drives.
 | GET | `/api/runs/{id}/parameters` | What a Run was: `fixed` (all of them, resolved), `overridden`, `defaults`, `derived` |
 | GET | `/api/runs/{id}/telemetry` | Parallel telemetry for a `workers` > 1 Run: codelets handed to workers, aborts by reason, barriers, time in update cycles |
 | GET | `/api/review/runs/{id}` | One Run's review projection, for linking straight to it |
-| PUT | `/api/review/sessions/{id}/note` | Set a Training Session's note |
+| PUT | `/api/review/sessions/{id}/note` | Set a Training Session's note (Metacat Mode's session) |
 | GET | `/api/system/numeric` | Which numeric backend the server process is running, and on what device |
 
 ### The swarm
@@ -1182,7 +1251,7 @@ The tables below cover the routes a user drives.
 
 ### Trainings
 
-Training mode. The full list, with request and response shapes, is in
+Training Mode. The full list, with request and response shapes, is in
 [API.md](API.md) and the [Training section](#training-many-problems-on-every-core).
 
 | Method | Endpoint | Purpose |
@@ -1193,7 +1262,7 @@ Training mode. The full list, with request and response shapes, is in
 | GET | `/api/trainings/{id}/problems/{pid}`, `.../runs` | One problem's distribution / its runs, with `seq` and `memory_version` |
 | POST | `/api/trainings/{id}/problems/{pid}/cancel` | Cancel one problem |
 | GET | `/api/trainings/{id}/finished` | Problems finished after a cursor; long-polls with `wait` |
-| GET | `/api/trainings/{id}/memory` | The episode's Episodic Memory (shared only) |
+| GET | `/api/trainings/{id}/memory` | The Training episode's memory (shared only) |
 | POST | `/api/trainings/{id}/pause`, `/resume`, `/close`, `/cancel` | Lifecycle |
 | GET | `/api/trainings/{id}/export` | CSV or JSON of problems, distribution or runs |
 
@@ -1216,7 +1285,7 @@ they live in their own router rather than in `runs.py`.
 
 | Method | Endpoint | Returns |
 |--------|----------|---------|
-| GET | `/api/review/sessions` | Training Sessions, newest first, with Run counts |
+| GET | `/api/review/sessions` | Training Sessions (Metacat Mode's sessions), newest first, with Run counts |
 | GET | `/api/review/sessions/{id}` | The sequence of Runs in one session |
 | GET | `/api/review/runs/{id}/captures` | Which boundary captures a Run has |
 | GET | `/api/review/runs/{id}/captures/{boundary}` | One capture, projected into the shapes the live views read |
@@ -1441,8 +1510,8 @@ Some additional minor differences include:
 ## Future Direction
 
 Petacat is not an end state. It's a foundation for a longer-running set of
-questions about whether perception, analogy-making, learning, and
-self-awareness might really be one thing seen at different levels of
+questions about whether perception, analogy-making, learning (Training-Mode learning, in
+Petacat's terms), and self-awareness might really be one thing seen at different levels of
 abstraction — the bet underneath Hofstadter's whole programme, spelled out
 one step further. Four open threads worth pulling on are sketched in
 [FUTURE_DIRECTION.md](FUTURE_DIRECTION.md): a self/other grounding at the

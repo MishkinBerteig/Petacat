@@ -19,14 +19,14 @@ describe('HamburgerMenu', () => {
       .getAllByRole('button')
       .map((b) => b.textContent?.replace('✓', '').trim())
       .filter((t) => t && t !== '☰')
-    expect(labels).toEqual(['Run Dashboard', 'Review', 'Training', 'Configuration', 'Admin'])
+    expect(labels).toEqual(['Run Dashboard (Metacat Mode)', 'Review (Metacat Mode)', 'Training Mode', 'Configuration (Metacat Mode)', 'Admin (Metacat Mode)'])
   })
 
   it('selects the training view', () => {
     const onSelect = vi.fn()
     render(<HamburgerMenu activeView="dashboard" onSelect={onSelect} />)
     fireEvent.click(screen.getByRole('button', { name: 'Navigation menu' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Training' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Training Mode' }))
     expect(onSelect).toHaveBeenCalledWith('training')
   })
 

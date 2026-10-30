@@ -69,27 +69,27 @@ export function HamburgerMenu({ activeView, onSelect, disabled }: Props) {
           }}
         >
           <MenuItem
-            label="Run Dashboard"
+            label="Run Dashboard (Metacat Mode)"
             active={activeView === 'dashboard'}
             onClick={() => select('dashboard')}
           />
           <MenuItem
-            label="Review"
+            label="Review (Metacat Mode)"
             active={activeView === 'review'}
             onClick={() => select('review')}
           />
           <MenuItem
-            label="Training"
+            label="Training Mode"
             active={activeView === 'training'}
             onClick={() => select('training')}
           />
           <MenuItem
-            label="Configuration"
+            label="Configuration (Metacat Mode)"
             active={activeView === 'config'}
             onClick={() => select('config')}
           />
           <MenuItem
-            label="Admin"
+            label="Admin (Metacat Mode)"
             active={activeView === 'admin'}
             onClick={() => select('admin')}
           />

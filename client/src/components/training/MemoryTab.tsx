@@ -39,7 +39,7 @@ export function MemoryTab({ training }: { training: TrainingSummary }) {
         setMemory(await getTrainingMemory(training.id));
         setError(null);
       } catch (err) {
-        setError(describeApiError(err, 'load the episode memory'));
+        setError(describeApiError(err, "load this Training's episode memory"));
       }
     },
     training.state === 'running' ? POLL_RUNNING_MS : POLL_IDLE_MS,
@@ -49,7 +49,7 @@ export function MemoryTab({ training }: { training: TrainingSummary }) {
   return (
     <div data-testid="memory-tab">
       <div className="text-xs text-muted" style={{ marginBottom: 6 }}>
-        The episode's Episodic Memory, newest first. A run's additions reach it when the run finishes, and only
+        This Training&apos;s own episode memory (Training Mode, not Metacat Mode&apos;s Episodic Memory), newest first. A run's additions reach it when the run finishes, and only
         runs that start afterwards can use them.
         {training.memory_version !== null && <> Version {fmtInt(training.memory_version)}.</>}
       </div>

@@ -339,8 +339,8 @@ export function RunControlsPanel() {
   const handleNewSession = useCallback(async () => {
     if (
       !window.confirm(
-        'Start a new Training Session?\n\n'
-          + 'This clears Episodic Memory, which is what a session boundary is: the '
+        'Start a new Training Session (Metacat Mode\'s session)?\n\n'
+          + 'This clears Metacat Mode\'s Episodic Memory, which is what a session boundary is: the '
           + 'answers and snags from the runs so far are the only thing carried from '
           + 'one run to the next, so the runs after this point start from nothing.\n\n'
           + 'Recorded runs are not deleted — they stay in Run History and in Review, '
@@ -367,6 +367,10 @@ export function RunControlsPanel() {
       {/* ------------------------------------------------------------ */}
       <div style={groupStyle}>
         <div style={groupLabelStyle}>Run</div>
+        <div className="text-xs text-muted" data-testid="run-mode-note">
+          Run mode — single-threaded or multi-core — is how a run executes. It is separate from
+          Recording below (Fast, Normal or Audit), which is how a run is recorded.
+        </div>
 
         <div style={fieldGroupStyle}>
           {/* `execution-strategy` rather than the old `run-mode`: "mode" now means
@@ -395,8 +399,8 @@ export function RunControlsPanel() {
             architecture does. It is fixed at creation all the same. */}
         <div style={fieldGroupStyle}>
           <label style={labelStyle} htmlFor="run-workers">
-            Workers: {effectiveWorkers}
-            {effectiveWorkers === 1 ? ' (serial — the reference mode)' : ' (parallel, exact)'}
+            Run mode — Workers: {effectiveWorkers}
+            {effectiveWorkers === 1 ? ' (single-threaded, serial — the reference mode)' : ' (multi-core, exact)'}
           </label>
           <input
             id="run-workers"
@@ -578,10 +582,20 @@ export function RunControlsPanel() {
       {/* read about in Review and never started from here.             */}
       {/* ------------------------------------------------------------ */}
       <div style={groupStyle}>
-        <div style={groupLabelStyle}>Training Session</div>
+        <div style={groupLabelStyle}>
+          Training Session{' '}
+          <span
+            className="text-xs text-muted"
+            title="Metacat Mode's session: the runs that share one Episodic Memory. Not a Training, which belongs to Training Mode."
+            style={{ fontWeight: 400, textTransform: 'none' }}
+          >
+            (Metacat Mode&apos;s session)
+          </span>
+        </div>
 
         <div className="text-xs text-muted">
-          A sequence of runs sharing one Episodic Memory — the only thing that
+          Metacat Mode&apos;s session: a sequence of runs sharing one Episodic Memory
+          (Metacat-Mode learning) — the only thing that
           crosses a run boundary. Every run joins the open session automatically;
           there is nothing to start.
           {sessionId !== null && (
@@ -626,7 +640,12 @@ export function RunControlsPanel() {
       {/* what makes the difference between them visible.               */}
       {/* ------------------------------------------------------------ */}
       <div style={groupStyle}>
-        <div style={groupLabelStyle}>Recording</div>
+        <div style={groupLabelStyle}>
+          Recording{' '}
+          <span className="text-xs text-muted" style={{ fontWeight: 400, textTransform: 'none' }}>
+            (persistence mode, not run mode)
+          </span>
+        </div>
 
         <div style={fieldGroupStyle}>
           <label style={labelStyle} htmlFor="persistence-mode">
@@ -876,7 +895,7 @@ export function RunControlsPanel() {
                   {(identity.memory_hash ?? '——').slice(0, 8)}
                 </div>
                 {identity.session_id !== null && (
-                  <div title="The Training Session this run belongs to: the span between two Episodic Memory clears.">
+                  <div title="The Training Session (Metacat Mode's session) this run belongs to: the span between two Episodic Memory clears.">
                     Training Session {identity.session_id}
                   </div>
                 )}

@@ -228,7 +228,7 @@ describe('TrainingPanel: the list', () => {
     expect(await screen.findByText('Pilot')).toBeInTheDocument()
     expect(screen.getByText('Done one')).toBeInTheDocument()
     expect(screen.getByTestId('executor-line')).toHaveTextContent(
-      'swarm, 17 cores, 34 runs in flight, 12,000 queued',
+      'Run mode: multi-core (swarm, 17 workers; 34 runs in flight, 12,000 queued)',
     )
     const items = screen.getAllByTestId('training-item')
     expect(items).toHaveLength(2)
@@ -243,7 +243,7 @@ describe('TrainingPanel: the list', () => {
     m.listTrainings.mockResolvedValue({ ...LIST, executor: { kind: 'serial', workers: 1, in_flight: 0, queued_runs: 0 } })
     render(<TrainingPanel />)
     expect(await screen.findByTestId('executor-line')).toHaveTextContent(
-      'serial (parallel plugin not installed)',
+      'Run mode: single-threaded (serial; parallel plugin not installed)',
     )
   })
 
@@ -964,7 +964,7 @@ describe('TrainingPanel: the new-training form (v2)', () => {
     const select = screen.getByLabelText('Memory') as HTMLSelectElement
     expect(select.value).toBe('shared')
     expect(screen.getByRole('option', { name: 'Shared (one episode)' })).toBeInTheDocument()
-    expect(screen.getByTestId('memory-help-line')).toHaveTextContent(/copies the episode memory when it starts/)
+    expect(screen.getByTestId('memory-help-line')).toHaveTextContent(/copies the Training's episode memory when it starts/)
     fireEvent.change(select, { target: { value: 'independent' } })
     expect(screen.getByTestId('memory-help-line')).toHaveTextContent(/empty memory/)
   })

@@ -127,8 +127,8 @@ export function SessionBrowser({ selectedRunId, onSelectRun, focusSessionId = nu
   if (sessions.length === 0 && offset === 0) {
     return (
       <div className="text-muted text-sm" style={{ padding: 12 }}>
-        No Training Sessions recorded yet. A session begins with the first Run and
-        ends when Episodic Memory is cleared.
+        No Training Sessions recorded yet. A session (Metacat Mode&apos;s) begins with the first Run and
+        ends when Metacat Mode&apos;s Episodic Memory is cleared.
       </div>
     );
   }

@@ -140,9 +140,9 @@ export function AdminPanel() {
       // "removes stored descriptions" understated that — the boundary in the Review
       // browser is drawn by this button and nothing said so at the point of pressing.
       window.confirm(
-        'Clear episodic memory?\n\n'
-          + 'This ends the current Training Session and starts a new one: episodic '
-          + 'memory is the only thing carried from one run to the next, so the runs '
+        'Clear Metacat Mode\'s Episodic Memory?\n\n'
+          + 'This ends the current Training Session (Metacat Mode\'s session) and starts a new one: Episodic '
+          + 'Memory is the only thing carried from one run to the next, so the runs '
           + 'after this point start from an empty memory.\n\n'
           + 'It removes all stored answer and snag descriptions from past runs. '
           + 'It does NOT reset the current run or delete run history — past runs stay '
@@ -155,7 +155,7 @@ export function AdminPanel() {
       } catch (err) {
         // The session is still open and its answers are still stored, so the reader
         // is told which of the two states they are in.
-        setClearStatus({ kind: 'error', message: describeApiError(err, 'clear episodic memory') });
+        setClearStatus({ kind: 'error', message: describeApiError(err, "clear Metacat Mode's Episodic Memory") });
         return;
       }
       setClearStatus({ kind: 'done' });
@@ -174,7 +174,7 @@ export function AdminPanel() {
           + 'This will:\n'
           + '  - Stop any running run\n'
           + '  - Delete ALL runs and their history\n'
-          + '  - Clear all episodic memory\n'
+          + '  - Clear all of Metacat Mode\'s Episodic Memory\n'
           + '  - Reset the UI to its initial state\n\n'
           + 'This cannot be undone.'
       )
@@ -200,6 +200,24 @@ export function AdminPanel() {
         overflowY: 'auto',
       }}
     >
+      {/* Which mode the Admin view belongs to, and what it never touches. */}
+      <div
+        role="note"
+        data-testid="admin-mode-note"
+        className="text-xs"
+        style={{
+          padding: '6px 10px',
+          border: '1px solid var(--border)',
+          borderLeft: '4px solid var(--text-accent)',
+          borderRadius: 3,
+          color: 'var(--text-secondary)',
+        }}
+      >
+        <strong>Metacat Mode.</strong> This view edits the global configuration that Metacat Mode
+        uses, and clears Metacat Mode&apos;s Episodic Memory. A new Training in Training Mode
+        copies the global configuration when it is created; a Training never changes it.
+      </div>
+
       {/* ---- Row 1: Regenerate Help Documentation (utility, non-destructive) ---- */}
       <ActionSection
         state={topicState.admin_regenerate_help}
@@ -246,10 +264,11 @@ export function AdminPanel() {
                 <button onClick={handleClearMemory} style={warningButtonStyle}>
                   Clear Episodic Memory
                 </button>
+                <span className="text-xs text-muted">(Metacat Mode&apos;s Episodic Memory)</span>
                 {clearStatus.kind === 'done' && (
                   <span style={{ fontSize: 11, color: 'var(--success)' }}>
-                    Cleared — this Training Session is closed and the next one begins
-                    with the next run.
+                    Cleared — this Training Session (Metacat Mode&apos;s session) is closed and the next one
+                    begins with the next run.
                   </span>
                 )}
                 {clearStatus.kind === 'error' && (

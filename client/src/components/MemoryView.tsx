@@ -111,7 +111,7 @@ export function MemoryView() {
       useRunStore.setState({ memory: next });
       setLoadError(null);
     } catch (err) {
-      setLoadError(describeApiError(err, 'load episodic memory'));
+      setLoadError(describeApiError(err, "load Metacat Mode's Episodic Memory"));
     }
   }, [runId]);
 
@@ -240,13 +240,13 @@ export function MemoryView() {
   }, [selected, runId]);
 
   const handleClear = useCallback(async () => {
-    if (!window.confirm('Clear all episodic memory? This cannot be undone.')) return;
+    if (!window.confirm("Clear all of Metacat Mode's Episodic Memory? This cannot be undone.")) return;
     try {
       await request<void>('/memory', { method: 'DELETE' });
       setActionError(null);
     } catch (err) {
       // The answers below are still stored, so the panel keeps showing them.
-      setActionError(describeApiError(err, 'clear episodic memory'));
+      setActionError(describeApiError(err, "clear Metacat Mode's Episodic Memory"));
       return;
     }
     await refreshMemory();
@@ -293,11 +293,20 @@ export function MemoryView() {
             color: 'var(--text-secondary)',
           }}
         >
-          Read live from the Training Session's memory. A <strong>Fast</strong> run
+          Read live from the Training Session&apos;s memory (Metacat Mode&apos;s session; Metacat Mode&apos;s Episodic Memory). A <strong>Fast</strong> run
           shares this memory and is reminded from it, and the answers it finds are here
           for as long as the session runs.
         </div>
       )}
+
+      {/* Which mode's memory this is: Training Mode's Trainings keep their own. */}
+      <div
+        className="text-xs text-muted"
+        data-testid="memory-mode-note"
+        style={{ marginBottom: 4 }}
+      >
+        Metacat Mode&apos;s Episodic Memory — Metacat-Mode learning, shared by successive runs.
+      </div>
 
       {/* Header with counts and clear button */}
       <div
@@ -329,6 +338,7 @@ export function MemoryView() {
           {!isEmpty && (
             <button
               onClick={handleClear}
+              title="Clear Metacat Mode's Episodic Memory (not a Training's episode memory)"
               style={{ fontSize: 10, color: 'var(--error)' }}
             >
               Clear Memory

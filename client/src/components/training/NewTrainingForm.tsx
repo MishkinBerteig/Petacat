@@ -156,8 +156,8 @@ export function NewTrainingForm({ limits, defaults, onCreated, onCancel }: Props
         <ControlHelp topic="training_new" label="New training" />
       </div>
       <div className="text-xs text-muted" style={{ marginTop: 4 }}>
-        A Training is a named episode: many problems, each over many seeds. The settings below are fixed once it
-        is created.
+        A Training (Training Mode) is a named episode: many problems, each over many seeds. The settings below are fixed once it
+        is created. It copies the global configuration that Metacat Mode uses and never changes it.
       </div>
 
       <div style={{ ...fieldGroupStyle, marginTop: 8 }}>
@@ -194,7 +194,7 @@ export function NewTrainingForm({ limits, defaults, onCreated, onCancel }: Props
         </select>
         <div className="text-xs text-muted" data-testid="memory-help-line">
           {memory === 'shared'
-            ? 'Each run copies the episode memory when it starts and holds it static. What a run adds reaches only the runs that start after it finishes.'
+            ? 'Each run copies the Training\'s episode memory when it starts and holds it static. What a run adds reaches only the runs that start after it finishes.'
             : 'Every run starts with an empty memory and nothing is shared: a plain answer distribution.'}
         </div>
       </div>

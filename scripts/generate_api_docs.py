@@ -23,23 +23,37 @@ API_MD_PATH = os.path.join(REPO_ROOT, "API.md")
 
 #: Order the sections appear in, and what each one is for.
 GROUPS: list[tuple[str, str, str]] = [
-    ("/api/runs", "Runs", "Creating, driving and reading a run."),
+    (
+        "/api/runs",
+        "Runs",
+        "Metacat Mode: creating, driving and reading a run. On `POST /api/runs`, `mode` is the "
+        "persistence mode (Fast, Normal or Audit: how the run is recorded), a v1.2 name that "
+        "stays as it is, and `workers` is the run mode (1 is single-threaded, more is the exact "
+        "speculative executor).",
+    ),
     (
         "/api/swarm",
         "Swarm",
-        "One problem over many seeds on every core: the answer distribution, plus pool status "
-        "(a detachable plugin; 503 when absent).",
+        "Metacat Mode, multi-core across runs: one problem over many seeds on every core, giving the "
+        "answer distribution, plus pool status (a detachable plugin; 503 when absent).",
     ),
     (
         "/api/trainings",
         "Trainings",
-        "Named, long-lived episodes of many problems over many seeds, extendable while they "
-        "run, with a shared episode memory; the database is written only when a problem "
-        "finishes (works with or without the parallel plugin).",
+        "Training Mode: named, long-lived Training episodes of many problems over many seeds, "
+        "extendable while they run, each with its own episode memory (never Metacat Mode's "
+        "Episodic Memory); the database is written only when a problem finishes (works with or "
+        "without the parallel plugin).",
     ),
-    ("/api/memory", "Episodic Memory", "The Training Session's memory, shared by every run."),
-    ("/api/review", "Review", "Reading back what a Normal or Audit run recorded."),
-    ("/api/admin", "Configuration", "The editable copy of the seed data."),
+    (
+        "/api/memory",
+        "Episodic Memory",
+        "Metacat Mode: the Episodic Memory (Metacat-Mode learning) shared by the runs of the "
+        "Metacat Mode session, which the UI calls the \"Training Session\". It is not Training "
+        "Mode and is untouched by Trainings.",
+    ),
+    ("/api/review", "Review", "Metacat Mode: reading back what a Normal or Audit run recorded, and the sessions (\"Training Sessions\" in the UI; Metacat Mode, not Training Mode) the runs form."),
+    ("/api/admin", "Configuration", "Metacat Mode: the editable copy of the seed data (the global configuration). A Training copies it when created and never changes it."),
     ("/api/docs", "Help", "In-app help topics, the glossary and search."),
     ("/api/system", "System", "What the process resolved at startup."),
 ]
@@ -86,6 +100,11 @@ def render() -> str:
         f"{total} HTTP routes, plus `WS /ws/runs/{{run_id}}` for live state push.",
         "",
         "Interactive documentation is served at `/docs` while the API is running.",
+        "",
+        "Petacat has two modes: **Metacat Mode** (the v1.2 features, including Metacat's own "
+        "Episodic Memory) and **Training Mode** (Trainings and what follows). Nothing in "
+        "Training Mode affects Metacat Mode. Run mode (single-threaded or multi-core) is "
+        "independent of both and is not the persistence mode (Fast, Normal or Audit).",
         "",
     ]
 
