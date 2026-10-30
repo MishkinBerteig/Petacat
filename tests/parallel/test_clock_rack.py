@@ -264,6 +264,79 @@ def test_predict_with_changed_temperature_matches_and_does_not_mutate(meta):
     assert [c.id for c in order] == [c.id for c in got]
 
 
+def test_cached_prediction_is_exact_until_a_post_passes_it(meta):
+    """The engine reuses one prediction for a whole epoch.  ``predict_entries`` records the
+    urgency row and restarts ``floor_f``; while ``gen`` is unchanged, the entries with
+    ``F < floor_f`` that are still on the rack must be exactly the next choices, in order,
+    whatever was posted, evicted or chosen since."""
+    rng = random.Random(77)
+    rack = ClockCoderack(meta, Streams(5), rng_source=lambda: ev_rng)
+    ev_rng = RNG(9)
+    types = ["a", "b", "c", "d", "e"]
+    temperature = 60.0
+    for _ in range(40):
+        rack.post(Codelet(rng.choice(types), rng.randrange(0, 101)))
+    checked = 0
+    for step in range(1500):
+        entries = rack.predict_entries(temperature, 10)
+        gen0 = rack.gen
+        for _ in range(rng.randrange(1, 12)):
+            op = rng.random()
+            if op < 0.45:
+                rack.post(Codelet(rng.choice(types), rng.randrange(0, 101)))
+            elif op < 0.55:
+                rack.post_deferred(
+                    [Codelet(rng.choice(types), rng.randrange(0, 101)) for _ in range(5)],
+                    step, ev_rng)
+            elif op < 0.8:
+                rack.choose_and_remove(temperature, None)
+            elif op < 0.9:
+                # The engine drops its cache whenever the temperature moves (it only
+                # moves in an update cycle), so a cache is never read across this.
+                temperature = float(rng.randrange(0, 101))
+                break
+            elif op < 0.95:
+                rack.clamp_codelet_type(rng.choice(types), rng.randrange(0, 101))
+            else:
+                rack.unclamp_all()
+            if rack.gen != gen0:
+                break
+            valid = []
+            for f, cid in entries:
+                if f >= rack.floor_f:
+                    break
+                if cid in rack._by_id:
+                    valid.append(cid)
+            if valid:
+                truth = rack.predict(temperature, len(valid))
+                assert [c.id for c in truth] == valid
+                checked += 1
+        while rack.total_count > 80:
+            rack.choose_and_remove(temperature, None)
+        if rack.total_count < 20:
+            for _ in range(30):
+                rack.post(Codelet(rng.choice(types), rng.randrange(0, 101)))
+    assert checked > 500
+
+
+def test_sync_row_is_the_choices_own_reweighting(meta):
+    """``sync_row`` does early exactly what the next ``choose_and_remove`` would do first."""
+    cods = [Codelet(t, u) for t, u in MIX]  # clocks are keyed by id: share the codelets
+    a, b = ClockCoderack(meta, Streams(41)), ClockCoderack(meta, Streams(41))
+    for rack in (a, b):
+        for c in cods:
+            rack.post(c)
+    a.choose_and_remove(95.0, None)
+    b.choose_and_remove(95.0, None)
+    a.sync_row(30.0)
+    assert a._row != b._row
+    ca, cb = a.choose_and_remove(30.0, None), b.choose_and_remove(30.0, None)
+    # (The two racks hold different Codelet objects, so compare what the clocks say.)
+    assert ca.id == cb.id and a._row == b._row and a.t_now == b.t_now
+    assert a._clock == b._clock
+    assert [c.id for c in a.predict(30.0, 6)] == [c.id for c in b.predict(30.0, 6)]
+
+
 def test_bins_heap_stay_consistent(meta):
     """Random operations (incl. eviction past capacity, clamps, deferred batches)."""
     rng = random.Random(2024)

@@ -85,6 +85,19 @@ class ClockCoderack(Coderack):
         #: Telemetry / tests.
         self.rescales = 0
         self.fallbacks = 0
+        #: Prediction bookkeeping for the speculative engine's cached lookahead.  ``gen``
+        #: changes whenever the order of codelets already on the rack can change (a
+        #: re-weighting to another urgency row, a clamp re-filing codelets, a clear);
+        #: ``floor_f`` is the smallest firing time enrolled since the last
+        #: :meth:`predict_entries`.  A cached ``(F, id)`` list is therefore still the
+        #: exact head of the order while ``gen`` is unchanged and ``F < floor_f``.
+        #: Neither is read by the choice itself.
+        self.gen = 0
+        #: Codelets evicted from the rack (not chosen): lets a reader notice cheaply that
+        #: some codelet it knew about is gone.
+        self.removed = 0
+        self.floor_f = _INF
+        self.pred_row: tuple[int, ...] | None = None
 
     # -- the run's generator, bound per thread by the context ------------
 
@@ -142,6 +155,8 @@ class ClockCoderack(Coderack):
         self._clock[cid] = (f, w)
         self._by_id[cid] = codelet
         heapq.heappush(self._heap, (f, cid))
+        if f < self.floor_f:
+            self.floor_f = f
 
     def _enroll_missing(self) -> None:
         clock = self._clock
@@ -178,6 +193,10 @@ class ClockCoderack(Coderack):
         return out
 
     def _reweight(self, row: tuple[int, ...]) -> None:
+        if row != self.pred_row:
+            # A cached prediction was made under another row: its firing times are void.
+            # (One made under *this* row used the very same rescaling, so it stays valid.)
+            self.gen += 1
         self._clock = self._rescaled(row)
         self._row = row
         self._heap = [(f, cid) for cid, (f, _) in self._clock.items()]
@@ -210,6 +229,27 @@ class ClockCoderack(Coderack):
         clocks are reweighted on a *copy*, by the same formula the real choice applies,
         so the prediction and the choice cannot disagree on a rounding.
         """
+        return [self._by_id[cid] for _, cid in self._predict(temperature, count)]
+
+    def predict_entries(self, temperature: float, count: int) -> list[tuple[float, int]]:
+        """:meth:`predict` as ``(F, id)`` pairs, and restart the cache bookkeeping.
+
+        Records the urgency row the firing times were computed under (``pred_row``) and
+        resets ``floor_f``: from now on ``floor_f`` is the smallest firing time posted
+        after this call, so every returned pair with ``F < floor_f`` is still exactly
+        where the choice will find it -- provided the posts are on the same scale as the
+        pairs, which is why this first does :meth:`sync_row` (a non-empty rack's clocks
+        move to *temperature*'s row now rather than at the choice).  The caller must
+        therefore be about to choose with this temperature and must post nothing before
+        it does (the engine calls this from the hook that runs just before a step).
+        """
+        if self._total_count:
+            self.sync_row(temperature)
+        self.pred_row = self.urgency_table.row(temperature)
+        self.floor_f = _INF
+        return self._predict(temperature, count)
+
+    def _predict(self, temperature: float, count: int) -> list[tuple[float, int]]:
         row = self.urgency_table.row(temperature)
         if self._row is not None and row != self._row:
             clock = self._rescaled(row)
@@ -234,9 +274,27 @@ class ClockCoderack(Coderack):
                 want *= 2
         if entries and entries[0][0] == _INF:
             return []  # the all-zero fallback is not predictable without a step
-        return [self._by_id[cid] for f, cid in entries if f != _INF]
+        return [(f, cid) for f, cid in entries if f != _INF]
 
     # -- the choice ------------------------------------------------------
+
+    def sync_row(self, temperature: float) -> None:
+        """Do now the re-weighting the next :meth:`choose_and_remove` would do first.
+
+        ``choose_and_remove`` begins by moving every clock to the urgency row of the
+        temperature it is given.  A caller that is about to choose with *this same
+        temperature*, and knows that nothing will be posted in between, may do that part
+        early, so that a prediction made first reads the heap as it is instead of
+        re-weighting a copy of every clock (and the choice then finds the work done).
+        The state afterwards is exactly the state the choice would have left, so the
+        sequence of clocks, and with it every later choice, is unchanged.  The caller
+        must not use this on an empty rack: codelets posted to it before the choice are
+        enrolled under the *previous* row and re-weighted by the choice, a different
+        number than enrolling them under the new row.
+        """
+        row = self.urgency_table.row(temperature)
+        if row != self._row:
+            self._reweight(row)
 
     def choose_and_remove(self, temperature: float, rng: Any = None) -> Codelet | None:
         """The codelet with the smallest firing time.  Draws nothing from *rng*."""
@@ -271,6 +329,7 @@ class ClockCoderack(Coderack):
         if not non_empty:
             return None
         self.fallbacks += 1
+        self.gen += 1
         chosen_bin: CoderackBin = stream.pick(non_empty)
         codelet = chosen_bin.choose_random(stream)
         chosen_bin.remove(codelet)
@@ -318,12 +377,14 @@ class ClockCoderack(Coderack):
         removed = super().remove_old_codelets(current_time, num_to_remove, rng, temperature)
         for codelet in removed:
             self._forget(codelet)
+        self.removed += len(removed)
         return removed
 
     def clear(self) -> None:
         if self.guard is not None:
             self.guard()
         super().clear()
+        self.gen += 1
         self._clock.clear()
         self._by_id.clear()
         self._heap.clear()
@@ -333,6 +394,7 @@ class ClockCoderack(Coderack):
         if self.guard is not None:
             self.guard()
         super()._move_urgencies(codelet_type, urgency_of)
+        self.gen += 1
         row = self._weights()
         t = self.t_now
         for cid, (f, w_old) in list(self._clock.items()):
