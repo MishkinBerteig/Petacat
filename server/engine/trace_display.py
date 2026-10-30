@@ -42,6 +42,7 @@ from __future__ import annotations
 import json
 import logging
 from typing import Any
+from server.engine.workspace import WorkspaceString
 
 logger = logging.getLogger(__name__)
 
@@ -242,8 +243,6 @@ def _string_role(string: Any) -> str:
 
 
 def _is_string(obj: Any) -> bool:
-    from server.engine.workspace import WorkspaceString
-
     return isinstance(obj, WorkspaceString)
 
 

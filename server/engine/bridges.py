@@ -9,9 +9,17 @@ Scheme source: bridges.ss
 
 from __future__ import annotations
 
+import math
 from typing import TYPE_CHECKING, Any
 
+from server.engine.themes import (
+    THEME_BOTTOM_BRIDGE,
+    THEME_TOP_BRIDGE,
+    THEME_VERTICAL_BRIDGE,
+    relation_name_for_label,
+)
 from server.engine.workspace_structures import WorkspaceStructure
+from server.engine.concept_mappings import ConceptMapping
 
 if TYPE_CHECKING:
     from server.engine.bonds import Bond
@@ -374,12 +382,6 @@ class Bridge(WorkspaceStructure):
     @property
     def theme_type(self) -> str:
         """The Themespace theme type this bridge feeds."""
-        from server.engine.themes import (
-            THEME_BOTTOM_BRIDGE,
-            THEME_TOP_BRIDGE,
-            THEME_VERTICAL_BRIDGE,
-        )
-
         return {
             BRIDGE_TOP: THEME_TOP_BRIDGE,
             BRIDGE_BOTTOM: THEME_BOTTOM_BRIDGE,
@@ -415,8 +417,6 @@ class Bridge(WorkspaceStructure):
         never gives them, from which they could go on to appear in dominant
         patterns, in answer indexing, and in the theme pattern a snag clamps.
         """
-        from server.engine.themes import relation_name_for_label
-
         relations: list[tuple[str, str]] = []
         for d1 in _plain_descriptions(self.object1):
             for d2 in _plain_descriptions(self.object2):
@@ -607,8 +607,6 @@ class Bridge(WorkspaceStructure):
         if dir1 is None or dir2 is None:
             return None
 
-        from server.engine.concept_mappings import ConceptMapping
-
         dir_cat_node = _slipnet_node(obj1, "plato-direction-category") or _slipnet_node(
             obj2, "plato-direction-category"
         )
@@ -656,8 +654,6 @@ class Bridge(WorkspaceStructure):
         ``cm.label.name`` ("plato-identity") to a pattern relation ("identity")
         could never match, so this returned ``False`` unconditionally.
         """
-        from server.engine.themes import relation_name_for_label
-
         filtered_cms = [
             cm for cm in self.get_all_concept_mappings()
             if not _is_whole_or_single_cm(cm)
@@ -786,8 +782,6 @@ _IDENTITY_SENTINEL = _IdentitySentinel()
 
 def _label_relation(descriptor1: Any, descriptor2: Any) -> str:
     """Bare theme-relation name relating two descriptors."""
-    from server.engine.themes import relation_name_for_label
-
     return relation_name_for_label(_label_node(descriptor1, descriptor2))
 
 
@@ -966,8 +960,6 @@ def _slipnet_node(obj: Any, name: str) -> Any:
 
 def _bridge_theme_compatibility_sigmoid(x: float) -> float:
     """Sharpen a raw support value.  Scheme: themes.ss:1115, beta = 4."""
-    import math
-
     beta = 4.0
     try:
         return 2.0 / (1.0 + math.exp(-2.0 * beta * x)) - 1.0
@@ -1082,8 +1074,6 @@ def make_concept_mappings(
     Applies the §3.3.1 horizontal/vertical asymmetry, so a vertical a-i bridge
     gets no ``LetterCategory: a => i`` slippage while the horizontal one does.
     """
-    from server.engine.concept_mappings import ConceptMapping
-
     if descriptions1 is None:
         descriptions1 = _plain_descriptions(object1)
     if descriptions2 is None:

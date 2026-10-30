@@ -11,7 +11,7 @@ from __future__ import annotations
 import math
 from typing import TYPE_CHECKING, Any
 
-from server.engine.formulas import weighted_average
+from server.engine.formulas import temp_adjusted_values, weighted_average
 from server.engine.numeric.backend import select_backend
 from server.engine.numeric.layout import (
     gather_object_values,
@@ -19,6 +19,8 @@ from server.engine.numeric.layout import (
     scatter_object_values,
 )
 from server.engine.workspace_objects import Letter, WorkspaceObject
+from server.engine.groups import Group as GroupClass
+from server.engine.rules import _get_equivalent_bridge, rule_describable_bridge, rules_equal
 
 if TYPE_CHECKING:
     from server.engine.bonds import Bond
@@ -27,7 +29,6 @@ if TYPE_CHECKING:
     from server.engine.groups import Group
     from server.engine.metadata import MetadataProvider
     from server.engine.rng import RNG
-    from server.engine.rules import Rule
     from server.engine.slipnet import Slipnet
 
 
@@ -79,8 +80,6 @@ def selection_weights(
     weights = [_object_weight(o, weight_key) for o in objects]
     if temperature is None or meta is None:
         return weights
-    from server.engine.formulas import temp_adjusted_values
-
     return temp_adjusted_values(weights, temperature, meta)
 
 
@@ -445,7 +444,6 @@ class WorkspaceString:
 
         Scheme: workspace-strings.ss:414-415.
         """
-        from server.engine.groups import Group as GroupClass
         for g in self.groups:
             if isinstance(g, GroupClass) and g.spans_whole_string():
                 return g
@@ -1288,8 +1286,6 @@ class Workspace:
         ``Direction: opposite`` themes that Metacat's does not).  One implementation now
         serves both this and the rule-support test.
         """
-        from server.engine.rules import _get_equivalent_bridge
-
         return _get_equivalent_bridge(self, bridge)
 
     def spanning_bridge_exists(self, bridge_type: str) -> bool:
@@ -1692,7 +1688,6 @@ class Workspace:
     @staticmethod
     def _object_spans_string(obj: WorkspaceObject) -> bool:
         """Check if an object spans its entire string."""
-        from server.engine.groups import Group as GroupClass
         if isinstance(obj, GroupClass):
             return obj.spans_whole_string()
         # A letter spans the string only if the string has exactly one letter
@@ -1780,8 +1775,6 @@ class Workspace:
         bridge counted as covering its letters and made a rule "possible"
         (dropping the temperature's rule factor) where Metacat's does not.
         """
-        from server.engine.rules import rule_describable_bridge
-
         return rule_describable_bridge(bridge)
 
     @staticmethod
@@ -1794,8 +1787,6 @@ class Workspace:
         # which object they describe (``[single]->b`` vs ``[a]->b``) were "equal" and
         # the rule-builder dropped the newcomer.  ``rules-equal?`` compares the
         # object-descriptions too (rules.ss:375-391); the faithful port is in rules.py.
-        from server.engine.rules import rules_equal
-
         if rule1.rule_type != rule2.rule_type:
             return False
         return rules_equal(rule1, rule2)

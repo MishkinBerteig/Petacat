@@ -14,6 +14,8 @@ from typing import TYPE_CHECKING, Any
 
 from server.engine.workspace_objects import WorkspaceObject
 from server.engine.workspace_structures import WorkspaceStructure
+from server.engine.concept_mappings import ConceptMapping
+from server.engine.descriptions import Description
 
 if TYPE_CHECKING:
     from server.engine.bonds import Bond
@@ -82,8 +84,6 @@ class Group(WorkspaceObject, WorkspaceStructure):
         answer turns on a whole-string group (``abc -> abcd``, ``abc -> aabbcc``)
         could never get off the ground.
         """
-        from server.engine.descriptions import Description
-
         slipnet = getattr(getattr(self.string, "workspace", None), "slipnet", None)
         if slipnet is None:
             slipnet = getattr(self.string, "slipnet", None)
@@ -323,8 +323,6 @@ class Group(WorkspaceObject, WorkspaceStructure):
         if num_of_objects == 0:
             return 100.0
 
-        from server.engine.groups import Group  # noqa: F811 — avoid circular at module level
-
         num_similar = 0
         for obj in other_objects:
             if (
@@ -427,8 +425,6 @@ class Group(WorkspaceObject, WorkspaceStructure):
         Scheme: the inline ``make-concept-mapping`` of groups.ss:313-320.
         """
         from server.engine.bridges import _IDENTITY_SENTINEL, _label_node
-        from server.engine.concept_mappings import ConceptMapping
-
         if self.direction is None or other_bond.direction is None:
             return None
         direction_category = getattr(self.direction, "category", None)
@@ -584,8 +580,6 @@ def attach_length_description(group: Group) -> bool:
     descriptor = node(descriptor_node)
     if descriptor is None:
         return False
-
-    from server.engine.descriptions import Description
 
     description = Description(group, length_type, descriptor)
     description.proposal_level = Description.BUILT

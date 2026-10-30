@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from server.engine.workspace_structures import WorkspaceStructure
-from server.engine.formulas import sigmoid, weighted_average
+from server.engine.formulas import sigmoid, temp_adjusted_values, weighted_average
 from server.engine.images import (
     ImageFailure,
     StringImage,
@@ -34,11 +34,14 @@ from server.engine.images import (
     make_string_image,
     change_length_first,
 )
+from server.engine.concept_mappings import SlippageLog
+from server.engine.descriptions import Description
+from server.engine.groups import Group, attach_length_description
+from server.engine.workspace_objects import Letter
 
 if TYPE_CHECKING:
     from server.engine.bridges import Bridge
     from server.engine.concept_mappings import ConceptMapping
-    from server.engine.groups import Group
     from server.engine.metadata import MetadataProvider
     from server.engine.rng import RNG
     from server.engine.slipnet import Slipnet, SlipnetNode
@@ -560,7 +563,6 @@ class IntrinsicChangeDescription:
         return bf is not None and self.dimension is bf
 
     def implied_by_opposite_group_category(self) -> bool:
-        from server.engine.groups import Group
         if not isinstance(self.reference_object, Group):
             return False
         # ending letter category of the group
@@ -573,7 +575,6 @@ class IntrinsicChangeDescription:
         If this is a self GroupCtgy change on a group, return a
         (self, plato-bond-facet, (bond_facet_node,)) change-template entry.
         """
-        from server.engine.groups import Group
         if not isinstance(self.reference_object, Group):
             return None
         dim_name = getattr(self.dimension, "name", "")
@@ -799,8 +800,7 @@ IntrinsicChangeDescription.is_dimension_by_name = (  # type: ignore[attr-defined
 
 def _is_workspace_string(obj: Any) -> bool:
     """Check if obj is a WorkspaceString (not a WorkspaceObject)."""
-    from server.engine.workspace import WorkspaceString
-    return isinstance(obj, WorkspaceString)
+    return isinstance(obj, _workspace.WorkspaceString)
 
 
 def _ascii_name(obj: Any) -> str:
@@ -851,8 +851,6 @@ def _get_constituent_objects(obj: Any) -> list[Any]:
     rather than incidental: falling out of ``getattr(obj, "objects", [])`` would put
     the same defect one refactor away.
     """
-    from server.engine.groups import Group
-
     if _is_workspace_string(obj):
         # Ordered by position, which the Scheme does with an explicit
         # ``sort-by-method 'get-left-string-pos <`` (``workspace-strings.ss:427``)
@@ -1479,8 +1477,6 @@ class Rule(WorkspaceStructure):
         # rules.ss:151-160 — a rule resting on a bridge that slips Length notices the
         # Length of its groups: any group of such a bridge lacking a Length
         # description gets one attached (fifth site of ``attach-length-description``).
-        from server.engine.groups import Group, attach_length_description
-
         for bridge in self.supporting_bridges:
             length_type = Group._node(bridge.object1, "plato-length")
             if length_type is None or not bridge.slippage_type_present(length_type):
@@ -1582,8 +1578,6 @@ class Rule(WorkspaceStructure):
         those of an undescribed letter.
         """
         from server.engine.bridges import make_concept_mappings
-        from server.engine.descriptions import Description
-
         identity = slipnet.nodes.get("plato-identity") if slipnet is not None else None
 
         for bridge in bridges:
@@ -1651,8 +1645,6 @@ class Rule(WorkspaceStructure):
         direction = "top-to-bottom" if self.is_top_rule else "bottom-to-top"
         # ``(slippage-log (make-slippage-log rule-type))`` (answers.ss:1296): a record of
         # the slippages this translation applies.  It draws nothing.
-        from server.engine.concept_mappings import SlippageLog
-
         slippage_log = SlippageLog("top" if self.is_top_rule else "bottom")
         # ``(map (translate-rule-clause ...) rule-clauses)`` (answers.ss:1297-1298) is
         # Chez's ``map`` and a failure aborts at once through ``(return #f)``, so the
@@ -1755,8 +1747,6 @@ def _reference_objects_with_repeats(rule: Rule, string: Any, slipnet: Any) -> li
 def get_all_nested_groups(obj: Any) -> list[Any]:
     """``get-all-nested-groups`` (``groups.ss:1063``): the group itself, then its
     constituents' groups, depth first.  A letter has none."""
-    from server.engine.groups import Group
-
     if not isinstance(obj, Group):
         return []
     found: list[Any] = [obj]
@@ -1790,8 +1780,6 @@ def get_rule_supporting_groups(top_rule: Rule, bottom_rule: Rule, workspace: Any
     The groups (not the letters) the two rules refer to, then those on the
     horizontal bridges that support either rule and their nested groups.
     """
-    from server.engine.groups import Group
-
     horizontal = list(top_rule.supporting_bridges) + list(bottom_rule.supporting_bridges)
     top_refs = list(get_all_reference_objects_with_strings(top_rule, workspace.initial_string, slipnet))
     bottom_refs = list(get_all_reference_objects_with_strings(bottom_rule, workspace.target_string, slipnet))
@@ -2013,9 +2001,6 @@ def rule_describable_bridge(bridge: Bridge) -> bool:
 
     Scheme: rule-describable-bridge? (rules.ss:528-541).
     """
-    from server.engine.groups import Group
-    from server.engine.workspace_objects import Letter
-
     o1, o2 = bridge.object1, bridge.object2
     is_letter1 = isinstance(o1, Letter)
     is_letter2 = isinstance(o2, Letter)
@@ -2479,8 +2464,6 @@ def descriptions_for_rule(obj: Any) -> list[Any]:
     so the clause applied as a silent no-op and the answer came out as the target
     string unchanged.
     """
-    from server.engine.groups import Group
-
     out: list[Any] = []
     for d in getattr(obj, "descriptions", []):
         if not (d.is_relevant() and d.is_distinguishing()):
@@ -2525,8 +2508,6 @@ def _choose_description_for_rule(
 
     weights = [float(getattr(d.descriptor, "conceptual_depth", 50)) for d in candidates]
     if meta is not None:
-        from server.engine.formulas import temp_adjusted_values
-
         weights = temp_adjusted_values(weights, temperature, meta)
     if not any(w > 0 for w in weights):
         return candidates[0]
@@ -2641,8 +2622,6 @@ def _instantiate_change_template(
             float(getattr(d, "conceptual_depth", 50)) for d in possible_descriptors
         ]
         if meta is not None:
-            from server.engine.formulas import temp_adjusted_values
-
             weights = temp_adjusted_values(weights, temperature, meta)
         chosen = rng.weighted_pick(possible_descriptors, weights)
 
@@ -2890,7 +2869,6 @@ def _get_object_image(obj: Any, slipnet: Slipnet) -> Any:
     if img is not None:
         return img
     # For letters, create a letter image
-    from server.engine.workspace_objects import Letter
     from server.engine.images import make_letter_image
     if isinstance(obj, Letter):
         lc = getattr(obj, "letter_category", None)
@@ -3016,15 +2994,11 @@ def _swap_descriptor_for(
     if dim_name != "plato-length":
         return _get_descriptor_for(obj, dim)
 
-    from server.engine.workspace_objects import Letter
-
     if isinstance(obj, Letter):
         return slipnet.nodes.get("plato-one")
     existing = _get_descriptor_for(obj, dim)
     if existing is not None:
         return existing
-    from server.engine.groups import Group, attach_length_description
-
     if isinstance(obj, Group):
         attach_length_description(obj)
     return _get_descriptor_for(obj, dim)
@@ -3131,9 +3105,6 @@ def _find_matching_objects(
         # ``new_length`` always fails — and snagged where MetaCat succeeds.
         whole_group = _get_whole_group(string, slipnet)
         return [whole_group] if whole_group is not None else [string]
-
-    from server.engine.groups import Group
-    from server.engine.workspace_objects import Letter
 
     obj_type_name = getattr(obj_type, "name", "") if obj_type is not None else ""
     candidates = []
@@ -3420,7 +3391,6 @@ def _get_letter_categories(string: WorkspaceString) -> list[SlipnetNode]:
 
     Scheme: get-letter-categories.
     """
-    from server.engine.workspace_objects import Letter
     letters = sorted(
         [o for o in string.objects if isinstance(o, Letter)],
         key=lambda o: o.left_string_pos,
@@ -3498,9 +3468,6 @@ def _get_equivalent_object(string: WorkspaceString, obj: Any) -> Any:
     ``get-equivalent-group`` (``workspace-strings.ss:390-412``).  The two strings are
     assumed to hold the same letter-categories; one of them may be a translated string.
     """
-    from server.engine.groups import Group
-    from server.engine.workspace_objects import Letter
-
     if obj is None:
         return None
     if isinstance(obj, Letter):
@@ -4034,3 +4001,9 @@ def _partition_change_descriptions(
         return c1.same_change_type(c2) and c1.same_reference_objects(c2)
 
     return _partition_by(same_group, cds)
+
+
+# ``workspace`` imports this module's rule functions, so it cannot be imported at the top; bound
+# here it is a module-global lookup per call, not a function-level ``import`` (a measured
+# thread-scaling hazard).
+from server.engine import workspace as _workspace  # noqa: E402

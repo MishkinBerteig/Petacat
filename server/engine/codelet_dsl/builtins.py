@@ -459,8 +459,6 @@ def propose_bond(
     as whatever the Slipnet happened to be feeling: a sameness bond proposed
     while ``plato-sameness`` sat at 30 landed in bin 2 rather than bin 6.
     """
-    from server.engine.formulas import bond_degree_of_assoc
-
     if ctx.verbose:
         ctx.verbose_log.say("proposing-bond")
     activate_from_workspace(ctx, from_descriptor, to_descriptor, bond_facet)
@@ -505,9 +503,6 @@ def propose_group(
       (groups.ss:827), a property of the idea being proposed, rather than at the
       current activation of whichever node the scout was launched from.
     """
-    from server.engine.formulas import bond_degree_of_assoc, length_description_probability
-    from server.engine.groups import attach_length_description
-
     objects = list(objects)
     bonds = list(bonds)
     if ctx.verbose:
@@ -554,8 +549,6 @@ def evaluate_group(ctx: EngineContext, group: Group) -> bool:
     added a separate curve.  On survival the bond category and the direction are
     jolted again (groups.ss:598-601).
     """
-    from server.engine.formulas import group_evaluation_probability
-
     group.update_strength(ctx.rng)
     _read(ctx, group)
     survival = group_evaluation_probability(
@@ -1234,8 +1227,6 @@ def _consolidate_group(ctx: EngineContext, group: Group) -> Group | None:
     Returns the group to build — possibly a *different* object from the one passed
     in — or ``None`` to fizzle.
     """
-    from server.engine.groups import Group as GroupClass, attach_length_description
-
     string = group.string
     category_name = getattr(group.group_category, "name", "")
     facet_name = getattr(group.bond_facet, "name", "")
@@ -1347,6 +1338,12 @@ def _consolidate_group(ctx: EngineContext, group: Group) -> Group | None:
 #: entries.  Imported rather than re-stated, because two mappings that must agree and
 #: are written down twice is `PHASE 1 PLAN.md` §0.2(c) in miniature.
 from server.engine.groups import PLATONIC_LENGTH_NODES as _PLATONIC_LENGTH
+from server.engine.concept_mappings import slippage_english_name
+from server.engine.formulas import bond_degree_of_assoc, group_evaluation_probability, length_description_probability
+from server.engine.groups import Group as GroupClass, attach_length_description
+from server.engine.rules import _generate_image_letters, _get_reference_objects_for_clause, _remq_duplicates, apply_rule as apply_rule_to_string, get_rule_supporting_groups, rule_signature
+from server.engine.trace import AnswerEvent, CONCEPT_MAPPING_BUILT, make_concept_activation_monitor
+from server.engine.workspace import WorkspaceString
 
 
 def _adjacent_bonds(
@@ -1498,8 +1495,6 @@ def _augment_bridge_at_build(ctx: EngineContext, bridge: Bridge) -> None:
         make_concept_mappings,
         platonic_length,
     )
-    from server.engine.concept_mappings import ConceptMapping
-
     horizontal = bridge.bridge_type != BRIDGE_VERTICAL
 
     if horizontal:
@@ -1572,8 +1567,6 @@ def _augment_bridge_at_build(ctx: EngineContext, bridge: Bridge) -> None:
 def _label_monitor(ctx: EngineContext) -> Any:
     """The Trace monitor a concept mapping's label flush reports to
     (``concept-mappings.ss:166-170`` via ``slipnet.ss:164-168``)."""
-    from server.engine.trace import make_concept_activation_monitor
-
     return make_concept_activation_monitor(
         ctx.trace,
         ctx.codelet_count,
@@ -1806,8 +1799,6 @@ def _record_slippage_events(
     just the newly-added ones from the duplicate branch of ``bridge-builder``
     (bridges.ss:1221-1222).  *concept_mappings* is that second case.
     """
-    from server.engine.trace import CONCEPT_MAPPING_BUILT
-
     threshold = ctx.meta.get_param("concept_mapping_importance_threshold", 65)
     under_pressure = ctx.themespace.has_thematic_pressure([bridge.theme_type])
 
@@ -2755,8 +2746,6 @@ def record_snag(ctx: EngineContext, top_rule: Any, translated_rule: Any) -> None
     # compares the three problem strings and the rule's **clause lists**, structurally.
     # Two structurally different rules can transcribe to the same English, and
     # would otherwise match one another.
-    from server.engine.rules import rule_signature
-
     if not ctx.memory.snag_present(problem, top_rule):
         ctx.memory.store_snag(
             SnagDescription(
@@ -2841,8 +2830,6 @@ def _answer_description_picture(
 
 def _snag_objects(ctx: EngineContext, translated_rule: Any) -> list:
     """Target-string objects the translated rule was trying to change."""
-    from server.engine.rules import _get_reference_objects_for_clause
-
     objects: list = []
     for clause in getattr(translated_rule, "clauses", []):
         try:
@@ -2944,7 +2931,6 @@ def _report_answer_locked(
     it) and sets ctx._pending_answer so step_mcat can detect the answer.
     """
     from server.engine.answers import create_answer_description, get_quality_phrase
-    from server.engine.concept_mappings import slippage_english_name
     from server.engine.commentary import (
         emit_answer_discovered,
         emit_answer_justified,
@@ -2952,8 +2938,6 @@ def _report_answer_locked(
         emit_reminding,
     )
     from server.engine.memory import AnswerDescription
-    from server.engine.workspace import WorkspaceString
-
     # Free-running lets two workers reach ``report_answer`` before either result has
     # been collected (WP4.4).  ``FreeRunningEngine._collect_outcome`` de-duplicates the
     # run's *status*, but by then each worker has already written its own
@@ -3008,8 +2992,6 @@ def _report_answer_locked(
         translation = getattr(bottom_rule, "translation", None)
     answer_supporting_groups = None
     if translation is not None and top_rule is not None and bottom_rule is not None:
-        from server.engine.rules import _remq_duplicates, get_rule_supporting_groups
-
         # ``(remq-duplicates (append vertical-mapping-supporting-groups
         # (get-rule-supporting-groups rule translated-rule)))`` (``answers.ss:992-996``),
         # read after ``make-translated-string`` has given the translated rule its bridges.
@@ -3069,8 +3051,6 @@ def _report_answer_locked(
     )
     # ``abstract-answer-description`` (``memory.ss:437``): the picture clicking the
     # answer redraws, made now while the Workspace is the one the answer came from.
-    from server.engine.trace import AnswerEvent
-
     # ``make-answer-event`` (``trace.ss:335``) keeps all of it, and the description's picture
     # is drawn from the event, so the event is made first and recorded after the description.
     logged = translation is not None and answer_supporting_groups is not None
@@ -3238,8 +3218,6 @@ def _apply_rule_locked(ctx: EngineContext, rule: Any, string: Any = None) -> str
     Returns the resulting string, or ``None`` if the rule cannot be applied —
     which is a snag.
     """
-    from server.engine.rules import apply_rule as apply_rule_to_string
-    from server.engine.rules import _generate_image_letters
     from server.engine.snag_explanation import failure_result_of
 
     target = string if string is not None else ctx.workspace.target_string

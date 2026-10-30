@@ -234,9 +234,7 @@ class ConceptMapping:
         and with the copy on ``Description``. One predicate is how they stop
         disagreeing.
         """
-        from server.engine.workspace_objects import distinguishing_descriptor
-
-        return distinguishing_descriptor(obj, descriptor)
+        return _workspace_objects.distinguishing_descriptor(obj, descriptor)
 
     def relevant_distinguishing(self) -> bool:
         """True if this CM is both relevant and distinguishing.
@@ -552,3 +550,9 @@ class SlippageLog:
 def _vertical_bridge_of(slippage: ConceptMapping) -> Any:
     """``(tell (tell slippage 'get-object1) 'get-bridge 'vertical)``."""
     return getattr(getattr(slippage, "object1", None), "vertical_bridge", None)
+
+
+# ``workspace_objects`` reaches this module through ``groups`` and ``bonds``, so it is bound
+# here, after every name above exists, as a module-global lookup per call in place of a
+# function-level ``import`` (a measured thread-scaling hazard).
+from server.engine import workspace_objects as _workspace_objects  # noqa: E402

@@ -13,6 +13,8 @@ from typing import TYPE_CHECKING, Any
 
 from server.engine.slipnet import opposite_node
 from server.engine.workspace_structures import WorkspaceStructure
+from server.engine.concept_mappings import ConceptMapping
+from server.engine.groups import Group
 
 if TYPE_CHECKING:
     from server.engine.rng import RNG
@@ -306,8 +308,6 @@ class Bond(WorkspaceStructure):
         Scheme: the inline ``make-concept-mapping`` of bonds.ss:108-115.
         """
         from server.engine.bridges import _IDENTITY_SENTINEL, _label_node
-        from server.engine.concept_mappings import ConceptMapping
-
         if self.direction is None or other_bond.direction is None:
             return None
         direction_category = getattr(self.direction, "category", None)
@@ -481,8 +481,6 @@ def incompatible_bond_candidates(
     ``313``); none of the ported scouts did, so the model was free to bond, for
     instance, a successor group to a predecessor group on letter-category.
     """
-    from server.engine.groups import Group
-
     def directed(obj: Any) -> bool:
         # Scheme: ``directed-group?`` (groups.ss:1050-1055).
         if not isinstance(obj, Group):

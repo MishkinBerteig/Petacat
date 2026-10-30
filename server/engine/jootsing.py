@@ -27,6 +27,8 @@ from server.engine.trace import (
     TraceEvent,
     negate_theme_pattern_entry,
 )
+from server.engine.groups import Group
+from server.engine.workspace_objects import Letter
 
 if TYPE_CHECKING:
     from server.engine.commentary import CommentaryLog
@@ -984,9 +986,6 @@ def equivalent_workspace_objects(o1: Any, o2: Any) -> bool:
     Compared by kind, string and span rather than by identity, because two snags
     separated by a rebuild refer to equivalent objects, not the same ones.
     """
-    from server.engine.groups import Group
-    from server.engine.workspace_objects import Letter
-
     l1, g1 = type(o1) is Letter, isinstance(o1, Group)
     l2, g2 = type(o2) is Letter, isinstance(o2, Group)
     if (l1, g1) != (l2, g2):

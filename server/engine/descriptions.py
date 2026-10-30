@@ -10,6 +10,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from server.engine.themes import (
+    THEME_BOTTOM_BRIDGE,
+    THEME_TOP_BRIDGE,
+    THEME_VERTICAL_BRIDGE,
+)
 from server.engine.workspace_structures import WorkspaceStructure
 
 if TYPE_CHECKING:
@@ -129,12 +134,6 @@ class Description(WorkspaceStructure):
         told the mode at ``init_mcat``, rather than stored: a description outlives the
         moment it was made and the mode belongs to the run.
         """
-        from server.engine.themes import (
-            THEME_BOTTOM_BRIDGE,
-            THEME_TOP_BRIDGE,
-            THEME_VERTICAL_BRIDGE,
-        )
-
         role = getattr(getattr(self.object, "string", None), "string_type", None)
         if role == "initial":
             return [THEME_TOP_BRIDGE, THEME_VERTICAL_BRIDGE]
