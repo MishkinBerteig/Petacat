@@ -1469,6 +1469,12 @@ def _new_telemetry(workers: int) -> dict[str, Any]:
         "lost_workers": 0,
         "repredicts": 0,
         "abandoned_read_only": 0,
+        # No longer measured (a clock read per step cost more than it explained); the keys
+        # stay so that a consumer of the telemetry dict (the run service passes it on to
+        # the API) finds what it found before.
+        "refill_seconds": 0.0,
+        "quiesce_seconds": 0.0,
+        "grant_seconds": 0.0,
     }
 
 
