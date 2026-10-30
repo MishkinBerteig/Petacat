@@ -81,6 +81,13 @@ class TypeInfo:
     #: False for a type that must not be speculated (it runs inline on the coordinator,
     #: in order, with its ``writes`` bumped) although it is not a barrier.
     speculate: bool = True
+    #: False for a type that *could* be speculated but does not pay: its codelet is so
+    #: short (measured, ``profitable`` entries in the data) that the hand-off costs more
+    #: than the overlap hides.  Like ``speculate`` it only decides who executes a step
+    #: and when, never what the step computes; unlike ``speculate`` it is a performance
+    #: choice, not a safety classification, so the exactness tests still treat the type
+    #: as speculable.
+    profitable: bool = True
 
 
 class Effects:
@@ -112,7 +119,7 @@ def load(path: str | None = None) -> Effects:
     types = {
         n: TypeInfo(n, bool(e["barrier"]), mask(e["reads"]), mask(e["writes"]),
                     bool(e["uses_cc"]), e.get("why", ""),
-                    bool(e.get("speculate", True)))
+                    bool(e.get("speculate", True)), bool(e.get("profitable", True)))
         for n, e in raw["types"].items()
     }
     eff = Effects(builtins, types)

@@ -573,6 +573,7 @@
   "bottom-up-bond-scout": {
    "barrier": false,
    "speculate": true,
+   "profitable": false,
    "reads": [
     "slipnet_act",
     "temperature",
@@ -585,7 +586,8 @@
     "verbose"
    ],
    "uses_cc": false,
-   "why": "Pure read prefix of 17 builtin calls then a single write builtin. Reads obj.left_string_pos (immutable). ~64.5k of 1.14M observed executions; fizzles ~55% of the time before propose_bond. ['verbose' a"
+   "why": "Pure read prefix of 17 builtin calls then a single write builtin. Reads obj.left_string_pos (immutable). ~64.5k of 1.14M observed executions; fizzles ~55% of the time before propose_bond. ['verbose' a",
+   "profit_note": "WP10: speculating only this type changed a run's time by x0.987 (median of 3 cases, 4 workers, M5 Max): its hand-off and cross-thread costs exceed the work it hides"
   },
   "top-down-bond-scout:category": {
    "barrier": false,
@@ -624,6 +626,7 @@
   "bond-evaluator": {
    "barrier": false,
    "speculate": true,
+   "profitable": false,
    "reads": [
     "slipnet_act",
     "temperature",
@@ -636,7 +639,8 @@
     "slipnet_buf"
    ],
    "uses_cc": false,
-   "why": "evaluate_structure (line 6) is a READ whose only mutation is to the argument bond (strength, proposal_level); the first shared write is the activate at line 10, then post_codelet('bond-builder', round"
+   "why": "evaluate_structure (line 6) is a READ whose only mutation is to the argument bond (strength, proposal_level); the first shared write is the activate at line 10, then post_codelet('bond-builder', round",
+   "profit_note": "WP10: speculating only this type changed a run's time by x0.969 (median of 3 cases, 4 workers, M5 Max): its hand-off and cross-thread costs exceed the work it hides"
   },
   "bond-builder": {
    "barrier": false,
@@ -663,6 +667,7 @@
   "top-down-group-scout:category": {
    "barrier": false,
    "speculate": true,
+   "profitable": false,
    "reads": [
     "slipnet_act",
     "temperature",
@@ -675,7 +680,8 @@
     "verbose"
    ],
    "uses_cc": false,
-   "why": "The most id-hungry body: allocates ids in the prefix of ~47% of its executions, BEFORE any builtin write and before the fizzle decision. Serial id order must be preserved even for singletons that are "
+   "why": "The most id-hungry body: allocates ids in the prefix of ~47% of its executions, BEFORE any builtin write and before the fizzle decision. Serial id order must be preserved even for singletons that are ",
+   "profit_note": "WP10: speculating only this type changed a run's time by x0.966 (median of 3 cases, 4 workers, M5 Max): its hand-off and cross-thread costs exceed the work it hides"
   },
   "top-down-group-scout:direction": {
    "barrier": false,
@@ -769,6 +775,7 @@
   "important-object-bridge-scout": {
    "barrier": false,
    "speculate": true,
+   "profitable": false,
    "reads": [
     "slipnet_act",
     "temperature",
@@ -781,7 +788,8 @@
     "verbose"
    ],
    "uses_cc": true,
-   "why": "Only prefix body with a hidden SHARED write before its first builtin write. Scans string2.objects and every object's relevant descriptions. ['verbose' appears in writes only when ctx.verbose is on.]"
+   "why": "Only prefix body with a hidden SHARED write before its first builtin write. Scans string2.objects and every object's relevant descriptions. ['verbose' appears in writes only when ctx.verbose is on.]",
+   "profit_note": "WP10: speculating only this type changed a run's time by x0.986 (median of 3 cases, 4 workers, M5 Max): its hand-off and cross-thread costs exceed the work it hides"
   },
   "bridge-evaluator": {
    "barrier": false,
@@ -842,6 +850,7 @@
   "top-down-description-scout": {
    "barrier": false,
    "speculate": true,
+   "profitable": false,
    "reads": [
     "slipnet_act",
     "temperature",
@@ -854,11 +863,13 @@
     "verbose"
    ],
    "uses_cc": false,
-   "why": "possible_descriptor evals the node's descriptor_predicate over live objects. ['verbose' appears in writes only when ctx.verbose is on.]"
+   "why": "possible_descriptor evals the node's descriptor_predicate over live objects. ['verbose' appears in writes only when ctx.verbose is on.]",
+   "profit_note": "WP10: speculating only this type changed a run's time by x0.985 (median of 3 cases, 4 workers, M5 Max): its hand-off and cross-thread costs exceed the work it hides"
   },
   "description-evaluator": {
    "barrier": false,
    "speculate": true,
+   "profitable": false,
    "reads": [
     "slipnet_act",
     "temperature",
@@ -871,7 +882,8 @@
     "slipnet_buf"
    ],
    "uses_cc": false,
-   "why": "Writes before it evaluates anything: no read-only prefix. 73k executions: treat as live-after-token from line 7."
+   "why": "Writes before it evaluates anything: no read-only prefix. 73k executions: treat as live-after-token from line 7.",
+   "profit_note": "WP10: speculating only this type changed a run's time by x0.967 (median of 3 cases, 4 workers, M5 Max): its hand-off and cross-thread costs exceed the work it hides"
   },
   "description-builder": {
    "barrier": false,
