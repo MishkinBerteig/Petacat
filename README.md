@@ -28,11 +28,11 @@ license change was authorised by Dr. Marshall directly (see
 > end-to-end. Episodic Memory shapes the runs that inherit it: a run declines an
 > answer already held for the same problem and rules, so repeating a problem
 > within a [Training Session](#persistence-modes-and-training-sessions) explores
-> a different answer each time. It ships with 2,863 test cases covering the engine, the API, and the
+> a different answer each time. It ships with 3,084 test cases covering the engine, the API, and the
 > help/config system, run on both the CPU and the GPU numeric backends. Underneath the seven components sits an execution
 > substrate — three [persistence modes](#persistence-modes-and-training-sessions),
 > a [GPU numeric substrate](#the-numeric-substrate), and
-> [barrier-free codelet parallelism](#free-running-codelets-across-cpu-cores) —
+> a detachable [multi-core plugin](#parallelism-the-serverparallel-plugin) —
 > which changes how Petacat runs without changing what it perceives. See
 > [Acknowledgements & License](#acknowledgements) below for credits and
 > licensing.
@@ -48,7 +48,9 @@ license change was authorised by Dr. Marshall directly (see
 - **Execution**: native — engine, API, client and database all run on the host
 - **Numeric substrate**: the engine's array arithmetic runs on the GPU through
   Metal (MLX), with vectorised-CPU and pure-Python backends behind the same seam
-- **Parallelism**: codelets can run across CPU cores with no global barrier
+- **Parallelism**: a detachable plugin (`server/parallel/`) — a warm process swarm
+  that runs Petacat on every core, each run byte-for-byte the serial run, and an exact
+  speculative executor that spreads one run's codelets across threads
 
 Engine parameters, slipnet topology, codelet definitions and theme dimensions
 live in `seed_data/*.json`, which the API reads at startup and which seeds the
@@ -171,16 +173,23 @@ half alone, which is the honest CPU baseline the GPU is measured against.
 
 #### The free-threaded interpreter
 
-A second virtual environment, `.venv-ft`, holds CPython 3.14.6 built without the
-global interpreter lock (`python3.14t`, `Py_GIL_DISABLED=1`). It exists because
-[free-running](#free-running-codelets-across-cpu-cores) only pays on an
-interpreter that can actually execute Python on more than one core at a time.
+A second virtual environment, `.venv-ft`, holds CPython 3.14.9, the same release
+as `.venv`, built without the global interpreter lock (`python3.14t`,
+`Py_GIL_DISABLED=1`). It exists because
+[thread parallelism inside a run](#exact-parallelism-inside-one-run) only pays on an
+interpreter that can actually execute Python on more than one core at a time. The
+[swarm](#the-swarm-every-core-exactly) does not need it: it runs one process per core
+on either interpreter.
 
 ```bash
-brew install python-freethreading
-python3.14t -m venv .venv-ft
-.venv-ft/bin/pip install -e ".[dev]"
+uv python install 3.14.9+freethreaded
+"$(uv python find 3.14.9+freethreaded)" -m venv .venv-ft
+.venv-ft/bin/pip install -e ".[dev]" numpy mlx
 ```
+
+`uv` rather than Homebrew, because Homebrew's `python-freethreading` follows each new
+minor release (3.15 at the time of writing), and an upgrade silently removed the
+3.14 interpreter an earlier `.venv-ft` pointed at.
 
 One wrinkle worth knowing before it confuses you. Importing SQLAlchemy
 **switches the GIL back on at runtime** — `sqlalchemy.cyextension.collections`
@@ -349,19 +358,20 @@ no run is active.
 Petacat has two test suites:
 
 - **Backend** (`tests/`) — Python / pytest. Covers the engine, the API, the
-  help-topic system, and database persistence. Organised into seven layers:
+  help-topic system, and database persistence. Organised into eight layers:
   `unit` (one class or function against fakes), `seed_unit` (one class or
   function against the shipped `seed_data/`), `module` (component assembly with
   codelets running), `architecture` (properties of the source tree),
-  `integration` (the repository's artifacts agreeing), `lockstep` (Petacat's decision
+  `integration` (the repository's artifacts agreeing), `parallel` (the multi-core
+  plugin against the serial runs it claims to equal), `lockstep` (Petacat's decision
   traces against Metacat's), and `e2e` (full HTTP
-  stack against a running database). All seven run in a single command against
-  the local Postgres — 2,863 cases, which includes the numeric matrix's second
-  pass over the 486 backend-sensitive tests. See
+  stack against a running database). All eight run in a single command against
+  the local Postgres — 3,084 cases, which includes the numeric matrix's second
+  pass over the 498 backend-sensitive tests. See
   [TESTING.md](TESTING.md) for the layer breakdown, the numeric backend matrix,
   the session ceiling, the unit-test rules, determinism requirements, test-double
   conventions, how to run the suite under the free-threaded interpreter, and what
-  to check first if the free-running tests fail.
+  to check first if the parallel tests fail.
 - **Frontend** (`client/src/**/*.test.tsx`) — React components with
   [Vitest](https://vitest.dev/) and
   [React Testing Library](https://testing-library.com/docs/react-testing-library/intro/).
@@ -478,9 +488,10 @@ about what the engine computes.
 
 A run's worker count decides which loop it takes. `workers` defaults to 1, the
 serial loop, which stays the reference every parallel result is measured
-against. Above 1 the run executes free-running. Audit holds `workers` at 1: its
-record is a forward log of actions, and reconstructing from it needs the order
-those actions committed in.
+against. Above 1 the run executes on the
+[speculative executor](#exact-parallelism-inside-one-run), whose result is the same
+for every worker count. Audit holds `workers` at 1: its record is a forward log of
+actions, and its reconstruction replays them through the faithful loop.
 
 Measured end to end on `abc → abd; mrrjjj → ?` at seed 42, on an Apple M2 Max,
 fastest of five runs per cell, all six producing the same 2,255 codelets and the
@@ -631,116 +642,299 @@ genuinely flips some jump draws, so its runs diverge and land on different
 answers; the *set* of answers reachable is unchanged, which is the standard
 every change in this layer is held to.
 
-## Free-running: codelets across CPU cores
+## Parallelism: the `server/parallel/` plugin
 
-`server/parallel/free_running.py` executes codelets on several worker threads with
-no global barrier. It wraps a prepared runner, which keeps the serial reference
-exactly the shape it has.
+Metacat is one run on one core, and so is Petacat's reference mode: `server/engine/`
+runs one codelet at a time, faithfully, and it never imports anything that would
+change that. Everything that spreads Petacat across a machine lives in a separate,
+**detachable** package, `server/parallel/`. The dependency points one way only: the
+plugin imports the engine and the engine never imports the plugin
+(`tests/architecture/test_parallel_detachable.py` checks this statically). The same
+test runs a serial run, and imports the service layer, in an interpreter that cannot
+import the plugin at all. Delete the directory and Petacat still serves every serial
+Run: a Run asked for more than one worker runs serially and records 1.
 
-Reach it by setting `workers` above 1 — on `POST /api/runs`, or in the
-**Workers** box in the Run Controls panel, which accepts 1 up to the machine's
-performance core count and is fixed at 1 for an Audit run. `workers: 0` on the
-API asks for that count without first having to look it up. The benchmarks
-(`scripts/bench_free_running.py`) and the tests
-(`tests/module/test_free_running.py`) drive it directly.
+Everything here is held to one standard: **the cognitive results come first.** Parallelism that changes what Petacat thinks is not offered. Two designs
+meet that standard, and they solve different problems.
 
-A free-running run is a different draw: its seed does not reproduce it. So the
-count it executed with is stored on the run (`runs.workers`), reported by the API,
-and shown in the Run History **W** column. Without it, two recorded runs with the
-same seed, configuration and memory that end differently have nothing to explain
-them. Runs created before the count was stored have none, and the API and the
-column say so rather than assuming one.
+| | The swarm | The speculative executor |
+|---|---|---|
+| What runs in parallel | whole runs, one per core | the codelets of one run |
+| Relation to the serial run | **byte-for-byte the serial run** with the same seed | **bit-for-bit the stream-serial reference** with the same seed, for every worker count |
+| Speed today | ≈ 11–12× the throughput of one core | not yet faster than serial (see below) |
+| Reached by | `POST /api/swarm`, the **Swarm** group in Run Controls, `scripts/swarm.py`, `server.parallel.swarm` | `workers` > 1 on a Run, or the `"speculative"` executor |
 
-Three things had to exist first, and each is useful on its own:
+### The swarm: every core, exactly
 
-- **Counter-based random streams** (`splittable_rng.py`). A Mersenne Twister has
-  19,937 bits of state that every draw advances, so concurrent codelets either
-  serialise behind a lock or corrupt it. A counter-based generator *computes*
-  the n-th value of a stream from `(seed, stream, counter)`, which makes streams
-  independent without coordination and addressable without having drawn the ones
-  before them.
-- **Read and write sets** (`access.py`). Each codelet records what it read, and
-  the version each thing carried when it read it; at its commit point a read-set
-  whose versions have all held is a codelet that decided on a Workspace that has
-  not moved. Validation is optimistic rather than lock-based, which suits this
-  engine unusually well because a lost race is not a retry — it is a **fizzle**,
-  an outcome the architecture already has and the temperature already accounts
-  for.
-- **A coderack that can be shared** (`server/parallel/coderack_shards.py`). Three candidates were
-  built and measured: one rack behind a mutex, shards by codelet family, and
-  per-worker shards with work stealing. The free-running engine installs the
-  first, `LockedCoderack`, around the serial rack itself.
+Research is many runs, not one: an answer distribution over seeds, the
+[oracle comparison](#6-run-the-tests) against Metacat, a parameter sweep, an episode
+corpus, the lockstep corpus. Runs share nothing, so the exact way to use a whole
+machine on them is one engine per core. `server/parallel/swarm.py` keeps a pool of
+worker processes warm and hands each the next run.
 
-  Per-worker shards were installed first and were wrong, and the reason is worth
-  keeping. Selection is a two-stage draw weighted by temperature-adjusted bin
-  urgency, so choosing a shard by size and then a codelet within it is *not*
-  uniform over the whole rack's membership: each shard weighs its own bins. A
-  worker confined to its shard also drew from a shard the poster had not filled
-  evenly, and the capacity was divided between shards, so one worker's posts
-  evicted at a quarter of the rack's size. Measured on `wxyz → vxyz; abcd → ?`:
-  one worker through `FreeRunningEngine` found `abce` in 11.4% of runs against
-  14.5% with a single shard and 15.0% serially. The locked rack is the serial
-  rack, so every draw and every eviction is exactly the serial one
-  (`test_a_threaded_draw_has_the_serial_racks_exact_distribution` and
-  `test_a_threaded_rack_evicts_exactly_as_the_serial_rack_does`). The sharded
-  classes remain for `scripts/bench_shards.py` and are not used by a run.
+- **The pool starts with `forkserver`, preloaded.** `fork` is unsafe on macOS once the
+  parent has threads, Objective-C or Metal state, and the API process has all three.
+  `spawn` per task would pay an interpreter start and an engine import for every run.
+  A forkserver imports the engine once, and each worker is forked from that warm image.
+  Seventeen workers are up in about 0.2 s, and each holds about 27 MB.
+- **The metadata is sent once per worker,** pickled and keyed by its config hash
+  (about 130 KB). A call that brings a different configuration, such as an admin edit
+  in the database, re-initialises idle workers. Otherwise it ships the configuration
+  with the call's own tasks.
+- **Scheduling is task by task,** so the Super and Performance cores of an M5, and the
+  P and E cores of an M1 Ultra or M2 Max, balance without being told which is which.
+  Workers run at QoS *user-initiated* (`server/parallel/qos.py`, via
+  `pthread_set_qos_class_self_np`), which keeps them off the efficiency-only tier.
+- **Each run's outcome is the serial run's,** byte for byte: same stopping state,
+  codelet count, answers, final temperature and answer quality. `tests/parallel/test_swarm.py`
+  checks this problem by problem, seed by seed, for justification mode and for
+  episodes (several runs sharing one Episodic Memory). A run that raises comes back as
+  an outcome carrying its traceback, so one bad seed cannot sink a 10,000-run sweep.
 
-Measured throughput against the serial loop, free-threaded, best of three:
-1.33× at 8 workers on `mrrjjj`, 1.35× at 4 on `iijjkk`. Against a ceiling of
-1.67× for parallelising codelet execution alone, less the ~9% the free-threaded
-interpreter costs single-threaded, the realistic maximum is about 1.52× — so
-1.35× is roughly 89% of what parallelising codelets *can* give. The remainder is
-serial by nature: coderack maintenance and the numeric substrate.
+Measured on an Apple M5 Max (6 Super + 12 Performance cores), with the substrate
+`off`, on a mix of six demo problems, quiet machine:
 
-Worker count follows the machine. The shard count (`PETACAT_CODERACK_SHARDS`,
-`MIN_SHARD_CAPACITY`) now only configures the benchmark candidates; a free-running
-run has one rack. `PHASE 1 PLAN.md` carries where parallelism past a single rack
-may come from.
+| Processes | Runs/s | Speed-up | Efficiency |
+|---:|---:|---:|---:|
+| serial, in process | 6.51 | — | — |
+| 1 | 6.52 | 1.00× | 1.00 |
+| 2 | 12.86 | 1.97× | 0.99 |
+| 4 | 24.13 | 3.70× | 0.93 |
+| 6 | 31.59 | 4.85× | 0.81 |
+| 8 | 39.92 | 6.12× | 0.77 |
+| 12 | 55.17 | 8.46× | 0.70 |
+| 17 | 69.75 | **10.7×** | 0.63 |
 
-**What free-running does not yet match.** Five defects were fixed so that a
-one-worker run through the free-running engine behaves like the serial loop: the
-draw above; the structure clock (`set_structure_clock` is thread-local and was never
-set in workers, so every structure built there had `time_stamp` 0); the codelet count
-(a codelet saw, and stamped its events with, a count one higher than serially,
-because the increment came before the codelet ran rather than after); the lockstep
-fixed initial-unclamp time (`initial_clamp_fixed_time`), which workers ignored; and
-the pending-answer hand-off, which any worker could clear from another's codelet and
-is now collected by the serialised codelet that set it, under its lock. What
-remains is inherent to overlapping codelets: with several workers, a codelet decides
-against a Workspace that others are changing, which lowers the rate at which the
-deep answer `abce` is found. See "Statistical check" below for the measured size.
+Every outcome at every width is identical to the serial run (`identical=True` in
+`measurements/parallel/swarm-scaling.json`).
 
-**Statistical check.** 1,000 runs of `wxyz → vxyz; abcd → ?` (seeds 101–1100,
-budget 100,000, numpy backend), counting the deep answer `abce`: serial 150
-(15.0%); one worker through `FreeRunningEngine` 128 (12.8%, z = −1.42 against
-serial, not significant); six workers 93 (9.3%, z = −3.90). Before the fixes the
-same measurement gave 11.4% at one worker and 7.3% at six. The six-worker gap that
-remains is the overlap effect, which these fixes do not address.
+Two things hold the 17-process figure down:
+- **A long tail.** This mix is 288 runs, which range from about 200 codelets to the
+  20,000 cap, so the last long runs finish alone.
+- **Per-process speed.** Under full load each process runs at about 10,000
+  codelets/s, against about 20,000 alone, because 12 of the 18 cores are the slower
+  Performance tier, the memory system is shared, and the chip is under thermal load.
 
-Two things are deliberately still serialised. The update cycle is not stopped
-for — whichever worker crosses the boundary runs it while the others carry on,
-which is exactly the staleness the design budgets for. Committing a structure
-*is* serialised, because `build_structure`'s duplicate check and its fights are
-read-modify-write sequences over shared lists, and running two at once corrupts
-the lists rather than producing a conflict the model could read as a fizzle.
+A larger batch of one problem is closer to the steady state. 2,000 runs of
+`abc → abd; xyz` took **19.1 s on the swarm against 239.4 s serially (12.5×)**,
+215,526 codelets per second, with the same answer distribution answer for answer.
+Counting the serial engine's own gains below, that is about 19× the night-before
+throughput.
 
-The answer codelets and the self-watching codelets (the `answer` and `meta`
-families) run whole under the same lock. They snag, give up, clamp and report
-answers, and those rewrite the Slipnet, the Themespace, the coderack and the
-Trace, which the update cycle reads and writes back. A jootser giving up used to
-run a second update cycle beside the scheduled one. On the GPU backend that
-aborted the process, because MLX's streams belong to the thread that made them.
-And a snag's restart empties the rack, as Metacat's `delete-all-codelets` does,
-so a codelet a worker had already taken off it is dropped rather than run
-(`discarded` in the run's telemetry). Before that, an answer-finder chosen just
-before another worker's snag went on to report an answer from before the snag,
-at the snag's temperature of 100.
+The research scripts that run many runs now default to every core but one:
+`scripts/lockstep_corpus.py` (7 min 54 s serially → 3 min 0 s, with an identical
+ratchet table; long traces and per-trace subprocesses set the floor), `scripts/compare_to_metacat.py` and
+`scripts/compare_frequencies.py`. `scripts/compare_executors.py` compares two
+executors' answer distributions over the same seeds on the swarm.
 
-**How much staleness cognition tolerates was measured before any of this was
-written**, by making the serial loop read state as it stood N codelets ago:
-nothing moves at N ≤ 5; by N = 15 runs start failing to converge inside the
-codelet cap; by N = 50 a genuinely new answer appears. Five codelets is
-therefore the budget, and no frequently-reached answer was lost at any delay.
+### Exact parallelism inside one run
+
+The first attempt at codelet parallelism, free-running (its history is below),
+changed what Petacat thinks. With six workers the deep answer `abce` to
+`wxyz → vxyz; abcd` fell from 15.0% to 9.3% of runs, because codelets acted on a
+Workspace that other codelets were changing. Its seed did not reproduce a run either.
+Its replacement is built so that neither can happen.
+
+**The stream-serial reference** (`server/parallel/speculative/reference.py`,
+executor `"stream"`) is the engine's own `run_mcat`, with two mechanisms swapped for
+ones that have the same probability law:
+
+1. **Per-codelet random streams.** Each codelet body draws from a counter-based
+   stream keyed by the codelet's id (`server/parallel/speculative/streams.py`).
+   Faithful mode uses one Mersenne Twister consumed in order. What a codelet draws now
+   depends on which codelet it is, not on what ran before it.
+2. **An exponential-race coderack** (`clock_rack.py`). When a codelet is posted it
+   gets a firing time `t + E/w`, where `E` is an exponential draw keyed by its id and
+   `w` is its bin's urgency weight at the current temperature. The rack fires the
+   smallest. By memorylessness each codelet is chosen with probability `w / Σw`, which
+   is exactly Metacat's two-stage draw: a bin weighted by count × urgency, then
+   uniform within it. A residual is rescaled when the temperature or a clamp changes
+   its weight. The difference is that a codelet posted later can change an earlier
+   choice only by beating it.
+
+Equality in law can only be checked statistically, and it was. Every demo problem was
+run over seeds 1–500 under both loops, 29,000 runs in all (`scripts/compare_executors.py`,
+recorded in `measurements/parallel/cognitive-equivalence.md`). **No problem's answer
+distribution differs:**
+- 0 of 29 chi-square tests reach p < 0.01, and the smallest p is 0.148;
+- 0 of 157 per-answer z-scores pass the Bonferroni line, and the largest |z| is 2.34;
+- the total variation distance is at most 0.07;
+- mean codelet counts agree.
+
+The answer free-running lost was checked separately, at the original study's
+settings. `abce` to `wxyz → vxyz; abcd` was found in 13.7% of 8,000 faithful runs
+and 13.3% of 8,000 stream runs (z = 0.74; `measurements/parallel/abce-serial-vs-stream.md`).
+
+**The speculative executor** (`server/parallel/speculative/engine.py`, executor
+`"speculative"`) runs one run across threads, and its result is **bit-identical to the
+stream-serial reference for every worker count**. That covers the codelet sequence,
+every structure built and broken, every Trace event, the answers, the status and the
+final state. Worker count is therefore a pure performance knob, and a parallel Run is
+reproducible by its seed.
+
+- **The coordinator is the engine's own loop.** It runs `run_mcat` and chooses each
+  codelet from the clock rack exactly as the reference does. Worker threads run the
+  *read prefixes* of the codelets predicted to come next.
+- **Every builtin is classified** as read, write or barrier, per shared component
+  (`effects.py`, from an audit of all 57 builtins and 27 codelet bodies:
+  `measurements/parallel/speculative-effects-audit.md`).
+- **Writes are serialised in run order.** A write waits for the commit token, which
+  passes in serial order. Each component carries a seqlock version, and a prefix must
+  find every component it may have read unchanged when it commits.
+- **Writes that bypass the builtins are trapped as well:** id allocation, Trace
+  records and rack mutations.
+- **Anything surprising aborts.** The codelet is then re-executed live from scratch,
+  on the same stream, so it draws the same numbers.
+- **Some codelets run on the coordinator,** with nothing in flight: the `meta` and
+  `answer` families, the three rule codelets (because `Rule.currently_works` writes
+  image caches onto shared objects), and every update cycle.
+- **The evidence is zero divergence.** About 1,100 compared runs at 1–16 workers on
+  both interpreters showed none; neither did 9 runs on the Metal backend, nor a
+  per-seed sweep through the swarm of 580 seed pairs (every demo problem × 20
+  seeds, run to the end, 3 threads, the free-threaded interpreter).
+
+**It is not faster yet, and the reasons are measured.**
+- A run is about half update cycle, and the update cycle is serial.
+- Codelets average about 25 µs.
+- Rule codelets must run inline.
+- Coordinating a step costs about 20 µs.
+- At 4 or more workers, 20–35% of speculations conflict and re-run.
+
+On a quiet machine:
+
+| Workers | Against the stream reference (median) | Speculations aborted (median) |
+|---:|---:|---:|
+| 1 | 0.78× | 0% |
+| 2 | 0.82× | 9% |
+| 4 | 0.79× | 21% |
+| 8 | 0.56× | 41% |
+
+This is `scripts/bench_speculative.py` under `.venv-ft` on an M5 Max: five problems × 3
+seeds, 3,000 codelets, best of 3, every run exact
+(`measurements/parallel/speculative-bench.json`). The single-worker row is the cost
+of the machinery itself. Each extra worker wins back part of it, until conflicts
+outgrow the gain.
+
+`measurements/parallel/speculative-engine.md` lists the engine seams that would let
+more codelets speculate: call-private image maps in `Rule.currently_works`, a
+non-storing `Bridge.get_all_concept_mappings`, and a `Group`-free singleton test in
+`top-down-group-scout:category`. They change no behaviour, but they are changes to the
+port, so they were left for a decision.
+
+A Run created with `workers` above 1 runs on this executor, and so does the
+**Workers** control in Run Controls. Audit still refuses it: Audit's reconstruction
+replays the faithful loop, which a stream-mode run is not. `GET /api/runs/{id}/telemetry`
+reports the executor's account of the run: codelets handed to workers, aborts by
+reason, barriers, and time in update cycles against codelets.
+
+### The update cycle in parallel
+
+`server/parallel/update_cycle.py` re-implements one update cycle outside the engine,
+phase for phase. Its `faithful` policy is bit-identical to `update_everything`: the
+serial corpus with it swapped in is identical (725 of 725 runs on numpy, 200 of 200 on
+`off`). Its `stream` policy keys every random decision by update, phase and item, so
+its Jacobi-safe loops can be spread over a thread team: bond and group strengths,
+object values and posting decisions. The dependency analysis is in
+`measurements/parallel/update-cycle-analysis.md`. Bridge strengths are Gauss-Seidel,
+because each sums its neighbours' fresh values, and the Slipnet jumps and the deferred
+posting draw in sequence. **On today's Workspace, about 14 objects, the team costs more
+than it saves**, so `threads` is a knob, not a default.
+
+### The GPU and the Neural Engine
+
+The numeric substrate already runs on Metal, and the plugin measured where else the
+GPU could help (`measurements/parallel/gpu-ane-unified-memory.md`). At today's 59-node
+Slipnet, nowhere:
+- Everything a GPU could take is about 11% of a run.
+- A Metal dispatch costs about 0.2 ms, against about 0.01 ms for a whole NumPy
+  Slipnet update.
+- **Under many processes, MLX collapses:**
+  - a 17-worker swarm on `mlx` peaked at 8.9 runs/s, against 87 on `off`;
+  - from 16 concurrent workers Metal failed to load kernels (`MTLCompilerService`
+    unreachable).
+- **Batching doesn't rescue it.** Batching K runs' Slipnet updates into one `[K, 59]`
+  dispatch beats K separate NumPy updates from K ≈ 30, but a float64 batched CPU
+  update until K ≈ 256–512, so the end-to-end gain is bounded at a few per cent.
+- **The Neural Engine has nothing to run.** It executes float16 Core ML graphs, and
+  the engine has no dense model.
+
+`server/parallel/placement.py` writes the result down:
+- both executors run with the substrate `off`, which is the fastest and exact;
+- they move to `numpy` from 512 Slipnet nodes;
+- they never pick the GPU on their own.
+
+`off`, `python` and `numpy` agree run for run over the whole corpus, so this changes
+nothing a run computes. The engine's own default, the GPU at every size, is unchanged.
+
+### The free-threaded interpreter, and a faster serial engine
+
+Thread parallelism only pays on an interpreter that runs Python on several cores at
+once, so `.venv-ft` holds free-threaded CPython 3.14.9 ([setup](#the-free-threaded-interpreter)).
+Sampling it under load found the engine scaling badly even across *independent* runs
+on separate threads. **Behaviour-neutral fixes** removed the main causes:
+- **`codelet_dsl/interpreter.py`** rebuilt about 270 bound builtins for every codelet
+  and set `__name__` and `__doc__` on each. On a free-threaded build every such
+  assignment stops the world. The builtins are now `functools.partial`, cached per
+  context.
+- **Hot function-level imports** were hoisted to module level.
+- **`Fraction` arithmetic** no longer goes through the `numbers.Rational` ABC check,
+  which takes a lock every thread shares.
+- **The posting-formula cache** is a dict, where it was a locked `lru_cache`.
+
+A second pass took the update cycle's strength and object-value loops apart, again
+bit for bit.
+
+Each change was held to the same standard:
+- **the serial corpus is identical:** every demo problem × 25 seeds, plus `off` runs,
+  compared run for run on stopping state, codelet count, RNG draws and a hash of the
+  Trace;
+- **the lockstep ratchet against Metacat's own traces exits 0;**
+- **the fast suite shows no new failures.**
+
+Measured on an Apple M5 Max, quiet machine, best of three. The workload was five
+problems × 8 seeds (2 for `mlx`), interleaved runs of the tree as it stood before this
+work (`cc9037b`) and after it. Both produced the same 86,622 codelets (23,909 on
+`mlx`):
+
+| Backend | Interpreter | Before (codelets/s) | After | Gain |
+|---|---|---:|---:|---:|
+| `off` | standard | 13,294 | 19,957 | **1.50×** |
+| `off` | free-threaded | 13,381 | 19,807 | **1.48×** |
+| `numpy` | standard | 11,558 | 16,414 | 1.42× |
+| `numpy` | free-threaded | 11,487 | 16,105 | 1.40× |
+| `mlx` (GPU) | standard | 2,589 | 2,801 | 1.08× |
+| `mlx` (GPU) | free-threaded | 2,560 | 2,776 | 1.08× |
+
+The GPU rows barely move, because a Metal dispatch dominates every update there. Every
+swarm run is a serial run, so the gain multiplies across the swarm's cores.
+
+### Free-running, the first attempt
+
+`server/parallel/free_running.py` executes codelets on several worker threads with no
+global barrier, committing structures under a lock and treating a lost race as a
+fizzle. Six defects were found and fixed so that one worker behaved like the serial
+loop, among them:
+- per-worker coderack shards, whose urgency-weighted draw is not the rack's;
+- the structure clock and the codelet count;
+- the fixed initial-unclamp time;
+- the pending-answer hand-off.
+
+What remained is inherent to overlapping codelets. Over 1,000 runs of
+`wxyz → vxyz; abcd`, `abce` fell from 15.0% serially to 9.3% at six workers (z = −3.90).
+At best it ran 1.35× faster than serial. A large part of that ceiling turned out to be
+the setattr stop-the-world described above.
+
+The service no longer reaches it. It stays registered as `"free"` for research scripts
+such as `scripts/compare_frequencies.py`'s multi-worker study, and as the point of
+comparison. `scripts/bench_free_running.py`, `scripts/bench_shards.py`,
+`tests/module/test_free_running.py` and `tests/module/test_coderack_shards.py` still
+exercise it.
+
+How much staleness cognition tolerates was measured before any of it was written, by
+making the serial loop read state as it stood N codelets ago:
+- nothing moves at N ≤ 5;
+- by N = 15, runs start failing to converge inside the codelet cap;
+- by N = 50, a genuinely new answer appears.
 
 ## Sizing to the machine
 
@@ -753,9 +947,10 @@ and a full set of sizes.
 
 | Size | Rule | Environment variable |
 |---|---|---|
-| Free-running workers | One per performance core. Codelet bodies are interpreted Python and CPU-bound, and a worker holds the commit lock while it mutates the Workspace. | `PETACAT_WORKERS` |
+| Speculative workers | One per core on the fastest performance level (`hw.perflevel0`: the 6 Super cores of an M5 Max). Codelet bodies are interpreted Python and CPU-bound, and the token holder runs on whichever is free. | `PETACAT_WORKERS` |
 | Coderack shards | One per worker, floor of two, bounded further by the capacity a shard needs to hold a jootsing sequence (`MIN_SHARD_CAPACITY`). | `PETACAT_CODERACK_SHARDS` |
-| Population processes | Every logical core but one. The runs share nothing, so efficiency cores add throughput, and the reserved core leaves the parent and the OS somewhere to run. | `PETACAT_POPULATION_WORKERS` |
+| Swarm processes | Every logical core but one. The runs share nothing, so every tier of core adds throughput, and the reserved core leaves the parent and the OS somewhere to run. | `PETACAT_POPULATION_WORKERS` |
+| Executor numeric backend | `off` below 512 Slipnet nodes, `numpy` from there, never the GPU on its own (`server/parallel/placement.py`). | `PETACAT_SWARM_BACKEND`, `PETACAT_SPECULATIVE_BACKEND` |
 | GPU dispatch threads | GPU cores × 1,024, rounded up to a power of two. This is the target the Slipnet kernel splits rows against, so a larger GPU splits more widely in the latency-bound regime. | `PETACAT_GPU_CORES`, `PETACAT_GPU_THREADS_PER_CORE` |
 
 `GET /api/system/numeric` reports the detected machine and everything derived
@@ -785,7 +980,7 @@ The tables below cover the routes a user drives.
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| POST | `/api/runs` | Create a new run — takes `mode` (`fast`/`normal`/`audit`), `workers` (1–16; above 1 runs free-running), `spreading_threshold`, and `parameters` for per-run overrides |
+| POST | `/api/runs` | Create a new run — takes `mode` (`fast`/`normal`/`audit`), `workers` (1–16; above 1 runs the exact speculative executor), `spreading_threshold`, and `parameters` for per-run overrides |
 | GET | `/api/runs/{id}` | Get run info |
 | POST | `/api/runs/{id}/step` | Step N codelets |
 | POST | `/api/runs/{id}/run` | Run to completion |
@@ -813,10 +1008,17 @@ The tables below cover the routes a user drives.
 | GET | `/api/runs/{id}/identity` | Mode, seed, spreading threshold, config hash, memory hash, session |
 | GET | `/api/runs/parameters/catalogue` | The settable run parameters: kind, bounds, default, what each does |
 | GET | `/api/runs/{id}/parameters` | What a Run was: `fixed` (all of them, resolved), `overridden`, `defaults`, `derived` |
-| GET | `/api/runs/{id}/telemetry` | Free-running telemetry: worker split, conflict rate, throughput |
+| GET | `/api/runs/{id}/telemetry` | Parallel telemetry for a `workers` > 1 Run: codelets handed to workers, aborts by reason, barriers, time in update cycles |
 | GET | `/api/review/runs/{id}` | One Run's review projection, for linking straight to it |
 | PUT | `/api/review/sessions/{id}/note` | Set a Training Session's note |
 | GET | `/api/system/numeric` | Which numeric backend the server process is running, and on what device |
+
+### The swarm
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| POST | `/api/swarm` | Run one problem (an `answer` makes it justification mode) over many seeds — `seeds`, or `count` and `seed_start` — on every core; returns the answer distribution, status counts, per-run outcomes and throughput. Persists nothing |
+| GET | `/api/swarm` | The pool: whether the plugin is installed, worker count, core tiers, backends and executors, limits |
 
 ### Interactive controls
 
@@ -1029,10 +1231,11 @@ the static [`HELP.md`](HELP.md) reference and matching TypeScript constants.
    strengths, object values, themespace dynamics and temperature are expressed
    as flat arrays and executed through Metal. See
    [The numeric substrate](#the-numeric-substrate).
-7. **Codelets can run in parallel**: The original is a serial loop, and so is
-   Petacat's reference mode. Petacat can also run codelets across CPU cores with
-   no global barrier, resolving lost races as fizzles. See
-   [Free-running](#free-running-codelets-across-cpu-cores).
+7. **It uses every core**: The original is one run on one core, and so is
+   Petacat's reference mode. A detachable plugin runs many runs at once, one per
+   core, each identical to the serial run; and it can spread one run's codelets
+   across threads with a result identical for every worker count. See
+   [Parallelism](#parallelism-the-serverparallel-plugin).
 8. **Clamps lapse by update cycle**: Metacat unfreezes the initially clamped
    Slipnet nodes at a fixed codelet count (`run.ss:151-154`). Petacat counts
    every clamp down by update cycles, so it lapses on the update cycle that

@@ -1,0 +1,89 @@
+{
+ "executors": [
+  "serial",
+  "stream"
+ ],
+ "seeds": [
+  3101,
+  8100
+ ],
+ "max_steps": 100000,
+ "backend": "numpy",
+ "seconds": 301.45156483400206,
+ "processes": 17,
+ "alpha": 0.01,
+ "z_critical": 3.4369817237268987,
+ "errors": {},
+ "rows": [
+  {
+   "problem": "wxyz-vxyz-abcd",
+   "reference": "serial",
+   "other": "stream",
+   "n": [
+    5000,
+    5000
+   ],
+   "chi2": 4.578356241001643,
+   "df": 7,
+   "p": 0.711262475598593,
+   "tv": 0.011799999999999982,
+   "z": {
+    "answer_found:abcd": 0.29457314966691106,
+    "answer_found:vwxd": -0.8167416401841853,
+    "answer_found:vwcd": 0.0,
+    "answer_found:abce": -0.6182238644418824,
+    "answer_found:abcv": -0.8285090158718684,
+    "answer_found:atuv": 1.7323106736613452,
+    "answer_found:abcc": 0.36025321849018593,
+    "answer_found:aabc": 1.0002000600200067,
+    "answer_found:abde": 1.0000500037503126,
+    "answer_found:vbcdd": -0.4473254408425842,
+    "gave_up:": 0.236834429918242,
+    "answer_found:vbcd": 0.40111892461245363,
+    "answer_found:vcbb": 1.0000500037503126,
+    "answer_found:uvcd": 1.1342904901988708,
+    "answer_found:vbcddd": 1.0000500037503126,
+    "answer_found:vxyz": -0.9079257015172557,
+    "answer_found:acde": 0.5774368912204485
+   },
+   "mean_codelets": [
+    3585.554,
+    3776.9558
+   ],
+   "reference_states": {
+    "answer_found:vbcd": 1709,
+    "gave_up:": 1166,
+    "answer_found:abcd": 843,
+    "answer_found:abce": 655,
+    "answer_found:vxyz": 220,
+    "answer_found:abcc": 200,
+    "answer_found:abcv": 186,
+    "answer_found:uvcd": 5,
+    "answer_found:atuv": 3,
+    "answer_found:aabc": 3,
+    "answer_found:acde": 2,
+    "answer_found:vbcdd": 2,
+    "answer_found:vwxd": 2,
+    "answer_found:abde": 1,
+    "answer_found:vcbb": 1,
+    "answer_found:vbcddd": 1,
+    "answer_found:vwcd": 1
+   },
+   "other_states": {
+    "answer_found:vbcd": 1690,
+    "gave_up:": 1156,
+    "answer_found:abcd": 832,
+    "answer_found:abce": 676,
+    "answer_found:vxyz": 239,
+    "answer_found:abcv": 202,
+    "answer_found:abcc": 193,
+    "answer_found:vwxd": 4,
+    "answer_found:vbcdd": 3,
+    "answer_found:uvcd": 2,
+    "answer_found:aabc": 1,
+    "answer_found:acde": 1,
+    "answer_found:vwcd": 1
+   }
+  }
+ ]
+}

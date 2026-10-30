@@ -86,6 +86,9 @@ def main() -> int:
     ap.add_argument("--max-steps", type=int, default=20000)
     ap.add_argument("--only", help="comma-separated substrings of problem labels")
     ap.add_argument("--no-justify", action="store_true", help="discovery problems only")
+    ap.add_argument("--problem", nargs=3, metavar=("INITIAL", "MODIFIED", "TARGET"),
+                    help="compare on this one problem instead of the demo problems")
+    ap.add_argument("--count-answer", help="also report each executor's rate of this answer")
     ap.add_argument("--backend", default=None, help="numeric backend (default: placement policy)")
     ap.add_argument("--workers", type=int, default=0,
                     help="within-run workers for the 'speculative' executor (default 2)")
@@ -98,7 +101,10 @@ def main() -> int:
 
     executors = [e.strip() for e in args.executors.split(",") if e.strip()]
     only = {o.strip() for o in args.only.split(",")} if args.only else None
-    problems = _problems(only, include_justify=not args.no_justify)
+    if args.problem:
+        problems = [("-".join(args.problem), (*args.problem, None))]
+    else:
+        problems = _problems(only, include_justify=not args.no_justify)
     seeds = list(range(args.seed_start, args.seed_start + args.seeds))
 
     tasks = []
@@ -169,6 +175,13 @@ def main() -> int:
               f"{r['n'][0]:>5d}/{r['n'][1]:<5d} {r['chi2']:8.2f} {r['df']:3d} {p:>8s} "
               f"{(r['tv'] or 0.0):6.3f} {zmax:7.2f}{mark:2s} "
               f"{r['mean_codelets'][0]:8.0f}/{r['mean_codelets'][1]:<8.0f}")
+    if args.count_answer:
+        for label, _ in problems:
+            for executor in executors:
+                counts = states.get((label, executor), Counter())
+                n = sum(counts.values())
+                hits = sum(v for k, v in counts.items() if k.split(":", 1)[-1] == args.count_answer)
+                print(f"{label} {executor:12s} {args.count_answer}: {hits}/{n} = {hits / max(1, n):.1%}")
     expected = args.alpha * sum(1 for r in rows if r["p"] is not None)
     print(f"\nchi-square p < {args.alpha}: {len(flagged_p)} of {len(rows)} comparisons "
           f"(about {expected:.1f} expected by chance if the executors agree)")

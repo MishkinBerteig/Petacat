@@ -10,7 +10,7 @@ focused on the research goals of the project.
 .venv/bin/python -m pytest tests/ -q
 ```
 
-This is the command a change is verified with. It runs all seven layers against the
+This is the command a change is verified with. It runs all eight layers against the
 local Postgres, runs every test whose outcome the numeric substrate produces on
 **both the CPU and the GPU**, and stops at a **60-minute wall-clock ceiling**. The
 matrix and the ceiling are properties of the suite, so this one command carries
@@ -121,19 +121,20 @@ outside the matrix take it too and the run is entirely what it says it is.
 
 ```
 ============================= petacat test matrix ==============================
-  cpu  numpy    float64    486 tests
-  gpu  mlx      float32    486 tests
+  cpu  numpy    float64    498 tests
+  gpu  mlx      float32    498 tests
   whole suite requested: the full matrix is required of this run
 
   unit           732 collected    732 run    732 passed      0 failed      0 skipped  complete
   seed_unit      494 collected    494 run    494 passed      0 failed      0 skipped  complete
   module        1025 collected   1025 run   1025 passed      0 failed      0 skipped  complete
-  architecture    34 collected     34 run     34 passed      0 failed      0 skipped  complete
+  architecture    37 collected     37 run     37 passed      0 failed      0 skipped  complete
   integration     68 collected     68 run     68 passed      0 failed      0 skipped  complete
-  lockstep      223 collected    223 run    223 passed      0 failed      0 skipped  complete
-  e2e            287 collected    287 run    287 passed      0 failed      0 skipped  complete
+  parallel       211 collected    211 run    211 passed      0 failed      0 skipped  complete
+  lockstep       223 collected    223 run    223 passed      0 failed      0 skipped  complete
+  e2e            294 collected    294 run    294 passed      0 failed      0 skipped  complete
 
-  run complete in 14.2 min against a 60 min ceiling
+  run complete in 12.5 min against a 60 min ceiling
 ```
 
 The first block is what makes "both were run" checkable: it names each backend, its
@@ -197,7 +198,7 @@ it reached.
 
 ## Test layers
 
-The backend suite (`tests/`) is organised into seven layers. A layer is defined by
+The backend suite (`tests/`) is organised into eight layers. A layer is defined by
 what its tests are allowed to reach for, and every test in a layer stays inside
 that allowance.
 
@@ -206,13 +207,14 @@ that allowance.
 | **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 732 |
 | **seed unit** | `tests/seed_unit/` | One class or function, measured against the values Petacat ships with | Real `seed_data/*.json`, and the machine the process is running on | 494 |
 | **module** | `tests/module/` | Several real components assembled and driven | Real engine objects and `seed_data/*.json`; no DB, no HTTP | 1025 |
-| **architecture** | `tests/architecture/` | How the source tree is allowed to depend on itself | The repository's source, `seed_data/*.json`, child interpreters | 34 |
+| **architecture** | `tests/architecture/` | How the source tree is allowed to depend on itself | The repository's source, `seed_data/*.json`, child interpreters | 37 |
 | **integration** | `tests/integration/` | Agreement between the repository's artifacts, and the harness's own rules | Real `seed_data/*.json`, the ORM declarations, the generated client files, the documentation, a real pytest session | 68 |
+| **parallel** | `tests/parallel/` | The detachable multi-core plugin (`server/parallel/`): each executor against the serial run it claims to equal | Real engine objects and `seed_data/*.json`, worker processes and threads; each test pins the backend it compares on | 211 |
 | **lockstep** | `tests/lockstep/` | Petacat's decision traces against Metacat's: naming, helper conformance, tracing/replay RNGs, determinism guards, the comparer | Real engine in faithful mode (numeric backend off, or a named backend); recorded Metacat traces | 223 |
-| **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 287 |
+| **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 294 |
 
 Those counts are cases, so they include the second pass the numeric matrix makes
-over the 486 backend-sensitive tests.
+over the 498 backend-sensitive tests.
 
 One line decides each layer. Read them as a question about what a new test's
 subject is, and write the test where the answer lands:
@@ -227,6 +229,10 @@ subject is, and write the test where the answer lands:
   what running it produces.
 - **integration** — the assertion is that two artifacts in the repository say
   the same thing.
+- **parallel** — the subject is the parallel plugin, and the assertion is an
+  equality: a swarm outcome equals the serial run's, a speculative run equals the
+  stream-serial reference's, bit for bit, at every worker count. Outside the backend
+  matrix, like lockstep: each test pins the backend its comparison is made on.
 - **lockstep** — the assertion is about Petacat's random decisions: what they are
   named, how a helper draws, whether a replay of a Metacat trace repeats exactly.
   It runs the engine in faithful mode, which pins the numeric backend off, so it
@@ -238,9 +244,9 @@ subject is, and write the test where the answer lands:
 A first pass should test **the lowest level of code just above the database
 first**, then move up toward the API and GUI.
 
-All seven layers run in one command — the
+All eight layers run in one command — the
 [required command](#the-required-command) — and, since Petacat runs natively, all
-seven actually run: **2,863 cases**, every one of them executed. A layer that is
+eight actually run: **3,084 cases**, every one of them executed. A layer that is
 normally skipped is not a layer that is normally green, and none of these is.
 
 Wall-clock time depends heavily on the machine and on what else it is doing. The
@@ -448,6 +454,7 @@ the number of endpoints taking `Depends(get_session)`, the size of
 | File | Fns | Covers |
 |------|----:|--------|
 | `test_engine_purity.py` | 18 | Nothing under `server/engine/**` imports `sqlalchemy`, `server.models`, `server.db` or `server.services`, and the serializers run in an interpreter where those cannot be imported |
+| `test_parallel_detachable.py` | 3 | Nothing under `server/engine/**` imports the parallel plugin, and a serial run and the service layer work in an interpreter where `server.parallel` cannot be imported |
 
 **`tests/integration/` — the repository's artifacts agree**
 
@@ -495,13 +502,25 @@ the number of endpoints taking `Depends(get_session)`, the size of
 | `test_api_system.py` | 8 | The system endpoints: what is executing, not what was recorded |
 | `test_help_api.py` | 7 | The help topics API |
 | `test_persistence.py` | 4 | Snapshot save/restore and the DB metadata round-trip |
-| `test_persistence_modes.py` | 32 | The three persistence modes: Fast, Normal, Audit |
+| `test_persistence_modes.py` | 33 | The three persistence modes: Fast, Normal, Audit; a parallel Run is the same at any worker count |
 | `test_run_parameters.py` | 13 | Run parameters are settable per Run, stored, and readable back |
 | `test_run_to_answer.py` | 8 | The Run-to-Answer feature over HTTP |
 | `test_memory_order.py` | 2 | A restart puts stored answers back newest first by the memory's own identifier, both projections list them oldest first, and forgetting one keeps the rest in order |
 | `test_snag_identity.py` | 5 | A snag is the same snag whichever endpoint served it, and is written once |
 | `test_moment_display.py` | 6 | Event, answer and snag redisplay over the API: print names in the listing, the picture served live and from the stored row, the toggle and the switch, rows with no picture |
+| `test_swarm_api.py` | 5 | `POST /api/swarm` equals the serial runs, persists nothing, and rejects bad requests; `GET /api/swarm` reports the pool |
 | `test_step0_config_from_db.py` | 50 | Step 0's guard tests: a shipped value reproduces the run and a changed one moves it |
+
+**`tests/parallel/` — the multi-core plugin against the serial runs it claims to equal**
+
+| File | Fns | Covers |
+|------|----:|--------|
+| `test_swarm.py` | 17 | A swarm outcome is the serial run's, byte for byte: demo problems × seeds, justification, episodes, parameter overrides, both CPU backends; errors come back as outcomes; configuration changes re-initialise workers |
+| `test_placement.py` | 13 | The measured backend policy: the CPU by default, never the GPU on its own, the environment overrides |
+| `test_update_cycle.py` | 9 | The plugin's update cycle: faithful is bit-identical to the engine's, stream is identical at every thread count |
+| `test_clock_rack.py` | 10 | The exponential-race coderack draws each codelet with the faithful two-stage draw's probability, and a later post never disturbs an earlier choice it does not beat |
+| `test_effects.py` | 8 | The builtin effects table is complete, and no speculated read prefix writes shared state (the hidden-write detector) |
+| `test_speculative_exact.py` | 10 | The speculative executor is bit-identical to the stream-serial reference at every worker count, with forced aborts too; the slow sweep (`PETACAT_SPECULATIVE_SWEEP_SEEDS`) widens it |
 
 **Collected by no layer**
 
@@ -528,6 +547,13 @@ in a child interpreter with MLX and NumPy made unimportable. It chooses its own
 backend environment, which is why it sits outside the numeric matrix.
 
 Three others carried it until the expected-range oracle was removed; see below.
+
+The parallel layer adds two more, both in `tests/parallel/test_speculative_exact.py`:
+a sweep of every demo problem at 4 and 16 workers, and six runs to their natural end
+at 8 workers, each compared bit for bit with the stream-serial reference. The sweep
+runs one seed per problem by default; `PETACAT_SPECULATIVE_SWEEP_SEEDS=5` restores
+the full sweep (five seeds at 2, 4, 8 and 16 workers, about 25 minutes), which is
+worth running under `.venv-ft` after any change to the speculative executor.
 
 ### Regressions: what replaced the expected-range oracle
 
@@ -636,10 +662,13 @@ editors and the review surfaces. Run it with `cd client && npx vitest run`, and
 
 ### Running under the free-threaded interpreter
 
-`.venv-ft` holds CPython 3.14.6 built without the GIL (`python3.14t`,
-`Py_GIL_DISABLED=1`). It exists because the concurrency work is meaningless on
-an interpreter that cannot execute Python on two cores at once, and the suite is
-run under it as well as under the standard build.
+`.venv-ft` holds CPython 3.14.9 built without the GIL (`python3.14t`,
+`Py_GIL_DISABLED=1`), the same release as `.venv`. It exists because the
+concurrency work is meaningless on an interpreter that cannot execute Python on two
+cores at once, and the suite is run under it as well as under the standard build.
+The parallel layer matters most there: the speculative executor's exactness tests
+(`tests/parallel/test_speculative_exact.py`, and its `slow` sweep) only meet real
+interleavings when the threads genuinely overlap.
 
 ```bash
 # The suite, with the GIL genuinely off
@@ -659,16 +688,26 @@ itself; that is the property `tests/architecture/test_engine_purity.py` protects
 is the reason codelet parallelism gets a genuinely lock-free interpreter while
 only the API process pays.
 
-NumPy and MLX are not installed in `.venv-ft`, so the numeric substrate falls
-back to its pure-Python reference backend there. Tests that need a specific
-backend skip rather than fail when it is unavailable, and the matrix reports its
-`cpu` role as filled by `python` and its `gpu` role as not installed — one pass,
-on the reference, stated in the summary.
+NumPy and MLX are installed in `.venv-ft` (both ship free-threaded wheels), so
+the matrix runs both roles there as it does under the standard build.
 
-The interpreter costs roughly 9% single-threaded against the standard build,
-with identical codelet counts — so it is the interpreter's overhead, not
-different cognition, and the parallelism has to beat it before it earns
-anything.
+Single-threaded, the free-threaded build now costs nothing measurable against the
+standard one (14,195 against 13,824 codelets per second on an M5 Max, identical
+codelet counts). What it used to cost, and why it scaled so badly across threads,
+was the engine rather than the interpreter: binding the codelet builtins set
+`__name__` and `__doc__` on about 270 fresh closures per codelet, and on a
+free-threaded build every such assignment stops the world. The README's
+[parallelism section](README.md#parallelism-the-serverparallel-plugin) has the rest.
+
+Rebuilding it: Homebrew's `python-freethreading` moves to each new minor release
+(it is 3.15 at the time of writing), so the interpreter comes from `uv`, which
+pins the exact build:
+
+```bash
+uv python install 3.14.9+freethreaded
+"$(uv python find 3.14.9+freethreaded)" -m venv .venv-ft
+.venv-ft/bin/pip install -e ".[dev]" numpy mlx
+```
 
 ### Benchmarks are not tests
 
