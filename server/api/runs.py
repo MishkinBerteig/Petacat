@@ -44,12 +44,12 @@ class CreateRunRequest(BaseModel):
     #: live dialogue can coexist in one process.  ``fast`` touches the database at no
     #: point, including creation, so a Fast Run works with Postgres stopped.
     mode: str = "normal"
-    #: Worker threads for free-running execution (WP4.4).  1 — the default — is the
-    #: serial loop, which stays the reference mode.  Above 1 the run's codelets execute
-    #: across CPU cores with no global barrier; the expected range is unchanged, but a
-    #: seed no longer reproduces a run, because execution order is not determined.
-    #: Audit refuses anything above 1, since its forward log would not describe the
-    #: order things actually happened in.
+    #: Worker threads for the exact speculative executor.  1 — the default — is the
+    #: faithful serial loop, which stays the reference mode.  Above 1 the run's codelets
+    #: execute speculatively across threads and the result is identical for every
+    #: count at or above 2, so a seed reproduces the run; it is a different (equal in
+    #: law) run from workers=1, and not yet faster than serial.  Audit refuses
+    #: anything above 1, since its replay reconstructs the faithful loop.
     #:
     #: 0 asks for this machine's own count — one worker per performance core, which
     #: ``GET /api/system/numeric`` reports under ``derived.workers``.  It is how a
@@ -88,8 +88,8 @@ class RunResponse(BaseModel):
     justify_mode: bool = False
     #: Which Slipnet nodes were allowed to spread; 100 is the original.
     spreading_threshold: int = 100
-    #: Workers the run executes with: 1 is the serial loop, more is free-running, under
-    #: which the seed does not reproduce the run.  Null when nothing records it, as
+    #: Workers the run executes with: 1 is the serial loop, more is the exact speculative
+    #: executor, which a seed reproduces identically for any count of 2 or more.  Null when nothing records it, as
     #: for runs created before the count was stored.
     workers: int | None = None
 
@@ -490,9 +490,9 @@ async def get_run_parameters(
                 "staleness_delay": ctx.staleness_delay,
             }
         )
-        telemetry = svc._free_run_telemetry.get(run_id)
+        telemetry = svc._parallel_telemetry.get(run_id)
         if telemetry is not None:
-            derived["free_running"] = telemetry
+            derived["parallel"] = telemetry
 
     try:
         from server.engine.numeric.backend import select_backend
@@ -518,18 +518,18 @@ async def get_run_parameters(
 
 @router.get("/{run_id}/telemetry")
 async def get_run_telemetry(run_id: int):
-    """Free-running telemetry for a run, if it ran free-running.
+    """Parallel telemetry for a run, if it ran on the speculative executor.
 
-    Reported rather than inferred, because the interesting figures — the conflict rate
-    and how the work actually divided between workers — cannot be reconstructed from
-    the run's record afterwards. A free-running run is one draw, and this is the only
-    account of how it was taken.
+    Reported rather than inferred, because the figures — aborted speculations, barriers,
+    the split of time between update cycles and codelets, and how the work divided
+    between workers — cannot be reconstructed from the run's record afterwards. They
+    describe performance only: the run's result does not depend on them.
     """
     svc = get_run_service()
-    telemetry = svc._free_run_telemetry.get(run_id)
+    telemetry = svc._parallel_telemetry.get(run_id)
     if telemetry is None:
-        return {"run_id": run_id, "free_running": False}
-    return {"run_id": run_id, "free_running": True, **telemetry}
+        return {"run_id": run_id, "parallel": False}
+    return {"run_id": run_id, "parallel": True, **telemetry}
 
 
 @router.post("/{run_id}/run", response_model=RunResponse)

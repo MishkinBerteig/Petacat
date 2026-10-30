@@ -100,7 +100,7 @@ class DerivedSizes(BaseModel):
     variable.  ``overrides`` names the variables actually set in this process.
     """
 
-    #: Free-running worker threads: one per performance core.
+    #: Parallel worker threads (speculative executor): one per performance core.
     workers: int
     #: Coderack shards: one per worker, floor of two, bounded further by the
     #: capacity a shard needs.

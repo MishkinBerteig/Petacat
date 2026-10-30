@@ -765,17 +765,16 @@ async def test_deleting_a_run_removes_its_captures_and_audit_log(app_client, db_
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Free-running through the API (WP4.4)
+# Parallel (speculative, exact) runs through the API
 # ─────────────────────────────────────────────────────────────────────────────
 
 
 @pytest.mark.asyncio
-async def test_a_run_can_be_executed_free_running(app_client):
+async def test_a_run_can_be_executed_in_parallel(app_client):
     """The capability has to be *reachable*, not merely implemented.
 
-    `FreeRunningEngine` was built and benchmarked while nothing in the service layer
-    drove a run through it, so the whole of Workstream B was unreachable from the
-    product. This is the path that makes it real.
+    A parallel engine nothing in the service layer drove would be unreachable from
+    the product. This is the path that makes the speculative executor real.
     """
     resp = await app_client.post(
         "/api/runs", json={**PROBLEM, "seed": SEED, "mode": MODE_NORMAL, "workers": 4}
@@ -790,18 +789,47 @@ async def test_a_run_can_be_executed_free_running(app_client):
     assert body["status"] in {"answer_found", "halted", "gave_up", "paused"}
 
     telemetry = (await app_client.get(f"/api/runs/{run_id}/telemetry")).json()
-    assert telemetry["free_running"] is True
+    assert telemetry["parallel"] is True
+    assert telemetry["executor"] == "speculative"
     assert telemetry["workers"] == 4
-    assert sum(telemetry["per_worker"]) == telemetry["codelets"]
-    assert 0.0 <= telemetry["conflict_rate"] <= 1.0
+    assert len(telemetry["per_worker"]) == 4
+    assert telemetry["wall_seconds"] > 0
 
 
 @pytest.mark.asyncio
-async def test_a_free_running_run_is_persisted_like_any_other(app_client, db_session):
+@pytest.mark.parametrize("seed", [7, 4242])
+async def test_parallel_fast_runs_are_identical_for_any_worker_count(app_client, seed):
+    """The new property: workers is a pure performance knob, and a seed reproduces.
+
+    The speculative executor is bit-identical to the stream-serial reference for every
+    worker count, so two Fast Runs with one seed and 2 and 4 workers must end in the
+    same state.  This is what free-running could not offer.
+    """
+    ended = []
+    for workers in (2, 4):
+        # Identical starting conditions include Episodic Memory (see the mode-parity
+        # test above): the second run would otherwise decline the first one's answer.
+        assert (await app_client.delete("/api/memory")).status_code == 200
+        resp = await app_client.post(
+            "/api/runs",
+            json={**PROBLEM, "seed": seed, "mode": MODE_FAST, "workers": workers},
+        )
+        assert resp.status_code == 200, resp.text
+        run_id = resp.json()["run_id"]
+        done = await app_client.post(f"/api/runs/{run_id}/run", json={"max_steps": 1500})
+        assert done.status_code == 200, done.text
+        body = done.json()
+        ended.append((body["status"], body["answer"], body["codelet_count"]))
+    assert ended[0] == ended[1]
+    assert ended[0][2] > 0
+
+
+@pytest.mark.asyncio
+async def test_a_parallel_run_is_persisted_like_any_other(app_client, db_session):
     """The ``RunSink`` port's payoff: no mode had to learn about concurrency.
 
     The engine emits the same events in the same order whether one worker or eight
-    produced them, so a free-running Normal run must leave exactly the record a serial
+    produced them, so a parallel Normal run must leave exactly the record a serial
     Normal run leaves.
     """
     resp = await app_client.post(
@@ -824,8 +852,8 @@ async def test_a_free_running_run_is_persisted_like_any_other(app_client, db_ses
 async def test_a_run_records_how_many_workers_executed_it(app_client, db_session):
     """The worker count is part of the record, because it decides what the seed means.
 
-    Free-running runs with one seed, configuration and memory end differently, and the
-    record has to say why.  The count was held only by the live service, so a restart
+    A parallel run is a different draw from the serial loop with the same seed, and the
+    record has to say which one it was.  The count was held only by the live service, so a restart
     lost it and the listing never had it.
     """
     from server.api import runs as runs_module
@@ -857,11 +885,11 @@ async def test_a_run_records_how_many_workers_executed_it(app_client, db_session
 
 
 @pytest.mark.asyncio
-async def test_audit_refuses_to_run_free(app_client):
+async def test_audit_refuses_parallel_workers(app_client):
     """Audit is serial by definition, and says so rather than quietly going serial.
 
-    Its forward log reconstructs intermediate states by replay, and under free-running
-    the order it records is not the order things happened in. Silently downgrading to
+    Its forward log reconstructs intermediate states by replay, and a parallel run
+    executes the stream-serial reference, which that replay does not reproduce. Silently downgrading to
     one worker would produce a correct record of a run the caller did not ask for.
     """
     resp = await app_client.post(
@@ -880,4 +908,4 @@ async def test_one_worker_is_still_the_serial_loop(app_client):
     run_id = resp.json()["run_id"]
     await app_client.post(f"/api/runs/{run_id}/run", json={"max_steps": 500})
     telemetry = (await app_client.get(f"/api/runs/{run_id}/telemetry")).json()
-    assert telemetry["free_running"] is False
+    assert telemetry["parallel"] is False

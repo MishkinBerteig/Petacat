@@ -177,7 +177,7 @@ class RunInfo:
     spreading_threshold: int = 100
     #: The persistence mode this run was created with.
     mode: str = "normal"
-    #: Workers the run executes with: 1 is serial, more is free-running.  None when
+    #: Workers the run executes with: 1 is the serial loop, more is the exact speculative executor.  None when
     #: neither the row nor a live runner says, as for rows written before it was
     #: recorded.
     workers: int | None = None
@@ -223,8 +223,9 @@ class RunService:
         #: Worker count per live run.  1 is the serial loop — the permanent reference
         #: mode — and is the default, so nothing changes unless a run asks for it.
         self._workers: dict[int, int] = {}
-        #: Last free-running telemetry per run — worker count, conflict rate, throughput.
-        self._free_run_telemetry: dict[int, dict] = {}
+        #: Last parallel telemetry per run — the speculative executor's counters plus
+        #: ``executor`` — worker count, aborts, barriers, time split.
+        self._parallel_telemetry: dict[int, dict] = {}
         #: Identifiers for Fast Runs.  A Fast Run has no database row to take an id
         #: from — that is the whole point — so it needs one from somewhere, and it must
         #: not collide with a real ``runs.id``.  Negative numbers cannot: the column is
@@ -289,13 +290,18 @@ class RunService:
         same problem, the same seed and the same memory whichever mode is chosen, which
         is what makes a mode-mixed Training Session comparable with an all-Fast one.
 
-        ``workers`` above 1 runs the Run free-running (WP4.4): codelets across CPU
-        cores with no global barrier.  It defaults to 1 — the serial loop — because
-        serial execution is the permanent reference mode every later phase validates
-        against, and because free-running is a *different draw*: the expected range is
-        unchanged, but a given seed no longer reproduces a given run, since execution
-        order is not determined.  Audit refuses it outright, for the same reason it
-        exists: a record of actions with no record of commit order reconstructs nothing.
+        ``workers`` above 1 runs the Run on the exact speculative executor
+        (``server/parallel/speculative``): codelets execute across threads, but the
+        result is bit-identical for every worker count at or above 2, and so is
+        reproducible by its seed.  It is not the same run as ``workers == 1``: the
+        stream-serial reference it matches draws from per-step random streams and an
+        exponential-race coderack, which are equal in law to the faithful loop but not
+        the same draws.  It defaults to 1 — the serial loop — because serial execution
+        is the permanent reference mode every later phase validates against.  The
+        speculative executor is not yet faster than serial at today's sizes; the
+        swarm is the throughput path.  Audit refuses ``workers > 1`` outright: its
+        reconstruction replays the faithful loop's action log forward, which a
+        stream-mode run is not.
         """
         # Validated before anything is created, so a bad override cannot leave a
         # half-built Run behind. Raises ValueError, which the API turns into a 400.
@@ -316,10 +322,11 @@ class RunService:
             workers = 1
         if workers > 1 and mode == MODE_AUDIT:
             raise ValueError(
-                "Audit mode is serial by definition and cannot run free-running: it "
-                "reconstructs intermediate states by replaying its action log forward, "
-                "and under free-running the order that log records is not the order "
-                "things happened in. Use Normal or Fast for a parallel run."
+                "Audit mode is serial by definition and cannot run with workers > 1: it "
+                "reconstructs intermediate states by replaying its action log forward "
+                "as the faithful loop, and a parallel run executes the stream-serial "
+                "reference, which that replay does not reproduce. Use Normal or Fast "
+                "for a parallel run."
             )
         threshold = (
             run_meta.get_param("spreading_activation_threshold", 100)
@@ -742,7 +749,7 @@ class RunService:
         ]
         return runs, total
 
-    async def _run_free(
+    async def _run_parallel(
         self,
         session: AsyncSession,
         run_id: int,
@@ -750,7 +757,7 @@ class RunService:
         workers: int,
         max_steps: int,
     ) -> RunInfo:
-        """Drive a Run free-running, then persist it exactly as a serial Run.
+        """Drive a Run on the speculative executor, then persist it as a serial Run.
 
         The engine work happens in worker *threads* and is handed to a thread executor so
         the event loop stays free — otherwise a run would block every other request for
@@ -775,9 +782,12 @@ class RunService:
                 "workers > 1 needs the parallel subsystem (server/parallel/), which is "
                 "not installed in this checkout"
             )
-        engine = _parallel.get_executor("free")(runner, workers=workers)
+        engine = _parallel.get_executor("speculative")(runner, workers=workers)
         result = await asyncio.to_thread(engine.run, max_steps)
-        self._free_run_telemetry[run_id] = result.summary()
+        self._parallel_telemetry[run_id] = {
+            **(getattr(result, "telemetry", None) or {}),
+            "executor": "speculative",
+        }
 
         status_str = runner.status
         if not fast:
@@ -826,7 +836,7 @@ class RunService:
 
         workers = self._workers.get(run_id, 1)
         if workers > 1:
-            return await self._run_free(session, run_id, runner, workers, max_steps)
+            return await self._run_parallel(session, run_id, runner, workers, max_steps)
 
         fast = self._is_fast(run_id)
         if not fast:
@@ -1052,7 +1062,7 @@ class RunService:
             self._sinks.pop(run_id, None)
             self._modes.pop(run_id, None)
             self._workers.pop(run_id, None)
-            self._free_run_telemetry.pop(run_id, None)
+            self._parallel_telemetry.pop(run_id, None)
             return
 
         # Delete associated rows

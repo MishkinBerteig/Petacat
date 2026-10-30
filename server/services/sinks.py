@@ -288,7 +288,7 @@ class AuditSink(TraceRecordingSink):
     reconstructed by replaying forward from the Run-start capture.
 
     It also forces serial execution.  A record of actions with no record of commit order
-    would not reconstruct anything under free-running, and Audit is the phase's
+    would not reconstruct anything under a parallel run, and Audit is the phase's
     **serial reference mode** — the fully-recorded, one-codelet-at-a-time execution that
     every later phase validates against. That is why Audit stays serial forever rather
     than being a slow setting of a parallel engine.

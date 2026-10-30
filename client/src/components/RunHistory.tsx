@@ -30,7 +30,7 @@ function workersTitle(workers: number | null | undefined): string {
     return 'Workers not recorded: the run was created before the count was stored';
   }
   return workers > 1
-    ? `${workers} workers: free-running, so the seed does not reproduce this run`
+    ? `${workers} workers: the exact parallel executor, identical for any count of 2 or more; the seed reproduces this run, but not as the serial loop would`
     : '1 worker: the serial loop, so problem, seed and memory reproduce this run';
 }
 
@@ -337,7 +337,7 @@ export function RunHistory() {
         </span>
         <span
           style={{ width: 16, flexShrink: 0, textAlign: 'right' }}
-          title="Workers: 1 is the serial loop, which a seed reproduces; more is free-running, which it does not."
+          title="Workers: 1 is the serial loop, which a seed reproduces; more is the exact parallel executor, identical for any count of 2 or more but a different draw from the serial loop."
         >
           W
         </span>
@@ -430,9 +430,9 @@ export function RunHistory() {
             <span style={{ width: 54, flexShrink: 0 }}>
               <ModeBadge mode={run.mode ?? 'normal'} />
             </span>
-            {/* A free-running run is a different draw: its seed does not reproduce
-                it, so the count belongs in the record of the run, as the spreading
-                threshold does. */}
+            {/* A parallel run is a different (equal in law) draw from the serial
+                loop with the same seed, so the count belongs in the record of the
+                run, as the spreading threshold does. */}
             <span
               className="mono"
               style={{

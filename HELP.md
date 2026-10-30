@@ -126,7 +126,7 @@ The four fields are:
 - Target: The starting string of the bottom row, e.g. 'xyz'. Metacat will try to apply an analogous transformation to this string.
 - Answer (optional): If you supply this, Metacat enters justification mode and tries to explain why this specific answer is (or isn't) a good analogy, rather than discovering an answer from scratch.
 
-Seed sets the random seed. With one worker, the same problem, the same seed and the same Episodic Memory reproduce a run exactly; with more than one (free-running, set in Run Controls) the seed does not. Blank or 0 means seed 0. It lives here because it is part of the problem's identity -- changing it gives you a different run of the same strings.
+Seed sets the random seed. With one worker, the same problem, the same seed and the same Episodic Memory reproduce a run exactly; with more than one (parallel, set in Run Controls) the seed still reproduces the run, identically for any worker count of 2 or more, but as a different run from the one-worker loop. Blank or 0 means seed 0. It lives here because it is part of the problem's identity -- changing it gives you a different run of the same strings.
 
 The Demo Problem dropdown lets you load pre-configured problems from the dissertation, including well-known examples like the 'abc -> abd; xyz -> ?' problem and many harder variations. Each demo also carries a preset seed, which pins the run while the configuration is unchanged -- handy for following a known-good run.
 
@@ -195,7 +195,7 @@ If self-watching is turned off for a run (the 'Self-watching enabled' engine par
 **Topic key:** `run_history`  
 **Summary:** A list of every recorded run in this Petacat instance, with quick links to load them back up. Fast runs are not recorded and do not appear.
 
-The Run History panel shows all runs that have been created in the current Petacat instance, ordered by recency. Each entry shows the run number, problem strings (initial, modified, target, and answer if found), persistence mode, how many workers ran it (W), status (running, paused, halted, answer_found), final codelet count, final temperature, and spreading threshold (Spr). W is 1 for the serial loop, which problem, seed and memory reproduce, and more for a free-running run, which they do not; a dash marks a run created before the count was recorded.
+The Run History panel shows all runs that have been created in the current Petacat instance, ordered by recency. Each entry shows the run number, problem strings (initial, modified, target, and answer if found), persistence mode, how many workers ran it (W), status (running, paused, halted, answer_found), final codelet count, final temperature, and spreading threshold (Spr). W is 1 for the serial loop, which problem, seed and memory reproduce, and more for a parallel run, which a seed reproduces identically for any count of 2 or more but as a different draw from the serial loop; a dash marks a run created before the count was recorded.
 
 Clicking a run entry loads that run's state back into the dashboard -- the Workspace, Slipnet, Coderack, Themespace, Trace, and other panels all refresh to show the selected run. The URL hash updates to '#/runs/N' so you can bookmark or share a direct link to any run.
 
@@ -531,20 +531,20 @@ What has replaced exact repetition is re-execution. A Normal run records the com
 
 Direction indicates the orientation of a group or sequence of bonds within a string. A group with direction 'right' reads naturally from left to right (e.g., 'abc' as a rightward successor-group), while a group with direction 'left' reads from right to left (e.g., 'cba' as a leftward successor-group, since reading right-to-left yields a, b, c -- a successor sequence). Sameness bonds have no direction. Direction is one of the Slipnet concepts that commonly participates in slippage: 'left' and 'right' are connected by the 'opposite' link, so in problems involving reversal, direction slippage is a key mechanism for discovering the analogy.
 
-### Free-Running
+### Parallel Runs (Workers)
 
 **Topic key:** `free_running`  
-**Summary:** Codelets executing simultaneously across CPU cores with no global barrier, with a lost race resolving as an ordinary fizzle.
+**Summary:** Running one Run on several threads, exactly: the result is the same for any worker count of 2 or more and is reproduced by its seed.
 
-Metacat's control loop is serial: choose a codelet, run it, repeat, with a housekeeping update every fifteen codelets. Free-running keeps the same architecture but lets several codelets execute at once on different CPU cores, with no barrier that everything has to stop at. Set the Workers box in Run Controls above 1 to run this way; it accepts 1 to 16, and an Audit run holds it at 1. Free-running is deliberately built as a wrapper around the serial runner, so the serial reference cannot acquire concurrency bugs by proximity.
+Metacat's control loop is serial: choose a codelet, run it, repeat, with a housekeeping update every fifteen codelets. Set the Workers box in Run Controls above 1 and the Run executes on Petacat's speculative executor instead: several codelets run at once on different CPU cores, but every effect is committed in the order a single thread would have used. Workers accepts 1 to 16, and an Audit run holds it at 1.
 
-The obvious objection is that a codelet then decides on a Workspace that has moved on by the time it acts. The architecture already has an answer: a codelet that loses a race *fizzles*, which is exactly what it does when the structure it proposed turns out too weak. Nothing new has to be invented for the model to interpret, and a rising fizzle rate reads correctly as the Workspace being busy. So most of the work is in *detecting* the situation: each codelet records what it read and the version each thing carried when it read it, and at the moment it commits, a read-set whose versions have all held is a codelet whose premises did not move.
+The result is exact. For any worker count of 2 or more the run is identical -- the same codelets, the same structures, the same trace, the same answer -- so the worker count is only a performance setting, and a seed reproduces a parallel run. A codelet that turns out to have read something another codelet changed is undone and re-executed in order, which costs time but never changes the result.
 
-How much staleness the architecture tolerates was measured before any of the concurrency was written, by making the serial loop read state as it stood N codelets ago. Nothing changes up to five codelets of lag; by fifteen, runs start taking longer to converge; by fifty, a genuinely new answer appears. Five is therefore the budget the parallel scheduler is tuned to stay inside.
+A parallel run is not the same run as the serial loop with the same seed. To make exact parallelism possible, each codelet draws from its own random stream and the coderack chooses by an exponential race instead of two draws; both give every codelet exactly the same probability of being chosen as Metacat's rule, so the distribution of answers is the same, but an individual seed lands on a different run. Use Workers 1 when you want the faithful serial loop.
 
-Two things stay serial on purpose. The housekeeping update is not stopped for -- whichever worker reaches the boundary runs it while the others carry on. Committing a structure is serialised, because deciding a fight between two structures is a read-then-modify sequence over shared lists, and running two of those at once corrupts the lists rather than producing a conflict the model could read as a fizzle.
+It is also not yet faster than serial. Codelets are small, the update cycle (about half of a run) is serial, and conflicts are frequent, so at today's sizes the coordination costs about as much as it saves. To get answers sooner, use the Swarm, which runs many seeds at once on every core and is faster in proportion to the cores.
 
-The practical consequence for a user is that a free-running run cannot be replayed afterwards: no record is kept of the order in which codelets committed. Where a specific run needs explaining, re-run it in Audit mode, which is serial and records everything.
+An older free-running engine, which let codelets act on a moving Workspace, lowered the rate of some answers and is no longer reachable from Run Controls.
 
 ### Group Category
 

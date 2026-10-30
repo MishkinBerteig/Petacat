@@ -61,8 +61,11 @@ async def test_every_catalogued_parameter_is_one_the_engine_reads(app_client):
     import re
 
     read: set[str] = set()
-    for path in pathlib.Path("server/engine").rglob("*.py"):
-        read |= set(re.findall(r'get_param\(\s*["\']([a-z_]+)["\']', path.read_text()))
+    # The parallel plugin reads its own parameters (``min_shard_capacity`` is the sharded
+    # coderack's), and it moved out of ``server/engine/`` to ``server/parallel/``.
+    for root in ("server/engine", "server/parallel"):
+        for path in pathlib.Path(root).rglob("*.py"):
+            read |= set(re.findall(r'get_param\(\s*["\']([a-z_]+)["\']', path.read_text()))
     for spec in json.load(open("seed_data/codelet_types.json")):
         read |= set(
             re.findall(r'get_param\(\s*["\']([a-z_]+)["\']', spec.get("execute_body") or "")
@@ -228,14 +231,15 @@ async def test_a_fast_run_reports_parameters_from_the_live_runner(app_client):
 
 
 @pytest.mark.asyncio
-async def test_derived_values_report_the_sharding_a_free_run_settled_on(app_client):
-    """Shard count is derived, not set: it is bounded by capacity, not worker count."""
+async def test_derived_values_report_the_rack_and_telemetry_of_a_parallel_run(app_client):
+    """A parallel run executes the speculative executor on the ordinary, unsharded rack."""
     run = (await _create(app_client, mode=MODE_NORMAL, workers=8)).json()
     run_id = run["run_id"]
     await app_client.post(f"/api/runs/{run_id}/run", json={"max_steps": 600})
 
     derived = (await app_client.get(f"/api/runs/{run_id}/parameters")).json()["derived"]
     assert derived["workers"] == 8
-    assert derived["coderack_shards"] <= 4
+    assert derived["coderack_shards"] == 1
     assert derived["coderack_capacity_per_shard"] >= 25
-    assert derived["free_running"]["workers"] == 8
+    assert derived["parallel"]["workers"] == 8
+    assert derived["parallel"]["executor"] == "speculative"

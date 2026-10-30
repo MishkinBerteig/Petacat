@@ -29,8 +29,9 @@ export interface RunParams {
   mode?: PersistenceMode;
   /**
    * Worker threads. 1 — the default — is the serial loop, which stays the
-   * reference mode. Above 1 the run executes free-running, and a seed no longer
-   * reproduces it. Audit refuses anything above 1.
+   * reference mode. Above 1 the run executes on the exact speculative executor:
+   * identical for any count of 2 or more and reproduced by its seed, though not
+   * the serial loop's draw. Audit refuses anything above 1.
    */
   workers?: number;
   /**
@@ -72,18 +73,32 @@ export interface RunParameterSpec {
   default: RunParameterValue;
 }
 
-/** Free-running telemetry: the only account of how a parallel run was taken. */
-export interface FreeRunTelemetry {
-  status: string;
-  answers: string[];
+/**
+ * Telemetry of the speculative executor: performance only, since a parallel
+ * run's result does not depend on it.
+ */
+export interface ParallelTelemetry {
+  executor: string;
   workers: number;
-  codelets: number;
-  seconds: number;
-  codelets_per_second: number;
-  conflicts: number;
-  conflict_rate: number;
+  /** Codelets handed to workers. */
+  assigned: number;
+  /** Speculative attempts. */
+  speculated: number;
+  committed_speculated: number;
+  committed_read_only: number;
+  /** Speculations undone for a read/write conflict. */
+  aborted_conflict: number;
+  /** Speculations undone because the codelet choice changed. */
+  aborted_step: number;
+  reexecuted: number;
+  barriers: number;
+  inline: number;
   update_cycles: number;
   per_worker: number[];
+  wall_seconds: number;
+  update_seconds: number;
+  codelet_seconds: number;
+  [key: string]: unknown;
 }
 
 /**
@@ -120,7 +135,7 @@ export interface RunParametersView {
     staleness_delay?: number;
     numeric_backend?: string | null;
     numeric_device?: string | null;
-    free_running?: FreeRunTelemetry;
+    parallel?: ParallelTelemetry;
   };
 }
 
@@ -163,8 +178,8 @@ export interface RunInfo {
   /** The persistence mode the run was created with. */
   mode?: string;
   /**
-   * Workers the run executed with: 1 is the serial loop, more is free-running,
-   * under which the seed does not reproduce the run. Null when nothing records
+   * Workers the run executed with: 1 is the serial loop, more is the exact
+   * speculative executor, identical for any count of 2 or more. Null when nothing records
    * it, as for runs created before the count was stored.
    */
   workers?: number | null;

@@ -699,8 +699,8 @@ describe('RunControlsPanel — worker count', () => {
     expect(createRun).not.toHaveBeenCalled()
   })
 
-  it('refuses free-running under Audit rather than letting the request 400', () => {
-    // Audit reconstructs states by replaying its log forward, and under free-running
+  it('refuses parallel workers under Audit rather than letting the request 400', () => {
+    // Audit reconstructs states by replaying its log forward, and under a parallel run
     // that log does not record the order things happened in — so the backend rejects
     // anything above 1. The control has to say so, not discover it.
     setup({ ...LOADED, workers: 4, persistenceMode: 'audit', createRun, runToAnswer })

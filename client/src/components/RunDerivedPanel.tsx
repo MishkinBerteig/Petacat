@@ -6,7 +6,7 @@
 // panel from the settable one. Fixed parameters are inputs, chosen before the first
 // codelet; these are outputs — which numeric backend was actually selected, how many
 // shards sharding settled on, the config and memory hashes, the Training Session,
-// and the free-running telemetry when there is any. Presenting them as though they
+// and the parallel telemetry when there is any. Presenting them as though they
 // could be set would be a lie about how the engine works, so the panel says
 // read-only in its header and renders nothing you can type into.
 //
@@ -23,7 +23,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRunStore } from '@/store/runStore';
 import { getRunParameters } from '@/api/client';
-import type { FreeRunTelemetry, RunParametersView } from '@/types';
+import type { ParallelTelemetry, RunParametersView } from '@/types';
 
 export function RunDerivedPanel() {
   const runId = useRunStore((s) => s.runId);
@@ -57,7 +57,7 @@ export function RunDerivedPanel() {
   if (runId === null) return null;
 
   const derived = view?.derived;
-  const telemetry = derived?.free_running;
+  const telemetry = derived?.parallel;
 
   return (
     <div style={groupStyle}>
@@ -71,7 +71,7 @@ export function RunDerivedPanel() {
         {telemetry !== undefined && (
           <span
             className="mono"
-            title="This run executed free-running, across more than one worker."
+            title="This run executed on the exact speculative executor, across more than one worker."
             style={{
               fontSize: 9,
               fontWeight: 700,
@@ -81,7 +81,7 @@ export function RunDerivedPanel() {
               padding: '0 4px',
             }}
           >
-            free-running
+            parallel
           </span>
         )}
         <span className="text-muted" style={{ fontSize: 11 }}>
@@ -92,7 +92,7 @@ export function RunDerivedPanel() {
       {!open && (
         <div className="text-xs text-muted" style={{ marginTop: 4 }}>
           Derived from the run rather than set on it: backend, sharding, hashes,
-          session, and free-running telemetry.
+          session, and parallel telemetry.
         </div>
       )}
 
@@ -115,7 +115,7 @@ export function RunDerivedPanel() {
                     derived.workers === null
                       ? 'This run was created before the worker count was stored, so whether its seed reproduces it is not known.'
                       : (derived.workers ?? 1) > 1
-                        ? 'Free-running: codelets across CPU cores with no global barrier. A seed no longer reproduces this run.'
+                        ? 'Parallel, exact: speculative execution, identical for any worker count of 2 or more and reproduced by its seed. A different (equal in law) draw from the serial loop, and not yet faster.'
                         : 'Serial — the reference mode. Seed and problem reproduce the run exactly.'
                   }
                 />
@@ -140,7 +140,7 @@ export function RunDerivedPanel() {
                 <Row
                   label="Coderack shards"
                   value={derived.coderack_shards}
-                  hint="How many racks the coderack divided itself into. 1 is the unsharded serial rack; free-running settles on more."
+                  hint="How many racks the coderack divided itself into. 1 is the unsharded rack, which the parallel executor also uses."
                 />
                 <Row
                   label="Capacity per shard"
@@ -202,22 +202,29 @@ export function RunDerivedPanel() {
 /**
  * How the run actually divided, which cannot be reconstructed afterwards.
  *
- * A free-running run is one draw: the conflict rate and the per-worker split are the
- * only account of how it was taken, and nothing in the run's record implies them.
+ * A parallel run's result does not depend on these figures: they account for its
+ * performance only (aborts, barriers, and where the time went), and nothing in the
+ * run's record implies them.
  */
-function Telemetry({ telemetry }: { telemetry: FreeRunTelemetry }) {
+function Telemetry({ telemetry }: { telemetry: ParallelTelemetry }) {
   const total = telemetry.per_worker.reduce((a, b) => a + b, 0) || 1;
   return (
-    <Section title="Free-running telemetry">
+    <Section title="Parallel telemetry">
+      <Row label="Executor" value={telemetry.executor} />
       <Row label="Workers" value={telemetry.workers} />
-      <Row label="Codelets" value={telemetry.codelets} />
-      <Row label="Wall time" value={`${telemetry.seconds}s`} />
-      <Row label="Codelets/second" value={telemetry.codelets_per_second} />
+      <Row label="Codelets handed to workers" value={telemetry.assigned} />
+      <Row label="Wall time" value={`${Number(telemetry.wall_seconds).toFixed(3)}s`} />
       <Row
-        label="Conflicts"
-        value={`${telemetry.conflicts} (${(telemetry.conflict_rate * 100).toFixed(1)}%)`}
-        hint="Codelets whose read-set had moved by the time they committed. A lost race is folded into the architecture's own fizzle outcome, so a conflict is not an error."
+        label="Update-cycle time"
+        value={`${Number(telemetry.update_seconds).toFixed(3)}s`}
+        hint="The update cycle runs on the coordinator with nothing else in flight, so it bounds what workers can gain."
       />
+      <Row
+        label="Aborted speculations"
+        value={`${telemetry.aborted_conflict + telemetry.aborted_step} of ${telemetry.speculated}`}
+        hint="Speculations undone because something they read had moved, or the codelet choice changed. An abort is re-executed in order, so it costs time and never changes the result."
+      />
+      <Row label="Barriers" value={telemetry.barriers} />
       <Row label="Update cycles" value={telemetry.update_cycles} />
 
       <div className="text-xs text-muted" style={{ marginTop: 4 }}>

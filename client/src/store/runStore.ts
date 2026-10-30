@@ -195,7 +195,8 @@ export interface RunStore {
   runParameterOverrides: Record<string, RunParameterValue>;
   /**
    * Worker threads for the *next* run. 1 is the serial loop and the reference mode;
-   * above 1 the run executes free-running and a seed no longer reproduces it.
+   * above 1 the run executes on the exact speculative executor: identical for any
+   * count of 2 or more and reproduced by its seed, but not the serial loop's draw.
    */
   workers: number;
   /** Worker count the loaded run was created with — fixed, like the mode. */

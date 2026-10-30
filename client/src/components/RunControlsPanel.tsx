@@ -396,7 +396,7 @@ export function RunControlsPanel() {
         <div style={fieldGroupStyle}>
           <label style={labelStyle} htmlFor="run-workers">
             Workers: {effectiveWorkers}
-            {effectiveWorkers === 1 ? ' (serial — the reference mode)' : ' (free-running)'}
+            {effectiveWorkers === 1 ? ' (serial — the reference mode)' : ' (parallel, exact)'}
           </label>
           <input
             id="run-workers"
@@ -411,14 +411,15 @@ export function RunControlsPanel() {
           <span className="text-xs text-muted">
             {store.persistenceMode === 'audit'
               ? 'Audit is serial by definition: it reconstructs states by replaying its '
-                + 'action log forward, and under free-running that log does not record the '
-                + 'order things happened in. Choose Normal or Fast to run in parallel.'
+                + 'action log forward, a parallel run executes the stream-serial reference, which that '
+                + 'replay does not reproduce. Choose Normal or Fast to run in parallel.'
               : effectiveWorkers === 1
                 ? 'One codelet at a time, in order. The same problem and seed reproduce the '
                   + 'run exactly, which is why this stays the reference mode.'
-                : 'Codelets execute across CPU cores with no global barrier. The expected '
-                  + 'range of answers is unchanged, but a seed no longer reproduces a run, '
-                  + 'because execution order is not determined.'}
+                : 'Parallel, exact: the run is identical for any worker count of 2 or '
+                  + 'more and is reproduced by its seed. It is a different run from the '
+                  + 'serial loop with the same seed (equal in law, not the same draws), '
+                  + 'and it is not yet faster than serial. For throughput use the Swarm.'}
             {machineWorkers !== null && (
               <>
                 {' '}

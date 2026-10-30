@@ -676,7 +676,7 @@ describe('RunHistory — columns line up with their headings', () => {
 })
 
 describe('RunHistory — how many workers ran each run', () => {
-  it('shows the count, marking a free-running run as one its seed does not reproduce', async () => {
+  it('shows the count, marking a parallel run as a different draw from the serial loop', async () => {
     mockedListRuns.mockResolvedValue({
       runs: [runInfo({ run_id: 23, workers: 6 }), runInfo({ run_id: 17, workers: 1 })],
       total: 2,
@@ -685,7 +685,7 @@ describe('RunHistory — how many workers ran each run', () => {
     render(<RunHistory />)
     await waitFor(() => expect(screen.getByText('#23')).toBeTruthy())
 
-    expect(screen.getByText('6').title).toMatch(/free-running, so the seed does not reproduce/)
+    expect(screen.getByText('6').title).toMatch(/exact parallel executor.*seed reproduces this run/)
     expect(screen.getByText('1').title).toMatch(/serial loop/)
   })
 
