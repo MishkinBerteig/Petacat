@@ -44,21 +44,41 @@ Every doc, UI string, help topic, plan and decision must keep the distinction pe
     configuration;
   - Metacat's own **episodic runs**: each run inherits the Episodic Memory that the runs before
     it left, until that memory is cleared. A clear is an event, shown as a marker between
-    runs. Metacat Mode has no "sessions" of any kind: v1.2's "Training Session" was a Petacat
+    runs. Metacat Mode has no sessions of any kind. v1.2's "Training Session" was a Petacat
     misnomer, not a Metacat concept, and is removed for v2.0 (UX, API, names and schema).
+    It is unrelated to Training Mode Sessions, below.
 
-  Episodic Memory is a very minimal kind of learning. Metacat Mode is permanently faithful to
-  Metacat, and nothing in Training Mode affects it in any way.
+  Metacat Mode is permanently faithful to Metacat, and nothing in Training Mode affects it in
+  any way.
 - **Training Mode** is every new extension since v1.2 that makes Petacat a novel
-  machine-learning platform: Trainings, each with its own episode memory, the Training's own
-  evolving Slipnet, and learners. A Training never reads or writes Metacat Mode's Episodic
-  Memory, Slipnet or configuration.
+  machine-learning platform. Its unit is the **Training Mode Session**, or just "session"
+  where the context makes it obvious.
+  - Sessions are named and managed by the user: created, edited, run, paused, stopped,
+    started again and deleted. There can be any number of them.
+  - Each session has its own Episodic Memory and its own evolving configuration, starting
+    from its Starting Conceptual State.
+  - A session never reads or writes Metacat Mode's Episodic Memory, Slipnet or configuration.
+
+  Until the v2.0 rename lands, the code, API, UI and older docs still call a session "a
+  Training".
+- **Episodic Memory is used in both modes, always.** Neither mode has "independent memory".
+  - Metacat Mode's Episodic Memory is global, and a user will often clear it after a single
+    run.
+  - A Training Mode Session's Episodic Memory is never cleared. It goes only when the whole
+    session is deleted.
+
+  Episodic Memory is a very minimal kind of learning.
 - **"Learning"** (learn, learned, learner) is ambiguous and must **always** be qualified by
-  mode: **Metacat-Mode learning** (Episodic Memory) or **Training-Mode learning**.
-- **"Episode"** is always qualified: a **Training episode**, or **Metacat's** episodic memory.
-- **Starting Conceptual State** is the whole configuration a Training starts with: its base plus any
-  creation overrides. In testing it is often a replica of the Metacat Standard Configuration (the
-  seed files). Training-Mode learning may change any aspect of it. The term replaces "innate".
+  mode:
+  - **Metacat-Mode learning** is Episodic Memory.
+  - **Training-Mode learning** is a session's configuration changed by the **learning
+    sources**: the in-worker learner, the external route and the Admin view.
+- **"Episode"** is always qualified: a **Training episode** (the whole life of one Training
+  Mode Session), or **Metacat's** episodic memory.
+- **Starting Conceptual State** is the whole configuration a Training Mode Session starts with:
+  its base plus any creation overrides. In testing it is often a replica of the Metacat Standard
+  Configuration (the seed files). Training-Mode learning may change any aspect of it. The term
+  replaces "innate".
 - **Run mode** is how runs execute: single-threaded, or multi-core (the speculative executor
   within a run, the swarm across runs). It is orthogonal to the two modes and must be viable
   in both. It is not the persistence mode (Fast, Normal or Audit).
