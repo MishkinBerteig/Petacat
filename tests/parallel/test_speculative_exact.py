@@ -86,6 +86,80 @@ def test_forced_aborts_reexecute_exactly(meta, pi, workers):
     assert spec.telemetry["aborted_chaos"] > 0
 
 
+def test_one_worker_is_the_reference_itself(meta):
+    """With a single worker there is nothing to overlap, so the engine adds nothing: the
+    run is the SSR's own loop, with no plugin classes on the context and no threads."""
+    import threading
+
+    from server.engine.runner import EngineContext
+    from server.parallel.speculative.engine import SpeculativeEngine
+
+    problem = PROBLEMS[0]
+    ssr = run_record(meta, problem, 6, "ssr", max_steps=400)
+    spec = run_record(meta, problem, 6, "spec", workers=1, max_steps=400, use_qos=False)
+    assert diff(ssr, spec) == []
+    runner = EngineRunner(meta)
+    runner.init_mcat(*problem, seed=6)
+    threads_before = threading.active_count()
+    with SpeculativeEngine(runner, 1, use_qos=False) as engine:
+        engine.install()
+        assert type(runner.ctx) is EngineContext
+        assert threading.active_count() == threads_before
+        assert not engine._eligible
+    assert "step_mcat" not in runner.__dict__ and "_update_everything" not in runner.__dict__
+
+
+@pytest.mark.parametrize("pi", [0, 1, 16])
+def test_machinery_with_one_worker_is_still_exact(meta, pi):
+    """The bypass above is an optimisation; the engine with one worker and the bypass off
+    (the hand-off, the validation and the rollback, with one thread) must still agree."""
+    check(meta, PROBLEMS[pi], 2, 1, 450, direct_single=False)
+
+
+@pytest.mark.parametrize("workers", [2, 4])
+@pytest.mark.parametrize("allowed", [set(), {"top-down-bond-scout:category"},
+                                     {"bottom-up-bridge-scout", "bridge-evaluator",
+                                      "important-object-bridge-scout"}])
+def test_which_types_run_ahead_never_changes_the_result(meta, workers, allowed):
+    """Choosing what runs ahead is a pure scheduling decision: nothing, one type or a few
+    all give the SSR's run."""
+    ssr, spec = check(meta, PROBLEMS[1], 3, workers, 450, only_types=allowed)
+    if not allowed:
+        assert spec.telemetry["speculated"] == 0
+
+
+@pytest.mark.parametrize("window", [1, 3, 8])
+def test_lookahead_depth_never_changes_the_result(meta, window):
+    check(meta, PROBLEMS[0], 4, 4, 450, window=window)
+
+
+@pytest.mark.parametrize("workers", [2, 4])
+def test_read_only_prefixes_are_committed_by_the_coordinator(meta, workers):
+    """A prefix that never wrote needs no worker to commit: the telemetry must show such
+    commits, and the forced aborts of them must re-execute on the coordinator."""
+    ssr, spec = check(meta, PROBLEMS[1], 5, workers, 600)
+    assert spec.telemetry["committed_read_only"] > 0
+    ssr, spec = check(meta, PROBLEMS[1], 5, workers, 600, chaos=0.5)
+    t = spec.telemetry
+    assert t["committed_read_only"] > 0 and t["aborted_chaos"] > 0
+    assert t["reexecuted"] >= t["aborted_chaos"]
+
+
+def test_abandoned_prefixes_leave_no_trace(meta):
+    """Speculations are abandoned when the rack sheds their codelet, when a barrier or an
+    update cycle comes first, or when the choice was not the guess.  Whether a worker is
+    still running or has already parked a finished read-only prefix, the private
+    mutations of the prefix must be undone: the run stays the SSR's.  A deep window makes
+    wrong guesses common."""
+    abandoned = read_only = 0
+    for pi, seed in [(0, 1), (1, 2), (12, 3), (16, 4), (4, 5), (7, 6)]:
+        ssr, spec = check(meta, PROBLEMS[pi], seed, 4, 700, window=12)
+        abandoned += spec.telemetry["abandoned"]
+        read_only += spec.telemetry["abandoned_read_only"]
+    assert abandoned > 0
+    assert read_only <= abandoned
+
+
 @pytest.mark.parametrize("workers", [0, 2, 4])
 def test_stream_update_cycle_policy_is_exact(meta, workers):
     """WP5's stream-keyed update cycle: the SSR and the engine must use the same policy,

@@ -44,6 +44,39 @@ Why the result is exact
 What is *not* parallel: choosing, the token hand-off, everything after the codelet, the
 update cycle, and the ``meta``/``answer`` codelet families (which run on the coordinator
 with a version bump over every component).  That is the Amdahl floor: see ``bench``.
+
+The cost of the machinery (WP10)
+--------------------------------
+The overlap this engine can win is small and the machinery that wins it is not free, so
+most of the design is about not paying where nothing is won.  What was measured on an M5
+Max (``measurements/parallel/speculative-engine.md`` has the figures) and what was done:
+
+* **One worker is the SSR.**  With a single worker nothing can overlap, so the engine
+  installs nothing and runs the reference's own loop (``direct_single``).
+* **A prefix that never writes commits on the coordinator.**  Such a prefix (about half
+  of all speculations) needs neither the token nor its worker to commit: it parks its
+  result (``S_RO_DONE``) and the worker is free for the next codelet at once; the
+  coordinator compares the versions when the step comes up (``_commit_read_only``).  A
+  stale one is undone and re-run through the SSR's own ``_execute_codelet``.
+* **Run ahead only what pays.**  The codelets chosen to run ahead are a scheduling
+  decision, never a result: the effects table marks types whose prefix is too short to
+  repay a hand-off (``profitable``), and nothing runs ahead of, or behind, a step that
+  may write what prefixes read (``_type_plan``: it would only abort them).
+* **One prediction per epoch.**  The coordinator reads the upcoming codelets off a cached
+  ``predict_entries`` list, trusted while ``gen`` is unchanged and ``F < floor_f`` (the
+  clock rack keeps both), with a scan pointer so that a step handles about one new entry.
+* **Idle workers park while the update cycle runs**, and nowhere else do they cost the
+  coordinator anything: spinning cores slowed the update cycle by 10-20%.
+* **No class swaps in a hot loop.**  Assigning an object's ``__class__`` is a
+  stop-the-world pause on the free-threaded interpreter (it cost 300 us per update cycle
+  when tried), so the guards stay installed for the whole run.  Workers bind their own
+  guarded id allocator (``_WorkerIds``), so the coordinator's allocations pay no guard.
+
+What it still costs, and why it does not pay at today's sizes: a codelet is 6-40 us, the
+update cycle (serial) is more than half of a run, and every object a worker reads
+becomes a cache line the coordinator must fetch back (free-threaded reference counts are
+writes), which costs the coordinator about 10 us per speculated codelet afterwards.  The
+net effect of speculating any one codelet type is within a few percent of zero.
 """
 
 from __future__ import annotations
@@ -104,7 +137,7 @@ R_EXCEPTION = "exception"
 R_ABANDONED = "abandoned"
 R_CHAOS = "chaos"
 
-S_PENDING, S_RUNNING, S_WAITING, S_LIVE, S_DONE, S_GONE = range(6)
+S_PENDING, S_RUNNING, S_WAITING, S_LIVE, S_DONE, S_GONE, S_RO_DONE = range(7)
 
 
 class Spec:
@@ -113,7 +146,7 @@ class Spec:
     __slots__ = (
         "codelet", "type", "info", "compiled", "pred_cc", "status", "go", "abandon",
         "arbiter", "start", "reads", "step_rel", "live", "worker", "error", "reason",
-        "reexec", "token_held", "snapshot", "committed", "fp0", "deferred",
+        "reexec", "token_held", "snapshot", "committed", "fp0", "deferred", "left",
     )
 
     def __init__(self, codelet: Any, info: Any, compiled: Any, pred_cc: int, worker: int) -> None:
@@ -143,6 +176,8 @@ class Spec:
         self.fp0: Any = None
         #: Slipnet nodes whose buffer a prefix would have jolted (applied at commit).
         self.deferred: list[Any] = []
+        #: True once the worker has fully left this spec (touches its arguments no more).
+        self.left = False
 
 
 class _SpecContext(EngineContext):
@@ -165,6 +200,11 @@ class _SpecContext(EngineContext):
     def codelet_count(self, value: int) -> None:
         self.__dict__["codelet_count"] = value
 
+
+#: What a prefix reads that another step's commit may have written: a step that may write
+#: any of it is a *blocker* for the prefixes behind it (see ``SpeculativeEngine._type_plan``).
+_CONFLICT_MASK = (fx.BIT["workspace"] | fx.BIT["slipnet_act"] | fx.BIT["themespace"]
+                  | fx.BIT["temperature"])
 
 #: Set to the running engine's trap while one is installed (one engine per process).
 _GUARD: Callable[["Spec"], None] | None = None
@@ -260,6 +300,41 @@ class _GuardedIds(IdAllocator):
         if spec is not None and not spec.live:
             _trap(spec)
         return IdAllocator.next(self, kind)
+
+
+class _WorkerIds(IdAllocator):
+    """The allocator a worker thread binds: the run's, behind the commit-token guard.
+
+    The engine reaches the run's id allocator only through ``ids.next_id``, which reads a
+    ``ContextVar`` that each thread binds for itself.  The coordinator keeps the run's own
+    allocator, so its allocations (an update cycle makes thousands) pay no guard; a worker
+    binds this proxy, whose ``next`` waits for the token like any other write.  (In the
+    inline and detect modes the coordinator itself plays the speculating thread, and the
+    run's allocator is given the guarded class instead -- see ``install``.)
+    """
+
+    __slots__ = ("_real",)
+
+    def __init__(self, real: IdAllocator) -> None:  # no counters of its own
+        self._real = real
+
+    def next(self, kind: str) -> int:  # type: ignore[override]
+        spec = _tl.spec
+        if spec is not None and not spec.live:
+            _trap(spec)
+        return self._real.next(kind)
+
+    def peek(self, kind: str) -> int:
+        return self._real.peek(kind)
+
+    def reserve(self, kind: str, value: int) -> None:
+        self._real.reserve(kind, value)
+
+    def snapshot(self) -> dict[str, int]:
+        return self._real.snapshot()
+
+    def restore(self, counters: dict[str, int]) -> None:
+        self._real.restore(counters)
 
 
 class _GuardedTrace(TemporalTrace):
@@ -388,13 +463,33 @@ def _restore_private(saved: list[tuple[Any, dict, list]]) -> None:
 # ---------------------------------------------------------------------------
 
 
+class _Flags:
+    """The two flags idle workers poll, on an object of their own.
+
+    A worker spins on these (and on its slot) while it waits.  Kept as attributes of the
+    engine they would share cache lines with the many fields the coordinator writes every
+    step, and each write would pull the line away from the spinning cores and back.
+    """
+
+    __slots__ = ("stop", "parking")
+
+    def __init__(self) -> None:
+        self.stop = False
+        self.parking = False
+
+
 class _Slot:
-    __slots__ = ("spec", "done", "current")
+    """One worker's mailbox: the spec to run, and its park lock."""
+
+    __slots__ = ("spec", "parked", "lock")
 
     def __init__(self) -> None:
         self.spec: Spec | None = None
-        self.done = True
-        self.current: Spec | None = None
+        #: True while the worker blocks on ``lock`` instead of spinning on ``spec``.
+        self.parked = False
+        #: A binary semaphore held locked: releasing it wakes a parked worker.
+        self.lock = threading.Lock()
+        self.lock.acquire()
 
 
 class SpeculativeEngine:
@@ -408,7 +503,10 @@ class SpeculativeEngine:
     coordinator through the plugin interpreter (no threads); ``detect`` additionally
     fingerprints the shared state around every read prefix and records any change as a
     hidden-write violation; ``chaos`` forces a fraction of otherwise-valid speculations
-    to abort, to exercise the re-execution path.
+    to abort, to exercise the re-execution path; ``direct_single=False`` keeps the
+    machinery with one worker (otherwise one worker is just the SSR); ``only_types``
+    restricts which codelet types may run ahead (a scheduling choice that cannot change a
+    result); ``window`` is how many positions past the next codelet may be run ahead.
     """
 
     def __init__(
@@ -424,8 +522,11 @@ class SpeculativeEngine:
         window: int | None = None,
         use_qos: bool = True,
         grant_timeout: float = 1.0,
-        idle_spins: int = 200,
+        idle_spins: int = 100,
+        idle_long_spins: int = 3000,
         idle_nap: float = 0.0,
+        direct_single: bool = True,
+        only_types: Any = None,
     ) -> None:
         if workers < 0:
             raise ValueError("workers must be >= 0")
@@ -434,12 +535,21 @@ class SpeculativeEngine:
         self.inline = inline or detect or workers == 0
         self.detect = detect
         self.chaos = chaos
-        self.window = window if window is not None else max(1, workers)
+        self.window = window if window is not None else min(max(2, 2 * workers), 6)
         self.use_qos = use_qos
         self.grant_timeout = grant_timeout
-        #: An idle worker spins this many polls, then sleeps ``idle_nap`` per poll.
+        #: An idle worker spins this many polls, then parks on a lock until it is given
+        #: work (``idle_nap`` is accepted for compatibility and unused).
         self.idle_spins = idle_spins
+        self.idle_long_spins = idle_long_spins
         self.idle_nap = idle_nap
+        #: If given, only these codelet types are ever speculated (an experiment knob:
+        #: which codelets run ahead never changes a result, only who executes them).
+        self._only = None if only_types is None else frozenset(only_types)
+        #: With one worker there is nothing to overlap: the machinery would only add its
+        #: own cost, so the run is the stream-serial reference itself (see ``install``).
+        #: Test knobs that exercise the machinery (chaos, detect, inline) keep it.
+        self._direct = (direct_single and workers == 1 and not (inline or detect or chaos))
         self.ssr = StreamSerial(runner, update=update, update_threads=update_threads)
         self.effects = fx.load()
         self._builtins = get_builtins()
@@ -449,10 +559,21 @@ class SpeculativeEngine:
         self._free: list[int] = []
         self._slots: list[_Slot] = []
         self._threads: list[threading.Thread] = []
-        self._stop = False
+        self._flags = _Flags()
         self._installed = False
         self._stale: dict[int, Spec] = {}
         self._wtele: list[dict[str, int]] = []
+        #: Counters bumped on the coordinator (merged with the workers' at the end).
+        self._ctele: dict[str, int] = {}
+        #: The cached prediction: ``(F, codelet)`` in clock order, valid while the rack's
+        #: ``gen`` is unchanged and ``F`` is below the rack's ``floor_f`` (see ``_refill``).
+        self._pq: list[tuple[float, Any]] = []
+        self._pq_gen = -1
+        self._pq_head = 0
+        self._pq_scan = 0
+        self._seen_removed = 0
+        self._plans: dict[str, tuple[Any, bool, bool]] = {}
+        self._registry_get = runner._registry.get_compiled
         self.telemetry = _new_telemetry(workers)
         self.violations: list[dict[str, Any]] = []
         #: Optional per-step log of how each speculated step committed (debugging).
@@ -528,13 +649,19 @@ class SpeculativeEngine:
         ctx = runner.ctx
         ssr = self.ssr
         ssr.install()
+        if self._direct:
+            # One worker: the stream-serial reference *is* the exact answer, with no
+            # plugin classes, hooks or threads on top of it.
+            self._installed = True
+            return
         self._eligible = self._eligible_run() and not self.inline
         self.ucl = runner.meta.get_param("update_cycle_length", 15)
 
         # Plugin classes: step-relative codelet_count; guards on ids, the trace, the rack.
         self._orig_classes = (ctx.__class__, ctx.ids.__class__, ctx.trace.__class__)
         ctx.__class__ = _SpecContext
-        ctx.ids.__class__ = _GuardedIds
+        if self.inline:
+            ctx.ids.__class__ = _GuardedIds
         ctx.trace.__class__ = _GuardedTrace
         ctx.coderack.guard = _rack_guard
         self._nodes = list(ctx.slipnet.nodes.values())
@@ -578,6 +705,10 @@ class SpeculativeEngine:
         global _GUARD
         if not self._installed:
             return
+        if self._direct:
+            self.ssr.uninstall()
+            self._installed = False
+            return
         self._shutdown_workers()
         runner = self.runner
         ctx = runner.ctx
@@ -615,24 +746,28 @@ class SpeculativeEngine:
         self._merge_telemetry()
         self.telemetry["wall_seconds"] = time.perf_counter() - t0
         self.telemetry["update_seconds"] = self._t_update
-        self.telemetry["codelet_seconds"] = self._t_codelets
+        self.telemetry["codelet_seconds"] = max(0.0, self.telemetry["wall_seconds"] - self._t_update)
         return result
 
     def _merge_telemetry(self) -> None:
         tele = self.telemetry
+        c = self._ctele
         for key in ("speculated", "committed_speculated", "committed_read_only",
                     "aborted_conflict", "aborted_step", "aborted_exception",
                     "aborted_chaos", "reexecuted", "abandoned"):
-            tele[key] = sum(w.get(key, 0) for w in self._wtele)
+            tele[key] = sum(w.get(key, 0) for w in self._wtele) + c.get(key, 0)
+        tele["abandoned_read_only"] = c.get("abandoned_read_only", 0)
         tele["per_worker"] = [w.get("committed_speculated", 0) + w.get("reexecuted", 0)
                               for w in self._wtele]
 
     # -- worker pool -----------------------------------------------------------
 
     def _start_workers(self) -> None:
-        self._stop = False
+        self._flags.stop = False
         self._slots = [_Slot() for _ in range(self.workers)]
         self._wtele = [dict() for _ in range(self.workers)]
+        #: Idle workers.  A worker returns itself here once it has left its spec; only the
+        #: coordinator pops (``list.append`` / ``pop`` are atomic).
         self._free = list(range(self.workers))
         self._threads = []
         ready = threading.Event()
@@ -646,7 +781,7 @@ class SpeculativeEngine:
         ready.set()
 
     def _shutdown_workers(self) -> None:
-        self._stop = True
+        self._flags.stop = True
         self._abandon_all()
         for t in self._threads:
             t.join(timeout=1.0)
@@ -663,21 +798,37 @@ class SpeculativeEngine:
                 pass
         ctx = self.runner.ctx
         slot = self._slots[index]
+        free = self._free
+        flags = self._flags
+        spins = self.idle_spins
+        long_spins = self.idle_long_spins
         # The id allocator is a ContextVar, so it must be bound in *this* thread.
-        with use_allocator(ctx.ids):
+        with use_allocator(_WorkerIds(ctx.ids)):
             idle = 0
-            while not self._stop:
+            while not flags.stop:
                 spec = slot.spec
                 if spec is None:
                     idle += 1
-                    if idle > self.idle_spins:
-                        # Nothing assigned: stop competing for the coordinator's cores.
-                        time.sleep(self.idle_nap)
+                    if idle > spins and (flags.parking or idle > long_spins):
+                        # Nothing assigned: either an update cycle is running (park at
+                        # once) or the worker has idled for a few hundred microseconds
+                        # (a run of inline codelets): stop competing for the
+                        # coordinator's cores.  The coordinator releases ``slot.lock``
+                        # when the cycle ends or when it assigns work.  The wait is
+                        # timed so that a wake-up lost to memory ordering costs 1 ms,
+                        # never a hang (a shorter timeout makes the idle workers wake
+                        # often enough to slow the coordinator by 2%).
+                        slot.parked = True
+                        if slot.spec is None and not flags.stop:
+                            slot.lock.acquire(True, 0.001)
+                        slot.parked = False
+                        idle = 0
                     continue
                 idle = 0
                 slot.spec = None
                 self._run_spec(spec)
-                slot.done = True
+                spec.left = True
+                free.append(index)
 
     # -- a speculation ----------------------------------------------------------
 
@@ -687,6 +838,11 @@ class SpeculativeEngine:
 
     def _run_spec(self, spec: Spec) -> None:
         ctx = self.runner.ctx
+        if spec.abandon:
+            # The coordinator gave up on it before we picked it up: nothing was touched.
+            self._bump_tele(spec, "abandoned")
+            spec.status = S_GONE
+            return
         spec.status = S_RUNNING
         _tl.spec = spec
         _tl.cc = spec.pred_cc
@@ -706,7 +862,7 @@ class SpeculativeEngine:
         finally:
             _tl.spec = None
             _tl.cc = 0
-            if spec.status != S_DONE:
+            if spec.status != S_DONE and spec.status != S_RO_DONE:
                 spec.status = S_GONE
 
     def _after_failed_attempt(self, spec: Spec, reason: str, ctx: Any) -> None:
@@ -747,15 +903,14 @@ class SpeculativeEngine:
         with ctx.use_codelet_rng(self.ssr.streams.body(spec.codelet.id)):
             self.runner._interpreter.execute(spec.compiled, ctx, **spec.codelet.arguments)
         if not spec.live:
-            # A prefix that never wrote: validate at its end; there is nothing to apply.
-            self._validate(spec)
-            if spec.deferred:
-                self._bump(fx.BIT["slipnet_buf"])
-                self._apply_deferred(spec)
-                self._bump(fx.BIT["slipnet_buf"])
-            spec.committed = True
-            spec.status = S_DONE
-            self._bump_tele(spec, "committed_read_only")
+            # A prefix that never wrote needs no token and no worker to commit: park the
+            # result and let the coordinator validate it against the versions when the
+            # step comes up (``_commit_read_only``).  The worker is free at once.  Taking
+            # the arbiter is what stops the coordinator abandoning the spec under us:
+            # whoever holds it decides who restores the prefix's private mutations.
+            if not spec.arbiter.acquire(False):
+                raise SpeculationAbort(R_ABANDONED)
+            spec.status = S_RO_DONE
             return
         self._finish_live(spec)
 
@@ -818,193 +973,363 @@ class SpeculativeEngine:
     # -- the coordinator's hooks ------------------------------------------------
 
     def _step_hook(self) -> Any:
-        if self._eligible:
-            t0 = time.perf_counter()
-            self._maybe_refill()
-            self.telemetry["refill_seconds"] += time.perf_counter() - t0
+        if self._free and self._eligible:
+            self._refill()
         return self._ssr_step()
 
     def _update_hook(self, ctx: Any) -> None:
         t0 = time.perf_counter()
-        if self._eligible:
-            tq = time.perf_counter()
+        eligible = self._eligible
+        if eligible:
             self._quiesce()
-            self.telemetry["quiesce_seconds"] += time.perf_counter() - tq
+            # The update cycle moves the temperature, the urgencies and the rack: the
+            # prediction made before it says nothing about the epoch that follows.
+            self._pq_gen = -1
+            # Nothing runs ahead during the cycle, so idle workers should not burn the
+            # cores (and the memory system) the coordinator is using: they block on
+            # their locks until the cycle is over.
+            self._flags.parking = True
         self._bump(fx.ALL)
+        # (The per-call guards on ids, trace and the rack stay on: swapping an object's
+        # ``__class__`` is a stop-the-world pause on free-threaded CPython, far dearer than
+        # the guards themselves.)
         try:
             self._ssr_update(ctx)
         finally:
+            if eligible:
+                self._unpark()
             self._bump(fx.ALL)
             self._t_update += time.perf_counter() - t0
             self.telemetry["update_cycles"] += 1
 
+    def _unpark(self) -> None:
+        """The update cycle is over: wake every parked worker so it is spinning for work."""
+        self._flags.parking = False
+        for slot in self._slots:
+            if slot.parked:
+                try:
+                    slot.lock.release()
+                except RuntimeError:
+                    pass
+
     def _execute_hook(self, codelet: Any) -> None:
-        runner = self.runner
-        ctx = runner.ctx
-        ctx.last_codelet_type = codelet.codelet_type
-        compiled = runner._registry.get_compiled(codelet.codelet_type)
-        if compiled.is_empty:
-            return
-        t0 = time.perf_counter()
-        info = self.effects.info(codelet.codelet_type)
-        spec = self._specs.pop(codelet.id, None) if self._eligible else None
+        ctype = codelet.codelet_type
+        plan = self._plans.get(ctype) or self._type_plan(ctype)
+        info = plan[0]
+        spec = self._specs.pop(codelet.id, None) if self._specs else None
         if spec is not None and not info.barrier:
+            self.runner.ctx.last_codelet_type = ctype
             self._commit_speculated(spec, codelet)
-        else:
-            if spec is not None:
-                self._abandon(spec)
-            if codelet.id in self._stale:
-                self._wait_stale(codelet.id)
-            if info.barrier:
-                self.telemetry["barriers"] += 1
-                self._run_inline(codelet, fx.ALL)
-            elif self.detect:
+            return
+        if spec is not None:
+            self._abandon(spec)
+        if self._stale and codelet.id in self._stale:
+            self._wait_stale(codelet.id)
+        if info.barrier:
+            self.telemetry["barriers"] += 1
+            self._run_inline(codelet, fx.ALL)
+        elif self.detect:
+            compiled = self.runner._registry.get_compiled(ctype)
+            self.runner.ctx.last_codelet_type = ctype
+            if not compiled.is_empty:
                 self._run_detect(codelet, compiled, info)
-            else:
-                self.telemetry["inline"] += 1
-                self._run_inline(codelet, info.writes)
-        self._t_codelets += time.perf_counter() - t0
+        else:
+            self.telemetry["inline"] += 1
+            self._run_inline(codelet, info.writes)
 
     def _run_inline(self, codelet: Any, mask: int) -> None:
-        self._bump(mask)
+        """The step as the serial run executes it, with *mask*'s versions held odd.
+
+        An empty-bodied type needs no special case: the engine's own ``_execute_codelet``
+        (which ``_ssr_execute`` ends in) returns before running anything.
+        """
+        indices = self._idx_cache.get(mask) or self._indices(mask)
+        ver = self.ver
+        for i in indices:
+            ver[i] += 1
         try:
             self._ssr_execute(codelet)
         finally:
-            self._bump(mask)
+            for i in indices:
+                ver[i] += 1
 
     def _commit_speculated(self, spec: Spec, codelet: Any) -> None:
-        """Grant the token to the worker holding this step and wait for it to finish."""
+        """Commit the step the chosen codelet's speculation was running.
+
+        A prefix that has already finished without writing (``S_RO_DONE``) is validated
+        and committed right here, by the coordinator, with no worker involved.  One that
+        is still running, or is waiting at its first write, is granted the commit token
+        and the coordinator waits for the worker to finish it.
+        """
         tele = self.telemetry
-        if spec.status != S_WAITING:
-            tele["granted_not_ready"] += 1  # the prefix had not finished: the chain stalls
-        t_grant = time.perf_counter()
-        spec.go = self.runner.ctx.__dict__["codelet_count"]
-        deadline = t_grant + self.grant_timeout
+        cc = self.runner.ctx.__dict__["codelet_count"]
+        if spec.status != S_RO_DONE:
+            if spec.status != S_WAITING:
+                tele["granted_not_ready"] += 1  # the prefix had not finished: the chain stalls
+            spec.go = cc
+            deadline = 0.0
+            n = 0
+            while True:
+                st = spec.status
+                if st == S_RO_DONE or st == S_DONE or st == S_GONE:
+                    break
+                n += 1
+                if n > 100:
+                    time.sleep(0)
+                    now = time.perf_counter()
+                    if not deadline:
+                        deadline = now + self.grant_timeout
+                    elif now > deadline:
+                        if spec.arbiter.acquire(False):
+                            # The worker never reached the token: take the step back.
+                            spec.abandon = True
+                            self._stale[codelet.id] = spec
+                            tele["timeouts"] += 1
+                            tele["inline"] += 1
+                            self._run_inline(codelet, spec.info.writes)
+                            return
+                        deadline = now + self.grant_timeout
+        if spec.status == S_RO_DONE:
+            self._commit_read_only(spec, codelet, cc)
+            return
+        # Done or gone: the worker has finished with the spec (or is about to leave it).
         n = 0
-        while spec.status != S_DONE and spec.status != S_GONE:
+        while not spec.left:
             n += 1
             if n > 100:
                 time.sleep(0)
-                if time.perf_counter() > deadline:
-                    if spec.arbiter.acquire(False):
-                        # The worker never reached the token: take the step back.
-                        spec.abandon = True
-                        self._stale[codelet.id] = spec
-                        self.telemetry["timeouts"] += 1
-                        self.telemetry["inline"] += 1
-                        self._run_inline(codelet, spec.info.writes)
-                        return
-                    deadline = time.perf_counter() + self.grant_timeout
-        tele["grant_seconds"] += time.perf_counter() - t_grant
-        self._recycle(spec)
         if self.outcomes is not None:
             self.outcomes.append((spec.go + 1, spec.type, codelet.id,
-                                  "reexec:" + str(spec.reason) if spec.reexec
-                                  else ("read-only" if not spec.info.writes or spec.deferred is None else "spec"),
+                                  "reexec:" + str(spec.reason) if spec.reexec else "spec",
                                   spec.pred_cc + 1))
         if spec.status == S_GONE:
             # The worker could not take the token: run the step here.
-            self.telemetry["inline"] += 1
+            tele["inline"] += 1
             self._run_inline(codelet, spec.info.writes)
             return
         if spec.error is not None:
             raise spec.error
+
+    def _commit_read_only(self, spec: Spec, codelet: Any, cc: int) -> None:
+        """Validate a finished read-only prefix on the coordinator and commit it.
+
+        This is ``_validate`` without the token hand-off: the coordinator is the only
+        thread that can write anything while the step is being committed (every worker
+        that holds a token is waiting for *this* step), so comparing the versions now
+        is comparing them at the moment the serial run would have run the codelet.  A
+        prefix that fails is undone and re-executed live, here, through the SSR's own
+        ``_execute_codelet`` -- the very statements the serial run executes.
+        """
+        reason = None
+        if spec.step_rel and spec.pred_cc != cc:
+            reason = R_STEP
+        elif self.chaos and _chaos_hit(codelet.id, self.chaos):
+            reason = R_CHAOS
+        else:
+            ver = self.ver
+            start = spec.start
+            for i in self._indices(spec.reads):
+                if ver[i] != start[i]:  # type: ignore[index]
+                    reason = R_CONFLICT
+                    break
+        c = self._ctele
+        if reason is None:
+            if spec.deferred:
+                buf = fx.BIT["slipnet_buf"]
+                self._bump(buf)
+                self._apply_deferred(spec)
+                self._bump(buf)
+            spec.committed = True
+            c["committed_read_only"] = c.get("committed_read_only", 0) + 1
+            if self.outcomes is not None:
+                self.outcomes.append((cc + 1, spec.type, codelet.id, "read-only", spec.pred_cc + 1))
+            return
+        # Stale: undo the prefix's private mutations and run the step for real.
+        _restore_private(spec.snapshot)
+        spec.deferred = []
+        key = "aborted_" + (reason if reason in (R_CONFLICT, R_EXCEPTION, R_CHAOS) else "step")
+        c[key] = c.get(key, 0) + 1
+        c["reexecuted"] = c.get("reexecuted", 0) + 1
+        spec.reason = reason
+        spec.reexec = True
+        if self.outcomes is not None:
+            self.outcomes.append((cc + 1, spec.type, codelet.id, "reexec:" + reason, spec.pred_cc + 1))
+        self._run_inline(codelet, spec.info.writes | fx.BIT["slipnet_buf"])
 
     def _wait_stale(self, cid: int) -> None:
         """An abandoned worker may still be reading this codelet's arguments: let it stop."""
         spec = self._stale.get(cid)
         if spec is None:
             return
-        slot = self._slots[spec.worker]
         deadline = time.perf_counter() + 2.0
         n = 0
-        while not slot.done and time.perf_counter() < deadline:
+        while not spec.left and time.perf_counter() < deadline:
             n += 1
             if n > 100:
                 time.sleep(0)
-        self._reclaim()
+        self._reap_stale()
 
     # -- prediction and assignment -----------------------------------------------
 
-    def _maybe_refill(self) -> None:
-        if self._stale:
-            self._reclaim()
-        # Hysteresis: predicting costs a scan of the rack, so refill in batches.
-        if self._free and len(self._specs) <= self.window // 2:
-            if self._skip:
-                self._skip -= 1
-                return
-            assigned = self.telemetry["assigned"]
-            self._refill()
-            if self.telemetry["assigned"] == assigned:
-                self._skip = 2  # nothing to speculate on right now: don't rescan every step
+    def _type_plan(self, codelet_type: str) -> tuple[Any, bool, bool]:
+        """``(info, may run ahead, blocks what comes after)`` for a codelet type, cached.
+
+        *May run ahead*: the type is classified speculable and profitable (and is in the
+        experiment allow-list, if one was given).  *Blocks*: the type may write what
+        other prefixes read (workspace, Slipnet activations, themespace, temperature) or
+        is a barrier, so a prefix started *behind* it would find its premises changed
+        and abort; it is therefore not run ahead of, and nothing past it is.
+        """
+        got = self._plans.get(codelet_type)
+        if got is None:
+            info = self.effects.info(codelet_type)
+            ok = (info.speculate and info.profitable and not info.barrier
+                  and (self._only is None or codelet_type in self._only))
+            blocks = bool(info.barrier or info.writes & _CONFLICT_MASK)
+            got = self._plans[codelet_type] = (info, ok and not blocks, blocks)
+        return got
 
     def _refill(self) -> None:
-        runner = self.runner
-        ctx = runner.ctx
-        rack = ctx.coderack
+        """Hand upcoming codelets to free workers (positions 1..window past the head).
+
+        The codelets that will run next are read off a cached prediction of the clock
+        rack -- the ``(F, codelet)`` pairs ``predict_entries`` returned -- and the cache
+        stays exact for as long as nothing could have been posted ahead of an entry: an
+        entry is trusted while its ``F`` is below the smallest ``F`` enrolled since the
+        cache was built (``rack.floor_f``), and the cache is void once the rack
+        re-weights (``rack.gen``).  Codelets that have left the rack (chosen, evicted)
+        are skipped.  None of this decides what runs: it only decides what to run
+        *ahead of time*, and a wrong guess costs speed, never exactness (the real
+        choice is made by the coordinator, and a speculation is committed only for the
+        codelet the choice returned).
+
+        A scan pointer remembers how far into the cache entries have been handled, so a
+        step examines about one new entry, not the whole window again.
+        """
+        free = self._free
+        if not free:
+            return
+        if self._stale:
+            self._reap_stale()
+        if self._skip:
+            self._skip -= 1
+            return
+        ctx = self.runner.ctx
         cc = ctx.__dict__["codelet_count"]
         left = self.ucl - (cc % self.ucl)
-        want = min(left, self.window)
-        by_id = rack._by_id
-        # Drop speculations whose codelet has left the rack (evicted or cleared).
-        for cid in [c for c in self._specs if c not in by_id]:
-            self._abandon(self._specs.pop(cid))
-        if want <= 0 or not self._free:
+        depth = min(left - 1, self.window)  # the head (position 0) runs inline
+        if depth <= 0:
             return
-        predicted = rack.predict(ctx.temperature.value, want)
-        registry = runner._registry
-        info_of = self.effects.info
-        for i, codelet in enumerate(predicted):
-            info = info_of(codelet.codelet_type)
-            if info.barrier:
+        rack = ctx.coderack
+        by_id = rack._by_id
+        specs = self._specs
+        if rack.removed != self._seen_removed and specs:
+            # Some codelet was evicted: drop speculations whose codelet has left the rack.
+            for cid in [c for c in specs if c not in by_id]:
+                self._abandon(specs.pop(cid))
+        self._seen_removed = rack.removed
+        stale = self._stale
+        plans = self._plans
+        slots = self._slots
+        tele = self.telemetry
+        satisfied = False
+        for attempt in (0, 1):
+            if self._pq_gen != rack.gen:
+                queue = self._pq = []
+                self._pq_head = self._pq_scan = 0
+            else:
+                queue = self._pq
+            n = len(queue)
+            head = self._pq_head
+            while head < n and queue[head][1].id not in by_id:
+                head += 1  # chosen or evicted since: not ahead of us any more
+            scan = self._pq_scan
+            if scan < head:
+                scan = head
+            pos = 0  # on-rack entries in [head, scan): the window already handled
+            for j in range(head, scan):
+                if queue[j][1].id in by_id:
+                    pos += 1
+            floor = rack.floor_f
+            while scan < n:
+                f, codelet = queue[scan]
+                if f >= floor:
+                    break  # something posted after the cache may sort before this entry
+                cid = codelet.id
+                if cid in by_id:
+                    plan = plans.get(codelet.codelet_type) or self._type_plan(codelet.codelet_type)
+                    if plan[2]:
+                        satisfied = True  # a writer/barrier: nothing past it is worth running ahead
+                        break
+                    if pos:
+                        if plan[1] and cid not in specs and cid not in stale:
+                            if not free:
+                                break
+                            compiled = self._compiled(codelet.codelet_type)
+                            if compiled is not None:
+                                widx = free.pop()
+                                spec = Spec(codelet, plan[0], compiled, cc + pos, widx)
+                                specs[cid] = spec
+                                slot = slots[widx]
+                                tele["assigned"] += 1
+                                slot.spec = spec
+                                if slot.parked:
+                                    try:
+                                        slot.lock.release()  # wake the parked worker
+                                    except RuntimeError:
+                                        pass
+                        if pos >= depth:
+                            scan += 1
+                            satisfied = True
+                            break
+                    pos += 1
+                scan += 1
+            self._pq_head = head
+            self._pq_scan = scan
+            if satisfied or attempt or scan < n or not free:
                 break
-            if not info.speculate:
-                continue
-            cid = codelet.id
-            if cid in self._specs or cid in self._stale:
-                continue
-            compiled = registry.get_compiled(codelet.codelet_type)
-            if compiled.is_empty:
-                continue
-            if not self._free:
-                break
-            widx = self._free.pop()
-            spec = Spec(codelet, info, compiled, cc + i, widx)
-            self._specs[cid] = spec
-            slot = self._slots[widx]
-            slot.done = False
-            slot.current = spec
-            self.telemetry["assigned"] += 1
-            slot.spec = spec
+            # The cache ran dry before the window was full: predict afresh.  The step about
+            # to run chooses with this very temperature and nothing is posted before it,
+            # so ``predict_entries`` may do the choice's own re-weighting now, once,
+            # instead of on a copy for the prediction and again for the choice.
+            entries = rack.predict_entries(ctx.temperature.value, max(8, min(left, 16) + depth))
+            self._pq = [(f, by_id[cid]) for f, cid in entries]
+            self._pq_gen = rack.gen
+            self._pq_head = self._pq_scan = 0
+            tele["repredicts"] += 1
+        if not satisfied:
+            self._skip = 2  # nothing (more) to speculate on right now: don't rescan every step
 
-    def _recycle(self, spec: Spec) -> None:
-        slot = self._slots[spec.worker]
-        n = 0
-        deadline = time.perf_counter() + 2.0
-        while not slot.done:  # the worker has fully left the spec
-            n += 1
-            if n > 100:
-                time.sleep(0)
-                if time.perf_counter() > deadline:
-                    self.telemetry["lost_workers"] += 1  # never returned to the pool
-                    return
-        slot.current = None
-        self._free.append(spec.worker)
+    def _compiled(self, codelet_type: str) -> Any:
+        c = self._registry_get(codelet_type)
+        return None if c.is_empty else c
+
+    def _reap_stale(self) -> None:
+        for cid, spec in list(self._stale.items()):
+            if spec.left:
+                del self._stale[cid]
 
     def _abandon(self, spec: Spec) -> None:
         """Mark a speculation dead.  Its worker returns to the pool once it has stopped."""
         spec.abandon = True
-        spec.arbiter.acquire(False)  # nobody may ever take its token
-        self._stale[spec.codelet.id] = spec
-
-    def _reclaim(self) -> None:
-        for cid, spec in list(self._stale.items()):
-            slot = self._slots[spec.worker]
-            if slot.done:
-                slot.current = None
-                self._free.append(spec.worker)
-                del self._stale[cid]
+        if spec.arbiter.acquire(False):
+            # Nobody has the token, and nobody will: a worker still on the spec finds the
+            # arbiter taken, restores its own private mutations and leaves.
+            self._stale[spec.codelet.id] = spec
+            return
+        # The arbiter was already taken: the worker finished a read-only prefix.  It has
+        # stopped touching the codelet, so undo the prefix's private mutations here.
+        deadline = time.perf_counter() + 1.0
+        while spec.status != S_RO_DONE and time.perf_counter() < deadline:
+            pass
+        if spec.status == S_RO_DONE:
+            _restore_private(spec.snapshot)
+            spec.deferred = []
+            c = self._ctele
+            c["abandoned"] = c.get("abandoned", 0) + 1
+            c["abandoned_read_only"] = c.get("abandoned_read_only", 0) + 1
+        else:  # pragma: no cover - the worker never left the arbiter taken
+            self._stale[spec.codelet.id] = spec
 
     def _abandon_all(self) -> None:
         for cid in list(self._specs):
@@ -1016,7 +1341,7 @@ class SpeculativeEngine:
         deadline = time.perf_counter() + timeout
         n = 0
         while self._stale:
-            self._reclaim()
+            self._reap_stale()
             n += 1
             if n > 100:
                 time.sleep(0)
@@ -1109,9 +1434,8 @@ def _new_telemetry(workers: int) -> dict[str, Any]:
         "codelet_seconds": 0.0,
         "granted_not_ready": 0,
         "lost_workers": 0,
-        "refill_seconds": 0.0,
-        "quiesce_seconds": 0.0,
-        "grant_seconds": 0.0,
+        "repredicts": 0,
+        "abandoned_read_only": 0,
     }
 
 
