@@ -110,6 +110,18 @@ class RunResult:
     steps: list[StepResult] = field(default_factory=list)
 
 
+class _CodeletRngSlot(threading.local):
+    """A per-thread slot for the bound codelet stream, ``None`` until one is bound.
+
+    The ``None`` is a class attribute so that ``slot.value`` is found on every thread
+    without raising ``AttributeError`` inside ``getattr(slot, "value", None)`` -- the
+    miss path that ``EngineContext.rng`` took on every read (about ten per codelet) when
+    no stream was bound.  Reading and writing behave exactly as on a bare ``threading.local``.
+    """
+
+    value: Any = None
+
+
 class EngineContext:
     """Bundles all engine state for codelet execution."""
 
@@ -144,7 +156,7 @@ class EngineContext:
         #: prefers a per-thread codelet stream when one is bound; see
         #: :meth:`use_codelet_rng`.
         self._rng = rng
-        self._codelet_rng = threading.local()
+        self._codelet_rng = _CodeletRngSlot()
         self.meta = meta
         #: Where this run's record goes.  ``NullSink`` rather than ``None`` so every
         #: emission site can call unconditionally; the engine never learns which mode
@@ -247,7 +259,7 @@ class EngineContext:
         — or against the run's shared ``random.Random``, which is a data race
         under the free-threaded interpreter as well as a determinism hole.
         """
-        rng = getattr(self._codelet_rng, "value", None)
+        rng = self._codelet_rng.value
         return rng if rng is not None else self._rng
 
     @rng.setter
@@ -270,7 +282,7 @@ class EngineContext:
     @contextmanager
     def use_codelet_rng(self, rng: RNG) -> Iterator[RNG]:
         """Bind *rng* as this thread's generator for the duration of one codelet."""
-        previous = getattr(self._codelet_rng, "value", None)
+        previous = self._codelet_rng.value
         self._codelet_rng.value = rng
         try:
             yield rng
