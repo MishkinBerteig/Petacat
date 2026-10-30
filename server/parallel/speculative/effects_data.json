@@ -1,0 +1,1099 @@
+{
+ "builtins": {
+  "choose_object": {
+   "kind": "READ",
+   "reads": [
+    "temperature",
+    "workspace"
+   ],
+   "writes": [],
+   "why": "Salience-weighted pick over all objects (workspace.choose_object, builtins.py:226-235); one weighted_pick over temp_adjusted weights."
+  },
+  "choose_string_object": {
+   "kind": "READ",
+   "reads": [
+    "temperature",
+    "workspace"
+   ],
+   "writes": [],
+   "why": "Same as choose_object but over one string's objects (builtins.py:238-251)."
+  },
+  "choose_neighbor": {
+   "kind": "READ",
+   "reads": [
+    "workspace"
+   ],
+   "writes": [],
+   "why": "Salience-weighted pick among objects edged at the adjacent positions (workspace_objects.py:152-214); reads string.letters/groups and neighbours' salience."
+  },
+  "choose_directed_neighbor": {
+   "kind": "READ",
+   "reads": [
+    "workspace"
+   ],
+   "writes": [],
+   "why": "One-sided variant of choose_neighbor (workspace_objects.py:171-177)."
+  },
+  "choose_bond_facet": {
+   "kind": "READ",
+   "reads": [
+    "slipnet_act",
+    "workspace"
+   ],
+   "writes": [],
+   "why": "Weighted pick of a facet by (local support + facet.activation)/2 (builtins.py:320-357); walks every object of the string for local support."
+  },
+  "choose_string": {
+   "kind": "READ",
+   "reads": [
+    "workspace"
+   ],
+   "writes": [],
+   "why": "Pick a string weighted by get_average_intra_string_unhappiness (builtins.py:379-398); that value is the update-cycle-stored one (workspace.py:249-264)."
+  },
+  "choose_string_for": {
+   "kind": "READ",
+   "reads": [
+    "workspace"
+   ],
+   "writes": [],
+   "why": "Pick a string by relevance(category|direction) + stored unhappiness (builtins.py:401-436); relevance walks the LIVE right_bond pointers of every object (workspa"
+  },
+  "choose_leftmost_object": {
+   "kind": "READ",
+   "reads": [
+    "workspace"
+   ],
+   "writes": [],
+   "why": "Pick, by relative_importance, an object described leftmost (builtins.py:600-624)."
+  },
+  "propose_bond": {
+   "kind": "WRITE",
+   "reads": [
+    "coderack",
+    "slipnet_act"
+   ],
+   "writes": [
+    "coderack",
+    "ids",
+    "slipnet_buf"
+   ],
+   "why": "Jolts 3 nodes, constructs a Bond (structure id), posts bond-evaluator (Codelet id + Coderack.post) - builtins.py:441-480."
+  },
+  "propose_group": {
+   "kind": "WRITE",
+   "reads": [
+    "coderack",
+    "slipnet_act",
+    "temperature",
+    "workspace"
+   ],
+   "writes": [
+    "coderack",
+    "ids",
+    "slipnet_buf"
+   ],
+   "why": "Constructs a Group (object id, structure id, 4-7 Description structure ids), maybe attaches a Length description (stochastic), jolts category/direction, posts g"
+  },
+  "propose_description": {
+   "kind": "WRITE",
+   "reads": [
+    "coderack",
+    "slipnet_act"
+   ],
+   "writes": [
+    "coderack",
+    "ids",
+    "slipnet_buf"
+   ],
+   "why": "Jolts the descriptor, constructs a Description (structure id), posts description-evaluator at description_type.activation - builtins.py:763-778."
+  },
+  "activate_from_workspace": {
+   "kind": "READ",
+   "reads": [
+    "slipnet_act",
+    "temperature",
+    "workspace"
+   ],
+   "writes": [],
+   "why": "only jolts Slipnet buffers: deferred to commit by _DeferredNode"
+  },
+  "num_bonds_to_scan": {
+   "kind": "READ",
+   "reads": [],
+   "writes": [],
+   "why": "weighted_pick over 0..n-1 by i^2; reads only string.length (immutable) (builtins.py:582-597)."
+  },
+  "scan_bonds": {
+   "kind": "READ",
+   "reads": [
+    "slipnet_act",
+    "temperature",
+    "workspace"
+   ],
+   "writes": [],
+   "why": "reads; Bond.flipped() allocates ids, which the guarded allocator traps"
+  },
+  "polarize_bonds": {
+   "kind": "READ",
+   "reads": [
+    "slipnet_act",
+    "temperature",
+    "workspace"
+   ],
+   "writes": [],
+   "why": "reads; Bond.flipped() allocates ids, which the guarded allocator traps"
+  },
+  "right_adjacent_bonds": {
+   "kind": "READ",
+   "reads": [
+    "workspace"
+   ],
+   "writes": [],
+   "why": "Follows right_bond pointers (builtins.py:716-728)."
+  },
+  "right_adjacent_objects": {
+   "kind": "READ",
+   "reads": [
+    "workspace"
+   ],
+   "writes": [],
+   "why": "Follows right_bond pointers (builtins.py:731-743)."
+  },
+  "bonds_still_available": {
+   "kind": "READ",
+   "reads": [
+    "workspace"
+   ],
+   "writes": [],
+   "why": "string.bond_present/flipped_bond_present over group.group_bonds (builtins.py:746-760); pure scans of string.bonds."
+  },
+  "evaluate_structure": {
+   "kind": "READ",
+   "reads": [
+    "slipnet_act",
+    "temperature",
+    "themespace",
+    "workspace"
+   ],
+   "writes": [],
+   "why": "structure.update_strength(ctx.rng) then one prob(1-p) coin (builtins.py:796-843). Bond/Group: density walk over live neighbours; Bridge: other bridges' strength"
+  },
+  "evaluate_group": {
+   "kind": "READ",
+   "reads": [
+    "slipnet_act",
+    "temperature",
+    "workspace"
+   ],
+   "writes": [],
+   "why": "private strength + coin; its only shared write is the deferred Slipnet jolt"
+  },
+  "build_structure": {
+   "kind": "WRITE",
+   "reads": [
+    "coderack",
+    "slipnet_act",
+    "slipnet_buf",
+    "temperature",
+    "themespace",
+    "workspace"
+   ],
+   "writes": [
+    "ids",
+    "sink",
+    "slipnet_act",
+    "slipnet_buf",
+    "themespace",
+    "trace",
+    "verbose",
+    "workspace"
+   ],
+   "why": "Duplicate check, premise check, fights (update_strength on proposer AND built opponents + weighted coin), breaks losers, consolidates groups, adds to workspace,"
+  },
+  "break_structure": {
+   "kind": "WRITE",
+   "reads": [
+    "coderack",
+    "workspace"
+   ],
+   "writes": [
+    "sink",
+    "verbose",
+    "workspace"
+   ],
+   "why": "Dispatches to _break_group/_break_bond/_break_bridge (builtins.py:2181-2206); removes from string/workspace lists, clears back-references, sets proposal_level=P"
+  },
+  "break_group": {
+   "kind": "WRITE",
+   "reads": [
+    "coderack",
+    "workspace"
+   ],
+   "writes": [
+    "sink",
+    "verbose",
+    "workspace"
+   ],
+   "why": "_break_group (builtins.py:2209-2213, 2258-2315): breaks enclosing group (recursively), incident bonds, vertical/horizontal bridges, clears enclosing_group back-"
+  },
+  "break_bond": {
+   "kind": "WRITE",
+   "reads": [
+    "workspace"
+   ],
+   "writes": [
+    "sink",
+    "verbose",
+    "workspace"
+   ],
+   "why": "_break_bond (builtins.py:2216-2219, 2233-2246): remove_bond, remove_outgoing/incoming_bond, enclosing_group := None."
+  },
+  "prob": {
+   "kind": "READ",
+   "reads": [],
+   "writes": [],
+   "why": "ctx.rng.prob(p) (builtins.py:2334)."
+  },
+  "weighted_pick": {
+   "kind": "READ",
+   "reads": [],
+   "writes": [],
+   "why": "ctx.rng.weighted_pick (builtins.py:2339)."
+  },
+  "temp_adjusted_prob": {
+   "kind": "READ",
+   "reads": [
+    "temperature"
+   ],
+   "writes": [],
+   "why": "formulas.temp_adjusted_probability(p, T) (builtins.py:2344)."
+  },
+  "temp_adjusted_vals": {
+   "kind": "READ",
+   "reads": [
+    "temperature"
+   ],
+   "writes": [],
+   "why": "formulas.temp_adjusted_values(vals, T) (builtins.py:2349)."
+  },
+  "get_node": {
+   "kind": "READ",
+   "reads": [],
+   "writes": [],
+   "why": "slipnet.nodes.get(name): the node dict is immutable after build."
+  },
+  "get_activation": {
+   "kind": "READ",
+   "reads": [
+    "slipnet_act"
+   ],
+   "writes": [],
+   "why": "node.activation (builtins.py:2361)."
+  },
+  "fully_active": {
+   "kind": "READ",
+   "reads": [
+    "slipnet_act"
+   ],
+   "writes": [],
+   "why": "node.activation >= max (slipnet.py:280-303)."
+  },
+  "get_bond_category": {
+   "kind": "READ",
+   "reads": [],
+   "writes": [],
+   "why": "Walks from_desc.outgoing_links (static topology; the property builds a fresh list each call, slipnet.py:405) for a labelled link (builtins.py:2383-2391)."
+  },
+  "object_has_description_type": {
+   "kind": "READ",
+   "reads": [
+    "workspace"
+   ],
+   "writes": [],
+   "why": "obj.get_all_descriptions() scan (builtins.py:2396-2412)."
+  },
+  "possible_descriptor": {
+   "kind": "READ",
+   "reads": [
+    "slipnet_act",
+    "workspace"
+   ],
+   "writes": [],
+   "why": "Instance-link candidates filtered by the node's descriptor_predicate (eval of a compiled expression over the object, may call middle_in_string), weighted by act"
+  },
+  "descriptor_support": {
+   "kind": "READ",
+   "reads": [
+    "workspace"
+   ],
+   "writes": [],
+   "why": "Fraction of built groups carrying a descriptor (builtins.py:2438-2456)."
+  },
+  "single_letter_group_probability": {
+   "kind": "READ",
+   "reads": [
+    "slipnet_act",
+    "temperature",
+    "workspace"
+   ],
+   "writes": [],
+   "why": "group.get_num_of_local_supporting_groups + group._local_support(ctx.rng) (a stochastic density walk) x plato-length activation (builtins.py:2459-2479)."
+  },
+  "get_objects": {
+   "kind": "READ",
+   "reads": [
+    "workspace"
+   ],
+   "writes": [],
+   "why": "workspace.all_objects (fresh list) (builtins.py:2482)."
+  },
+  "get_string_objects": {
+   "kind": "READ",
+   "reads": [
+    "workspace"
+   ],
+   "writes": [],
+   "why": "Returns string.objects ITSELF, the live list, not a copy (builtins.py:2490-2495)."
+  },
+  "get_built_bonds": {
+   "kind": "READ",
+   "reads": [
+    "workspace"
+   ],
+   "writes": [],
+   "why": "Fresh list of built bonds (builtins.py:2498)."
+  },
+  "get_built_bridges": {
+   "kind": "READ",
+   "reads": [
+    "workspace"
+   ],
+   "writes": [],
+   "why": "Fresh list of built bridges of a type (builtins.py:2506)."
+  },
+  "mapping_strength": {
+   "kind": "READ",
+   "reads": [
+    "workspace"
+   ],
+   "writes": [],
+   "why": "Returns workspace.{top,bottom,vertical}_mapping_strength, stored once per update cycle (workspace.py:989-1002)."
+  },
+  "has_supported_rule": {
+   "kind": "READ",
+   "reads": [
+    "workspace"
+   ],
+   "writes": [],
+   "why": "len(workspace.get_supported_rules(top)) (builtins.py:2525)."
+  },
+  "say": {
+   "kind": "WRITE",
+   "reads": [],
+   "writes": [
+    "verbose"
+   ],
+   "why": "ctx.verbose_log.say -> emit: appends a numbered line under a lock (verbose.py:542-553). Bound only when ctx.verbose."
+  },
+  "vprint": {
+   "kind": "WRITE",
+   "reads": [
+    "workspace"
+   ],
+   "writes": [
+    "verbose"
+   ],
+   "why": "verbose_log.print_object -> print_text then emit (builtins.py:165-167)."
+  },
+  "ascii_name": {
+   "kind": "READ",
+   "reads": [
+    "workspace"
+   ],
+   "writes": [],
+   "why": "verbose.ascii_name(obj): pure formatting (verbose.py:158). Verbose only."
+  },
+  "generic_name": {
+   "kind": "READ",
+   "reads": [],
+   "writes": [],
+   "why": "verbose.generic_name(string): pure (verbose.py:135). Verbose only."
+  },
+  "print_name": {
+   "kind": "READ",
+   "reads": [
+    "workspace"
+   ],
+   "writes": [],
+   "why": "verbose.object_print_name: pure (verbose.py:181). Verbose only."
+  },
+  "round_to_100ths": {
+   "kind": "READ",
+   "reads": [],
+   "writes": [],
+   "why": "pure arithmetic (verbose.py:111). Verbose only."
+  },
+  "exact": {
+   "kind": "READ",
+   "reads": [],
+   "writes": [],
+   "why": "pure (verbose.py:81). Verbose only."
+  },
+  "post_codelet": {
+   "kind": "WRITE",
+   "reads": [
+    "coderack"
+   ],
+   "writes": [
+    "coderack",
+    "ids"
+   ],
+   "why": "Codelet(type, urgency, arguments, time_stamp=ctx.codelet_count) then ctx.coderack.post (builtins.py:2532-2544)."
+  },
+  "record_event": {
+   "kind": "WRITE",
+   "reads": [
+    "slipnet_act",
+    "themespace",
+    "workspace"
+   ],
+   "writes": [
+    "ids",
+    "trace"
+   ],
+   "why": "TraceEvent(...) (event_number := next_id, OUTSIDE the commit lock) then trace.record_event -> attach_picture (builtins.py:2549-2592)."
+  },
+  "record_snag": {
+   "kind": "BARRIER",
+   "reads": [
+    "coderack",
+    "memory",
+    "slipnet_act",
+    "temperature",
+    "themespace",
+    "trace",
+    "workspace"
+   ],
+   "writes": [
+    "coderack",
+    "ids",
+    "memory",
+    "sink",
+    "slipnet_act",
+    "slipnet_buf",
+    "temperature",
+    "themespace",
+    "trace",
+    "verbose",
+    "workspace"
+   ],
+   "why": "process-snag (builtins.py:2595-2787): SnagEvent, clamp temperature to 100, event.activate (clamps concepts/themes/codelet pattern, salience clamps), memory.stor"
+  },
+  "give_up": {
+   "kind": "BARRIER",
+   "reads": [
+    "coderack",
+    "slipnet_act",
+    "temperature",
+    "themespace",
+    "workspace"
+   ],
+   "writes": [
+    "coderack",
+    "ids",
+    "slipnet_act",
+    "slipnet_buf",
+    "temperature",
+    "themespace",
+    "trace",
+    "workspace"
+   ],
+   "why": "ctx.on_update_everything() (a full update cycle) then ctx._gave_up = True (builtins.py:2866-2883)."
+  },
+  "answer_present": {
+   "kind": "READ",
+   "reads": [
+    "memory",
+    "workspace"
+   ],
+   "writes": [],
+   "why": "memory.answer_present(problem, rule_signature...) - scans memory.answers (builtins.py:2888-2913)."
+  },
+  "report_answer": {
+   "kind": "BARRIER",
+   "reads": [
+    "coderack",
+    "memory",
+    "slipnet_act",
+    "temperature",
+    "themespace",
+    "trace",
+    "workspace"
+   ],
+   "writes": [
+    "coderack",
+    "ids",
+    "memory",
+    "sink",
+    "slipnet_act",
+    "slipnet_buf",
+    "temperature",
+    "themespace",
+    "trace",
+    "verbose",
+    "workspace"
+   ],
+   "why": "builtins.py:2916-3158: builds the answer string (new Letters/Groups/Bridges: ids), ctx.on_update_everything() FIRST, trace.undo_last_clamp, create_answer_descri"
+  },
+  "translate_rule": {
+   "kind": "BARRIER",
+   "reads": [
+    "slipnet_act",
+    "workspace"
+   ],
+   "writes": [
+    "ids"
+   ],
+   "why": "rule.translate (rules.py:1623-1699) under the commit lock: translated Rule (structure id), SlippageLog, coattail coins from ctx.rng (builtins.py:3177-3220)."
+  },
+  "apply_rule": {
+   "kind": "BARRIER",
+   "reads": [
+    "slipnet_act",
+    "workspace"
+   ],
+   "writes": [
+    "workspace"
+   ],
+   "why": "rules.apply_rule via the image system (builtins.py:3223-3271): resets ctx.last_failure*, and REBUILDS obj.image for every object of the target string."
+  }
+ },
+ "types": {
+  "bottom-up-bond-scout": {
+   "barrier": false,
+   "speculate": true,
+   "reads": [
+    "slipnet_act",
+    "temperature",
+    "workspace"
+   ],
+   "writes": [
+    "coderack",
+    "ids",
+    "slipnet_buf",
+    "verbose"
+   ],
+   "uses_cc": false,
+   "why": "Pure read prefix of 17 builtin calls then a single write builtin. Reads obj.left_string_pos (immutable). ~64.5k of 1.14M observed executions; fizzles ~55% of the time before propose_bond. ['verbose' a"
+  },
+  "top-down-bond-scout:category": {
+   "barrier": false,
+   "speculate": true,
+   "reads": [
+    "slipnet_act",
+    "temperature",
+    "workspace"
+   ],
+   "writes": [
+    "coderack",
+    "ids",
+    "slipnet_buf",
+    "verbose"
+   ],
+   "uses_cc": false,
+   "why": "args['slipnode'] / args['scope'] are codelet arguments (shared Slipnet node / WorkspaceString; read-only). choose_string_for reads live bond pointers (relevance), not just stored values. ['verbose' ap"
+  },
+  "top-down-bond-scout:direction": {
+   "barrier": false,
+   "speculate": true,
+   "reads": [
+    "slipnet_act",
+    "temperature",
+    "workspace"
+   ],
+   "writes": [
+    "coderack",
+    "ids",
+    "slipnet_buf",
+    "verbose"
+   ],
+   "uses_cc": false,
+   "why": "Same shape as :category. ['verbose' appears in writes only when ctx.verbose is on.]"
+  },
+  "bond-evaluator": {
+   "barrier": false,
+   "speculate": true,
+   "reads": [
+    "slipnet_act",
+    "temperature",
+    "themespace",
+    "workspace"
+   ],
+   "writes": [
+    "coderack",
+    "ids",
+    "slipnet_buf"
+   ],
+   "uses_cc": false,
+   "why": "evaluate_structure (line 6) is a READ whose only mutation is to the argument bond (strength, proposal_level); the first shared write is the activate at line 10, then post_codelet('bond-builder', round"
+  },
+  "bond-builder": {
+   "barrier": false,
+   "speculate": true,
+   "reads": [
+    "slipnet_act",
+    "temperature",
+    "themespace",
+    "workspace"
+   ],
+   "writes": [
+    "ids",
+    "sink",
+    "slipnet_act",
+    "slipnet_buf",
+    "themespace",
+    "trace",
+    "verbose",
+    "workspace"
+   ],
+   "uses_cc": false,
+   "why": "One builtin, entirely a write. The whole body should be treated as live-after-token."
+  },
+  "top-down-group-scout:category": {
+   "barrier": false,
+   "speculate": true,
+   "reads": [
+    "slipnet_act",
+    "temperature",
+    "workspace"
+   ],
+   "writes": [
+    "coderack",
+    "ids",
+    "slipnet_buf",
+    "verbose"
+   ],
+   "uses_cc": false,
+   "why": "The most id-hungry body: allocates ids in the prefix of ~47% of its executions, BEFORE any builtin write and before the fizzle decision. Serial id order must be preserved even for singletons that are "
+  },
+  "top-down-group-scout:direction": {
+   "barrier": false,
+   "speculate": true,
+   "reads": [
+    "slipnet_act",
+    "temperature",
+    "workspace"
+   ],
+   "writes": [
+    "coderack",
+    "ids",
+    "slipnet_buf",
+    "verbose"
+   ],
+   "uses_cc": false,
+   "why": " ['verbose' appears in writes only when ctx.verbose is on.]"
+  },
+  "group-scout:whole-string": {
+   "barrier": false,
+   "speculate": true,
+   "reads": [
+    "slipnet_act",
+    "temperature",
+    "workspace"
+   ],
+   "writes": [
+    "coderack",
+    "ids",
+    "slipnet_buf",
+    "verbose"
+   ],
+   "uses_cc": false,
+   "why": "Reads string.bonds (live list) at line 4. Note the body binds `rng = ctx.rng` ONCE at exec start: it must be the step's stream at that moment. ['verbose' appears in writes only when ctx.verbose is on."
+  },
+  "group-evaluator": {
+   "barrier": false,
+   "speculate": true,
+   "reads": [
+    "slipnet_act",
+    "temperature",
+    "workspace"
+   ],
+   "writes": [
+    "coderack",
+    "ids",
+    "slipnet_buf"
+   ],
+   "uses_cc": false,
+   "why": "Reads group.strength (private, recomputed) for the post urgency."
+  },
+  "group-builder": {
+   "barrier": false,
+   "speculate": true,
+   "reads": [
+    "slipnet_act",
+    "temperature",
+    "themespace",
+    "workspace"
+   ],
+   "writes": [
+    "ids",
+    "sink",
+    "slipnet_act",
+    "slipnet_buf",
+    "themespace",
+    "trace",
+    "verbose",
+    "workspace"
+   ],
+   "uses_cc": false,
+   "why": "Prefix is two reads then the write builtin. ['verbose' appears in writes only when ctx.verbose is on.]"
+  },
+  "bottom-up-bridge-scout": {
+   "barrier": false,
+   "speculate": true,
+   "reads": [
+    "slipnet_act",
+    "temperature",
+    "workspace"
+   ],
+   "writes": [
+    "coderack",
+    "ids",
+    "slipnet_buf",
+    "verbose"
+   ],
+   "uses_cc": true,
+   "why": "Reads workspace.answer_string (set only by report_answer = barrier). `justify_mode` and `codelet_count` are namespace locals captured at exec start. Everything up to line 80 (the whole admissibility g"
+  },
+  "important-object-bridge-scout": {
+   "barrier": false,
+   "speculate": true,
+   "reads": [
+    "slipnet_act",
+    "temperature",
+    "workspace"
+   ],
+   "writes": [
+    "coderack",
+    "ids",
+    "slipnet_buf",
+    "verbose"
+   ],
+   "uses_cc": true,
+   "why": "Only prefix body with a hidden SHARED write before its first builtin write. Scans string2.objects and every object's relevant descriptions. ['verbose' appears in writes only when ctx.verbose is on.]"
+  },
+  "bridge-evaluator": {
+   "barrier": false,
+   "speculate": true,
+   "reads": [
+    "slipnet_act",
+    "temperature",
+    "themespace",
+    "workspace"
+   ],
+   "writes": [
+    "coderack",
+    "ids",
+    "slipnet_buf"
+   ],
+   "uses_cc": false,
+   "why": "The slipnet_buf writes are NOT builtins, so a builtin-level classifier misses them. Observed 111,275 cm.activate_descriptions calls in 51,235 executions."
+  },
+  "bridge-builder": {
+   "barrier": false,
+   "speculate": true,
+   "reads": [
+    "slipnet_act",
+    "temperature",
+    "themespace",
+    "workspace"
+   ],
+   "writes": [
+    "ids",
+    "sink",
+    "slipnet_act",
+    "slipnet_buf",
+    "themespace",
+    "trace",
+    "verbose",
+    "workspace"
+   ],
+   "uses_cc": false,
+   "why": "vprint at line 8 only when verbose. Heavy builder: fights, flips, concept-mapping augmentation, Themespace boost, Trace events. ['verbose' appears in writes only when ctx.verbose is on.]"
+  },
+  "bottom-up-description-scout": {
+   "barrier": false,
+   "speculate": true,
+   "reads": [
+    "slipnet_act",
+    "temperature",
+    "workspace"
+   ],
+   "writes": [
+    "coderack",
+    "ids",
+    "slipnet_buf",
+    "verbose"
+   ],
+   "uses_cc": false,
+   "why": " ['verbose' appears in writes only when ctx.verbose is on.]"
+  },
+  "top-down-description-scout": {
+   "barrier": false,
+   "speculate": true,
+   "reads": [
+    "slipnet_act",
+    "temperature",
+    "workspace"
+   ],
+   "writes": [
+    "coderack",
+    "ids",
+    "slipnet_buf",
+    "verbose"
+   ],
+   "uses_cc": false,
+   "why": "possible_descriptor evals the node's descriptor_predicate over live objects. ['verbose' appears in writes only when ctx.verbose is on.]"
+  },
+  "description-evaluator": {
+   "barrier": false,
+   "speculate": true,
+   "reads": [
+    "slipnet_act",
+    "temperature",
+    "themespace",
+    "workspace"
+   ],
+   "writes": [
+    "coderack",
+    "ids",
+    "slipnet_buf"
+   ],
+   "uses_cc": false,
+   "why": "Writes before it evaluates anything: no read-only prefix. 73k executions: treat as live-after-token from line 7."
+  },
+  "description-builder": {
+   "barrier": false,
+   "speculate": true,
+   "reads": [
+    "slipnet_act",
+    "temperature",
+    "themespace",
+    "workspace"
+   ],
+   "writes": [
+    "ids",
+    "sink",
+    "slipnet_act",
+    "slipnet_buf",
+    "themespace",
+    "trace",
+    "verbose",
+    "workspace"
+   ],
+   "uses_cc": false,
+   "why": "Lines 8-17 are a pure read prefix (object-exists + duplicate scan). Line 26 writes again after the build. ['verbose' appears in writes only when ctx.verbose is on.]"
+  },
+  "rule-scout": {
+   "barrier": false,
+   "speculate": false,
+   "reads": [
+    "slipnet_act",
+    "temperature",
+    "themespace",
+    "workspace"
+   ],
+   "writes": [
+    "coderack",
+    "ids",
+    "slipnet_buf",
+    "verbose",
+    "workspace"
+   ],
+   "uses_cc": true,
+   "why": "build_rule_from_bridges/currently_works: image caches and id/description writes on shared objects"
+  },
+  "rule-evaluator": {
+   "barrier": false,
+   "speculate": false,
+   "reads": [
+    "slipnet_act",
+    "temperature",
+    "themespace",
+    "workspace"
+   ],
+   "writes": [
+    "coderack",
+    "ids",
+    "verbose",
+    "workspace"
+   ],
+   "uses_cc": false,
+   "why": "Rule.currently_works rewrites obj.image on every workspace object (hidden shared write)"
+  },
+  "rule-builder": {
+   "barrier": false,
+   "speculate": false,
+   "reads": [
+    "slipnet_act",
+    "temperature",
+    "themespace",
+    "workspace"
+   ],
+   "writes": [
+    "coderack",
+    "ids",
+    "sink",
+    "slipnet_act",
+    "slipnet_buf",
+    "themespace",
+    "trace",
+    "verbose",
+    "workspace"
+   ],
+   "uses_cc": false,
+   "why": "mutates a BUILT incumbent rule (revise_abstracted_rule_information) before build_structure"
+  },
+  "answer-finder": {
+   "barrier": true,
+   "speculate": false,
+   "reads": [
+    "memory",
+    "slipnet_act",
+    "temperature",
+    "themespace",
+    "trace",
+    "workspace"
+   ],
+   "writes": [
+    "coderack",
+    "ids",
+    "memory",
+    "sink",
+    "slipnet_act",
+    "slipnet_buf",
+    "temperature",
+    "themespace",
+    "trace",
+    "verbose",
+    "workspace"
+   ],
+   "uses_cc": false,
+   "why": "BARRIER: can call record_snag (update cycle + coderack flush) and report_answer (update cycle, memory). Most executions fizzle at the first probability gate (4,238 executions, 187 answers) but cannot "
+  },
+  "answer-justifier": {
+   "barrier": true,
+   "speculate": false,
+   "reads": [
+    "memory",
+    "slipnet_act",
+    "temperature",
+    "themespace",
+    "trace",
+    "workspace"
+   ],
+   "writes": [
+    "coderack",
+    "ids",
+    "memory",
+    "sink",
+    "slipnet_act",
+    "slipnet_buf",
+    "temperature",
+    "themespace",
+    "trace",
+    "verbose",
+    "workspace"
+   ],
+   "uses_cc": true,
+   "why": "BARRIER (clamp state). Passes trace/themespace/slipnet/memory/coderack/temperature objects directly into the engine function."
+  },
+  "thematic-bridge-scout": {
+   "barrier": false,
+   "speculate": false,
+   "reads": [
+    "slipnet_act",
+    "temperature",
+    "themespace",
+    "workspace"
+   ],
+   "writes": [
+    "coderack",
+    "ids",
+    "sink",
+    "slipnet_act",
+    "slipnet_buf",
+    "themespace",
+    "trace",
+    "verbose",
+    "workspace"
+   ],
+   "uses_cc": true,
+   "why": "interleaves id-allocating writes with reads; 0.03% of codelets"
+  },
+  "progress-watcher": {
+   "barrier": true,
+   "speculate": false,
+   "reads": [
+    "slipnet_act",
+    "temperature",
+    "themespace",
+    "trace",
+    "workspace"
+   ],
+   "writes": [
+    "coderack",
+    "ids",
+    "slipnet_act",
+    "themespace",
+    "trace",
+    "verbose"
+   ],
+   "uses_cc": true,
+   "why": "BARRIER (touches trace clamp state). 15,885 executions but only 180 Trace events written: most are read-only 'activity>0' checks - a conditional-barrier refinement could be a later optimisation, at th"
+  },
+  "jootser": {
+   "barrier": true,
+   "speculate": false,
+   "reads": [
+    "memory",
+    "slipnet_act",
+    "temperature",
+    "themespace",
+    "trace",
+    "workspace"
+   ],
+   "writes": [
+    "coderack",
+    "ids",
+    "memory",
+    "sink",
+    "slipnet_act",
+    "slipnet_buf",
+    "temperature",
+    "themespace",
+    "trace",
+    "verbose",
+    "workspace"
+   ],
+   "uses_cc": true,
+   "why": "BARRIER: can call give_up (update_everything) and report_answer. ['verbose' appears in writes only when ctx.verbose is on.]"
+  },
+  "breaker": {
+   "barrier": false,
+   "speculate": true,
+   "reads": [
+    "temperature",
+    "workspace"
+   ],
+   "writes": [
+    "sink",
+    "verbose",
+    "workspace"
+   ],
+   "uses_cc": false,
+   "why": "Reads EVERY built structure's strength and the list order of all structure lists - a very wide read set, but a pure one until the break. Family 'breaker' is not barrier per the brief (observed 2,332 e"
+  }
+ }
+}

@@ -14,10 +14,26 @@ loop rather than fail.
 
 What lives here
 ---------------
+``swarm`` (with ``qos``)
+    Run-level parallelism: a warm ``forkserver`` process pool over every core, each run
+    byte-for-byte the serial run with the same seed.  The throughput path -- answer
+    distributions, oracle comparisons, sweeps, episodes -- and ``POST /api/swarm``.
+``speculative``
+    Within-run parallelism that is *exact*: the stream-serial reference (``"stream"``:
+    per-codelet counter-based random streams and an exponential-race coderack, equal in
+    law to the faithful loop) and the speculative executor (``"speculative"``), which runs
+    codelets' read prefixes on worker threads and commits them in serial order, so its
+    result is bit-identical to the stream reference for every worker count.
+``update_cycle``
+    The update cycle re-implemented plugin-side, faithful or stream-keyed, with its
+    Jacobi-safe loops on a thread team.
+``placement``
+    Which numeric backend each executor runs on, from measurements: the CPU, because at
+    today's Slipnet size a Metal dispatch costs more than the whole update.
 ``free_running``
-    The first free-running engine (WP4.4): codelets on several threads with no
-    global barrier.  Measurably changes cognition — see the README — and is kept
-    as the comparison point for what replaces it.
+    The first free-running engine (WP4.4): codelets on several threads with no global
+    barrier.  Measurably changes cognition (``abce`` 15.0% serially, 9.3% at six
+    workers), so the service no longer uses it; kept as the comparison point.
 ``coderack_shards``
     The locked rack free-running installs, and the sharded benchmark candidates.
 ``population``
@@ -73,3 +89,11 @@ def load() -> ModuleType | None:
         return import_module("server.parallel")
     except ImportError:
         return None
+
+
+# -- within-run, exact executors (WP3) -------------------------------------------------
+# ``"stream"`` is the stream-serial reference; ``"speculative"`` runs the same run across
+# threads and is bit-identical to it for every worker count.  See
+# ``server/parallel/speculative/``.
+register_executor("stream", "server.parallel.speculative.reference:StreamSerialExecutor")
+register_executor("speculative", "server.parallel.speculative.engine:SpeculativeExecutor")
