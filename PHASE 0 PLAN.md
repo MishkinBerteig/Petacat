@@ -20,7 +20,9 @@ count every engine-size figure in this document uses. Seed data: 59 slipnet node
 integration + 8 module files run locally; 9 e2e files currently require Docker, which
 WP2.1 removes).
 
-> **As built.** `server/engine/` holds 56 modules and 38,666 lines.
+> **As built.** `server/engine/` holds 53 modules and 37,283 lines. The multi-core machinery
+> (`free_running.py`, `coderack_shards.py`, `population.py`) moved out to the detachable
+> plugin package `server/parallel/`, which is not counted here.
 
 ---
 
