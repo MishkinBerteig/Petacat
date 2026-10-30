@@ -56,6 +56,9 @@ Every doc, UI string, help topic, plan and decision must keep the distinction pe
 - **"Learning"** (learn, learned, learner) is ambiguous and must **always** be qualified by
   mode: **Metacat-Mode learning** (Episodic Memory) or **Training-Mode learning**.
 - **"Episode"** is always qualified: a **Training episode**, or **Metacat's** episodic memory.
+- **Starting Conceptual State** is the whole configuration a Training starts with: its base plus any
+  creation overrides. In testing it is often a replica of the Metacat Standard Configuration (the
+  seed files). Training-Mode learning may change any aspect of it. The term replaces "innate".
 - **Run mode** is how runs execute: single-threaded, or multi-core (the speculative executor
   within a run, the swarm across runs). It is orthogonal to the two modes and must be viable
   in both. It is not the persistence mode (Fast, Normal or Audit).
