@@ -1,0 +1,1113 @@
+{
+ "executors": [
+  "serial",
+  "stream"
+ ],
+ "seeds": [
+  1,
+  500
+ ],
+ "max_steps": 20000,
+ "backend": null,
+ "seconds": 2042.2352486669988,
+ "processes": 17,
+ "alpha": 0.01,
+ "z_critical": 3.998689150813584,
+ "errors": {},
+ "rows": [
+  {
+   "problem": "abc-abd-mrrjjj=mrrjjjj",
+   "reference": "serial",
+   "other": "stream",
+   "n": [
+    500,
+    500
+   ],
+   "chi2": 1.0162601626016259,
+   "df": 1,
+   "p": 0.313407754584464,
+   "tv": 0.008000000000000004,
+   "z": {
+    "answer_found:mrrjjjj": -1.0080972981818903,
+    "gave_up:mrrjjjj": 1.415629900797544,
+    "halted:mrrjjjj": 0.538303892653705
+   },
+   "mean_codelets": [
+    4647.32,
+    4873.622
+   ],
+   "reference_states": {
+    "answer_found:mrrjjjj": 490,
+    "halted:mrrjjjj": 8,
+    "gave_up:mrrjjjj": 2
+   },
+   "other_states": {
+    "answer_found:mrrjjjj": 494,
+    "halted:mrrjjjj": 6
+   }
+  },
+  {
+   "problem": "xqc-xqd-mrrjjj=mrrkkk",
+   "reference": "serial",
+   "other": "stream",
+   "n": [
+    500,
+    500
+   ],
+   "chi2": 0.0,
+   "df": 0,
+   "p": null,
+   "tv": 0.0,
+   "z": {
+    "answer_found:mrrkkk": 0.0
+   },
+   "mean_codelets": [
+    1366.376,
+    1355.13
+   ],
+   "reference_states": {
+    "answer_found:mrrkkk": 500
+   },
+   "other_states": {
+    "answer_found:mrrkkk": 500
+   }
+  },
+  {
+   "problem": "rst-rsu-xyz=uyz",
+   "reference": "serial",
+   "other": "stream",
+   "n": [
+    500,
+    500
+   ],
+   "chi2": 0.32938076416337286,
+   "df": 1,
+   "p": 0.5660239442586013,
+   "tv": 0.016000000000000014,
+   "z": {
+    "answer_found:uyz": 0.5739170359584854,
+    "halted:uyz": -0.4483358396622203,
+    "gave_up:uyz": -0.5052880809891813
+   },
+   "mean_codelets": [
+    4463.098,
+    4635.274
+   ],
+   "reference_states": {
+    "answer_found:uyz": 372,
+    "gave_up:uyz": 126,
+    "halted:uyz": 2
+   },
+   "other_states": {
+    "answer_found:uyz": 364,
+    "gave_up:uyz": 133,
+    "halted:uyz": 3
+   }
+  },
+  {
+   "problem": "abc-abd-xyz=dyz",
+   "reference": "serial",
+   "other": "stream",
+   "n": [
+    500,
+    500
+   ],
+   "chi2": 0.2606396842536396,
+   "df": 1,
+   "p": 0.6096810234377172,
+   "tv": 0.016000000000000014,
+   "z": {
+    "answer_found:dyz": -0.5105288280338732,
+    "gave_up:dyz": 0.5874038118967151,
+    "halted:dyz": -0.4483358396622203
+   },
+   "mean_codelets": [
+    4504.792,
+    4575.362
+   ],
+   "reference_states": {
+    "answer_found:dyz": 371,
+    "gave_up:dyz": 127,
+    "halted:dyz": 2
+   },
+   "other_states": {
+    "answer_found:dyz": 378,
+    "gave_up:dyz": 119,
+    "halted:dyz": 3
+   }
+  },
+  {
+   "problem": "xqc-xqd-mrrjjj=mrrjjjj",
+   "reference": "serial",
+   "other": "stream",
+   "n": [
+    500,
+    500
+   ],
+   "chi2": 0.0,
+   "df": 0,
+   "p": null,
+   "tv": 0.006000000000000002,
+   "z": {
+    "answer_found:mrrjjjj": -0.7099522928088314,
+    "gave_up:mrrjjjj": -0.4483358396622203,
+    "halted:mrrjjjj": 1.7346547441043507
+   },
+   "mean_codelets": [
+    5780.636,
+    5604.708
+   ],
+   "reference_states": {
+    "answer_found:mrrjjjj": 495,
+    "halted:mrrjjjj": 3,
+    "gave_up:mrrjjjj": 2
+   },
+   "other_states": {
+    "answer_found:mrrjjjj": 497,
+    "gave_up:mrrjjjj": 3
+   }
+  },
+  {
+   "problem": "eqe-qeq-abbbc=aaabccc",
+   "reference": "serial",
+   "other": "stream",
+   "n": [
+    500,
+    500
+   ],
+   "chi2": 0.03332076377223955,
+   "df": 2,
+   "p": 0.9834776347433017,
+   "tv": 0.0020000000000000018,
+   "z": {
+    "gave_up:aaabccc": 0.0,
+    "halted:aaabccc": -0.18245562819544683,
+    "answer_found:aaabccc": 0.1342082404268956
+   },
+   "mean_codelets": [
+    9373.196,
+    9635.018
+   ],
+   "reference_states": {
+    "answer_found:aaabccc": 471,
+    "halted:aaabccc": 15,
+    "gave_up:aaabccc": 14
+   },
+   "other_states": {
+    "answer_found:aaabccc": 470,
+    "halted:aaabccc": 16,
+    "gave_up:aaabccc": 14
+   }
+  },
+  {
+   "problem": "abc-abd-xyz",
+   "reference": "serial",
+   "other": "stream",
+   "n": [
+    500,
+    500
+   ],
+   "chi2": 2.8925656786241474,
+   "df": 6,
+   "p": 0.8222051954299066,
+   "tv": 0.054000000000000006,
+   "z": {
+    "answer_found:yyz": -0.30837183938793894,
+    "answer_found:wyz": 0.8860106867807943,
+    "answer_found:abd": 1.0766077853074096,
+    "answer_found:xyz": 0.8341330942846135,
+    "answer_found:dyz": -0.7989354619369614,
+    "answer_found:xyd": -1.1104353500617083,
+    "halted:": -1.415629900797544,
+    "gave_up:": 0.11105696689993853
+   },
+   "mean_codelets": [
+    2052.014,
+    2225.248
+   ],
+   "reference_states": {
+    "answer_found:xyd": 179,
+    "answer_found:wyz": 127,
+    "answer_found:xyz": 92,
+    "gave_up:": 45,
+    "answer_found:dyz": 27,
+    "answer_found:yyz": 21,
+    "answer_found:abd": 9
+   },
+   "other_states": {
+    "answer_found:xyd": 196,
+    "answer_found:wyz": 115,
+    "answer_found:xyz": 82,
+    "gave_up:": 44,
+    "answer_found:dyz": 33,
+    "answer_found:yyz": 23,
+    "answer_found:abd": 5,
+    "halted:": 2
+   }
+  },
+  {
+   "problem": "eqe-qeq-abbbc",
+   "reference": "serial",
+   "other": "stream",
+   "n": [
+    500,
+    500
+   ],
+   "chi2": 6.812451864293178,
+   "df": 10,
+   "p": 0.7430240828020265,
+   "tv": 0.07,
+   "z": {
+    "answer_found:bccbb": 1.415629900797544,
+    "answer_found:cddda": 0.3031834646792182,
+    "answer_found:qcccb": 0.11723482493771761,
+    "answer_found:qeeqr": 1.0005003753127737,
+    "answer_found:baaab": 1.2712834523274563,
+    "answer_found:abbbq": 1.137883003574202,
+    "answer_found:qbccb": 1.0005003753127737,
+    "answer_found:bcaab": -0.4483358396622203,
+    "answer_found:qbbbq": -1.171392500532336,
+    "answer_found:qrrrq": 1.0005003753127737,
+    "answer_found:qbbbc": -0.379294334524734,
+    "answer_found:pqeeq": -1.7346547441043507,
+    "gave_up:": 0.8023693415671794,
+    "answer_found:bccab": 0.0,
+    "answer_found:qreeq": -1.0005003753127737,
+    "answer_found:qeeeq": -0.760921509752562,
+    "answer_found:cbbba": 0.7627146032604594,
+    "answer_found:baaaq": -0.7854219331980222,
+    "answer_found:qeq": 0.5162066272466127,
+    "answer_found:bcccb": 1.2231192032027183,
+    "answer_found:qrbbq": 1.0005003753127737,
+    "answer_found:pqqbc": -1.0005003753127737
+   },
+   "mean_codelets": [
+    2631.576,
+    2576.016
+   ],
+   "reference_states": {
+    "answer_found:qeeeq": 262,
+    "gave_up:": 45,
+    "answer_found:qcccb": 40,
+    "answer_found:baaaq": 40,
+    "answer_found:qbbbq": 27,
+    "answer_found:cbbba": 25,
+    "answer_found:qeq": 19,
+    "answer_found:bcccb": 11,
+    "answer_found:baaab": 7,
+    "answer_found:cddda": 6,
+    "answer_found:abbbq": 5,
+    "answer_found:qbbbc": 3,
+    "answer_found:bccab": 2,
+    "answer_found:bccbb": 2,
+    "answer_found:bcaab": 2,
+    "answer_found:qeeqr": 1,
+    "answer_found:qrrrq": 1,
+    "answer_found:qrbbq": 1,
+    "answer_found:qbccb": 1
+   },
+   "other_states": {
+    "answer_found:qeeeq": 274,
+    "answer_found:baaaq": 47,
+    "answer_found:qcccb": 39,
+    "gave_up:": 38,
+    "answer_found:qbbbq": 36,
+    "answer_found:cbbba": 20,
+    "answer_found:qeq": 16,
+    "answer_found:bcccb": 6,
+    "answer_found:cddda": 5,
+    "answer_found:qbbbc": 4,
+    "answer_found:baaab": 3,
+    "answer_found:bcaab": 3,
+    "answer_found:pqeeq": 3,
+    "answer_found:abbbq": 2,
+    "answer_found:bccab": 2,
+    "answer_found:qreeq": 1,
+    "answer_found:pqqbc": 1
+   }
+  },
+  {
+   "problem": "abc-abd-xyz=xyd",
+   "reference": "serial",
+   "other": "stream",
+   "n": [
+    500,
+    500
+   ],
+   "chi2": 0.0,
+   "df": 0,
+   "p": null,
+   "tv": 0.002000000000000001,
+   "z": {
+    "gave_up:xyd": -0.5782182480347836,
+    "answer_found:xyd": 0.5782182480347838
+   },
+   "mean_codelets": [
+    1125.968,
+    1080.83
+   ],
+   "reference_states": {
+    "answer_found:xyd": 499,
+    "gave_up:xyd": 1
+   },
+   "other_states": {
+    "answer_found:xyd": 498,
+    "gave_up:xyd": 2
+   }
+  },
+  {
+   "problem": "abc-abd-xyz=wyz",
+   "reference": "serial",
+   "other": "stream",
+   "n": [
+    500,
+    500
+   ],
+   "chi2": 0.0,
+   "df": 0,
+   "p": null,
+   "tv": 0.004000000000000002,
+   "z": {
+    "halted:wyz": -1.415629900797544,
+    "answer_found:wyz": 1.0020060200702536,
+    "gave_up:wyz": 0.0
+   },
+   "mean_codelets": [
+    1399.828,
+    1492.002
+   ],
+   "reference_states": {
+    "answer_found:wyz": 499,
+    "gave_up:wyz": 1
+   },
+   "other_states": {
+    "answer_found:wyz": 497,
+    "halted:wyz": 2,
+    "gave_up:wyz": 1
+   }
+  },
+  {
+   "problem": "rst-rsu-xyz=xyu",
+   "reference": "serial",
+   "other": "stream",
+   "n": [
+    500,
+    500
+   ],
+   "chi2": 0.0,
+   "df": 0,
+   "p": null,
+   "tv": 0.004000000000000002,
+   "z": {
+    "gave_up:xyu": -0.709952292808831,
+    "answer_found:xyu": 0.7099522928088314
+   },
+   "mean_codelets": [
+    949.522,
+    941.648
+   ],
+   "reference_states": {
+    "answer_found:xyu": 497,
+    "gave_up:xyu": 3
+   },
+   "other_states": {
+    "answer_found:xyu": 495,
+    "gave_up:xyu": 5
+   }
+  },
+  {
+   "problem": "rst-rsu-xyz=wyz",
+   "reference": "serial",
+   "other": "stream",
+   "n": [
+    500,
+    500
+   ],
+   "chi2": 0.0,
+   "df": 0,
+   "p": null,
+   "tv": 0.004000000000000002,
+   "z": {
+    "halted:wyz": 0.4483358396622203,
+    "answer_found:wyz": -0.7099522928088314,
+    "gave_up:wyz": 0.5782182480347836
+   },
+   "mean_codelets": [
+    1535.114,
+    1410.752
+   ],
+   "reference_states": {
+    "answer_found:wyz": 495,
+    "halted:wyz": 3,
+    "gave_up:wyz": 2
+   },
+   "other_states": {
+    "answer_found:wyz": 497,
+    "halted:wyz": 2,
+    "gave_up:wyz": 1
+   }
+  },
+  {
+   "problem": "abc-abd-mrrjjj=mrrkkk",
+   "reference": "serial",
+   "other": "stream",
+   "n": [
+    500,
+    500
+   ],
+   "chi2": 0.0,
+   "df": 0,
+   "p": null,
+   "tv": 0.002000000000000001,
+   "z": {
+    "answer_found:mrrkkk": 1.0005003753127741,
+    "halted:mrrkkk": -1.0005003753127737
+   },
+   "mean_codelets": [
+    1709.096,
+    1667.992
+   ],
+   "reference_states": {
+    "answer_found:mrrkkk": 500
+   },
+   "other_states": {
+    "answer_found:mrrkkk": 499,
+    "halted:mrrkkk": 1
+   }
+  },
+  {
+   "problem": "eqe-qeq-abbba=baaab",
+   "reference": "serial",
+   "other": "stream",
+   "n": [
+    500,
+    500
+   ],
+   "chi2": 0.6091370558375635,
+   "df": 1,
+   "p": 0.43511290897522314,
+   "tv": 0.006000000000000003,
+   "z": {
+    "gave_up:baaab": -0.4483358396622203,
+    "halted:baaab": -0.6356417261637282,
+    "answer_found:baaab": 0.780472328681526
+   },
+   "mean_codelets": [
+    3457.96,
+    3360.67
+   ],
+   "reference_states": {
+    "answer_found:baaab": 494,
+    "halted:baaab": 4,
+    "gave_up:baaab": 2
+   },
+   "other_states": {
+    "answer_found:baaab": 491,
+    "halted:baaab": 6,
+    "gave_up:baaab": 3
+   }
+  },
+  {
+   "problem": "eqe-qeq-abbba=aaabaaa",
+   "reference": "serial",
+   "other": "stream",
+   "n": [
+    500,
+    500
+   ],
+   "chi2": 0.627915918751154,
+   "df": 2,
+   "p": 0.7305497402810954,
+   "tv": 0.014000000000000005,
+   "z": {
+    "answer_found:aaabaaa": 0.48635627432327405,
+    "gave_up:aaabaaa": -0.6935419821470654,
+    "halted:aaabaaa": -0.13277508124161183
+   },
+   "mean_codelets": [
+    17081.626,
+    17080.632
+   ],
+   "reference_states": {
+    "halted:aaabaaa": 325,
+    "answer_found:aaabaaa": 150,
+    "gave_up:aaabaaa": 25
+   },
+   "other_states": {
+    "halted:aaabaaa": 327,
+    "answer_found:aaabaaa": 143,
+    "gave_up:aaabaaa": 30
+   }
+  },
+  {
+   "problem": "eeqee-qeeq-xxixx",
+   "reference": "serial",
+   "other": "stream",
+   "n": [
+    500,
+    500
+   ],
+   "chi2": 5.12677059529735,
+   "df": 5,
+   "p": 0.40060580264136125,
+   "tv": 0.052000000000000005,
+   "z": {
+    "answer_found:qiq": -2.343904744116077,
+    "answer_found:qxeeq": -1.415629900797544,
+    "answer_found:ixxq": -0.4784317829430697,
+    "answer_found:qexq": 1.0005003753127737,
+    "answer_found:qiiq": 1.0005003753127737,
+    "answer_found:ixxiiii": -1.0005003753127737,
+    "answer_found:qqxeeq": -1.0005003753127737,
+    "answer_found:qeqq": -1.0005003753127737,
+    "answer_found:xxiq": 0.5782182480347836,
+    "answer_found:qeeq": -0.06355146359442913,
+    "answer_found:qxxxi": 1.0005003753127737,
+    "gave_up:": -0.6286819354834571,
+    "answer_found:qxxi": 1.0780492023301294,
+    "answer_found:qeexq": 0.5782182480347836,
+    "answer_found:iixxxi": -1.0005003753127737,
+    "answer_found:ixxxi": -1.0005003753127737,
+    "answer_found:qixq": -1.0005003753127737,
+    "answer_found:ixxi": 0.9642659979384155,
+    "halted:": 0.5782182480347836
+   },
+   "mean_codelets": [
+    4134.562,
+    4132.122
+   ],
+   "reference_states": {
+    "answer_found:qeeq": 225,
+    "answer_found:ixxi": 158,
+    "gave_up:": 69,
+    "answer_found:ixxq": 19,
+    "answer_found:qxxi": 19,
+    "answer_found:xxiq": 2,
+    "halted:": 2,
+    "answer_found:qeexq": 2,
+    "answer_found:qexq": 1,
+    "answer_found:qiq": 1,
+    "answer_found:qiiq": 1,
+    "answer_found:qxxxi": 1
+   },
+   "other_states": {
+    "answer_found:qeeq": 226,
+    "answer_found:ixxi": 144,
+    "gave_up:": 76,
+    "answer_found:ixxq": 22,
+    "answer_found:qxxi": 13,
+    "answer_found:qiq": 8,
+    "answer_found:qxeeq": 2,
+    "answer_found:qqxeeq": 1,
+    "answer_found:xxiq": 1,
+    "answer_found:ixxxi": 1,
+    "answer_found:qeexq": 1,
+    "halted:": 1,
+    "answer_found:qeqq": 1,
+    "answer_found:qixq": 1,
+    "answer_found:iixxxi": 1,
+    "answer_found:ixxiiii": 1
+   }
+  },
+  {
+   "problem": "aabc-aabd-ijkk=ijll",
+   "reference": "serial",
+   "other": "stream",
+   "n": [
+    500,
+    500
+   ],
+   "chi2": 0.0,
+   "df": 0,
+   "p": null,
+   "tv": 0.002000000000000001,
+   "z": {
+    "halted:ijll": 0.0,
+    "answer_found:ijll": 0.3348435348737254,
+    "gave_up:ijll": -1.0005003753127737
+   },
+   "mean_codelets": [
+    2399.116,
+    2213.636
+   ],
+   "reference_states": {
+    "answer_found:ijll": 496,
+    "halted:ijll": 4
+   },
+   "other_states": {
+    "answer_found:ijll": 495,
+    "halted:ijll": 4,
+    "gave_up:ijll": 1
+   }
+  },
+  {
+   "problem": "aabc-aabd-ijkk=hjkk",
+   "reference": "serial",
+   "other": "stream",
+   "n": [
+    500,
+    500
+   ],
+   "chi2": 0.0,
+   "df": 0,
+   "p": null,
+   "tv": 0.006000000000000003,
+   "z": {
+    "answer_found:hjkk": -1.3450075189866615,
+    "halted:hjkk": 1.002006020070253,
+    "gave_up:hjkk": 1.0005003753127737
+   },
+   "mean_codelets": [
+    4937.618,
+    4965.784
+   ],
+   "reference_states": {
+    "answer_found:hjkk": 496,
+    "halted:hjkk": 3,
+    "gave_up:hjkk": 1
+   },
+   "other_states": {
+    "answer_found:hjkk": 499,
+    "halted:hjkk": 1
+   }
+  },
+  {
+   "problem": "abc-cba-mrrjjj=mmmrrj",
+   "reference": "serial",
+   "other": "stream",
+   "n": [
+    500,
+    500
+   ],
+   "chi2": 0.24823477493380408,
+   "df": 1,
+   "p": 0.6183207783760214,
+   "tv": 0.013999999999999999,
+   "z": {
+    "answer_found:mmmrrj": 0.4982316478645294,
+    "halted:mmmrrj": -0.5825752650035347,
+    "gave_up:mmmrrj": 1.0005003753127737
+   },
+   "mean_codelets": [
+    11071.202,
+    11075.878
+   ],
+   "reference_states": {
+    "answer_found:mmmrrj": 415,
+    "halted:mmmrrj": 84,
+    "gave_up:mmmrrj": 1
+   },
+   "other_states": {
+    "answer_found:mmmrrj": 409,
+    "halted:mmmrrj": 91
+   }
+  },
+  {
+   "problem": "abc-abd-ijk=abd",
+   "reference": "serial",
+   "other": "stream",
+   "n": [
+    500,
+    500
+   ],
+   "chi2": 2.095637264240808,
+   "df": 1,
+   "p": 0.14772010722467388,
+   "tv": 0.04400000000000001,
+   "z": {
+    "gave_up:abd": 1.4476316051540208,
+    "answer_found:abd": -1.4476316051540226
+   },
+   "mean_codelets": [
+    4704.562,
+    4555.016
+   ],
+   "reference_states": {
+    "answer_found:abd": 308,
+    "gave_up:abd": 192
+   },
+   "other_states": {
+    "answer_found:abd": 330,
+    "gave_up:abd": 170
+   }
+  },
+  {
+   "problem": "abc-aabbcc-kkjjii",
+   "reference": "serial",
+   "other": "stream",
+   "n": [
+    500,
+    500
+   ],
+   "chi2": 7.987812911382953,
+   "df": 6,
+   "p": 0.23899752366634963,
+   "tv": 0.060000000000000005,
+   "z": {
+    "answer_found:kjjjiii": -0.5782182480347836,
+    "answer_found:kkjjjii": -1.0005003753127737,
+    "answer_found:llkkjjiii": 1.0005003753127737,
+    "answer_found:kkjjiiii": -1.0005003753127737,
+    "answer_found:kkkji": 0.5782182480347836,
+    "answer_found:aabbcc": 2.3233834511910763,
+    "answer_found:kkkkjjii": 0.0,
+    "answer_found:kkkjiii": -1.0005003753127737,
+    "answer_found:kjjji": 0.5782182480347836,
+    "answer_found:kkkjjjjiii": 0.0,
+    "answer_found:kkkkjjjii": -1.0005003753127737,
+    "answer_found:kkkjjiihh": 0.0,
+    "answer_found:kjjiii": 1.0005003753127737,
+    "answer_found:kkjjiii": -0.5782182480347836,
+    "answer_found:kkjjji": 0.0,
+    "halted:": -0.3600207493137542,
+    "answer_found:kkkjjjiii": 0.07525841539850173,
+    "answer_found:kjiii": -1.002006020070253,
+    "answer_found:kkjjii": -0.36969246171698233,
+    "answer_found:kkjjjiiiii": 1.0005003753127737,
+    "answer_found:kkkjjiii": -0.5808458627977691,
+    "answer_found:kkkjji": -1.0005003753127737,
+    "answer_found:kkkkkjjii": 1.0005003753127737,
+    "answer_found:kkjjjiii": -0.379294334524734,
+    "gave_up:": 0.818957148778788,
+    "answer_found:kkjjiiiii": 0.5782182480347836,
+    "answer_found:kjji": 1.415629900797544,
+    "answer_found:kkkjjii": 1.0005003753127737,
+    "answer_found:kkkkjjiii": 1.7346547441043507,
+    "answer_found:kkkjjjii": 1.415629900797544,
+    "answer_found:kji": -0.6643088638193715,
+    "answer_found:kkkkkkkjjii": 1.0005003753127737,
+    "answer_found:kkjji": 1.415629900797544,
+    "answer_found:kkkjjji": 0.5782182480347836
+   },
+   "mean_codelets": [
+    7759.818,
+    7904.258
+   ],
+   "reference_states": {
+    "halted:": 128,
+    "answer_found:kkjjii": 118,
+    "answer_found:kkkjjjiii": 115,
+    "answer_found:kji": 84,
+    "answer_found:aabbcc": 10,
+    "answer_found:kkkjjiii": 5,
+    "gave_up:": 4,
+    "answer_found:kkjjjiii": 3,
+    "answer_found:kkkkjjiii": 3,
+    "answer_found:kkkjjiihh": 3,
+    "answer_found:kkkjjjii": 2,
+    "answer_found:kkjjiiiii": 2,
+    "answer_found:kjji": 2,
+    "answer_found:kkkjjji": 2,
+    "answer_found:kjjji": 2,
+    "answer_found:kkjji": 2,
+    "answer_found:kkkji": 2,
+    "answer_found:kkkjjjjiii": 2,
+    "answer_found:kjiii": 1,
+    "answer_found:kkjjji": 1,
+    "answer_found:kkkkkkkjjii": 1,
+    "answer_found:kkkjjii": 1,
+    "answer_found:kjjjiii": 1,
+    "answer_found:kkkkkjjii": 1,
+    "answer_found:kkjjiii": 1,
+    "answer_found:kkjjjiiiii": 1,
+    "answer_found:llkkjjiii": 1,
+    "answer_found:kjjiii": 1,
+    "answer_found:kkkkjjii": 1
+   },
+   "other_states": {
+    "halted:": 133,
+    "answer_found:kkjjii": 123,
+    "answer_found:kkkjjjiii": 114,
+    "answer_found:kji": 92,
+    "answer_found:kkkjjiii": 7,
+    "answer_found:kkjjjiii": 4,
+    "answer_found:kkkjjiihh": 3,
+    "answer_found:kjiii": 3,
+    "answer_found:aabbcc": 2,
+    "gave_up:": 2,
+    "answer_found:kjjjiii": 2,
+    "answer_found:kkjjiii": 2,
+    "answer_found:kkkjjjjiii": 2,
+    "answer_found:kkjjji": 1,
+    "answer_found:kkjjiiii": 1,
+    "answer_found:kkkjjji": 1,
+    "answer_found:kjjji": 1,
+    "answer_found:kkkjiii": 1,
+    "answer_found:kkkkjjjii": 1,
+    "answer_found:kkkji": 1,
+    "answer_found:kkkjji": 1,
+    "answer_found:kkjjjii": 1,
+    "answer_found:kkkkjjii": 1,
+    "answer_found:kkjjiiiii": 1
+   }
+  },
+  {
+   "problem": "a-b-z",
+   "reference": "serial",
+   "other": "stream",
+   "n": [
+    500,
+    500
+   ],
+   "chi2": 2.5921488150403813,
+   "df": 3,
+   "p": 0.458867623832916,
+   "tv": 0.03600000000000002,
+   "z": {
+    "answer_found:b": -0.9498713802919563,
+    "answer_found:y": 1.4502983777883032,
+    "answer_found:z": 0.26859796516861534,
+    "gave_up:": -0.4900351776211294
+   },
+   "mean_codelets": [
+    429.388,
+    417.13
+   ],
+   "reference_states": {
+    "answer_found:b": 255,
+    "answer_found:z": 168,
+    "answer_found:y": 59,
+    "gave_up:": 18
+   },
+   "other_states": {
+    "answer_found:b": 270,
+    "answer_found:z": 164,
+    "answer_found:y": 45,
+    "gave_up:": 21
+   }
+  },
+  {
+   "problem": "abc-abd-glz",
+   "reference": "serial",
+   "other": "stream",
+   "n": [
+    500,
+    500
+   ],
+   "chi2": 8.219619280173593,
+   "df": 6,
+   "p": 0.22245099340126542,
+   "tv": 0.04199999999999999,
+   "z": {
+    "answer_found:dlz": -0.4773283284129399,
+    "answer_found:glz": -0.24534921997340361,
+    "answer_found:abd": 1.0766077853074096,
+    "answer_found:gld": 0.8397482811922922,
+    "answer_found:hlz": -0.07572824456627537,
+    "answer_found:flz": 0.0,
+    "halted:": 1.6742176743686266,
+    "gave_up:": -2.026530552338317
+   },
+   "mean_codelets": [
+    2140.112,
+    2017.992
+   ],
+   "reference_states": {
+    "answer_found:gld": 149,
+    "answer_found:hlz": 112,
+    "answer_found:glz": 90,
+    "answer_found:flz": 82,
+    "answer_found:dlz": 36,
+    "gave_up:": 15,
+    "answer_found:abd": 9,
+    "halted:": 7
+   },
+   "other_states": {
+    "answer_found:gld": 137,
+    "answer_found:hlz": 113,
+    "answer_found:glz": 93,
+    "answer_found:flz": 82,
+    "answer_found:dlz": 40,
+    "gave_up:": 28,
+    "answer_found:abd": 5,
+    "halted:": 2
+   }
+  },
+  {
+   "problem": "ab-c-ab",
+   "reference": "serial",
+   "other": "stream",
+   "n": [
+    500,
+    500
+   ],
+   "chi2": 0.03583715596330275,
+   "df": 1,
+   "p": 0.8498521767878702,
+   "tv": 0.0040000000000000036,
+   "z": {
+    "answer_found:ab": 0.18930704150480723,
+    "answer_found:c": -0.18930704150480723
+   },
+   "mean_codelets": [
+    700.368,
+    730.18
+   ],
+   "reference_states": {
+    "answer_found:c": 435,
+    "answer_found:ab": 65
+   },
+   "other_states": {
+    "answer_found:c": 437,
+    "answer_found:ab": 63
+   }
+  },
+  {
+   "problem": "bc-d-bc",
+   "reference": "serial",
+   "other": "stream",
+   "n": [
+    500,
+    500
+   ],
+   "chi2": 0.0,
+   "df": 0,
+   "p": null,
+   "tv": 0.0,
+   "z": {
+    "answer_found:d": 0.0
+   },
+   "mean_codelets": [
+    672.362,
+    682.994
+   ],
+   "reference_states": {
+    "answer_found:d": 500
+   },
+   "other_states": {
+    "answer_found:d": 500
+   }
+  },
+  {
+   "problem": "xy-z-xy",
+   "reference": "serial",
+   "other": "stream",
+   "n": [
+    500,
+    500
+   ],
+   "chi2": 0.0,
+   "df": 0,
+   "p": null,
+   "tv": 0.0,
+   "z": {
+    "answer_found:z": 0.0
+   },
+   "mean_codelets": [
+    712.47,
+    724.784
+   ],
+   "reference_states": {
+    "answer_found:z": 500
+   },
+   "other_states": {
+    "answer_found:z": 500
+   }
+  },
+  {
+   "problem": "zy-x-zy",
+   "reference": "serial",
+   "other": "stream",
+   "n": [
+    500,
+    500
+   ],
+   "chi2": 0.08228571428571428,
+   "df": 1,
+   "p": 0.7742234502430368,
+   "tv": 0.006000000000000005,
+   "z": {
+    "answer_found:x": 0.28685486624025475,
+    "answer_found:zy": -0.28685486624025475
+   },
+   "mean_codelets": [
+    701.78,
+    713.4
+   ],
+   "reference_states": {
+    "answer_found:x": 439,
+    "answer_found:zy": 61
+   },
+   "other_states": {
+    "answer_found:x": 436,
+    "answer_found:zy": 64
+   }
+  },
+  {
+   "problem": "aabb-cc-aabb",
+   "reference": "serial",
+   "other": "stream",
+   "n": [
+    500,
+    500
+   ],
+   "chi2": 1.5169735193313612,
+   "df": 3,
+   "p": 0.6783584282033954,
+   "tv": 0.014000000000000007,
+   "z": {
+    "answer_found:a": 0.0,
+    "answer_found:ccc": -0.818957148778788,
+    "answer_found:ccbb": -0.4483358396622203,
+    "halted:": -0.5653438092372196,
+    "answer_found:cc": 0.31801944631338425,
+    "answer_found:ac": -1.0005003753127737,
+    "gave_up:": 0.12651641222001372
+   },
+   "mean_codelets": [
+    5032.442,
+    5066.954
+   ],
+   "reference_states": {
+    "gave_up:": 256,
+    "answer_found:cc": 226,
+    "halted:": 13,
+    "answer_found:ccc": 2,
+    "answer_found:ccbb": 2,
+    "answer_found:a": 1
+   },
+   "other_states": {
+    "gave_up:": 254,
+    "answer_found:cc": 221,
+    "halted:": 16,
+    "answer_found:ccc": 4,
+    "answer_found:ccbb": 3,
+    "answer_found:ac": 1,
+    "answer_found:a": 1
+   }
+  },
+  {
+   "problem": "abc-d-abc",
+   "reference": "serial",
+   "other": "stream",
+   "n": [
+    500,
+    500
+   ],
+   "chi2": 0.1268874508311128,
+   "df": 1,
+   "p": 0.7216813203933532,
+   "tv": 0.011999999999999995,
+   "z": {
+    "answer_found:d": 0.35621264833118016,
+    "answer_found:dc": 1.0005003753127737,
+    "answer_found:abc": -0.537335937017508,
+    "gave_up:": 1.0005003753127737
+   },
+   "mean_codelets": [
+    839.624,
+    862.836
+   ],
+   "reference_states": {
+    "answer_found:d": 428,
+    "answer_found:abc": 70,
+    "answer_found:dc": 1,
+    "gave_up:": 1
+   },
+   "other_states": {
+    "answer_found:d": 424,
+    "answer_found:abc": 76
+   }
+  }
+ ]
+}
