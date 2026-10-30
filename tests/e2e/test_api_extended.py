@@ -804,7 +804,7 @@ _ANSWER_JUDGEMENT_FIELDS = (
 
 
 @pytest.mark.asyncio
-async def test_the_session_and_run_memory_describe_an_answer_the_same_way(app_client):
+async def test_the_shared_and_run_memory_describe_an_answer_the_same_way(app_client):
     """`GET /api/memory` and `GET /runs/{id}/memory` are two reads of one memory.
 
     §4.7.3 weighs answers by how abstract their rules and themes are, so a reader gets
@@ -822,7 +822,7 @@ async def test_the_session_and_run_memory_describe_an_answer_the_same_way(app_cl
 
     shared = (await app_client.get("/api/memory")).json()["answers"]
     per_run = (await app_client.get(f"/api/runs/{run_id}/memory")).json()["answers"]
-    assert shared, "the run contributed no answer to the session memory"
+    assert shared, "the run contributed no answer to the shared memory"
 
     for answer in shared + per_run:
         for field in _ANSWER_JUDGEMENT_FIELDS:
@@ -1229,10 +1229,10 @@ async def test_a_stored_answer_can_be_displayed_over_the_live_themespace(app_cli
 
 
 @pytest.mark.asyncio
-async def test_two_answers_in_one_session_can_be_compared_and_explained(app_client):
+async def test_two_answers_in_one_memory_can_be_compared_and_explained(app_client):
     """§4.7.3 – §4.7.4: the program is asked to compare two answers it has found.
 
-    Two runs sharing one Training Session share one Episodic Memory, which is the only
+    Two episodic runs before any clear share one Episodic Memory, which is the only
     way two answers ever end up comparable — "asking the program to compare two answers
     is accomplished simply by clicking on graphical icons associated with the answers"
     (§4.6).  Asserted here is the shape MetaCat's own output has: one paragraph, an

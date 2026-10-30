@@ -6,7 +6,7 @@ the failure this work package was convened to fix was not a bad writer but a wri
 with no reader, and a writer with a reader that has no tests is the same failure one
 release later.
 
-The tests are organised the way the surfaces are: the Training Session browser, the
+The tests are organised the way the surfaces are: the episodic-run timeline, the
 Normal start-against-end comparison, and the forward-only Audit inspector.  The two
 that matter most are ``test_the_inspector_reconstructs_the_recorded_run``, which
 requires the inspector's re-execution to agree with the recorded action log tick for
@@ -55,84 +55,287 @@ async def _run(client, mode: str, max_steps: int = 900, **kw):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# The Training Session browser
+# The episodic-run timeline
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.asyncio
-async def test_sessions_list_with_their_run_counts(review_client):
-    """The browser's top level: sessions, newest first, countable at a glance."""
-    run_id = await _run(review_client, MODE_NORMAL, max_steps=200)
+@pytest.fixture
+async def empty_timeline(db_session):
+    """A database with no recorded runs and no clears, before and after."""
+    from sqlalchemy import delete
 
-    resp = await review_client.get("/api/review/sessions")
+    from server.models.run import EpisodicMemoryClear, Run
+
+    async def _empty():
+        await db_session.execute(delete(EpisodicMemoryClear))
+        await db_session.execute(delete(Run))
+        await db_session.commit()
+
+    await _empty()
+    yield
+    await _empty()
+
+
+async def _insert_runs(db_session, n: int) -> list[int]:
+    """``n`` recorded runs, oldest first, as their ids."""
+    from server.models.run import Run
+
+    rows = [
+        Run(initial_string="abc", modified_string="abd", target_string="xyz", seed=i)
+        for i in range(n)
+    ]
+    db_session.add_all(rows)
+    await db_session.commit()
+    return [r.id for r in rows]
+
+
+async def _insert_clear(db_session, after_run_id, note: str = "") -> int:
+    from server.models.run import EpisodicMemoryClear
+
+    row = EpisodicMemoryClear(after_run_id=after_run_id, note=note)
+    db_session.add(row)
+    await db_session.commit()
+    return row.id
+
+
+def _shape(body, runs, clears):
+    """The page as a list of ``run:<index>`` / ``clear:<index>`` labels."""
+    out = []
+    for item in body["items"]:
+        if item["kind"] == "run":
+            out.append(f"run:{runs.index(item['run']['run_id'])}")
+        else:
+            assert item["kind"] == "memory_cleared"
+            out.append(f"clear:{clears.index(item['clear']['clear_id'])}")
+    return out
+
+
+async def _timeline_fixture(db_session):
+    """Six runs r0..r5 and five clears, placed to cover every rule.
+
+    Clears, oldest to newest: c0 has no run before it, c1 and c2 share the gap after r1,
+    c3 is after r3, c4 is after the latest run.
+    """
+    runs = await _insert_runs(db_session, 6)
+    clears = [
+        await _insert_clear(db_session, None),
+        await _insert_clear(db_session, runs[1]),
+        await _insert_clear(db_session, runs[1]),
+        await _insert_clear(db_session, runs[3]),
+        await _insert_clear(db_session, runs[5]),
+    ]
+    return runs, clears
+
+
+@pytest.mark.asyncio
+async def test_the_timeline_places_each_clear_exactly(review_client, db_session, empty_timeline):
+    runs, clears = await _timeline_fixture(db_session)
+
+    resp = await review_client.get("/api/review/episodic-runs?limit=50")
     assert resp.status_code == 200, resp.text
     body = resp.json()
-    assert body["total"] >= 1
-    assert body["sessions"], "the run just created belongs to a session"
-
-    current = body["sessions"][0]
-    assert current["run_count"] >= 1
-    assert current["first_run_at"] is not None
-    assert current["last_run_at"] is not None
-    # A session ends when Episodic Memory is cleared; nothing has cleared it here.
-    assert current["is_open"] is True
-
-    detail = await review_client.get(f"/api/review/sessions/{current['session_id']}")
-    assert detail.status_code == 200
-    runs = detail.json()["runs"]
-    assert run_id in [r["run_id"] for r in runs]
+    assert (body["total_runs"], body["total_clears"]) == (6, 5)
+    assert (body["limit"], body["offset"]) == (50, 0)
+    # Newest first; a clear sits above every run up to its after_run_id, and clears in
+    # the same gap are newest first (c2 above c1); the clear with nothing before it is
+    # at the very end.
+    assert _shape(body, runs, clears) == [
+        "clear:4", "run:5", "run:4", "clear:3", "run:3", "run:2",
+        "clear:2", "clear:1", "run:1", "run:0", "clear:0",
+    ]
+    clear = body["items"][0]["clear"]
+    assert set(clear) == {"clear_id", "cleared_at", "after_run_id", "note"}
+    assert clear["after_run_id"] == runs[5]
+    run = body["items"][1]["run"]
+    assert "session_id" not in run
+    assert set(body["items"][0]) == {"kind", "clear"}
+    assert set(body["items"][1]) == {"kind", "run"}
 
 
 @pytest.mark.asyncio
-async def test_a_session_can_be_named(review_client):
-    """The one editable thing about a Training Session.
+async def test_timeline_pages_partition_the_runs_and_the_clears(
+    review_client, db_session, empty_timeline
+):
+    runs, clears = await _timeline_fixture(db_session)
 
-    A session is not created deliberately — it is the span between two Episodic Memory
-    clears — so a number and a date range is all that otherwise distinguishes one. The
-    column has existed since WP3.0 and nothing could set it.
-    """
-    await _run(review_client, MODE_NORMAL, max_steps=100)
-    sessions = (await review_client.get("/api/review/sessions")).json()["sessions"]
-    session_id = sessions[0]["session_id"]
+    pages = []
+    for offset in (0, 2, 4):
+        body = (
+            await review_client.get(f"/api/review/episodic-runs?limit=2&offset={offset}")
+        ).json()
+        assert (body["total_runs"], body["total_clears"]) == (6, 5)
+        pages.append(_shape(body, runs, clears))
+    assert pages == [
+        ["clear:4", "run:5", "run:4"],
+        ["clear:3", "run:3", "run:2"],
+        ["clear:2", "clear:1", "run:1", "run:0", "clear:0"],
+    ]
+    # Every run and every clear appears once across the pages.
+    flat = [x for page in pages for x in page]
+    assert sorted(flat) == sorted(
+        [f"run:{i}" for i in range(6)] + [f"clear:{i}" for i in range(5)]
+    )
+
+    # A page boundary falling directly after a clear's run keeps it with that run.
+    body = (await review_client.get("/api/review/episodic-runs?limit=3&offset=3")).json()
+    assert _shape(body, runs, clears) == [
+        "run:2", "clear:2", "clear:1", "run:1", "run:0", "clear:0",
+    ]
+    body = (await review_client.get("/api/review/episodic-runs?limit=3&offset=0")).json()
+    assert _shape(body, runs, clears) == [
+        "clear:4", "run:5", "run:4", "clear:3", "run:3",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_a_clear_whose_run_was_deleted_keeps_its_place(
+    review_client, db_session, empty_timeline
+):
+    """``after_run_id`` is a value, not a foreign key: deleting a run does not lose the event."""
+    from sqlalchemy import delete
+
+    from server.models.run import Run
+
+    runs, clears = await _timeline_fixture(db_session)
+    await db_session.execute(delete(Run).where(Run.id == runs[3]))
+    await db_session.commit()
+
+    body = (await review_client.get("/api/review/episodic-runs")).json()
+    assert _shape(body, runs, clears) == [
+        "clear:4", "run:5", "run:4", "clear:3", "run:2",
+        "clear:2", "clear:1", "run:1", "run:0", "clear:0",
+    ]
+    body = (await review_client.get("/api/review/episodic-runs?limit=2&offset=2")).json()
+    assert _shape(body, runs, clears) == ["clear:3", "run:2", "clear:2", "clear:1", "run:1"]
+
+
+@pytest.mark.asyncio
+async def test_the_timeline_with_no_runs_still_shows_the_clears(
+    review_client, db_session, empty_timeline
+):
+    first = await _insert_clear(db_session, None)
+    second = await _insert_clear(db_session, None)
+    body = (await review_client.get("/api/review/episodic-runs")).json()
+    assert [i["clear"]["clear_id"] for i in body["items"]] == [second, first]
+    assert (body["total_runs"], body["total_clears"]) == (0, 2)
+    beyond = (await review_client.get("/api/review/episodic-runs?offset=5")).json()
+    assert beyond["items"] == []
+
+
+@pytest.mark.asyncio
+async def test_the_timeline_refuses_nonsense_paging(review_client):
+    for query in ("limit=0", "limit=501", "offset=-1"):
+        resp = await review_client.get(f"/api/review/episodic-runs?{query}")
+        assert resp.status_code == 422, query
+
+
+@pytest.mark.asyncio
+async def test_the_old_session_endpoints_are_gone(review_client):
+    for method, path in (
+        ("get", "/api/review/sessions"),
+        ("get", "/api/review/sessions/1"),
+        ("put", "/api/review/sessions/1/note"),
+    ):
+        resp = await getattr(review_client, method)(path)
+        assert resp.status_code in (404, 405), path
+
+
+@pytest.mark.asyncio
+async def test_a_recorded_run_appears_in_the_timeline_with_its_identity(review_client):
+    """Mode, problem, status, codelet count, answer and the two hashes — enough to
+    tell one recorded experiment from another without opening it."""
+    run_id = await _run(review_client, MODE_NORMAL, max_steps=400)
+
+    body = (await review_client.get("/api/review/episodic-runs")).json()
+    run = next(
+        i["run"] for i in body["items"] if i["kind"] == "run" and i["run"]["run_id"] == run_id
+    )
+
+    assert run["mode"] == MODE_NORMAL
+    assert (run["initial"], run["modified"], run["target"]) == (
+        PROBLEM["initial"], PROBLEM["modified"], PROBLEM["target"],
+    )
+    assert run["status"]
+    assert run["codelet_count"] > 0
+    assert run["seed"] == SEED
+    assert run["config_hash"] and run["memory_hash"]
+    # Normal writes exactly two captures and no actions; that is the mode's whole
+    # difference from Fast, and the timeline shows it.
+    assert run["capture_count"] == 2
+    assert run["action_count"] == 0
+
+    # Opening the same run by id gives the same projection.
+    opened = (await review_client.get(f"/api/review/runs/{run_id}")).json()
+    assert opened == run
+
+
+@pytest.mark.asyncio
+async def test_a_memory_clear_note_can_be_set_and_read_back(review_client, db_session, empty_timeline):
+    """The one editable thing about a clear: a person says afterwards what it was for."""
+    clear_id = await _insert_clear(db_session, None)
 
     saved = await review_client.put(
-        f"/api/review/sessions/{session_id}/note",
-        json={"note": "five-letter sweep"},
+        f"/api/memory/clears/{clear_id}/note", json={"note": "five-letter sweep"}
     )
     assert saved.status_code == 200, saved.text
-    assert saved.json() == {"session_id": session_id, "note": "five-letter sweep"}
+    body = saved.json()
+    assert body["clear_id"] == clear_id
+    assert body["note"] == "five-letter sweep"
+    assert set(body) == {"clear_id", "cleared_at", "after_run_id", "note"}
 
-    # Both places the browser reads it from have to agree, because it shows the note
-    # in the list header and in the opened detail, and fetches them separately.
-    listed = (await review_client.get("/api/review/sessions")).json()["sessions"]
-    assert next(s for s in listed if s["session_id"] == session_id)["note"] == (
-        "five-letter sweep"
-    )
-    detail = (await review_client.get(f"/api/review/sessions/{session_id}")).json()
-    assert detail["note"] == "five-letter sweep"
+    # Both places that show it have to agree.
+    listed = (await review_client.get("/api/memory/clears")).json()
+    assert listed["total"] == 1
+    assert listed["clears"][0]["note"] == "five-letter sweep"
+    timeline = (await review_client.get("/api/review/episodic-runs")).json()
+    assert timeline["items"][0]["clear"]["note"] == "five-letter sweep"
+
+    # And it can be emptied again.
+    cleared = await review_client.put(f"/api/memory/clears/{clear_id}/note", json={"note": ""})
+    assert cleared.json()["note"] == ""
 
 
 @pytest.mark.asyncio
-async def test_naming_a_session_that_does_not_exist_is_refused(review_client):
-    """A 404 rather than a silent no-op.
-
-    A note the caller believes was saved and was not is worse than an error, because
-    it is discovered much later — when the record is being read rather than written.
-    """
-    resp = await review_client.put(
-        "/api/review/sessions/999999/note", json={"note": "x"}
-    )
+async def test_a_note_on_a_clear_that_does_not_exist_is_refused(review_client):
+    """A 404 rather than a silent no-op: a note believed saved and not is found much later."""
+    resp = await review_client.put("/api/memory/clears/999999/note", json={"note": "x"})
     assert resp.status_code == 404
 
 
 @pytest.mark.asyncio
-async def test_a_run_can_be_opened_by_id_without_knowing_its_session(review_client):
-    """The route from the dashboard into the review surfaces.
+async def test_memory_clears_list_newest_first_with_paging(review_client, db_session, empty_timeline):
+    ids = [await _insert_clear(db_session, None) for _ in range(3)]
+    body = (await review_client.get("/api/memory/clears?limit=2&offset=0")).json()
+    assert body["total"] == 3
+    assert [c["clear_id"] for c in body["clears"]] == [ids[2], ids[1]]
+    body = (await review_client.get("/api/memory/clears?limit=2&offset=2")).json()
+    assert [c["clear_id"] for c in body["clears"]] == [ids[0]]
+    assert (await review_client.get("/api/memory/clears?limit=0")).status_code == 422
 
-    The browser is organised by Training Session, which is the wrong way round for a
-    reader arriving from Run History: they know the run, and the session is precisely
-    what they do not.
-    """
+
+@pytest.mark.asyncio
+async def test_delete_memory_returns_the_clear_and_the_timeline_places_it(
+    review_client, empty_timeline
+):
+    run_id = await _run(review_client, MODE_NORMAL, max_steps=200)
+
+    resp = await review_client.delete("/api/memory")
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["cleared"] is True
+    assert set(body["removed"]) == {"answers", "snags"}
+    clear = body["clear"]
+    assert set(clear) == {"clear_id", "cleared_at", "after_run_id", "note"}
+    assert clear["after_run_id"] == run_id
+
+    timeline = (await review_client.get("/api/review/episodic-runs")).json()
+    assert [(i["kind"]) for i in timeline["items"]] == ["memory_cleared", "run"]
+    assert timeline["items"][0]["clear"] == clear
+
+
+@pytest.mark.asyncio
+async def test_a_run_can_be_opened_by_id_without_the_timeline(review_client):
+    """The route from the dashboard into the review surfaces."""
     run_id = await _run(review_client, MODE_NORMAL, max_steps=200)
 
     resp = await review_client.get(f"/api/review/runs/{run_id}")
@@ -142,19 +345,9 @@ async def test_a_run_can_be_opened_by_id_without_knowing_its_session(review_clie
     assert run["run_id"] == run_id
     assert run["mode"] == MODE_NORMAL
     assert run["seed"] == SEED
-    # The session is what the caller could not have known, so it is answered.
-    assert run["session_id"] is not None
-    # The same projection the session listing gives, counts included.
+    assert "session_id" not in run
     assert run["capture_count"] == 2
     assert run["action_count"] == 0
-
-    detail = (
-        await review_client.get(f"/api/review/sessions/{run['session_id']}")
-    ).json()
-    listed = next(r for r in detail["runs"] if r["run_id"] == run_id)
-    assert {k: listed[k] for k in ("mode", "seed", "capture_count", "action_count")} == {
-        k: run[k] for k in ("mode", "seed", "capture_count", "action_count")
-    }
 
 
 @pytest.mark.asyncio
@@ -171,36 +364,10 @@ async def test_opening_a_fast_run_by_id_says_why_there_is_nothing(review_client)
 
 
 @pytest.mark.asyncio
-async def test_a_run_in_a_session_carries_its_identity(review_client):
-    """Mode, problem, status, codelet count, answer and the two hashes — enough to
-    tell one recorded experiment from another without opening it."""
-    run_id = await _run(review_client, MODE_NORMAL, max_steps=400)
-
-    sessions = (await review_client.get("/api/review/sessions")).json()["sessions"]
-    detail = (
-        await review_client.get(f"/api/review/sessions/{sessions[0]['session_id']}")
-    ).json()
-    run = next(r for r in detail["runs"] if r["run_id"] == run_id)
-
-    assert run["mode"] == MODE_NORMAL
-    assert (run["initial"], run["modified"], run["target"]) == (
-        PROBLEM["initial"], PROBLEM["modified"], PROBLEM["target"],
-    )
-    assert run["status"]
-    assert run["codelet_count"] > 0
-    assert run["seed"] == SEED
-    assert run["config_hash"] and run["memory_hash"]
-    # Normal writes exactly two captures and no actions; that is the mode's whole
-    # difference from Fast, and the browser shows it.
-    assert run["capture_count"] == 2
-    assert run["action_count"] == 0
-
-
-@pytest.mark.asyncio
 async def test_a_fast_run_says_so_rather_than_looking_broken(review_client):
     """A Fast Run has nothing to review, which is the mode working, not failing.
 
-    It is not even in a session — it has no database row at all — so the surface that
+    It is not even in the timeline — it has no database row at all — so the surface that
     has to behave well is the capture fetch, which must say "nothing was recorded"
     rather than erroring in a way that reads as a bug.
     """
@@ -298,7 +465,7 @@ async def test_the_comparison_shows_what_the_run_did(review_client):
     """Not both blobs: what changed.
 
     Structures built, how far the temperature moved, which concepts were recruited,
-    which themes came to dominate, and what was added to the Training Session's
+    which themes came to dominate, and what was added to the
     Episodic Memory.
     """
     run_id = await _run(review_client, MODE_NORMAL, max_steps=1500)

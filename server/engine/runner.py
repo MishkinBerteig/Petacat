@@ -446,7 +446,7 @@ class EngineRunner:
         # ``run.ss:212`` — ``(tell *memory* 'clear-activations)``.  A stored answer's
         # activation is how strongly the program is *currently* reminded of it (§4.7.5),
         # so it belongs to the run that did the reminding.  Carried into the next run of
-        # a Training Session it would show a fresh run as already reminded of answers it
+        # a sequence of episodic runs it would show a fresh run as already reminded of answers it
         # has not thought about, and the Memory panel renders exactly this value.
         memory.clear_activations()
 

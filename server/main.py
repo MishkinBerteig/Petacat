@@ -158,6 +158,8 @@ async def _reconcile_metadata_columns(engine) -> None:
 
 
 async def _ensure_db_ready():
+    from server.services.episodic_clears_migration import EpisodicClearMigrationError
+
     """Create tables and seed metadata if they don't exist yet.
 
     Help topics are always synced on startup (idempotent upsert by topic_key),
@@ -178,6 +180,20 @@ async def _ensure_db_ready():
 
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+
+        # Metacat Mode has no Training Sessions: convert a database that still records
+        # them into Episodic Memory clears, losslessly and once (no-op afterwards).  The
+        # development database has no ``alembic_version``, so this is how it is converted;
+        # Alembic migration 018 runs the same function.
+        from server.services.episodic_clears_migration import convert_sessions_to_clears
+
+        async with engine.begin() as conn:
+            converted = await conn.run_sync(convert_sessions_to_clears)
+        if converted["converted"]:
+            logger.info(
+                "Converted Training Sessions to %d Episodic Memory clears",
+                converted["clears"],
+            )
 
         # create_all only creates missing tables; bring existing ones up to date.
         await _reconcile_metadata_columns(engine)
@@ -229,6 +245,9 @@ async def _ensure_db_ready():
             await _sync_help_topics(session, SEED_DATA_DIR)
 
         await engine.dispose()
+    except EpisodicClearMigrationError:
+        # Not "the database may be unavailable": converting would lose a note.  Stop.
+        raise
     except Exception as e:
         logger.warning("DB setup skipped (may not be available): %s", e)
 

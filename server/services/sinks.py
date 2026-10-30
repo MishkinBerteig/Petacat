@@ -97,8 +97,8 @@ class TraceRecordingSink:
         #: an ordinary run, with the rows' descriptions empty.
         self._snags: list[Any] = []
         #: The memory's snags this run has already accounted for, by identifier: the
-        #: ones it inherited, and the ones it has taken since.  The memory is the whole
-        #: Training Session's, and ``flush`` empties ``_snags``, so neither the memory's
+        #: ones it inherited, and the ones it has taken since.  The memory is shared by every
+        #: episodic run, and ``flush`` empties ``_snags``, so neither the memory's
         #: length nor the buffer's says which snags are new.  Comparing the two lengths
         #: wrote every earlier snag again under each later run that snagged, and again
         #: after each flush, relabelled with that run's id.
@@ -243,7 +243,7 @@ class NormalSink(TraceRecordingSink):
     mode-equivalence test meaningful, because there is nothing else that *could* differ.
 
     Why complete state rather than the problem and the seed: a Run inherits its Episodic
-    Memory from whatever preceded it in the Training Session, so ``(problem, seed)`` does
+    Memory from whatever preceded it among the episodic runs, so ``(problem, seed)`` does
     not determine its behaviour and ``(complete starting state, problem, seed)`` does.
     That is also what makes a Normal Run **reproducible by re-execution** — reload the
     recorded start state, run, and the recorded end state must follow — rather than by

@@ -25,10 +25,10 @@ An allocator belongs to whatever the identifiers are meaningful within:
   ``EngineContext.ids`` holds that allocator, and the engine binds it as the current
   allocator for the duration of every engine entry point.
 - The **Episodic Memory** owns answer and snag numbering, because Episodic Memory is
-  the one component that deliberately outlives a run: within a Training Session it
+  the one component that deliberately outlives a run: across episodic runs it
   accumulates answers across many runs, and ``POST /api/memory/compare`` looks answers
   up by ``answer_id``.  Per-run numbering there would hand two different answers in
-  one session the same identifier.  ``EpisodicMemory`` therefore carries its own
+  one memory the same identifier.  ``EpisodicMemory`` therefore carries its own
   allocator and stamps descriptions as they are stored.
 
 Binding
@@ -100,7 +100,7 @@ class IdAllocator:
 
         Used when identifiers arrive from outside the allocator — restoring an Episodic
         Memory from its stored rows, where each answer keeps the identifier it was given
-        in the session that found it.  Without this the counter would start again at 1
+        in the run that found it.  Without this the counter would start again at 1
         and re-issue an identifier already in use, and the two answers sharing it would
         be indistinguishable to every API that names one.
         """

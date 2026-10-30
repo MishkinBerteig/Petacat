@@ -108,9 +108,9 @@ Comparison allows two answers to be directly contrasted, analyzing their shared 
 
 Commentary is the system's ability to generate natural-language English descriptions of answers and comparisons. This is not natural language understanding -- it is template-based transcription from the Slipnet concept vocabulary into English phrases. For example, Metacat can say 'The answer xyz was produced by replacing the rightmost letter by its successor' or 'Both answers share the theme of left-to-right directionality in their top bridges.' This commentary capability makes the system's reasoning accessible and interpretable.
 
-Episodic Memory is the only thing that survives a run boundary. The Slipnet, the Themespace, the Workspace, the Coderack, the Temporal Trace, the temperature and the random stream are all rebuilt for each new run; the memory is handed on. That is what makes a sequence of runs a *training session* (Metacat Mode's session, labelled 'Training Session' in the UI, and not Training Mode) rather than a sequence of unrelated attempts, and it is why clearing the memory from the Admin view is what separates one session from the next. Every persistence mode shares that memory: a Fast run inherits from the session and contributes to it exactly as Normal and Audit do. Each stored answer carries three actions. **display** re-enters that earlier Metacat episode: the Workspace is redrawn with the answer's description ('Answer Description', or 'Unjustified Answer Description'), showing the supporting groups and bridges, the concept-mappings that support its themes, the slippages the translation applied and the objects and bridges behind each rule; the Slipnet and Coderack are blanked; the Temperature shows the temperature the answer was found at; and the vertical, top and bottom theme-patterns are imposed over the live Themespace. Again restores the live state. A snag has the same **display** button: it redraws the 'Snag Description' with the failed translated rule and '???', shows a temperature of 100, and imposes the snag's theme-pattern. **explain** gives the program's own account of what the answer is based on. **forget** deletes that one answer, which is how you ask the program to look for it again.
+Episodic Memory is the only thing that survives a run boundary. The Slipnet, the Themespace, the Workspace, the Coderack, the Temporal Trace, the temperature and the random stream are all rebuilt for each new run; the memory is handed on. That is what makes Metacat Mode's runs episodic runs: each inherits what the runs before it left, rather than being an unrelated attempt. Clearing the memory, from the Run Controls panel or the Admin view, is an event that the next episodic run starts after with none. Every persistence mode shares that memory: a Fast run inherits from it and contributes to it exactly as Normal and Audit do. Each stored answer carries three actions. **display** re-enters that earlier Metacat episode: the Workspace is redrawn with the answer's description ('Answer Description', or 'Unjustified Answer Description'), showing the supporting groups and bridges, the concept-mappings that support its themes, the slippages the translation applied and the objects and bridges behind each rule; the Slipnet and Coderack are blanked; the Temperature shows the temperature the answer was found at; and the vertical, top and bottom theme-patterns are imposed over the live Themespace. Again restores the live state. A snag has the same **display** button: it redraws the 'Snag Description' with the failed translated rule and '???', shows a temperature of 100, and imposes the snag's theme-pattern. **explain** gives the program's own account of what the answer is based on. **forget** deletes that one answer, which is how you ask the program to look for it again.
 
-**Related concepts:** `answer_description`, `snag_description`, `reminding`, `comparison`, `commentary`, `quality_score`, `thematic_profile`, `cross_run`, `training_session`
+**Related concepts:** `answer_description`, `snag_description`, `reminding`, `comparison`, `commentary`, `quality_score`, `thematic_profile`, `cross_run`, `episodic_runs`
 
 ### Metacat Mode and Training Mode
 
@@ -119,7 +119,7 @@ Episodic Memory is the only thing that survives a run boundary. The Slipnet, the
 
 Petacat has two modes, and every feature belongs to exactly one of them.
 
-Metacat Mode is Petacat as a functional equivalent of Metacat, exactly as in v1.2: ordinary runs (Fast, Normal and Audit; Run to answer and Live updates), Run History and Review, the one-problem Swarm, and the Admin view, which edits the global configuration. It also holds Metacat's own episodic features: the Episodic Memory that successive runs share, with reminding, snags and answer and snag descriptions, and the session those runs form, which the Run Controls panel calls the 'Training Session'. Despite its name, that session is Metacat Mode's: it shares Metacat Mode's Episodic Memory and has nothing to do with Training Mode. Episodic Memory is a very minimal kind of learning, which this help calls Metacat-Mode learning. Metacat Mode stays permanently faithful to Metacat.
+Metacat Mode is Petacat as a functional equivalent of Metacat, exactly as in v1.2: ordinary runs (Fast, Normal and Audit; Run to answer and Live updates), Run History and Review, the one-problem Swarm, and the Admin view, which edits the global configuration. It also holds Metacat's own episodic features: the Episodic Memory that successive runs share, with reminding, snags and answer and snag descriptions. Metacat Mode's runs are episodic runs: each inherits the Episodic Memory that the runs before it left, until that memory is cleared. Metacat Mode has no sessions of any kind; v1.2's 'Training Session' was a Petacat misnomer that v2.0 removed. Episodic Memory is a very minimal kind of learning, which this help calls Metacat-Mode learning. Metacat Mode stays permanently faithful to Metacat.
 
 Training Mode is every extension added since v1.2 that makes Petacat a machine-learning platform. Today that is Trainings: named, database-backed episodes of many problems, extendable while they run, each with its own episode memory. Planned for Training Mode are a Training's own evolving Slipnet, learners, and an external delta route; the first major milestone, v2.0, is Petacat recognizing new concepts and incorporating them into the Slipnet by modelling a learning feedback loop and perceptual processes. All of that is Training-Mode learning. A Training copies the global configuration when it is created and never reads or writes Metacat Mode's Episodic Memory, Slipnet or configuration.
 
@@ -160,19 +160,19 @@ Problem Input fields are disabled while a run is in progress; press Stop first.
 ### Review
 
 **Topic key:** `review`  
-**Summary:** Reads back what recorded runs wrote: a training session (Metacat Mode's session) browser, a start-versus-end comparison for Normal runs, and a forward step-through for Audit runs.
+**Summary:** Reads back what recorded runs wrote: an episodic-run timeline, a start-versus-end comparison for Normal runs, and a forward step-through for Audit runs.
 
 The Review view is reached from the hamburger menu. Where the dashboard shows a run that is happening, Review shows runs that have already happened, rendered from what they recorded rather than from a live engine.
 
-The left-hand panel lists training sessions (Metacat Mode's sessions), newest first, each expanding into the sequence of runs it contains with each run's persistence mode shown. Fast runs are not merely empty here -- they are absent, because a Fast run writes no database row at all. Selecting a run opens the review appropriate to its mode, since the two modes record genuinely different things and there is nothing sensible to show a reader who opens the wrong one.
+The left-hand panel is the episodic-run timeline: Metacat Mode's recorded runs, newest first, with each run's persistence mode shown. Wherever Episodic Memory was cleared, the timeline shows an 'Episodic Memory cleared' marker with its date, between the run before the clear and the run after it. Each marker has a note you can edit, to say why the memory was cleared. The timeline is paged by runs. Fast runs are not merely empty here -- they are absent, because a Fast run writes no database row at all. Selecting a run opens the review appropriate to its mode, since the two modes record genuinely different things and there is nothing sensible to show a reader who opens the wrong one.
 
-**A Normal run** shows the complete state captured at its start, the complete state captured at its end, and a comparison of the two. The comparison is the useful part: the two captures are large and nearly identical, so rather than showing both it reports what actually moved -- how many codelets ran, how far the temperature fell, which structures were built in which string and which kinds of bridge were made, the rules the run finished holding together with their English descriptions, the largest changes in Slipnet activation, which themes moved and which were dominant at the end, and what the run contributed to the training session's episodic memory.
+**A Normal run** shows the complete state captured at its start, the complete state captured at its end, and a comparison of the two. The comparison is the useful part: the two captures are large and nearly identical, so rather than showing both it reports what actually moved -- how many codelets ran, how far the temperature fell, which structures were built in which string and which kinds of bridge were made, the rules the run finished holding together with their English descriptions, the largest changes in Slipnet activation, which themes moved and which were dominant at the end, and what the run contributed to Episodic Memory.
 
 **An Audit run** gets a tick-by-tick inspector. Step forward through the run and see, at each tick, the codelet that ran, the structures that changed, and the activation and temperature at that instant. Stepping is forward-only in this release. The inspector works by restoring the run's start capture and walking a real engine forward, which is only honest if the reconstruction really is the recorded run -- so it is checked against the recorded action log as it goes.
 
 Everything is drawn with the same Workspace, Slipnet, Themespace and Trace components as the live dashboard, pointed at recorded state instead of a running engine. One exception: the Slipnet graph is read-only here, because right-clicking a node clamps it and clamping a recording means nothing.
 
-**Related concepts:** `persistence_mode`, `training_session`, `run_history`, `memory`, `trace`
+**Related concepts:** `persistence_mode`, `episodic_runs`, `run_history`, `memory`, `trace`
 
 ### Run Controls
 
@@ -226,7 +226,7 @@ Run History is distinct from Episodic Memory: runs are database rows recording a
 
 To look at what a Normal or Audit run recorded -- its start and end states, what changed between them, or a step-by-step walk through an audited run -- use the Review view in the hamburger menu rather than this panel. Clicking a run here reloads it into the live dashboard; Review reads the record instead.
 
-**Related concepts:** `run`, `deterministic_replay`, `memory`, `persistence_mode`, `training_session`
+**Related concepts:** `run`, `deterministic_replay`, `memory`, `persistence_mode`, `episodic_runs`
 
 ### Slipnet (Semantic Network)
 
@@ -354,7 +354,7 @@ The Trace is reset at the beginning of each run, so it captures the processing h
 
 A Training is a named, long-lived Training episode, and it belongs to Training Mode. You give it a list of letter-string analogy problems and a number of seeds per problem; it runs every problem over every seed on all the cores of the machine and keeps, for each problem, the distribution of answers Petacat reached. Where the Swarm group answers that question for one problem on the dashboard, a Training answers it for dozens or thousands of problems and remembers the result. A Training is also what Training-Mode learning will drive. Nothing in a Training affects Metacat Mode.
 
-This is not the 'Training Sessions' of the Review view. Those are Metacat Mode's sessions: recordings of runs made on the dashboard, sharing Metacat Mode's Episodic Memory. A Training is a job that Petacat runs by itself, and it is stored in its own tables.
+This is not the episodic runs of the Review view. Those are Metacat Mode's recordings of runs made on the dashboard, each inheriting Metacat Mode's Episodic Memory. A Training is a job that Petacat runs by itself, and it is stored in its own tables.
 
 A Training stays open. You can add problems while it runs: start with 25, then add five more each time some finish. Close it when you have nothing more to add; it is then finished once its last problem finishes.
 
@@ -520,13 +520,13 @@ Destructive or utility operations exposed via the Admin view. These topics are a
 
 - Removes all stored answer descriptions and snag descriptions that Metacat has accumulated from past runs.
 - After clearing, Metacat can no longer "remember" previous answers or get "reminded" of similar problems. Each subsequent run starts fresh, without bias from prior solutions.
-- Episodic Memory (Metacat Mode's, Metacat-Mode learning) is the one thing that carries from one run to the next, so clearing it is what separates one training session (Metacat Mode's session) from the next. Everything else -- the slipnet, the themespace, the workspace, the trace -- is rebuilt for every run anyway.
+- Episodic Memory (Metacat Mode's, Metacat-Mode learning) is the one thing that carries from one run to the next, so after a clear the next episodic run starts with none; the clear is marked in the Review timeline. Everything else -- the slipnet, the themespace, the workspace, the trace -- is rebuilt for every run anyway.
 - Does NOT affect the current run, run history, or any engine configuration (slipnet nodes, codelet types, parameters, etc.).
 - Useful when you want the system to approach a problem without influence from answers it found before, or when past entries are no longer relevant.
 
 **Technical details:**
 
-- Calls DELETE /api/memory, which deletes every row from the answer_descriptions and snag_descriptions tables and clears the process-wide EpisodicMemory object in place, so live runners holding a reference see the change.
+- Calls DELETE /api/memory, which deletes every row from the answer_descriptions and snag_descriptions tables and clears the process-wide EpisodicMemory object in place, so live runners holding a reference see the change. It also inserts an episodic_memory_clears row, which is the marker the Review timeline shows, and returns it.
 - Both halves are necessary: the Memory panel reads the rows, so clearing only the in-process object left every answer still on screen and looked like the clear had not worked.
 - Does NOT touch the runs, run_state_captures, audit_actions or trace_events tables. Run history and everything the persistence modes recorded survive.
 - Bumps the store epoch counter so the Memory panel re-renders even if the data shape is unchanged.
@@ -544,12 +544,12 @@ Destructive or utility operations exposed via the Admin view. These topics are a
 - Deletes EVERY run ever created, together with their trace events.
 - Clears all episodic memory (answer and snag descriptions).
 - Resets all UI panels to their empty/default state.
-- This is the "start completely over" button. Use it when you want a clean slate with no leftover data from previous Metacat Mode sessions.
+- This is the "start completely over" button. Use it when you want a clean slate with no leftover data from previous runs.
 
 **Technical details:**
 
-- Calls DELETE /api/runs, which deletes all rows from the runs, trace_events, answer_descriptions, snag_descriptions and (legacy, no longer written) cycle_snapshots tables.
-- It does NOT currently delete the run_state_captures, audit_actions or training_sessions rows that Normal and Audit runs wrote, so those are left behind without the runs they belong to.
+- Calls DELETE /api/runs, which deletes all rows from the runs, trace_events, answer_descriptions, snag_descriptions and (legacy, no longer written) cycle_snapshots tables, and the episodic_memory_clears rows (the Episodic Memory clear markers and their notes) with them.
+- It does NOT currently delete the run_state_captures or audit_actions rows that Normal and Audit runs wrote, so those are left behind without the runs they belong to.
 - Calls DELETE /api/memory to clear the in-memory episodic memory store.
 - Resets all Zustand store state: runId, workspace, slipnet, coderack, themespace, trace, memory, temperature, commentary, and codeletCount.
 - Bumps the store epoch to force all components to re-fetch and re-render.
@@ -663,7 +663,7 @@ Supplying the same random seed narrows that variation, which is useful while dev
 
 That limit matters because Petacat is built to grow beyond Metacat. Once the system learns in Training Mode -- adding concepts and connections to its own slipnet and carrying them forward -- its configuration is no longer fixed between runs, so reproducing an earlier run becomes progressively less possible and less meaningful. A system doing Training-Mode learning that repeated itself exactly would not be learning. What is worth preserving instead is the ability to inspect what a run did: saved run state and recorded processing history let a run be re-examined step by step whether or not it could ever be reproduced.
 
-Four things narrow the seed further. Episodic Memory (Metacat-Mode learning) carries answers across the runs of a Metacat Mode session (the 'Training Session'), and a run declines an answer the memory already holds for the same problem and the same rules, so repeating a problem within a session explores a different answer each time. Random numbers come from counter-based per-codelet streams, so a seed pins a run against the current stream layout. Running codelets in parallel makes a run unrepeatable, because the order in which they commit is unjournaled -- where a specific run needs explaining, re-run it in Audit mode, which is serial and records everything. And the GPU numeric backend computes in float32 where the reference computes in float64, which flips some probabilistic choices.
+Four things narrow the seed further. Episodic Memory (Metacat-Mode learning) carries answers from each episodic run to the next, until the memory is cleared, and a run declines an answer the memory already holds for the same problem and the same rules, so repeating a problem explores a different answer each time. Random numbers come from counter-based per-codelet streams, so a seed pins a run against the current stream layout. Running codelets in parallel makes a run unrepeatable, because the order in which they commit is unjournaled -- where a specific run needs explaining, re-run it in Audit mode, which is serial and records everything. And the GPU numeric backend computes in float32 where the reference computes in float64, which flips some probabilistic choices.
 
 None of that is a loss of rigour, because the standard Petacat is actually held to is not "the same seed gives the same run". It is that the *set* of answers a problem can reach is unchanged -- membership, not frequency, and not a particular run. That set was established by sampling each of thirteen problems until no new answers were appearing (410,000 runs in total), and every change to the execution machinery is checked against it. A seeded run remains a convenience for development; the reachable set is the thing that is defended.
 
@@ -675,6 +675,23 @@ What has replaced exact repetition is re-execution. A Normal run records the com
 **Summary:** The orientation of a group or bond sequence within a string: left or right.
 
 Direction indicates the orientation of a group or sequence of bonds within a string. A group with direction 'right' reads naturally from left to right (e.g., 'abc' as a rightward successor-group), while a group with direction 'left' reads from right to left (e.g., 'cba' as a leftward successor-group, since reading right-to-left yields a, b, c -- a successor sequence). Sameness bonds have no direction. Direction is one of the Slipnet concepts that commonly participates in slippage: 'left' and 'right' are connected by the 'opposite' link, so in problems involving reversal, direction slippage is a key mechanism for discovering the analogy.
+
+### Episodic runs and Episodic Memory (Metacat Mode)
+
+**Topic key:** `episodic_runs`  
+**Summary:** Metacat Mode's runs are episodic runs: each inherits the Episodic Memory the runs before it left, until that memory is cleared. Not Training Mode.
+
+A run is one letter-analogy problem plus Petacat's response. Metacat Mode's runs are episodic runs: each inherits the Episodic Memory (Metacat-Mode learning) that the runs before it left, and that memory is the only thing that carries from one run to the next. The Slipnet, the Themespace, the Workspace, the Coderack, the Temporal Trace, the temperature and the random stream are all rebuilt for every run, exactly as in the original Metacat.
+
+This is a Metacat Mode feature. It shares Metacat Mode's Episodic Memory and has nothing to do with Training Mode or with a Training (the Training Mode feature). Metacat Mode has no sessions of any kind: v1.2 showed a 'Training Session', which was a Petacat misnomer and was removed in v2.0.
+
+Clearing Episodic Memory is an event. After a clear no run inherits anything from the runs before it, so the next episodic run starts with none. Two controls do it, and they are the same action: the 'Clear Episodic Memory' button in the Episodic Memory group of the Run Controls panel, and 'Clear Episodic Memory' in the Admin view. Each clear is recorded and marked in the Review view's episodic-run timeline, with an editable note. Recorded runs are never deleted by a clear.
+
+Nothing needs to be started: every run is simply the next episodic run. A run created in Fast mode takes part like any other -- it inherits the shared Episodic Memory and contributes its answers to it -- but it writes no row, so it does not appear in the Review timeline.
+
+Running the same problem twice is what the Run button does: once a run has found its answer or given up, pressing Run again starts the next episodic run rather than re-entering the finished one. The second run inherits the first one's answer and declines to give it twice, which is how Episodic Memory makes repeated runs explore a problem instead of repeating themselves.
+
+The episodic runs may mix all three persistence modes freely. Because the mode changes only what is recorded, a sequence of mixed modes is cognitively identical to the same sequence run entirely in Fast.
 
 ### Parallel Runs (Workers)
 
@@ -727,7 +744,7 @@ Every run is created in one of three persistence modes, chosen in the Recording 
 
 **Audit** records every state-changing action as a forward log, which is what the Review view's step-through inspector reads. It is deliberately serial -- one codelet at a time -- and takes roughly 1.8 times as long as Fast. Audit is also the permanent reference: a fully-recorded serial execution is what everything faster or more parallel is checked against.
 
-**Fast** records nothing, ever. It never opens a database connection, not even to insert the row that would name it, so a Fast run completes with the database stopped. It has no run number to take from the database either and uses a negative one instead. What it does not skip is the session (Metacat Mode's 'Training Session'): it thinks against the same shared episodic memory as the other two, its answers join that memory, and later runs are reminded of them -- mode chooses where a run is recorded, not what it is. Nothing is buffered for later: the alternative reading of "fast" -- collect it all in memory and write it at the end -- is exactly what this mode is defined not to do. The cost is that a Fast run is absent from Run History and from Review, which is the mode working rather than a fault.
+**Fast** records nothing, ever. It never opens a database connection, not even to insert the row that would name it, so a Fast run completes with the database stopped. It has no run number to take from the database either and uses a negative one instead. What it does not skip is being an episodic run: it thinks against the same shared episodic memory as the other two, its answers join that memory, and later runs are reminded of them -- mode chooses where a run is recorded, not what it is. Nothing is buffered for later: the alternative reading of "fast" -- collect it all in memory and write it at the end -- is exactly what this mode is defined not to do. The cost is that a Fast run is absent from Run History and from Review, which is the mode working rather than a fault.
 
 Measured on the same problem and seed, the three produce the same number of codelets and the same answer. Normal takes about 1.4 times as long as Fast and writes 137 KB; Audit takes about 1.8 times as long and writes 381 KB.
 
@@ -805,21 +822,6 @@ Temperature is a global value (0 to 100) that inversely measures how well the sy
 **Summary:** An activated pattern along a conceptual dimension in the Themespace, characterizing an aspect of the current interpretation.
 
 A theme represents an activated conceptual pattern within the Themespace, organized by bridge type and dimension. Themes capture the character of the interpretation being built -- for example, 'in the top bridge, the direction dimension shows a left-to-right identity mapping.' Each theme carries one signed activation between -100 and +100 -- positive for supporting its idea, negative for opposing it, zero for having no bearing -- and themes within a cluster compete through excitatory and inhibitory interactions that move a theme toward its own pole or toward zero. A theme is dominant when it leads its cluster by more than a margin, which makes it part of that bridge type's theme pattern -- the pattern that characterizes rules and indexes answers in memory. Thematic pressure, which biases codelet posting and structure evaluation toward an interpretation, is switched on separately by clamping a theme pattern: during a snag response, during justify mode, during jootsing, or by hand from the Themespace panel.
-
-### Training Session
-
-**Topic key:** `training_session`  
-**Summary:** Metacat Mode's session: a sequence of runs sharing one Episodic Memory -- the only thing that crosses a run boundary. Not Training Mode.
-
-A run is one letter-analogy problem plus Petacat's response. A training session is Metacat Mode's session: a sequence of runs that share one Episodic Memory (Metacat-Mode learning), and that memory is the only thing that carries from one run to the next: the Slipnet, the Themespace, the Workspace, the Coderack, the Temporal Trace, the temperature and the random stream are all rebuilt for every run, exactly as in the original Metacat.
-
-The name uses the word 'Training', but this is a Metacat Mode feature, sharing Metacat Mode's Episodic Memory; it is not Training Mode and has nothing to do with a Training (the Training Mode feature). That is why the session is worth naming. It is the unit over which the system accumulates anything -- the span within which one run can be reminded of another. Clearing episodic memory is what separates one session from the next, because after a clear no run inherits anything from the runs before it. Two controls do it, and they are the same action under two names: "Start a new Training Session" in the Run Controls panel, named for what it ends, and "Clear Episodic Memory" in the Admin view, named for what it removes.
-
-Sessions are not something you create. One is opened automatically when a run needs one, and the runs that follow join it. The Review view lists sessions with their runs, so a session can be read back as the sequence it was. A run created in Fast mode takes part in the session like any other -- it inherits the shared episodic memory and contributes its answers to it -- but it writes no row, so it carries no recorded session number and does not appear among the session's runs in Review.
-
-Running the same problem twice in one session is the thing a session is for, and it is what the Run button does: once a run has found its answer or given up, pressing Run again starts the next run rather than re-entering the finished one. The second run inherits the first one's answer and declines to give it twice, which is how a session explores a problem instead of repeating itself.
-
-A session may mix all three persistence modes freely. Because the mode changes only what is recorded, a session of mixed modes is cognitively identical to the same session run entirely in Fast.
 
 ### Update Cycle
 

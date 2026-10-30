@@ -35,7 +35,7 @@ from server.models.run import (
     RunStateCapture,
     SnagDescriptionRow,
     TraceEventRow,
-    TrainingSession,
+    EpisodicMemoryClear,
 )
 from server.engine.commentary import CommentaryLog
 from server.engine.hashing import config_hash, memory_hash
@@ -57,8 +57,8 @@ _global_memory = EpisodicMemory()
 def _memory_row_order(row: Any, identifier: str) -> tuple:
     """Sort key putting stored rows in the order Episodic Memory found them.
 
-    A row's own ``id`` is the order it reached the database, which a Training Session
-    does not guarantee is the order the memory made its descriptions in (concurrent runs
+    A row's own ``id`` is the order it reached the database, which concurrent runs
+    do not guarantee is the order the memory made its descriptions in (concurrent runs
     flush in their own time).  The memory's identifier (``answer_id`` / ``snag_id``) is
     that order.  A row written before the identifier was recorded has none, and is older
     than any row that has one.
@@ -288,7 +288,7 @@ class RunService:
         phases want a Fast corpus-training population and a Normal live dialogue in the
         same process.  It selects a sink and nothing else: the engine is handed the
         same problem, the same seed and the same memory whichever mode is chosen, which
-        is what makes a mode-mixed Training Session comparable with an all-Fast one.
+        is what makes a mode-mixed sequence of episodic runs comparable with an all-Fast one.
 
         ``workers`` above 1 runs the Run on the exact speculative executor
         (``server/parallel/speculative``): codelets execute across threads, but the
@@ -353,7 +353,6 @@ class RunService:
             spreading_threshold=threshold,
             mode=mode,
             workers=workers,
-            session_id=await self._current_session_id(session),
             # Hashed over the Run's *own* metadata, so two Runs that differ only in a
             # parameter override are distinguishable by their config hash alone.
             config_hash=config_hash(run_meta),
@@ -368,12 +367,12 @@ class RunService:
         sink = sink_for_mode(mode)
         # **Mode is a persistence choice and nothing else.**  Every mode gets the same
         # Episodic Memory and the same commentary; what differs is only what reaches the
-        # database.  A Fast Run therefore takes part in the Training Session exactly as
+        # database.  A Fast Run therefore takes part in the episodic runs exactly as
         # Normal and Audit do — its answers join the shared memory, later runs are
         # reminded of them, and ``answer_present`` stops a later run rediscovering them.
         #
         # Fast leaves nothing in the *database*, which is what it is for.  It takes part
-        # in the *session* like the other two, which is what keeps a Fast training
+        # in the episodic runs like the other two, which is what keeps a Fast training
         # population comparable with a Normal recorded run.
         memory = _global_memory
         commentary = CommentaryLog()
@@ -425,7 +424,7 @@ class RunService:
         a run that inserted a row and then wrote nothing more would still fail with the
         database stopped, which is the condition the mode is verified under.
 
-        What it does *not* skip is the Training Session: the memory is the shared one
+        What it does *not* skip is the shared Episodic Memory: the memory is the shared one
         and the commentary is real, because mode chooses where a run is *recorded*, not
         what it is.  A Fast Run contributes its answers to Episodic Memory like any
         other, and later runs are reminded of them and will not rediscover them.
@@ -464,26 +463,6 @@ class RunService:
 
     def _is_fast(self, run_id: int) -> bool:
         return self._modes.get(run_id) == MODE_FAST
-
-    async def _current_session_id(self, session: AsyncSession) -> int:
-        """The open Training Session, opening one if none is.
-
-        Sessions are not created by the user; they are the span between memory clears,
-        which is already how the concept worked.  This gives that span a row so Runs can
-        be grouped and reviewed (WP3.0), and changes no behaviour.
-        """
-        result = await session.execute(
-            select(TrainingSession)
-            .where(TrainingSession.ended_at.is_(None))
-            .order_by(TrainingSession.id.desc())
-            .limit(1)
-        )
-        current = result.scalars().first()
-        if current is None:
-            current = TrainingSession()
-            session.add(current)
-            await session.flush()
-        return current.id
 
     async def step(
         self,
@@ -1096,8 +1075,9 @@ class RunService:
         await session.execute(delete(CycleSnapshot))
         await session.execute(delete(RunStateCapture))
         await session.execute(delete(AuditAction))
-        # Sessions group runs; with every run gone there is nothing left to group.
-        await session.execute(delete(TrainingSession))
+        # A clear marker is placed by the id of the run before it; with every run gone
+        # there is nothing to place it against, so the markers and their notes go too.
+        await session.execute(delete(EpisodicMemoryClear))
         await session.execute(delete(TraceEventRow))
         await session.execute(delete(AnswerDescriptionRow))
         await session.execute(delete(SnagDescriptionRow))
@@ -1192,14 +1172,21 @@ class RunService:
 
         return row is not None or removed_live
 
-    async def clear_memory(self, session: AsyncSession) -> dict[str, int]:
-        """Clear episodic memory in both of the places it lives.
+    async def clear_memory(self, session: AsyncSession) -> dict:
+        """Clear episodic memory in both of the places it lives, and record the event.
 
         Answer and snag descriptions exist twice over: as rows in the database,
         and in the process-wide ``_global_memory`` that live runs read and write.
         ``get_memory_state_from_db`` serves the *rows*, so clearing only the
         in-process object left every answer still on screen — which looked like
         the clear had simply not worked.
+
+        Clearing is an event in the sequence of episodic runs: every run before it
+        inherited the memory it discards, every run after it starts with none.  The event
+        is recorded as an ``EpisodicMemoryClear`` placed after the latest recorded run
+        (``after_run_id``), so the Review timeline can show it in exactly that place.
+
+        Returns ``{"answers": n, "snags": m, "clear": EpisodicMemoryClear}``.
         """
         answers = (
             await session.execute(select(func.count()).select_from(AnswerDescriptionRow))
@@ -1211,26 +1198,18 @@ class RunService:
         await session.execute(delete(AnswerDescriptionRow))
         await session.execute(delete(SnagDescriptionRow))
 
-        # Clearing the memory *is* the end of the Training Session — it discards the one
-        # thing that crosses Run boundaries, so the Runs before and after it did not
-        # share anything and do not belong together.  WP3.0 says as much and the review
-        # UI tells the user so, but nothing was closing the row: every Run in the
-        # database therefore belonged to one session that had been open since the first
-        # one, which makes the grouping useless precisely when it would start to matter.
-        now = _utcnow()
-        closed = (
-            await session.execute(
-                update(TrainingSession)
-                .where(TrainingSession.ended_at.is_(None))
-                .values(ended_at=now)
-            )
-        ).rowcount or 0
+        last_run_id = (
+            await session.execute(select(func.max(Run.id)))
+        ).scalar()
+        clear = EpisodicMemoryClear(after_run_id=last_run_id, note="")
+        session.add(clear)
         await session.commit()
+        await session.refresh(clear)
 
         # Cleared in place, so the runners holding this reference see it too.
         _global_memory.clear()
 
-        return {"answers": answers, "snags": snags, "sessions_closed": closed}
+        return {"answers": answers, "snags": snags, "clear": clear}
 
     async def get_memory_state_from_db(self, session: AsyncSession) -> dict:
         """Read episodic memory from the database."""
@@ -1330,7 +1309,7 @@ class RunService:
             select(SnagDescriptionRow).order_by(SnagDescriptionRow.id)
         )
         # One row per snag.  Until the sink took only the snags a run added, every run
-        # that snagged wrote all of the session's earlier snags again under its own id,
+        # that snagged wrote all of the memory's earlier snags again under its own id,
         # and loading those copies would put the same snag in memory once per copy.  The
         # first row is the one the run that found the snag wrote, so it is kept and the
         # copies are deleted.  Rows from before the identifier was recorded are matched
@@ -1420,7 +1399,7 @@ class RunService:
         ]
 
     def get_memory_state(self, memory: EpisodicMemory | None = None) -> dict:
-        """Return episodic memory contents (cross-run); *memory* defaults to the session's."""
+        """Return episodic memory contents (cross-run); *memory* defaults to the shared memory."""
         memory = _global_memory if memory is None else memory
         return {
             "answers": [

@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// ReviewPanel -- the Review view: session browser on the left, the selected
+// ReviewPanel -- the Review view: episodic-run timeline on the left, the selected
 // Run's review on the right (WP3.9)
 // ---------------------------------------------------------------------------
 //
@@ -16,7 +16,7 @@ import { useEffect, useState } from 'react';
 import type { RecordedRun } from '@/types';
 import { ApiError, describeApiError, getRecordedRun } from '@/api/client';
 import { ModeBadge } from '@/components/ModeBadge';
-import { SessionBrowser } from './SessionBrowser';
+import { EpisodicRunTimeline } from './EpisodicRunTimeline';
 import { NormalRunReview } from './NormalRunReview';
 import { AuditRunReview } from './AuditRunReview';
 
@@ -24,9 +24,8 @@ export interface ReviewPanelProps {
   /**
    * A Run to open straight away, from `#/review/runs/42`.
    *
-   * Fetched by id rather than found by walking the sessions: the reader arriving from
-   * Run History knows the run and not the session, and asking them to guess which
-   * session contains it is the gap this closes.
+   * Fetched by id rather than found by paging the timeline: the reader arriving from Run
+   * History knows the run, and asking them to page to it is the gap this closes.
    */
   initialRunId?: number | null;
 }
@@ -79,15 +78,11 @@ export function ReviewPanel({ initialRunId = null }: ReviewPanelProps) {
             not in it. Somebody who has just run one and comes looking needs to be
             told that on the page rather than in the plan. */}
         <div className="text-xs text-muted" style={{ marginBottom: 6 }}>
-          Metacat Mode&apos;s Training Session is a sequence of Runs sharing one Episodic Memory. It
-          ends when the memory is cleared. Fast Runs do not appear: they write
+          Metacat Mode&apos;s runs are episodic runs: each inherits the Episodic Memory the runs
+          before it left, until the memory is cleared. Fast Runs do not appear: they write
           nothing, including the row that would list them.
         </div>
-        <SessionBrowser
-          selectedRunId={run?.run_id ?? null}
-          onSelectRun={setRun}
-          focusSessionId={run?.session_id ?? null}
-        />
+        <EpisodicRunTimeline selectedRunId={run?.run_id ?? null} onSelectRun={setRun} />
       </div>
 
       <div style={{ minHeight: 0, overflow: 'auto' }}>

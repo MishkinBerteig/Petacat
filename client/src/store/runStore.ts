@@ -170,7 +170,7 @@ export interface RunStore {
    * threshold is remembered because it changes what a run does and a forgotten
    * value would silently change results; this changes only what is kept, and the
    * failure modes of a remembered value are the bad ones — coming back the next
-   * day to find that a session's worth of work recorded nothing (fast), or ran at
+   * day to find that a day's worth of work recorded nothing (fast), or ran at
    * 1.8x cost for a record nobody wanted (audit). It starts at `normal` every
    * time, which is the mode whose promise is hardest to be disappointed by.
    */
@@ -243,14 +243,13 @@ export interface RunStore {
   deleteRun: () => Promise<void>;
   fullReset: () => Promise<void>;
   /**
-   * End the open Training Session and let the next run open a new one.
+   * Clear Episodic Memory, so the next episodic run starts with none.
    *
-   * Clearing Episodic Memory *is* the session boundary — it discards the only thing
-   * that crosses a run — so there is no separate "new session" call to make and none
-   * is needed: a session is opened by the first run that needs one. Raises if the
-   * clear was refused, so a caller does not report a boundary that was not drawn.
+   * It discards the only thing that crosses a run, and is recorded as an event in the
+   * Review timeline. Raises if the clear was refused, so a caller does not report a
+   * clear that did not happen.
    */
-  startNewTrainingSession: () => Promise<void>;
+  clearEpisodicMemory: () => Promise<void>;
 
   // State refresh
   refreshAll: () => Promise<void>;
@@ -864,7 +863,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
     beginAction();
 
     // Delete ALL runs, snapshots, trace events, and episodic memory on server.
-    // Clearing the memory is also what closes the Training Session.
+    // Clearing the memory is recorded as an event, not a run.
     try {
       await apiDeleteAllRuns();
       await apiClearMemory();
@@ -901,22 +900,20 @@ export const useRunStore = create<RunStore>((set, get) => ({
     });
   },
 
-  startNewTrainingSession: async (): Promise<void> => {
+  clearEpisodicMemory: async (): Promise<void> => {
     beginAction();
     try {
       await apiClearMemory();
     } catch (err) {
-      // Raised as well as reported: the caller says on screen that a new session has
-      // begun, and a refused clear means the old one is still open with everything
-      // still in it.
-      reportFailure(err, 'start a new Training Session');
+      // Raised as well as reported: the caller says on screen that the memory is
+      // cleared, and a refused clear means everything is still in it.
+      reportFailure(err, 'clear Episodic Memory');
       throw err;
     }
-    // The run on screen is left where it is — it belongs to the session just closed
-    // and its record does not change. What changes is what the *next* run inherits,
-    // which is nothing. The epoch bump is what makes the panels keyed to memory and
-    // to run identity read that boundary rather than keep showing the closed
-    // session's answers.
+    // The run on screen is left where it is — its record does not change. What
+    // changes is what the *next* run inherits, which is nothing. The epoch bump is
+    // what makes the panels keyed to memory and to run identity read that clear
+    // rather than keep showing the cleared answers.
     set({ memory: freshMemory(), epoch: get().epoch + 1 });
     await get().refreshMemory();
   },
@@ -1035,8 +1032,8 @@ export const useRunStore = create<RunStore>((set, get) => ({
   },
 
   refreshMemory: async (): Promise<void> => {
-    // Asked *of the run* whenever there is one. Every run shares the Training
-    // Session's memory, and the run-scoped read is the one that reaches it by the
+    // Asked *of the run* whenever there is one. Every run shares the one Episodic
+    // Memory, and the run-scoped read is the one that reaches it by the
     // right route in every mode: a Fast Run has no database rows, so its memory is
     // served from the live object rather than from storage.
     const { runId } = get();

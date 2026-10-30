@@ -122,7 +122,6 @@ export interface RunParametersView {
     workers?: number | null;
     config_hash?: string | null;
     memory_hash?: string | null;
-    session_id?: number | null;
     seed?: number | null;
     recorded?: boolean;
     codelet_count?: number;
@@ -193,7 +192,7 @@ export interface RunInfo {
 
 /**
  * What identifies a Run as an experiment: which configuration and which Episodic
- * Memory it executed against, and which Training Session it belongs to.
+ * Memory it executed against.
  *
  * `recorded: false` is a Fast Run — there is no row to read the hashes from, which
  * is the mode keeping its promise rather than a lookup failure.
@@ -206,7 +205,6 @@ export interface RunIdentity {
   spreading_threshold: number;
   config_hash: string | null;
   memory_hash: string | null;
-  session_id: number | null;
   created_at: string | null;
 }
 
@@ -659,7 +657,7 @@ export interface MemoryState {
   answers: AnswerDescription[];
   snags: SnagDescription[];
   /**
-   * How this copy of the Training Session's memory was read.
+   * How this copy of the Episodic Memory was read.
    *
    *   shared  from the stored rows
    *   live    from the object the engine is using — a Fast Run writes no rows, so
@@ -712,18 +710,32 @@ export interface SlipnetLayout {
 // The review surfaces render *recorded* state through the same components as live
 // state, so a recorded Workspace is a `WorkspaceState`, a recorded Slipnet is a
 // `SlipnetState`, and so on. Only the things that have no live equivalent — a
-// Training Session, a capture, an audit action — need types of their own.
+// Episodic Memory clear, a capture, an audit action — need types of their own.
 
-export interface TrainingSessionSummary {
-  session_id: number;
-  started_at: string | null;
-  ended_at: string | null;
+/**
+ * A moment Episodic Memory was cleared. It is an event in the run timeline, not the
+ * end of anything: `after_run_id` is the last recorded run before it (null when
+ * there was none), which places the marker exactly in the run sequence.
+ */
+export interface MemoryClear {
+  clear_id: number;
+  cleared_at: string;
+  after_run_id: number | null;
+  /** A free-text note a person may attach to the clear. */
   note: string;
-  run_count: number;
-  first_run_at: string | null;
-  last_run_at: string | null;
-  /** A session ends when Episodic Memory is cleared; until then it can gain Runs. */
-  is_open: boolean;
+}
+
+/** One entry of the episodic-run timeline: a recorded run, or a memory-clear marker. */
+export type EpisodicTimelineItem =
+  | { kind: 'run'; run: RecordedRun }
+  | { kind: 'memory_cleared'; clear: MemoryClear };
+
+export interface EpisodicRunTimeline {
+  items: EpisodicTimelineItem[];
+  total_runs: number;
+  total_clears: number;
+  limit: number;
+  offset: number;
 }
 
 export interface RecordedRun {
@@ -747,20 +759,6 @@ export interface RecordedRun {
   /** How much record the Run left. Zero and zero is a Fast Run, by design. */
   capture_count: number;
   action_count: number;
-  /**
-   * Which Training Session contains this Run. Only set when the Run was looked up
-   * by id — reached through its session, the caller already knows.
-   */
-  session_id?: number | null;
-}
-
-export interface TrainingSessionDetail {
-  session_id: number;
-  started_at: string | null;
-  ended_at: string | null;
-  note: string;
-  is_open: boolean;
-  runs: RecordedRun[];
 }
 
 export interface CaptureSummary {
@@ -1007,7 +1005,7 @@ export interface SwarmResult {
 // Training (/api/trainings): a named episode of many problems over many seeds
 // ---------------------------------------------------------------------------
 //
-// Not the older "Training Sessions" of the Review view, which are recordings of
+// Not the episodic runs of Metacat Mode's Review view, which are recordings of
 // dashboard runs. A Training is a long-lived, database-backed episode with one
 // Episodic Memory (when its memory is shared).
 

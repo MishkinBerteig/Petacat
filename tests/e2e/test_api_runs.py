@@ -253,7 +253,7 @@ async def test_answer_appears_in_workspace(app_client):
     # If no answer is found in time, the test is inconclusive (not failed).
     #
     # Its own seed, not the module's, for the reason given in
-    # ``test_a_fast_run_contributes_its_answer_to_the_session``: ``xyz``/12345 now gives
+    # ``test_a_fast_run_contributes_its_answer_to_episodic_memory``: ``xyz``/12345 now gives
     # up. The ``pytest.skip`` below is meant to be the rare safety net for a run that
     # happens not to converge, not the branch every run takes — a test that always skips
     # asserts nothing, and this one had gone quiet.  It went quiet again after the
@@ -333,7 +333,7 @@ async def test_no_mid_run_snapshots_are_written(app_client, db_session):
 
 
 @pytest.mark.asyncio
-async def test_run_identity_carries_the_hashes_and_the_session(app_client):
+async def test_run_identity_carries_the_hashes(app_client):
     resp = await app_client.post("/api/runs", json={
         "initial": "abc", "modified": "abd", "target": "xyz", "seed": SEED,
     })
@@ -346,7 +346,7 @@ async def test_run_identity_carries_the_hashes_and_the_session(app_client):
     assert data["seed"] == SEED
     assert data["config_hash"]
     assert data["memory_hash"]
-    assert data["session_id"] is not None
+    assert "session_id" not in data
 
 
 @pytest.mark.asyncio
@@ -368,7 +368,6 @@ async def test_identity_hashes_match_the_row_the_review_browser_reads(app_client
     row = (await db_session.execute(select(Run).where(Run.id == run_id))).scalar_one()
     assert data["config_hash"] == row.config_hash
     assert data["memory_hash"] == row.memory_hash
-    assert data["session_id"] == row.session_id
 
 
 @pytest.mark.asyncio
@@ -392,7 +391,6 @@ async def test_a_fast_run_reports_no_recorded_identity_rather_than_404(app_clien
     assert data["recorded"] is False
     assert data["config_hash"] is None
     assert data["memory_hash"] is None
-    assert data["session_id"] is None
 
 
 @pytest.mark.asyncio
@@ -435,7 +433,7 @@ async def test_a_fast_run_is_absent_from_the_list_by_construction(app_client):
 # Which Episodic Memory a run is thinking against
 #
 # A Fast Run is handed an ephemeral ``EpisodicMemory`` of its own so that it can
-# contribute nothing to the Training Session — that is the whole of what Fast
+# contribute nothing to the shared Episodic Memory — that is the whole of what Fast
 # promises. The run-scoped memory endpoint served the shared database memory to it
 # regardless, which made the panel a straightforward lie about the run: the answers
 # it listed were ones the run could not be reminded of.
@@ -461,8 +459,8 @@ async def test_a_normal_run_reads_the_shared_memory(app_client):
 
 
 @pytest.mark.asyncio
-async def test_a_fast_run_reads_the_shared_session_memory(app_client):
-    """A Fast Run is in the Training Session like any other.
+async def test_a_fast_run_reads_the_shared_episodic_memory(app_client):
+    """A Fast Run is an episodic run like any other.
 
     Mode chooses where a run is *recorded*, not what it is, so a Fast Run thinks
     against the shared Episodic Memory: it can be reminded of earlier answers, and
@@ -476,7 +474,7 @@ async def test_a_fast_run_reads_the_shared_session_memory(app_client):
         f"/api/runs/{seeded.json()['run_id']}/run", json={"max_steps": 3000}
     )
     shared = (await app_client.get("/api/memory")).json()["answers"]
-    assert shared, "nothing in the session, test proves nothing"
+    assert shared, "nothing in the shared memory, test proves nothing"
 
     created = await app_client.post("/api/runs", json={
         "initial": "abc", "modified": "abd", "target": "xyz", "seed": SEED,
@@ -493,13 +491,13 @@ async def test_a_fast_run_reads_the_shared_session_memory(app_client):
 
 
 @pytest.mark.asyncio
-async def test_a_fast_run_contributes_its_answer_to_the_session(app_client):
-    """A Fast Run leaves nothing in the *database* and everything in the *session*.
+async def test_a_fast_run_contributes_its_answer_to_episodic_memory(app_client):
+    """A Fast Run leaves nothing in the *database* and everything in the *Episodic Memory*.
 
     Those are different promises and only the first belongs to the mode.  A Fast Run
     whose answer vanished from Episodic Memory would be a different program from a
     Normal one rather than the same program recorded differently, and a Fast training
-    population would then teach the session nothing.
+    population would then teach the memory nothing.
     """
     shared_before = len((await app_client.get("/api/memory")).json()["answers"])
 

@@ -98,7 +98,7 @@ Training Mode: named, long-lived Training episodes of many problems over many se
 
 ## Episodic Memory
 
-Metacat Mode: the Episodic Memory (Metacat-Mode learning) shared by the runs of the Metacat Mode session, which the UI calls the "Training Session". It is not Training Mode and is untouched by Trainings.
+Metacat Mode: the Episodic Memory (Metacat-Mode learning) that each episodic run inherits from the runs before it, until it is cleared. Clearing is an event, recorded with an editable note. It is not Training Mode and is untouched by Trainings.
 
 | Method | Path | Purpose |
 |---|---|---|
@@ -107,15 +107,18 @@ Metacat Mode: the Episodic Memory (Metacat-Mode learning) shared by the runs of 
 | `DELETE` | `/api/memory/answers/{answer_id}` | Forget Answer |
 | `POST` | `/api/memory/answers/{answer_id}/display` | Display Answer |
 | `GET` | `/api/memory/answers/{answer_id}/explanation` | Explain Answer |
+| `GET` | `/api/memory/clears` | List Memory Clears |
+| `PUT` | `/api/memory/clears/{clear_id}/note` | Set Memory Clear Note |
 | `POST` | `/api/memory/compare` | Compare Answers |
 | `POST` | `/api/memory/snags/{snag_id}/display` | Display Snag |
 
 ## Review
 
-Metacat Mode: reading back what a Normal or Audit run recorded, and the sessions ("Training Sessions" in the UI; Metacat Mode, not Training Mode) the runs form.
+Metacat Mode: reading back what a Normal or Audit run recorded, and the episodic-run timeline: recorded runs with the Episodic Memory clears between them (Metacat Mode, not Training Mode).
 
 | Method | Path | Purpose |
 |---|---|---|
+| `GET` | `/api/review/episodic-runs` | List Episodic Runs |
 | `GET` | `/api/review/runs/{run_id}` | Get Recorded Run |
 | `GET` | `/api/review/runs/{run_id}/actions` | List Actions |
 | `GET` | `/api/review/runs/{run_id}/actions/summary` | Action Summary |
@@ -127,9 +130,6 @@ Metacat Mode: reading back what a Normal or Audit run recorded, and the sessions
 | `POST` | `/api/review/runs/{run_id}/inspector` | Open Inspector |
 | `DELETE` | `/api/review/runs/{run_id}/inspector` | Close Inspector |
 | `POST` | `/api/review/runs/{run_id}/inspector/advance` | Advance Inspector |
-| `GET` | `/api/review/sessions` | List Sessions |
-| `GET` | `/api/review/sessions/{session_id}` | Get Session Runs |
-| `PUT` | `/api/review/sessions/{session_id}/note` | Set Session Note |
 
 ## Configuration
 

@@ -5,8 +5,9 @@ each run copies when it starts and merges its additions into when it finishes.  
 problems; a problem holds its per-seed runs; the memory merges are logged in order so the
 memory can be rebuilt exactly.
 
-(``training_sessions`` in ``server/models/run.py`` is the older, unrelated notion that
-groups interactive Runs sharing the process memory.  This is a different thing.)
+(Metacat Mode's episodic runs share the process Episodic Memory until it is cleared; the
+clears are ``episodic_memory_clears`` in ``server/models/run.py``.  A Training is a different
+thing.)
 
 The database is written only at milestones (see ``server/services/training_service.py``):
 a Training or its problems are created or changed, and **once when a problem finishes** --

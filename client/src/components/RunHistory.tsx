@@ -106,7 +106,7 @@ export function RunHistory() {
   // Fetch on mount, when the current run changes, after destructive ops, and
   // on every status transition.
   //
-  // `liveStatus` matters: this panel is mounted for the whole session, so
+  // `liveStatus` matters: this panel is mounted for the whole page visit, so
   // without it the list was fetched once when a run was created and never
   // again. Finished runs kept showing the values they had a moment after
   // creation — "initialized, 0 codelets, T 100" — even though the API had the
@@ -161,10 +161,9 @@ export function RunHistory() {
   /**
    * Open this run in the Review browser.
    *
-   * The record was reachable only by browsing Training Sessions, which is the right
-   * way round when the reader is exploring and the wrong way round when they have
-   * just watched a run finish: the session is precisely the thing they do not know,
-   * and the run they want is one of however many in it. The hash carries the run id
+   * The record was reachable only by paging through the episodic-run timeline, which is
+   * fine when the reader is exploring and slow when they have just watched a run
+   * finish and the run they want is one of however many. The hash carries the run id
    * so the link survives a reload and can be shared.
    */
   const handleReview = useCallback((e: React.MouseEvent, runId: number) => {

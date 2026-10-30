@@ -127,8 +127,8 @@ export function AdminPanel() {
   }, [loadTopics]);
 
   // --- Clear episodic memory ---
-  /** What became of the last clear asked for: the session boundary it draws is the
-   *  one thing that crosses a Run, so a clear that did not land has to say so. */
+  /** What became of the last clear asked for: Episodic Memory is the one thing
+   *  that crosses a Run, so a clear that did not land has to say so. */
   const [clearStatus, setClearStatus] = useState<
     { kind: 'idle' } | { kind: 'done' } | { kind: 'error'; message: string }
   >({ kind: 'idle' });
@@ -136,24 +136,23 @@ export function AdminPanel() {
   const handleClearMemory = useCallback(async () => {
     if (
       // Named as what it is: Episodic Memory is the one thing that crosses a Run
-      // boundary, so clearing it is what ends a Training Session. Saying only
-      // "removes stored descriptions" understated that — the boundary in the Review
-      // browser is drawn by this button and nothing said so at the point of pressing.
+      // boundary, so clearing it matters. Saying only "removes stored descriptions"
+      // understated that — the clear is marked in the Review timeline by this button
+      // and nothing said so at the point of pressing.
       window.confirm(
         'Clear Metacat Mode\'s Episodic Memory?\n\n'
-          + 'This ends the current Training Session (Metacat Mode\'s session) and starts a new one: Episodic '
-          + 'Memory is the only thing carried from one run to the next, so the runs '
-          + 'after this point start from an empty memory.\n\n'
+          + 'Episodic Memory is the only thing carried from one episodic run to the next, '
+          + 'so the next episodic run starts with none.\n\n'
           + 'It removes all stored answer and snag descriptions from past runs. '
           + 'It does NOT reset the current run or delete run history — past runs stay '
-          + 'in the Review browser, grouped under the session that is being closed.\n\n'
+          + 'in the Review browser, and the clear is marked in the episodic-run timeline.\n\n'
           + 'This cannot be undone.'
       )
     ) {
       try {
         await request<void>('/memory', { method: 'DELETE' });
       } catch (err) {
-        // The session is still open and its answers are still stored, so the reader
+        // The memory was not cleared and its answers are still stored, so the reader
         // is told which of the two states they are in.
         setClearStatus({ kind: 'error', message: describeApiError(err, "clear Metacat Mode's Episodic Memory") });
         return;
@@ -267,8 +266,7 @@ export function AdminPanel() {
                 <span className="text-xs text-muted">(Metacat Mode&apos;s Episodic Memory)</span>
                 {clearStatus.kind === 'done' && (
                   <span style={{ fontSize: 11, color: 'var(--success)' }}>
-                    Cleared — this Training Session (Metacat Mode&apos;s session) is closed and the next one
-                    begins with the next run.
+                    Episodic Memory cleared — the next episodic run starts with none.
                   </span>
                 )}
                 {clearStatus.kind === 'error' && (

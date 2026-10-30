@@ -132,7 +132,7 @@ outside the matrix take it too and the run is entirely what it says it is.
   integration     68 collected     68 run     68 passed      0 failed      0 skipped  complete
   parallel       244 collected    244 run    244 passed      0 failed      0 skipped  complete
   lockstep       223 collected    223 run    223 passed      0 failed      0 skipped  complete
-  e2e            326 collected    326 run    326 passed      0 failed      0 skipped  complete
+  e2e            341 collected    341 run    341 passed      0 failed      0 skipped  complete
 
   run complete in 12.5 min against a 60 min ceiling
 ```
@@ -211,7 +211,7 @@ that allowance.
 | **integration** | `tests/integration/` | Agreement between the repository's artifacts, and the harness's own rules | Real `seed_data/*.json`, the ORM declarations, the generated client files, the documentation, a real pytest session | 68 |
 | **parallel** | `tests/parallel/` | The detachable multi-core plugin (`server/parallel/`): each executor against the serial run it claims to equal | Real engine objects and `seed_data/*.json`, worker processes and threads; each test pins the backend it compares on | 244 |
 | **lockstep** | `tests/lockstep/` | Petacat's decision traces against Metacat's: naming, helper conformance, tracing/replay RNGs, determinism guards, the comparer | Real engine in faithful mode (numeric backend off, or a named backend); recorded Metacat traces | 223 |
-| **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 326 |
+| **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 341 |
 
 Those counts are cases, so they include the second pass the numeric matrix makes
 over the 498 backend-sensitive tests.
@@ -246,7 +246,7 @@ first**, then move up toward the API and GUI.
 
 All eight layers run in one command — the
 [required command](#the-required-command) — and, since Petacat runs natively, all
-eight actually run: **3,150 cases**, every one of them executed. A layer that is
+eight actually run: **3,165 cases**, every one of them executed. A layer that is
 normally skipped is not a layer that is normally green, and none of these is.
 
 Wall-clock time depends heavily on the machine and on what else it is doing. The
@@ -437,7 +437,7 @@ the number of endpoints taking `Depends(get_session)`, the size of
 | `test_runner_status.py` | 7 | The status an `EngineRunner` reports as a run moves through it |
 | `test_singleton_group_images.py` | 3 | Every object a rule names owns an image, singleton groups included |
 | `test_sink_emission.py` | 9 | The engine emits a complete run record to its sink |
-| `test_snag_records.py` | 4 | A run records the snags it adds to the session's memory, once each |
+| `test_snag_records.py` | 4 | A run records the snags it adds to Metacat Mode's Episodic Memory, once each |
 | `test_snag_response.py` | 7 | The snag response driven end to end through a real run |
 | `test_staleness.py` | 8 | The staleness probe reads a Workspace that lags the live one |
 | `test_state_graph.py` | 12 | A captured run restores to a state that continues identically; memory captured oldest first and restored newest first, with the slippage logs of its events |
@@ -497,9 +497,10 @@ the number of endpoints taking `Depends(get_session)`, the size of
 | `test_api_displays.py` | 5 | The coderack, EEG and Themespace-name data the Metacat windows need |
 | `test_api_docs.py` | 11 | The documentation endpoints |
 | `test_api_extended.py` | 57 | Extended runs, memory, docs and admin endpoints |
-| `test_api_review.py` | 19 | The review surfaces read back what the persistence modes wrote |
+| `test_api_review.py` | 26 | The review surfaces read back what the persistence modes wrote, and the episodic-run timeline places each Episodic Memory clear exactly between the runs, page by page, with its note |
 | `test_api_runs.py` | 26 | The runs API with persistence |
 | `test_api_system.py` | 8 | The system endpoints: what is executing, not what was recorded |
+| `test_episodic_clears_migration.py` | 8 | Training Sessions become Episodic Memory clears without losing anything: the mapping, notes before and after a clear, failing loudly rather than dropping a note, idempotence, the downgrade, and an Alembic 018 round trip |
 | `test_help_api.py` | 7 | The help topics API |
 | `test_persistence.py` | 4 | Snapshot save/restore and the DB metadata round-trip |
 | `test_persistence_modes.py` | 33 | The three persistence modes: Fast, Normal, Audit; a parallel Run is the same at any worker count |
@@ -630,7 +631,7 @@ nothing consults them now.
 
 `client/` carries a Vitest suite covering the store, the panels, the admin
 editors and the review surfaces. Run it with `cd client && npx vitest run`, and
-`npx tsc --noEmit` alongside it. **543 cases across 37 files**, all passing, in
+`npx tsc --noEmit` alongside it. **546 cases across 38 files**, all passing, in
 3.1 s on an Apple M-series machine.
 
 | File (`client/src/`) | Cases | Covers |
@@ -669,7 +670,8 @@ editors and the review surfaces. Run it with `cd client && npx vitest run`, and
 | `components/WorkspaceView.test.tsx` | 12 | Workspace labels do not print on top of each other |
 | `components/admin/AdminEditors.test.tsx` | 42 | Every Configuration tab edits the collection it shows |
 | `components/admin/AdminHttpFailures.test.tsx` | 11 | The Configuration screen reports what the server refused |
-| `components/review/ReviewPanel.test.tsx` | 34 | The review surfaces read the record back |
+| `components/review/EpisodicRunTimeline.test.tsx` | 3 | A note being typed on an Episodic Memory clear survives a late refresh, and an untouched note follows the server |
+| `components/review/ReviewPanel.test.tsx` | 34 | The review surfaces read the record back, and the episodic-run timeline shows each Episodic Memory clear between the runs with an editable note |
 | `components/training/problemText.test.ts` | 37 | Parsing pasted or uploaded problems (letters only, 1 to 64 characters, case-sensitive; JSON entries with their own seeds, answer and tag) and the preview the Training view shows before adding them |
 | `components/training/TrainingPanel.test.tsx` | 59 | The Training view: the list and the selected Training, creating one, adding problems, the error-policy fields, the problems table searched and sorted through the server, the Memory tab, and the controls (pause, resume, close, cancel, export) |
 

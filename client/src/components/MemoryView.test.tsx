@@ -2,12 +2,12 @@
 // Petacat -- the Memory panel shows the memory the run is actually thinking against
 // ---------------------------------------------------------------------------
 //
-// Every Run shares the Training Session's Episodic Memory, and the panel shows it. A
+// Every Run shares the one Episodic Memory, and the panel shows it. A
 // Fast Run writes no database rows, so its copy is read from the live object the engine
 // is using; `scope` reports which read was taken — `shared` from the rows, `live` from
 // the object — and both are the same memory with the same answers under the same ids.
 //
-// The header's two actions therefore apply to either read: Clear deletes the session's
+// The header's two actions therefore apply to either read: Clear deletes the
 // answers, and Compare identifies two of them by id.
 //
 // The panel reads its own memory, so a blank panel has one meaning at a time: a memory
@@ -73,7 +73,7 @@ function refusal(status: number, statusText: string, detail: string) {
   return reply({ detail }, status, statusText)
 }
 
-/** Whether a URL is the panel's read of the Training Session's memory. */
+/** Whether a URL is the panel's read of the Episodic Memory. */
 function isMemoryRead(url: string): boolean {
   return url.endsWith('/api/memory') || /\/api\/runs\/-?\d+\/memory$/.test(url)
 }
@@ -111,7 +111,7 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-describe('MemoryView — how the session memory was read', () => {
+describe('MemoryView — how the Episodic Memory was read', () => {
   it('says nothing extra when the memory came from the stored rows', () => {
     useRunStore.setState({
       memory: memory({ scope: 'shared', answers: [answer()] }),
@@ -123,7 +123,7 @@ describe('MemoryView — how the session memory was read', () => {
 
   it('says the memory was read live when a Fast run is loaded', () => {
     // A Fast run writes no rows, so its memory is read from the live object. It is the
-    // Training Session's memory either way.
+    // Episodic Memory either way.
     useRunStore.setState({
       memory: memory({ scope: 'live', mode: 'fast', answers: [answer()] }),
     })
@@ -300,7 +300,7 @@ describe('MemoryView — explaining one answer', () => {
 // A memory that could not be read, told apart from a memory holding nothing
 // ---------------------------------------------------------------------------
 //
-// "No answers stored" is a claim about the Training Session: it says the runs so far
+// "No answers stored" is a claim about the Episodic Memory: it says the runs so far
 // have found nothing worth remembering, which is the fact §5.2's experiments turn on.
 // The panel reserves it for that case, and gives the reason when the read failed.
 // ---------------------------------------------------------------------------
@@ -444,7 +444,7 @@ describe('MemoryView — an action the server refuses', () => {
       if (isMemoryRead(url) && (init?.method ?? 'GET') === 'GET') {
         return reply(useRunStore.getState().memory)
       }
-      return refusal(500, 'Internal Server Error', 'the session rows are locked')
+      return refusal(500, 'Internal Server Error', 'the memory rows are locked')
     }
     useRunStore.setState({
       memory: memory({ scope: 'shared', answers: [answer({ answer_id: 1 })] }),

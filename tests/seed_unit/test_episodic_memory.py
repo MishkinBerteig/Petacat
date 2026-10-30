@@ -718,7 +718,7 @@ def test_a_snag_on_another_problem_is_a_different_episode(nodes):
 def test_clear_activations_zeroes_every_stored_answer():
     """``init-mcat`` clears them at the start of every run (``run.ss:212``): an
     activation says how strongly *this* run is reminded of a past answer, so a new run
-    of a Training Session starts reminded of nothing."""
+    of a sequence of episodic runs starts reminded of nothing."""
     memory = EpisodicMemory()
     past = _answer({"direction": "opposite"})
     memory.store_answer(past)

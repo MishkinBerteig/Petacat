@@ -2941,7 +2941,7 @@ def _report_answer_locked(
     # Free-running lets two workers reach ``report_answer`` before either result has
     # been collected (WP4.4).  ``FreeRunningEngine._collect_outcome`` de-duplicates the
     # run's *status*, but by then each worker has already written its own
-    # ``AnswerDescription`` — and under a Training Session that memory is shared with
+    # ``AnswerDescription`` — and across episodic runs that memory is shared with
     # every later Run, so the pollution outlives the run that caused it.  Measured at 8
     # workers before this guard: 22 of 40 runs stored 2–5 answers where the serial loop
     # stores exactly 1.

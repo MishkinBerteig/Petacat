@@ -129,15 +129,13 @@ class RunIdentityResponse(BaseModel):
     run_id: int
     mode: str
     #: False for a Fast Run.  There is no ``runs`` row, so there is nothing to read
-    #: the hashes from and nothing to link a Training Session to.  This is the mode
+    #: the hashes from and nothing to look up.  This is the mode
     #: keeping its promise, not a lookup failure, and the client says so.
     recorded: bool
     seed: int | None = None
     spreading_threshold: int = 100
     config_hash: str | None = None
     memory_hash: str | None = None
-    #: The Training Session this Run belongs to — the span between memory clears.
-    session_id: int | None = None
     created_at: datetime | None = None
 
 
@@ -364,7 +362,7 @@ async def get_run_identity(
     run_id: int,
     session: AsyncSession = Depends(get_session),
 ):
-    """The recorded identity of a run: mode, seed, config hash, memory hash, session.
+    """The recorded identity of a run: mode, seed, config hash, memory hash.
 
     Served here rather than from ``/api/review`` because this one is about a run that
     may still be executing.  The review router's contract is that its 404 means
@@ -398,7 +396,6 @@ async def get_run_identity(
         ),
         config_hash=row.config_hash,
         memory_hash=row.memory_hash,
-        session_id=row.session_id,
         created_at=row.created_at,
     )
 
@@ -464,7 +461,6 @@ async def get_run_parameters(
         ),
         "config_hash": row.config_hash if row is not None else None,
         "memory_hash": row.memory_hash if row is not None else None,
-        "session_id": row.session_id if row is not None else None,
         "seed": row.seed if row is not None else None,
         "recorded": row is not None,
     }
@@ -800,8 +796,8 @@ def _project_memory(memory) -> dict:
 async def get_memory(run_id: int, session: AsyncSession = Depends(get_session)):
     """The Episodic Memory *this run* is actually thinking against.
 
-    That is the shared Training Session memory in **every** mode.  Mode chooses where a
-    run is recorded, not what it is: a Fast Run takes part in the session exactly as a
+    That is the shared Episodic Memory in **every** mode.  Mode chooses where a
+    run is recorded, not what it is: a Fast Run takes part in the episodic runs exactly as a
     Normal or Audit Run does, so it is reminded of earlier answers and its own answers
     are there for the runs that follow.
 

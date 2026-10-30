@@ -39,7 +39,6 @@ vi.mock('@/api/client', async (importOriginal) => ({
     spreading_threshold: 100,
     config_hash: 'c0ffee1234567890',
     memory_hash: 'deadbeef12345678',
-    session_id: 3,
     created_at: null,
   }),
   // The panel now mounts the parameter form and the derived read-out, both of which
@@ -591,7 +590,7 @@ describe('RunControlsPanel — run identity', () => {
     render(<RunControlsPanel />)
     await waitFor(() => expect(screen.getByText(/cfg c0ffee12/)).toBeTruthy())
     expect(screen.getByText(/mem deadbeef/)).toBeTruthy()
-    expect(screen.getByText(/Training Session 3/)).toBeTruthy()
+    expect(screen.queryByText(/session/i)).toBeNull()
   })
 
   it('explains, rather than blanks, a Fast Run that has no recorded identity', async () => {
@@ -603,7 +602,6 @@ describe('RunControlsPanel — run identity', () => {
       spreading_threshold: 100,
       config_hash: null,
       memory_hash: null,
-      session_id: null,
       created_at: null,
     })
 
@@ -859,12 +857,12 @@ describe('RunControlsPanel — a refused request reaches the error channel', () 
 // A finished run is not continued — it is followed
 // ---------------------------------------------------------------------------
 //
-// Repeating a problem is the whole point of a Training Session: Episodic Memory
+// Repeating a problem is the whole point of episodic runs: Episodic Memory
 // carries the first run's answer into the second, which declines to give it again
 // and goes somewhere else. Pressing Run twice on an unchanged problem used to
 // re-enter the finished run instead -- the backend puts its status back to
 // `running` and steps it on past its own answer, in the same row -- so the second
-// run of a session could not be started from this panel at all, and the only
+// episodic run could not be started from this panel at all, and the only
 // workaround was to change the seed, which makes it a different experiment.
 //
 // Halted and paused are not terminal and must keep continuing, or Stop-then-Run
@@ -931,12 +929,12 @@ describe('RunControlsPanel — a finished run is followed by a new one', () => {
     expect(createRun).not.toHaveBeenCalled()
   })
 
-  it('says the next press begins the next run of the session', () => {
+  it('says the next press begins the next episodic run', () => {
     setup({ ...SAME_PROBLEM, status: 'answer_found', createRun, runToAnswer })
 
     render(<RunControlsPanel />)
     expect(
-      screen.getByText(/starts the next run of this Training Session/i),
+      screen.getByText(/starts the next episodic run/i),
     ).toBeTruthy()
     // And not the caption that reads as "this is what you are looking at".
     expect(screen.queryByText(/Showing run #12/)).toBeNull()
@@ -1018,15 +1016,14 @@ describe('RunControlsPanel — while a run is under way', () => {
 })
 
 // ---------------------------------------------------------------------------
-// Starting the next Training Session
+// Clearing Episodic Memory
 // ---------------------------------------------------------------------------
 //
-// A session is the unit runs accumulate into, and its boundary was reachable only
-// from the Admin view under a name that says what it removes ("Clear Episodic
-// Memory") rather than what it ends. So the unit could be read about in Review and
-// never started from the panel whose Run button builds it.
+// Episodic runs accumulate into Episodic Memory, and clearing it was reachable only
+// from the Admin view. So the memory could be read about in Review and never
+// cleared from the panel whose Run button builds it.
 
-describe('RunControlsPanel — Training Session', () => {
+describe('RunControlsPanel — Episodic Memory', () => {
   const LOADED = {
     runId: 12,
     runParams: { initial: 'abc', modified: 'abd', target: 'xyz', seed: 7 },
@@ -1034,60 +1031,61 @@ describe('RunControlsPanel — Training Session', () => {
     formInputs: { initial: 'abc', modified: 'abd', target: 'xyz', answer: '', seed: '7' },
   }
 
-  it('names the session the loaded run belongs to', async () => {
+  it('has an Episodic Memory group that says what episodic runs are', () => {
     setup(LOADED)
     render(<RunControlsPanel />)
-    // Exact, because the run card further down says "Training Session 3" as well.
-    await waitFor(() => expect(screen.getByText('session 3')).toBeTruthy())
+    expect(screen.getByText('Episodic Memory')).toBeTruthy()
+    expect(screen.getByText(/runs are episodic runs/)).toBeTruthy()
+    expect(screen.getByText(/the next\s+episodic run starts with none/)).toBeTruthy()
   })
 
-  it('ends the session on confirmation, since that is what the boundary is', async () => {
-    const startNewTrainingSession = vi.fn().mockResolvedValue(undefined)
+  it('clears Episodic Memory on confirmation', async () => {
+    const clearEpisodicMemory = vi.fn().mockResolvedValue(undefined)
     vi.spyOn(window, 'confirm').mockReturnValue(true)
-    setup({ ...LOADED, startNewTrainingSession })
+    setup({ ...LOADED, clearEpisodicMemory })
 
     render(<RunControlsPanel />)
-    fireEvent.click(screen.getByRole('button', { name: /start a new training session/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^clear episodic memory$/i }))
 
-    await waitFor(() => expect(startNewTrainingSession).toHaveBeenCalled())
+    await waitFor(() => expect(clearEpisodicMemory).toHaveBeenCalled())
     expect(
-      await screen.findByText(/the next run opens a new one/i),
+      await screen.findByText(/Episodic Memory cleared — the next run starts with none/i),
     ).toBeTruthy()
   })
 
   it('does nothing when the confirmation is declined', () => {
-    const startNewTrainingSession = vi.fn().mockResolvedValue(undefined)
+    const clearEpisodicMemory = vi.fn().mockResolvedValue(undefined)
     vi.spyOn(window, 'confirm').mockReturnValue(false)
-    setup({ ...LOADED, startNewTrainingSession })
+    setup({ ...LOADED, clearEpisodicMemory })
 
     render(<RunControlsPanel />)
-    fireEvent.click(screen.getByRole('button', { name: /start a new training session/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^clear episodic memory$/i }))
 
-    expect(startNewTrainingSession).not.toHaveBeenCalled()
+    expect(clearEpisodicMemory).not.toHaveBeenCalled()
   })
 
-  it('does not claim a new session when the clear was refused', async () => {
+  it('does not claim a clear when the clear was refused', async () => {
     // The store reports the failure on the channel the header renders; claiming a
-    // boundary here as well would contradict it — and the old session is still open.
-    const startNewTrainingSession = vi
+    // clear here as well would contradict it — and the memory is still full.
+    const clearEpisodicMemory = vi
       .fn()
       .mockRejectedValue(new ApiError(503, 'Service Unavailable', ''))
     vi.spyOn(window, 'confirm').mockReturnValue(true)
-    setup({ ...LOADED, startNewTrainingSession })
+    setup({ ...LOADED, clearEpisodicMemory })
 
     render(<RunControlsPanel />)
-    fireEvent.click(screen.getByRole('button', { name: /start a new training session/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^clear episodic memory$/i }))
 
-    await waitFor(() => expect(startNewTrainingSession).toHaveBeenCalled())
-    expect(screen.queryByText(/the next run opens a new one/i)).toBeNull()
+    await waitFor(() => expect(clearEpisodicMemory).toHaveBeenCalled())
+    expect(screen.queryByText(/Episodic Memory cleared — the next run starts with none/i)).toBeNull()
   })
 
-  it('refuses to draw a session boundary in the middle of a run', () => {
+  it('refuses to clear Episodic Memory in the middle of a run', () => {
     setup({ ...LOADED, status: 'running' })
 
     render(<RunControlsPanel />)
     expect(
-      screen.getByRole('button', { name: /start a new training session/i }),
+      screen.getByRole('button', { name: /^clear episodic memory$/i }),
     ).toBeDisabled()
   })
 })

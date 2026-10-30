@@ -227,7 +227,7 @@ function ComparisonSummary({ comparison }: { comparison: RunComparison }) {
       )}
 
       {memory.added_answers.length > 0 && (
-        <Section title="Left in the Training Session's Episodic Memory (Metacat Mode)">
+        <Section title="Left in Episodic Memory (Metacat Mode)">
           <ul style={{ margin: 0, paddingLeft: 16, fontSize: 11 }}>
             {memory.added_answers.map((a, i) => (
               <li key={i} style={{ fontFamily: 'var(--font-mono)' }}>

@@ -10,32 +10,36 @@ def _utcnow() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 from sqlalchemy import BigInteger, Column, DateTime, ForeignKey, Index, Integer, String, Text, Float, Boolean
+from sqlalchemy import func
 from sqlalchemy.dialects.postgresql import JSONB
 
 from server.models.metadata import Base
 
 
-class TrainingSession(Base):
-    """A sequence of Runs sharing one Episodic Memory (WP3.0).
+class EpisodicMemoryClear(Base):
+    """One event: Episodic Memory was cleared.
 
-    The concept already existed and already worked — Episodic Memory is carried across
-    Run boundaries by injection, and a memory clear is already the boundary between one
-    session and the next. What was missing was any way to *say so*: Runs could not be
-    grouped, and there was no row to hang a session's identity on. This adds the
-    representation and changes no behaviour; in particular it does not touch
-    ``init_mcat``.
+    Metacat Mode's runs are episodic runs.  Each inherits the Episodic Memory the runs
+    before it left, until someone clears that memory.  A clear is an *event* in that
+    sequence, not the end of anything; this row records when it happened and lets a person
+    attach a note to it.
 
-    ``ended_at`` is set when the memory is cleared, which is what ends a session.
+    ``after_run_id`` is the id of the last recorded run before the clear (null if none).
+    It places the marker exactly in the run sequence, independent of clock ties.  Runs are
+    recorded when they start, so a run already going when the memory was cleared sits
+    before the marker, which is correct: it inherited the memory from before the clear.
+    It is deliberately not a foreign key: deleting a run must not delete the event.
     """
 
-    __tablename__ = "training_sessions"
+    __tablename__ = "episodic_memory_clears"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    started_at = Column(DateTime, default=_utcnow)
-    #: Set by ``POST /api/memory/clear`` — the action that ends a session by
-    #: discarding the one thing that crosses Run boundaries.
-    ended_at = Column(DateTime, nullable=True)
-    note = Column(Text, default="")
+    cleared_at = Column(
+        DateTime(timezone=True), nullable=False,
+        default=lambda: datetime.now(timezone.utc), server_default=func.now(),
+    )
+    after_run_id = Column(Integer, nullable=True)
+    note = Column(Text, nullable=False, default="", server_default="")
 
 
 class RunStateCapture(Base):
@@ -121,9 +125,6 @@ class Run(Base):
     spreading_threshold = Column(
         Integer, nullable=False, default=100, server_default="100",
     )
-    #: Which Training Session this Run belongs to (WP3.0). Nullable so Runs recorded
-    #: before sessions existed still read back.
-    session_id = Column(Integer, nullable=True, index=True)
     #: Persistence mode — a property of the Run, chosen at creation, never a global
     #: setting: later phases want a Fast corpus-training population and a Normal live
     #: dialogue in the same process.
@@ -213,7 +214,7 @@ class AnswerDescriptionRow(Base):
     # The Episodic Memory's own identifier for this answer, and the one every API that
     # names an answer uses (compare, display, forget).  Recorded here rather than
     # letting the row's primary key stand in for it: a Fast Run contributes answers to
-    # the session but writes no rows, so a row-derived identifier would collide with a
+    # the memory but writes no rows, so a row-derived identifier would collide with a
     # Fast answer's and resolve a comparison to the wrong pair.  One id space, owned by
     # the memory, of which this column is a record.
     answer_id = Column(Integer, nullable=True)
@@ -259,7 +260,7 @@ class SnagDescriptionRow(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     # The Episodic Memory's own identifier for this snag, recorded the way
     # ``answer_descriptions.answer_id`` records an answer's.  One id space, owned by the
-    # memory: a Fast Run contributes snags to the session and writes no rows, so the
+    # memory: a Fast Run contributes snags to the memory and writes no rows, so the
     # memory's counter is the only identifier that covers every snag, and every
     # projection of a snag — live object or row — reports that one.
     snag_id = Column(Integer, nullable=True)

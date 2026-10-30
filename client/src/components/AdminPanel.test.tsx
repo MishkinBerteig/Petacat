@@ -3,10 +3,10 @@
 // ---------------------------------------------------------------------------
 //
 // Every button here is irreversible, and one of them draws a boundary the rest of
-// the program is organised around: clearing Episodic Memory is what ends a Training
-// Session, because episodic memory is the only thing that crosses a Run boundary.
+// the program is organised around: Episodic Memory is the only thing that crosses a
+// Run boundary, so clearing it changes what every later episodic run inherits.
 //
-// A clear that did not land leaves the session open and its answers stored, and the
+// A clear that did not land leaves the memory uncleared and its answers stored, and the
 // panel looks exactly as it does after a clear that did. So the outcome is stated:
 // cleared, or the reason it was not.
 //
@@ -84,7 +84,7 @@ describe('AdminPanel — clearing Episodic Memory', () => {
       const match = /\/api\/docs\/components\/(.+)$/.exec(url)
       if (match) return reply(topic(match[1]))
       if (url.endsWith('/api/memory') && init?.method === 'DELETE') {
-        return refusal(500, 'Internal Server Error', 'the session rows are locked')
+        return refusal(500, 'Internal Server Error', 'the memory rows are locked')
       }
       return refusal(404, 'Not Found', url)
     }
@@ -99,14 +99,14 @@ describe('AdminPanel — clearing Episodic Memory', () => {
         screen.getByText(/Could not clear Metacat Mode's Episodic Memory: the server failed to complete it/),
       ).toBeTruthy(),
     )
-    expect(screen.getByText(/the session rows are locked/)).toBeTruthy()
-    // The session is still open, so nothing downstream was told it closed.
+    expect(screen.getByText(/the memory rows are locked/)).toBeTruthy()
+    // The memory is still full, so nothing downstream was told it was cleared.
     expect(useRunStore.getState().epoch).toBe(ORIGINAL.epoch)
 
     vi.mocked(window.confirm).mockRestore()
   })
 
-  it('says the session closed when the clear did land', async () => {
+  it('says the memory was cleared when the clear did land', async () => {
     handler = async (url, init) => {
       const match = /\/api\/docs\/components\/(.+)$/.exec(url)
       if (match) return reply(topic(match[1]))
@@ -122,7 +122,7 @@ describe('AdminPanel — clearing Episodic Memory', () => {
     fireEvent.click(screen.getByRole('button', { name: /Clear Episodic Memory/i }))
 
     await waitFor(() =>
-      expect(screen.getByText(/this Training Session .* is closed/)).toBeTruthy(),
+      expect(screen.getByText(/Episodic Memory cleared — the next episodic run starts with none/)).toBeTruthy(),
     )
     expect(useRunStore.getState().epoch).toBe(ORIGINAL.epoch + 1)
 

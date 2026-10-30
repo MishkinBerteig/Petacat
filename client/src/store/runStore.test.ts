@@ -163,7 +163,7 @@ describe('runStore — spreading threshold persistence', () => {
     )
   })
 
-  it('lets an explicit per-run value win over the session default', async () => {
+  it('lets an explicit per-run value win over the default', async () => {
     window.localStorage.setItem(STORAGE_KEY, '40')
     const useRunStore = await freshStore()
 
@@ -639,7 +639,7 @@ describe('runStore — the error channel', () => {
 
 describe('runStore — which Episodic Memory the panel reads', () => {
   it('asks the run, not the shared store, once a run is loaded', async () => {
-    // The run-scoped read reaches the Training Session's memory by the right route in
+    // The run-scoped read reaches the Episodic Memory by the right route in
     // every mode, including a Fast Run, which is served from the live object.
     const store = await freshStore()
     store.setState({ runId: 7 })
@@ -651,55 +651,53 @@ describe('runStore — which Episodic Memory the panel reads', () => {
 })
 
 // ---------------------------------------------------------------------------
-// Ending a Training Session
+// Clearing Episodic Memory
 // ---------------------------------------------------------------------------
 //
-// A session is not created and cannot be: it opens when a run needs one. What can
-// be done is end it, and ending it *is* clearing Episodic Memory -- that memory is
-// the only thing one run hands the next, so after the clear the runs on either
-// side share nothing and do not belong together. The run on screen is deliberately
-// left alone: it ran in the session that has just closed, and that stays true.
+// Episodic Memory is the only thing one run hands the next, so after a clear the runs
+// on either side share nothing. The run on screen is deliberately left alone: its
+// record does not change.
 
-describe('runStore — ending a Training Session', () => {
-  it('clears Episodic Memory, which is what the boundary is', async () => {
+describe('runStore — clearing Episodic Memory', () => {
+  it('clears Episodic Memory, so the next run inherits none', async () => {
     const store = await freshStore()
     store.setState({ runId: 7 })
 
-    await store.getState().startNewTrainingSession()
+    await store.getState().clearEpisodicMemory()
 
     expect(clearMemory).toHaveBeenCalled()
     expect(store.getState().memory.answers).toEqual([])
   })
 
-  it('bumps the epoch so the panels re-read across the boundary', async () => {
+  it('bumps the epoch so the panels re-read across the clear', async () => {
     const store = await freshStore()
     const before = store.getState().epoch
 
-    await store.getState().startNewTrainingSession()
+    await store.getState().clearEpisodicMemory()
 
     expect(store.getState().epoch).toBe(before + 1)
   })
 
-  it('leaves the loaded run alone — it belongs to the session just closed', async () => {
+  it('leaves the loaded run alone — its record is unchanged', async () => {
     const store = await freshStore()
     store.setState({ runId: 7, codeletCount: 842, status: 'answer_found' })
 
-    await store.getState().startNewTrainingSession()
+    await store.getState().clearEpisodicMemory()
 
     expect(store.getState().runId).toBe(7)
     expect(store.getState().codeletCount).toBe(842)
   })
 
-  it('raises and says so when the clear was refused, since the session is still open', async () => {
+  it('raises and says so when the clear was refused, since the memory is still full', async () => {
     const { ApiError } = await import('@/api/client')
     const store = await freshStore()
     clearMemory.mockRejectedValueOnce(new ApiError(503, 'Service Unavailable', ''))
 
-    await expect(store.getState().startNewTrainingSession()).rejects.toBeTruthy()
+    await expect(store.getState().clearEpisodicMemory()).rejects.toBeTruthy()
 
-    expect(store.getState().lastError).toContain('start a new Training Session')
+    expect(store.getState().lastError).toContain('clear Episodic Memory')
     // Nothing was discarded locally either: the memory on screen is still the
-    // session's, because the session is still open.
+    // still the full one.
     expect(store.getState().epoch).toBe(0)
   })
 })

@@ -23,7 +23,7 @@ from server.models.run import (
     Run,
     RunStateCapture,
     TraceEventRow,
-    TrainingSession,
+    EpisodicMemoryClear,
 )
 from server.services.sinks import MODE_AUDIT, MODE_FAST, MODE_NORMAL
 
@@ -355,10 +355,10 @@ async def test_a_fast_run_is_absent_from_the_listing_that_reads_rows(app_client)
 
 @pytest.mark.asyncio
 async def test_fast_run_joins_the_shared_memory(app_client, db_session):
-    """A Fast Run takes part in the Training Session like any other.
+    """A Fast Run takes part in the episodic runs like any other.
 
     The mode promises not to write to the *database*; it promises nothing about the
-    session, and must not, or a Fast training population would teach the session
+    shared memory, and must not, or a Fast training population would teach the memory
     nothing and a Fast Run would not be comparable with a Normal one.  It is the same
     ``EpisodicMemory`` object, so its answers are there for the runs that follow and
     ``answer_present`` will stop them being rediscovered.
@@ -512,12 +512,12 @@ async def test_a_normal_run_re_executes_from_its_recorded_start_state(app_client
 
 
 @pytest.mark.asyncio
-async def test_a_mid_session_normal_run_records_the_memory_it_inherited(
+async def test_a_later_normal_run_records_the_memory_it_inherited(
     app_client, db_session
 ):
     """The one thing that crosses Run boundaries must actually be captured.
 
-    A Normal Run placed *after* other Runs in a Training Session inherits their
+    A Normal Run placed *after* other episodic runs inherits their
     answers, and its start-state capture has to contain them — otherwise "re-execute
     from the recorded start state" would silently start from a different memory.
     """
@@ -663,17 +663,12 @@ async def test_an_unknown_mode_is_rejected(app_client):
 
 
 @pytest.mark.asyncio
-async def test_runs_are_grouped_into_a_training_session(app_client, db_session):
-    """WP3.0: the concept already worked; this gives it a representation."""
+async def test_a_run_row_carries_no_session(app_client, db_session):
+    """Metacat Mode's runs are episodic runs: a run records no grouping of any kind."""
     run = await _create(app_client, MODE_NORMAL)
     result = await db_session.execute(select(Run).where(Run.id == run["run_id"]))
     row = result.scalars().one()
-    assert row.session_id is not None
-
-    sessions = await db_session.execute(
-        select(TrainingSession).where(TrainingSession.id == row.session_id)
-    )
-    assert sessions.scalars().one().ended_at is None
+    assert not hasattr(row, "session_id")
 
 
 @pytest.mark.asyncio
@@ -687,52 +682,35 @@ async def test_config_and_memory_hashes_are_recorded(app_client, db_session):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Session and cleanup lifecycle
+# Clear and cleanup lifecycle
 # ─────────────────────────────────────────────────────────────────────────────
 
 
 @pytest.mark.asyncio
-async def test_clearing_the_memory_ends_the_training_session(app_client, db_session):
-    """A memory clear is the session boundary — and must actually close the row.
+async def test_clearing_the_memory_records_an_event_after_the_latest_run(app_client, db_session):
+    """A memory clear is an event, recorded and placed after the latest recorded run.
 
-    WP3.0 says so and the review UI tells the user so, but nothing was writing
-    ``ended_at``: every Run in the database therefore belonged to a single session that
-    had been open since the first one, which makes the grouping useless exactly when it
-    starts to matter. The symptom was invisible — a session list with one entry looks
-    plausible.
+    ``DELETE /api/memory`` is the one clear action; it returns the event it recorded.
     """
-    from sqlalchemy import func
-
     first = await _create(app_client, MODE_NORMAL)
-    row = (await db_session.execute(select(Run).where(Run.id == first["run_id"]))).scalars().one()
-    original_session = row.session_id
-    assert original_session is not None
 
-    # ``DELETE /api/memory``, not the ``POST /api/memory/clear`` the plan text names —
-    # the plan is out of date on the route, not the behaviour.
     resp = await app_client.delete("/api/memory")
     assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["cleared"] is True
+    assert set(body["removed"]) == {"answers", "snags"}
+    assert body["clear"]["after_run_id"] == first["run_id"]
+    assert body["clear"]["note"] == ""
 
-    closed = (
-        await db_session.execute(
-            select(TrainingSession).where(TrainingSession.id == original_session)
-        )
-    ).scalars().one()
-    assert closed.ended_at is not None, "the memory clear did not end the session"
+    rows = (await db_session.execute(select(EpisodicMemoryClear))).scalars().all()
+    assert [r.id for r in rows] == [body["clear"]["clear_id"]]
+    assert rows[0].after_run_id == first["run_id"]
 
-    # And the next Run starts a new one.
+    # The next run does not change the event; a second clear is a second event.
     second = await _create(app_client, MODE_NORMAL)
-    row2 = (await db_session.execute(select(Run).where(Run.id == second["run_id"]))).scalars().one()
-    assert row2.session_id != original_session
-
-    open_sessions = (
-        await db_session.execute(
-            select(func.count())
-            .select_from(TrainingSession)
-            .where(TrainingSession.ended_at.is_(None))
-        )
-    ).scalar()
-    assert open_sessions == 1
+    again = (await app_client.delete("/api/memory")).json()["clear"]
+    assert again["after_run_id"] == second["run_id"]
+    assert again["clear_id"] != body["clear"]["clear_id"]
 
 
 @pytest.mark.asyncio

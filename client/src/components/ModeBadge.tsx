@@ -12,7 +12,7 @@
 // dashboard and the Review browser and leave the same mode looking like two.
 // ---------------------------------------------------------------------------
 
-/** Persistence mode to a colour, so a mixed session reads at a glance. */
+/** Persistence mode to a colour, so a mixed list reads at a glance. */
 export const MODE_COLORS: Record<string, string> = {
   fast: '#90a4ae',
   normal: '#4fc3f7',

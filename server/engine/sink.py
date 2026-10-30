@@ -78,7 +78,7 @@ class RunSink(Protocol):
         """The Run is initialised and about to execute its first codelet.
 
         Normal mode's first complete-state capture. Everything a Run inherits from its
-        Training Session — the Episodic Memory, and nothing else in Phase 0 — is
+        earlier episodic runs — the Episodic Memory, and nothing else in Phase 0 — is
         already in place, which is what makes the captured state sufficient to
         re-execute the Run from.
         """

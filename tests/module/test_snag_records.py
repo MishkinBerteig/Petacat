@@ -1,9 +1,9 @@
-"""Which snags a run records: the ones it adds to the session's memory, once each.
+"""Which snags a run records: the ones it adds to the shared memory, once each.
 
-Episodic Memory belongs to the Training Session, so a run starts out holding every
+Episodic Memory is shared by episodic runs, so a run starts out holding every
 earlier run's snags.  The recording sink used to find a run's new snags by comparing
 the memory's length with its own buffer's, and ``flush`` empties that buffer.  So every
-run that snagged wrote all of the session's earlier snags again under its own id, and
+run that snagged wrote all of the memory's earlier snags again under its own id, and
 again after each flush, and relabelled the memory's copies with its own run id.
 
 No database is needed: ``flush`` only stages rows on the session it is given.

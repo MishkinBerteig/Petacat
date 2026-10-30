@@ -20,7 +20,7 @@ Fixed and derived
 Run.  Those are the ones below.
 
 **Derived** values are outputs: the numeric backend that was actually selected, the shard
-count sharding actually settled on, the config and memory hashes, the Training Session.
+count sharding actually settled on, the config and memory hashes.
 They belong beside the fixed parameters when reading a Run — they are equally part of
 "what this Run was" — but they cannot be set, and presenting them as though they could
 be would be a lie about how the engine works.

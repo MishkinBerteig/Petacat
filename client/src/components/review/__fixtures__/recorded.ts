@@ -14,8 +14,8 @@ import type {
   RecordedRun,
   RecordedState,
   RunComparison,
-  TrainingSessionDetail,
-  TrainingSessionSummary,
+  EpisodicRunTimeline,
+  MemoryClear,
 } from '@/types'
 
 export function recordedRun(overrides: Partial<RecordedRun> = {}): RecordedRun {
@@ -41,33 +41,30 @@ export function recordedRun(overrides: Partial<RecordedRun> = {}): RecordedRun {
   }
 }
 
-export function sessionSummary(
-  overrides: Partial<TrainingSessionSummary> = {},
-): TrainingSessionSummary {
+export function memoryClear(overrides: Partial<MemoryClear> = {}): MemoryClear {
   return {
-    session_id: 3,
-    started_at: '2026-07-29T08:00:00',
-    ended_at: null,
+    clear_id: 1,
+    cleared_at: '2026-07-29T10:30:00',
+    after_run_id: 7,
     note: '',
-    run_count: 2,
-    first_run_at: '2026-07-29T08:01:00',
-    last_run_at: '2026-07-29T09:00:00',
-    is_open: true,
     ...overrides,
   }
 }
 
-export function sessionDetail(
-  runs: RecordedRun[],
-  overrides: Partial<TrainingSessionDetail> = {},
-): TrainingSessionDetail {
+/** A timeline window: runs and clear markers in the order given (newest first). */
+export function timeline(
+  items: Array<RecordedRun | MemoryClear>,
+  overrides: Partial<EpisodicRunTimeline> = {},
+): EpisodicRunTimeline {
+  const built = items.map((i) =>
+    'run_id' in i ? ({ kind: 'run', run: i } as const) : ({ kind: 'memory_cleared', clear: i } as const),
+  )
   return {
-    session_id: 3,
-    started_at: '2026-07-29T08:00:00',
-    ended_at: null,
-    note: '',
-    is_open: true,
-    runs,
+    items: built,
+    total_runs: built.filter((i) => i.kind === 'run').length,
+    total_clears: built.filter((i) => i.kind === 'memory_cleared').length,
+    limit: 50,
+    offset: 0,
     ...overrides,
   }
 }

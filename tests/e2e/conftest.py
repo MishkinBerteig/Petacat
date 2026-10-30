@@ -6,8 +6,8 @@ Petacat runs natively on macOS (WP2.1), so these reach a local Postgres:
   .venv/bin/python -m pytest tests/e2e/ -v
 
 TEST_DATABASE_URL overrides the default below.  It names a separate database on the
-same instance as the development one, so a test run cannot touch the Training
-Session accumulated in `petacat`.
+same instance as the development one, so a test run cannot touch the runs and
+Episodic Memory accumulated in `petacat`.
 
 ALL e2e tests are deterministic: they use fixed seeds and produce
 identical results on every run.
@@ -172,7 +172,7 @@ async def fresh_episodic_memory(test_engine, setup_db):
     """Start every test with an empty Episodic Memory.
 
     ``_global_memory`` is process-global and deliberately outlives a Run — that is what
-    a Training Session *is*.  It used to be harmless to let it accumulate across
+    makes runs episodic.  It used to be harmless to let it accumulate across
     unrelated tests because nothing read it back into cognition.  It is not harmless
     now: ``answer_present`` makes the program refuse to rediscover an answer already in
     memory (``answers.ss:982``), so a test could inherit an answer from whichever test

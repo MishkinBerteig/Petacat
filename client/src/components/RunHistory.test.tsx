@@ -2,7 +2,7 @@
 // Petacat -- Tests for Run History staying current
 // ---------------------------------------------------------------------------
 //
-// The original bug: this panel is mounted for the whole session, and its fetch
+// The original bug: this panel is mounted for the whole page visit, and its fetch
 // effect depended only on [currentRunId, epoch]. Nothing in that list changes
 // when a run *finishes*, so the list was fetched once just after a run was
 // created and never again. Completed runs kept showing the values they had a
@@ -356,10 +356,9 @@ describe('RunHistory — persistence mode per run', () => {
 // Reaching the record from the dashboard
 // ---------------------------------------------------------------------------
 //
-// The review surfaces were reachable only by opening the Review view and browsing
-// Training Sessions — which is the right way round for a reader who is exploring,
-// and the wrong way round for one who has just watched a run finish: they know the
-// run and not the session it landed in.
+// The review surfaces were reachable only by opening the Review view and paging
+// the episodic-run timeline — fine for a reader who is exploring, slow for one who
+// has just watched a run finish: they know the run.
 
 describe('RunHistory — opening a run in the Review browser', () => {
   it('offers a review route on every listed run', async () => {

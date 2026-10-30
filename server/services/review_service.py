@@ -7,8 +7,8 @@ without the readers would repeat the mistake exactly.
 
 Three surfaces, three mechanisms
 --------------------------------
-- **The Training Session browser** is ordinary aggregate SQL over ``runs``,
-  ``training_sessions``, ``run_state_captures`` and ``audit_actions``.  It is meant to
+- **The episodic-run timeline** is ordinary aggregate SQL over ``runs``,
+  ``episodic_memory_clears``, ``run_state_captures`` and ``audit_actions``.  It is meant to
   be scanned, so it answers in one query per level and never touches the engine.
 
 - **Rendering a capture** goes through ``capture_projection``, which reads the record
@@ -51,7 +51,7 @@ from server.models.run import (
     AuditAction,
     Run,
     RunStateCapture,
-    TrainingSession,
+    EpisodicMemoryClear,
 )
 from server.services.capture_projection import project_capture
 
@@ -139,6 +139,16 @@ class _Inspector:
         return self.runner.ctx.codelet_count if self.runner.ctx else 0
 
 
+def clear_summary(clear: EpisodicMemoryClear) -> dict:
+    """The wire shape of one Episodic Memory clear (``MemoryClear``)."""
+    return {
+        "clear_id": clear.id,
+        "cleared_at": clear.cleared_at,
+        "after_run_id": clear.after_run_id,
+        "note": clear.note or "",
+    }
+
+
 class ReviewService:
     """Reads the record; never mutates a Run.
 
@@ -158,133 +168,138 @@ class ReviewService:
         self._inspectors: dict[int, _Inspector] = {}
 
     # ------------------------------------------------------------------
-    # Training Sessions
+    # The episodic-run timeline
     # ------------------------------------------------------------------
 
-    async def list_sessions(
+    async def episodic_timeline(
         self, session: AsyncSession, limit: int = 50, offset: int = 0
-    ) -> tuple[list[dict], int]:
-        """Sessions newest first, each with its Run count and date range.
-
-        The counts are aggregated in the same query as the sessions rather than
-        fetched per session, because the browser's job is to be fast to scan and a
-        query per row is how a list of twenty sessions becomes twenty-one round trips.
-        """
-        total = (
-            await session.execute(select(func.count()).select_from(TrainingSession))
-        ).scalar() or 0
-
-        rows = (
-            await session.execute(
-                select(
-                    TrainingSession.id,
-                    TrainingSession.started_at,
-                    TrainingSession.ended_at,
-                    TrainingSession.note,
-                    func.count(Run.id).label("run_count"),
-                    func.min(Run.created_at).label("first_run_at"),
-                    func.max(Run.created_at).label("last_run_at"),
-                )
-                .select_from(TrainingSession)
-                .outerjoin(Run, Run.session_id == TrainingSession.id)
-                .group_by(TrainingSession.id)
-                .order_by(TrainingSession.id.desc())
-                .limit(limit)
-                .offset(offset)
-            )
-        ).all()
-
-        sessions = [
-            {
-                "session_id": r.id,
-                "started_at": r.started_at,
-                "ended_at": r.ended_at,
-                "note": r.note or "",
-                "run_count": r.run_count,
-                "first_run_at": r.first_run_at,
-                "last_run_at": r.last_run_at,
-                "is_open": r.ended_at is None,
-            }
-            for r in rows
-        ]
-        return sessions, total
-
-    async def get_session_runs(
-        self, session: AsyncSession, session_id: int
     ) -> dict:
-        """One session and the sequence of Runs in it.
+        """Recorded episodic runs, newest first, with Episodic Memory clears in place.
 
-        Each Run carries how much of a record it actually left — captures and audit
-        actions — so the browser can say "nothing to review" for a Fast Run rather
-        than opening an empty inspector and looking broken.
+        ``limit`` and ``offset`` count *runs*.  A clear with ``after_run_id = a`` sits
+        above every run with id <= a and below every run with id > a, so the list reads
+        ``[clears a >= r1], r1, [clears r2 <= a < r1], r2, ...`` for a page of runs
+        ``r1 > r2 > ...``.  A clear belongs to the page where ``rk <= a < prev``, ``rk``
+        being the page's oldest run and ``prev`` the run just before the page (infinity
+        on page 0), so the pages partition the clears.  On the last page the lower bound
+        is dropped: clears with a null ``after_run_id``, or placed below the oldest run
+        (because that run was deleted), come at the very end.  Clears in the same gap are
+        newest first.
+
+        The placement is by run id, never by clock, so ties cannot misplace a marker.
+        Counts are aggregated per run in the same pass rather than queried per row.
         """
-        header = (
+        total_runs = (
+            await session.execute(select(func.count()).select_from(Run))
+        ).scalar() or 0
+        total_clears = (
             await session.execute(
-                select(TrainingSession).where(TrainingSession.id == session_id)
+                select(func.count()).select_from(EpisodicMemoryClear)
             )
-        ).scalars().first()
-        if header is None:
-            raise NotRecorded(f"no Training Session {session_id}")
-
-        capture_counts = dict(
-            (
-                await session.execute(
-                    select(RunStateCapture.run_id, func.count())
-                    .join(Run, Run.id == RunStateCapture.run_id)
-                    .where(Run.session_id == session_id)
-                    .group_by(RunStateCapture.run_id)
-                )
-            ).all()
-        )
-        action_counts = dict(
-            (
-                await session.execute(
-                    select(AuditAction.run_id, func.count())
-                    .join(Run, Run.id == AuditAction.run_id)
-                    .where(Run.session_id == session_id)
-                    .group_by(AuditAction.run_id)
-                )
-            ).all()
-        )
+        ).scalar() or 0
 
         runs = (
             await session.execute(
-                select(Run)
-                .where(Run.session_id == session_id)
-                .order_by(Run.id)
+                select(Run).order_by(Run.id.desc()).limit(limit).offset(offset)
+            )
+        ).scalars().all()
+        run_ids = [r.id for r in runs]
+
+        capture_counts: dict[int, int] = {}
+        action_counts: dict[int, int] = {}
+        if run_ids:
+            capture_counts = dict(
+                (
+                    await session.execute(
+                        select(RunStateCapture.run_id, func.count())
+                        .where(RunStateCapture.run_id.in_(run_ids))
+                        .group_by(RunStateCapture.run_id)
+                    )
+                ).all()
+            )
+            action_counts = dict(
+                (
+                    await session.execute(
+                        select(AuditAction.run_id, func.count())
+                        .where(AuditAction.run_id.in_(run_ids))
+                        .group_by(AuditAction.run_id)
+                    )
+                ).all()
+            )
+
+        prev: int | None = None  # None = infinity: nothing newer than this page
+        if offset > 0:
+            prev = (
+                await session.execute(
+                    select(Run.id).order_by(Run.id.desc()).limit(1).offset(offset - 1)
+                )
+            ).scalar()
+        is_last_page = offset + len(runs) >= total_runs
+
+        # The clears table is small (one row per deliberate clear), so the placement
+        # rules are applied here, where they can be read, rather than in SQL.
+        all_clears = (
+            await session.execute(
+                select(EpisodicMemoryClear).order_by(EpisodicMemoryClear.id.desc())
             )
         ).scalars().all()
 
-        return {
-            "session_id": header.id,
-            "started_at": header.started_at,
-            "ended_at": header.ended_at,
-            "note": header.note or "",
-            "is_open": header.ended_at is None,
-            "runs": [
+        def on_page(c: EpisodicMemoryClear) -> bool:
+            if not runs:
+                return offset == 0  # no runs at all: every clear is on page 0
+            a = c.after_run_id
+            if a is None:
+                return is_last_page
+            if prev is not None and a >= prev:
+                return False
+            return is_last_page or a >= run_ids[-1]
+
+        clears = [c for c in all_clears if on_page(c)]
+
+        items: list[dict] = []
+        pending = list(clears)  # newest first
+        for run in runs:
+            above, pending = (
+                [c for c in pending if c.after_run_id is not None and c.after_run_id >= run.id],
+                [c for c in pending if c.after_run_id is None or c.after_run_id < run.id],
+            )
+            items.extend({"kind": "memory_cleared", "clear": clear_summary(c)} for c in above)
+            items.append(
                 {
-                    "run_id": r.id,
-                    "mode": r.mode or "normal",
-                    "status": r.status or "",
-                    "initial": r.initial_string,
-                    "modified": r.modified_string,
-                    "target": r.target_string,
-                    "answer": r.answer_string,
-                    "justify_mode": bool(r.justify_mode),
-                    "seed": r.seed,
-                    "codelet_count": r.codelet_count or 0,
-                    "temperature": r.temperature or 0.0,
-                    "spreading_threshold": (
-                        100 if r.spreading_threshold is None else int(r.spreading_threshold)
-                    ),
-                    "config_hash": r.config_hash,
-                    "memory_hash": r.memory_hash,
-                    "created_at": r.created_at,
-                    "capture_count": capture_counts.get(r.id, 0),
-                    "action_count": action_counts.get(r.id, 0),
+                    "kind": "run",
+                    "run": {
+                        "run_id": run.id,
+                        "mode": run.mode or "normal",
+                        "status": run.status or "",
+                        "initial": run.initial_string,
+                        "modified": run.modified_string,
+                        "target": run.target_string,
+                        "answer": run.answer_string,
+                        "justify_mode": bool(run.justify_mode),
+                        "seed": run.seed,
+                        "codelet_count": run.codelet_count or 0,
+                        "temperature": run.temperature or 0.0,
+                        "spreading_threshold": (
+                            100
+                            if run.spreading_threshold is None
+                            else int(run.spreading_threshold)
+                        ),
+                        "config_hash": run.config_hash,
+                        "memory_hash": run.memory_hash,
+                        "created_at": run.created_at,
+                        "capture_count": capture_counts.get(run.id, 0),
+                        "action_count": action_counts.get(run.id, 0),
+                    },
                 }
-                for r in runs
-            ],
+            )
+        items.extend({"kind": "memory_cleared", "clear": clear_summary(c)} for c in pending)
+
+        return {
+            "items": items,
+            "total_runs": total_runs,
+            "total_clears": total_clears,
+            "limit": limit,
+            "offset": offset,
         }
 
     # ------------------------------------------------------------------
@@ -377,7 +392,7 @@ class ReviewService:
 
         What is actually worth seeing is what the Run *did*: which structures it built,
         how far the temperature fell, which concepts it recruited, which themes came to
-        dominate, and what it left in Episodic Memory for the next Run in the session.
+        dominate, and what it left in Episodic Memory for the next episodic run.
         Those are computed here, straight from the two records, with no engine
         involved.
         """
@@ -420,7 +435,7 @@ class ReviewService:
                 "answers_at_end": len(end_view["memory"]["answers"]),
                 "snags_at_start": len(start_view["memory"]["snags"]),
                 "snags_at_end": len(end_view["memory"]["snags"]),
-                # What this Run contributed to the Training Session it belongs to —
+                # What this Run contributed to the Episodic Memory —
                 # the one thing that survives a Run boundary.  Matched on the id
                 # Episodic Memory stamps rather than on list position, because
                 # positions coincide for reasons other than being the same answer.

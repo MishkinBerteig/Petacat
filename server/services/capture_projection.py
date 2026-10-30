@@ -511,7 +511,7 @@ def project_memory(state: dict) -> dict:
     """The Episodic Memory the run held, in ``GET /api/memory``'s shape.
 
     This is the one component that crosses Run boundaries, so a Run-start capture's
-    memory is what the Run *inherited* from the Training Session and a Run-end
+    memory is what the Run *inherited* from the earlier episodic runs and a Run-end
     capture's is what it left behind.  Seeing both is the point of recording it.
     """
     g = _Graph(state)

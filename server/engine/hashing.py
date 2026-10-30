@@ -3,7 +3,7 @@
 A Run's behaviour is not determined by ``(problem, seed)``.  It is determined by
 ``(complete starting state, problem, seed)``, and two parts of that starting state come
 from outside the Run: the **metadata** it executes under, and the **Episodic Memory** it
-inherits from its Training Session.  Neither was recorded, so two runs that behaved
+inherits from the episodic runs before it.  Neither was recorded, so two runs that behaved
 differently for good reason were indistinguishable in the record.
 
 These hashes make *which* configuration and *which* memory a run saw part of the run's
@@ -96,7 +96,7 @@ def memory_hash(memory: Any) -> str:
     memory and a value the next run overwrites.
 
     An empty memory hashes to a stable value rather than to a special case, so a Run at
-    the start of a Training Session is recorded as what it is.
+    the start of a sequence of episodic runs is recorded as what it is.
     """
     answers = [
         {

@@ -42,8 +42,10 @@ Every doc, UI string, help topic, plan and decision must keep the distinction pe
 - **Metacat Mode** is the v1.2 features exactly as they are:
   - ordinary runs, Run History, Review, the one-problem Swarm and the Admin view's global
     configuration;
-  - Metacat's own episodic features: the Episodic Memory that successive runs share, and the
-    session those runs form.
+  - Metacat's own **episodic runs**: each run inherits the Episodic Memory that the runs before
+    it left, until that memory is cleared. A clear is an event, shown as a marker between
+    runs. Metacat Mode has no "sessions" of any kind: v1.2's "Training Session" was a Petacat
+    misnomer, not a Metacat concept, and is removed for v2.0 (UX, API, names and schema).
 
   Episodic Memory is a very minimal kind of learning. Metacat Mode is permanently faithful to
   Metacat, and nothing in Training Mode affects it in any way.

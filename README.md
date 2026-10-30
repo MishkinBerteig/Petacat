@@ -27,11 +27,10 @@ license change was authorised by Dr. Marshall directly (see
 > Temperature) and generates answers to letter-string analogy problems
 > end-to-end. Episodic Memory (Metacat-Mode learning) shapes the runs that inherit it: a run
 > declines an answer already held for the same problem and rules, so repeating a
-> problem within one of Metacat Mode's sessions (the UI's
-> [Training Session](#persistence-modes-and-training-sessions), which is Metacat
-> Mode and not Training Mode) explores a different answer each time. It ships with 3,150 test cases covering the engine, the API, and the
+> problem across Metacat Mode's [episodic runs](#persistence-modes-and-episodic-runs)
+> (which are Metacat Mode and not Training Mode) explores a different answer each time. It ships with 3,165 test cases covering the engine, the API, and the
 > help/config system, run on both the CPU and the GPU numeric backends. Underneath the seven components sits an execution
-> substrate — three [persistence modes](#persistence-modes-and-training-sessions),
+> substrate — three [persistence modes](#persistence-modes-and-episodic-runs),
 > a [GPU numeric substrate](#the-numeric-substrate), and
 > a detachable [multi-core plugin](#parallelism-the-serverparallel-plugin) —
 > which changes how Petacat runs without changing what it perceives. See
@@ -51,16 +50,18 @@ functional equivalent of Metacat here, permanently, and **nothing in Training Mo
 affects it in any way**. It comprises:
 
 - ordinary runs: the dashboard's Fast, Normal and Audit runs (the
-  [persistence modes](#persistence-modes-and-training-sessions)), with Run to answer
+  [persistence modes](#persistence-modes-and-episodic-runs)), with Run to answer
   and Live updates;
 - Run History and Review;
 - the one-problem [Swarm](#the-swarm-every-core-exactly);
 - the Admin view, which edits the global configuration;
 - **Metacat's own episodic features**: the **Episodic Memory** that successive runs
-  share, with reminding, snags and answer and snag descriptions, and the **session**
-  those runs form. The UI and this README call that session the **Training Session**,
-  but it is *Metacat Mode's* session, it shares *Metacat Mode's* Episodic Memory, and
-  it has nothing to do with Training Mode. (The name is under review and may change.)
+  share, with reminding, snags and answer and snag descriptions. Metacat Mode's runs
+  are **episodic runs**: each inherits the Episodic Memory that the runs before it
+  left, until that memory is cleared. This is *Metacat Mode's* Episodic Memory and it
+  has nothing to do with Training Mode. (v1.2 called the sequence of runs a "Training
+  Session". That was a Petacat misnomer, not Metacat's term, and v2.0 removed it:
+  Metacat Mode has no sessions of any kind.)
 
 Episodic Memory is a very minimal kind of learning: **Metacat-Mode learning**.
 
@@ -325,7 +326,7 @@ view. The two left-hand panels split along *what* versus *how*:
 Modified, Target, and optionally Answer — supplying an Answer switches the
 engine into justification mode), the **Seed**, and the demo dropdown.
 
-**Run Controls** (below it) decides how that problem executes, in eight groups: Run, Training Session (Metacat Mode's session), Recording, Engine parameters, What this run is, Manual stepping, Swarm, and Settings.
+**Run Controls** (below it) decides how that problem executes, in eight groups: Run, Episodic Memory, Recording, Engine parameters, What this run is, Manual stepping, Swarm, and Settings.
 
 **Run** picks between the two mutually exclusive execution strategies, and the
 action button and pacing control follow the choice:
@@ -340,19 +341,19 @@ action button and pacing control follow the choice:
   after each one — raise it to follow the run by eye. Much slower, but every
   structure-build is visible as it happens.
 
-**Training Session** names the sequence of runs the next run joins: Metacat Mode's session, sharing Metacat Mode's Episodic Memory (it is not Training Mode). It offers the one
-control that ends it: **Start a new Training Session**, which clears Episodic
-Memory. That clear *is* the boundary — Episodic Memory is the only thing a run
-hands to the next — so there is nothing to start, only something to end. Runs
-already recorded stay in Run History and in Review, grouped under the session
-being closed. (The same action lives in the Admin view as **Clear Episodic
-Memory**, named for what it removes rather than for what it ends.)
+**Episodic Memory** is what Metacat Mode's episodic runs accumulate: each run inherits
+the Episodic Memory that the runs before it left (it is not Training Mode). The group
+offers one control, **Clear Episodic Memory**, after a confirmation, so that the next
+episodic run starts with none. Episodic Memory is the only thing a run hands to the
+next, so there is nothing to start, only something to clear. Runs already recorded
+stay in Run History and in Review, where the clear is marked in the episodic-run
+timeline. (The same action lives in the Admin view, under the same name.)
 
 **Recording** picks the run's **persistence mode** — Normal, Audit or Fast — and
 that is a different question entirely: the execution strategy is about how this
 browser watches a run, and the persistence mode is about whether the run is
 written down at all. See
-[Persistence modes](#persistence-modes-and-training-sessions). It is fixed when
+[Persistence modes](#persistence-modes-and-episodic-runs). It is fixed when
 the run is created, so changing it starts a new run.
 
 **Manual stepping** (Step N) is independent of both: it advances a fixed number
@@ -382,17 +383,17 @@ Three different intentions, and the control for each:
   That starts a *new* run, leaving the previous one in the run history. The line
   under the Run button names the run currently on screen and warns you when your
   inputs have drifted away from it.
-- **The same problem again, as the next run of the session.** Just press Run
+- **The same problem again, as the next episodic run.** Just press Run
   again. Once a run has found its answer or given up, there is nothing left to
   continue, so Run starts the next run rather than re-entering the finished one —
   and that next run inherits the Episodic Memory the last one left behind, which
   is what makes it explore a different answer rather than repeat itself. This is
-  what a Training Session is for. (A run you stopped by hand, or one that hit a
+  what episodic runs are for. (A run you stopped by hand, or one that hit a
   step limit, is *not* finished: pressing Run carries it on.)
 - **The same run over again, from codelet 0.** **Reset to codelet 0**, at the
   bottom of the Problem Input panel, re-initializes the current run with the same
   problem and seed and discards what it had recorded. It does not start running —
-  press Run afterwards. Use it to re-watch a run, not to add one to the session.
+  press Run afterwards. Use it to re-watch a run, not to add one to the episodic runs.
 
 ### 5. Explore and edit configuration
 
@@ -438,7 +439,7 @@ Petacat has two test suites:
   plugin against the serial runs it claims to equal), `lockstep` (Petacat's decision
   traces against Metacat's), and `e2e` (full HTTP
   stack against a running database). All eight run in a single command against
-  the local Postgres — 3,150 cases, which includes the numeric matrix's second
+  the local Postgres — 3,165 cases, which includes the numeric matrix's second
   pass over the 498 backend-sensitive tests. See
   [TESTING.md](TESTING.md) for the layer breakdown, the numeric backend matrix,
   the session ceiling, the unit-test rules, determinism requirements, test-double
@@ -523,27 +524,26 @@ Frontend test files live next to the component they cover, named
 are shared with the production build), and global test setup lives in
 `client/src/test/setup.ts`.
 
-## Persistence modes and Training Sessions
+## Persistence modes and episodic runs
 
-A **Run** is one letter-analogy problem plus Petacat's response. A **Training
-Session** is a sequence of Runs that share one Episodic Memory. It is Metacat
-Mode's session, not Training Mode (see [Two modes](#two-modes)), and Episodic
-Memory (Metacat-Mode learning) is the *only* thing that crosses a Run boundary. Everything else (the
-Slipnet, the Themespace, the Workspace, the Coderack, the Trace, the
-temperature, the random stream) is rebuilt for each Run, exactly as in the
+A **Run** is one letter-analogy problem plus Petacat's response. Metacat Mode's runs
+are **episodic runs**: each inherits the Episodic Memory (Metacat-Mode learning) that
+the runs before it left, and that memory is the *only* thing that crosses a Run
+boundary. This is Metacat Mode, not Training Mode (see [Two modes](#two-modes)).
+Everything else (the Slipnet, the Themespace, the Workspace, the Coderack, the Trace,
+the temperature, the random stream) is rebuilt for each Run, exactly as in the
 original Metacat.
 
-Sessions are not something you create. One opens by itself when a Run needs it,
-and every Run afterwards joins it. Clearing Episodic Memory is what a session
-boundary means — after a clear, no Run inherits anything from the Runs before it.
-Two controls do it, and they are the same action under two names: **Start a new
-Training Session** in the Run Controls panel, and **Clear Episodic Memory** in
-the Admin view.
+Nothing needs to be started: every Run is simply the next episodic run. Clearing
+Episodic Memory is an event, and after it no Run inherits anything from the Runs
+before it. Two controls do it, and they are the same action: **Clear Episodic
+Memory** in the Run Controls panel, and **Clear Episodic Memory** in the Admin view.
+Each clear is recorded and marked in Review's episodic-run timeline, where you can
+attach a note to it.
 
-A Fast Run takes part in a session exactly as the other two modes do: it inherits
-the shared Episodic Memory and contributes its answers to it. What it does not do
-is write a row, so it carries no recorded session number and does not appear
-among the session's Runs in Review.
+A Fast Run takes part exactly as the other two modes do: it inherits the shared
+Episodic Memory and contributes its answers to it. What it does not do is write a
+row, so it does not appear among the recorded runs in Review.
 
 ### The three modes
 
@@ -598,8 +598,8 @@ implementation (`server/services/sinks.py`) is attached.
 takes its identifier as a negative number from an in-process counter. The fast
 sink is a no-op, and its `__slots__` is empty.
 
-**Mode chooses where a run is recorded.** All three modes share the Metacat Mode
-Training Session's Episodic Memory and write real commentary. A Fast Run's answers are
+**Mode chooses where a run is recorded.** All three modes share Metacat Mode's
+Episodic Memory and write real commentary. A Fast Run's answers are
 available to the runs that follow, it is reminded of theirs, and
 `answer_present` stops a later run rediscovering one of them.
 
@@ -625,14 +625,15 @@ Normal and Audit exist in order to be looked at, so the reading surfaces ship
 with the writers. Open the **Review** view from the hamburger menu (or
 `#/review`).
 
-- **Session browser** — Training Sessions newest first, each expanding to its
-  sequence of Runs with each Run's mode. Fast Runs are absent, and the panel
-  says so rather than leaving you to wonder.
+- **Episodic-run timeline** — the recorded Runs, newest first, with each Run's
+  mode, and an "Episodic Memory cleared" marker, with its date and an editable
+  note, wherever the memory was cleared. It is paged by Runs. Fast Runs are
+  absent, and the panel says so rather than leaving you to wonder.
 - **A Normal Run** shows its start state, its end state, and a comparison of the
   two: codelets, temperature delta, structures built by string and bridge kind,
   the rules the run ended holding with their English, the largest Slipnet
   activation changes, which themes moved and which were dominant at the end, and
-  what the Run added to the session's Episodic Memory. The two captures are
+  what the Run added to Episodic Memory. The two captures are
   ~110 KB each and nearly identical, so the comparison — about 7 KB — is the
   useful artefact, not the blobs.
 - **An Audit Run** gets a tick inspector: step forward through the Run and see,
@@ -649,7 +650,7 @@ recorded state instead of a running engine.
 ### Reproducibility is by re-execution, not replay
 
 A Normal Run records the *complete* state at both boundaries, and the reason is
-the Training Session invariant (Metacat Mode's session): a Run inherits the Episodic Memory of everything
+the episodic-run invariant: a Run inherits the Episodic Memory of everything
 before it, and declines an answer that memory already holds for the same problem
 and the same rules. `(complete starting state, problem, seed)` determines a Run's
 behaviour. Reload the recorded start state, re-run, and the recorded end state
@@ -1023,9 +1024,8 @@ making the serial loop read state as it stood N codelets ago:
 
 A **Training** is a named, long-lived **Training episode**: many different letter-string
 problems, each run over a number of seeds, spread across every core. It belongs to
-**Training Mode**, which the machine-learning layer drives. It is not the "Training
-Sessions" of Review, which are Metacat Mode's sessions of dashboard runs and share
-Metacat Mode's Episodic Memory; a Training is a job Petacat runs by itself, with its own
+**Training Mode**, which the machine-learning layer drives. It is not the episodic runs of Review, which are Metacat Mode's recordings of dashboard
+runs and share Metacat Mode's Episodic Memory; a Training is a job Petacat runs by itself, with its own
 episode memory, and it lives in its own tables (`alembic/versions/017_trainings.py`, `server/models/training.py`).
 
 **Problems can be added while it runs.** Create a Training with 25 problems; whenever
@@ -1234,12 +1234,12 @@ The tables below cover the routes a user drives.
 | GET | `/api/runs/{id}/verbose?since=N` | Verbose mode's narration (Metacat's `vprintf`/`say` output: what each codelet chose, tried and gave up on), from line `N`; the buffer is bounded |
 | PUT | `/api/runs/{id}/verbose` | Switch Verbose mode on or off mid-run (`{"enabled": true}`); with it off the engine builds none of the text |
 | DELETE | `/api/runs/{id}/verbose` | Empty the narration buffer |
-| GET | `/api/runs/{id}/identity` | Mode, seed, spreading threshold, config hash, memory hash, session |
+| GET | `/api/runs/{id}/identity` | Mode, seed, spreading threshold, config hash, memory hash |
 | GET | `/api/runs/parameters/catalogue` | The settable run parameters: kind, bounds, default, what each does |
 | GET | `/api/runs/{id}/parameters` | What a Run was: `fixed` (all of them, resolved), `overridden`, `defaults`, `derived` |
 | GET | `/api/runs/{id}/telemetry` | Parallel telemetry for a `workers` > 1 Run: codelets handed to workers, aborts by reason, barriers, time in update cycles |
 | GET | `/api/review/runs/{id}` | One Run's review projection, for linking straight to it |
-| PUT | `/api/review/sessions/{id}/note` | Set a Training Session's note (Metacat Mode's session) |
+| PUT | `/api/memory/clears/{id}/note` | Set the note on an Episodic Memory clear |
 | GET | `/api/system/numeric` | Which numeric backend the server process is running, and on what device |
 
 ### The swarm
@@ -1285,8 +1285,8 @@ they live in their own router rather than in `runs.py`.
 
 | Method | Endpoint | Returns |
 |--------|----------|---------|
-| GET | `/api/review/sessions` | Training Sessions (Metacat Mode's sessions), newest first, with Run counts |
-| GET | `/api/review/sessions/{id}` | The sequence of Runs in one session |
+| GET | `/api/review/episodic-runs` | Metacat Mode's recorded episodic runs, newest first, with Episodic Memory clear markers in place; paged by runs |
+| GET | `/api/memory/clears` | Every Episodic Memory clear, newest first, with its note |
 | GET | `/api/review/runs/{id}/captures` | Which boundary captures a Run has |
 | GET | `/api/review/runs/{id}/captures/{boundary}` | One capture, projected into the shapes the live views read |
 | GET | `/api/review/runs/{id}/captures/{boundary}/raw` | The same capture as the raw state graph |
@@ -1472,7 +1472,7 @@ the static [`HELP.md`](HELP.md) reference and matching TypeScript constants.
    records a Run's complete state at both of its boundaries and can re-execute
    it, or record every state-changing action and step forward through it — or,
    in Fast mode, record nothing at all. See
-   [Persistence modes](#persistence-modes-and-training-sessions).
+   [Persistence modes](#persistence-modes-and-episodic-runs).
 6. **The arithmetic runs on the GPU**: Activation spreading, structure
    strengths, object values, themespace dynamics and temperature are expressed
    as flat arrays and executed through Metal. See

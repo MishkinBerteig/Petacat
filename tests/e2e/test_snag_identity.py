@@ -71,7 +71,7 @@ async def test_snag_identifier_agrees_across_both_projections(app_client):
 async def test_snag_identifier_survives_a_memory_clear(app_client):
     """The agreement holds where the two id spaces visibly differ.
 
-    Clearing episodic memory ends the Training Session: the descriptions go and the
+    Clearing episodic memory is an event: the descriptions go and the
     memory's counter starts again at one, while the table's own key carries on from
     where it was.  The snags of the run after the clear are therefore numbered from one
     in the memory and from something larger in the table, and both projections report
@@ -91,7 +91,7 @@ async def test_snag_identifier_survives_a_memory_clear(app_client):
 
 @pytest.mark.asyncio
 async def test_each_snag_is_written_once_however_many_runs_meet_it(app_client, db_session):
-    """A run writes the snags it added to the session's memory, not the ones it met.
+    """A run writes the snags it added to the shared memory, not the ones it met.
 
     The second run has the first one's problem and seed, so it meets the same impasses;
     ``snag_present`` keeps the memory from storing them again, but the snag events

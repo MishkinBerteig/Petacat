@@ -24,7 +24,7 @@
 // nothing else.
 //
 // Group 1: Run — how to execute + workers + go/stop + the chosen strategy's pacing
-// Group 2: Training Session — the sequence of runs the next one joins, and its end
+// Group 2: Episodic Memory — what the episodic runs accumulate, and clearing it
 // Group 3: Recording — the persistence mode the next run is created with
 // Group 4: Engine parameters — the 25 the run is fixed with (collapsed)
 // Group 5: What this run is — the derived, read-only half (collapsed)
@@ -39,7 +39,7 @@
 // means the next press of Run starts a new run rather than continuing this one.
 //
 // `loadedRunIsFinished` is the second half of that rule, and the one that makes a
-// Training Session usable from this panel at all: a run that has produced its outcome
+// sequence of episodic runs usable from this panel at all: a run that has produced its outcome
 // is never continued, so pressing Run again on an unchanged problem starts the *next*
 // run rather than re-entering the last one.
 //
@@ -181,7 +181,7 @@ export function RunControlsPanel() {
    * and re-entering such a run is not a run: the backend puts its status back to
    * `running` and steps it on past its own answer, in the same row, over the same
    * record. So pressing Run a second time on an unchanged problem produced no second
-   * run at all, which is precisely the sequence a Training Session exists to hold:
+   * run at all, which is precisely the sequence of episodic runs Metacat Mode exists to hold:
    * repeat a problem and watch Episodic Memory push the next run somewhere else.
    *
    * Halted and paused are deliberately not terminal. A run stopped by hand or by the
@@ -320,44 +320,40 @@ export function RunControlsPanel() {
     };
   }, [store.runId, store.epoch]);
 
-  /** The session the loaded run belongs to, when it is one that was recorded. */
-  const sessionId = identity?.session_id ?? null;
-
   /**
-   * A session has been closed and nothing has opened the next one yet.
+   * Episodic Memory has been cleared and no run has started since.
    *
-   * Worth saying out loud for exactly as long as it is true: a closed session leaves
-   * no visible trace on this panel — the run on screen still reports the session it
-   * ran in, because that is still the session it ran in — so without this the button
-   * looks as though it did nothing.
+   * Worth saying out loud for exactly as long as it is true: a clear leaves no visible
+   * trace on this panel — the run on screen still shows what it ran with — so without
+   * this the button looks as though it did nothing.
    */
-  const [sessionEnded, setSessionEnded] = useState(false);
+  const [memoryCleared, setMemoryCleared] = useState(false);
   useEffect(() => {
-    setSessionEnded(false);
+    setMemoryCleared(false);
   }, [store.runId]);
 
-  const handleNewSession = useCallback(async () => {
+  const handleClearMemory = useCallback(async () => {
     if (
       !window.confirm(
-        'Start a new Training Session (Metacat Mode\'s session)?\n\n'
-          + 'This clears Metacat Mode\'s Episodic Memory, which is what a session boundary is: the '
-          + 'answers and snags from the runs so far are the only thing carried from '
-          + 'one run to the next, so the runs after this point start from nothing.\n\n'
+        'Clear Episodic Memory?\n\n'
+          + 'This clears Metacat Mode\'s Episodic Memory: the answers and snags from the '
+          + 'episodic runs so far are the only thing carried from one run to the next, '
+          + 'so the next episodic run starts with none.\n\n'
           + 'Recorded runs are not deleted — they stay in Run History and in Review, '
-          + 'grouped under the session being closed.\n\n'
+          + 'and the clear is marked in the Review timeline.\n\n'
           + 'This cannot be undone.',
       )
     ) {
       return;
     }
     try {
-      await store.startNewTrainingSession();
+      await store.clearEpisodicMemory();
     } catch {
-      // Said once, on the store's channel, which the header renders. Claiming a new
-      // session here as well would contradict it.
+      // Said once, on the store's channel, which the header renders. Claiming a clear
+      // here as well would contradict it.
       return;
     }
-    setSessionEnded(true);
+    setMemoryCleared(true);
   }, [store]);
 
   return (
@@ -496,12 +492,12 @@ export function RunControlsPanel() {
             hasInputs ? 'Starts a new run.' : 'Enter a problem above to begin.'
           ) : inputsMatchLoadedRun && loadedRunIsFinished ? (
             /* The same problem again is not a repeat of run #N — it is the next run
-               of this Training Session, and the one whose answer Episodic Memory can
+               of the episodic runs, and the one whose answer Episodic Memory can
                already tell it not to give twice. Saying so here is what makes the
-               session visible from the button that builds it. */
+               memory visible from the button that builds it. */
             <span style={{ color: 'var(--text-accent)' }}>
               Run #{store.runId} {store.status === 'gave_up' ? 'gave up' : 'found its answer'}
-              {' '}&mdash; running starts the next run of this Training Session, on the
+              {' '}&mdash; running starts the next episodic run, on the
               same problem, against the Episodic Memory this one leaves behind.
             </span>
           ) : inputsMatchLoadedRun ? (
@@ -571,63 +567,45 @@ export function RunControlsPanel() {
       </div>
 
       {/* ------------------------------------------------------------ */}
-      {/* GROUP 2: Training Session — what the runs accumulate into     */}
+      {/* GROUP 2: Episodic Memory — what the episodic runs accumulate */}
       {/*                                                              */}
       {/* Directly under the Run button because that button is what     */}
-      {/* builds a session: each press adds a run to the open one, and  */}
-      {/* Episodic Memory is what carries between them. The boundary    */}
-      {/* was reachable only from the Admin view, under a name          */}
-      {/* ("Clear Episodic Memory") that says what it removes rather    */}
-      {/* than what it ends — so the unit the runs belong to could be   */}
-      {/* read about in Review and never started from here.             */}
+      {/* builds the memory: each press adds an episodic run, and       */}
+      {/* Episodic Memory is what carries between them. Clearing it was */}
+      {/* reachable only from the Admin view.                           */}
       {/* ------------------------------------------------------------ */}
       <div style={groupStyle}>
-        <div style={groupLabelStyle}>
-          Training Session{' '}
-          <span
-            className="text-xs text-muted"
-            title="Metacat Mode's session: the runs that share one Episodic Memory. Not a Training, which belongs to Training Mode."
-            style={{ fontWeight: 400, textTransform: 'none' }}
-          >
-            (Metacat Mode&apos;s session)
-          </span>
-        </div>
+        <div style={groupLabelStyle}>Episodic Memory</div>
 
         <div className="text-xs text-muted">
-          Metacat Mode&apos;s session: a sequence of runs sharing one Episodic Memory
-          (Metacat-Mode learning) — the only thing that
-          crosses a run boundary. Every run joins the open session automatically;
-          there is nothing to start.
-          {sessionId !== null && (
-            <>
-              {' '}This run is in <strong>session {sessionId}</strong>.
-            </>
-          )}
+          Metacat Mode&apos;s runs are episodic runs: each inherits the Episodic Memory
+          (Metacat-Mode learning) that the runs before it left, and that memory is
+          the only thing that crosses a run boundary. Clearing it means the next
+          episodic run starts with none.
         </div>
 
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }}>
           <button
-            onClick={handleNewSession}
+            onClick={handleClearMemory}
             disabled={runInProgress}
             title={
               runInProgress
-                ? 'A run is under way. A session boundary drawn mid-run would put the run and the memory it is thinking against on opposite sides of it.'
-                : 'End this Training Session by clearing Episodic Memory. The next run starts a new session and inherits nothing.'
+                ? 'A run is under way. Clearing the memory mid-run would put the run and the memory it is thinking against on opposite sides of the clear.'
+                : 'Clear Episodic Memory. The next episodic run starts with none.'
             }
           >
-            Start a new Training Session
+            Clear Episodic Memory
           </button>
-          {sessionEnded && (
+          {memoryCleared && (
             <span className="text-xs" style={{ color: 'var(--success)' }}>
-              Session closed — the next run opens a new one.
+              Episodic Memory cleared — the next run starts with none.
             </span>
           )}
         </div>
 
         <div className="text-xs text-muted" style={{ marginTop: 6 }}>
-          Ending a session means clearing Episodic Memory, because that is the whole
-          of what one run hands the next. Runs already recorded stay in Run History
-          and in Review, grouped under the session being closed.
+          Runs already recorded stay in Run History and in Review, where the clear is
+          marked in the episodic-run timeline.
         </div>
       </div>
 
@@ -691,7 +669,7 @@ export function RunControlsPanel() {
           >
             Fast runs write nothing to the database: no row in Run History and
             nothing in Review. They get a negative run number, because there is no
-            database row to take one from. They take part in the Training Session's
+            database row to take one from. They take part in the
             Episodic Memory and narrate themselves like any other run.
           </div>
         )}
@@ -894,11 +872,6 @@ export function RunControlsPanel() {
                   cfg {(identity.config_hash ?? '——').slice(0, 8)} · mem{' '}
                   {(identity.memory_hash ?? '——').slice(0, 8)}
                 </div>
-                {identity.session_id !== null && (
-                  <div title="The Training Session (Metacat Mode's session) this run belongs to: the span between two Episodic Memory clears.">
-                    Training Session {identity.session_id}
-                  </div>
-                )}
                 {/* The other route into Review, beside the run you are actually
                     watching. Run History has one per row; this one is for the run
                     that has just finished, which is when the question arises. */}
@@ -925,7 +898,7 @@ export function RunControlsPanel() {
             {/* Two ways to reach this: the endpoint said `recorded: false`, or it
                 could not be reached at all while the loaded run is a Fast one. The
                 second is not hypothetical — a Fast Run is required to complete with
-                Postgres stopped, and the identity endpoint needs a session. Trusting
+                Postgres stopped, and the identity endpoint needs a database connection. Trusting
                 the mode we already know keeps the explanation on screen in exactly
                 the condition where the rest of the record is unavailable. */}
             {(store.runMode === 'fast' || (identity !== null && !identity.recorded)) && (
@@ -934,7 +907,7 @@ export function RunControlsPanel() {
                 style={{ marginTop: 4, color: 'var(--warning)' }}
               >
                 Not recorded — a Fast Run has no database row, so no config or
-                memory hash, no Training Session, and no entry in Run History.
+                memory hash, and no entry in Run History.
               </div>
             )}
             {store.lastCodeletType && (

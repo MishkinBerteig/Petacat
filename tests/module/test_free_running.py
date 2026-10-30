@@ -351,8 +351,8 @@ def test_a_free_run_stores_exactly_one_answer_like_the_serial_loop(meta):
     """Episodic Memory must not gain an entry per racing worker.
 
     ``_collect_outcome`` de-duplicates the run's *status*, but each worker that reached
-    ``report_answer`` had already written its own ``AnswerDescription``.  Under a
-    Training Session that memory is shared with every later Run, so the pollution
+    ``report_answer`` had already written its own ``AnswerDescription``.  Across
+    episodic runs that memory is shared with every later Run, so the pollution
     outlived the run that caused it — and because ``on_answer`` fires once, the database
     and the live memory silently disagreed about how many answers there were.
 

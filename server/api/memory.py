@@ -6,12 +6,16 @@ that persists across runs, backed by the database.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.api.runs import get_run_service
 from server.db import get_session
+from server.models.run import EpisodicMemoryClear
+from server.api.review import MemoryClear
+from server.services.review_service import clear_summary
 
 router = APIRouter(prefix="/api/memory", tags=["memory"])
 
@@ -29,6 +33,15 @@ class CompareRequest(BaseModel):
     run_id: int | None = None
 
 
+class MemoryClearNoteRequest(BaseModel):
+    note: str = ""
+
+
+class MemoryClearListResponse(BaseModel):
+    clears: list[MemoryClear]
+    total: int
+
+
 # ------------------------------------------------------------------
 # Endpoints
 # ------------------------------------------------------------------
@@ -36,17 +49,17 @@ class CompareRequest(BaseModel):
 
 @router.get("")
 async def list_memory(session: AsyncSession = Depends(get_session)):
-    """The Training Session's Episodic Memory — what the program can be reminded of.
+    """The Episodic Memory the episodic runs share — what the program can be reminded of.
 
     Served from the live memory, not from the rows.  The two differ by exactly the
-    answers a **Fast Run** contributed: a Fast Run takes part in the session like any
+    answers a **Fast Run** contributed: a Fast Run takes part in the episodic runs like any
     other but writes nothing, so reading the rows would show a memory missing answers
     the program is demonstrably using — which is what "Fast Run is not contributing to
     episodic memory" looked like from the UI, even once it was.
 
     The rows remain the durable record; ``rehydrate_memory`` loads them into this same
     object at startup, so after a restart the live memory is the rows plus whatever the
-    session has added since.
+    episodic runs have added since.
     """
     svc = get_run_service()
     return svc.get_memory_state()
@@ -54,10 +67,65 @@ async def list_memory(session: AsyncSession = Depends(get_session)):
 
 @router.delete("")
 async def clear_memory(session: AsyncSession = Depends(get_session)):
-    """Clear all episodic memory — both the stored rows and the live object."""
+    """Clear all Episodic Memory — both the stored rows and the live object.
+
+    This is an event in the sequence of episodic runs: the next episodic run starts with
+    no memory.  The event is recorded and returned as ``clear`` so its note can be edited.
+    """
     svc = get_run_service()
-    removed = await svc.clear_memory(session)
-    return {"cleared": True, "removed": removed}
+    result = await svc.clear_memory(session)
+    return {
+        "cleared": True,
+        "removed": {"answers": result["answers"], "snags": result["snags"]},
+        "clear": MemoryClear(**clear_summary(result["clear"])),
+    }
+
+
+@router.get("/clears", response_model=MemoryClearListResponse)
+async def list_memory_clears(
+    limit: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    session: AsyncSession = Depends(get_session),
+):
+    """Every recorded Episodic Memory clear, newest first."""
+    total = (
+        await session.execute(select(func.count()).select_from(EpisodicMemoryClear))
+    ).scalar() or 0
+    rows = (
+        await session.execute(
+            select(EpisodicMemoryClear)
+            .order_by(EpisodicMemoryClear.id.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+    ).scalars().all()
+    return MemoryClearListResponse(
+        clears=[MemoryClear(**clear_summary(r)) for r in rows], total=total
+    )
+
+
+@router.put("/clears/{clear_id}/note", response_model=MemoryClear)
+async def set_memory_clear_note(
+    clear_id: int,
+    req: MemoryClearNoteRequest,
+    session: AsyncSession = Depends(get_session),
+):
+    """Set the note on one Episodic Memory clear.
+
+    A clear is not described when it happens, so the note is the one field that lets a
+    reader say afterwards what it was for.  A missing clear is a 404 rather than a silent
+    no-op: a note the caller believes was saved and was not is discovered much later.
+    """
+    row = (
+        await session.execute(
+            select(EpisodicMemoryClear).where(EpisodicMemoryClear.id == clear_id)
+        )
+    ).scalars().first()
+    if row is None:
+        raise HTTPException(404, f"no Episodic Memory clear {clear_id}")
+    row.note = req.note
+    await session.commit()
+    return MemoryClear(**clear_summary(row))
 
 
 @router.delete("/answers/{answer_id}")

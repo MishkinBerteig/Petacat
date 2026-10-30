@@ -9,21 +9,22 @@ them, and their 404 means "nothing was recorded".  Serving both notions of "not 
 from one file would make it impossible to tell, from the outside, which one a caller
 had hit.
 
-The routes are grouped by what is being reviewed rather than by mode, because a
-Training Session mixes modes freely and the browser has to list them together.
+The routes are grouped by what is being reviewed rather than by mode, because the
+episodic-run timeline mixes modes freely and has to list them together.
 """
 
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import func, select, update
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.db import get_session
-from server.models.run import AuditAction, Run, RunStateCapture, TrainingSession
+from server.models.run import AuditAction, Run, RunStateCapture
 from server.services.capture_projection import CaptureFormatError
 from server.services.review_service import (
     BackwardsNotSupported,
@@ -48,23 +49,17 @@ def get_review_service():
 # ------------------------------------------------------------------
 
 
-class SessionSummary(BaseModel):
-    session_id: int
-    started_at: datetime | None
-    ended_at: datetime | None
+class MemoryClear(BaseModel):
+    """One event: Episodic Memory was cleared.
+
+    ``after_run_id`` is the last recorded run before the clear (null if none), which
+    places the marker exactly in the run sequence.
+    """
+
+    clear_id: int
+    cleared_at: datetime
+    after_run_id: int | None
     note: str = ""
-    run_count: int
-    first_run_at: datetime | None
-    last_run_at: datetime | None
-    #: A session ends when Episodic Memory is cleared; until then it can gain Runs.
-    is_open: bool
-
-
-class SessionListResponse(BaseModel):
-    sessions: list[SessionSummary]
-    total: int
-    limit: int
-    offset: int
 
 
 class RunSummary(BaseModel):
@@ -90,19 +85,24 @@ class RunSummary(BaseModel):
     #: statement about the mode rather than a fault.
     capture_count: int = 0
     action_count: int = 0
-    #: Which Training Session contains this Run.  Absent when the Run was reached
-    #: *through* its session, because the caller already knows; present when it was
-    #: looked up by id, because then the session is the thing they do not know.
-    session_id: int | None = None
 
 
-class SessionDetailResponse(BaseModel):
-    session_id: int
-    started_at: datetime | None
-    ended_at: datetime | None
-    note: str = ""
-    is_open: bool
-    runs: list[RunSummary]
+class RunTimelineItem(BaseModel):
+    kind: Literal["run"] = "run"
+    run: RunSummary
+
+
+class ClearTimelineItem(BaseModel):
+    kind: Literal["memory_cleared"] = "memory_cleared"
+    clear: MemoryClear
+
+
+class EpisodicRunsResponse(BaseModel):
+    items: list[RunTimelineItem | ClearTimelineItem]
+    total_runs: int
+    total_clears: int
+    limit: int
+    offset: int
 
 
 class CaptureSummary(BaseModel):
@@ -115,23 +115,6 @@ class CaptureSummary(BaseModel):
 class CaptureListResponse(BaseModel):
     run_id: int
     captures: list[CaptureSummary]
-
-
-class SessionNoteRequest(BaseModel):
-    """What the reader wants this Training Session to be remembered as.
-
-    A Training Session is not created deliberately — it is the span between two memory
-    clears — so the only thing that can distinguish one from another after the fact is
-    a number and a date range.  The note is the one field that lets a reader say what
-    the session was *for*, which is what makes a list of them worth keeping.
-    """
-
-    note: str = ""
-
-
-class SessionNoteResponse(BaseModel):
-    session_id: int
-    note: str
 
 
 class AdvanceRequest(BaseModel):
@@ -166,68 +149,24 @@ def _fail(exc: Exception) -> HTTPException:
 
 
 # ------------------------------------------------------------------
-# Training Sessions
+# The episodic-run timeline
 # ------------------------------------------------------------------
 
 
-@router.get("/sessions", response_model=SessionListResponse)
-async def list_sessions(
-    limit: int = 50,
-    offset: int = 0,
+@router.get("/episodic-runs", response_model=EpisodicRunsResponse)
+async def list_episodic_runs(
+    limit: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0),
     session: AsyncSession = Depends(get_session),
 ):
-    """Training Sessions, newest first, with Run counts and date range."""
-    svc = get_review_service()
-    sessions, total = await svc.list_sessions(session, limit=limit, offset=offset)
-    return SessionListResponse(
-        sessions=[SessionSummary(**s) for s in sessions],
-        total=total,
-        limit=limit,
-        offset=offset,
-    )
+    """Metacat Mode's recorded episodic runs, newest first, with Episodic Memory clears.
 
-
-@router.get("/sessions/{session_id}", response_model=SessionDetailResponse)
-async def get_session_runs(
-    session_id: int,
-    session: AsyncSession = Depends(get_session),
-):
-    """The sequence of Runs in one Training Session."""
-    svc = get_review_service()
-    try:
-        detail = await svc.get_session_runs(session, session_id)
-    except ReviewError as exc:
-        raise _fail(exc) from None
-    return SessionDetailResponse(
-        **{**detail, "runs": [RunSummary(**r) for r in detail["runs"]]}
-    )
-
-
-@router.put("/sessions/{session_id}/note", response_model=SessionNoteResponse)
-async def set_session_note(
-    session_id: int,
-    req: SessionNoteRequest,
-    session: AsyncSession = Depends(get_session),
-):
-    """Set a Training Session's note.
-
-    Written here rather than through ``ReviewService`` because the service reads the
-    record and this is the one thing about a session a person may change; keeping the
-    write beside the read would make the service's contract — "nothing here mutates" —
-    no longer true of it.
-
-    A missing session is a 404 rather than a silent no-op: a note the caller believes
-    was saved and was not is worse than an error, because it is discovered much later.
+    ``limit`` and ``offset`` count runs.  A clear is interleaved in its exact place in
+    the run sequence (``after_run_id``), so a reader sees which runs inherited which
+    memory.  Notes on clears are edited through ``PUT /api/memory/clears/{id}/note``.
     """
-    result = await session.execute(
-        update(TrainingSession)
-        .where(TrainingSession.id == session_id)
-        .values(note=req.note)
-    )
-    if (result.rowcount or 0) == 0:
-        raise HTTPException(404, f"no Training Session {session_id}")
-    await session.commit()
-    return SessionNoteResponse(session_id=session_id, note=req.note)
+    svc = get_review_service()
+    return EpisodicRunsResponse(**await svc.episodic_timeline(session, limit, offset))
 
 
 # ------------------------------------------------------------------
@@ -240,14 +179,12 @@ async def get_recorded_run(
     run_id: int,
     session: AsyncSession = Depends(get_session),
 ):
-    """One Run's recorded summary, without knowing which session it belongs to.
+    """One Run's recorded summary, by id.
 
-    The session browser reaches a Run by opening the session that contains it, which is
-    the right way round when the reader is browsing.  It is the wrong way round when
-    they already have a Run in mind — coming from Run History on the dashboard, say —
-    because they would have to find the session first, and the session is exactly the
-    thing they do not know.  This is the same projection ``get_session_runs`` produces
-    for one Run.
+    The timeline reaches a Run by paging, which is the right way round when the reader
+    is browsing.  It is the wrong way round when they already have a Run in mind —
+    coming from Run History on the dashboard, say.  This is the same projection the
+    timeline produces for one Run.
     """
     row = (
         await session.execute(select(Run).where(Run.id == run_id))
@@ -296,7 +233,6 @@ async def get_recorded_run(
         created_at=row.created_at,
         capture_count=captures,
         action_count=actions,
-        session_id=row.session_id,
     )
 
 

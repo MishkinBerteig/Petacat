@@ -15,8 +15,8 @@ import type {
   MemoryState,
   DemoProblem,
   SlipnetNodeDef,
-  TrainingSessionSummary,
-  TrainingSessionDetail,
+  EpisodicRunTimeline,
+  MemoryClear,
   CaptureSummary,
   RecordedRun,
   RecordedState,
@@ -354,11 +354,15 @@ export async function getMemory(): Promise<MemoryState> {
 }
 
 /**
- * Clear Episodic Memory, which is what a Training Session boundary means: after it,
- * no Run inherits anything from the ones before.
+ * Clear Episodic Memory: after it, no Run inherits anything from the ones before.
+ * The clear is recorded as an event and returned, so the timeline can mark it.
  */
-export async function clearMemory(): Promise<{ cleared: boolean; removed: number }> {
-  return request<{ cleared: boolean; removed: number }>('/memory', {
+export async function clearMemory(): Promise<{
+  cleared: boolean;
+  removed: { answers: number; snags: number };
+  clear: MemoryClear;
+}> {
+  return request<{ cleared: boolean; removed: { answers: number; snags: number }; clear: MemoryClear }>('/memory', {
     method: 'DELETE',
   });
 }
@@ -366,8 +370,8 @@ export async function clearMemory(): Promise<{ cleared: boolean; removed: number
 /**
  * The Episodic Memory a particular run is thinking against.
  *
- * The shared Training Session memory in every mode — a Fast Run takes part in the
- * session like any other, because mode chooses where a run is *recorded*, not what it
+ * The shared Episodic Memory in every mode — a Fast Run takes part in it like
+ * any other run, because mode chooses where a run is *recorded*, not what it
  * is. A Fast Run is served from the live object rather than the database, since it has
  * no rows; `scope` says which read was taken.
  */
@@ -744,41 +748,39 @@ export async function getNumericSubstrate(): Promise<NumericSubstrate> {
 // Run is the mode working, not a fault.
 // ---------------------------------------------------------------------------
 
-export async function listTrainingSessions(
+/**
+ * Metacat Mode's recorded episodic runs, newest first, with "Episodic Memory cleared"
+ * markers interleaved in their exact places. `limit` and `offset` count runs.
+ */
+export async function listEpisodicRuns(
   limit?: number,
   offset?: number,
-): Promise<{ sessions: TrainingSessionSummary[]; total: number }> {
-  return request(`/review/sessions${qs({ limit, offset })}`);
+): Promise<EpisodicRunTimeline> {
+  return request<EpisodicRunTimeline>(`/review/episodic-runs${qs({ limit, offset })}`);
 }
 
-export async function getTrainingSession(
-  sessionId: number,
-): Promise<TrainingSessionDetail> {
-  return request<TrainingSessionDetail>(`/review/sessions/${sessionId}`);
+/** Every recorded Episodic Memory clear, newest first. */
+export async function listMemoryClears(
+  limit?: number,
+  offset?: number,
+): Promise<{ clears: MemoryClear[]; total: number }> {
+  return request(`/memory/clears${qs({ limit, offset })}`);
 }
 
-/**
- * Name a Training Session.
- *
- * A session is not created deliberately — it is the span between two memory clears —
- * so a number and a date range is all that distinguishes one otherwise.
- */
-export async function setSessionNote(
-  sessionId: number,
+/** Attach a note to an Episodic Memory clear. 404 when the clear does not exist. */
+export async function setMemoryClearNote(
+  clearId: number,
   note: string,
-): Promise<{ session_id: number; note: string }> {
-  return request(`/review/sessions/${sessionId}/note`, {
+): Promise<MemoryClear> {
+  return request<MemoryClear>(`/memory/clears/${clearId}/note`, {
     method: 'PUT',
     body: JSON.stringify({ note }),
   });
 }
 
 /**
- * One recorded Run by id, without knowing its session.
- *
- * The session browser reaches a Run by opening the session containing it, which is
- * the wrong way round for a reader arriving from Run History with a Run already in
- * mind: the session is precisely what they do not know.
+ * One recorded Run by id, for a reader arriving from Run History with a Run already
+ * in mind rather than browsing the timeline.
  */
 export async function getRecordedRun(runId: number): Promise<RecordedRun> {
   return request<RecordedRun>(`/review/runs/${runId}`);
@@ -1015,9 +1017,9 @@ export const api = {
   getNumericSubstrate,
 
   // Review
-  listTrainingSessions,
-  getTrainingSession,
-  setSessionNote,
+  listEpisodicRuns,
+  listMemoryClears,
+  setMemoryClearNote,
   getRecordedRun,
   listCaptures,
   getCapture,

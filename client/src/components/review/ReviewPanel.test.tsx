@@ -24,15 +24,14 @@ import {
   ApiError,
   getCapture,
   getRunComparison,
-  getTrainingSession,
-  listTrainingSessions,
+  listEpisodicRuns,
   listAuditActions,
   getAuditSummary,
   openInspector,
   advanceInspector,
   closeInspector,
   getRecordedRun,
-  setSessionNote,
+  setMemoryClearNote,
 } from '@/api/client'
 import type { AuditAction } from '@/types'
 import {
@@ -40,8 +39,8 @@ import {
   recordedRun,
   recordedState,
   runComparison,
-  sessionDetail,
-  sessionSummary,
+  memoryClear,
+  timeline,
 } from './__fixtures__/recorded'
 
 // The endpoints are faked; `ApiError` and `describeApiError` are the real ones, so a
@@ -49,8 +48,7 @@ import {
 // read it the way they read a live failure.
 vi.mock('@/api/client', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/api/client')>()),
-  listTrainingSessions: vi.fn(),
-  getTrainingSession: vi.fn(),
+  listEpisodicRuns: vi.fn(),
   getCapture: vi.fn(),
   getRunComparison: vi.fn(),
   listAuditActions: vi.fn(),
@@ -59,7 +57,7 @@ vi.mock('@/api/client', async (importOriginal) => ({
   advanceInspector: vi.fn(),
   closeInspector: vi.fn(),
   getRecordedRun: vi.fn(),
-  setSessionNote: vi.fn(),
+  setMemoryClearNote: vi.fn(),
 }))
 
 /** A rejection shaped like the one `request` produces for a given status. */
@@ -68,8 +66,7 @@ function apiError(status: number, statusText: string, detail: string): ApiError 
 }
 
 const mocked = {
-  listTrainingSessions: vi.mocked(listTrainingSessions),
-  getTrainingSession: vi.mocked(getTrainingSession),
+  listEpisodicRuns: vi.mocked(listEpisodicRuns),
   getCapture: vi.mocked(getCapture),
   getRunComparison: vi.mocked(getRunComparison),
   listAuditActions: vi.mocked(listAuditActions),
@@ -78,16 +75,12 @@ const mocked = {
   advanceInspector: vi.mocked(advanceInspector),
   closeInspector: vi.mocked(closeInspector),
   getRecordedRun: vi.mocked(getRecordedRun),
-  setSessionNote: vi.mocked(setSessionNote),
+  setMemoryClearNote: vi.mocked(setMemoryClearNote),
 }
 
-/** Wire the browser to serve one session containing `runs`. */
+/** Wire the timeline to serve one window containing `runs`, newest first. */
 function withRuns(runs = [recordedRun()]) {
-  mocked.listTrainingSessions.mockResolvedValue({
-    sessions: [sessionSummary({ run_count: runs.length })],
-    total: 1,
-  })
-  mocked.getTrainingSession.mockResolvedValue(sessionDetail(runs))
+  mocked.listEpisodicRuns.mockResolvedValue(timeline(runs))
 }
 
 beforeEach(() => {
@@ -99,22 +92,27 @@ beforeEach(() => {
 })
 
 // ---------------------------------------------------------------------------
-// The session browser
+// The episodic-run timeline
 // ---------------------------------------------------------------------------
 
-describe('SessionBrowser — the coarse-grained level', () => {
-  it('lists sessions with their run counts and opens the newest', async () => {
-    withRuns([recordedRun({ run_id: 7 }), recordedRun({ run_id: 8, mode: 'audit', action_count: 1200 })])
+describe('EpisodicRunTimeline — the coarse-grained level', () => {
+  it('lists the recorded runs, newest first', async () => {
+    withRuns([recordedRun({ run_id: 8, mode: 'audit', action_count: 1200 }), recordedRun({ run_id: 7 })])
     render(<ReviewPanel />)
 
-    // The newest session is expanded on mount: a browser that opens on an empty
-    // pane makes the reader click to find out whether there is anything at all.
-    // Waiting on a *run* row therefore waits on both fetches, the session list and
-    // the session's detail, which land in separate ticks.
     await waitFor(() => expect(screen.getByText('#7')).toBeTruthy())
-    expect(screen.getByText('Session 3')).toBeTruthy()
-    expect(screen.getByText('2 runs')).toBeTruthy()
     expect(screen.getByText('#8')).toBeTruthy()
+    const rows = screen.getAllByRole('row').slice(1)
+    expect(rows[0].textContent).toContain('#8')
+    expect(rows[1].textContent).toContain('#7')
+    expect(mocked.listEpisodicRuns).toHaveBeenCalledWith(50, 0)
+  })
+
+  it('never calls anything an episodic run is in a session', async () => {
+    withRuns()
+    render(<ReviewPanel />)
+    await waitFor(() => expect(screen.getByText('#7')).toBeTruthy())
+    expect(document.body.textContent).not.toMatch(/session/i)
   })
 
   it('shows each run its mode, problem, answer and both hashes', async () => {
@@ -130,41 +128,78 @@ describe('SessionBrowser — the coarse-grained level', () => {
     expect(screen.getByText('c0nf1g / m3m0ry')).toBeTruthy()
   })
 
-  // The memory clear is the event that defines a Training Session's extent, and it
-  // is the only thing a session carries across Run boundaries. A browser that showed
-  // OPEN and then nothing at all for the closed case left the boundary invisible: a
-  // reader could see that a session stopped gaining Runs but not what stopped it.
-  it('says when and why a closed session ended', async () => {
-    mocked.listTrainingSessions.mockResolvedValue({
-      sessions: [
-        sessionSummary({ is_open: false, ended_at: '2026-07-29T10:30:00', run_count: 1 }),
-      ],
-      total: 1,
-    })
-    mocked.getTrainingSession.mockResolvedValue({
-      ...sessionDetail([recordedRun()]),
-      is_open: false,
-      ended_at: '2026-07-29T10:30:00',
-    })
-
+  it('opens a run when its row is clicked', async () => {
+    withRuns([recordedRun({ run_id: 7 })])
+    mocked.getRunComparison.mockResolvedValue(runComparison())
+    mocked.getCapture.mockResolvedValue(recordedState())
     render(<ReviewPanel />)
-    // Waiting on a run row waits on both fetches: the session list renders the
-    // header (and its MEMORY CLEARED badge) a tick before the detail arrives with
-    // the sentence underneath, so waiting on the badge alone races the second.
+
     await waitFor(() => expect(screen.getByText('#7')).toBeTruthy())
-    expect(screen.getByText(/MEMORY CLEARED/)).toBeTruthy()
-    expect(
-      screen.getByText(/Runs after that point started from an empty memory/),
-    ).toBeTruthy()
+    expect(screen.getByText('Select a Run to review it.')).toBeTruthy()
+    await act(async () => {
+      screen.getByText('#7').closest('tr')!.click()
+    })
+    await waitFor(() => expect(screen.getByText('Run #7')).toBeTruthy())
+    expect(screen.getByRole('row', { selected: true })).toBeTruthy()
   })
 
-  it('says of an open session that it is still accumulating', async () => {
-    withRuns([recordedRun()])
+  it('opens a run from its accessible button', async () => {
+    withRuns([recordedRun({ run_id: 7 })])
+    mocked.getRunComparison.mockResolvedValue(runComparison())
+    mocked.getCapture.mockResolvedValue(recordedState())
     render(<ReviewPanel />)
 
+    fireEvent.click(await screen.findByRole('button', { name: 'Open run 7' }))
+    await waitFor(() => expect(screen.getByText('Run #7')).toBeTruthy())
+  })
+
+  // A clear is an event between runs, not a container for them. The marker sits
+  // exactly where the server put it, so a reader sees which runs inherited what.
+  it('puts an "Episodic Memory cleared" marker between the runs it separates', async () => {
+    mocked.listEpisodicRuns.mockResolvedValue(
+      timeline([
+        recordedRun({ run_id: 9 }),
+        memoryClear({ clear_id: 4, after_run_id: 8, cleared_at: '2026-07-29T10:30:00' }),
+        recordedRun({ run_id: 8 }),
+        recordedRun({ run_id: 7 }),
+      ]),
+    )
+    render(<ReviewPanel />)
+
+    const marker = await screen.findByTestId('memory-clear-4')
+    expect(marker.textContent).toMatch(/Episodic Memory cleared — /)
+    const rows = screen.getAllByRole('row').slice(1)
+    expect(rows.map((r) => (r.getAttribute('data-testid') ?? r.textContent!.match(/#\d/)![0]))).toEqual([
+      '#9',
+      'memory-clear-4',
+      '#8',
+      '#7',
+    ])
+  })
+
+  it('shows a clear after the newest run at the top, and one with no earlier run at the end', async () => {
+    mocked.listEpisodicRuns.mockResolvedValue(
+      timeline([
+        memoryClear({ clear_id: 5, after_run_id: 9 }),
+        recordedRun({ run_id: 9 }),
+        memoryClear({ clear_id: 3, after_run_id: null }),
+      ]),
+    )
+    render(<ReviewPanel />)
+
+    await screen.findByTestId('memory-clear-5')
+    const ids = screen
+      .getAllByRole('row')
+      .slice(1)
+      .map((r) => r.getAttribute('data-testid') ?? 'run')
+    expect(ids).toEqual(['memory-clear-5', 'run', 'memory-clear-3'])
+  })
+
+  it('shows no marker when the memory was never cleared', async () => {
+    withRuns([recordedRun()])
+    render(<ReviewPanel />)
     await waitFor(() => expect(screen.getByText('#7')).toBeTruthy())
-    expect(screen.getByText(/still accumulating/)).toBeTruthy()
-    expect(screen.queryByText(/MEMORY CLEARED/)).toBeNull()
+    expect(screen.queryByText(/Episodic Memory cleared/)).toBeNull()
   })
 
   it('reports how much record each mode left', async () => {
@@ -249,7 +284,7 @@ describe('NormalRunReview', () => {
     // The concepts the run recruited, and the themes it ended holding.
     expect(screen.getByText(/successor \+100/)).toBeTruthy()
     expect(screen.getByText(/string-position-category = identity/)).toBeTruthy()
-    // And what it left for the next Run in the Training Session.
+    // And what it left for the next Run in Episodic Memory.
     expect(screen.getByText(/abc abd mrrjjj mrrkkk/)).toBeTruthy()
   })
 
@@ -474,15 +509,14 @@ describe('AuditRunReview — forward-stepping only', () => {
 // Arriving with a Run already in mind
 // ---------------------------------------------------------------------------
 //
-// The browser is organised by Training Session, which is right for exploring and
-// wrong for a reader who has just watched a run finish on the dashboard: they know
-// the run, and the session is precisely the thing they do not know. `#/review/runs/42`
+// The timeline is paged, which is right for exploring and slow for a reader who has
+// just watched a run finish on the dashboard: they know the run. `#/review/runs/42`
 // opens it directly.
 
 describe('ReviewPanel — a Run opened by id', () => {
-  it('opens the named Run without being told which session it is in', async () => {
+  it('opens the named Run without paging the timeline to it', async () => {
     withRuns([recordedRun({ run_id: 42 })])
-    mocked.getRecordedRun.mockResolvedValue(recordedRun({ run_id: 42, session_id: 3 }))
+    mocked.getRecordedRun.mockResolvedValue(recordedRun({ run_id: 42 }))
     mocked.getRunComparison.mockResolvedValue(runComparison())
     mocked.getCapture.mockResolvedValue(recordedState())
 
@@ -490,17 +524,6 @@ describe('ReviewPanel — a Run opened by id', () => {
 
     await waitFor(() => expect(mocked.getRecordedRun).toHaveBeenCalledWith(42))
     await waitFor(() => expect(screen.getByText('Run #42')).toBeTruthy())
-  })
-
-  it('expands the session containing it, so the highlighted row is on screen', async () => {
-    withRuns([recordedRun({ run_id: 42 })])
-    mocked.getRecordedRun.mockResolvedValue(recordedRun({ run_id: 42, session_id: 3 }))
-    mocked.getRunComparison.mockResolvedValue(runComparison())
-    mocked.getCapture.mockResolvedValue(recordedState())
-
-    render(<ReviewPanel initialRunId={42} />)
-
-    await waitFor(() => expect(mocked.getTrainingSession).toHaveBeenCalledWith(3))
   })
 
   it('says a Fast Run has no record rather than sitting on "select a Run"', async () => {
@@ -538,87 +561,80 @@ describe('ReviewPanel — a Run opened by id', () => {
 })
 
 // ---------------------------------------------------------------------------
-// The Training Session note
+// The note on an Episodic Memory clear
 // ---------------------------------------------------------------------------
 //
-// A session is not created deliberately — it is the span between two Episodic Memory
-// clears — so a number and a date range is all that distinguishes one from another.
-// The note column has existed since WP3.0, carried by the model, the service and both
-// review responses, and nothing ever rendered it or offered to set it.
+// A clear is an event with nothing else to distinguish it from the next but its date,
+// so the one editable thing about it is a note saying why the memory was cleared.
 
-describe('SessionBrowser — naming a Training Session', () => {
-  it('shows a session\'s note beside its number', async () => {
-    mocked.listTrainingSessions.mockResolvedValue({
-      sessions: [sessionSummary({ note: 'sweep of the five-letter problems' })],
-      total: 1,
-    })
-    mocked.getTrainingSession.mockResolvedValue(
-      sessionDetail([recordedRun()], { note: 'sweep of the five-letter problems' }),
+describe('EpisodicRunTimeline — noting an Episodic Memory clear', () => {
+  function withClear(note = '') {
+    mocked.listEpisodicRuns.mockResolvedValue(
+      timeline([recordedRun({ run_id: 8 }), memoryClear({ clear_id: 4, note }), recordedRun({ run_id: 7 })]),
     )
+  }
 
+  it("shows a clear's note in its marker", async () => {
+    withClear('sweep of the five-letter problems')
     render(<ReviewPanel />)
-    await waitFor(() =>
-      expect(screen.getAllByText(/sweep of the five-letter problems/).length).toBeGreaterThan(0),
-    )
+    const field = await screen.findByDisplayValue('sweep of the five-letter problems')
+    expect(field.closest('[data-testid="memory-clear-4"]')).toBeTruthy()
   })
 
-  it('saves an edited note and keeps both places it is shown in step', async () => {
-    withRuns()
-    mocked.setSessionNote.mockResolvedValue({ session_id: 3, note: 'baseline' })
+  it('saves an edited note against that clear and shows the saved text', async () => {
+    withClear()
+    mocked.setMemoryClearNote.mockResolvedValue(memoryClear({ clear_id: 4, note: 'baseline' }))
 
     render(<ReviewPanel />)
-    const field = await screen.findByLabelText('Note')
+    const field = await screen.findByLabelText(/Note on the Episodic Memory clear/)
 
     fireEvent.change(field, { target: { value: 'baseline' } })
-    fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Save the note on the clear/ }))
 
-    await waitFor(() => expect(mocked.setSessionNote).toHaveBeenCalledWith(3, 'baseline'))
-    // The list carries the note as well as the detail, and both are fetched
-    // separately: without updating both, the header keeps the old text and the save
-    // reads as having failed.
+    await waitFor(() => expect(mocked.setMemoryClearNote).toHaveBeenCalledWith(4, 'baseline'))
+    // Saved means the marker shows it and no longer offers to save it again.
     await waitFor(() =>
-      expect(screen.getAllByText('baseline').length).toBeGreaterThan(0),
+      expect(screen.getByRole('button', { name: /Save the note on the clear/ })).toBeDisabled(),
     )
+    expect((screen.getByLabelText(/Note on the Episodic Memory clear/) as HTMLInputElement).value).toBe('baseline')
+    // The window was not refetched to show it.
+    expect(mocked.listEpisodicRuns).toHaveBeenCalledTimes(1)
   })
 
   it('does not offer to save an unchanged note', async () => {
-    withRuns()
-
+    withClear('as it was')
     render(<ReviewPanel />)
-    await screen.findByLabelText('Note')
-    expect(screen.getByRole('button', { name: /^save$/i })).toBeDisabled()
+    await screen.findByLabelText(/Note on the Episodic Memory clear/)
+    expect(screen.getByRole('button', { name: /Save the note on the clear/ })).toBeDisabled()
   })
 
   it('says when a save did not land, rather than looking as though it did', async () => {
-    withRuns()
-    mocked.setSessionNote.mockRejectedValue(
-      apiError(500, 'Internal Server Error', 'the session row is locked'),
+    withClear()
+    mocked.setMemoryClearNote.mockRejectedValue(
+      apiError(500, 'Internal Server Error', 'the clear row is locked'),
     )
 
     render(<ReviewPanel />)
-    fireEvent.change(await screen.findByLabelText('Note'), { target: { value: 'x' } })
-    fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
+    fireEvent.change(await screen.findByLabelText(/Note on the Episodic Memory clear/), {
+      target: { value: 'x' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /Save the note on the clear/ }))
 
     await waitFor(() => expect(screen.getByText('not saved')).toBeTruthy())
-    // And why, so the reader has something to act on.
     expect(
-      screen.getByText(/Could not save the session note: the server failed to complete it/),
+      screen.getByText(/Could not save the note on the Episodic Memory clear: the server failed to complete it/),
     ).toBeTruthy()
-    expect(screen.getByText(/the session row is locked/)).toBeTruthy()
+    expect(screen.getByText(/the clear row is locked/)).toBeTruthy()
   })
 })
 
 // ---------------------------------------------------------------------------
 // A listing that could not be read, told apart from a listing with nothing in it
 // ---------------------------------------------------------------------------
-//
-// "No Training Sessions recorded yet" is a statement about the database, and so is a
-// session with no Runs under it. Each is reserved for the case it describes, and a
-// request that failed says so in its own words.
 
-describe('SessionBrowser — a listing that failed to load', () => {
-  it('gives the reason instead of saying no sessions have been recorded', async () => {
-    mocked.listTrainingSessions.mockRejectedValue(
+describe('EpisodicRunTimeline — a listing that failed to load', () => {
+  it('gives the reason instead of saying no runs have been recorded', async () => {
+    mocked.listEpisodicRuns.mockRejectedValue(
       apiError(503, 'Service Unavailable', 'the database is not accepting connections'),
     )
 
@@ -626,41 +642,21 @@ describe('SessionBrowser — a listing that failed to load', () => {
 
     await waitFor(() =>
       expect(
-        screen.getByText(/Could not load the Training Sessions: the server failed to complete it/),
+        screen.getByText(/Could not load the episodic runs: the server failed to complete it/),
       ).toBeTruthy(),
     )
     expect(screen.getByText(/the database is not accepting connections/)).toBeTruthy()
-    expect(screen.queryByText(/No Training Sessions recorded yet/)).toBeNull()
+    expect(screen.queryByText(/No episodic runs recorded yet/)).toBeNull()
   })
 
   it('still says so when there genuinely are none', async () => {
-    mocked.listTrainingSessions.mockResolvedValue({ sessions: [], total: 0 })
+    mocked.listEpisodicRuns.mockResolvedValue(timeline([]))
 
     render(<ReviewPanel />)
 
     await waitFor(() =>
-      expect(screen.getByText(/No Training Sessions recorded yet/)).toBeTruthy(),
+      expect(screen.getByText(/No episodic runs recorded yet/)).toBeTruthy(),
     )
-  })
-
-  it('reports a session whose Runs could not be read, keeping the list usable', async () => {
-    mocked.listTrainingSessions.mockResolvedValue({
-      sessions: [sessionSummary({ run_count: 2 })],
-      total: 1,
-    })
-    mocked.getTrainingSession.mockRejectedValue(
-      apiError(500, 'Internal Server Error', 'run join failed'),
-    )
-
-    render(<ReviewPanel />)
-
-    await waitFor(() =>
-      expect(
-        screen.getByText(/Could not load the Runs in Training Session 3/),
-      ).toBeTruthy(),
-    )
-    // The session header is still there to collapse, and the rest of the list with it.
-    expect(screen.getByText('Session 3')).toBeTruthy()
   })
 })
 
@@ -693,51 +689,6 @@ describe('NormalRunReview — a record that would not load', () => {
 
 // ---------------------------------------------------------------------------
 // Reaching the records past the first window
-// ---------------------------------------------------------------------------
-//
-// Both listings the review surfaces read are paged by the server: `GET
-// /api/review/sessions` takes a limit and an offset, and so does `GET
-// /api/review/runs/{id}/actions`. Each shows one window at a time, reports the
-// total behind it, and moves the window on request, so every recorded session and
-// every recorded action is reachable.
-
-describe('SessionBrowser — paging', () => {
-  it('asks for the next window of sessions and renders it', async () => {
-    mocked.listTrainingSessions.mockImplementation(async (_limit, offset) => ({
-      sessions: [sessionSummary({ session_id: offset === 0 ? 137 : 87 })],
-      total: 137,
-    }))
-    mocked.getTrainingSession.mockImplementation(async (id) =>
-      sessionDetail([recordedRun()], { session_id: id }),
-    )
-    mocked.getCapture.mockResolvedValue(recordedState())
-    mocked.getRunComparison.mockResolvedValue(runComparison())
-
-    render(<ReviewPanel />)
-    await waitFor(() => expect(screen.getByText('Session 137')).toBeTruthy())
-    expect(mocked.listTrainingSessions).toHaveBeenCalledWith(50, 0)
-    expect(screen.getByText('1–1 of 137 Training Sessions')).toBeTruthy()
-
-    await act(async () => {
-      screen.getByRole('button', { name: /next page of Training Sessions/i }).click()
-    })
-
-    await waitFor(() => expect(mocked.listTrainingSessions).toHaveBeenCalledWith(50, 50))
-    await waitFor(() => expect(screen.getByText('Session 87')).toBeTruthy())
-    expect(screen.getByText('51–51 of 137 Training Sessions')).toBeTruthy()
-    expect(screen.queryByText('Session 137')).toBeNull()
-  })
-
-  it('offers no next window when every session is on screen', async () => {
-    withRuns()
-
-    render(<ReviewPanel />)
-    await waitFor(() => expect(screen.getByText('1–1 of 1 Training Sessions')).toBeTruthy())
-    expect(screen.getByRole('button', { name: /next page of Training Sessions/i })).toBeDisabled()
-    expect(screen.getByRole('button', { name: /previous page of Training Sessions/i })).toBeDisabled()
-  })
-})
-
 describe('AuditRunReview — paging the recorded action log', () => {
   /** One recorded action, identifiable by its sequence number. */
   function loggedAction(seq: number): AuditAction {

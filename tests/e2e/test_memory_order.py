@@ -4,7 +4,7 @@ Metacat conses each new description onto the front of ``answer-descriptions`` an
 ``snag-descriptions`` (``memory.ss:101-111``), so ``get-answers`` is newest first, the
 reminding loop and ``get-equivalent-snag`` walk it that way, and the Memory window draws
 it oldest first.  The database rows come back in whatever order they were written, which
-a Training Session does not guarantee is the order the memory made them in, so a restart
+concurrent runs do not guarantee is the order the memory made them in, so a restart
 orders them by the memory's own identifier.
 
 Requires: a local Postgres -- start it with `scripts/dev.sh db`.

@@ -5,7 +5,7 @@
 // The other half of `GET /api/runs/{id}/parameters`, and deliberately a separate
 // panel from the settable one. Fixed parameters are inputs, chosen before the first
 // codelet; these are outputs — which numeric backend was actually selected, how many
-// shards sharding settled on, the config and memory hashes, the Training Session,
+// shards sharding settled on, the config and memory hashes,
 // and the parallel telemetry when there is any. Presenting them as though they
 // could be set would be a lie about how the engine works, so the panel says
 // read-only in its header and renders nothing you can type into.
@@ -92,7 +92,7 @@ export function RunDerivedPanel() {
       {!open && (
         <div className="text-xs text-muted" style={{ marginTop: 4 }}>
           Derived from the run rather than set on it: backend, sharding, hashes,
-          session, and parallel telemetry.
+          and parallel telemetry.
         </div>
       )}
 
@@ -163,7 +163,6 @@ export function RunDerivedPanel() {
                 />
                 <Row label="Config hash" value={shorten(derived.config_hash)} title={derived.config_hash ?? undefined} />
                 <Row label="Memory hash" value={shorten(derived.memory_hash)} title={derived.memory_hash ?? undefined} />
-                <Row label="Training Session" value={derived.session_id} />
               </Section>
 
               {telemetry !== undefined && <Telemetry telemetry={telemetry} />}

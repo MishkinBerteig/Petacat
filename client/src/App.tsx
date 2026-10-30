@@ -147,9 +147,8 @@ function parseConfigNodeFromHash(): string | null {
 /**
  * A run to open in the Review browser: `#/review/runs/42`.
  *
- * The review surfaces were reachable only by browsing Training Sessions, which is
- * the wrong way round for a reader who has just watched a run finish — they know the
- * run and not the session. Putting the id in the hash also makes the link survive a
+ * The review surfaces were reachable only by paging the episodic-run timeline, which is
+ * slow for a reader who has just watched a run finish — they know the run. Putting the id in the hash also makes the link survive a
  * reload and be worth sending to somebody.
  */
 function parseReviewRunFromHash(): number | null {
@@ -283,7 +282,7 @@ export default function App() {
           ) : view === 'admin' ? (
             'Admin — the global configuration Metacat Mode uses'
           ) : view === 'review' ? (
-            "Review — recorded Training Sessions (Metacat Mode's sessions)"
+            "Review — Metacat Mode's recorded episodic runs"
           ) : view === 'training' ? (
             `${MODE_LABELS.training} — Trainings: episodes of many problems over many seeds`
           ) : (

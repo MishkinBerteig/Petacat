@@ -47,7 +47,7 @@ const PANEL_LABELS: Record<PanelKey, string> = {
 
 /**
  * Tabbed rather than the dashboard's grid, because a review pane sits beside the
- * session list and the comparison and has perhaps half the width the dashboard
+ * run timeline and the comparison and has perhaps half the width the dashboard
  * gives these panels. Five of them tiled at that size would be five illegible
  * thumbnails.
  */

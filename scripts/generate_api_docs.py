@@ -48,11 +48,11 @@ GROUPS: list[tuple[str, str, str]] = [
     (
         "/api/memory",
         "Episodic Memory",
-        "Metacat Mode: the Episodic Memory (Metacat-Mode learning) shared by the runs of the "
-        "Metacat Mode session, which the UI calls the \"Training Session\". It is not Training "
-        "Mode and is untouched by Trainings.",
+        "Metacat Mode: the Episodic Memory (Metacat-Mode learning) that each episodic run inherits "
+        "from the runs before it, until it is cleared. Clearing is an event, recorded with an "
+        "editable note. It is not Training Mode and is untouched by Trainings.",
     ),
-    ("/api/review", "Review", "Metacat Mode: reading back what a Normal or Audit run recorded, and the sessions (\"Training Sessions\" in the UI; Metacat Mode, not Training Mode) the runs form."),
+    ("/api/review", "Review", "Metacat Mode: reading back what a Normal or Audit run recorded, and the episodic-run timeline: recorded runs with the Episodic Memory clears between them (Metacat Mode, not Training Mode)."),
     ("/api/admin", "Configuration", "Metacat Mode: the editable copy of the seed data (the global configuration). A Training copies it when created and never changes it."),
     ("/api/docs", "Help", "In-app help topics, the glossary and search."),
     ("/api/system", "System", "What the process resolved at startup."),

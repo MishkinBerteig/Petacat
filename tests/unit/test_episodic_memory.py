@@ -69,7 +69,7 @@ def test_storing_snags_assigns_incrementing_ids():
 def test_answer_ids_are_scoped_to_the_memory_not_the_process():
     """A fresh memory numbers from 1 again.
 
-    Episodic Memory outlives a run — within a Training Session it accumulates
+    Episodic Memory outlives a run — across episodic runs it accumulates
     answers across many of them — so ``answer_id`` has to be unique within the
     memory: ``/api/memory/compare`` identifies answers by it.  What it must *not*
     depend on is how many answers some earlier, unrelated memory happened to hold,

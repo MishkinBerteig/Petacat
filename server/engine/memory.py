@@ -160,14 +160,14 @@ class SnagDescription:
 class EpisodicMemory:
     """Cross-run episodic memory.
 
-    Memory is scoped to the user/session, not to individual runs.
+    Memory is scoped to the user, not to a run: each episodic run inherits it.
     A manual "Clear Memory" action resets it (matching clearmem in Scheme).
 
     Because it outlives a run, it is also the right owner of answer and snag
     numbering.  ``POST /api/memory/compare`` identifies answers by ``answer_id``
-    across every run in a Training Session, so those identifiers have to be unique
+    across every episodic run, so those identifiers have to be unique
     within the *memory*; per-run numbering would give two answers found in two runs
-    of one session the same id.  A fresh ``EpisodicMemory`` starts again at 1, which
+    of one memory the same id.  A fresh ``EpisodicMemory`` starts again at 1, which
     is what removes the process-history dependence WP0.3 is about.
     """
 

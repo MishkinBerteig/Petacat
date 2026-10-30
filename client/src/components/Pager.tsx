@@ -2,8 +2,8 @@
 // Pager -- one window of a server-paged list, with the total behind it
 // ---------------------------------------------------------------------------
 //
-// Three lists in Petacat are paged by the server: Run History, the Training
-// Session browser and the audit action log. Each takes a `limit` and an `offset`
+// Three lists in Petacat are paged by the server: Run History, the episodic-run
+// timeline and the audit action log. Each takes a `limit` and an `offset`
 // and reports a `total`, and a reader needs both halves of that -- which window
 // they are looking at, and how many records exist behind it.
 //
@@ -23,7 +23,7 @@ interface Props {
   /** Move to a window starting here. */
   onChange: (offset: number) => void;
   /**
-   * What is being counted, plural — "runs", "sessions", "actions from tick 12".
+   * What is being counted, plural — "runs", "memory clears", "actions from tick 12".
    * Read straight after the numbers: "51–100 of 137 runs".
    */
   label: string;
@@ -51,7 +51,7 @@ export function Pager({ offset, limit, total, count, onChange, label }: Props) {
       </span>
       <span style={{ flex: 1 }} />
       {/* Named by what they page, because a screen can hold more than one of these
-          — the audit log sits inside the Run the Session browser is listing. */}
+          — the audit log sits inside the Run the timeline is listing. */}
       <button
         onClick={() => onChange(Math.max(0, offset - limit))}
         disabled={!hasPrev}

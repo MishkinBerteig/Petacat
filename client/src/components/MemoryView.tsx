@@ -98,7 +98,7 @@ export function MemoryView() {
   const [actionError, setActionError] = useState<string | null>(null);
 
   /**
-   * Read the Training Session's Episodic Memory, by the route that reaches it.
+   * Read the Episodic Memory, by the route that reaches it.
    *
    * Every Run shares one memory; a Fast Run has no database rows, so the run-scoped
    * read serves its copy from the live object. The result goes into the store, which
@@ -255,7 +255,7 @@ export function MemoryView() {
   const { answers, snags } = memory;
   const isEmpty = answers.length === 0 && snags.length === 0;
   /**
-   * Every Run shares the Training Session's Episodic Memory. `scope` says how this
+   * Every Run shares the one Episodic Memory. `scope` says how this
    * copy of it was read: `shared` from the stored rows, `live` from the object the
    * engine is using. A Fast Run writes no rows, so its memory is read live — the same
    * answers, taken from the place that has them.
@@ -293,9 +293,9 @@ export function MemoryView() {
             color: 'var(--text-secondary)',
           }}
         >
-          Read live from the Training Session&apos;s memory (Metacat Mode&apos;s session; Metacat Mode&apos;s Episodic Memory). A <strong>Fast</strong> run
+          Read live from Metacat Mode&apos;s Episodic Memory. A <strong>Fast</strong> run
           shares this memory and is reminded from it, and the answers it finds are here
-          for as long as the session runs.
+          until the memory is cleared.
         </div>
       )}
 
