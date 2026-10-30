@@ -275,3 +275,24 @@ def test_metadata_pickles_cheaply(meta):
 def test_default_status_does_not_start_a_pool():
     status = default_swarm_status()
     assert status["workers"] >= 1 and status["start_method"] == "forkserver"
+
+
+def test_a_fresh_swarm_given_no_metadata_runs_on_the_seed_data(meta):
+    """The first call on a pool constructed without metadata binds the seed data.
+
+    The tasks of that call must name the configuration the workers were started with.
+    They once carried the empty hash read before ``_start`` bound it, and every worker
+    refused them ("no metadata for config ''"); the other tests never saw it because
+    each passes ``meta`` explicitly.
+    """
+    swarm = Swarm(workers=2)
+    try:
+        outcome = swarm.map([RunTask("abc", "abd", "xyz", seed=7, max_steps=3000)])[0]
+    finally:
+        swarm.shutdown()
+    assert outcome.error is None, outcome.error
+    expected = run_inprocess(
+        RunTask("abc", "abd", "xyz", seed=7, max_steps=3000, backend=default_backend(meta)),
+        meta,
+    )
+    assert outcome.fingerprint() == expected.fingerprint()

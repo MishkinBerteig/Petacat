@@ -645,6 +645,10 @@ class Swarm:
                     self._executor.shutdown(wait=False, cancel_futures=True)
                     self._executor = None
                 self._start()
+            if meta is None:
+                # A fresh pool binds the seed data in ``_start``; the tasks must name
+                # that configuration, not the empty hash read before it existed.
+                cfg = self._bound_hash
             self._inflight += 1
             return self._executor, cfg, payload
 
