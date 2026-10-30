@@ -160,6 +160,44 @@ def test_abandoned_prefixes_leave_no_trace(meta):
     assert read_only <= abandoned
 
 
+@pytest.mark.parametrize("pi", [0, 1, 12])
+def test_prefixes_never_read_the_step_through_the_real_context(meta, pi):
+    """With worker threads the run's own context is a plain ``EngineContext`` -- the
+    step-relative ``codelet_count`` lives on the workers' context, which shares its
+    ``__dict__`` -- so the coordinator pays nothing for it.  That is only exact if no
+    speculating thread ever reaches ``codelet_count`` through the *real* context before it
+    holds the token.  Instrument the real context and run: any such read is recorded."""
+    from server.engine.runner import EngineContext
+    from server.parallel.speculative import engine as E
+
+    reads = []
+
+    class Audited(EngineContext):
+        @property
+        def codelet_count(self):
+            spec = E._tl.spec
+            if spec is not None and not spec.live:
+                reads.append(spec.type)
+            return self.__dict__["codelet_count"]
+
+        @codelet_count.setter
+        def codelet_count(self, value):
+            self.__dict__["codelet_count"] = value
+
+    runner = EngineRunner(meta)
+    runner.init_mcat(*PROBLEMS[pi], seed=3)
+    engine = E.SpeculativeEngine(runner, 4, use_qos=False)
+    engine.install()
+    runner.ctx.__class__ = Audited
+    try:
+        engine.run(500)
+    finally:
+        runner.ctx.__class__ = EngineContext
+        engine.close()
+    assert engine.telemetry["speculated"] > 0
+    assert reads == []
+
+
 @pytest.mark.parametrize("workers", [0, 2, 4])
 def test_stream_update_cycle_policy_is_exact(meta, workers):
     """WP5's stream-keyed update cycle: the SSR and the engine must use the same policy,

@@ -71,12 +71,19 @@ Max (``measurements/parallel/speculative-engine.md`` has the figures) and what w
   stop-the-world pause on the free-threaded interpreter (it cost 300 us per update cycle
   when tried), so the guards stay installed for the whole run.  Workers bind their own
   guarded id allocator (``_WorkerIds``), so the coordinator's allocations pay no guard.
+* **The step-relative ``codelet_count`` is the workers' alone.**  A Python-level property
+  on the run's context, read a dozen times a step, was 3% of a run.  The real context
+  stays a plain ``EngineContext``; the workers use a second context object that shares its
+  ``__dict__`` and carries the property (``_wctx``).  Every builtin a prefix runs is bound
+  to that object, and the engine objects that keep the real context (the trace) read it
+  only on write paths, which a prefix cannot reach before it holds the token
+  (``test_prefixes_never_read_the_step_through_the_real_context`` instruments it).
 
 What it still costs, and why it does not pay at today's sizes: a codelet is 6-40 us, the
 update cycle (serial) is more than half of a run, and every object a worker reads
 becomes a cache line the coordinator must fetch back (free-threaded reference counts are
-writes), which costs the coordinator about 10 us per speculated codelet afterwards.  The
-net effect of speculating any one codelet type is within a few percent of zero.
+writes), which costs the coordinator a few microseconds per speculated codelet afterwards.
+The net effect of speculating any one codelet type is within a few percent of zero.
 """
 
 from __future__ import annotations
@@ -186,6 +193,14 @@ class _SpecContext(EngineContext):
     A data descriptor on the class wins over the instance ``__dict__`` entry the base
     class writes, so the serial code (``ctx.codelet_count += 1``) keeps working through
     the property while a thread with a live speculation record sees the predicted count.
+
+    The coordinator does not pay for the property: with worker threads, the run's own
+    context stays a plain ``EngineContext`` (the engine reads ``codelet_count`` a dozen
+    times a step, and a Python-level property made that 3% of a run) and the workers use
+    a second object of this class that *shares its ``__dict__``* with the real one
+    (``SpeculativeEngine._wctx``), so every other attribute is the same storage.  Only
+    the inline and detect modes, where the coordinator itself plays the speculating
+    thread, swap the real context's class.
     """
 
     @property
@@ -574,6 +589,9 @@ class SpeculativeEngine:
         self._seen_removed = 0
         self._plans: dict[str, tuple[Any, bool, bool]] = {}
         self._registry_get = runner._registry.get_compiled
+        #: What worker threads see as ``ctx`` (see ``_SpecContext``); ``None`` when the
+        #: coordinator itself plays the speculating thread.
+        self._wctx: Any = None
         self.telemetry = _new_telemetry(workers)
         self.violations: list[dict[str, Any]] = []
         #: Optional per-step log of how each speculated step committed (debugging).
@@ -659,9 +677,14 @@ class SpeculativeEngine:
 
         # Plugin classes: step-relative codelet_count; guards on ids, the trace, the rack.
         self._orig_classes = (ctx.__class__, ctx.ids.__class__, ctx.trace.__class__)
-        ctx.__class__ = _SpecContext
         if self.inline:
+            ctx.__class__ = _SpecContext
             ctx.ids.__class__ = _GuardedIds
+        else:
+            # Workers get a context of their own that shares the real one's attributes.
+            wctx = object.__new__(_SpecContext)
+            wctx.__dict__ = ctx.__dict__
+            self._wctx = wctx
         ctx.trace.__class__ = _GuardedTrace
         ctx.coderack.guard = _rack_guard
         self._nodes = list(ctx.slipnet.nodes.values())
@@ -716,7 +739,11 @@ class SpeculativeEngine:
                      "_unclamp_initial_slipnodes"):
             runner.__dict__.pop(name, None)
         runner._interpreter = self._orig_interpreter
-        ctx.__class__, ctx.ids.__class__, ctx.trace.__class__ = self._orig_classes
+        orig_ctx, orig_ids, orig_trace = self._orig_classes
+        if self.inline:
+            ctx.__class__, ctx.ids.__class__ = orig_ctx, orig_ids
+        ctx.trace.__class__ = orig_trace
+        self._wctx = None
         ctx.coderack.guard = None
         for node in self._nodes:
             node.__class__ = SlipnetNode
@@ -837,7 +864,7 @@ class SpeculativeEngine:
         w[key] = w.get(key, 0) + 1
 
     def _run_spec(self, spec: Spec) -> None:
-        ctx = self.runner.ctx
+        ctx = self._wctx
         if spec.abandon:
             # The coordinator gave up on it before we picked it up: nothing was touched.
             self._bump_tele(spec, "abandoned")
