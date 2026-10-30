@@ -1419,8 +1419,9 @@ class RunService:
             for e in events
         ]
 
-    def get_memory_state(self) -> dict:
-        """Return episodic memory contents (cross-run)."""
+    def get_memory_state(self, memory: EpisodicMemory | None = None) -> dict:
+        """Return episodic memory contents (cross-run); *memory* defaults to the session's."""
+        memory = _global_memory if memory is None else memory
         return {
             "answers": [
                 {
@@ -1451,7 +1452,7 @@ class RunService:
                     "activation": a.activation,
                     "has_picture": a.picture is not None,
                 }
-                for a in _global_memory.answers_oldest_first
+                for a in memory.answers_oldest_first
             ],
             "snags": [
                 {
@@ -1466,7 +1467,7 @@ class RunService:
                     "explanation": snag_explanation_text(s, self.meta.commentary_templates),
                     "has_picture": s.picture is not None,
                 }
-                for s in _global_memory.snags_oldest_first
+                for s in memory.snags_oldest_first
             ],
         }
 

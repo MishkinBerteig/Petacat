@@ -107,6 +107,12 @@ class RunTask:
     executor_options: dict[str, Any] | None = None
     #: Caller's label, returned untouched on the outcome.
     tag: Any = None
+    #: A Training's episode memory (``server.services.training_memory.MemoryRef``): the run
+    #: starts from a copy of it and reports its additions.  ``None`` is a fresh memory.
+    memory: Any = None
+    #: Test hook (``"error"`` raises inside the run, ``"kill"`` kills this worker process);
+    #: only the Training service's in-process fault hook ever sets it.
+    fault: str | None = None
 
 
 @dataclass
@@ -157,6 +163,10 @@ class RunOutcome:
     #: A traceback summary when the run raised; the other fields are then empty.
     error: str | None = None
     worker_pid: int = 0
+    #: With a ``RunTask.memory``: the pickled ``training_memory.Additions`` of the run.
+    additions: bytes | None = None
+    #: The worker could not reach the task's memory version; resubmit with a snapshot.
+    need_snapshot: bool = False
 
     def fingerprint(self) -> tuple:
         """The fields that must be identical to a serial run (not timing/pid/index)."""
@@ -280,13 +290,32 @@ def run_one(task: RunTask, meta: MetadataProvider) -> RunOutcome:
 
     started = time.perf_counter()
     try:
+        if task.fault == "kill":
+            os._exit(137)  # test hook: this worker dies mid-task
+        memory = None
+        if task.memory is not None:
+            from server.services import training_memory as tm
+
+            try:
+                memory, base_a, base_s = tm.begin(task.memory)
+            except tm.NeedSnapshot:
+                return RunOutcome(
+                    seed=task.seed, status="need_snapshot", answer="", answers=[], codelets=0,
+                    seconds=0.0, stopping_state="need_snapshot:", need_snapshot=True,
+                    worker_pid=os.getpid(),
+                )
         runner = EngineRunner(meta)
         runner.init_mcat(
             task.initial, task.modified, task.target, task.answer,
-            seed=task.seed, parameters=task.parameters or None,
+            seed=task.seed, parameters=task.parameters or None, memory=memory,
         )
+        if task.fault == "error":
+            raise RuntimeError("injected fault")
         result = _drive(runner, task)
-        return _outcome(runner, result, task.seed, started)
+        outcome = _outcome(runner, result, task.seed, started, base_a if memory is not None else None)
+        if memory is not None:
+            outcome.additions = tm.end(memory, base_a, base_s)
+        return outcome
     except Exception:  # noqa: BLE001 - one bad run must not sink a sweep
         return _failure(task.seed, started)
 
@@ -370,9 +399,45 @@ _W_STACK_BYTES = 64 * 1024 * 1024
 _W_CACHE_LIMIT = 4
 
 
-def _worker_init(meta_blob: bytes, cfg_hash: str, qos_on: bool) -> None:
+def _watch_owner(owner_pid: int) -> None:
+    """Make it impossible for a pool to outlive the process that owns it.
+
+    When the owner is killed outright (SIGKILL, or out of memory) ``atexit`` never runs, and
+    the pool's pipes do not reliably reach EOF -- the forkserver and every idle worker
+    would sit on forever (hours, 17 processes at a time).  So each worker watches its
+    owner: once a second, and the moment it is gone the worker exits, taking its forkserver
+    (its parent) with it, which in turn lets the resource tracker see EOF and exit.
+    """
+    import signal
+    import threading
+
+    forkserver = os.getppid()  # recorded now: the pid we may later signal, and only that one
+
+    def _loop() -> None:
+        while True:
+            time.sleep(1.0)
+            try:
+                os.kill(owner_pid, 0)
+                continue
+            except PermissionError:
+                continue  # exists, not ours to signal
+            except ProcessLookupError:
+                pass
+            if forkserver > 1 and os.getppid() == forkserver:
+                try:
+                    os.kill(forkserver, signal.SIGTERM)  # the forkserver
+                except OSError:
+                    pass
+            os._exit(0)
+
+    threading.Thread(target=_loop, name="owner-watchdog", daemon=True).start()
+
+
+def _worker_init(meta_blob: bytes, cfg_hash: str, qos_on: bool, owner_pid: int = 0) -> None:
     """Pool initializer: receive the bound metadata once, and take a QoS class."""
     global _W_META, _W_HASH, _W_QOS, _W_QOS_ON
+    if owner_pid:
+        _watch_owner(owner_pid)
     for name in ("OMP_NUM_THREADS", "VECLIB_MAXIMUM_THREADS", "OPENBLAS_NUM_THREADS"):
         os.environ.setdefault(name, "1")  # one engine per core; no BLAS fan-out under it
     _W_META = pickle.loads(meta_blob)
@@ -510,6 +575,10 @@ class Swarm:
         self._blob: bytes = b""
         self._executor: ProcessPoolExecutor | None = None
         self._lock = threading.RLock()
+        #: Guards ``_inflight`` alone.  ``submit`` releases from a future's done-callback,
+        #: which runs on the pool's management thread while ``_acquire`` may hold ``_lock``
+        #: waiting for that very thread to exit (a broken pool): taking ``_lock`` there deadlocks.
+        self._count_lock = threading.Lock()
         self._inflight = 0
         self._closed = False
         #: Start-up and traffic figures for ``status()``.
@@ -552,7 +621,7 @@ class Swarm:
             max_workers=self.workers,
             mp_context=self._context(),
             initializer=_worker_init,
-            initargs=(self._blob, self._bound_hash, self._qos_on),
+            initargs=(self._blob, self._bound_hash, self._qos_on, os.getpid()),
         )
         # ProcessPoolExecutor starts workers on demand under forkserver; slow probes
         # held concurrently force all of them up now, so the first real task is not
@@ -649,11 +718,12 @@ class Swarm:
                 # A fresh pool binds the seed data in ``_start``; the tasks must name
                 # that configuration, not the empty hash read before it existed.
                 cfg = self._bound_hash
-            self._inflight += 1
+            with self._count_lock:
+                self._inflight += 1
             return self._executor, cfg, payload
 
     def _release(self) -> None:
-        with self._lock:
+        with self._count_lock:
             self._inflight -= 1
 
     def _prepare(
@@ -711,6 +781,36 @@ class Swarm:
             for future in pending:
                 future.cancel()
             self._release()
+
+    def submit(
+        self,
+        tasks: Iterable[RunTask | EpisodeTask],
+        meta: MetadataProvider | None = None,
+    ) -> Future:
+        """Submit *tasks* as one unit; the future's result is their outcomes in task order.
+
+        For callers that feed work as it arrives (the Batch scheduler) rather than handing
+        over a whole job: the call returns at once, the tasks run on one worker, and the job
+        counts as in flight until the future completes.  Backends resolve exactly as
+        :meth:`imap_unordered` resolves them.  A ``BrokenProcessPool`` surfaces on the
+        future; the next call restarts the pool, and the caller may resubmit (runs are
+        deterministic, so a rerun is exact).
+        """
+        executor, cfg, payload = self._acquire(meta)
+        try:
+            batch = list(self._prepare(tasks, meta))
+            future = executor.submit(_worker_run, batch, cfg, payload)
+        except BaseException:
+            self._release()
+            raise
+
+        def _done(f: Future) -> None:
+            self._release()
+            if not f.cancelled() and f.exception() is None:
+                self.tasks_run += len(batch)
+
+        future.add_done_callback(_done)
+        return future
 
     def map(
         self,

@@ -296,3 +296,183 @@ def test_a_fresh_swarm_given_no_metadata_runs_on_the_seed_data(meta):
         meta,
     )
     assert outcome.fingerprint() == expected.fingerprint()
+
+
+# ---------------------------------------------------------------------------
+# Swarm.submit and the Training executors
+# ---------------------------------------------------------------------------
+
+
+def _submit_tasks(backend="off"):
+    problems = [("abc", "abd", "ijk"), ("abc", "abd", "xyz"), ("aabc", "aabd", "ijkk")]
+    return [RunTask(i, m, t, None, seed, MAX_STEPS, backend=backend) for (i, m, t) in problems for seed in (1, 2)]
+
+
+def test_submit_returns_a_future_of_outcomes_equal_to_serial_and_counts_in_flight(swarm, meta):
+    tasks = _submit_tasks()
+    before = swarm.status()["tasks_run"]
+    futures = [swarm.submit([t], meta) for t in tasks]
+    got = [f.result(timeout=120)[0] for f in futures]
+    for task, outcome in zip(tasks, got):
+        assert outcome.fingerprint() == run_inprocess(task, meta).fingerprint()
+    chunk = swarm.submit(tasks[:3], meta).result(timeout=120)  # several tasks in one unit
+    assert [o.index for o in chunk] == [0, 1, 2]
+    assert [o.fingerprint() for o in chunk] == [o.fingerprint() for o in got[:3]]
+    assert swarm.status()["tasks_run"] - before == len(tasks) + 3
+    assert swarm.status()["inflight_jobs"] == 0  # released in the done-callback
+
+
+def test_submit_resolves_the_default_backend_like_map(swarm, meta):
+    task = RunTask("abc", "abd", "ijk", None, 3, MAX_STEPS)  # backend None -> the swarm's default
+    got = swarm.submit([task], meta).result(timeout=120)[0]
+    assert got.fingerprint() == swarm.map([task], meta=meta)[0].fingerprint()
+
+
+def test_the_serial_executor_equals_the_swarm_for_the_same_tasks(swarm, meta):
+    """The detached-plugin path gives the swarm's results run for run."""
+    from server.services.training_executor import SerialExecutor, TrainingTask, outcome_fingerprint
+
+    tasks = _submit_tasks()
+    ex = SerialExecutor()
+    try:
+        via_swarm = [swarm.submit([t], meta).result(timeout=120)[0] for t in tasks]
+        via_serial = [
+            ex.submit([TrainingTask(t.initial, t.modified, t.target, t.answer, t.seed, t.max_steps,
+                                    None, "off")], meta).result(timeout=300)[0]
+            for t in tasks
+        ]
+        assert [outcome_fingerprint(o) for o in via_swarm] == [outcome_fingerprint(o) for o in via_serial]
+        assert ex.in_flight == 0 and ex.kind == "serial" and ex.workers == 1
+    finally:
+        ex.close()
+
+
+def test_memory_tasks_agree_across_executors_and_with_a_serial_episode(swarm, meta):
+    """A task with a MemoryRef: same outcome and same additions on the swarm, the serial
+    child and in process; a task that is behind asks for a snapshot."""
+    import pickle
+
+    from server.engine.memory import EpisodicMemory
+    from server.services import training_memory as tm
+    from server.services.training_executor import SerialExecutor, TrainingTask
+
+    master = EpisodicMemory()
+    refs, expected = [], []
+    ex = SerialExecutor()
+    try:
+        for version, seed in enumerate((1, 2, 3, 4)):
+            ref = tm.MemoryRef(99, "epoch-a", version, 0, [blob for blob in tail_blobs(expected)])
+            task = RunTask("abc", "abd", "xyz", None, seed, 2500, backend="off", memory=ref)
+            got = swarm.submit([task], meta).result(timeout=120)[0]
+            twin = ex.submit([TrainingTask("abc", "abd", "xyz", None, seed, 2500, None, "off",
+                                           memory=ref)], meta).result(timeout=300)[0]
+            # The reference: a copy of the master as of this version, run in process.
+            copy = tm.copy_for_run(master)
+            from server.engine.numeric.backend import use_backend
+
+            with use_backend("off"):
+                runner = EngineRunner(meta)
+                runner.init_mcat("abc", "abd", "xyz", seed=seed, memory=copy)
+                runner.run_mcat(max_steps=2500)
+            adds = tm.additions_of(copy, len(master.answers), len(master.snags))
+            assert (got.status, got.codelets) == (runner.status, runner.ctx.codelet_count)
+            assert (twin.status, twin.codelets) == (got.status, got.codelets)
+            assert pickle.loads(got.additions).answers.__len__() == len(adds.answers)
+            assert got.additions == twin.additions or [
+                vars(a) for a in pickle.loads(got.additions).answers
+            ] == [vars(a) for a in pickle.loads(twin.additions).answers]
+            blob = tm.dump_additions(adds)
+            tm.apply_merge(master, adds)
+            expected.append(blob)
+        # A task whose cache and tail cannot reach its version asks for a snapshot.
+        lost = tm.MemoryRef(99, "epoch-never-seen", 4, 3, [expected[-1]])
+        out = swarm.submit([RunTask("abc", "abd", "xyz", None, 5, 100, backend="off", memory=lost)], meta).result(timeout=60)[0]
+        assert out.need_snapshot
+        snap = tm.MemoryRef(99, "epoch-never-seen", 4, snapshot=tm.snapshot_blob(master))
+        out = swarm.submit([RunTask("abc", "abd", "xyz", None, 5, 100, backend="off", memory=snap)], meta).result(timeout=60)[0]
+        assert not out.need_snapshot and out.additions is not None
+    finally:
+        ex.close()
+
+
+def tail_blobs(blobs):
+    return list(blobs)
+
+
+# ---------------------------------------------------------------------------
+# A pool never outlives the process that owns it
+# ---------------------------------------------------------------------------
+
+_OWNER = r"""
+import os, sys, time
+mode = sys.argv[1]
+if mode == "swarm":
+    from server.parallel.swarm import Swarm
+    Swarm(workers=2).start()
+else:
+    from server.engine.metadata import MetadataProvider
+    from server.services.training_executor import SerialExecutor, TrainingTask
+    meta = MetadataProvider.from_seed_data(os.path.join(os.getcwd(), "seed_data"))
+    SerialExecutor().submit([TrainingTask("abc", "abd", "ijk", None, 1, 50, None, "off")], meta).result(timeout=300)
+print("READY", os.getpid(), flush=True)
+time.sleep(600)
+"""
+
+
+def _descendants(root: int) -> set[int]:
+    import subprocess
+
+    rows = subprocess.run(["ps", "-Ao", "pid,ppid"], capture_output=True, text=True).stdout.split("\n")[1:]
+    kids: dict[int, list[int]] = {}
+    for row in rows:
+        if row.strip():
+            pid, ppid = map(int, row.split())
+            kids.setdefault(ppid, []).append(pid)
+    out, todo = set(), [root]
+    while todo:
+        for child in kids.get(todo.pop(), []):
+            if child not in out:
+                out.add(child)
+                todo.append(child)
+    return out
+
+
+def _alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+
+
+@pytest.mark.parametrize("mode", ["swarm", "serial"])
+def test_a_killed_owner_leaves_no_forkserver_or_worker_behind(mode):
+    """SIGKILL gives ``atexit`` no chance: the pool's own processes must notice and exit."""
+    import signal
+    import subprocess
+    import sys
+    import time
+
+    repo = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    env = dict(os.environ, PYTHONPATH=repo)
+    owner = subprocess.Popen([sys.executable, "-c", _OWNER, mode], stdout=subprocess.PIPE,
+                             text=True, cwd=repo, env=env)
+    try:
+        pid = int(owner.stdout.readline().split()[1])
+        started = _descendants(pid)
+        assert started, "the owner started no pool processes"
+        os.kill(pid, signal.SIGKILL)
+        owner.wait()
+        deadline = time.monotonic() + 15
+        left = started
+        while time.monotonic() < deadline:
+            left = {p for p in started if _alive(p)}
+            if not left:
+                break
+            time.sleep(0.5)
+        assert not left, f"processes outlived their owner: {sorted(left)}"
+    finally:
+        if owner.poll() is None:
+            owner.kill()

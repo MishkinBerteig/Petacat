@@ -30,6 +30,13 @@ GROUPS: list[tuple[str, str, str]] = [
         "One problem over many seeds on every core: the answer distribution, plus pool status "
         "(a detachable plugin; 503 when absent).",
     ),
+    (
+        "/api/trainings",
+        "Trainings",
+        "Named, long-lived episodes of many problems over many seeds, extendable while they "
+        "run, with a shared episode memory; the database is written only when a problem "
+        "finishes (works with or without the parallel plugin).",
+    ),
     ("/api/memory", "Episodic Memory", "The Training Session's memory, shared by every run."),
     ("/api/review", "Review", "Reading back what a Normal or Audit run recorded."),
     ("/api/admin", "Configuration", "The editable copy of the seed data."),

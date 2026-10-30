@@ -126,6 +126,7 @@ async def setup_db(test_engine, schema_lock):
     # Import all models so Base.metadata knows about them
     from server.models.metadata import Base  # noqa
     import server.models.run  # noqa — registers Run, CycleSnapshot, etc. on Base.metadata
+    import server.models.training  # noqa — registers trainings, training_problems, ...
 
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)

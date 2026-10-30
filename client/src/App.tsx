@@ -49,6 +49,7 @@ import { CommentaryPanel } from '@/components/CommentaryPanel';
 import { VerbosePanel } from '@/components/VerbosePanel';
 import { RunHistory } from '@/components/RunHistory';
 import { ReviewPanel } from '@/components/review/ReviewPanel';
+import { TrainingPanel } from '@/components/training/TrainingPanel';
 import type { ComponentHelpKey } from '@/constants/helpTopics';
 
 // ---------------------------------------------------------------------------
@@ -132,6 +133,7 @@ function parseViewFromHash(): AppView {
   if (window.location.hash.startsWith('#/config')) return 'config';
   if (window.location.hash.startsWith('#/admin')) return 'admin';
   if (window.location.hash.startsWith('#/review')) return 'review';
+  if (window.location.hash.startsWith('#/training')) return 'training';
   return 'dashboard';
 }
 
@@ -154,6 +156,12 @@ function parseReviewRunFromHash(): number | null {
   return match ? parseInt(match[1], 10) : null;
 }
 
+/** A Training to select in the Training view: `#/training/7`. */
+function parseTrainingIdFromHash(): number | null {
+  const match = window.location.hash.match(/^#\/training\/(\d+)$/);
+  return match ? parseInt(match[1], 10) : null;
+}
+
 // ---------------------------------------------------------------------------
 // App
 // ---------------------------------------------------------------------------
@@ -170,6 +178,7 @@ export default function App() {
   const [view, setView] = useState<AppView>(parseViewFromHash);
   const [configEditNode, setConfigEditNode] = useState<string | null>(parseConfigNodeFromHash);
   const [reviewRunId, setReviewRunId] = useState<number | null>(parseReviewRunFromHash);
+  const [trainingId, setTrainingId] = useState<number | null>(parseTrainingIdFromHash);
 
   // The engine's own account of the run, pushed as it moves rather than polled for.
   // A snag response clamping the temperature, or a run reaching an answer, reaches the
@@ -187,6 +196,7 @@ export default function App() {
       setView(newView);
       setConfigEditNode(parseConfigNodeFromHash());
       setReviewRunId(parseReviewRunFromHash());
+      setTrainingId(parseTrainingIdFromHash());
     };
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
@@ -199,12 +209,15 @@ export default function App() {
     // Choosing Review from the menu means "browse", not "reopen whatever run was
     // last deep-linked", so the pinned run is dropped along with the pinned node.
     setReviewRunId(null);
+    setTrainingId(null);
     if (newView === 'config') {
       window.location.hash = '/config';
     } else if (newView === 'admin') {
       window.location.hash = '/admin';
     } else if (newView === 'review') {
       window.location.hash = '/review';
+    } else if (newView === 'training') {
+      window.location.hash = '/training';
     } else if (isDeepLinkable(runId)) {
       window.location.hash = `/runs/${runId}`;
     } else {
@@ -263,6 +276,8 @@ export default function App() {
             'Admin'
           ) : view === 'review' ? (
             'Review — recorded Training Sessions'
+          ) : view === 'training' ? (
+            'Training — episodes of many problems over many seeds'
           ) : (
             <>
               {runId ? `Run #${runId}` : 'No run'}
@@ -336,6 +351,22 @@ export default function App() {
           <div className="panel-content" style={{ height: '100%' }}>
             <ErrorBoundary fallback="Review">
               <ReviewPanel initialRunId={reviewRunId} />
+            </ErrorBoundary>
+          </div>
+        </div>
+      )}
+
+      {/* ---- Training view ----
+          Database-backed jobs, read from the server; independent of the run store
+          except when "Open in dashboard" fills in the Problem Input form. */}
+      {view === 'training' && (
+        <div
+          className="panel"
+          style={{ gridColumn: '1 / -1', gridRow: '2 / -1', minHeight: 0 }}
+        >
+          <div className="panel-content" style={{ height: '100%' }}>
+            <ErrorBoundary fallback="Training">
+              <TrainingPanel initialTrainingId={trainingId} />
             </ErrorBoundary>
           </div>
         </div>

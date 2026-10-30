@@ -464,6 +464,94 @@
   },
   {
     "topic_type": "component",
+    "topic_key": "training",
+    "title": "Training",
+    "short_desc": "A named episode of many problems, each run over many seeds on every core, kept in the database.",
+    "full_desc": "A Training is a named, long-lived episode. You give it a list of letter-string analogy problems and a number of seeds per problem; it runs every problem over every seed on all the cores of the machine and keeps, for each problem, the distribution of answers Petacat reached. Where the Swarm group answers that question for one problem on the dashboard, a Training answers it for dozens or thousands of problems and remembers the result. A Training is also the mode the machine-learning layer will drive.\n\nThis is not the 'Training Sessions' of the Review view. Those are recordings of runs made on the dashboard. A Training is a job that Petacat runs by itself, and it is stored in its own tables.\n\nA Training stays open. You can add problems while it runs: start with 25, then add five more each time some finish. Close it when you have nothing more to add; it is then finished once its last problem finishes.\n\nEvery run is exact: it is the same run that the Run button would make with that seed, with the same answer and the same codelet count, whether or not the parallel plugin is installed (without it the Training runs one run at a time). The order in which problems are processed is not guaranteed: they are started roughly in the order they arrived so that they finish steadily, but do not depend on any order.\n\nThe database is written only at milestones: when a Training is created or renamed, when problems are added, when you pause, close or cancel or change the policy, and when a problem finishes all its seeds (its summary, the runs committed since the last write and the memory merges are written together). Progress inside a problem lives in memory and is shown from there. If the server stops, the memory is rebuilt from the stored merges, problems resume at the seeds not yet stored, and anything after the last milestone is redone. Because runs are deterministic the result is the same.\n\nThe left column lists the Trainings, newest first, with a line about the cores. The right side shows the selected Training: its settings, its error policy, its totals and controls, a box to add problems, the table of problems and, for a Training with shared memory, a tab for the episode's Episodic Memory.",
+    "metadata": {}
+  },
+  {
+    "topic_type": "component",
+    "topic_key": "training_new",
+    "title": "Training: New training",
+    "short_desc": "Creates a Training from a name, its settings, an error policy and a list of problems.",
+    "full_desc": "Name is required. The settings (memory, seeds per problem, first seed, max codelets per run, parameter overrides and backend) are fixed once the Training is created, because they decide what a run is; the error policy can be changed later.\n\nMax codelets per run is the most codelets any one run may execute; a run that reaches it gives up and is counted as 'gave up at max codelets'.\n\n'Use the dashboard's parameter overrides' applies the engine-parameter changes you have made in Run Controls to every run. They are recorded with the Training, so it keeps running with them even if you later change the dashboard.\n\nBackend is the numeric backend every run uses. Leave it on the default unless you are comparing backends.\n\nThe problems come from the text box, from a file you upload (.txt, .md, .csv or .json, read in your browser), or from the demo problems. The preview says how many problems were found, how many lines were rejected (open the list to see which and why) and how many exact duplicates were dropped, and the total number of runs. Nothing is sent until you press Create. A very long list is sent in several requests to stay within the server's limit.",
+    "metadata": {}
+  },
+  {
+    "topic_type": "component",
+    "topic_key": "training_seeds",
+    "title": "Training: Seeds per problem",
+    "short_desc": "How many runs each problem gets, one per seed.",
+    "full_desc": "One run of Petacat gives one answer, but Petacat's behaviour on a problem is the distribution of answers over random seeds. Each seed gives an independent, exactly reproducible run. More seeds give a better estimate of how often each answer is reached: with 100 seeds an answer seen 30% of the time is known to within roughly 9 percentage points, with 1,000 seeds to within roughly 3. The default is 100.\n\nThe Training uses the seeds first, first+1, ... first+N-1 for every problem. Running again with the same first seed and count gives the same distribution (with shared memory, provided the runs see the same memory versions; each run records the version it started with); a different first seed draws an independent sample.",
+    "metadata": {}
+  },
+  {
+    "topic_type": "component",
+    "topic_key": "training_memory_mode",
+    "title": "Training: Memory",
+    "short_desc": "Whether the runs of a Training share one Episodic Memory.",
+    "full_desc": "Shared (one episode), the default: all the runs of the Training belong to a single episode that owns one Episodic Memory. Each run copies the episode memory when it starts and holds that copy static for its whole duration, so what other runs learn never changes a run already in flight. The answers and snags a run adds go into its own copy, as in any run. When the run finishes its additions are merged into the episode memory, and they reach only the runs that start after the merge. The merge applies Metacat's own checks, so the episode never holds the same description twice. With one worker this is exactly Metacat's serial episode; with many workers it is the same idea with runs overlapping.\n\nThe memory has a version, the number of merges so far. Every run records the version it started with (memory version) and its merge order (seq); that record is what makes a Training reproducible.\n\nIndependent runs: every run starts with an empty memory and nothing is shared. This is the plain answer-distribution mode, as in the Swarm group.",
+    "metadata": {}
+  },
+  {
+    "topic_type": "component",
+    "topic_key": "training_error_policy",
+    "title": "Training: When things go wrong",
+    "short_desc": "What a Training does when a run raises an error, a worker dies or the engine configuration changes.",
+    "full_desc": "When a run raises an error: 'record and carry on' keeps the error as that run's outcome ('error') and continues; 'skip the rest of that problem' cancels that problem's remaining seeds; 'pause the Training' and 'cancel the Training' do what they say. Max errors per problem cancels a problem once it has had that many errors; max errors total pauses the Training. Leave either blank for no limit.\n\nWhen a worker process dies (killed, out of memory): 'retry' resubmits its runs, up to the given number of times per run, and pauses the Training when that is exhausted. Retrying is exact because runs are deterministic. 'Pause' pauses at once.\n\nWhen the engine configuration changes (the engine code or its parameters differ from when the Training was created): 'pause' stops the Training, shown as stalled, until the configuration returns; 'continue under the new configuration' carries on, and each run records the configuration it ran under.\n\nThe policy can be edited while the Training exists. The reason for a pause is shown as the last event.",
+    "metadata": {}
+  },
+  {
+    "topic_type": "component",
+    "topic_key": "training_add_problems",
+    "title": "Training: Add problems",
+    "short_desc": "Adds more problems to a Training that is still open or paused.",
+    "full_desc": "Paste or upload problems exactly as when creating a Training; the preview shows what will be added. They join the end of the queue and are started in roughly the order they arrive, though the order is not guaranteed. Each new problem gets the Training's seeds per problem and first seed (unless a JSON entry gives its own seeds).\n\nA problem already in the Training is not recognised specially: adding it again makes a second row with its own runs. A Training that is closed or cancelled accepts no more problems.",
+    "metadata": {}
+  },
+  {
+    "topic_type": "component",
+    "topic_key": "training_problem_text",
+    "title": "Training: Problem text formats",
+    "short_desc": "The ways of writing problems that the Training view understands.",
+    "full_desc": "Strings are letters only (a-z, A-Z), 1 to 64 of them, and case matters: abC is a different problem from abc. Blank lines and lines starting with # or // are ignored. Accepted forms, one problem per line:\n\n- abc -> abd; xyz -> ?   (the arrow may be -> or the character →). A trailing '-> ?', or nothing after the target, means discovery mode.\n- abc -> abd; xyz -> wyz   justification mode: the answer to explain is wyz.\n- abc abd xyz   or   abc abd xyz wyz   (separated by spaces or tabs)\n- abc,abd,xyz   or   abc,abd,xyz,wyz   CSV, with an optional header row 'initial,modified,target,answer'.\n- Markdown table rows: the first problem in `backticks` on the line is taken, so a table such as the one in list-of-letter-string-analogy-problems.md can be pasted whole.\n- A JSON array of objects {\"initial\", \"modified\", \"target\", \"answer\"} (answer optional; seeds and tag too), when the whole text is JSON.\n\nExact duplicates within what you paste are dropped and counted. Lines that cannot be read are listed with the reason, never silently skipped. Ordinary prose that mentions a problem may be picked up as one; the preview shows what was found before anything is sent.",
+    "metadata": {}
+  },
+  {
+    "topic_type": "component",
+    "topic_key": "training_problems_table",
+    "title": "Training: Problems table",
+    "short_desc": "One row per problem, with the shape of its answer distribution.",
+    "full_desc": "Each row is one problem. 'Runs' is finished runs over the seeds it will get. 'Top' and '2nd' are the most and second most frequent answers with their share of the finished runs, 'No answer' is the share of runs that found none, 'Distinct' counts the different outcomes (including no answer, error and gave up), 'Codelets' is the mean number of codelets per run, and 'Errors' counts runs that raised an error. 'Gave up' counts runs that reached max codelets.\n\nThe tabs filter by status and the search box matches the problem's strings. Click a column heading to sort; sorting and paging are done by the server, so they work on very large Trainings. The figures of a running problem are partial and keep moving; the order of rows is not the order of processing.\n\nClick a row to open its full distribution: every outcome, how many runs, the share and the mean answer quality (0-100). Outcomes other than an answer are labelled 'no answer' (the engine gave up or halted without one), 'gave up at max codelets' and 'error'. Below it the Runs table lists each run: seed, outcome, codelets, quality, the memory version it started with, its merge order (seq), attempts (more than 1 means it was retried after a worker died) and any error.\n\n'Open in dashboard' loads the problem into Problem Input so you can run one of its seeds and watch it. 'Cancel problem' stops a queued or running problem; runs already finished are kept.",
+    "metadata": {}
+  },
+  {
+    "topic_type": "component",
+    "topic_key": "training_memory",
+    "title": "Training: Memory tab",
+    "short_desc": "The Episodic Memory of a Training with shared memory.",
+    "full_desc": "Lists the answers and snags stored in the episode's memory, newest first. The memory version is the number of merges applied so far; a run's additions reach the list when it finishes. The counts in the header are the same numbers. A Training with independent runs has no shared memory, so there is nothing to show.",
+    "metadata": {}
+  },
+  {
+    "topic_type": "component",
+    "topic_key": "training_export",
+    "title": "Training: Export",
+    "short_desc": "Downloads a Training's results as CSV (or JSON).",
+    "full_desc": "Problems: one row per problem with its strings, status, tallies and top answers. Distribution: one row per problem and outcome, with the count, share and mean quality. Runs: one row per run (seed, outcome, codelets, memory version, seq and so on), for analysis outside Petacat; its JSON form is one JSON object per line. The files hold what has been written to the database, which includes every problem that has finished.",
+    "metadata": {}
+  },
+  {
+    "topic_type": "component",
+    "topic_key": "training_run_state",
+    "title": "Training: Pause, Close, Cancel",
+    "short_desc": "Controls for a Training's life.",
+    "full_desc": "Pause stops new runs from starting; runs already on a core finish and are kept. Resume lets the Training carry on. Close means 'accept no more problems': the Training keeps running what it has and becomes finished when the last problem is done. Cancel stops the Training for good: queued and running problems become cancelled (finished runs are kept) and nothing more is accepted. Delete removes the Training, its problems, runs and memory from the database, cancelling first; that cannot be undone.\n\nThe state shown is derived: 'running' means work is in flight or queued; 'idle' means the Training is open with nothing to do (add problems); 'stalled' means it cannot run, and the reason is given, for example because the engine configuration changed since the Training was created. The policy may also pause or cancel a Training by itself; the last event says why.",
+    "metadata": {}
+  },
+  {
+    "topic_type": "component",
     "topic_key": "commentary",
     "title": "Commentary",
     "short_desc": "Natural-language narration of what Metacat is doing and why, generated as the run unfolds.",

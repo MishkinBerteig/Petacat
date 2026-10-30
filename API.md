@@ -2,7 +2,7 @@
 
 > **Auto-generated.** Run `python scripts/generate_api_docs.py` to regenerate from the FastAPI application.
 
-137 HTTP routes, plus `WS /ws/runs/{run_id}` for live state push.
+154 HTTP routes, plus `WS /ws/runs/{run_id}` for live state push.
 
 Interactive documentation is served at `/docs` while the API is running.
 
@@ -69,6 +69,30 @@ One problem over many seeds on every core: the answer distribution, plus pool st
 |---|---|---|
 | `GET` | `/api/swarm` | Swarm Status |
 | `POST` | `/api/swarm` | Run Swarm |
+
+## Trainings
+
+Named, long-lived episodes of many problems over many seeds, extendable while they run, with a shared episode memory; the database is written only when a problem finishes (works with or without the parallel plugin).
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/api/trainings` | List Trainings |
+| `POST` | `/api/trainings` | Create Training |
+| `GET` | `/api/trainings/{training_id}` | Get Training |
+| `PATCH` | `/api/trainings/{training_id}` | Update Training |
+| `DELETE` | `/api/trainings/{training_id}` | Delete Training |
+| `POST` | `/api/trainings/{training_id}/cancel` | Cancel |
+| `POST` | `/api/trainings/{training_id}/close` | Close |
+| `GET` | `/api/trainings/{training_id}/export` | Export |
+| `GET` | `/api/trainings/{training_id}/finished` | Finished |
+| `GET` | `/api/trainings/{training_id}/memory` | Training Memory |
+| `POST` | `/api/trainings/{training_id}/pause` | Pause |
+| `GET` | `/api/trainings/{training_id}/problems` | List Problems |
+| `POST` | `/api/trainings/{training_id}/problems` | Add Problems |
+| `GET` | `/api/trainings/{training_id}/problems/{problem_id}` | Get Problem |
+| `POST` | `/api/trainings/{training_id}/problems/{problem_id}/cancel` | Cancel Problem |
+| `GET` | `/api/trainings/{training_id}/problems/{problem_id}/runs` | Problem Runs |
+| `POST` | `/api/trainings/{training_id}/resume` | Resume |
 
 ## Episodic Memory
 

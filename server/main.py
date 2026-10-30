@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import signal
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
+from fastapi.exception_handlers import request_validation_exception_handler
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -170,6 +174,7 @@ async def _ensure_db_ready():
 
         from server.models.metadata import Base
         import server.models.run  # noqa — register runtime tables
+        import server.models.training  # noqa — trainings and their problems, runs, memory merges
 
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
@@ -297,8 +302,28 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.debug("Memory rehydration skipped (DB may not be available): %s", e)
 
+    # Trainings: the scheduler that feeds every core from the problems of all active Trainings.
+    try:
+        from server.services.training_service import start_default_service
+
+        await start_default_service(lambda: run_service.meta)
+    except Exception as e:
+        logger.warning("Training service not started (database may not be available): %s", e)
+
     logger.info("Petacat started — %d codelet types loaded", len(meta.codelet_specs))
     yield
+
+    from server.services.training_service import stop_default_service
+
+    await stop_default_service()
+
+    # The swarm's process pool must not outlive this process (it is a detachable plugin).
+    try:
+        from server.parallel.swarm import shutdown_default
+    except ImportError:
+        pass
+    else:
+        await asyncio.to_thread(shutdown_default)
 
     # Graceful shutdown: stop any running runs
     for run_id, runner in list(run_service._runners.items()):
@@ -335,6 +360,22 @@ from server.api.ws import router as ws_router
 from server.api.review import router as review_router
 from server.api.system import router as system_router
 from server.api.swarm import router as swarm_router
+from server.api.trainings import router as trainings_router
+
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error_handler(request: Request, exc: RequestValidationError):
+    """FastAPI's list-of-errors body, except under /api/trainings, whose contract is a
+    ``{"detail": string}`` for every error."""
+    if request.url.path.startswith("/api/trainings"):
+        parts = []
+        for err in exc.errors():
+            where = ".".join(str(x) for x in err.get("loc", ()) if x != "body")
+            parts.append(f"{where}: {err.get('msg')}" if where else str(err.get("msg")))
+        return JSONResponse({"detail": "; ".join(parts[:5])}, status_code=422)
+    return await request_validation_exception_handler(request, exc)
+
 
 _CONFIG_WRITE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
@@ -373,6 +414,7 @@ app.include_router(ws_router)
 app.include_router(review_router)
 app.include_router(system_router)
 app.include_router(swarm_router)
+app.include_router(trainings_router)
 
 
 @app.get("/healthz")

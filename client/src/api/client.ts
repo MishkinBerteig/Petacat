@@ -36,6 +36,21 @@ import type {
   SwarmStatus,
   SwarmRequest,
   SwarmResult,
+  TrainingListResponse,
+  TrainingSummary,
+  CreateTrainingRequest,
+  UpdateTrainingRequest,
+  TrainingAddResponse,
+  ProblemInput,
+  TrainingProblemQuery,
+  TrainingProblemPage,
+  TrainingProblemDetail,
+  TrainingProblemRow,
+  TrainingRun,
+  TrainingFinishedResponse,
+  TrainingMemory,
+  TrainingExportWhat,
+  TrainingExportFormat,
 } from '../types';
 
 const API_BASE = '/api';
@@ -823,6 +838,122 @@ export async function advanceInspector(
 
 export async function closeInspector(runId: number): Promise<void> {
   return request<void>(`/review/runs/${runId}/inspector`, { method: 'DELETE' });
+}
+
+// ---------------------------------------------------------------------------
+// Training — a named episode of many problems over many seeds, kept in the database
+// ---------------------------------------------------------------------------
+
+/** Every Training (newest first), the executor's state, the limits and the defaults. */
+export async function listTrainings(): Promise<TrainingListResponse> {
+  return request<TrainingListResponse>('/trainings');
+}
+
+export async function createTraining(req: CreateTrainingRequest): Promise<TrainingAddResponse> {
+  return request<TrainingAddResponse>('/trainings', { method: 'POST', body: JSON.stringify(req) });
+}
+
+export async function getTraining(trainingId: number): Promise<TrainingSummary> {
+  return request<TrainingSummary>(`/trainings/${trainingId}`);
+}
+
+/** Rename, change the note or change the error policy; settings cannot change. */
+export async function updateTraining(
+  trainingId: number,
+  req: UpdateTrainingRequest,
+): Promise<TrainingSummary> {
+  return request<TrainingSummary>(`/trainings/${trainingId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(req),
+  });
+}
+
+/** Insert problems into a Training that is open or paused (409 otherwise). */
+export async function addTrainingProblems(
+  trainingId: number,
+  problems: ProblemInput[],
+): Promise<TrainingAddResponse> {
+  return request<TrainingAddResponse>(`/trainings/${trainingId}/problems`, {
+    method: 'POST',
+    body: JSON.stringify({ problems }),
+  });
+}
+
+export async function listTrainingProblems(
+  trainingId: number,
+  query: TrainingProblemQuery = {},
+): Promise<TrainingProblemPage> {
+  return request<TrainingProblemPage>(`/trainings/${trainingId}/problems${qs({ ...query })}`);
+}
+
+export async function getTrainingProblem(
+  trainingId: number,
+  problemId: number,
+): Promise<TrainingProblemDetail> {
+  return request<TrainingProblemDetail>(`/trainings/${trainingId}/problems/${problemId}`);
+}
+
+export async function getTrainingProblemRuns(
+  trainingId: number,
+  problemId: number,
+): Promise<{ runs: TrainingRun[] }> {
+  return request<{ runs: TrainingRun[] }>(`/trainings/${trainingId}/problems/${problemId}/runs`);
+}
+
+export async function cancelTrainingProblem(
+  trainingId: number,
+  problemId: number,
+): Promise<TrainingProblemRow> {
+  return request<TrainingProblemRow>(`/trainings/${trainingId}/problems/${problemId}/cancel`, {
+    method: 'POST',
+  });
+}
+
+/** Problems finished after `after`; with `wait` (seconds, at most 60) it long-polls. */
+export async function getTrainingFinished(
+  trainingId: number,
+  after = 0,
+  limit = 100,
+  wait = 0,
+): Promise<TrainingFinishedResponse> {
+  return request<TrainingFinishedResponse>(
+    `/trainings/${trainingId}/finished${qs({ after, limit, wait })}`,
+  );
+}
+
+/** The episode's Episodic Memory (shared memory only). */
+export async function getTrainingMemory(trainingId: number): Promise<TrainingMemory> {
+  return request<TrainingMemory>(`/trainings/${trainingId}/memory`);
+}
+
+export async function pauseTraining(trainingId: number): Promise<TrainingSummary> {
+  return request<TrainingSummary>(`/trainings/${trainingId}/pause`, { method: 'POST' });
+}
+
+export async function resumeTraining(trainingId: number): Promise<TrainingSummary> {
+  return request<TrainingSummary>(`/trainings/${trainingId}/resume`, { method: 'POST' });
+}
+
+/** Accept no more problems; the Training is finished once the last one finishes. */
+export async function closeTraining(trainingId: number): Promise<TrainingSummary> {
+  return request<TrainingSummary>(`/trainings/${trainingId}/close`, { method: 'POST' });
+}
+
+export async function cancelTraining(trainingId: number): Promise<TrainingSummary> {
+  return request<TrainingSummary>(`/trainings/${trainingId}/cancel`, { method: 'POST' });
+}
+
+export async function deleteTraining(trainingId: number): Promise<void> {
+  return request<void>(`/trainings/${trainingId}`, { method: 'DELETE' });
+}
+
+/** The URL of an export download; a plain link, not a fetch. */
+export function trainingExportUrl(
+  trainingId: number,
+  what: TrainingExportWhat,
+  format: TrainingExportFormat = 'csv',
+): string {
+  return `${API_BASE}/trainings/${trainingId}/export${qs({ what, format })}`;
 }
 
 // ---------------------------------------------------------------------------

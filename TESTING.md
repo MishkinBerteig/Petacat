@@ -128,11 +128,11 @@ outside the matrix take it too and the run is entirely what it says it is.
   unit           732 collected    732 run    732 passed      0 failed      0 skipped  complete
   seed_unit      494 collected    494 run    494 passed      0 failed      0 skipped  complete
   module        1025 collected   1025 run   1025 passed      0 failed      0 skipped  complete
-  architecture    37 collected     37 run     37 passed      0 failed      0 skipped  complete
+  architecture    38 collected     38 run     38 passed      0 failed      0 skipped  complete
   integration     68 collected     68 run     68 passed      0 failed      0 skipped  complete
-  parallel       232 collected    232 run    232 passed      0 failed      0 skipped  complete
+  parallel       244 collected    244 run    244 passed      0 failed      0 skipped  complete
   lockstep       223 collected    223 run    223 passed      0 failed      0 skipped  complete
-  e2e            294 collected    294 run    294 passed      0 failed      0 skipped  complete
+  e2e            325 collected    325 run    325 passed      0 failed      0 skipped  complete
 
   run complete in 12.5 min against a 60 min ceiling
 ```
@@ -207,11 +207,11 @@ that allowance.
 | **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 732 |
 | **seed unit** | `tests/seed_unit/` | One class or function, measured against the values Petacat ships with | Real `seed_data/*.json`, and the machine the process is running on | 494 |
 | **module** | `tests/module/` | Several real components assembled and driven | Real engine objects and `seed_data/*.json`; no DB, no HTTP | 1025 |
-| **architecture** | `tests/architecture/` | How the source tree is allowed to depend on itself | The repository's source, `seed_data/*.json`, child interpreters | 37 |
+| **architecture** | `tests/architecture/` | How the source tree is allowed to depend on itself | The repository's source, `seed_data/*.json`, child interpreters | 38 |
 | **integration** | `tests/integration/` | Agreement between the repository's artifacts, and the harness's own rules | Real `seed_data/*.json`, the ORM declarations, the generated client files, the documentation, a real pytest session | 68 |
-| **parallel** | `tests/parallel/` | The detachable multi-core plugin (`server/parallel/`): each executor against the serial run it claims to equal | Real engine objects and `seed_data/*.json`, worker processes and threads; each test pins the backend it compares on | 232 |
+| **parallel** | `tests/parallel/` | The detachable multi-core plugin (`server/parallel/`): each executor against the serial run it claims to equal | Real engine objects and `seed_data/*.json`, worker processes and threads; each test pins the backend it compares on | 244 |
 | **lockstep** | `tests/lockstep/` | Petacat's decision traces against Metacat's: naming, helper conformance, tracing/replay RNGs, determinism guards, the comparer | Real engine in faithful mode (numeric backend off, or a named backend); recorded Metacat traces | 223 |
-| **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 294 |
+| **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 325 |
 
 Those counts are cases, so they include the second pass the numeric matrix makes
 over the 498 backend-sensitive tests.
@@ -246,7 +246,7 @@ first**, then move up toward the API and GUI.
 
 All eight layers run in one command — the
 [required command](#the-required-command) — and, since Petacat runs natively, all
-eight actually run: **3,105 cases**, every one of them executed. A layer that is
+eight actually run: **3,149 cases**, every one of them executed. A layer that is
 normally skipped is not a layer that is normally green, and none of these is.
 
 Wall-clock time depends heavily on the machine and on what else it is doing. The
@@ -454,7 +454,7 @@ the number of endpoints taking `Depends(get_session)`, the size of
 | File | Fns | Covers |
 |------|----:|--------|
 | `test_engine_purity.py` | 18 | Nothing under `server/engine/**` imports `sqlalchemy`, `server.models`, `server.db` or `server.services`, and the serializers run in an interpreter where those cannot be imported |
-| `test_parallel_detachable.py` | 3 | Nothing under `server/engine/**` imports the parallel plugin, and a serial run and the service layer work in an interpreter where `server.parallel` cannot be imported |
+| `test_parallel_detachable.py` | 4 | Nothing under `server/engine/**` imports the parallel plugin, and a serial run and the service layer work in an interpreter where `server.parallel` cannot be imported; a Training run there chooses the serial executor and produces the plugin's runs, run for run |
 
 **`tests/integration/` — the repository's artifacts agree**
 
@@ -466,7 +466,7 @@ the number of endpoints taking `Depends(get_session)`, the size of
 | `test_help_topics.py` | 13 | The help JSON, the generated TypeScript and the panels that reference them |
 | `test_metadata_seeding.py` | 13 | Every seed file is well-formed, and the `MetadataProvider` round-trip holds |
 | `test_numeric_matrix_harness.py` | 11 | The matrix's own reporting rules and the exit status of a narrowed run |
-| `test_seed_reconciliation.py` | 7 | The DB copy of the metadata tracks the seed files without eating runtime data, and the seeder refills every table it empties |
+| `test_seed_reconciliation.py` | 7 | The DB copy of the metadata tracks the seed files without eating runtime data (the four Training tables are among the runtime tables it must leave alone), and the seeder refills every table it empties |
 
 **`tests/lockstep/` — Petacat's decision traces (the Petacat/Metacat lockstep harness)**
 
@@ -509,18 +509,20 @@ the number of endpoints taking `Depends(get_session)`, the size of
 | `test_snag_identity.py` | 5 | A snag is the same snag whichever endpoint served it, and is written once |
 | `test_moment_display.py` | 6 | Event, answer and snag redisplay over the API: print names in the listing, the picture served live and from the stored row, the toggle and the switch, rows with no picture |
 | `test_swarm_api.py` | 5 | `POST /api/swarm` equals the serial runs, persists nothing, and rejects bad requests; `GET /api/swarm` reports the pool |
+| `test_trainings_api.py` | 31 | Trainings over HTTP: every stored run is the serial run; the 25 + 5 workflow (problems added while it runs); the finished long-poll; pause, resume, close, cancel, delete; the database written only when a problem finishes; a restart redoes what was cut off to the identical result and rebuilds the shared memory exactly; one worker is a serial episode and many replay from the merge log; fair sharing of the cores; every error policy; worker-failure retries, charged only to the run that broke the pool; a policy pause survives a concurrent status change; live counts never step backwards; seed ranges fit the database; configuration change stalls or is adopted; validation, export, defaults and fixed settings |
 | `test_step0_config_from_db.py` | 50 | Step 0's guard tests: a shipped value reproduces the run and a changed one moves it |
 
 **`tests/parallel/` — the multi-core plugin against the serial runs it claims to equal**
 
 | File | Fns | Covers |
 |------|----:|--------|
-| `test_swarm.py` | 17 | A swarm outcome is the serial run's, byte for byte: demo problems × seeds, justification, episodes, parameter overrides, both CPU backends; errors come back as outcomes; configuration changes re-initialise workers |
+| `test_swarm.py` | 22 | A swarm outcome is the serial run's, byte for byte: demo problems × seeds, justification, episodes, parameter overrides, both CPU backends; errors come back as outcomes; configuration changes re-initialise workers; `Swarm.submit` (the Training executor's entry point) returns futures equal to the serial runs, counts runs in flight and resolves the default backend like `map` |
 | `test_placement.py` | 13 | The measured backend policy: the CPU by default, never the GPU on its own, the environment overrides |
 | `test_update_cycle.py` | 9 | The plugin's update cycle: faithful is bit-identical to the engine's, stream is identical at every thread count |
 | `test_clock_rack.py` | 12 | The exponential-race coderack draws each codelet with the faithful two-stage draw's probability, and a later post never disturbs an earlier choice it does not beat; the prediction cached for an epoch stays exact until a post passes it |
 | `test_effects.py` | 8 | The builtin effects table is complete, and no speculated read prefix writes shared state (the hidden-write detector) |
 | `test_speculative_exact.py` | 17 | The speculative executor is bit-identical to the stream-serial reference at every worker count, with forced aborts too; which codelets run ahead, and how far, never changes a result; one worker is the reference itself; the slow sweep (`PETACAT_SPECULATIVE_SWEEP_SEEDS`) widens it |
+| `test_training_memory.py` | 6 | The Training episode memory without a database: descriptions survive the JSON storage encoding and pickle transport, a merge skips what the episode already holds and restamps ids in the master's numbering, a run's copy is independent of the master, a serial episode equals copy-and-merge one run at a time, and a worker reaches a version from its cache plus the tail (or asks for a snapshot) |
 
 **Collected by no layer**
 
@@ -628,37 +630,47 @@ nothing consults them now.
 
 `client/` carries a Vitest suite covering the store, the panels, the admin
 editors and the review surfaces. Run it with `cd client && npx vitest run`, and
-`npx tsc --noEmit` alongside it. **420 cases across 32 files**, all passing, in
-3.3 s on an Apple M2 Max.
+`npx tsc --noEmit` alongside it. **525 cases across 36 files**, all passing, in
+3.1 s on an Apple M-series machine.
 
 | File (`client/src/`) | Cases | Covers |
 |----------------------|------:|--------|
 | `api/errors.test.ts` | 5 | One failure, one sentence a reader can act on |
 | `api/ws.test.ts` | 4 | The URL the client opens is the route the server serves |
-| `store/runStore.test.ts` | 39 | The spreading threshold outliving a page reload, and the store's run lifecycle |
+| `store/displayStore.test.ts` | 7 | Panel visibility (an entry for every panel including the EEG, Verbose hidden by default, toggling, show or hide all, remembered in localStorage, and surviving storage that throws) and the graphics switches that stop and resume the Slipnet and Coderack polls independently |
+| `store/runStore.test.ts` | 44 | The spreading threshold outliving a page reload, and the store's run lifecycle |
+| `hooks/useWorkspaceClick.test.ts` | 3 | Clicking the Workspace steps when idle, stops a running run and resumes it on the next click, and ignores other buttons and a missing run |
 | `components/AdminPanel.test.tsx` | 5 | The Admin panel's operations report what became of them |
+| `components/CoderackBars.test.tsx` | 9 | The Coderack window as Metacat draws it: a slot per codelet type in engine order, bars at the engine's selection probability and never derived from a type's name, counts and total, the last-run marker, a recorded coderack without probabilities, and the Options-menu switches for the count column and the last-type marker |
 | `components/CoderackView.test.tsx` | 6 | The Coderack panel's codelet-pattern clamps |
 | `components/ClampControls.test.tsx` | 5 | Clamp theme pattern, Undo last clamp and the mid-run Self-watching toggle, as Metacat's Options menu has them |
-| `components/CommentaryPanel.test.tsx` | 3 | An empty commentary panel has two different causes |
+| `components/CommentaryPanel.test.tsx` | 7 | An empty commentary panel has two different causes |
+| `components/EegView.test.tsx` | 4 | The EEG window: the two curves titled in Metacat's colours, each starting at 100 with one point per cycle, the message when a run has no EEG, and the live run read from the store |
+| `components/HamburgerMenu.test.tsx` | 3 | Training is a view of its own, between Review and Configuration, and choosing it reports the view to the app |
 | `components/HelpPopover.test.tsx` | 3 | The popover shows a glossary term, and says when it cannot |
 | `components/LastErrorBanner.test.tsx` | 3 | The error channel is rendered where it can be seen |
-| `components/MemoryView.test.tsx` | 16 | The Memory panel shows the memory the run is thinking against |
+| `components/MemoryView.test.tsx` | 18 | The Memory panel shows the memory the run is thinking against |
 | `components/MomentDisplay.test.tsx` | 21 | Clicking a Trace event, answer or snag redisplays the moment: the Workspace header and highlights, the Slipnet pattern, the Coderack, the Temperature, the Trace window's print-name labels |
 | `components/ProblemInputPanel.test.tsx` | 7 | The problem panel owns the problem's identity |
-| `components/RunControlsPanel.test.tsx` | 40 | A run starts on the problem the form actually shows |
-| `components/RunHistory.test.tsx` | 31 | Run History stays current as runs finish |
+| `components/RunControlsPanel.test.tsx` | 55 | A run starts on the problem the form actually shows |
+| `components/RunHistory.test.tsx` | 34 | Run History stays current as runs finish |
 | `components/RunParametersPanel.test.tsx` | 14 | The twenty-six run parameters, settable before a run |
 | `components/SearchPalette.test.tsx` | 7 | Cmd+K search reaches every kind of help topic |
+| `components/SelfWatchingWarning.test.tsx` | 4 | The red warning shown whenever self-watching is off: absent while it is on, and separate warnings for the next run and the loaded run, following a catalogue default of off |
 | `components/SlipnetGraphView.test.tsx` | 7 | The Slipnet graph says what it could not do |
 | `components/SlipnetView.test.tsx` | 8 | The node-focus Edit button's visibility |
 | `components/SubstrateBadge.test.tsx` | 5 | The header says which processor the arithmetic runs on |
+| `components/SwarmPanel.test.tsx` | 6 | The Swarm group: it sends the form's problem with the chosen seeds, shows the distribution and telemetry returned, uses justification mode when there is an answer, disables itself with a reason when the plugin is detached or the seed count is over the limit or there is no problem, and shows a server error without losing the form |
 | `components/TemperatureGauge.test.tsx` | 8 | The gauge reports the engine's temperature clamp |
 | `components/ThemespaceView.test.tsx` | 14 | The Themespace grid is clampable, as MetaCat's theme windows are; its theme-edit mode |
 | `components/VerbosePanel.test.tsx` | 11 | The Verbose panel and the store's narration: polled from where the last reply ended, bounded on both sides, the Step button sent as step mode, the mode remembered with no run loaded |
-| `components/WorkspaceView.test.tsx` | 10 | Workspace labels do not print on top of each other |
+| `components/WindowsMenu.test.tsx` | 3 | The Windows menu lists Hide/Show for each panel including EEG, hides and shows all windows, and carries the Slipnet and Coderack graphics switches |
+| `components/WorkspaceView.test.tsx` | 12 | Workspace labels do not print on top of each other |
 | `components/admin/AdminEditors.test.tsx` | 42 | Every Configuration tab edits the collection it shows |
 | `components/admin/AdminHttpFailures.test.tsx` | 11 | The Configuration screen reports what the server refused |
 | `components/review/ReviewPanel.test.tsx` | 34 | The review surfaces read the record back |
+| `components/training/problemText.test.ts` | 37 | Parsing pasted or uploaded problems (letters only, 1 to 64 characters, case-sensitive; JSON entries with their own seeds, answer and tag) and the preview the Training view shows before adding them |
+| `components/training/TrainingPanel.test.tsx` | 59 | The Training view: the list and the selected Training, creating one, adding problems, the error-policy fields, the problems table searched and sorted through the server, the Memory tab, and the controls (pause, resume, close, cancel, export) |
 
 ### Running under the free-threaded interpreter
 

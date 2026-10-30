@@ -115,3 +115,113 @@ print("OK")
     )
     assert completed.returncode == 0, completed.stderr
     assert "OK" in completed.stdout
+
+
+def test_trainings_run_serially_in_one_child_when_the_plugin_is_detached() -> None:
+    """The Training service is core: with ``server.parallel`` unimportable it chooses the
+    serial executor, and the runs it produces equal the plugin's in-process reference.
+
+    This needs the test Postgres (the Training is database-backed); without it only the
+    executor itself is checked.
+    """
+    import json
+
+    completed = _run_detached(
+        r"""
+import asyncio, json, os, sys
+from server.engine.metadata import MetadataProvider
+from server.services.training_executor import SerialExecutor, TrainingTask, create_executor
+
+meta = MetadataProvider.from_seed_data(os.path.join(os.getcwd(), "seed_data"))
+executor = create_executor()
+assert executor.kind == "serial" and isinstance(executor, SerialExecutor), executor
+problems = [("abc", "abd", "ijk"), ("abc", "abd", "xyz")]
+out = {}
+
+# The executor alone.
+tasks = [TrainingTask(i, m, t, None, seed, 300, None, "off") for (i, m, t) in problems for seed in (1, 2)]
+for task in tasks:
+    o = executor.submit([task], meta).result(timeout=300)[0]
+    out[f"exec/{task.target}/{task.seed}"] = [o.status, o.answer, o.codelets]
+executor.close()
+
+# The whole service, when the test database is reachable.
+async def service():
+    import socket
+    url = os.environ.get("TEST_DATABASE_URL", "postgresql+asyncpg://petacat:dev@localhost:5432/petacat_test")
+    try:
+        host_port = url.split("@")[1].split("/")[0]
+        host, _, port = host_port.partition(":")
+        socket.create_connection((host, int(port or 5432)), timeout=2).close()
+    except Exception:
+        return
+    from sqlalchemy import delete
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+    from sqlalchemy.pool import NullPool
+    from server.models.metadata import Base
+    from server.models import training as tr
+    from server.services.training_service import TrainingService
+
+    engine = create_async_engine(url, poolclass=NullPool)
+    async with engine.begin() as conn:
+        await conn.run_sync(lambda c: Base.metadata.create_all(c, tables=[
+            tr.Training.__table__, tr.TrainingProblem.__table__, tr.TrainingRun.__table__,
+            tr.TrainingMemoryMerge.__table__]))
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    svc = TrainingService(factory, lambda: meta, executor=create_executor())
+    await svc.start()
+    try:
+        made = await svc.create_training(
+            name="detached", settings={"memory": "independent", "seeds_per_problem": 2,
+                                       "max_codelets": 300, "backend": "off"},
+            problems=[{"initial": i, "modified": m, "target": t} for (i, m, t) in problems])
+        tid = made["training"]["id"]
+        await svc.close(tid)
+        for _ in range(600):
+            if (await svc.summary(tid))["state"] == "finished":
+                break
+            await asyncio.sleep(0.2)
+        assert (await svc.summary(tid))["state"] == "finished"
+        assert svc.executor_info()["kind"] == "serial"
+        for pid, (_, _, t) in zip(made["problem_ids"], problems):
+            for r in await svc.problem_runs(tid, pid):
+                out[f"svc/{t}/{r['seed']}"] = [r["status"], r["answer"], r["codelets"]]
+    finally:
+        await svc.stop()
+        async with factory() as s:
+            await s.execute(delete(tr.Training).where(tr.Training.name == "detached"))
+            await s.commit()
+        await engine.dispose()
+
+asyncio.run(service())
+assert "server.parallel" not in sys.modules
+print("RESULT", json.dumps(out))
+"""
+    )
+    assert completed.returncode == 0, completed.stderr[-3000:]
+    out = json.loads(completed.stdout.split("RESULT ", 1)[1])
+    assert any(k.startswith("exec/") for k in out)
+
+    # The plugin's in-process reference (a fresh interpreter, plugin present) gives the
+    # same runs, run for run.
+    env = dict(os.environ)
+    env["PYTHONPATH"] = REPO_ROOT + os.pathsep + env.get("PYTHONPATH", "")
+    reference = subprocess.run(
+        [sys.executable, "-c", r"""
+import json, sys
+from server.engine.metadata import MetadataProvider
+from server.parallel.swarm import SEED_DIR, RunTask, run_inprocess
+meta = MetadataProvider.from_seed_data(SEED_DIR)
+keys = json.loads(sys.argv[1])
+out = {}
+for key in keys:
+    _, target, seed = key.split("/")
+    want = run_inprocess(RunTask("abc", "abd", target, None, int(seed), 300, backend="off"), meta)
+    out[key] = [want.status, want.answer, want.codelets]
+print("RESULT", json.dumps(out))
+""", json.dumps(sorted(out))],
+        capture_output=True, text=True, cwd=REPO_ROOT, env=env, timeout=300,
+    )
+    assert reference.returncode == 0, reference.stderr[-3000:]
+    want = json.loads(reference.stdout.split("RESULT ", 1)[1])
+    assert out == want

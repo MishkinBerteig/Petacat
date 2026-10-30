@@ -23,6 +23,10 @@ def test_clearing_derived_metadata_never_touches_runtime_tables():
         "cycle_snapshots",
         "answer_descriptions",
         "snag_descriptions",
+        "trainings",
+        "training_problems",
+        "training_runs",
+        "training_memory_merges",
     }
     assert not (names & runtime), f"runtime tables would be cleared: {names & runtime}"
     assert "help_topics" not in names, "help topics are upserted, not cleared"

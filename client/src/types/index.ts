@@ -960,6 +960,8 @@ export interface SwarmStatus {
   started: boolean;
   workers: number;
   default_backend: string | null;
+  /** Numeric backends importable on this machine (plus "off"). */
+  backends?: string[];
   limits: Record<string, number>;
 }
 
@@ -1000,3 +1002,208 @@ export interface SwarmResult {
   statuses: Record<string, number>;
   telemetry: SwarmTelemetry;
 }
+
+// ---------------------------------------------------------------------------
+// Training (/api/trainings): a named episode of many problems over many seeds
+// ---------------------------------------------------------------------------
+//
+// Not the older "Training Sessions" of the Review view, which are recordings of
+// dashboard runs. A Training is a long-lived, database-backed episode with one
+// Episodic Memory (when its memory is shared).
+
+export type TrainingStatus = 'open' | 'paused' | 'closed' | 'cancelled';
+export type TrainingState = 'running' | 'idle' | 'paused' | 'finished' | 'cancelled' | 'stalled';
+export type TrainingProblemStatus = 'queued' | 'running' | 'finished' | 'cancelled';
+export type TrainingMemoryMode = 'shared' | 'independent';
+
+export interface TrainingErrorPolicy {
+  on_run_error: 'record' | 'skip_problem' | 'pause' | 'cancel';
+  max_errors_per_problem: number | null;
+  max_errors_total: number | null;
+  on_worker_failure: 'retry' | 'pause';
+  max_retries: number;
+  on_config_change: 'pause' | 'adopt';
+}
+
+/** Fixed at creation: they shape what a run is. */
+export interface TrainingSettings {
+  memory: TrainingMemoryMode;
+  seeds_per_problem: number;
+  seed_start: number;
+  max_codelets: number;
+  parameters: Record<string, unknown> | null;
+  backend: string;
+}
+
+/** A problem as a client sends it. Strings are letters only, 1 to 64 of them. */
+export interface ProblemInput {
+  initial: string;
+  modified: string;
+  target: string;
+  /** Set for justification mode. */
+  answer?: string | null;
+  /** This problem's seed count; defaults to the Training's `seeds_per_problem`. */
+  seeds?: number | null;
+  /** Any JSON, returned untouched. */
+  tag?: unknown;
+}
+
+export interface TrainingSummary {
+  id: number;
+  name: string;
+  note: string;
+  status: TrainingStatus;
+  state: TrainingState;
+  stalled_reason: string | null;
+  settings: TrainingSettings;
+  policy: TrainingErrorPolicy;
+  config_hash: string;
+  created_at: string;
+  updated_at: string;
+  closed_at: string | null;
+  problems: { total: number; queued: number; running: number; finished: number; cancelled: number };
+  runs: { total: number; done: number; errors: number; capped: number; retries: number };
+  /** Null for independent memory. */
+  memory: { answers: number; snags: number } | null;
+  codelets: number;
+  runs_per_second: number | null;
+  eta_seconds: number | null;
+  /** Merges applied so far (shared memory only). */
+  memory_version: number | null;
+  finished_cursor: number;
+  last_event: string | null;
+}
+
+export interface TrainingAnswerShare {
+  answer: string;
+  count: number;
+  fraction: number;
+  mean_quality: number | null;
+}
+
+export interface TrainingProblemRow {
+  id: number;
+  training_id: number;
+  initial: string;
+  modified: string;
+  target: string;
+  answer: string | null;
+  seeds: number;
+  seed_start: number;
+  tag: unknown | null;
+  status: TrainingProblemStatus;
+  runs_done: number;
+  errors: number;
+  capped: number;
+  mean_codelets: number | null;
+  /** At most 3, most frequent first; `fraction` is of `runs_done`. */
+  top: TrainingAnswerShare[];
+  none_fraction: number | null;
+  distinct: number;
+  statuses: Record<string, number>;
+  finished_seq: number | null;
+  added_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+}
+
+export interface TrainingProblemDetail extends TrainingProblemRow {
+  distribution: TrainingAnswerShare[];
+  first_error: string | null;
+}
+
+export interface TrainingRun {
+  seq: number | null;
+  memory_version: number | null;
+  seed: number;
+  status: string;
+  key: string;
+  answer: string;
+  answers: string[];
+  codelets: number;
+  seconds: number;
+  temperature: number;
+  answer_quality: number | null;
+  error: string | null;
+  config_hash: string;
+  attempts: number;
+  memory_added: { answers: number; snags: number } | null;
+}
+
+export interface TrainingExecutorInfo {
+  kind: 'swarm' | 'serial';
+  workers: number;
+  in_flight: number;
+  queued_runs: number;
+}
+
+export interface TrainingLimits {
+  max_problems_per_request: number;
+  max_seeds_per_problem: number;
+  max_codelets: number;
+}
+
+export interface TrainingListResponse {
+  trainings: TrainingSummary[];
+  executor: TrainingExecutorInfo;
+  limits: TrainingLimits;
+  defaults: { settings: TrainingSettings; policy: TrainingErrorPolicy };
+}
+
+export interface CreateTrainingRequest {
+  name: string;
+  note?: string;
+  settings?: Partial<TrainingSettings>;
+  policy?: Partial<TrainingErrorPolicy>;
+  problems?: ProblemInput[];
+}
+
+export interface UpdateTrainingRequest {
+  name?: string;
+  note?: string;
+  policy?: Partial<TrainingErrorPolicy>;
+}
+
+export interface TrainingAddResponse {
+  training: TrainingSummary;
+  added: number;
+  problem_ids: number[];
+}
+
+export type TrainingProblemSort =
+  | 'id'
+  | 'runs_done'
+  | 'top_fraction'
+  | 'none_fraction'
+  | 'distinct'
+  | 'errors'
+  | 'mean_codelets'
+  | 'finished_seq';
+
+export interface TrainingProblemQuery {
+  status?: TrainingProblemStatus;
+  q?: string;
+  sort?: TrainingProblemSort;
+  order?: 'asc' | 'desc';
+  offset?: number;
+  limit?: number;
+}
+
+export interface TrainingProblemPage {
+  total: number;
+  problems: TrainingProblemRow[];
+}
+
+export interface TrainingFinishedResponse {
+  cursor: number;
+  problems: TrainingProblemRow[];
+}
+
+/** The episode's memory, newest first, in the shape `GET /api/memory` uses. */
+export interface TrainingMemory {
+  answers: AnswerDescription[];
+  snags: SnagDescription[];
+}
+
+export type TrainingExportWhat = 'problems' | 'distribution' | 'runs';
+export type TrainingExportFormat = 'csv' | 'json';
