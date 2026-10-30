@@ -17,7 +17,9 @@ structure proposals, stochastic decisions, slipnet access, etc.
 
 from __future__ import annotations
 
+import math
 import types
+from functools import partial
 from typing import TYPE_CHECKING, Any, Callable
 
 if TYPE_CHECKING:
@@ -64,9 +66,37 @@ class CodeletInterpreter:
     current EngineContext.
     """
 
+    #: Class-level default, so a subclass that skips ``__init__`` still works.
+    _bound_cache: tuple[Any, dict, dict, dict] | None = None
+
     def __init__(self, builtins: dict[str, Callable] | None = None) -> None:
         # Held by reference, not copied: a caller (the tests) may swap an entry afterwards.
         self._builtins = builtins if builtins is not None else {}
+        self._bound_cache: tuple[Any, dict, dict, dict] | None = None
+
+    def _bound_for(self, ctx: Any) -> tuple[dict[str, Callable], dict[str, Callable]]:
+        """The builtins bound to *ctx*: ``(always, verbose_only)``.
+
+        Built once per ctx and reused for every codelet that ctx runs.  The cache is a
+        single immutable tuple, replaced whole, so a thread that finds it stale rebuilds
+        and publishes without a lock and no thread can see half of one.  It records the
+        ``_builtins`` entries it was built from and is discarded when they differ -- the
+        tests swap an entry after construction -- so a changed builtin takes effect on
+        the very next execution, exactly as when each execution rebound every one.  The
+        dicts are only ever read (``dict.update`` copies them into the namespace).
+        """
+        cached = self._bound_cache
+        builtins = self._builtins
+        if cached is not None and cached[0] is ctx and cached[1] == builtins:
+            return cached[2], cached[3]
+        always = {n: _bind_ctx(fn, ctx) for n, fn in builtins.items() if n not in VERBOSE_ONLY}
+        verbose_only = {}
+        for name in VERBOSE_ONLY:
+            fn = builtins.get(name)
+            if fn is not None:
+                verbose_only[name] = _bind_ctx(fn, ctx)
+        self._bound_cache = (ctx, dict(builtins), always, verbose_only)
+        return always, verbose_only
 
     def compile(self, source: str, name: str = "<codelet>") -> CompiledCodelet:
         """Compile Python source to a code object. Called once at startup."""
@@ -123,19 +153,15 @@ class CodeletInterpreter:
             "verbose": ctx.verbose,
         }
 
-        # Add built-in functions, each pre-bound to ctx
-        for name, fn in self._builtins.items():
-            if name not in VERBOSE_ONLY:
-                namespace[name] = _bind_ctx(fn, ctx)
-
+        # Add built-in functions, each pre-bound to ctx.  The bound set is cached per ctx
+        # (``_bound_for``): rebuilding ~270 callables for every codelet was allocation churn
+        # that every thread then paid for in shared-refcount traffic.
+        bound, bound_verbose = self._bound_for(ctx)
+        namespace.update(bound)
         if ctx.verbose:
-            for name in VERBOSE_ONLY:
-                fn = self._builtins.get(name)
-                if fn is not None:
-                    namespace[name] = _bind_ctx(fn, ctx)
+            namespace.update(bound_verbose)
 
         # Add safe Python builtins
-        import math
         namespace["math"] = math
         namespace["min"] = min
         namespace["max"] = max
@@ -200,9 +226,13 @@ def _fizzle() -> None:
 
 
 def _bind_ctx(fn: Callable, ctx: Any) -> Callable:
-    """Return a wrapper that passes ctx as the first argument."""
-    def bound(*args: Any, **kwargs: Any) -> Any:
-        return fn(ctx, *args, **kwargs)
-    bound.__name__ = getattr(fn, "__name__", "builtin")
-    bound.__doc__ = fn.__doc__
-    return bound
+    """Return a callable that passes ctx as the first argument.
+
+    A ``functools.partial`` rather than a closure with ``__name__`` and ``__doc__``
+    copied onto it.  Calling it is identical -- ``fn(ctx, *args, **kwargs)`` -- but
+    building it writes no attribute of a function object.  Under free-threaded CPython
+    ``func_set_name`` and ``func_set_doc`` stop the world, and this ran about 270 times
+    two setattrs per codelet, which capped thread scaling near 1.8x at 16 threads.  No
+    codelet body reads a builtin's ``__name__`` or ``__doc__``.
+    """
+    return partial(fn, ctx)
