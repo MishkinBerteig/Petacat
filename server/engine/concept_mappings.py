@@ -218,9 +218,12 @@ class ConceptMapping:
         # Identity mapping of 'whole' is not distinguishing
         if self.is_identity and getattr(self.descriptor1, "name", "") == "plato-whole":
             return False
+        # ``_descriptor_is_distinguishing`` is the one predicate (below); called
+        # directly, without the staticmethod hop, on this per-bridge-pair hot path.
+        predicate = _workspace_objects.distinguishing_descriptor
         return (
-            self._descriptor_is_distinguishing(self.descriptor1, self.object1)
-            and self._descriptor_is_distinguishing(self.descriptor2, self.object2)
+            predicate(self.object1, self.descriptor1)
+            and predicate(self.object2, self.descriptor2)
         )
 
     @staticmethod

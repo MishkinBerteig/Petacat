@@ -96,18 +96,19 @@ class Description(WorkspaceStructure):
         # asked only of the siblings that carry a description of this type -- the
         # same siblings are counted, in the same order, with the same result.
         count = 0
+        # A letter has no ``objects``, so ``_contains`` is False for it without a call.
+        obj_is_group = hasattr(obj, "objects")
         for other in objects:
             if other is obj:
                 continue
-            for d in getattr(other, "descriptions", []):
+            for d in getattr(other, "descriptions", ()):
                 if d.description_type is dtype:
-                    # Skip objects where one contains the other.  A letter has no
-                    # ``objects``, so ``_contains`` is False for it without a call.
-                    if not (
-                        (hasattr(obj, "objects") and _contains(obj, other))
-                        or (hasattr(other, "objects") and _contains(other, obj))
-                    ):
-                        count += 1
+                    # Skip objects where one contains the other.
+                    if obj_is_group and _contains(obj, other):
+                        break
+                    if hasattr(other, "objects") and _contains(other, obj):
+                        break
+                    count += 1
                     break
 
         if count == 0:

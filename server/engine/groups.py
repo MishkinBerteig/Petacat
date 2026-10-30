@@ -194,8 +194,19 @@ class Group(WorkspaceObject, WorkspaceStructure):
         string_objects = getattr(self.string, "objects", [])
         if not string_objects:
             return False
-        string_left = min(o.left_string_pos for o in string_objects)
-        string_right = max(o.right_string_pos for o in string_objects)
+        # One pass for both extremes (WP9): the same ``min`` and ``max`` over the same
+        # positions, without two generator expressions.
+        it = iter(string_objects)
+        first = next(it)
+        string_left = first.left_string_pos
+        string_right = first.right_string_pos
+        for o in it:
+            p = o.left_string_pos
+            if p < string_left:
+                string_left = p
+            p = o.right_string_pos
+            if p > string_right:
+                string_right = p
         return self.left_string_pos == string_left and self.right_string_pos == string_right
 
     def calculate_internal_strength(self) -> float:
