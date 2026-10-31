@@ -12,7 +12,8 @@ messages are for debugging and "slow down the program considerably"
 
 Where things live
 -----------------
-* **The English** is in ``seed_data/commentary_templates.json`` under ``verbose_messages``,
+* **The English** is in the Metacat Standard Configuration's ``commentary_templates.json``
+  under ``verbose_messages``,
   one entry per distinct message, keyed by a name and written with ``{}`` where the
   Scheme prints an argument.  It is the same file, the same ``MetadataProvider`` field
   and the same database row as every other phrase the engine writes, so there is one
@@ -341,9 +342,8 @@ def _rule_text(rule: Any, unscored: bool = False) -> str:
     A rule Metacat has made but not yet scored (a translated rule, until the builder's
     ``set-quality-values``) prints every figure as 0; Petacat scores it at translation.
     """
-    lines = rule.english_lines
-    if lines is None:
-        lines = rule.transcribe_to_english().split("\n")
+    # Fixed when the rule was made (``rules.ss:98``); every construction site transcribes.
+    lines = rule.english_lines or []
     text = "".join(line + "\n" for line in lines)
     if unscored:
         return text + f"(Type={rule.rule_type}, Q=0, RQ=0, Uniformity=0, Abstractness=0, Succinctness=0)\n\n"

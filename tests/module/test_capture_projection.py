@@ -112,7 +112,7 @@ def _add_a_built_rule(ctx) -> None:
     rule.set_verbatim_rule_information()
     rule.time_stamp = ctx.codelet_count
     rule.compute_quality(ctx.meta)
-    rule.english_transcription = rule.transcribe_to_english()
+    rule.english_transcription = rule.transcribe_to_english(ctx.meta)
     rule.proposal_level = rule.BUILT
     ctx.workspace.add_rule(rule)
 
@@ -152,7 +152,7 @@ def test_a_translated_rule_justify_mode_adds_is_listed_live_and_recorded(meta):
     translated.set_verbatim_rule_information()
     translated.time_stamp = runner.ctx.codelet_count
     translated.compute_quality(runner.ctx.meta)
-    translated.english_transcription = translated.transcribe_to_english()
+    translated.english_transcription = translated.transcribe_to_english(runner.ctx.meta)
     before = len(runner.ctx.workspace.top_rules)
     runner.ctx.workspace.top_rules.insert(0, translated)
     assert not translated.is_built

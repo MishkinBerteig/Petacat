@@ -12,47 +12,38 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import dataclass, field
-from functools import lru_cache
 from typing import Any
 
-#: The repository's ``seed_data/`` directory, derived the same way
-#: ``server/parallel/population.py`` derives it.
-DEFAULT_SEED_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-    "seed_data",
-)
 
+class ConfigurationRequired(RuntimeError):
+    """A configuration-dependent engine function was called without a ``MetadataProvider``.
 
-@lru_cache(maxsize=1)
-def default_commentary_templates() -> dict[str, Any]:
-    """The phrase-templates as they stand in ``seed_data/``.
-
-    Every production path renders commentary from ``meta.commentary_templates``, which
-    comes from Postgres and therefore reflects whatever the admin UI last saved.  This
-    serves callers that have no ``MetadataProvider`` — unit tests and the REPL — and
-    keeps the seed data the single place any English phrase is written down.
-
-    Returns ``{}`` when the seed data is not on disk, and the renderers then produce
-    empty strings.
+    The engine takes every parameter, phrase and conceptual depth from the provider its
+    run holds.  There is no fallback to the Metacat Standard Configuration files: a
+    caller that has no provider must build one (``MetadataProvider.from_seed_data`` in a
+    test, the database in a served run) and pass it.
     """
-    path = os.path.join(DEFAULT_SEED_DIR, "commentary_templates.json")
-    try:
-        with open(path) as f:
-            return json.load(f)
-    except OSError:
-        return {}
 
 
-def verbose_messages(meta: Any = None) -> dict[str, str]:
-    """Verbose mode's message catalogue (``seed_data/commentary_templates.json``, ``verbose_messages``).
+def require_meta(meta: Any, what: str) -> Any:
+    """``meta``, or :class:`ConfigurationRequired` naming what needed it."""
+    if meta is None:
+        raise ConfigurationRequired(
+            f"{what} needs the run's MetadataProvider (meta); none was given and the "
+            "engine does not read the Metacat Standard Configuration files at run time"
+        )
+    return meta
 
-    The seed data's entries, overlaid with whatever the provider holds -- the database in
-    a served run -- so a database seeded before a message existed still narrates it.
+
+def verbose_messages(meta: Any) -> dict[str, str]:
+    """Verbose mode's message catalogue: ``meta.commentary_templates["verbose_messages"]``.
+
+    Exactly what the provider holds (the database in a served run); nothing is overlaid
+    from the Metacat Standard Configuration files.
     """
-    messages = dict(default_commentary_templates().get("verbose_messages") or {})
+    require_meta(meta, "verbose_messages")
     held = getattr(meta, "commentary_templates", None) or {}
-    messages.update(held.get("verbose_messages") or {})
-    return messages
+    return dict(held.get("verbose_messages") or {})
 
 
 @dataclass(frozen=True)

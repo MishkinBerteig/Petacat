@@ -1,11 +1,18 @@
 """The EpisodicMemory happy paths: store, remind, compare, clear.
 
-``compare_answers`` resolves the commentary templates from ``seed_data/`` when no
-``MetadataProvider`` supplies them, and ``find_remindings`` reaches it through
-``distance``, so the reminding and comparison paths read the shipped phrasing.
+``compare_answers`` takes the commentary templates from the run's ``MetadataProvider``
+(here the Metacat Standard Configuration), and ``find_remindings`` reaches it through
+``distance``, so the reminding and comparison paths read the provider's phrasing.
 """
 
+import os
+
 from server.engine.memory import AnswerDescription, EpisodicMemory
+from server.engine.metadata import MetadataProvider
+
+_META = MetadataProvider.from_seed_data(
+    os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
+)
 
 
 def test_store_and_retrieve():
@@ -44,7 +51,7 @@ def test_reminding():
         unjustified_slippages=[],
     )
     mem.store_answer(desc1)
-    remindings = mem.find_remindings(desc2, distance_threshold=5)
+    remindings = mem.find_remindings(desc2, distance_threshold=5, meta=_META)
     assert len(remindings) == 1
     assert remindings[0] is desc1
 
@@ -69,7 +76,7 @@ def test_comparison():
         themes={"position": "rightmost", "direction": "opposite"},
         unjustified_slippages=[],
     )
-    result = mem.compare_answers(desc1, desc2)
+    result = mem.compare_answers(desc1, desc2, meta=_META)
     assert "position" in result["common_themes"]
     assert "direction" in result["b_unique_themes"]
 

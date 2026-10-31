@@ -1868,7 +1868,7 @@ def _record_rule_event(ctx: EngineContext, rule: Rule) -> None:
             ctx,
             RULE_BUILT,
             structures=[rule],
-            description=rule.transcribe_to_english(),
+            description=rule.transcribe_to_english(ctx.meta),
             # ``trace.ss:965`` — a rule event's strength is its relative quality.
             strength=float(relative_quality),
         )
@@ -2580,7 +2580,10 @@ def record_event(
         from server.engine.commentary import emit_snag
         snag_count = ctx.trace.snag_count
         explanation = description or "The rule could not be applied"
-        emit_snag(ctx.commentary, explanation, snag_count, ctx.codelet_count)
+        emit_snag(
+            ctx.commentary, explanation, snag_count, ctx.codelet_count,
+            ctx.meta.commentary_templates,
+        )
 
 
 def record_snag(ctx: EngineContext, top_rule: Any, translated_rule: Any) -> None:
@@ -2666,7 +2669,7 @@ def record_snag(ctx: EngineContext, top_rule: Any, translated_rule: Any) -> None
     explanation = explain_failure(failure, templates)
     if explanation is None:
         explanation = fallback_explanation(
-            top_rule.transcribe_to_english(), workspace.target_string.text, templates
+            top_rule.transcribe_to_english(ctx.meta), workspace.target_string.text, templates
         )
 
     # ``process-snag`` (``answers.ss:1145-1160``) is handed what ``translate`` returned: the
@@ -2753,10 +2756,10 @@ def record_snag(ctx: EngineContext, top_rule: Any, translated_rule: Any) -> None
                 codelet_count=ctx.codelet_count,
                 temperature=ctx.temperature.value,
                 theme_pattern=_theme_pattern_dict(theme_pattern),
-                description=top_rule.transcribe_to_english(),
+                description=top_rule.transcribe_to_english(ctx.meta),
                 # ``abstract-snag-description`` (``memory.ss:474-477``) also hands over
                 # the translated rule's English and the explanation.
-                translated_rule_description=translated_rule.transcribe_to_english(),
+                translated_rule_description=translated_rule.transcribe_to_english(ctx.meta),
                 explanation=explanation,
                 # ``make-snag-description`` (``memory.ss:289-291``) is given both clause
                 # lists: the rule that was found and the translation that failed.

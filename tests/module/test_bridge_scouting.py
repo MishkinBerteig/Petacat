@@ -742,7 +742,7 @@ def test_building_a_rule_posts_the_answer_finder_at_urgency_91(meta):
     rule = Rule(RULE_TOP, [RuleClause(clause_type=CLAUSE_VERBATIM, verbatim_letters=letters)])
     rule.set_verbatim_rule_information()
     rule.compute_quality(meta)
-    rule.transcribe_to_english()
+    rule.transcribe_to_english(meta)
 
     ctx.coderack.clear()
     interp.execute(registry.get_compiled("rule-builder"), ctx, structure=rule)
@@ -767,7 +767,7 @@ def test_a_justify_mode_rule_build_posts_the_answer_justifier_instead(meta):
     rule = Rule(RULE_TOP, [RuleClause(clause_type=CLAUSE_VERBATIM, verbatim_letters=letters)])
     rule.set_verbatim_rule_information()
     rule.compute_quality(meta)
-    rule.transcribe_to_english()
+    rule.transcribe_to_english(meta)
 
     ctx.coderack.clear()
     interp.execute(registry.get_compiled("rule-builder"), ctx, structure=rule)

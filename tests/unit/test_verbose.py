@@ -91,12 +91,24 @@ def test_emit_splits_on_newlines_and_drops_one_trailing_newline():
     assert log.since(0)["lines"] == ["a", "b", "", "c"]
 
 
-def test_the_database_catalogue_overlays_the_seed_data_catalogue():
+def test_the_catalogue_is_exactly_what_the_provider_holds():
     from server.engine.metadata import verbose_messages
 
-    merged = verbose_messages(_Meta())
-    assert merged["greet"] == "Hello {} and {}"          # the provider's own
-    assert merged["chose-object"] == "Chose object {}"   # a message the seed data adds
+    held = verbose_messages(_Meta())
+    assert held == {"greet": "Hello {} and {}", "plain": "Plain."}
+    # Nothing is overlaid from the Metacat Standard Configuration files.
+    assert "chose-object" not in held
+
+
+def test_the_catalogue_without_a_provider_raises_rather_than_reading_the_files():
+    import pytest
+
+    from server.engine.metadata import ConfigurationRequired, verbose_messages
+
+    with pytest.raises(ConfigurationRequired):
+        verbose_messages(None)
+    with pytest.raises(ConfigurationRequired):
+        _ = V.VerboseLog(5).messages
 
 
 def test_the_buffer_is_bounded_and_says_how_much_fell_off():

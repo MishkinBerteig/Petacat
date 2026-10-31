@@ -12,6 +12,17 @@ from server.engine.commentary import (
 )
 
 
+import os as _os
+
+from server.engine.metadata import MetadataProvider as _MetadataProvider
+
+_META = _MetadataProvider.from_seed_data(
+    _os.path.join(_os.path.dirname(__file__), "..", "..", "seed_data")
+)
+#: The Metacat Standard Configuration's phrase-templates, from a provider.
+T = _META.commentary_templates
+
+
 # ---- CommentaryLog core ----
 
 
@@ -123,7 +134,7 @@ def test_new_problem_justify():
 
 def test_snag_first():
     log = CommentaryLog()
-    emit_snag(log, "The successor of z does not exist", 1, 100)
+    emit_snag(log, "The successor of z does not exist", 1, 100, T)
     eliza = log.render(eliza_mode=True)
     tech = log.render(eliza_mode=False)
     assert "Uh-oh" in eliza
@@ -133,7 +144,7 @@ def test_snag_first():
 
 def test_snag_repeat():
     log = CommentaryLog()
-    emit_snag(log, "Same problem", 3, 200)
+    emit_snag(log, "Same problem", 3, 200, T)
     eliza = log.render(eliza_mode=True)
     tech = log.render(eliza_mode=False)
     assert "again" in eliza
@@ -151,7 +162,7 @@ def _both(log):
 
 def test_clamp_activate_rule_codelet():
     log = CommentaryLog()
-    emit_clamp_activate(log, "rule_codelet_clamp", 1, 100)
+    emit_clamp_activate(log, "rule_codelet_clamp", 1, 100, T)
     assert _both(log) == (
         "I'll just have to try a little harder...",
         "Clamping rule-codelet pattern...",
@@ -160,7 +171,7 @@ def test_clamp_activate_rule_codelet():
 
 def test_clamp_activate_snag_response():
     log = CommentaryLog()
-    emit_clamp_activate(log, "snag_response_clamp", 1, 100)
+    emit_clamp_activate(log, "snag_response_clamp", 1, 100, T)
     assert _both(log) == (
         "All right, I've had enough of this!  Let's try something different for a change...",
         "Clamping negative theme pattern...",
@@ -169,28 +180,28 @@ def test_clamp_activate_snag_response():
 
 def test_clamp_activate_justify_first_and_another():
     log = CommentaryLog()
-    emit_clamp_activate(log, "justify_clamp", 1, 100)
+    emit_clamp_activate(log, "justify_clamp", 1, 100, T)
     assert _both(log) == ("Aha!  I have an idea...", "Clamping theme patterns...")
     log = CommentaryLog()
-    emit_clamp_activate(log, "justify_clamp", 2, 100)
+    emit_clamp_activate(log, "justify_clamp", 2, 100, T)
     assert _both(log)[0] == "Aha!  I have another idea..."
 
 
 def test_clamp_activate_manual_first_and_another():
     log = CommentaryLog()
-    emit_clamp_activate(log, "manual_clamp", 1, 100)
+    emit_clamp_activate(log, "manual_clamp", 1, 100, T)
     assert _both(log) == (
         "Thank you for that interesting suggestion!  Let me think about it...",
         "Manually clamping patterns...",
     )
     log = CommentaryLog()
-    emit_clamp_activate(log, "manual_clamp", 2, 100)
+    emit_clamp_activate(log, "manual_clamp", 2, 100, T)
     assert _both(log)[0].startswith("Thank you for another interesting suggestion!")
 
 
 def test_clamp_activate_says_nothing_for_an_unknown_type():
     log = CommentaryLog()
-    emit_clamp_activate(log, "mystery_clamp", 1, 100)
+    emit_clamp_activate(log, "mystery_clamp", 1, 100, T)
     assert log.count == 0
 
 
@@ -201,7 +212,7 @@ def test_clamp_activate_says_nothing_for_an_unknown_type():
 
 def test_clamp_expired_rule_codelet_zero():
     log = CommentaryLog()
-    emit_clamp_expired(log, "rule_codelet_clamp", 0, 200)
+    emit_clamp_expired(log, "rule_codelet_clamp", 0, 200, T)
     assert _both(log) == (
         "Well, my latest effort to think up new rules resulted in zero progress."
         "  Guess it was a pretty useless effort, in retrospect.",
@@ -211,7 +222,7 @@ def test_clamp_expired_rule_codelet_zero():
 
 def test_clamp_expired_rule_codelet_a_lot():
     log = CommentaryLog()
-    emit_clamp_expired(log, "rule_codelet_clamp", 100, 200)
+    emit_clamp_expired(log, "rule_codelet_clamp", 100, 200, T)
     assert _both(log) == (
         "Well, my latest effort to think up new rules resulted in a lot of progress."
         "  Guess it was a pretty good effort, in retrospect.",
@@ -222,7 +233,7 @@ def test_clamp_expired_rule_codelet_a_lot():
 def test_clamp_expired_snag_response_matches_metacat_log():
     # Logged from Metacat 1.2, abc -> abd, xyz -> ?, seed 2.
     log = CommentaryLog()
-    emit_clamp_expired(log, "snag_response_clamp", 79, 1976)
+    emit_clamp_expired(log, "snag_response_clamp", 79, 1976, T)
     assert _both(log) == (
         "Looks like I made some headway in coming up with new ideas.",
         "Unclamping patterns.  Progress achieved by snag-response clamp = 79.",
@@ -231,14 +242,14 @@ def test_clamp_expired_snag_response_matches_metacat_log():
 
 def test_clamp_expired_justify_and_manual():
     log = CommentaryLog()
-    emit_clamp_expired(log, "justify_clamp", 30, 5)
+    emit_clamp_expired(log, "justify_clamp", 30, 5, T)
     assert _both(log) == (
         "Looks like that last brilliant idea I had resulted in very little progress."
         "  Guess it was not such a great idea, in retrospect.",
         "Unclamping patterns.  Progress achieved by justify clamp = 30.",
     )
     log = CommentaryLog()
-    emit_clamp_expired(log, "manual_clamp", 50, 5)
+    emit_clamp_expired(log, "manual_clamp", 50, 5, T)
     assert _both(log) == (
         "That last suggestion of yours resulted in some progress."
         "  Guess it was an okay idea, in retrospect.",
@@ -286,7 +297,7 @@ def test_frustrated_names_the_poor_string_pairs():
     from server.engine.commentary import emit_frustrated
 
     both = CommentaryLog()
-    emit_frustrated(both, "abc", "abd", "xyz", "xyd", True, True, 10)
+    emit_frustrated(both, "abc", "abd", "xyz", "xyd", True, True, 10, T)
     assert _both(both) == (
         "I'm getting frustrated.  I still don't see a good way to describe either "
         'how "abc" changes to "abd" or how "xyz" changes to "xyd".',
@@ -294,10 +305,10 @@ def test_frustrated_names_the_poor_string_pairs():
         'how "abc" changes to "abd" or how "xyz" changes to "xyd".',
     )
     top = CommentaryLog()
-    emit_frustrated(top, "abc", "abd", "xyz", None, True, False, 10)
+    emit_frustrated(top, "abc", "abd", "xyz", None, True, False, 10, T)
     assert _both(top)[0].endswith('describe how "abc" changes to "abd".')
     bottom = CommentaryLog()
-    emit_frustrated(bottom, "abc", "abd", "xyz", "xyd", False, True, 10)
+    emit_frustrated(bottom, "abc", "abd", "xyz", "xyd", False, True, 10, T)
     assert _both(bottom)[1].endswith('describing how "xyz" changes to "xyd".')
 
 
@@ -306,7 +317,7 @@ def test_frustrated_names_the_poor_string_pairs():
 
 def test_reminding_strong():
     log = CommentaryLog()
-    emit_reminding(log, "xyd", "abc -> abd, xyz -> ?", 85, 100)
+    emit_reminding(log, "xyd", "abc -> abd, xyz -> ?", 85, 100, T)
     assert _both(log) == (
         'This answer strongly reminds me of the answer xyd to the problem "abc -> abd, xyz -> ?".',
         'This answer is reminiscent of the answer xyd to the problem "abc -> abd, xyz -> ?".'
@@ -316,6 +327,6 @@ def test_reminding_strong():
 
 def test_reminding_weak():
     log = CommentaryLog()
-    emit_reminding(log, "xyd", "abc -> abd, xyz -> ?", 20, 100)
+    emit_reminding(log, "xyd", "abc -> abd, xyz -> ?", 20, 100, T)
     eliza = log.render(eliza_mode=True)
     assert "vaguely reminds" in eliza

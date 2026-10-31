@@ -283,7 +283,7 @@ class TestRules:
                         name = getattr(change.dimension, "name", "")
                         assert name != "plato-string-position-category", (
                             f"intrinsic string-position clause in "
-                            f"{rule.transcribe_to_english()!r}"
+                            f"{rule.english_transcription!r}"
                         )
 
     def test_abstract_change_descriptor_beats_a_literal_one(self, meta):
@@ -630,7 +630,7 @@ def _answer(name, themes, *, rule="rule", abstractness=60.0, unjustified=None):
 
 
 class TestMemory:
-    def test_comparison_separates_common_differing_and_unique_themes(self):
+    def test_comparison_separates_common_differing_and_unique_themes(self, meta):
         """§4.7.3 names three distinct relationships; "a_only / b_only" conflated
         differing themes with unique ones."""
         memory = EpisodicMemory()
@@ -649,7 +649,7 @@ class TestMemory:
                 "plato-alphabetic-position-category": "opposite",
             },
         )
-        result = memory.compare_answers(xyd, dyz)
+        result = memory.compare_answers(xyd, dyz, meta=meta)
 
         assert result["common_themes"] == {"plato-direction-category": "identity"}
         assert result["differing_themes"] == {
@@ -660,7 +660,7 @@ class TestMemory:
         }
         assert result["a_unique_themes"] == {}
 
-    def test_similar_answers_are_closer_than_dissimilar_ones(self):
+    def test_similar_answers_are_closer_than_dissimilar_ones(self, meta):
         """§4.7.5: distance grows with differing and unique themes."""
         memory = EpisodicMemory()
         base = _answer("xyd", {"plato-string-position-category": "identity"})
@@ -673,9 +673,9 @@ class TestMemory:
                 "plato-alphabetic-position-category": "opposite",
             },
         )
-        assert memory.distance(base, near) < memory.distance(base, far)
+        assert memory.distance(base, near, meta) < memory.distance(base, far, meta)
 
-    def test_an_unrelated_answer_does_not_come_to_mind(self):
+    def test_an_unrelated_answer_does_not_come_to_mind(self, meta):
         """Reminding must discriminate.  With an empty theme comparison and a
         threshold of 5 it used to return *every* stored answer at distance 0."""
         memory = EpisodicMemory()
@@ -691,20 +691,20 @@ class TestMemory:
         )
         memory.store_answer(far)
         query = _answer("xyd", {"plato-string-position-category": "identity"})
-        assert memory.find_remindings(query, distance_threshold=2.0) == []
+        assert memory.find_remindings(query, distance_threshold=2.0, meta=meta) == []
 
-    def test_reminding_sets_an_activation_level(self):
+    def test_reminding_sets_an_activation_level(self, meta):
         """§4.7.5: "the activation level of an answer reflects how strongly the
         program is reminded of it."."""
         memory = EpisodicMemory()
         past = _answer("xyu", {"plato-string-position-category": "identity"})
         memory.store_answer(past)
         query = _answer("xyd", {"plato-string-position-category": "identity"})
-        memory.find_remindings(query, distance_threshold=5.0)
+        memory.find_remindings(query, distance_threshold=5.0, meta=meta)
         assert 0 < past.activation <= 100
         assert query.activation == 100.0
 
-    def test_a_stored_snag_reclassifies_an_unjustified_theme(self):
+    def test_a_stored_snag_reclassifies_an_unjustified_theme(self, meta):
         """§4.7.3: the aaabccc / aaabaaa discrimination.
 
         An unjustified theme becomes *snag-justified* when a snag description in
@@ -758,11 +758,11 @@ class TestMemory:
             )
         )
 
-        result = memory.compare_answers(with_snag, without_snag)
+        result = memory.compare_answers(with_snag, without_snag, meta=meta)
         assert result["a_unjustified_themes"]["plato-bond-facet"] == "snag_justified"
         assert result["b_unjustified_themes"]["plato-bond-facet"] == "unjustified"
 
-    def test_comparison_produces_english_commentary(self):
+    def test_comparison_produces_english_commentary(self, meta):
         """§4.7.4: the classification is rendered through phrase-templates.
 
         The templates were all present in the seed data and referenced by no code
@@ -779,7 +779,7 @@ class TestMemory:
                 "plato-alphabetic-position-category": "opposite",
             },
         )
-        commentary = describe_answer_comparison(xyd, dyz, memory=memory)
+        commentary = describe_answer_comparison(xyd, dyz, memory=memory, meta=meta)
 
         assert commentary["paragraphs"]
         assert "xyd" in commentary["text"] and "dyz" in commentary["text"]

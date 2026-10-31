@@ -10,6 +10,8 @@ and is meant to be editable.  ``test_the_prose_is_seed_data_not_python`` is the 
 that pins that property down.
 """
 
+import os
+
 import pytest
 
 from server.engine.answer_comparison import (
@@ -25,7 +27,7 @@ from server.engine.answer_comparison import (
     theme_phrases,
 )
 from server.engine.memory import AnswerDescription, EpisodicMemory, SnagDescription
-from server.engine.metadata import default_commentary_templates
+from server.engine.metadata import ConfigurationRequired, MetadataProvider
 
 STRING_POSITION = "plato-string-position-category"
 DIRECTION = "plato-direction-category"
@@ -34,9 +36,14 @@ BOND_FACET = "plato-bond-facet"
 ALPHABETIC = "plato-alphabetic-position-category"
 
 
+_SEED_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
+#: The Metacat Standard Configuration as a provider: the run's configuration here.
+_META = MetadataProvider.from_seed_data(_SEED_DIR)
+
+
 @pytest.fixture
 def templates():
-    return default_commentary_templates()
+    return _META.commentary_templates
 
 
 def _answer(
@@ -359,7 +366,7 @@ def test_rules_of_different_shape_are_not_comparable():
     change is described as viewed "in a completely different way" — abstractness is not
     consulted, because there is nothing to line up."""
     assert compare_rule_signatures([["a"]], [["a"], ["b"]]) is None
-    assert count_rule_differences(None) == -1
+    assert count_rule_differences(None, _META) == -1
 
 
 def test_concepts_of_equal_depth_are_not_a_rule_difference():
@@ -479,19 +486,31 @@ def test_an_abstract_rule_and_a_literal_one_line_up_slot_for_slot():
     ]
     differences = compare_rule_signatures(abstract, literal)
     assert differences == [("plato-successor", "plato-d")]
-    assert count_rule_differences(differences) == 1
+    assert count_rule_differences(differences, _META) == 1
 
 
-def test_the_depth_filter_falls_back_to_the_shipped_conceptual_depths():
-    """``count_rule_differences`` is reached from ``EpisodicMemory.distance`` with no
-    ``MetadataProvider`` in hand (``find_remindings`` has none), so the filter has to
-    have depths of its own or it silently stops filtering.
+def test_the_depth_filter_reads_the_providers_conceptual_depths():
+    """``count_rule_differences`` takes its depths from the run's ``MetadataProvider``.
 
-    ``seed_data/slipnet_nodes.json``: leftmost and rightmost are both 40, successor is
+    The Metacat Standard Configuration: leftmost and rightmost are both 40, successor is
     50 and sameness is 80.
     """
-    assert count_rule_differences([("plato-leftmost", "plato-rightmost")]) == 0
-    assert count_rule_differences([("plato-successor", "plato-sameness")]) == 1
+    assert count_rule_differences([("plato-leftmost", "plato-rightmost")], _META) == 0
+    assert count_rule_differences([("plato-successor", "plato-sameness")], _META) == 1
+
+
+def test_a_missing_meta_raises_rather_than_reading_the_files():
+    """The former fallback to ``slipnet_nodes.json`` is gone."""
+    with pytest.raises(ConfigurationRequired):
+        count_rule_differences([("plato-leftmost", "plato-rightmost")], None)
+
+
+def test_an_unresolved_name_is_reported_and_never_read_as_depth_zero():
+    """A name the provider has no node for contributes no distance and is reported."""
+    unresolved: set[str] = set()
+    pairs = [("plato-successor", "plato-no-such-node"), ("plato-successor", "plato-sameness")]
+    assert count_rule_differences(pairs, _META, unresolved) == 1
+    assert unresolved == {"plato-no-such-node"}
 
 
 # ---------------------------------------------------------------------------
@@ -508,7 +527,7 @@ def test_the_worked_example_reads_as_section_4_7_4_describes_it(templates):
     Alphabetic-Position: opposite; the incoherence remark for dyz; and the verdict
     "since it is more coherent".
     """
-    text = compare_answers_text(_dyz(), _xyd(), None, templates)["text"]
+    text = compare_answers_text(_dyz(), _xyd(), None, templates, meta=_META)["text"]
     assert text.startswith(
         'The answer dyz to the problem "abc -> abd, xyz -> ?" is based on seeing '
         "abc and xyz as symmetric predecessor and successor groups going in "
@@ -523,7 +542,7 @@ def test_the_worked_example_reads_as_section_4_7_4_describes_it(templates):
 def test_the_second_answer_is_named_without_repeating_the_problem(templates):
     """``answers.ss:448-451``: the problem is named on first mention only, and dropped
     entirely for the second answer when both answers answer the same problem."""
-    text = compare_answers_text(_dyz(), _xyd(), None, templates)["text"]
+    text = compare_answers_text(_dyz(), _xyd(), None, templates, meta=_META)["text"]
     assert text.count('to the problem "abc -> abd, xyz -> ?"') == 1
 
 
@@ -532,7 +551,7 @@ def test_answers_to_different_problems_each_name_their_problem(templates):
     two problems differ, because "xyu" alone would not say which problem it answers."""
     a = _answer(("abc", "abd", "xyz", "xyd"), {STRING_POSITION: "identity"})
     b = _answer(("rst", "rsu", "xyz", "xyu"), {STRING_POSITION: "opposite"})
-    text = compare_answers_text(a, b, None, templates)["text"]
+    text = compare_answers_text(a, b, None, templates, meta=_META)["text"]
     assert 'xyd to the problem "abc -> abd, xyz -> ?"' in text
     assert 'xyu to the problem "rst -> rsu, xyz -> ?"' in text
 
@@ -549,7 +568,7 @@ def test_two_answers_spelled_the_same_are_told_apart_by_ordinal(templates):
         unjustified={BOND_FACET: "diff"},
     )
     b = _answer(("abc", "abd", "xyz", "dyz"), {STRING_POSITION: "opposite"})
-    text = compare_answers_text(a, b, None, templates)["text"]
+    text = compare_answers_text(a, b, None, templates, meta=_META)["text"]
     assert "the second dyz is the better answer" in text
 
 
@@ -564,12 +583,12 @@ def test_in_part_appears_only_when_the_answers_share_ideas(templates):
         ("abc", "abd", "xyz", "dyz"),
         {STRING_POSITION: "opposite", GROUP_CATEGORY: "identity"},
     )
-    with_common = compare_answers_text(shared, other, None, templates)["text"]
+    with_common = compare_answers_text(shared, other, None, templates, meta=_META)["text"]
     assert "is based in part on seeing" in with_common
 
     unshared_a = _answer(("abc", "abd", "xyz", "xyd"), {STRING_POSITION: "identity"})
     unshared_b = _answer(("abc", "abd", "xyz", "dyz"), {STRING_POSITION: "opposite"})
-    without_common = compare_answers_text(unshared_a, unshared_b, None, templates)[
+    without_common = compare_answers_text(unshared_a, unshared_b, None, templates, meta=_META)[
         "text"
     ]
     assert "is based in part" not in without_common
@@ -589,7 +608,7 @@ def test_identical_answers_are_called_essentially_the_same(templates):
         {STRING_POSITION: "identity"},
         signature=[["change", "plato-letter-category"]],
     )
-    text = compare_answers_text(a, b, None, templates)["text"]
+    text = compare_answers_text(a, b, None, templates, meta=_META)["text"]
     assert text.startswith("The answer xyd to the problem")
     assert "is essentially the same as the answer" in text
     assert "Both answers rely on seeing two strings (abc and xyz in one case and " in text
@@ -614,7 +633,7 @@ def test_a_rule_difference_alone_is_the_only_essential_difference(templates):
         rule_abstractness=20.0,
         signature=[["change", "plato-length"]],
     )
-    text = compare_answers_text(a, b, None, templates)["text"]
+    text = compare_answers_text(a, b, None, templates, meta=_META)["text"]
     assert text.startswith(
         "The only essential difference between the answer xyd and the answer xyd"
     )
@@ -636,7 +655,7 @@ def test_the_rule_sentence_is_a_second_sentence_when_the_themes_differ_too(templ
         rule_abstractness=70.0,
         signature=[["change", "plato-length"]],
     )
-    text = compare_answers_text(a, b, None, templates)["text"]
+    text = compare_answers_text(a, b, None, templates, meta=_META)["text"]
     assert "Another key difference between the answers" in text
     assert "is viewed in a more literal way for the answer xyd" in text
 
@@ -651,7 +670,7 @@ def test_an_answer_with_one_theme_gets_the_singular_incoherence_wording(template
         theme_abstractness=80.0,
     )
     coherent = _answer(("abc", "abd", "xyz", "xyd"), {STRING_POSITION: "identity"})
-    text = compare_answers_text(incoherent, coherent, None, templates)["text"]
+    text = compare_answers_text(incoherent, coherent, None, templates, meta=_META)["text"]
     assert "since it involves seeing an abstract similarity between abc and xyz" in text
 
 
@@ -677,7 +696,7 @@ def test_coherence_outranks_the_count_of_unjustified_ideas(templates):
         {STRING_POSITION: "identity"},
         unjustified={BOND_FACET: "diff"},
     )
-    verdict = compare_answers_text(incoherent, coherent, None, templates)["verdict"]
+    verdict = compare_answers_text(incoherent, coherent, None, templates, meta=_META)["verdict"]
     assert verdict == "All in all, I'd say xyd is the better answer, since it is more coherent."
 
 
@@ -689,7 +708,7 @@ def test_no_unjustified_ideas_is_said_differently_from_merely_fewer(templates):
         {STRING_POSITION: "opposite"},
         unjustified={BOND_FACET: "diff"},
     )
-    verdict = compare_answers_text(clean, dirty, None, templates)["verdict"]
+    verdict = compare_answers_text(clean, dirty, None, templates, meta=_META)["verdict"]
     assert verdict.endswith("since it involves no unjustified ideas.")
 
 
@@ -711,7 +730,7 @@ def test_the_more_abstract_rule_decides_when_the_ideas_agree(templates):
         rule_abstractness=20.0,
         signature=[["change", "plato-length"]],
     )
-    verdict = compare_answers_text(abstract, literal, None, templates)["verdict"]
+    verdict = compare_answers_text(abstract, literal, None, templates, meta=_META)["verdict"]
     assert verdict.endswith(
         "since it involves seeing the change from abc to abd in a more abstract way."
     )
@@ -735,7 +754,7 @@ def test_the_more_abstract_rule_does_not_decide_when_the_ideas_differ(templates)
         rule_abstractness=20.0,
         signature=[["change", "plato-length"]],
     )
-    verdict = compare_answers_text(abstract, literal, None, templates)["verdict"]
+    verdict = compare_answers_text(abstract, literal, None, templates, meta=_META)["verdict"]
     assert verdict.endswith("since it is based on a richer set of ideas.")
 
 
@@ -754,7 +773,7 @@ def test_two_incoherent_answers_are_ranked_by_how_incoherent(templates):
         rule_abstractness=10.0,
         theme_abstractness=60.0,
     )
-    verdict = compare_answers_text(worse, better, None, templates)["verdict"]
+    verdict = compare_answers_text(worse, better, None, templates, meta=_META)["verdict"]
     assert verdict.startswith("Overall, though, I'd say wyz is the better answer")
     assert verdict.endswith("because it doesn't seem quite as incoherent as dyz.")
 
@@ -765,11 +784,11 @@ def test_evenly_matched_answers_are_described_by_quality_instead(templates):
     quality phrases coincide."""
     a = _answer(("abc", "abd", "xyz", "xyd"), {STRING_POSITION: "identity"}, quality=88.0)
     b = _answer(("abc", "abd", "xyz", "xyu"), {STRING_POSITION: "identity"}, quality=52.0)
-    verdict = compare_answers_text(a, b, None, templates)["verdict"]
+    verdict = compare_answers_text(a, b, None, templates, meta=_META)["verdict"]
     assert verdict == "All in all, I'd say xyd is very good and xyu is pretty bad."
 
     c = _answer(("abc", "abd", "xyz", "xyu"), {STRING_POSITION: "identity"}, quality=87.0)
-    same = compare_answers_text(a, c, None, templates)["verdict"]
+    same = compare_answers_text(a, c, None, templates, meta=_META)["verdict"]
     assert same == "All in all, I'd say they're both very good answers."
 
 
@@ -789,7 +808,7 @@ def test_the_judgment_order_comes_from_the_seed_data(templates):
         "more_abstract_rule",
         "neither_better",
     ]
-    result = compare_answers_text(_dyz(), _xyd(), None, reordered)
+    result = compare_answers_text(_dyz(), _xyd(), None, reordered, meta=_META)
     assert result["preferred"] == {"answer": "dyz", "reason": "richer_set_of_ideas"}
     assert result["verdict"].endswith("since it is based on a richer set of ideas.")
 
@@ -809,7 +828,7 @@ def test_the_prose_is_seed_data_not_python(templates):
     edited["comparison_templates"]["verdict"]["reason_more_coherent"] = (
         ", because it holds together"
     )
-    verdict = compare_answers_text(_dyz(), _xyd(), None, edited)["verdict"]
+    verdict = compare_answers_text(_dyz(), _xyd(), None, edited, meta=_META)["verdict"]
     assert verdict.endswith("is the better answer, because it holds together.")
 
 
@@ -817,7 +836,7 @@ def test_the_comparison_reads_the_same_in_both_voices(templates):
     """§4.6 footnote 16: "Turning off Eliza mode ... does not affect the commentary
     generated by the program when comparing different answers."  ``compare-answers``
     (``answers.ss:428-431``) passes one string for both voices."""
-    result = compare_answers_text(_dyz(), _xyd(), None, templates)
+    result = compare_answers_text(_dyz(), _xyd(), None, templates, meta=_META)
     assert result["eliza_text"] == result["technical_text"] == result["text"]
 
 

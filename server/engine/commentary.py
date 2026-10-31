@@ -17,17 +17,16 @@ from server.engine.answer_comparison import _fill
 
 
 def _reporting(templates: dict[str, Any] | None, key: str) -> dict[str, Any]:
-    """One ``answer_reporting`` block from the seed data.
+    """One ``answer_reporting`` block of the phrase-templates.
 
     Every ``emit_*`` helper below renders from these templates, so the paragraphs a run
     produces are editable in the same place as the comparison prose.  ``templates`` is
-    whatever the caller's ``MetadataProvider`` holds — the database, in a served run;
-    the seed data serves callers that have no provider.
+    ``meta.commentary_templates`` -- the database, in a served run -- and is mandatory:
+    ``None`` raises :class:`~server.engine.metadata.ConfigurationRequired`.
     """
-    from server.engine.metadata import default_commentary_templates
+    from server.engine.answer_comparison import resolve_templates
 
-    resolved = templates or default_commentary_templates()
-    section = (resolved.get("answer_reporting") or {}).get(key)
+    section = (resolve_templates(templates).get("answer_reporting") or {}).get(key)
     return section if isinstance(section, dict) else {}
 
 
@@ -492,7 +491,8 @@ def describe_answer_comparison(
     answer_b: Any,
     memory: Any = None,
     templates: dict[str, Any] | None = None,
-    meta: Any = None,
+    *,
+    meta: Any,
 ) -> dict[str, Any]:
     """Explain, in English, how two answers relate and which is preferred.
 
@@ -505,7 +505,9 @@ def describe_answer_comparison(
     """
     from server.engine.answer_comparison import compare_answers_text
 
-    return compare_answers_text(answer_a, answer_b, memory, templates, meta)
+    return compare_answers_text(
+        answer_a, answer_b, memory, templates, meta=meta
+    )
 
 
 def describe_answer(

@@ -48,7 +48,7 @@ GOLDEN_DIR = REPO_ROOT / "tests" / "lockstep" / "golden"
 BASELINE_PATH = GOLDEN_DIR / "engine_baseline.jsonl"
 RNG_DETAIL_PATH = GOLDEN_DIR / "engine_baseline_rng.json.gz"
 
-FORMAT = "petacat-golden-baseline/1"
+FORMAT = "petacat-golden-baseline/2"
 
 #: The CPU role's float64 backend, pinned by name.  ``numpy`` agrees with the pure-Python
 #: reference exactly (same values, same number of draws; TESTING.md, numeric backend
@@ -312,13 +312,10 @@ def iter_cases(meta: Any, progress: Callable[[str], None] | None = None,
 
 
 def header_record(meta: Any) -> dict[str, Any]:
-    from server.engine.hashing import config_hash
-
     triples, justify = demo_problems()
     return {
         "format": FORMAT,
         "configuration": "Metacat Standard Configuration (seed_data/*.json, from_seed_data)",
-        "config_hash": config_hash(meta),
         "numeric_backend": BACKEND,
         "precision": "float64",
         "verbose_mode": "on (a verbose-off pass is checked equal for every run)",

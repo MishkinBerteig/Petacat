@@ -241,7 +241,7 @@ def _serialize_rule(rule: Any) -> dict:
         "succinctness": round(rule.succinctness),
         "clause_count": len(rule.clauses),
         "verbatim": rule.is_verbatim_rule,
-        "english": rule.transcribe_to_english(),
+        "english": rule.english_transcription,
         "built": rule.is_built,
         "theme_pattern": rule.theme_pattern[1:] if rule.theme_pattern else [],
     }

@@ -1,5 +1,8 @@
 """Tests for Rule and RuleClause with string type constants."""
 
+import os
+
+from server.engine.metadata import MetadataProvider
 from server.engine.rules import (
     CLAUSE_EXTRINSIC,
     CLAUSE_INTRINSIC,
@@ -8,6 +11,10 @@ from server.engine.rules import (
     RULE_TOP,
     Rule,
     RuleClause,
+)
+
+_META = MetadataProvider.from_seed_data(
+    os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
 )
 
 
@@ -63,9 +70,9 @@ def test_bottom_rule():
 # clauses names no objects, so no string is consulted and None is admissible here.
 def test_translate_top_rule_becomes_bottom():
     rule = Rule(rule_type=RULE_TOP, clauses=[])
-    assert rule.translate(None, None, None).rule_type == RULE_BOTTOM
+    assert rule.translate(None, None, None, meta=_META).rule_type == RULE_BOTTOM
 
 
 def test_translate_bottom_rule_becomes_top():
     rule = Rule(rule_type=RULE_BOTTOM, clauses=[])
-    assert rule.translate(None, None, None).rule_type == RULE_TOP
+    assert rule.translate(None, None, None, meta=_META).rule_type == RULE_TOP

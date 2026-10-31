@@ -16,10 +16,22 @@ from server.engine.trace import (
 )
 
 
+import os as _os
+
+from server.engine.metadata import MetadataProvider as _MetadataProvider
+
+_META = _MetadataProvider.from_seed_data(
+    _os.path.join(_os.path.dirname(__file__), "..", "..", "seed_data")
+)
+#: The Metacat Standard Configuration's phrase-templates, from a provider.
+T = _META.commentary_templates
+
+
 def _trace() -> tuple[TemporalTrace, CommentaryLog]:
     trace = TemporalTrace()
     log = CommentaryLog()
     trace.commentary = log
+    trace.commentary_templates = T
     return trace, log
 
 
@@ -115,7 +127,7 @@ def test_a_slippage_is_named_from_its_two_descriptors():
 
 def test_comparing_answers_starts_with_lets_see():
     log = CommentaryLog()
-    emit_comparing_answers(log, 0)
+    emit_comparing_answers(log, 0, T)
     assert _lines(log) == [("Let's see...", "Comparing answers...")]
 
 
@@ -143,7 +155,7 @@ def test_remindings_come_newest_first_with_a_whole_number_strength(monkeypatch):
     distances = {id(oldest): 0.7, id(middle): 3.1}
     monkeypatch.setattr(memory, "distance", lambda new, past, meta=None: distances[id(past)])
 
-    reminded = memory.find_remindings(newest, 5)
+    reminded = memory.find_remindings(newest, 5, meta=_META)
 
     assert [r.problem[3] for r in reminded] == ["mrrkkk", "mrrjjk"]
     assert [r.activation for r in reminded] == [38, 86]
@@ -158,7 +170,7 @@ def test_a_distance_of_the_threshold_or_more_reminds_of_nothing(monkeypatch):
     new = _stored(memory, "mrrjjjj")
     monkeypatch.setattr(memory, "distance", lambda new, past, meta=None: 5.0)
 
-    assert memory.find_remindings(new, 5) == []
+    assert memory.find_remindings(new, 5, meta=_META) == []
     assert far.activation == 0
 
 
@@ -183,12 +195,12 @@ def test_an_unjustified_answer_is_stumped_in_both_voices():
     from server.engine.commentary import emit_answer_unjustified
 
     log = CommentaryLog()
-    emit_answer_unjustified(log, "letter-category <=> length", 10, None, 1)
+    emit_answer_unjustified(log, "letter-category <=> length", 10, T, 1)
     assert _lines(log) == [(
         "Okay, I'm stumped.  This answer makes no sense to me.  I see no way to make "
         "the necessary letter-category <=> length slippage here.",
         "Run terminated.  Unable to make the necessary letter-category <=> length slippage.",
     )]
     log = CommentaryLog()
-    emit_answer_unjustified(log, "a <=> b and c <=> d", 10, None, 2)
+    emit_answer_unjustified(log, "a <=> b and c <=> d", 10, T, 2)
     assert _lines(log)[0][1].endswith("a <=> b and c <=> d slippages.")

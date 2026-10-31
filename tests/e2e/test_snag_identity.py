@@ -209,7 +209,7 @@ async def test_rehydrating_keeps_the_explanation_and_falls_back_for_old_rows(db_
     assert new.translated_rule_description.startswith("Change letter-category")
     assert snag_explanation_text(new) == explanation
     assert old.explanation == ""
-    assert snag_explanation_text(old).startswith('the rule "change LetterCtgy by pred" cannot be applied to ')
+    assert snag_explanation_text(old, service.meta.commentary_templates).startswith('the rule "change LetterCtgy by pred" cannot be applied to ')
 
     served = service.get_memory_state()["snags"]
     assert [s["explanation"] for s in served][0] == explanation

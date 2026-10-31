@@ -127,7 +127,9 @@ def test_no_describable_bridges_builds_an_identity_rule():
     # rules.ss:417-442: an empty change list is an identity rule, not a fizzle.
     from server.engine.rules import build_rule_from_bridges
 
-    rule = build_rule_from_bridges("top", [], slipnet=None)
+    rule = build_rule_from_bridges(
+        "top", [], slipnet=None, meta=MetadataProvider.from_seed_data(SEED_DIR)
+    )
     assert rule is not None and rule.is_identity_rule
     assert rule.rule_clause_templates == []
 

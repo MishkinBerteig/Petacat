@@ -985,7 +985,7 @@ def _monitor_new_rule(
             codelet_count=codelet_count,
             temperature=temperature,
             structures=[rule],
-            description=rule.transcribe_to_english(),
+            description=rule.transcribe_to_english(meta),
             strength=float(relative_quality),
         )
     )

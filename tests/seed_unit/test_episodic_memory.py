@@ -1,10 +1,10 @@
 """Reminding and comparison, which render against the phrasing in ``seed_data/``.
 
-``compare_answers`` resolves the commentary templates when none are supplied, so the
-distance calculation and the comparison both read what the seed data holds.
-``find_remindings`` reaches the same code through ``distance``, and ``distance``'s
-depth filter reads the shipped conceptual depths when no ``MetadataProvider`` supplies
-them — so every figure below is a figure about the values Petacat ships with.
+``compare_answers`` takes the commentary templates from the run's ``MetadataProvider``
+when none are supplied, so the distance calculation and the comparison both read what
+the provider holds.  ``find_remindings`` reaches the same code through ``distance``, and
+``distance``'s depth filter reads the provider's conceptual depths.  Every figure below
+is about the Metacat Standard Configuration, loaded into a provider.
 """
 
 import os
@@ -12,6 +12,11 @@ import os
 import pytest
 
 from server.engine.memory import AnswerDescription, EpisodicMemory, SnagDescription
+from server.engine.metadata import ConfigurationRequired, MetadataProvider
+
+_META = MetadataProvider.from_seed_data(
+    os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
+)
 
 STRING_POSITION = "plato-string-position-category"
 DIRECTION = "plato-direction-category"
@@ -41,7 +46,7 @@ def test_find_remindings_excludes_the_query_answer_itself():
     desc = _answer({"direction": "opposite"})
     mem.store_answer(desc)
     # Querying with the very answer that is stored must not remind of itself.
-    assert mem.find_remindings(desc, distance_threshold=5.0) == []
+    assert mem.find_remindings(desc, distance_threshold=5.0, meta=_META) == []
 
 
 def test_find_remindings_returns_past_answer_within_threshold():
@@ -50,7 +55,7 @@ def test_find_remindings_returns_past_answer_within_threshold():
     mem.store_answer(past)
     # One differing dimension, plus ``calculate-answer-distance``'s base of 1.
     query = _answer({"direction": "opposite", "position": "leftmost"})  # distance 2
-    remindings = mem.find_remindings(query, distance_threshold=5.0)
+    remindings = mem.find_remindings(query, distance_threshold=5.0, meta=_META)
     assert remindings == [past]
 
 
@@ -59,7 +64,7 @@ def test_find_remindings_excludes_past_answer_beyond_threshold():
     past = _answer({"direction": "same", "position": "leftmost"})
     mem.store_answer(past)
     query = _answer({"direction": "opposite", "position": "rightmost"})  # distance 3
-    assert mem.find_remindings(query, distance_threshold=2.0) == []
+    assert mem.find_remindings(query, distance_threshold=2.0, meta=_META) == []
 
 
 def test_find_remindings_excludes_past_answer_at_exact_threshold():
@@ -72,9 +77,9 @@ def test_find_remindings_excludes_past_answer_at_exact_threshold():
     past = _answer({"direction": "opposite"})
     mem.store_answer(past)
     query = _answer({"direction": "same"})  # distance exactly 2
-    assert mem.find_remindings(query, distance_threshold=2.0) == []
+    assert mem.find_remindings(query, distance_threshold=2.0, meta=_META) == []
     # One step inside the threshold it is remembered, with a graded activation.
-    assert mem.find_remindings(query, distance_threshold=4.0) == [past]
+    assert mem.find_remindings(query, distance_threshold=4.0, meta=_META) == [past]
     assert past.activation == 50.0
 
 
@@ -389,9 +394,9 @@ def _dyz():
 )
 def test_distance_is_the_scheme_arithmetic(answer_a, answer_b, expected):
     memory = EpisodicMemory()
-    assert memory.distance(answer_a, answer_b) == expected
+    assert memory.distance(answer_a, answer_b, _META) == expected
     # ``calculate-answer-distance`` is symmetric in everything it sums.
-    assert memory.distance(answer_b, answer_a) == expected
+    assert memory.distance(answer_b, answer_a, _META) == expected
 
 
 def test_the_threshold_admits_the_near_pair_and_refuses_the_dissertations_pair():
@@ -416,7 +421,7 @@ def test_the_threshold_admits_the_near_pair_and_refuses_the_dissertations_pair()
         {STRING_POSITION: "opposite", DIRECTION: "identity", ALPHABETIC: "opposite"},
         signature=_rule(),
     )
-    assert memory.find_remindings(query, distance_threshold=5.0) == [near]
+    assert memory.find_remindings(query, distance_threshold=5.0, meta=_META) == [near]
     # 100 * (1 - 4/5), in binary floating point.
     assert near.activation == pytest.approx(20.0)
     assert far.activation == 0.0
@@ -466,7 +471,7 @@ def test_a_snag_justified_theme_leaves_the_justification_component():
         )
     )
 
-    assert memory.distance(with_snag, without_snag) == 2.0
+    assert memory.distance(with_snag, without_snag, _META) == 2.0
 
 
 def test_an_unjustified_theme_on_a_differing_dimension_is_not_charged_twice():
@@ -491,7 +496,7 @@ def test_an_unjustified_theme_on_a_differing_dimension_is_not_charged_twice():
         {STRING_POSITION: "opposite"},
         signature=_rule(),
     )
-    assert memory.distance(a, b) == 2.0
+    assert memory.distance(a, b, _META) == 2.0
 
 
 def test_two_identical_answers_are_zero_apart():
@@ -499,7 +504,7 @@ def test_two_identical_answers_are_zero_apart():
     memory = EpisodicMemory()
     one = _described(("abc", "abd", "xyz", "wyz"), _CROSSWISE, signature=_rule())
     other = _described(("abc", "abd", "xyz", "wyz"), _CROSSWISE, signature=_rule())
-    assert memory.distance(one, other) == 0.0
+    assert memory.distance(one, other, _META) == 0.0
 
 
 # --- compare_answers -------------------------------------------------------
@@ -508,7 +513,7 @@ def test_compare_answers_reports_shared_theme_with_equal_value():
     mem = EpisodicMemory()
     a = _answer({"position": "rightmost"})
     b = _answer({"position": "rightmost"})
-    result = mem.compare_answers(a, b)
+    result = mem.compare_answers(a, b, meta=_META)
     assert result["common_themes"] == {"position": "rightmost"}
 
 
@@ -516,7 +521,7 @@ def test_compare_answers_splits_dimension_with_differing_values():
     mem = EpisodicMemory()
     a = _answer({"direction": "opposite"})
     b = _answer({"direction": "same"})
-    result = mem.compare_answers(a, b)
+    result = mem.compare_answers(a, b, meta=_META)
     # Same category, different relation -> a *differing* theme, not two uniques.
     assert result["differing_themes"]["direction"] == ("opposite", "same")
 
@@ -525,7 +530,7 @@ def test_compare_answers_reports_dimension_present_only_in_a():
     mem = EpisodicMemory()
     a = _answer({"position": "rightmost", "direction": "opposite"})
     b = _answer({"position": "rightmost"})
-    result = mem.compare_answers(a, b)
+    result = mem.compare_answers(a, b, meta=_META)
     assert result["a_unique_themes"] == {"direction": "opposite"}
 
 
@@ -533,7 +538,7 @@ def test_compare_answers_includes_quality_and_rule_fields():
     mem = EpisodicMemory()
     a = _answer({"position": "rightmost"}, quality=80.0, top_rule="rule-a")
     b = _answer({"position": "rightmost"}, quality=55.0, top_rule="rule-b")
-    result = mem.compare_answers(a, b)
+    result = mem.compare_answers(a, b, meta=_META)
     assert result["a_quality"] == 80.0
     assert result["b_quality"] == 55.0
     assert result["a_rule"] == "rule-a"
@@ -622,7 +627,7 @@ def _snag_for(rule, problem=("abc", "abd", "xyz")):
         codelet_count=100,
         temperature=100.0,
         theme_pattern={},
-        description=rule.transcribe_to_english(),
+        description=rule.transcribe_to_english(_META),
         rule_signature=rule_signature(rule),
     )
 
@@ -645,7 +650,7 @@ def test_two_structurally_different_rules_with_identical_prose_do_not_collide(no
     memory = EpisodicMemory()
     by_position = _same_prose_rule(nodes, "plato-rightmost", "plato-string-position-category")
     by_length = _same_prose_rule(nodes, "plato-rightmost", "plato-length")
-    assert by_position.transcribe_to_english() == by_length.transcribe_to_english()
+    assert by_position.transcribe_to_english(_META) == by_length.transcribe_to_english(_META)
 
     memory.store_snag(_snag_for(by_position))
     assert memory.snag_present(("abc", "abd", "xyz"), by_length) is False
@@ -659,8 +664,8 @@ def test_two_rules_with_nothing_to_say_do_not_collide(nodes):
     memory = EpisodicMemory()
     first = _changeless_rule(nodes, position="plato-rightmost")
     second = _changeless_rule(nodes, position="plato-leftmost")
-    assert first.transcribe_to_english() == ""
-    assert second.transcribe_to_english() == ""
+    assert first.transcribe_to_english(_META) == ""
+    assert second.transcribe_to_english(_META) == ""
 
     memory.store_snag(_snag_for(first))
     assert memory.snag_present(("abc", "abd", "xyz"), second) is False
@@ -722,8 +727,23 @@ def test_clear_activations_zeroes_every_stored_answer():
     memory = EpisodicMemory()
     past = _answer({"direction": "opposite"})
     memory.store_answer(past)
-    memory.find_remindings(_answer({"direction": "opposite"}), distance_threshold=5.0)
+    memory.find_remindings(_answer({"direction": "opposite"}), distance_threshold=5.0, meta=_META)
     assert past.activation > 0.0
 
     memory.clear_activations()
     assert past.activation == 0.0
+
+
+def test_reminding_and_distance_without_a_provider_raise_rather_than_reading_the_files():
+    """The former fallback to ``slipnet_nodes.json`` and ``commentary_templates.json``."""
+    mem = EpisodicMemory()
+    past, query = _answer({STRING_POSITION: "identity"}), _answer({DIRECTION: "opposite"})
+    mem.store_answer(past)
+    with pytest.raises(TypeError):
+        mem.distance(query, past)  # type: ignore[call-arg]
+    with pytest.raises(TypeError):
+        mem.find_remindings(query, distance_threshold=5.0)  # type: ignore[call-arg]
+    with pytest.raises((ConfigurationRequired, AttributeError)):
+        mem.distance(query, past, None)
+    with pytest.raises((ConfigurationRequired, AttributeError)):
+        mem.find_remindings(query, distance_threshold=5.0, meta=None)

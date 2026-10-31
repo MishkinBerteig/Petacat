@@ -27,7 +27,7 @@ import pytest
 from server.engine.commentary import CommentaryLog, emit_snag
 from server.engine.images import ImageFailure
 from server.engine.memory import EpisodicMemory, SnagDescription
-from server.engine.metadata import MetadataProvider, default_commentary_templates
+from server.engine.metadata import MetadataProvider
 from server.engine.slipnet import Slipnet
 from server.engine.snag_explanation import (
     capitalize_string,
@@ -41,6 +41,17 @@ from server.engine.workspace import WorkspaceString
 import os
 
 SEED_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
+
+
+_META = MetadataProvider.from_seed_data(SEED_DIR)
+
+
+def default_commentary_templates():
+    """The Metacat Standard Configuration's phrase-templates, via a provider."""
+    return _META.commentary_templates
+
+
+T = default_commentary_templates()
 
 
 @pytest.fixture(scope="module")
@@ -88,10 +99,10 @@ def _change(obj, dimension, descriptor, *extra):
 
 def test_object_phrases_follow_trace_ss_1258(slipnet):
     s = _string(slipnet, "xyz")
-    assert snag_object_phrase(s) == 'the string "xyz"'
-    assert snag_object_phrase(_letter(s, 2)) == "the letter z"
-    assert snag_object_phrase(_Group(s, 0, 2)) == "the xyz group"
-    assert snag_object_phrase(_Group(s, 1, 2)) == "the yz group"
+    assert snag_object_phrase(s, T) == 'the string "xyz"'
+    assert snag_object_phrase(_letter(s, 2), T) == "the letter z"
+    assert snag_object_phrase(_Group(s, 0, 2), T) == "the xyz group"
+    assert snag_object_phrase(_Group(s, 1, 2), T) == "the yz group"
 
 
 # --- CHANGE: the transform's descriptor is a relation or a literal ----------------
@@ -101,7 +112,7 @@ def test_change_by_a_relation_says_its_name(nodes, slipnet):
     """Metacat: abc -> abd; xyz, seed 1, codelet 273."""
     s = _string(slipnet, "xyz")
     failure = _change(_letter(s, 2), nodes["plato-letter-category"], nodes["plato-successor"])
-    assert explain_failure(failure) == (
+    assert explain_failure(failure, T) == (
         "changing the letter-category of the letter z to its successor "
         "is not possible in xyz"
     )
@@ -111,7 +122,7 @@ def test_change_to_a_predecessor_of_a_letter(nodes, slipnet):
     """Metacat: wxyz -> vxyz; abcd -> ?"""
     s = _string(slipnet, "abcd")
     failure = _change(_letter(s, 0), nodes["plato-letter-category"], nodes["plato-predecessor"])
-    assert explain_failure(failure) == (
+    assert explain_failure(failure, T) == (
         "changing the letter-category of the letter a to its predecessor "
         "is not possible in abcd"
     )
@@ -121,11 +132,11 @@ def test_change_to_a_literal_is_quoted_Scheme_style(nodes, slipnet):
     """A non-relation descriptor reads `x' -- backquote, quote (``trace.ss:1124``)."""
     s = _string(slipnet, "xyz")
     failure = _change(_Group(s, 0, 2), nodes["plato-letter-category"], nodes["plato-z"])
-    assert explain_failure(failure) == (
+    assert explain_failure(failure, T) == (
         "changing the letter-category of the xyz group to `z' is not possible in xyz"
     )
     failure = _change(_Group(s, 0, 2), nodes["plato-length"], nodes["plato-four"])
-    assert explain_failure(failure) == (
+    assert explain_failure(failure, T) == (
         "changing the length of the xyz group to `four' is not possible in xyz"
     )
 
@@ -134,13 +145,13 @@ def test_change_of_a_whole_string_names_the_string(nodes, slipnet):
     """The object of a CHANGE can be a workspace string (``answers.ss:1143``)."""
     s = _string(slipnet, "xyzw")
     failure = _change(s, nodes["plato-length"], nodes["plato-predecessor"])
-    assert explain_failure(failure) == (
+    assert explain_failure(failure, T) == (
         'changing the length of the string "xyzw" to its predecessor '
         "is not possible in xyzw"
     )
     z = _string(slipnet, "zy")
     failure = _change(z, nodes["plato-object-category"], nodes["plato-letter"])
-    assert explain_failure(failure) == (
+    assert explain_failure(failure, T) == (
         'changing the object-category of the string "zy" to `letter\' '
         "is not possible in zy"
     )
@@ -151,7 +162,7 @@ def test_alphabetic_position_opposite(nodes, slipnet):
     failure = _change(
         _letter(s, 2), nodes["plato-alphabetic-position-category"], nodes["plato-opposite"]
     )
-    assert explain_failure(failure) == (
+    assert explain_failure(failure, T) == (
         "changing the alphabetic-position-category of the letter c to its opposite "
         "is not possible in abc"
     )
@@ -166,7 +177,7 @@ def test_swap_lists_the_objects_with_punctuate(nodes, slipnet):
     failure = _swap(
         [_Group(s, 0, 0), _Group(s, 1, 2), _Group(s, 3, 5)], nodes["plato-letter-category"]
     )
-    assert explain_failure(failure) == (
+    assert explain_failure(failure, T) == (
         "no letter-category swap is possible between the m group, the rr group, "
         "and the jjj group in mrrjjj"
     )
@@ -176,7 +187,7 @@ def test_a_swap_of_two_objects_is_joined_with_and(nodes, slipnet):
     """Derived from ``punctuate`` (``rules.ss:1824``); no two-object swap was observed."""
     s = _string(slipnet, "xyz")
     failure = _swap([_letter(s, 0), _letter(s, 1)], nodes["plato-letter-category"])
-    assert explain_failure(failure) == (
+    assert explain_failure(failure, T) == (
         "no letter-category swap is possible between the letter x and the letter y in xyz"
     )
 
@@ -189,7 +200,7 @@ def test_a_string_position_swap_uses_the_nodes_full_lowercase_name(nodes, slipne
         [_letter(s, 0), _letter(s, 1), _letter(s, 2)],
         nodes["plato-string-position-category"],
     )
-    assert explain_failure(failure) == (
+    assert explain_failure(failure, T) == (
         "no string-position-category swap is possible between the letter x, "
         "the letter y, and the letter z in xyz"
     )
@@ -206,7 +217,7 @@ def test_conflict_names_both_changes(nodes, slipnet):
         "conflict", objects=[g, g], kind=ImageFailure.CONFLICT,
         dimension=nodes["plato-group-category"], dimension2=nodes["plato-letter-category"],
     )
-    assert explain_failure(failure) == (
+    assert explain_failure(failure, T) == (
         "changing the group-category of the xyz group conflicts with changing the "
         "letter-category of the xyz group in xyz"
     )
@@ -223,7 +234,7 @@ def test_reversing_a_group_uses_the_bond_facet(nodes, slipnet):
         s, nodes["plato-group-category"], nodes["plato-opposite"],
         nodes["plato-letter-category"],
     )
-    assert explain_failure(failure) == (
+    assert explain_failure(failure, T) == (
         'reversing the starting and ending letter-category of the string "abcabc" '
         "is not possible in abcabc"
     )
@@ -232,7 +243,7 @@ def test_reversing_a_group_uses_the_bond_facet(nodes, slipnet):
     failure = _change(
         group, nodes["plato-group-category"], nodes["plato-opposite"], nodes["plato-length"]
     )
-    assert explain_failure(failure) == (
+    assert explain_failure(failure, T) == (
         "reversing the starting and ending length of the abc group "
         "is not possible in abcabc"
     )
@@ -245,9 +256,9 @@ def test_a_failure_without_its_result_has_no_explanation(nodes, slipnet):
     """Petacat can fail where Metacat's rule application cannot (an object with no
     image); there is no Metacat sentence for that, so the caller falls back."""
     s = _string(slipnet, "xyz")
-    assert explain_failure(None) is None
-    assert explain_failure(ImageFailure("no image", objects=[s])) is None
-    assert explain_failure(ImageFailure("x", objects=[])) is None
+    assert explain_failure(None, T) is None
+    assert explain_failure(ImageFailure("no image", objects=[s]), T) is None
+    assert explain_failure(ImageFailure("x", objects=[]), T) is None
 
 
 # --- capitalisation and the commentary ------------------------------------------------
@@ -270,8 +281,8 @@ def test_snag_commentary_is_metacats_two_lines():
     """``answers.ss:1164-1172``, both voices, first snag and a later one.  The strings
     are the CMT lines logged from Metacat 1.2 (abc -> abd; xyz, seed 1)."""
     log = CommentaryLog()
-    emit_snag(log, capitalize_string(EXPLANATION), 1, 273)
-    emit_snag(log, capitalize_string(EXPLANATION), 2, 421)
+    emit_snag(log, capitalize_string(EXPLANATION), 1, 273, T)
+    emit_snag(log, capitalize_string(EXPLANATION), 2, 421, T)
     p1, p2 = log.get_paragraphs()
     assert p1.eliza_text == (
         "Uh-oh, I seem to have run into a little problem.  Changing the "
@@ -336,7 +347,7 @@ def test_a_snag_description_keeps_the_explanation_and_the_translated_rule():
         explanation=EXPLANATION,
         translated_rule_description="Change letter-category of letter `z' to its successor",
     )
-    assert snag_explanation_text(snag) == EXPLANATION
+    assert snag_explanation_text(snag, T) == EXPLANATION
     assert snag.translated_rule_description.startswith("Change letter-category")
 
 
@@ -345,11 +356,11 @@ def test_a_snag_with_no_stored_explanation_falls_back_to_the_old_sentence():
     the fallback template (``caveat_templates.snag_explanation``) serves them."""
     snag = _snag()
     assert snag.explanation == ""
-    assert snag_explanation_text(snag) == (
+    assert snag_explanation_text(snag, T) == (
         'the rule "Replace letter category of rightmost letter by successor" '
         "cannot be applied to xyz"
     )
-    assert fallback_explanation("a\n  b", "xyz") == 'the rule "a; b" cannot be applied to xyz'
+    assert fallback_explanation("a\n  b", "xyz", T) == 'the rule "a; b" cannot be applied to xyz'
 
 
 def test_the_answer_caveat_quotes_the_stored_explanation():
@@ -365,3 +376,13 @@ def test_the_answer_caveat_quotes_the_stored_explanation():
     )
     memory.get_equivalent_snag = lambda a: snag  # the lookup is tested elsewhere
     assert snag_explanation_for(answer, memory, default_commentary_templates()) == EXPLANATION
+
+
+def test_explaining_without_templates_raises_rather_than_reading_the_files():
+    from server.engine.metadata import ConfigurationRequired
+
+    snag = _snag()
+    with pytest.raises(ConfigurationRequired):
+        snag_explanation_text(snag)
+    with pytest.raises(ConfigurationRequired):
+        fallback_explanation("a", "xyz")

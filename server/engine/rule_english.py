@@ -14,15 +14,13 @@ display-only.
 Names come from the slipnodes: Scheme's ``get-lowercase-name`` is the node's symbol
 without its ``plato-`` prefix, lower-cased, which is derived here from ``node.name``.
 The two pieces of genuine data -- the line-length limit and the dimension-name table
-of ``get-dimension-phrase`` -- are in ``seed_data/engine_params.json`` as
+of ``get-dimension-phrase`` -- are the engine parameters
 ``maximum_rule_line_length`` and ``rule_english_dimension_phrases``.
 """
 
 from __future__ import annotations
 
-import json
 import math
-import os
 from typing import TYPE_CHECKING, Any
 
 from server.engine.images import is_platonic_letter
@@ -31,8 +29,6 @@ if TYPE_CHECKING:
     from server.engine.metadata import MetadataProvider
     from server.engine.rules import Rule, RuleChange, RuleClause
 
-_SEED_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
-_seed_params_cache: dict[str, Any] | None = None
 
 #: ``new-object-phrase``'s ``an-letters`` (``rules.ss:2044``): the letters whose name
 #: starts with a vowel sound, so "an `e' group" but "a `b' group".
@@ -40,19 +36,14 @@ _AN_LETTERS = frozenset("aefhilmnorsx")
 
 
 def _param(meta: MetadataProvider | None, name: str, default: Any) -> Any:
-    """An engine parameter; from the seed file when no provider is at hand."""
-    global _seed_params_cache
-    if meta is not None:
-        value = meta.get_param(name, None)
-        if value is not None:
-            return value
-    if _seed_params_cache is None:
-        try:
-            with open(os.path.join(_SEED_DIR, "engine_params.json")) as f:
-                _seed_params_cache = json.load(f)
-        except OSError:
-            _seed_params_cache = {}
-    return _seed_params_cache.get(name, default)
+    """An engine parameter from the run's provider; ``meta`` is mandatory.
+
+    Raises :class:`~server.engine.metadata.ConfigurationRequired` when there is no
+    provider: nothing here reads the Metacat Standard Configuration files.
+    """
+    from server.engine.metadata import require_meta
+
+    return require_meta(meta, f"rule_english parameter {name!r}").get_param(name, default)
 
 
 def _lc(node: Any) -> str:

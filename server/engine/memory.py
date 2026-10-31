@@ -261,7 +261,8 @@ class EpisodicMemory:
         self,
         new_desc: AnswerDescription,
         distance_threshold: float = 5.0,
-        meta: Any = None,
+        *,
+        meta: Any,
     ) -> list[AnswerDescription]:
         """Reactivate past answers close enough to the new one to come to mind.
 
@@ -271,6 +272,9 @@ class EpisodicMemory:
         threshold, Metacat will be reminded of the answer, to the extent that
         the threshold is exceeded."
         """
+        from server.engine.metadata import require_meta
+
+        require_meta(meta, "EpisodicMemory.find_remindings")
         remindings = []
         threshold = distance_threshold or 5.0
         # Newest answer first: ``add-answer-description`` conses the new description onto
@@ -295,7 +299,7 @@ class EpisodicMemory:
         return remindings
 
     def distance(
-        self, a: AnswerDescription, b: AnswerDescription, meta: Any = None
+        self, a: AnswerDescription, b: AnswerDescription, meta: Any
     ) -> float:
         """How far apart two answers are.
 
@@ -330,19 +334,25 @@ class EpisodicMemory:
         at ``memory.ss:490-493``: two identical answers are 0 apart and two non-identical
         answers are always at least 1 apart.
 
-        ``meta`` supplies the conceptual depths component 2 filters on.  With none, the
-        depths come from ``seed_data/slipnet_nodes.json`` — the filter is not optional,
-        because without it ``leftmost`` against ``rightmost`` would read as a difference
-        in level when the two sit at the same depth.
+        ``meta`` (mandatory) supplies the conceptual depths component 2 filters on.  The
+        filter is not optional, because without it ``leftmost`` against ``rightmost``
+        would read as a difference in level when the two sit at the same depth.  A name
+        in a rule signature that ``meta`` has no node for is not available to this run;
+        it contributes no distance (and is never read as depth 0).
         """
         from server.engine.answer_comparison import AnswerComparison
+        from server.engine.metadata import require_meta
+
+        require_meta(meta, "EpisodicMemory.distance")
 
         # ``memory.ss:496-497``: identical answers are zero apart, before anything else
         # is computed.
         if self._answers_equal(a, b):
             return 0.0
 
-        comparison = AnswerComparison(a, b, self, None, meta)
+        comparison = AnswerComparison(
+            a, b, self, meta.commentary_templates, meta=meta
+        )
 
         distance = 1.0
 
@@ -420,7 +430,8 @@ class EpisodicMemory:
         a: AnswerDescription,
         b: AnswerDescription,
         templates: dict[str, Any] | None = None,
-        meta: Any = None,
+        *,
+        meta: Any,
     ) -> dict[str, Any]:
         """Classify how two answers relate.
 
@@ -448,10 +459,13 @@ class EpisodicMemory:
         what they share.
         """
         from server.engine.answer_comparison import AnswerComparison, _lookup
-        from server.engine.metadata import default_commentary_templates
 
         comparison = AnswerComparison(
-            a, b, self, templates or default_commentary_templates(), meta
+            a,
+            b,
+            self,
+            meta.commentary_templates if templates is None else templates,
+            meta=meta,
         )
         verdict = comparison.verdict()
 

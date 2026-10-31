@@ -12,10 +12,17 @@ store/remind/compare/clear happy paths in
 ``tests/seed_unit/test_answer_description.py``.
 """
 
+import os
+
 from server.engine.memory import (
     AnswerDescription,
     EpisodicMemory,
     SnagDescription,
+)
+from server.engine.metadata import MetadataProvider
+
+_META = MetadataProvider.from_seed_data(
+    os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
 )
 
 
@@ -241,4 +248,4 @@ def test_remindings_are_reported_newest_first():
     mem.store_answer(newer)
     new = _answer({"a": "1"})
     mem.store_answer(new)
-    assert mem.find_remindings(new) == [newer, older]
+    assert mem.find_remindings(new, meta=_META) == [newer, older]

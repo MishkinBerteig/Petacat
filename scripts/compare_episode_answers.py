@@ -116,7 +116,7 @@ def petacat_answer_lines(first_trace: Path) -> list[str]:
         snag_explanation_for,
     )
     from server.engine.memory import EpisodicMemory
-    from server.engine.metadata import default_commentary_templates
+    from server.engine.metadata import MetadataProvider
     from tests.lockstep.run_trace import episode_runs, replay_trace
 
     memory = EpisodicMemory()
@@ -128,7 +128,9 @@ def petacat_answer_lines(first_trace: Path) -> list[str]:
         lines.append(f"END\t{stem}\t{outcome.c}\t{outcome.reason}")
         if outcome.reason in ("error", "fatal"):
             break
-    templates = default_commentary_templates()
+    # The Metacat Standard Configuration, as the provider the replay itself ran under.
+    provider = MetadataProvider.from_seed_data(str(Path(__file__).resolve().parent.parent / "seed_data"))
+    templates = provider.commentary_templates
 
     def key(a):
         return "%s|%s" % (a.problem[3], "/".join(a.top_rule_description.split("\n")))
@@ -141,7 +143,7 @@ def petacat_answer_lines(first_trace: Path) -> list[str]:
         for b in memory.answers:
             if a is not b:
                 lines.append("CMP\t%s\t%s\t%s" % (
-                    key(a), key(b), compare_answers_text(a, b, memory, templates)["text"]))
+                    key(a), key(b), compare_answers_text(a, b, memory, templates, meta=provider)["text"]))
     return lines
 
 

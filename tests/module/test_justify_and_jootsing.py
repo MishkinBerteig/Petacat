@@ -187,6 +187,7 @@ def test_a_fully_unifying_translation_asks_for_one_more_answer_justifier(engine)
         None,
         500,
         memory=engine.ctx.memory,
+        meta=engine.ctx.meta,
     )
 
     assert result.action == "post_answer_justifier"
@@ -229,6 +230,7 @@ def test_a_partly_unjustified_translation_settles_for_the_answer(engine):
         None,
         500,
         memory=engine.ctx.memory,
+        meta=engine.ctx.meta,
     )
 
     assert result.action == "report_unjustified_answer"
@@ -323,6 +325,10 @@ def test_the_jootser_body_reports_the_unjustified_answer_instead_of_halting(
     top = _letter_rule(slipnet, RULE_TOP, "plato-rightmost", "plato-successor")
     top.quality = 80.0
     bottom = _letter_rule(slipnet, RULE_BOTTOM, "plato-leftmost", "plato-predecessor")
+    # A rule is described in English when it is made (``rules.ss:98``), against the
+    # run's provider.
+    top.transcribe_to_english(meta)
+    bottom.transcribe_to_english(meta)
     slippage = _concept_mapping(
         slipnet, "plato-bond-category", "plato-successor", "plato-predecessor",
         "plato-opposite",

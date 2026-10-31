@@ -27,7 +27,6 @@ Two facts about the shape of the output are worth stating before the code:
 
 from __future__ import annotations
 
-from functools import lru_cache
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -79,17 +78,22 @@ def _fill(template: str, **values: Any) -> str:
 
 
 def resolve_templates(templates: dict[str, Any] | None) -> dict[str, Any]:
-    """Whatever the caller supplied, or the seed data if it supplied nothing.
+    """The phrase-templates the caller supplied; they are mandatory.
 
-    Served requests pass ``meta.commentary_templates``, which came from Postgres, so an
-    admin edit takes effect on the next comparison.  ``None`` is for callers with no
-    ``MetadataProvider``.
+    Callers pass ``meta.commentary_templates``, which came from Postgres, so an admin
+    edit takes effect on the next comparison.  There is no fallback to the Metacat
+    Standard Configuration files: ``None`` raises
+    :class:`~server.engine.metadata.ConfigurationRequired`.  An empty dict is a
+    configuration with no phrases, and renders empty strings.
     """
-    if templates:
-        return templates
-    from server.engine.metadata import default_commentary_templates
+    if templates is None:
+        from server.engine.metadata import ConfigurationRequired
 
-    return default_commentary_templates()
+        raise ConfigurationRequired(
+            "commentary templates are required (pass meta.commentary_templates); the "
+            "engine does not read the Metacat Standard Configuration files at run time"
+        )
+    return templates
 
 
 def _section(templates: dict[str, Any], *path: str) -> Any:
@@ -530,55 +534,30 @@ def _depth_key(name: str) -> str:
     return "plato-group" if name == _COLLAPSED_GROUP_TOKEN else name
 
 
-@lru_cache(maxsize=1)
-def default_conceptual_depths() -> dict[str, float]:
-    """Every Slipnet node's conceptual depth as it stands in ``seed_data/``.
+def conceptual_depth_lookup(meta: Any):
+    """A ``name -> depth | None`` function over ``meta.slipnet_node_specs``.
 
-    ``count_rule_differences`` needs depths whether or not its caller holds a
-    ``MetadataProvider``: ``EpisodicMemory.distance`` is reached from
-    ``find_remindings`` with no metadata in hand, and dropping the filter there would
-    silently restore the very behaviour the filter exists to prevent.  Served requests
-    still pass ``meta``, so an admin edit to a depth takes effect at once; this is the
-    fallback, in the same spirit as ``default_commentary_templates``.
+    ``meta`` is mandatory.  A name the provider has no node for is *unresolved*: the
+    lookup returns ``None`` for it, never depth 0, and the caller reports it.
     """
-    import json
-    import os
+    from server.engine.metadata import require_meta
 
-    from server.engine.metadata import DEFAULT_SEED_DIR
+    require_meta(meta, "conceptual_depth_lookup")
+    specs = getattr(meta, "slipnet_node_specs", None) or {}
 
-    path = os.path.join(DEFAULT_SEED_DIR, "slipnet_nodes.json")
-    try:
-        with open(path) as f:
-            nodes = json.load(f)
-    except OSError:
-        return {}
-    if isinstance(nodes, dict):
-        nodes = nodes.get("nodes", [])
-    return {
-        node["name"]: float(node.get("conceptual_depth", 0) or 0)
-        for node in nodes
-        if isinstance(node, dict) and "name" in node
-    }
+    def lookup(name: str) -> float | None:
+        spec = specs.get(_depth_key(name))
+        if spec is None:
+            return None
+        return float(getattr(spec, "conceptual_depth", 0) or 0)
 
-
-def conceptual_depth_lookup(meta: Any = None):
-    """A ``name -> depth`` function, from ``meta`` when there is one and the seed data
-    otherwise."""
-    specs = getattr(meta, "slipnet_node_specs", None) if meta is not None else None
-    if specs:
-
-        def from_meta(name: str) -> float:
-            spec = specs.get(_depth_key(name))
-            return float(getattr(spec, "conceptual_depth", 0) or 0)
-
-        return from_meta
-
-    depths = default_conceptual_depths()
-    return lambda name: depths.get(_depth_key(name), 0.0)
+    return lookup
 
 
 def count_rule_differences(
-    differences: list[tuple[str, str]] | None, meta: Any = None
+    differences: list[tuple[str, str]] | None,
+    meta: Any,
+    unresolved: set[str] | None = None,
 ) -> int:
     """``num-rule-differences`` (``answers.ss:605-610``, ``memory.ss:560-565``): −1 when
     incomparable.
@@ -589,11 +568,25 @@ def count_rule_differences(
     sentence is about level.  ``leftmost`` against ``rightmost`` is the canonical case:
     both sit at depth 40, so a rule that changes the leftmost letter and one that
     changes the rightmost are, on this measure, the same distance from anything.
+
+    ``meta`` is mandatory.  A name the provider has no node for is not available to this
+    run (``ABSENCE-BEHAVIOUR.md`` 2.6): it is never read as depth 0.  A pair that
+    names one contributes no distance, and the name is added to ``unresolved`` (when the
+    caller passes a set) so the caller can report it.
     """
     if differences is None:
         return -1
     depth = conceptual_depth_lookup(meta)
-    return sum(1 for x, y in differences if depth(x) != depth(y))
+    count = 0
+    for x, y in differences:
+        dx, dy = depth(x), depth(y)
+        if dx is None or dy is None:
+            if unresolved is not None:
+                unresolved.update(n for n, d in ((x, dx), (y, dy)) if d is None)
+            continue
+        if dx != dy:
+            count += 1
+    return count
 
 
 # ---------------------------------------------------------------------------
@@ -664,7 +657,8 @@ def compare_answers_text(
     answer_b: AnswerDescription,
     memory: EpisodicMemory | None = None,
     templates: dict[str, Any] | None = None,
-    meta: Any = None,
+    *,
+    meta: Any,
 ) -> dict[str, Any]:
     """The full comparison paragraph for two answers.
 
@@ -674,7 +668,7 @@ def compare_answers_text(
     §4.7.4's.  What comes out is one paragraph; the segments are returned separately only
     so a UI can break it up.
     """
-    ctx = AnswerComparison(answer_a, answer_b, memory, templates, meta)
+    ctx = AnswerComparison(answer_a, answer_b, memory, templates, meta=meta)
     return ctx.render()
 
 
@@ -693,9 +687,15 @@ class AnswerComparison:
         other_answer: AnswerDescription,
         memory: EpisodicMemory | None = None,
         templates: dict[str, Any] | None = None,
-        meta: Any = None,
+        *,
+        meta: Any,
     ) -> None:
-        templates = resolve_templates(templates)
+        from server.engine.metadata import require_meta
+
+        require_meta(meta, "AnswerComparison")
+        templates = resolve_templates(
+            meta.commentary_templates if templates is None else templates
+        )
         self.templates = templates
         self.meta = meta
         self.memory = memory
@@ -803,7 +803,12 @@ class AnswerComparison:
         self.rule_differences = compare_rule_signatures(
             self_answer.top_rule_signature, other_answer.top_rule_signature
         )
-        self.num_rule_differences = count_rule_differences(self.rule_differences, meta)
+        #: Names in the rule signatures that the provider has no node for (reported,
+        #: never read as depth 0).
+        self.unresolved_names: set[str] = set()
+        self.num_rule_differences = count_rule_differences(
+            self.rule_differences, meta, self.unresolved_names
+        )
         self.rule_differences_exist = self.num_rule_differences != 0
         rule_tpl = _section(cmp_tpl, "rule_explanation")
         if self.rule_differences is None:

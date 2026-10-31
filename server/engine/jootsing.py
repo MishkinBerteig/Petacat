@@ -377,11 +377,11 @@ def attempt_jootsing(
             # Jootsing from clamps
             if clamp_type == "rule_codelet_clamp":
                 return joots_from_rule_codelet_clamps(
-                    clamps, commentary, codelet_count
+                    clamps, commentary, codelet_count, meta.commentary_templates
                 )
             elif clamp_type == "snag_response_clamp":
                 return joots_from_snag_response_clamps(
-                    clamps, commentary, codelet_count
+                    clamps, commentary, codelet_count, meta.commentary_templates
                 )
             elif clamp_type == "justify_clamp":
                 return joots_from_justify_clamps(
@@ -697,6 +697,7 @@ def joots_from_rule_codelet_clamps(
     clamps: list[TraceEvent],
     commentary: CommentaryLog | None = None,
     codelet_count: int = 0,
+    templates: dict[str, Any] | None = None,
 ) -> JootserResult:
     """Break out of rule codelet clamp patterns.
 
@@ -707,7 +708,7 @@ def joots_from_rule_codelet_clamps(
         from server.engine.commentary import emit_jootsing, emit_give_up
 
         emit_jootsing(commentary, "rule_codelet", codelet_count)
-        emit_give_up(commentary, codelet_count)
+        emit_give_up(commentary, codelet_count, templates)
 
     return JootserResult(
         pattern_detected=True,
@@ -720,6 +721,7 @@ def joots_from_snag_response_clamps(
     clamps: list[TraceEvent],
     commentary: CommentaryLog | None = None,
     codelet_count: int = 0,
+    templates: dict[str, Any] | None = None,
 ) -> JootserResult:
     """Break out of snag response patterns.
 
@@ -730,7 +732,7 @@ def joots_from_snag_response_clamps(
         from server.engine.commentary import emit_jootsing, emit_give_up
 
         emit_jootsing(commentary, "snag_response", codelet_count)
-        emit_give_up(commentary, codelet_count)
+        emit_give_up(commentary, codelet_count, templates)
 
     return JootserResult(
         pattern_detected=True,

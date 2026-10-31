@@ -122,7 +122,13 @@ def test_unjustified_theme_for_a_repeated_dimension_takes_the_first_entry():
 def test_differing_dimensions_counts_one_per_matching_pair():
     from server.engine.answer_comparison import AnswerComparison
     from server.engine.memory import AnswerDescription, EpisodicMemory
-    from server.engine.metadata import default_commentary_templates
+    import os
+
+    from server.engine.metadata import MetadataProvider
+
+    meta = MetadataProvider.from_seed_data(
+        os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
+    )
 
     X, Y = "plato-direction-category", "plato-group-category"
 
@@ -137,7 +143,9 @@ def test_differing_dimensions_counts_one_per_matching_pair():
     # Answer 1 states X twice (justified identity, unjustified opposite); answer 2 once.
     a = answer({X: "identity", Y: "identity"}, {X: "opposite"})
     b = answer({X: "different", Y: "identity"}, {})
-    cmp = AnswerComparison(a, b, EpisodicMemory(), default_commentary_templates(), None)
+    cmp = AnswerComparison(
+        a, b, EpisodicMemory(), meta.commentary_templates, meta=meta
+    )
     assert cmp.differing_dimensions == [X, X]
 
 

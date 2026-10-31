@@ -1690,7 +1690,7 @@ class Rule(WorkspaceStructure):
         )
         return translated
 
-    def transcribe_to_english(self, meta: MetadataProvider | None = None) -> str:
+    def transcribe_to_english(self, meta: MetadataProvider) -> str:
         """The rule in English, lines joined by newlines.
 
         Scheme: ``transcribe-to-english`` (``rules.ss:1723``), called once from

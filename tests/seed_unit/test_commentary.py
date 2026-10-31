@@ -1,8 +1,13 @@
 """The emit helpers that render from ``seed_data/commentary_templates.json``.
 
-``_reporting`` resolves the seed templates when a caller has no ``MetadataProvider``,
-so what these assert is which template each event picks and how it is filled.
+The templates come from a provider holding the Metacat Standard Configuration (the
+emit helpers have no fallback to the files), so what these assert is which template
+each event picks and how it is filled.
 """
+
+import os
+
+import pytest
 
 from server.engine.commentary import (
     CommentaryLog,
@@ -11,6 +16,11 @@ from server.engine.commentary import (
     emit_answer_unjustified,
     emit_give_up,
 )
+from server.engine.metadata import ConfigurationRequired, MetadataProvider
+
+T = MetadataProvider.from_seed_data(
+    os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
+).commentary_templates
 
 
 # ---- emit_answer_discovered ----
@@ -18,7 +28,7 @@ from server.engine.commentary import (
 
 def test_answer_discovered_high_quality():
     log = CommentaryLog()
-    emit_answer_discovered(log, "xyd", 90.0, "great", 50.0, 100, 0, {})
+    emit_answer_discovered(log, "xyd", 90.0, "great", 50.0, 100, 0, T)
     eliza = log.render(eliza_mode=True)
     tech = log.render(eliza_mode=False)
     assert '"xyd"' in eliza
@@ -28,7 +38,7 @@ def test_answer_discovered_high_quality():
 
 def test_answer_discovered_low_quality():
     log = CommentaryLog()
-    emit_answer_discovered(log, "xyd", 40.0, "really terrible", 80.0, 100, 0, {})
+    emit_answer_discovered(log, "xyd", 40.0, "really terrible", 80.0, 100, 0, T)
     eliza = log.render(eliza_mode=True)
     assert "really terrible" in eliza
 
@@ -36,7 +46,7 @@ def test_answer_discovered_low_quality():
 def test_answer_discovered_also():
     """Second answer should include 'also'."""
     log = CommentaryLog()
-    emit_answer_discovered(log, "xyd", 85.0, "good", 50.0, 200, 1, {})
+    emit_answer_discovered(log, "xyd", 85.0, "good", 50.0, 200, 1, T)
     eliza = log.render(eliza_mode=True)
     assert "also" in eliza
 
@@ -46,7 +56,7 @@ def test_answer_discovered_also():
 
 def test_answer_justified():
     log = CommentaryLog()
-    emit_answer_justified(log, 85.0, "pretty good", 100, {})
+    emit_answer_justified(log, 85.0, "pretty good", 100, T)
     eliza = log.render(eliza_mode=True)
     tech = log.render(eliza_mode=False)
     assert "Aha" in eliza
@@ -59,7 +69,7 @@ def test_answer_justified():
 
 def test_answer_unjustified():
     log = CommentaryLog()
-    emit_answer_unjustified(log, "leftmost->rightmost", 100)
+    emit_answer_unjustified(log, "leftmost->rightmost", 100, T)
     eliza = log.render(eliza_mode=True)
     tech = log.render(eliza_mode=False)
     assert "stumped" in eliza
@@ -72,8 +82,17 @@ def test_answer_unjustified():
 
 def test_give_up():
     log = CommentaryLog()
-    emit_give_up(log, 500)
+    emit_give_up(log, 500, T)
     eliza = log.render(eliza_mode=True)
     tech = log.render(eliza_mode=False)
     assert "punch" in eliza
     assert "terminated" in tech.lower()
+
+
+def test_emitting_without_templates_raises_rather_than_reading_the_files():
+    log = CommentaryLog()
+    with pytest.raises(ConfigurationRequired):
+        emit_give_up(log, 500)
+    with pytest.raises(ConfigurationRequired):
+        emit_answer_unjustified(log, "leftmost->rightmost", 100)
+    assert log.count == 0
