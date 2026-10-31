@@ -100,7 +100,7 @@ pytestmark = pytest.mark.skipif(
 @pytest.fixture(scope="module")
 async def step0_engine():
     """An engine on `petacat_step0`, created if it is not there yet."""
-    admin_url = TEST_DB_URL.rsplit("/", 1)[0] + "/petacat"
+    admin_url = TEST_DB_URL.rsplit("/", 1)[0] + "/postgres"
     admin_engine = create_async_engine(
         admin_url, isolation_level="AUTOCOMMIT", poolclass=NullPool
     )

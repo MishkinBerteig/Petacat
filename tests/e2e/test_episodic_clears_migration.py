@@ -38,7 +38,7 @@ REPO = Path(__file__).resolve().parents[2]
 async def scratch():
     """An empty scratch database holding the pre-018 shape of the two tables."""
     admin = create_async_engine(
-        TEST_DB_URL.rsplit("/", 1)[0] + "/petacat",
+        TEST_DB_URL.rsplit("/", 1)[0] + "/postgres",
         isolation_level="AUTOCOMMIT",
         poolclass=NullPool,
     )

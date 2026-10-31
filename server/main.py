@@ -16,6 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from server.config import SEED_DATA_DIR
+from server.db import get_session
 from server.services.configuration_startup import startup_configuration
 
 logger = logging.getLogger("petacat")
@@ -185,29 +186,53 @@ async def validation_error_handler(request: Request, exc: RequestValidationError
 
 _CONFIG_WRITE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
+#: Admin writes that are not configuration, or that reload the provider themselves.
+_NOT_CONFIGURATION_PREFIXES = ("/api/admin/help", "/api/admin/reload")
+
 
 @app.middleware("http")
 async def adopt_configuration_edits(request: Request, call_next):
     """Carry an admin edit through to the Runs created after it.
 
     A write under ``/api/admin`` changes the configuration in the database. The
-    ``RunService`` holds a ``MetadataProvider`` built from that configuration, and this
-    marks it stale so ``create_run`` rebuilds it from the database for the next Run.
+    ``RunService`` holds the ``MetadataProvider`` built from that configuration (the
+    Swarm, the Training scheduler and the parameter listings all read it from there), so
+    once the write has committed the provider is rebuilt from the database, and the next
+    Run, in either run mode, starts under the edit with no reload and no restart.
 
-    Marking rather than reloading here keeps a Run's metadata fixed for its whole life:
-    an edit made while something is running takes effect on the Run after it, and the
-    reload happens once however many cells were edited.
+    A Run already under way keeps the provider it was created with. If the rebuild
+    fails the previous provider stays in place and the caller gets a 500 saying so: the
+    edit is in the database but not yet in force.
     """
     response = await call_next(request)
+    path = request.url.path
     if (
         request.method in _CONFIG_WRITE_METHODS
-        and request.url.path.startswith("/api/admin")
+        and path.startswith("/api/admin")
+        and not path.startswith(_NOT_CONFIGURATION_PREFIXES)
         and 200 <= response.status_code < 300
     ):
         from server.api.runs import _run_service
 
         if _run_service is not None:
-            _run_service.mark_metadata_stale()
+            # The session the routes use, so a test that overrides it is reloaded from
+            # the database it wrote to.
+            source = app.dependency_overrides.get(get_session, get_session)
+            sessions = source()
+            try:
+                await _run_service.reload_metadata(await anext(sessions))
+            except Exception as exc:
+                logger.exception("Configuration reload after an admin edit failed")
+                return JSONResponse(
+                    status_code=500,
+                    content={
+                        "detail": "The edit was saved, but the configuration it leaves "
+                        f"could not be loaded ({exc}); the previous configuration "
+                        "stays in force until this is fixed."
+                    },
+                )
+            finally:
+                await sessions.aclose()
     return response
 
 

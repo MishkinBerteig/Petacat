@@ -241,29 +241,19 @@ class RunService:
         #: the live Themespace only if the current state is displayed,
         #: ``trace.ss:411-413``).
         self._displaying: dict[int, tuple[str, int]] = {}
-        #: Set when an admin write changes the configuration in the database.  The
-        #: reload happens at the next ``create_run`` rather than at the write, so a
-        #: Run's metadata is fixed for its whole life and an edit made while something
-        #: is running takes effect on the Run after it.
-        self._metadata_stale: bool = False
 
-    def mark_metadata_stale(self) -> None:
-        """Note that the configuration in the database has moved on."""
-        self._metadata_stale = True
+    async def reload_metadata(self, session: AsyncSession) -> None:
+        """Rebuild the ``MetadataProvider`` from the database for the Runs created from here on.
 
-    async def refresh_metadata_if_stale(self, session: AsyncSession) -> bool:
-        """Adopt the database's configuration for the Runs created from here on.
-
-        Returns whether a reload happened, which the admin endpoints report so a
-        caller can see that an edit has been taken up.
+        A Run holds the provider it was created with (``EngineRunner`` takes it at
+        creation), so a Run already under way keeps its configuration and an edit made
+        while something is running takes effect on the next one. The provider is
+        replaced only once the new one has been built: if the database holds a
+        configuration it cannot build from, this raises and the previous provider stays.
         """
-        if not self._metadata_stale:
-            return False
         from server.services.metadata_service import load_metadata_from_db
 
         self.meta = await load_metadata_from_db(session)
-        self._metadata_stale = False
-        return True
 
     # ------------------------------------------------------------------
     # Existing methods
@@ -305,10 +295,6 @@ class RunService:
         """
         # Validated before anything is created, so a bad override cannot leave a
         # half-built Run behind. Raises ValueError, which the API turns into a 400.
-        # An admin edit committed since the last Run is adopted here, so the Run about
-        # to be created executes under the configuration currently in the database.
-        await self.refresh_metadata_if_stale(session)
-
         overrides = validate_overrides(parameters)
         run_meta = self.meta.with_overrides(overrides)
 
@@ -833,7 +819,7 @@ class RunService:
         # never yields never lets them be served — the run would become uninterruptible.
         # Yielding once per update cycle keeps the pause and stop controls responsive
         # to within about a millisecond while removing fourteen fifteenths of the cost.
-        ucl = self.meta.get_param("update_cycle_length", 15)
+        ucl = runner.ctx.meta.get_param("update_cycle_length", 15)
         step = 0
 
         while runner.status == STATUS_RUNNING:

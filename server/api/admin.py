@@ -1190,11 +1190,8 @@ async def reload_metadata(session: AsyncSession = Depends(get_session)):
     used by the RunService for new runs.
     """
     from server.api.runs import get_run_service
-    from server.services.metadata_service import load_metadata_from_db
 
-    svc = get_run_service()
-    new_meta = await load_metadata_from_db(session)
-    svc.meta = new_meta
+    await get_run_service().reload_metadata(session)
     return {"reloaded": True}
 
 
@@ -1502,12 +1499,6 @@ async def import_metadata(
                 await _resync_identity_sequence(session, model)
 
         await session.commit()
-
-        # Trigger a metadata reload
-        from server.api.runs import get_run_service
-        from server.services.metadata_service import load_metadata_from_db
-        svc = get_run_service()
-        svc.meta = await load_metadata_from_db(session)
 
     except Exception as e:
         await session.rollback()

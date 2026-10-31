@@ -70,14 +70,17 @@ async def test_engine():
     from sqlalchemy.pool import NullPool
 
     # First, ensure the test database exists
-    admin_url = TEST_DB_URL.rsplit("/", 1)[0] + "/petacat"
+    # The maintenance database, so this works whichever database TEST_DATABASE_URL names
+    # and whether or not the development database `petacat` exists on the instance.
+    test_db_name = TEST_DB_URL.rsplit("/", 1)[1]
+    admin_url = TEST_DB_URL.rsplit("/", 1)[0] + "/postgres"
     admin_engine = create_async_engine(admin_url, isolation_level="AUTOCOMMIT", poolclass=NullPool)
     async with admin_engine.connect() as conn:
         result = await conn.execute(
-            text("SELECT 1 FROM pg_database WHERE datname = 'petacat_test'")
+            text("SELECT 1 FROM pg_database WHERE datname = :name"), {"name": test_db_name}
         )
         if result.fetchone() is None:
-            await conn.execute(text("CREATE DATABASE petacat_test"))
+            await conn.execute(text(f'CREATE DATABASE "{test_db_name}"'))
     await admin_engine.dispose()
 
     # Use NullPool to avoid connection sharing issues with ASGI transport
