@@ -107,6 +107,12 @@ export interface RunStore {
    * did not report it.
    */
   runMode: string | null;
+  /**
+   * The loaded run was given its answer to justify, rather than discovering one.
+   * `workspace.answer` carries either, so this is what says whether that answer is
+   * one the user typed (and may be copied back into the form) or one the run found.
+   */
+  runJustifyMode: boolean;
   status: RunStatus;
   workspace: WorkspaceState | null;
   slipnet: SlipnetState | null;
@@ -395,6 +401,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
   runId: null,
   runParams: null,
   runMode: null,
+  runJustifyMode: false,
   status: 'idle',
   workspace: null,
   slipnet: null,
@@ -477,6 +484,8 @@ export const useRunStore = create<RunStore>((set, get) => ({
       runId: info.run_id,
       runParams: params,
       runMode: info.mode ?? get().persistenceMode,
+      // Echoed by the server; the request is the fallback for a response without it.
+      runJustifyMode: info.justify_mode ?? !!params.answer,
       // Recorded as sent, not as echoed: the response carries neither, and these are
       // what decide whether the next press of Run continues this run or starts one.
       runParameterOverrides: { ...overrides },
@@ -516,6 +525,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
       // Carried over so the run controls know whether pressing Run would continue
       // this run or start a new one under a different mode.
       runMode: info.mode ?? null,
+      runJustifyMode: info.justify_mode ?? false,
       status: info.status as RunStatus,
       codeletCount: info.codelet_count,
       temperature: info.temperature,
@@ -834,6 +844,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
       runId: null,
       runParams: null,
       runMode: null,
+      runJustifyMode: false,
       runParameterOverrides: {},
       runWorkers: 1,
       status: 'idle',
@@ -878,6 +889,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
       runId: null,
       runParams: null,
       runMode: null,
+      runJustifyMode: false,
       runParameterOverrides: {},
       runWorkers: 1,
       status: 'idle',

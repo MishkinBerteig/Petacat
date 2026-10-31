@@ -52,8 +52,9 @@ RUN_CONTROL_PANELS = (
     REPO_ROOT / "client" / "src" / "components" / "SwarmPanel.tsx",
 )
 
-#: A rendered group heading: ``<div style={groupLabelStyle}>Run</div>``.
-_GROUP_LABEL = re.compile(r"style=\{groupLabelStyle\}>")
+#: A rendered group heading: ``<div style={groupLabelStyle}>Run</div>``, or a
+#: ``<CollapsibleGroup id="run" title="Run" ...>``, which draws its own heading.
+_GROUP_LABEL = re.compile(r"style=\{groupLabelStyle\}>|<CollapsibleGroup\b")
 
 _NUMBER = r"([\d,]+)"
 
@@ -195,7 +196,7 @@ _GROUP_COUNT_WORDS = {
 
 
 def test_the_run_controls_group_count_is_as_documented():
-    """Each group renders exactly one ``groupLabelStyle`` heading."""
+    """Each group renders exactly one heading: a ``groupLabelStyle`` label or a ``CollapsibleGroup``."""
     rendered = sum(
         len(_GROUP_LABEL.findall(path.read_text(encoding="utf-8")))
         for path in RUN_CONTROL_PANELS

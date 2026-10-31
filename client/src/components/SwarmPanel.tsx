@@ -131,14 +131,11 @@ export function SwarmPanel() {
   const t = result?.telemetry;
 
   return (
-    <div style={groupStyle} data-testid="swarm-panel">
-      <div style={{ display: 'flex', alignItems: 'center' }}>
-        <div style={groupLabelStyle}>Swarm</div>
-        <ControlHelp topic="swarm" label="Swarm" />
-      </div>
-      <div className="text-xs text-muted" style={{ margin: '4px 0 8px' }}>
-        Run mode: multi-core across runs. Run this problem over many seeds on every core and see
-        the answer distribution.{' '}
+    // The box, the "Swarm" header and its `?` belong to the collapsible group that
+    // RunControlsPanel wraps this in.
+    <div data-testid="swarm-panel">
+      <div className="text-xs text-muted" style={{ margin: '0 0 8px' }}>
+        Run mode: multi-core across runs. This problem over many seeds, as an answer distribution.{' '}
         {justification ? 'Justification mode: the problem has an answer.' : 'Discovery mode.'}
         {status?.available && status.workers > 0 ? ` ${status.workers} cores.` : ''}
       </div>
@@ -295,21 +292,6 @@ export function SwarmPanel() {
 // ---------------------------------------------------------------------------
 // Styles
 // ---------------------------------------------------------------------------
-
-const groupStyle: React.CSSProperties = {
-  background: 'var(--bg-card)',
-  border: '1px solid var(--border)',
-  borderRadius: 4,
-  padding: 10,
-};
-
-const groupLabelStyle: React.CSSProperties = {
-  fontSize: 10,
-  fontWeight: 700,
-  textTransform: 'uppercase',
-  letterSpacing: 0.6,
-  color: 'var(--text-secondary)',
-};
 
 const labelStyle: React.CSSProperties = {
   display: 'block',

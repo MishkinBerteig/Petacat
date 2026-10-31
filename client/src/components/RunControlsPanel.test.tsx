@@ -93,6 +93,18 @@ function workspaceFor(
 
 const ORIGINAL = useRunStore.getState()
 
+/** Open a collapsed Run Controls group by its header, as a user would. */
+function openGroup(name: RegExp) {
+  const header = screen.getByRole('button', { name })
+  if (header.getAttribute('aria-expanded') === 'false') fireEvent.click(header)
+}
+
+// Each group's open/closed state is remembered in localStorage, so a test that opens
+// one must not leave it open for the next.
+beforeEach(() => {
+  window.localStorage.clear()
+})
+
 function setup(overrides: Partial<ReturnType<typeof useRunStore.getState>>) {
   useRunStore.setState({ ...ORIGINAL, ...overrides }, true)
 }
@@ -355,6 +367,7 @@ describe('RunControlsPanel — execution strategy selector', () => {
   it('keeps manual stepping available regardless of strategy', () => {
     setupWithRun()
     render(<RunControlsPanel />)
+    openGroup(/^manual stepping$/i)
     expect(screen.getByRole('button', { name: /step 1/i })).toBeTruthy()
 
     fireEvent.change(screen.getByLabelText(/how to run/i), {
@@ -832,6 +845,7 @@ describe('RunControlsPanel — a refused request reaches the error channel', () 
     setup(LOADED)
 
     render(<RunControlsPanel />)
+    openGroup(/^settings$/i)
     fireEvent.change(screen.getByLabelText(/breakpoint/i), { target: { value: '250' } })
     fireEvent.click(screen.getByRole('button', { name: /^set$/i }))
 
@@ -846,6 +860,7 @@ describe('RunControlsPanel — a refused request reaches the error channel', () 
     setup({ ...LOADED, lastError: 'Could not set the breakpoint: it no longer exists.' })
 
     render(<RunControlsPanel />)
+    openGroup(/^settings$/i)
     fireEvent.change(screen.getByLabelText(/breakpoint/i), { target: { value: '250' } })
     fireEvent.click(screen.getByRole('button', { name: /^set$/i }))
 
@@ -945,6 +960,7 @@ describe('RunControlsPanel — a finished run is followed by a new one', () => {
     setup({ ...SAME_PROBLEM, status: 'answer_found', createRun, runToAnswer, step })
 
     render(<RunControlsPanel />)
+    openGroup(/^manual stepping$/i)
     fireEvent.click(screen.getByRole('button', { name: /step 1/i }))
 
     await waitFor(() => expect(step).toHaveBeenCalledWith(1))
@@ -974,6 +990,7 @@ describe('RunControlsPanel — while a run is under way', () => {
     setup({ ...LOADED, status: 'running' })
 
     render(<RunControlsPanel />)
+    openGroup(/^manual stepping$/i)
     expect(screen.getByRole('button', { name: /run to answer/i })).toBeDisabled()
     expect(screen.getByRole('button', { name: /step 1/i })).toBeDisabled()
   })
@@ -1034,9 +1051,10 @@ describe('RunControlsPanel — Episodic Memory', () => {
   it('has an Episodic Memory group that says what episodic runs are', () => {
     setup(LOADED)
     render(<RunControlsPanel />)
-    expect(screen.getByText('Episodic Memory')).toBeTruthy()
-    expect(screen.getByText(/runs are episodic runs/)).toBeTruthy()
-    expect(screen.getByText(/the next\s+episodic run starts with none/)).toBeTruthy()
+    expect(screen.getByRole('button', { name: /^episodic memory$/i })).toBeTruthy()
+    expect(
+      screen.getByText(/Each episodic run inherits the Episodic Memory the runs before it left/),
+    ).toBeTruthy()
   })
 
   it('clears Episodic Memory on confirmation', async () => {
@@ -1100,6 +1118,7 @@ describe('RunControlsPanel — reaching the record of the run on screen', () => 
     })
 
     render(<RunControlsPanel />)
+    openGroup(/^settings$/i)
     const link = await screen.findByRole('button', { name: /Review this run/i })
     fireEvent.click(link)
     expect(window.location.hash).toBe('#/review/runs/12')

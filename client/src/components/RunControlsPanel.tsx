@@ -60,6 +60,7 @@ import { RunParametersPanel } from '@/components/RunParametersPanel';
 import { ClampControls } from '@/components/ClampControls';
 import { RunDerivedPanel } from '@/components/RunDerivedPanel';
 import { SwarmPanel } from '@/components/SwarmPanel';
+import { CollapsibleGroup } from '@/components/CollapsibleGroup';
 import { useMachine } from '@/hooks/useMachine';
 import {
   parameterErrors,
@@ -361,11 +362,9 @@ export function RunControlsPanel() {
       {/* ------------------------------------------------------------ */}
       {/* GROUP 1: Run — strategy, go/stop, and that strategy's pacing  */}
       {/* ------------------------------------------------------------ */}
-      <div style={groupStyle}>
-        <div style={groupLabelStyle}>Run</div>
+      <CollapsibleGroup id="run" title="Run" defaultOpen helpTopic="run_controls">
         <div className="text-xs text-muted" data-testid="run-mode-note">
-          Run mode — single-threaded or multi-core — is how a run executes. It is separate from
-          Recording below (Fast, Normal or Audit), which is how a run is recorded.
+          Run mode (how it executes) is separate from Recording (how it is recorded).
         </div>
 
         <div style={fieldGroupStyle}>
@@ -385,8 +384,8 @@ export function RunControlsPanel() {
           </select>
           <span className="text-xs text-muted">
             {strategy === 'batch'
-              ? 'The engine runs flat out on the backend; the UI samples it as it goes. Quickest way to an answer. Changes only how this browser watches the run, not what the run does or records.'
-              : 'One codelet at a time, refreshing every panel after each. Much slower, but every structure being built is visible.'}
+              ? 'Full speed on the backend; the UI samples it. Changes only how you watch.'
+              : 'One codelet at a time, every panel refreshed. Much slower.'}
           </span>
         </div>
 
@@ -410,23 +409,17 @@ export function RunControlsPanel() {
           />
           <span className="text-xs text-muted">
             {store.persistenceMode === 'audit'
-              ? 'Audit is serial by definition: it reconstructs states by replaying its '
-                + 'action log forward, a parallel run executes the stream-serial reference, which that '
-                + 'replay does not reproduce. Choose Normal or Fast to run in parallel.'
+              ? 'Audit is serial by definition; choose Normal or Fast to run in parallel.'
               : effectiveWorkers === 1
-                ? 'One codelet at a time, in order. The same problem and seed reproduce the '
-                  + 'run exactly, which is why this stays the reference mode.'
-                : 'Parallel, exact: the run is identical for any worker count of 2 or '
-                  + 'more and is reproduced by its seed. It is a different run from the '
-                  + 'serial loop with the same seed (equal in law, not the same draws), '
-                  + 'and it is not yet faster than serial. For throughput use the Swarm.'}
+                ? 'The same problem and seed reproduce the run exactly.'
+                : 'Parallel, exact, and a different run from the serial loop with the same seed.'}
             {machineWorkers !== null && (
               <>
                 {' '}
-                {`The server has ${machineWorkers} performance core`}
+                {`Ceiling: ${machineWorkers} performance core`}
                 {machineWorkers === 1 ? '' : 's'}
                 {machine?.chip ? ` (${machine.chip})` : ''}
-                {', which is the ceiling here.'}
+                {'.'}
               </>
             )}
           </span>
@@ -539,8 +532,7 @@ export function RunControlsPanel() {
               style={{ width: '100%' }}
             />
             <div className="text-xs text-muted">
-              How often the UI reads the running engine. 0 = continuous (~100ms).
-              Does not change how the engine runs.
+              How often the UI reads the engine; 0 = continuous. Does not change the run.
             </div>
           </div>
         ) : (
@@ -564,7 +556,7 @@ export function RunControlsPanel() {
             </div>
           </div>
         )}
-      </div>
+      </CollapsibleGroup>
 
       {/* ------------------------------------------------------------ */}
       {/* GROUP 2: Episodic Memory — what the episodic runs accumulate */}
@@ -574,14 +566,9 @@ export function RunControlsPanel() {
       {/* Episodic Memory is what carries between them. Clearing it was */}
       {/* reachable only from the Admin view.                           */}
       {/* ------------------------------------------------------------ */}
-      <div style={groupStyle}>
-        <div style={groupLabelStyle}>Episodic Memory</div>
-
+      <CollapsibleGroup id="episodic-memory" title="Episodic Memory" defaultOpen helpTopic="run_controls">
         <div className="text-xs text-muted">
-          Metacat Mode&apos;s runs are episodic runs: each inherits the Episodic Memory
-          (Metacat-Mode learning) that the runs before it left, and that memory is
-          the only thing that crosses a run boundary. Clearing it means the next
-          episodic run starts with none.
+          Each episodic run inherits the Episodic Memory the runs before it left.
         </div>
 
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }}>
@@ -602,12 +589,7 @@ export function RunControlsPanel() {
             </span>
           )}
         </div>
-
-        <div className="text-xs text-muted" style={{ marginTop: 6 }}>
-          Runs already recorded stay in Run History and in Review, where the clear is
-          marked in the episodic-run timeline.
-        </div>
-      </div>
+      </CollapsibleGroup>
 
       {/* ------------------------------------------------------------ */}
       {/* GROUP 3: Recording — the persistence mode (Phase 0 §A2)       */}
@@ -617,13 +599,13 @@ export function RunControlsPanel() {
       {/* pair most easily confused and putting them side by side is    */}
       {/* what makes the difference between them visible.               */}
       {/* ------------------------------------------------------------ */}
-      <div style={groupStyle}>
-        <div style={groupLabelStyle}>
-          Recording{' '}
-          <span className="text-xs text-muted" style={{ fontWeight: 400, textTransform: 'none' }}>
-            (persistence mode, not run mode)
-          </span>
-        </div>
+      <CollapsibleGroup
+        id="recording"
+        title="Recording"
+        note="(persistence mode, not run mode)"
+        defaultOpen={false}
+        helpTopic="run_controls"
+      >
 
         <div style={fieldGroupStyle}>
           <label style={labelStyle} htmlFor="persistence-mode">
@@ -648,9 +630,7 @@ export function RunControlsPanel() {
         </div>
 
         <div className="text-xs text-muted">
-          Fixed when a run is created, so choosing a different one starts a new run.
-          None of the three changes what the engine computes — the same problem and
-          seed give the same answer in all three.
+          Fixed when a run is created: choosing another mode starts a new run.
         </div>
 
         {/* Warned about before the run rather than discovered afterwards: a Fast
@@ -673,7 +653,7 @@ export function RunControlsPanel() {
             Episodic Memory and narrate themselves like any other run.
           </div>
         )}
-      </div>
+      </CollapsibleGroup>
 
       {/* ------------------------------------------------------------ */}
       {/* GROUP 4: Engine parameters — the settable half                */}
@@ -698,8 +678,7 @@ export function RunControlsPanel() {
       {/* ------------------------------------------------------------ */}
       {/* GROUP 6: Manual stepping — independent of both selectors      */}
       {/* ------------------------------------------------------------ */}
-      <div style={groupStyle}>
-        <div style={groupLabelStyle}>Manual stepping</div>
+      <CollapsibleGroup id="manual-stepping" title="Manual stepping" defaultOpen={false} helpTopic="run_controls">
 
         <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -726,21 +705,21 @@ export function RunControlsPanel() {
           </button>
         </div>
         <div className="text-xs text-muted" style={{ marginTop: 6 }}>
-          Advance a fixed number of codelets and stop. Useful for inspecting a
-          specific moment.
+          Advance a fixed number of codelets, then stop.
         </div>
-      </div>
+      </CollapsibleGroup>
 
       {/* ------------------------------------------------------------ */}
       {/* GROUP 7: Swarm -- the problem over many seeds, on every core */}
       {/* ------------------------------------------------------------ */}
-      <SwarmPanel />
+      <CollapsibleGroup id="swarm" title="Swarm" defaultOpen={false} helpTopic="swarm">
+        <SwarmPanel />
+      </CollapsibleGroup>
 
       {/* ------------------------------------------------------------ */}
       {/* GROUP 8: Settings                                            */}
       {/* ------------------------------------------------------------ */}
-      <div style={groupStyle}>
-        <div style={groupLabelStyle}>Settings</div>
+      <CollapsibleGroup id="settings" title="Settings" defaultOpen={false} helpTopic="run_controls">
 
         <div style={fieldGroupStyle}>
           <label style={labelStyle} htmlFor="spreading-threshold">
@@ -758,9 +737,7 @@ export function RunControlsPanel() {
             style={{ width: '100%' }}
           />
           <span className="text-xs text-muted">
-            0 = all active nodes spread; 100 = only fully-active, matching the
-            original. Shows what the run on screen is using; moving it changes
-            that run, and the value chosen is what each new run starts with.
+            0 = all active nodes spread; 100 = the original. Moving it changes the run on screen.
           </span>
         </div>
 
@@ -920,7 +897,7 @@ export function RunControlsPanel() {
             )}
           </div>
         )}
-      </div>
+      </CollapsibleGroup>
     </div>
   );
 }
@@ -928,22 +905,6 @@ export function RunControlsPanel() {
 // ---------------------------------------------------------------------------
 // Styles
 // ---------------------------------------------------------------------------
-
-const groupStyle: React.CSSProperties = {
-  background: 'var(--bg-card)',
-  border: '1px solid var(--border)',
-  borderRadius: 4,
-  padding: 10,
-};
-
-const groupLabelStyle: React.CSSProperties = {
-  fontSize: 10,
-  fontWeight: 700,
-  textTransform: 'uppercase',
-  letterSpacing: 0.6,
-  color: 'var(--text-secondary)',
-  marginBottom: 8,
-};
 
 const labelStyle: React.CSSProperties = {
   display: 'block',

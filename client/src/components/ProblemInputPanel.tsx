@@ -17,6 +17,7 @@ import { getDemos, describeApiError } from '@/api/client';
 export function ProblemInputPanel() {
   const workspace = useRunStore((s) => s.workspace);
   const runId = useRunStore((s) => s.runId);
+  const runJustifyMode = useRunStore((s) => s.runJustifyMode);
   /** Last run whose problem we copied into the form. */
   const adoptedRunId = useRef<number | null>(null);
   const formInputs = useRunStore((s) => s.formInputs);
@@ -61,7 +62,10 @@ export function ProblemInputPanel() {
       initial: workspace.initial,
       modified: workspace.modified,
       target: workspace.target,
-      answer: workspace.answer ?? '',
+      // The Answer field is the answer the user *gives*, which switches runs and the
+      // Swarm into Justification mode. A discovery run's workspace carries the answer
+      // it found; copying that in would turn the next run into a justification of it.
+      answer: runJustifyMode ? (workspace.answer ?? '') : '',
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [runId, workspace]);

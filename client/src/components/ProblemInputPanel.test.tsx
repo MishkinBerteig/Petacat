@@ -175,3 +175,43 @@ describe('ProblemInputPanel — problem identity lives here', () => {
     expect(useRunStore.getState().formInputs.target).toBe('mrrjjj')
   })
 })
+
+describe('ProblemInputPanel — the Answer field is the answer the user gives', () => {
+  const withAnswer = (answer: string): WorkspaceState =>
+    ({ initial: 'abc', modified: 'abd', target: 'xyz', answer }) as unknown as WorkspaceState
+
+  const blankForm = { initial: '', modified: '', target: '', answer: '', seed: '' }
+  const answerField = () => screen.getByLabelText(/answer/i) as HTMLInputElement
+
+  it('leaves Answer empty when the adopted run discovered its answer', () => {
+    // The run FOUND xyd; copying that into the field would make the next run, and the
+    // Swarm, justify it instead of discovering one.
+    setup({ runId: 3, runJustifyMode: false, workspace: withAnswer('xyd'), formInputs: blankForm })
+
+    render(<ProblemInputPanel />)
+
+    expect(answerField().value).toBe('')
+    expect(useRunStore.getState().formInputs.target).toBe('xyz')
+  })
+
+  it('fills Answer with the given answer when the adopted run was a justification', () => {
+    setup({ runId: 4, runJustifyMode: true, workspace: withAnswer('xyd'), formInputs: blankForm })
+
+    render(<ProblemInputPanel />)
+
+    expect(answerField().value).toBe('xyd')
+  })
+
+  it('keeps Answer empty when the panel remounts after a discovery run', () => {
+    // Returning to the dashboard from Review remounts the panel, which re-adopts the
+    // loaded run: the found answer must not leak in on the second pass either.
+    setup({ runId: 3, runJustifyMode: false, workspace: withAnswer('xyd'), formInputs: blankForm })
+
+    const first = render(<ProblemInputPanel />)
+    first.unmount()
+    render(<ProblemInputPanel />)
+
+    expect(answerField().value).toBe('')
+    expect(useRunStore.getState().formInputs.answer).toBe('')
+  })
+})

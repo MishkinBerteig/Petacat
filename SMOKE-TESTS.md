@@ -20,13 +20,13 @@ Run the commands from the repo root. Step 2 keeps its terminal busy, so use a se
 
 8. **Run the same problem again:** click **Run to Answer**. Expect a new row `#2 abc->abd; xyz -> abd`, `answer found`, `2749`. A different answer and more work, because run #2 inherits the Episodic Memory that run #1 left (it already holds `xyd`).
 
-9. **Clear Episodic Memory:** click **Clear Episodic Memory** (the Episodic Memory group of the run controls). Expect the green message `Episodic Memory cleared — the next run starts with none.`
+9. **Clear Episodic Memory:** click **Clear Episodic Memory** (the **Episodic Memory** group of the Run Controls panel, open by default). Expect the green message `Episodic Memory cleared — the next run starts with none.`
 
 10. **Run it a third time:** click **Run to Answer**. Expect `#3 abc->abd; xyz -> xyd`, `1475`: exactly run #1 again, because the memory was empty.
 
 11. **Review a run:** click `review` on the `#3` row of Run History. Expect the Review (Metacat Mode) view with run #3 selected. Its **Start → end** summary shows `codelets 1475` and `memory answers 0 → 1`, and the episodic-run timeline beside it shows a marker for the clear between #3 and #2.
 
-12. **Run the one-problem Swarm:** back on the Run Dashboard, in the **Swarm** group (Seeds 200, First seed 1) click **Run 200 seeds**. Expect `200 runs in about 3 s on <your cores> cores`, no `with errors`, and a top row of `xyd`, Count `81`, `40.5` %. The seeds are fixed, so the 81 is exact.
+12. **Run the one-problem Swarm:** back on the Run Dashboard, click the **Swarm** header in the Run Controls panel to open that group (its line reads **Discovery mode.**, and **Answer (optional)** in Problem Input must be empty), leave Seeds 200 and First seed 1, and click **Run 200 seeds**. Expect `200 runs in about 3 s on <your cores> cores`, no `with errors`, and a top row of `xyd`, Count `81`, `40.5` %. The seeds are fixed, so the 81 is exact.
 
 13. **Run a Training (Training Mode):** `.venv/bin/python scripts/training_client.py --url http://localhost:8100 --name smoke --initial 3 --add 1 --total 3 --seeds 2 --max-codelets 3000`. Expect three `finished` lines, each with `errors 0`, then `done: 3 problems, 6 runs in ~1s ... errors 0`.
 
