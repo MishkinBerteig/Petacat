@@ -11,7 +11,7 @@ SEED_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
 
 @pytest.fixture
 def meta():
-    return MetadataProvider.from_seed_data(SEED_DIR)
+    return MetadataProvider.from_standard_configuration(SEED_DIR)
 
 
 # Computes a real temperature through the numeric seam, so it runs once per

@@ -127,32 +127,6 @@ export function AdminLayout({ editNodeName, onClearEditNode }: AdminLayoutProps)
     setFlash({ kind: 'success', text: `Exported the configuration to ${a.download}` })
   }, [])
 
-  /**
-   * Write the current configuration out to `seed_data/*.json`.
-   *
-   * The seed files are what a fresh database is built from and what the repository
-   * carries, so this is how a configuration arrived at here becomes the project's own
-   * starting point. The response names the files written and the collections whose
-   * seed files carry structure the database flattens.
-   */
-  const handleExportToSeed = useCallback(async () => {
-    try {
-      const body = await request<{ written: string[]; source_database: string }>(
-        '/admin/export-to-seed-data',
-        { method: 'POST' },
-      )
-      setFlash({
-        kind: 'success',
-        text: `Wrote ${body.written.length} seed files from ${body.source_database}; previous copies kept`,
-      })
-    } catch (err) {
-      setFlash({
-        kind: 'error',
-        text: describeApiError(err, 'write the current settings to seed data'),
-      })
-    }
-  }, [])
-
   const handleImport = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -204,13 +178,6 @@ export function AdminLayout({ editNodeName, onClearEditNode }: AdminLayoutProps)
         ))}
         <span style={{ flex: 1 }} />
         <button onClick={handleExport} style={{ fontSize: 10, padding: '3px 8px' }}>Export</button>
-        <button
-          onClick={handleExportToSeed}
-          title="Write the current configuration to seed_data/*.json, which a fresh database is built from"
-          style={{ fontSize: 10, padding: '3px 8px' }}
-        >
-          Export Current Settings to Seed Data
-        </button>
         <button onClick={() => fileInputRef.current?.click()} style={{ fontSize: 10, padding: '3px 8px' }}>Import</button>
         <input ref={fileInputRef} type="file" accept=".json" onChange={handleImport} style={{ display: 'none' }} />
       </div>

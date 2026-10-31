@@ -103,7 +103,7 @@ _META: MetadataProvider | None = None
 
 def _init_worker(seed_dir: str) -> None:
     global _META
-    _META = MetadataProvider.from_seed_data(seed_dir)
+    _META = MetadataProvider.from_standard_configuration(seed_dir)
 
 
 def _run_one(task: tuple) -> str:
@@ -198,7 +198,7 @@ def run_population_batched(
     """
     import time
 
-    meta = meta or MetadataProvider.from_seed_data(
+    meta = meta or MetadataProvider.from_standard_configuration(
         os.path.join(
             os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
             "seed_data",

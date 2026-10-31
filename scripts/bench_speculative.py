@@ -58,7 +58,7 @@ def main() -> None:
     args = ap.parse_args()
     workers = [int(w) for w in args.workers.split(",")]
     seeds = [int(s) for s in args.seeds.split(",")]
-    meta = MetadataProvider.from_seed_data(os.path.join(ROOT, "seed_data"))
+    meta = MetadataProvider.from_standard_configuration(os.path.join(ROOT, "seed_data"))
     gil = getattr(sys, "_is_gil_enabled", lambda: True)()
     machine = hardware.detect().as_dict()
     out = {

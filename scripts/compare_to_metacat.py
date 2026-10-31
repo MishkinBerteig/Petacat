@@ -109,7 +109,7 @@ def _parse_param(text: str):
     name, _, raw = text.partition("=")
     name, raw = name.strip(), raw.strip()
 
-    shipped = MetadataProvider.from_seed_data(SEED_DIR).params
+    shipped = MetadataProvider.from_standard_configuration(SEED_DIR).params
     if name not in shipped:
         raise argparse.ArgumentTypeError(
             f"unknown engine parameter {name!r}; "
@@ -141,7 +141,7 @@ def _init(backend: str, overrides: dict | None = None) -> None:
     # ``with_overrides`` is the same seam a Run uses for its per-Run parameters, so a
     # sweep here configures the engine exactly the way the application does rather
     # than by a mechanism only this script has.
-    _META = MetadataProvider.from_seed_data(SEED_DIR).with_overrides(overrides)
+    _META = MetadataProvider.from_standard_configuration(SEED_DIR).with_overrides(overrides)
 
 
 def _state(runner, ctx, answered: bool, cap: int = MAX_STEPS) -> str:

@@ -129,7 +129,7 @@ def petacat_answer_lines(first_trace: Path) -> list[str]:
         if outcome.reason in ("error", "fatal"):
             break
     # The Metacat Standard Configuration, as the provider the replay itself ran under.
-    provider = MetadataProvider.from_seed_data(str(Path(__file__).resolve().parent.parent / "seed_data"))
+    provider = MetadataProvider.from_standard_configuration(str(Path(__file__).resolve().parent.parent / "seed_data"))
     templates = provider.commentary_templates
 
     def key(a):

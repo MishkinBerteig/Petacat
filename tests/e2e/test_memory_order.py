@@ -20,7 +20,7 @@ def _service():
     from server.services.run_service import RunService
 
     seed_dir = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
-    return RunService(MetadataProvider.from_seed_data(seed_dir))
+    return RunService(MetadataProvider.from_standard_configuration(seed_dir))
 
 
 def _answer_row(answer_id, text):

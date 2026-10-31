@@ -21,7 +21,7 @@ def _slipnet():
     from server.engine.metadata import MetadataProvider
     from server.engine.slipnet import Slipnet
 
-    return Slipnet.from_metadata(MetadataProvider.from_seed_data(str(REPO_ROOT / "seed_data")))
+    return Slipnet.from_metadata(MetadataProvider.from_standard_configuration(str(REPO_ROOT / "seed_data")))
 
 
 def test_justify_has_three_blanket_handlers() -> None:

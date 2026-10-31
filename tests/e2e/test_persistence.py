@@ -21,7 +21,7 @@ async def test_metadata_db_round_trip(db_session):
     """
     import os
     seed_dir = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
-    meta_json = MetadataProvider.from_seed_data(seed_dir)
+    meta_json = MetadataProvider.from_standard_configuration(seed_dir)
     meta_db = await load_metadata_from_db(db_session)
 
     # Same number of nodes
@@ -61,7 +61,7 @@ async def test_codelet_execute_body_round_trip(db_session):
     from server.engine.codelet_dsl.builtins import get_builtins
 
     seed_dir = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
-    meta_json = MetadataProvider.from_seed_data(seed_dir)
+    meta_json = MetadataProvider.from_standard_configuration(seed_dir)
     meta_db = await load_metadata_from_db(db_session)
 
     interpreter = CodeletInterpreter(builtins=get_builtins())

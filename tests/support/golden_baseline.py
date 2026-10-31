@@ -3,7 +3,7 @@
 Captured *before* the first engine edit and compared byte for byte after every engine
 package.  For each (problem, seed) it records what a Metacat Mode run does, built from the
 Metacat Standard Configuration (``seed_data/*.json`` through
-``MetadataProvider.from_seed_data``) on the CPU numeric backend (float64), which is
+``MetadataProvider.from_standard_configuration``) on the CPU numeric backend (float64), which is
 deterministic:
 
 * the answer, the codelet count and the final temperature;
@@ -283,7 +283,7 @@ def capture_run(meta: Any, problem: Problem, seed: int, answer: str | None, memo
 def load_meta(seed_dir: Path = SEED_DIR) -> Any:
     from server.engine.metadata import MetadataProvider
 
-    return MetadataProvider.from_seed_data(str(seed_dir))
+    return MetadataProvider.from_standard_configuration(str(seed_dir))
 
 
 def iter_cases(meta: Any, progress: Callable[[str], None] | None = None,

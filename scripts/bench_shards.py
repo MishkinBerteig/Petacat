@@ -290,7 +290,7 @@ def main() -> None:
         if args.workers
         else hardware.worker_ladder()
     )
-    meta = MetadataProvider.from_seed_data(SEED_DIR)
+    meta = MetadataProvider.from_standard_configuration(SEED_DIR)
     names = ["locked", "family", "worker"]
 
     # The rack's capacity is divided across shards rather than replicated, so the

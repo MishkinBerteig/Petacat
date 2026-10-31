@@ -360,7 +360,7 @@ def test_the_free_running_engine_sizes_itself_from_the_machine(no_overrides):
         _os.path.dirname(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))),
         "seed_data",
     )
-    runner = EngineRunner(MetadataProvider.from_seed_data(seed_dir))
+    runner = EngineRunner(MetadataProvider.from_standard_configuration(seed_dir))
     engine = FreeRunningEngine(runner)
     assert engine.workers == hardware.worker_count()
     assert engine.shards == hardware.shard_count(engine.workers)

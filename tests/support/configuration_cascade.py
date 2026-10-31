@@ -18,7 +18,8 @@ Rules implemented (3.12.5):
   ``rule_english_dimension_phrases``) and its elements in the node lists
   (``initially_clamped_slipnodes``, ``top_down_slipnodes``,
   ``answer_description_theme_types``); its entry in every posting rule's
-  ``triggering_slipnodes``.  Codelet bodies and predicates that mention the name cannot
+  ``triggering_slipnodes``; its role bindings and its theme relation (EN2: the database
+  deletes both with the node).  Codelet bodies and predicates that mention the name cannot
   be rewritten and are reported as ``dangling``, as are demo problems that use a removed
   letter.
 * removing a codelet type deletes its posting rules, its entries in every codelet
@@ -116,6 +117,20 @@ def remove_node(docs: Documents, name: str) -> Report:
         theme["answer_description_theme_types"] = [x for x in listed if x != name]
         report.cascaded.append(("theme_dimensions.answer_description_theme_types", name, cause))
 
+    roles = docs["roles.json"]
+    bound = roles.get("node_roles", [])
+    left = [r for r in bound if r["node_name"] != name]
+    if len(left) != len(bound):
+        for r in bound:
+            if r["node_name"] == name:
+                report.cascaded.append(("slipnet_node_roles", f"{r['role']}[{r['ordinal']}]", cause))
+        roles["node_roles"] = left
+    relations = docs["theme_relations.json"]
+    for r in relations:
+        if r.get("node_name") == name:
+            report.cascaded.append(("theme_relations", r["name"], cause))
+    docs["theme_relations.json"] = [r for r in relations if r.get("node_name") != name]
+
     params = docs["engine_params.json"]
     for key in PARAM_NODE_MAPS:
         if name in params.get(key, {}):
@@ -168,6 +183,13 @@ def remove_codelet_type(docs: Documents, name: str) -> Report:
         if len(left) != len(entries):
             report.cascaded.append(("codelet_patterns", pattern, cause))
             posting["codelet_patterns"][pattern] = left
+
+    roles = docs["roles.json"]
+    bound = roles.get("codelet_roles", [])
+    for r in bound:
+        if r["codelet_type"] == name:
+            report.cascaded.append(("codelet_type_roles", f"{r['role']}[{r['ordinal']}]", cause))
+    roles["codelet_roles"] = [r for r in bound if r["codelet_type"] != name]
 
     params = docs["engine_params.json"]
     if name in params.get("initial_codelet_types", []):

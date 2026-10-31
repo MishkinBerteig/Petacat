@@ -93,7 +93,7 @@ import os
 from server.engine.metadata import MetadataProvider
 from server.engine.runner import EngineRunner
 
-meta = MetadataProvider.from_seed_data(os.path.join(os.getcwd(), "seed_data"))
+meta = MetadataProvider.from_standard_configuration(os.path.join(os.getcwd(), "seed_data"))
 runner = EngineRunner(meta)
 runner.init_mcat("abc", "abd", "xyz", seed=7)
 result = runner.run_mcat(max_steps=20000)
@@ -132,7 +132,7 @@ import asyncio, json, os, sys
 from server.engine.metadata import MetadataProvider
 from server.services.training_executor import SerialExecutor, TrainingTask, create_executor
 
-meta = MetadataProvider.from_seed_data(os.path.join(os.getcwd(), "seed_data"))
+meta = MetadataProvider.from_standard_configuration(os.path.join(os.getcwd(), "seed_data"))
 executor = create_executor()
 assert executor.kind == "serial" and isinstance(executor, SerialExecutor), executor
 problems = [("abc", "abd", "ijk"), ("abc", "abd", "xyz")]
@@ -211,7 +211,7 @@ print("RESULT", json.dumps(out))
 import json, sys
 from server.engine.metadata import MetadataProvider
 from server.parallel.swarm import SEED_DIR, RunTask, run_inprocess
-meta = MetadataProvider.from_seed_data(SEED_DIR)
+meta = MetadataProvider.from_standard_configuration(SEED_DIR)
 keys = json.loads(sys.argv[1])
 out = {}
 for key in keys:

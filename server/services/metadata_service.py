@@ -14,13 +14,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.engine.posting import validate_posting_formulas
 from server.engine.metadata import (
+    CodeletRoleSpec,
     CodeletSpec,
     DemoProblem,
     MetadataProvider,
+    NodeRoleSpec,
     PostingRuleSpec,
     SlipnetLinkSpec,
     SlipnodeSpec,
     ThemeDimensionSpec,
+    ThemeRelationSpec,
 )
 from server.models.metadata import (
     BridgeOrientationDef,
@@ -30,6 +33,7 @@ from server.models.metadata import (
     CodeletPatternDef,
     CodeletPhaseDef,
     CodeletTypeDef,
+    CodeletTypeRole,
     CommentaryTemplate,
     DemoModeDef,
     DemoProblem as DemoProblemRow,
@@ -46,7 +50,9 @@ from server.models.metadata import (
     SlipnetLayoutPos,
     SlipnetLinkDef,
     SlipnetNodeDef,
+    SlipnetNodeRole,
     ThemeDimensionDef,
+    ThemeRelation,
     ThemeTypeDef,
     UrgencyLevel,
 )
@@ -80,12 +86,18 @@ async def load_metadata_from_db(session: AsyncSession) -> MetadataProvider:
             short_name=row.short_name,
             conceptual_depth=row.conceptual_depth,
             descriptor_predicate=row.descriptor_predicate,
+            plain_name=row.plain_name,
+            glyph=row.glyph,
+            numeric_value=row.numeric_value,
+            full_name=row.full_name,
+            cm_short_name=row.cm_short_name,
+            article_an=row.article_an,
         )
         for row in result.scalars()
     }
 
     # Slipnet links
-    result = await session.execute(select(SlipnetLinkDef).order_by(SlipnetLinkDef.id))
+    result = await session.execute(select(SlipnetLinkDef).order_by(SlipnetLinkDef.sort_order, SlipnetLinkDef.id))
     link_specs = [
         SlipnetLinkSpec(
             from_node=row.from_node,
@@ -116,30 +128,38 @@ async def load_metadata_from_db(session: AsyncSession) -> MetadataProvider:
         for row in result.scalars()
     }
 
-    # Engine params.  ``ORDER BY name``: the table has no ordinal column, so the seed
-    # file's key order is not stored and the query can only be made deterministic, not
-    # seed-ordered (the engine looks parameters up by name and never iterates them; see
-    # ``tests/integration/test_db_seed_equivalence.py``, which records this limit).
-    result = await session.execute(select(EngineParam).order_by(EngineParam.name))
+    # Engine params, in the seed file's key order (``sort_order``; the name breaks a tie).
+    result = await session.execute(
+        select(EngineParam).order_by(EngineParam.sort_order, EngineParam.name)
+    )
     params: dict[str, Any] = {}
     for row in result.scalars():
         params[row.name] = _parse_param(row.value, row.value_type)
 
-    # Urgency levels.  Ordered by name for the same reason as the parameters.
-    result = await session.execute(select(UrgencyLevel).order_by(UrgencyLevel.name))
+    # Urgency levels, in the seed file's key order.
+    result = await session.execute(
+        select(UrgencyLevel).order_by(UrgencyLevel.sort_order, UrgencyLevel.name)
+    )
     urgency_levels = {row.name: row.value for row in result.scalars()}
 
-    # Formula coefficients.  Ordered by name for the same reason as the parameters.
+    # Formula coefficients, in the seed file's key order; ``value_type`` restores the
+    # int-against-float typing the Float column cannot hold.
     result = await session.execute(
-        select(FormulaCoefficient).order_by(FormulaCoefficient.name)
+        select(FormulaCoefficient).order_by(
+            FormulaCoefficient.sort_order, FormulaCoefficient.name
+        )
     )
-    formula_coefficients = {row.name: row.value for row in result.scalars()}
+    formula_coefficients = {
+        row.name: int(row.value) if row.value_type == "int" else float(row.value)
+        for row in result.scalars()
+    }
 
     # Posting rules.  Ordered explicitly: the engine consults these in sequence and
     # every consultation costs a draw from the run's random stream, so the order is
     # part of the configuration rather than an incidental of the query.  `id` carries
     # it, assigned from the seed file's order when the row is written.
-    result = await session.execute(select(PostingRule).order_by(PostingRule.id))
+    result = await session.execute(select(PostingRule).order_by(PostingRule.sort_order, PostingRule.id)
+    )
     posting_rules = [
         PostingRuleSpec(
             codelet_type=row.codelet_type,
@@ -151,6 +171,7 @@ async def load_metadata_from_db(session: AsyncSession) -> MetadataProvider:
             count_values=row.count_values,
             condition=row.condition or "always",
             triggering_slipnodes=row.triggering_slipnodes,
+            rule_key=row.rule_key,
         )
         for row in result.scalars()
     ]
@@ -200,26 +221,61 @@ async def load_metadata_from_db(session: AsyncSession) -> MetadataProvider:
         for row in result.scalars()
     ]
 
-    # Slipnet layout.  Display only; ordered by node name for the same reason as the
-    # parameters.
+    # Slipnet layout.  Display only; in the seed file's key order.
     result = await session.execute(
-        select(SlipnetLayoutPos).order_by(SlipnetLayoutPos.node_name)
+        select(SlipnetLayoutPos).order_by(
+            SlipnetLayoutPos.sort_order, SlipnetLayoutPos.node_name
+        )
     )
     slipnet_layout = {
         row.node_name: (row.grid_row, row.grid_col) for row in result.scalars()
     }
 
-    # Codelet patterns.  Ordered by `id`, which the seeder assigns across every
+    # Codelet patterns.  Ordered by `ordinal`, which the seeder assigns across every
     # pattern, so both the order of the patterns and the order within each one come
     # back as the seed file wrote them.
     result = await session.execute(
-        select(CodeletPatternDef).order_by(CodeletPatternDef.id)
+        select(CodeletPatternDef).order_by(CodeletPatternDef.ordinal, CodeletPatternDef.id)
     )
     codelet_patterns: dict[str, list[tuple[str, int]]] = {}
     for row in result.scalars():
         codelet_patterns.setdefault(row.pattern_name, []).append(
             (row.codelet_type, row.urgency_level)
         )
+
+    # Role bindings and theme relations.  ``role`` is ordered by byte value
+    # (``COLLATE "C"``) so the order does not depend on the database's locale.
+    result = await session.execute(
+        select(SlipnetNodeRole).order_by(
+            SlipnetNodeRole.role.collate("C"), SlipnetNodeRole.ordinal
+        )
+    )
+    node_roles = tuple(
+        NodeRoleSpec(role=r.role, ordinal=r.ordinal, node_name=r.node_name)
+        for r in result.scalars()
+    )
+    result = await session.execute(
+        select(CodeletTypeRole).order_by(
+            CodeletTypeRole.role.collate("C"), CodeletTypeRole.ordinal
+        )
+    )
+    codelet_roles = tuple(
+        CodeletRoleSpec(role=r.role, ordinal=r.ordinal, codelet_type=r.codelet_type)
+        for r in result.scalars()
+    )
+    result = await session.execute(
+        select(ThemeRelation).order_by(ThemeRelation.ordinal, ThemeRelation.name)
+    )
+    theme_relations = tuple(
+        ThemeRelationSpec(
+            name=r.name,
+            ordinal=r.ordinal,
+            node_name=r.node_name,
+            abstractness=r.abstractness,
+            description=r.description or "",
+        )
+        for r in result.scalars()
+    )
 
     # Enum values from lookup tables
     enum_table_models = {
@@ -256,6 +312,9 @@ async def load_metadata_from_db(session: AsyncSession) -> MetadataProvider:
         theme_dimensions=theme_dimensions,
         slipnet_layout=slipnet_layout,
         codelet_patterns=codelet_patterns,
+        node_roles=node_roles,
+        codelet_roles=codelet_roles,
+        theme_relations=theme_relations,
         enum_values=enum_values,
     )
 

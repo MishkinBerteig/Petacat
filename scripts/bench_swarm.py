@@ -120,7 +120,7 @@ def main() -> int:
     ap.add_argument("-o", "--out", default="agents-workspace/wp2-swarm/bench_swarm.json")
     args = ap.parse_args()
 
-    meta = MetadataProvider.from_seed_data(SEED_DIR)
+    meta = MetadataProvider.from_standard_configuration(SEED_DIR)
     top = hardware.population_worker_count()
     ladder = (
         [int(x) for x in args.workers.split(",")] if args.workers else hardware.worker_ladder(top)

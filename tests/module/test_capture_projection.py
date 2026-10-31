@@ -80,7 +80,7 @@ RESTORABLE_POINT = 750
 
 @pytest.fixture(scope="module")
 def meta() -> MetadataProvider:
-    return MetadataProvider.from_seed_data(SEED_DIR)
+    return MetadataProvider.from_standard_configuration(SEED_DIR)
 
 
 def _run_to(meta: MetadataProvider, codelets: int) -> EngineRunner:

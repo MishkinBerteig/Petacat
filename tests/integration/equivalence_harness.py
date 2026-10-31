@@ -1,6 +1,6 @@
 """The database-versus-seed-file equivalence harness (work package C0).
 
-``MetadataProvider.from_seed_data`` reads the Metacat Standard Configuration
+``MetadataProvider.from_standard_configuration`` reads the Metacat Standard Configuration
 (``seed_data/*.json``, the read-only reference).  ``load_metadata_from_db`` reads a
 database that was loaded from those same files.  Under a freshly loaded database,
 with no edits, the two providers must be the same value, field for field, including:
@@ -271,7 +271,7 @@ def seed_provider() -> Any:
     """A new provider built from the seed files (the reference)."""
     from server.engine.metadata import MetadataProvider
 
-    return MetadataProvider.from_seed_data(SEED_DIR)
+    return MetadataProvider.from_standard_configuration(SEED_DIR)
 
 
 # ---------------------------------------------------------------------------

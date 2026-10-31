@@ -20,6 +20,7 @@ from server.models.metadata import (
     ClauseTypeDef,
     CodeletFamilyDef,
     CodeletPatternDef,
+    CodeletTypeRole,
     CodeletPhaseDef,
     CodeletTypeDef,
     CommentaryTemplate,
@@ -39,8 +40,10 @@ from server.models.metadata import (
     SlipnetLayoutPos,
     SlipnetLinkDef,
     SlipnetNodeDef,
+    SlipnetNodeRole,
     ThemeDimensionDef,
     ThemeTypeDef,
+    ThemeRelation,
     UrgencyLevel,
 )
 
@@ -1177,108 +1180,11 @@ async def reload_metadata(session: AsyncSession = Depends(get_session)):
     return {"reloaded": True}
 
 
-@router.post("/export-to-seed-data")
-async def export_to_seed_data(session: AsyncSession = Depends(get_session)):
-    """Write the database's configuration back out to `seed_data/*.json`.
-
-    The seed files are what a fresh database is built from and what the repository
-    carries, so this is how a configuration arrived at through the Configuration screen
-    becomes the project's own starting point.
-
-    Each file keeps the shape it has on disk: the four flat collections are lists, the
-    three name/value tables become objects keyed by name, and the commentary templates
-    become an object keyed by template. `written` names the files this replaced and
-    `skipped` names the collections whose seed files carry structure the database
-    flattens, so a reader can see the whole picture in the response.
-    """
-    import json
-    import os
-
-    from server.config import SEED_DATA_DIR
-
-    exported = await export_metadata(session)
-
-    # The database this server is connected to is what gets written. Naming it in the
-    # response lets a caller confirm the source before the files are used.
-    from server.config import DATABASE_URL
-
-    def _drop_ids(rows: list[dict]) -> list[dict]:
-        return [{k: v for k, v in row.items() if k != "id"} for row in rows]
-
-    def _scalar(row: dict) -> Any:
-        """The value in the type the seed file carries it in.
-
-        The engine-params table stores every value as text beside a `value_type`, and
-        `_parse_param` is what the loader uses to turn the pair back into an int, float,
-        bool or JSON structure. Reusing it keeps the file a database export writes and
-        the file the loader reads as one format.
-        """
-        from server.services.metadata_service import _parse_param
-
-        value = row["value"]
-        value_type = row.get("value_type")
-        if value_type and isinstance(value, str):
-            return _parse_param(value, value_type)
-        if isinstance(value, float) and value.is_integer():
-            return int(value)
-        return value
-
-    def _by_name(rows: list[dict]) -> dict:
-        return {row["name"]: _scalar(row) for row in rows}
-
-    files: dict[str, Any] = {
-        "slipnet_nodes.json": _drop_ids(exported["slipnet_nodes"]),
-        "slipnet_links.json": _drop_ids(exported["slipnet_links"]),
-        "codelet_types.json": _drop_ids(exported["codelet_types"]),
-        "demo_problems.json": _drop_ids(exported["demo_problems"]),
-        "engine_params.json": _by_name(exported["engine_params"]),
-        "urgency_levels.json": _by_name(exported["urgency_levels"]),
-        "formula_coefficients.json": _by_name(exported["formula_coefficients"]),
-        # The templates live in one row keyed `all`, and the seed file is that row's
-        # payload. A single-row table is unwrapped; several rows are written as a map.
-        "commentary_templates.json": (
-            exported["commentary_templates"][0]["template_data"]
-            if len(exported["commentary_templates"]) == 1
-            and exported["commentary_templates"][0]["template_key"] == "all"
-            else {
-                row["template_key"]: row["template_data"]
-                for row in exported["commentary_templates"]
-            }
-        ),
-        "help_topics.en.json": _drop_ids(exported["help_topics"]),
-    }
-
-    # Every file this replaces is copied first, under a timestamp, so a configuration
-    # that was on disk and not in the database survives the write and can be put back.
-    import shutil
-    from datetime import datetime, timezone
-
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    backup_dir = os.path.join(SEED_DATA_DIR, ".backups", stamp)
-    os.makedirs(backup_dir, exist_ok=True)
-
-    written = []
-    for filename, payload in files.items():
-        path = os.path.join(SEED_DATA_DIR, filename)
-        if os.path.exists(path):
-            shutil.copy2(path, os.path.join(backup_dir, filename))
-        with open(path, "w") as handle:
-            json.dump(payload, handle, indent=2, ensure_ascii=True)
-            handle.write("\n")
-        written.append(filename)
-
-    return {
-        "written": written,
-        "skipped": {
-            "theme_dimensions.json": "grouped by cluster type on disk",
-            "posting_rules.json": "grouped into rules, initial codelets and patterns",
-            "slipnet_layout.json": "carries grid dimensions alongside node positions",
-            "enums.json": "lookup tables, edited through their own screen",
-        },
-        "directory": SEED_DATA_DIR,
-        "backup": backup_dir,
-        "source_database": DATABASE_URL.rsplit("/", 1)[-1],
-    }
+#: Slipnet node columns an export carries only when a node has a value.
+_NODE_OPTIONAL_COLUMNS = (
+    "plain_name", "glyph", "numeric_value", "full_name", "cm_short_name",
+    "article_an",
+)
 
 
 @router.get("/export")
@@ -1286,29 +1192,50 @@ async def export_metadata(session: AsyncSession = Depends(get_session)):
     """Export all metadata as a single JSON object."""
     # Ordered by primary key throughout, so two exports of the same configuration are
     # the same bytes and a backup can be diffed against the file it came from.
-    nodes_result = await session.execute(select(SlipnetNodeDef).order_by(SlipnetNodeDef.name))
-    links_result = await session.execute(select(SlipnetLinkDef).order_by(SlipnetLinkDef.id))
-    codelets_result = await session.execute(
-        select(CodeletTypeDef).order_by(CodeletTypeDef.name)
+    # Where a table keeps the file's order (``sort_order``), that is the order, so a
+    # configuration written out to the seed files comes back in the order it was read in.
+    nodes_result = await session.execute(
+        select(SlipnetNodeDef).order_by(SlipnetNodeDef.sort_order, SlipnetNodeDef.name)
     )
-    params_result = await session.execute(select(EngineParam).order_by(EngineParam.name))
-    urgency_result = await session.execute(select(UrgencyLevel).order_by(UrgencyLevel.name))
+    links_result = await session.execute(
+        select(SlipnetLinkDef).order_by(SlipnetLinkDef.sort_order, SlipnetLinkDef.id)
+    )
+    codelets_result = await session.execute(
+        select(CodeletTypeDef).order_by(CodeletTypeDef.sort_order, CodeletTypeDef.name)
+    )
+    params_result = await session.execute(
+        select(EngineParam).order_by(EngineParam.sort_order, EngineParam.name)
+    )
+    urgency_result = await session.execute(
+        select(UrgencyLevel).order_by(UrgencyLevel.sort_order, UrgencyLevel.name)
+    )
     formula_result = await session.execute(
-        select(FormulaCoefficient).order_by(FormulaCoefficient.name)
+        select(FormulaCoefficient).order_by(FormulaCoefficient.sort_order, FormulaCoefficient.name)
     )
     demos_result = await session.execute(select(DemoProblem).order_by(DemoProblem.id))
     theme_dims_result = await session.execute(
         select(ThemeDimensionDef).order_by(ThemeDimensionDef.id)
     )
-    posting_result = await session.execute(select(PostingRule).order_by(PostingRule.id))
+    posting_result = await session.execute(
+        select(PostingRule).order_by(PostingRule.sort_order, PostingRule.id)
+    )
     patterns_result = await session.execute(
-        select(CodeletPatternDef).order_by(CodeletPatternDef.id)
+        select(CodeletPatternDef).order_by(CodeletPatternDef.ordinal, CodeletPatternDef.id)
+    )
+    node_roles_result = await session.execute(
+        select(SlipnetNodeRole).order_by(SlipnetNodeRole.role.collate("C"), SlipnetNodeRole.ordinal)
+    )
+    codelet_roles_result = await session.execute(
+        select(CodeletTypeRole).order_by(CodeletTypeRole.role.collate("C"), CodeletTypeRole.ordinal)
+    )
+    relations_result = await session.execute(
+        select(ThemeRelation).order_by(ThemeRelation.ordinal, ThemeRelation.name)
     )
     commentary_result = await session.execute(
         select(CommentaryTemplate).order_by(CommentaryTemplate.id)
     )
     layout_result = await session.execute(
-        select(SlipnetLayoutPos).order_by(SlipnetLayoutPos.node_name)
+        select(SlipnetLayoutPos).order_by(SlipnetLayoutPos.sort_order, SlipnetLayoutPos.node_name)
     )
     help_result = await session.execute(select(HelpTopic).order_by(HelpTopic.id))
 
@@ -1320,6 +1247,12 @@ async def export_metadata(session: AsyncSession = Depends(get_session)):
                 "conceptual_depth": r.conceptual_depth,
                 "description": r.description or "",
                 "descriptor_predicate": r.descriptor_predicate,
+                # The EN2 columns, when the node has them (a file omits what a node lacks).
+                **{
+                    column: getattr(r, column)
+                    for column in _NODE_OPTIONAL_COLUMNS
+                    if getattr(r, column) is not None
+                },
             }
             for r in nodes_result.scalars().all()
         ],
@@ -1363,7 +1296,7 @@ async def export_metadata(session: AsyncSession = Depends(get_session)):
             for r in urgency_result.scalars().all()
         ],
         "formula_coefficients": [
-            {"name": r.name, "value": r.value}
+            {"name": r.name, "value": r.value, "value_type": r.value_type}
             for r in formula_result.scalars().all()
         ],
         "demo_problems": [
@@ -1387,7 +1320,8 @@ async def export_metadata(session: AsyncSession = Depends(get_session)):
         ],
         "posting_rules": [
             {
-                "id": r.id, "codelet_type": r.codelet_type, "direction": r.direction,
+                "id": r.id, "rule_key": r.rule_key, "codelet_type": r.codelet_type,
+                "direction": r.direction,
                 "urgency_when_posted": r.urgency_when_posted, "urgency_formula": r.urgency_formula,
                 "posting_formula": r.posting_formula or "", "count_formula": r.count_formula or "",
                 "count_values": r.count_values, "condition": r.condition or "always",
@@ -1409,6 +1343,23 @@ async def export_metadata(session: AsyncSession = Depends(get_session)):
         "slipnet_layout": [
             {"node_name": r.node_name, "grid_row": r.grid_row, "grid_col": r.grid_col}
             for r in layout_result.scalars().all()
+        ],
+        # Not among the importable collections (``_IMPORTABLE``); the Admin API for them
+        # arrives with the change API.  Exported so the download loses nothing.
+        "slipnet_node_roles": [
+            {"role": r.role, "ordinal": r.ordinal, "node_name": r.node_name}
+            for r in node_roles_result.scalars().all()
+        ],
+        "codelet_type_roles": [
+            {"role": r.role, "ordinal": r.ordinal, "codelet_type": r.codelet_type}
+            for r in codelet_roles_result.scalars().all()
+        ],
+        "theme_relations": [
+            {
+                "name": r.name, "ordinal": r.ordinal, "node_name": r.node_name,
+                "abstractness": r.abstractness, "description": r.description or "",
+            }
+            for r in relations_result.scalars().all()
         ],
         "help_topics": [
             {

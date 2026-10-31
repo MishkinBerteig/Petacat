@@ -14,7 +14,7 @@ twelve bulk JSON files and `posting_rules.json` is not among the tables it write
 so the production database held **zero** posting rules while the admin API listed,
 exported and imported them.
 
-The comparison is against `MetadataProvider.from_seed_data`, which is what
+The comparison is against `MetadataProvider.from_standard_configuration`, which is what
 `scripts/compare_to_metacat.py` and the whole of `tests/module/` run on.  That path
 is the reference here: it is the engine the oracle in `ORACLE-COMPARISON.md`
 measured, so "the database reproduces it" is the statement worth making.
@@ -163,7 +163,7 @@ async def db_session(step0_engine, step0_lock):
 @pytest.fixture(scope="module")
 def seed_meta():
     """The configuration the oracle and `tests/module/` measure."""
-    return MetadataProvider.from_seed_data(SEED_DIR)
+    return MetadataProvider.from_standard_configuration(SEED_DIR)
 
 
 # ──────────────────────────────────────────────────────────────────

@@ -1,7 +1,7 @@
 """EN1: the engine takes its configuration from the run's ``MetadataProvider``, never the files.
 
 The Metacat Standard Configuration (``seed_data/*.json``) is read to *build* a provider
-(here ``MetadataProvider.from_seed_data``, in the fixture), and by nothing else.  Two kinds
+(here ``MetadataProvider.from_standard_configuration``, in the fixture), and by nothing else.  Two kinds
 of guard:
 
 * **The audit hook.**  A ``sys.addaudithook`` hook fails any ``open`` of a file under the
@@ -53,7 +53,7 @@ def _audit(event: str, args: tuple) -> None:
 
 @pytest.fixture(scope="module")
 def meta():
-    return MetadataProvider.from_seed_data(SEED_DIR)
+    return MetadataProvider.from_standard_configuration(SEED_DIR)
 
 
 @pytest.fixture

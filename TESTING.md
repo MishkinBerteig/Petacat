@@ -121,15 +121,15 @@ outside the matrix take it too and the run is entirely what it says it is.
 
 ```
 ============================= petacat test matrix ==============================
-  cpu  numpy    float64    511 tests
-  gpu  mlx      float32    511 tests
+  cpu  numpy    float64    519 tests
+  gpu  mlx      float32    519 tests
   whole suite requested: the full matrix is required of this run
 
-  unit           733 collected    733 run    733 passed      0 failed      0 skipped  complete
-  seed_unit      584 collected    584 run    551 passed      0 failed     33 skipped  complete
+  unit           756 collected    756 run    756 passed      0 failed      0 skipped  complete
+  seed_unit      626 collected    626 run    593 passed      0 failed     33 skipped  complete
   module        1041 collected   1041 run   1041 passed      0 failed      0 skipped  complete
   architecture    42 collected     42 run     42 passed      0 failed      0 skipped  complete
-  integration    194 collected    194 run    193 passed      0 failed      1 skipped  complete
+  integration    203 collected    203 run    203 passed      0 failed      0 skipped  complete
   parallel       244 collected    244 run    244 passed      0 failed      0 skipped  complete
   lockstep       228 collected    228 run    228 passed      0 failed      0 skipped  complete
   e2e            339 collected    339 run    339 passed      0 failed      0 skipped  complete
@@ -204,17 +204,17 @@ that allowance.
 
 | Layer | Directory | Scope | May depend on | Cases |
 |-------|-----------|-------|---------------|-------|
-| **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 733 |
-| **seed unit** | `tests/seed_unit/` | One class or function, measured against the values Petacat ships with | Real `seed_data/*.json`, and the machine the process is running on | 584 |
+| **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 756 |
+| **seed unit** | `tests/seed_unit/` | One class or function, measured against the values Petacat ships with | Real `seed_data/*.json`, and the machine the process is running on | 626 |
 | **module** | `tests/module/` | Several real components assembled and driven | Real engine objects and `seed_data/*.json`; no DB, no HTTP | 1041 |
 | **architecture** | `tests/architecture/` | How the source tree is allowed to depend on itself | The repository's source, `seed_data/*.json`, child interpreters | 42 |
-| **integration** | `tests/integration/` | Agreement between the repository's artifacts, and the harness's own rules | Real `seed_data/*.json`, the ORM declarations, the generated client files, the documentation, a real pytest session | 194 |
+| **integration** | `tests/integration/` | Agreement between the repository's artifacts, and the harness's own rules | Real `seed_data/*.json`, the ORM declarations, the generated client files, the documentation, a real pytest session | 203 |
 | **parallel** | `tests/parallel/` | The detachable multi-core plugin (`server/parallel/`): each executor against the serial run it claims to equal | Real engine objects and `seed_data/*.json`, worker processes and threads; each test pins the backend it compares on | 244 |
 | **lockstep** | `tests/lockstep/` | Petacat's decision traces against Metacat's: naming, helper conformance, tracing/replay RNGs, determinism guards, the comparer | Real engine in faithful mode (numeric backend off, or a named backend); recorded Metacat traces | 228 |
 | **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 339 |
 
 Those counts are cases, so they include the second pass the numeric matrix makes
-over the 511 backend-sensitive tests.
+over the 519 backend-sensitive tests.
 
 One line decides each layer. Read them as a question about what a new test's
 subject is, and write the test where the answer lands:
@@ -246,7 +246,7 @@ first**, then move up toward the API and GUI.
 
 All eight layers run in one command — the
 [required command](#the-required-command) — and, since Petacat runs natively, all
-eight actually run: **3,405 cases**, every one of them executed. A layer that is
+eight actually run: **3,479 cases**, every one of them executed. A layer that is
 normally skipped is not a layer that is normally green, and none of these is.
 
 Wall-clock time depends heavily on the machine and on what else it is doing. The
@@ -374,7 +374,13 @@ changing what it records.
   change) that fails any `open` under `seed_data/` during a run, a swarm call and an
   episode, and checks that the former fallbacks raise when given no `MetadataProvider`.
   Tests that call an engine function that now takes the provider build one with
-  `MetadataProvider.from_seed_data`; the engine's own run-time paths never do.
+  `MetadataProvider.from_standard_configuration`; the engine's own run-time paths never do.
+- *EN2, schema and provider.* `tests/unit/test_config_hash_guard.py` (the hash guard),
+  `tests/seed_unit/test_standard_configuration_roles.py` (the role bindings and node data in
+  the Metacat Standard Configuration), `tests/integration/test_role_and_key_schema.py` (the
+  new tables on a database) and the G4 harness, which now compares the role tables, theme
+  relations, node columns, `rule_key`s and every ordinal field for field, with an empty
+  `RECORDED_STORAGE_LIMITS`.
 
 **`tests/unit/` — one class or function, against what the test constructs**
 
@@ -394,6 +400,7 @@ changing what it records.
 | `test_groups.py` | 22 | `Group`: length, spanning, membership, internal and external strength |
 | `test_jootsing_outcomes.py` | 7 | The jootser's outcomes: what counts as the same clamp, and when it gives up |
 | `test_object_choice.py` | 8 | Weighted object choice: the temperature exponent, and the absence of floors |
+| `test_config_hash_guard.py` | 11 | The hash guard (plan 3.8, EN2): `config_hash` covers every `MetadataProvider` field by reflection, the exclusion set is pinned, a field added to the provider is hashed without editing the hasher, each hashed field's digest moves with its value and order, the hash is `combine(field_digests)`, and the scheme and a number's type are part of it |
 | `test_order_fidelity.py` | 10 | The list orders `cons` and vectors fix: Chez Scheme's `sort` (80 cases from the Metacat image), a string's groups, the rule's subobject bridges, the coderack bin and deferred batch, the jootser's event set, and the display-time prints (DISCREPANCIES5 C-1, G-Z4, G-Z5, I-3…I-5) |
 | `test_rng.py` | 17 | The deterministic RNG wrapper |
 | `test_rule_bond_facet_change.py` | 1 | A GroupCtgy self change's BondFacet change is found wherever it sits (KNOWN-FAILURES, G-Q1) |
@@ -441,6 +448,7 @@ changing what it records.
 | `test_metadata_provider.py` | 25 | `MetadataProvider` loading every seed collection |
 | `test_numeric_backends.py` | 27 | The numeric backends against the reference (decay and spreading against exact rationals, including spreading's halfway cases), and the engine without them |
 | `test_reduced_configurations.py` | 14 | The reduced-configuration fixture generator (EN0, `tests/support/reduced_configurations.py` and `configuration_cascade.py`): nothing left that names a removed node or codelet type, the cascade removes what the plan's rules say, a provider loads from each; the engine is not run on them yet |
+| `test_standard_configuration_roles.py` | 14 | EN2: the Metacat Standard Configuration binds every role of `tests/support/role_table.py` to the node or codelet type today's code names (the two ordered roles in today's order), carries the five theme relations, `plain_name`, `glyph`, `numeric_value` and the display columns that reproduce the tables they replace, unique `rule_key`s and unique link keys, and the provider loads them |
 | `test_role_identity.py` | 12 | Role identity (gate G5), the skeleton laid down by EN0: today's side runs now (the role-to-literal table against the Metacat Standard Configuration, the engine's ordered constants and `role_identity_today.json`); the comparison with `slipnet.roles` skips, with a stated reason, until EN3 adds it |
 | `test_rule_english.py` | 10 | A rule's English against Metacat 1.2's own `transcribe-to-english` output: 463 recorded rule shapes, each string state, wrapping, articles, and the text kept from the moment the rule was made |
 | `test_snag_explanation.py` | 20 | A snag's explanation against Metacat 1.2's `get-explanation` (`trace.ss:1097-1125`): every branch of the failure-result, the object phrases, the commentary lines, the template-driven wording, and the fallback for a snag with no stored explanation |
@@ -508,13 +516,14 @@ changing what it records.
 | `test_documented_counts.py` | 3 | Every documented layer count, suite total and per-file figure, against the collection that produced it |
 | `test_configuration_input.py` | 31 | The four input-check classes of the configuration input library (C0, `server/services/configuration_input.py`) as pure functions, with no database, engine or routes: unknown reference, key exists, malformed, does-not-compile, stale base version, and applying operations to a copy |
 | `test_configuration_source.py` | 15 | C2, start-up tests 1-6 of the plan's 3.6, through `server/services/configuration_startup.py` (what `lifespan` calls): the database is the source and not the files; an empty database first-loads with a `configuration_state` row; a loaded database is never re-seeded (edits and deletions survive a restart) even when a seed file changes; the start-up reference equals the seed files whatever the database holds; refusals (unreachable database, rows without a state row, a state that is not `ready`, a state row over empty tables, an older schema, an unparseable parameter, an unreadable seed file); two simultaneous start-ups load once; start-up never writes the seed files. Uses its own scratch database `petacat_c2` (`C2_DATABASE_URL` overrides) |
-| `test_db_seed_equivalence.py` | 15 | C0 gate G4: a database loaded from the Metacat Standard Configuration with no edits yields a provider equal, field by field (order and JSON number typing included), to `MetadataProvider.from_seed_data`. `RECORDED_STORAGE_LIMITS` lists what the database cannot carry today and may only shrink: any other difference fails, and so does fixing a recorded limit without removing it. A new table must be added to `COVERED_TABLES`. Uses its own scratch database `petacat_c0` (`C0_HARNESS_DATABASE_URL` overrides), built by `equivalence_harness.py` |
+| `test_db_seed_equivalence.py` | 15 | C0 gate G4: a database loaded from the Metacat Standard Configuration with no edits yields a provider equal, field by field (order and JSON number typing included), to `MetadataProvider.from_standard_configuration`. `RECORDED_STORAGE_LIMITS` lists what the database cannot carry and may only shrink; EN2 removed the last three (ordinals on the name-keyed tables, `value_type` on formula coefficients, `json` rather than `jsonb`), so it is empty and the providers and `config_hash` must be equal in full. A new table must be added to `_expected_tables`. Uses its own scratch database `petacat_c0` (`C0_HARNESS_DATABASE_URL` overrides), built by `equivalence_harness.py` |
 | `test_db_seed_parallel_equivalence.py` | 2 | C0 gate G4: a swarm (real process pool) and a speculative run with `workers >= 2` equal the seed-file provider's runs on the database-loaded provider; slow, CPU float64 pinned by the tests themselves |
 | `test_db_seed_run_equivalence.py` | 2 | C0 gate G4: Metacat Mode runs per (problem, seed) on the database-loaded provider are identical to the seed-file provider's (answers, codelet count, draw count, final temperature, step/structure/trace hashes, final state); in the numeric matrix, with bit-identity down to the draw asserted on the float64 CPU half |
 | `test_enum_constants.py` | 17 | Engine string constants match `seed_data/enums.json` |
 | `test_help_topics.py` | 13 | The help JSON, the generated TypeScript and the panels that reference them |
 | `test_metadata_seeding.py` | 13 | Every seed file is well-formed, and the `MetadataProvider` round-trip holds |
 | `test_numeric_matrix_harness.py` | 11 | The matrix's own reporting rules and the exit status of a narrowed run |
+| `test_role_and_key_schema.py` | 9 | EN2, on the scratch database inside a rolled-back transaction: deleting a node or codelet type deletes its role bindings and theme relation (`ON DELETE CASCADE`), a rename follows, one node per role ordinal, the widened link key (two labels between the same nodes, no repeat, no second unlabeled link), unique glyph and numeric value, a row added without an ordinal goes last, and an Admin-style create of a posting rule, link, demo and theme dimension succeeds without an explicit id (the first load sets each id sequence past the ids it wrote) |
 | `test_seed_reconciliation.py` | 6 | The seeder writes every configuration table, the configuration tables exclude the runtime tables (the four Training tables among them), and no fingerprint or re-seed path remains |
 
 **`tests/lockstep/` — Petacat's decision traces (the Petacat/Metacat lockstep harness)**
@@ -681,7 +690,7 @@ nothing consults them now.
 
 `client/` carries a Vitest suite covering the store, the panels, the admin
 editors and the review surfaces. Run it with `cd client && npx vitest run`, and
-`npx tsc --noEmit` alongside it. **546 cases across 38 files**, all passing, in
+`npx tsc --noEmit` alongside it. **545 cases across 38 files**, all passing, in
 3.1 s on an Apple M-series machine.
 
 | File (`client/src/`) | Cases | Covers |
@@ -719,7 +728,7 @@ editors and the review surfaces. Run it with `cd client && npx vitest run`, and
 | `components/WindowsMenu.test.tsx` | 3 | The Windows menu lists Hide/Show for each panel including EEG, hides and shows all windows, and carries the Slipnet and Coderack graphics switches |
 | `components/WorkspaceView.test.tsx` | 12 | Workspace labels do not print on top of each other |
 | `components/admin/AdminEditors.test.tsx` | 42 | Every Configuration tab edits the collection it shows |
-| `components/admin/AdminHttpFailures.test.tsx` | 11 | The Configuration screen reports what the server refused |
+| `components/admin/AdminHttpFailures.test.tsx` | 10 | The Configuration screen reports what the server refused |
 | `components/review/EpisodicRunTimeline.test.tsx` | 3 | A note being typed on an Episodic Memory clear survives a late refresh, and an untouched note follows the server |
 | `components/review/ReviewPanel.test.tsx` | 34 | The review surfaces read the record back, and the episodic-run timeline shows each Episodic Memory clear between the runs with an editable note |
 | `components/training/problemText.test.ts` | 37 | Parsing pasted or uploaded problems (letters only, 1 to 64 characters, case-sensitive; JSON entries with their own seeds, answer and tag) and the preview the Training view shows before adding them |

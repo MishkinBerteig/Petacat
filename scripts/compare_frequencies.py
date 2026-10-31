@@ -255,7 +255,7 @@ _CONTEXT: dict = {}
 
 def _init(faithful: bool) -> None:
     from server.engine.metadata import MetadataProvider
-    _CONTEXT["meta"] = MetadataProvider.from_seed_data(str(ROOT / "seed_data"))
+    _CONTEXT["meta"] = MetadataProvider.from_standard_configuration(str(ROOT / "seed_data"))
     _CONTEXT["parameters"] = None
     if faithful:
         from tests.lockstep.faithful import FAITHFUL_PARAMETERS

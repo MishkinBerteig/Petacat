@@ -43,7 +43,7 @@ import os
 SEED_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
 
 
-_META = MetadataProvider.from_seed_data(SEED_DIR)
+_META = MetadataProvider.from_standard_configuration(SEED_DIR)
 
 
 def default_commentary_templates():
@@ -56,12 +56,12 @@ T = default_commentary_templates()
 
 @pytest.fixture(scope="module")
 def nodes():
-    return Slipnet.from_metadata(MetadataProvider.from_seed_data(SEED_DIR)).nodes
+    return Slipnet.from_metadata(MetadataProvider.from_standard_configuration(SEED_DIR)).nodes
 
 
 @pytest.fixture(scope="module")
 def slipnet():
-    return Slipnet.from_metadata(MetadataProvider.from_seed_data(SEED_DIR))
+    return Slipnet.from_metadata(MetadataProvider.from_standard_configuration(SEED_DIR))
 
 
 def _string(slipnet, text):

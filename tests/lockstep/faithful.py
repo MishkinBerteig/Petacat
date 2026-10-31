@@ -83,7 +83,7 @@ def git_revision() -> str:
 def _metadata() -> Any:
     from server.engine.metadata import MetadataProvider
 
-    return MetadataProvider.from_seed_data(str(SEED_DIR))
+    return MetadataProvider.from_standard_configuration(str(SEED_DIR))
 
 
 def header_record(problem: tuple[str, str, str], seed: int, cap: int,

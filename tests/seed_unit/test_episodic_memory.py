@@ -14,7 +14,7 @@ import pytest
 from server.engine.memory import AnswerDescription, EpisodicMemory, SnagDescription
 from server.engine.metadata import ConfigurationRequired, MetadataProvider
 
-_META = MetadataProvider.from_seed_data(
+_META = MetadataProvider.from_standard_configuration(
     os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
 )
 
@@ -559,7 +559,7 @@ def nodes():
     from server.engine.slipnet import Slipnet
 
     seed_dir = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
-    return Slipnet.from_metadata(MetadataProvider.from_seed_data(seed_dir)).nodes
+    return Slipnet.from_metadata(MetadataProvider.from_standard_configuration(seed_dir)).nodes
 
 
 def _real_rule(nodes, position="plato-rightmost", relation="plato-successor"):

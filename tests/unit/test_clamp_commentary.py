@@ -20,7 +20,7 @@ import os as _os
 
 from server.engine.metadata import MetadataProvider as _MetadataProvider
 
-_META = _MetadataProvider.from_seed_data(
+_META = _MetadataProvider.from_standard_configuration(
     _os.path.join(_os.path.dirname(__file__), "..", "..", "seed_data")
 )
 #: The Metacat Standard Configuration's phrase-templates, from a provider.

@@ -154,24 +154,6 @@ describe('AdminLayout — exporting the configuration', () => {
     expect(status.textContent).toContain('Exported the configuration')
   })
 
-  it('reports a refused write to the seed files', async () => {
-    serve((url) => {
-      if (url === '/api/admin/export-to-seed-data') {
-        return reply(503, { detail: 'seed_data is read-only' })
-      }
-      return reply(200, [])
-    })
-    render(<AdminLayout />)
-
-    fireEvent.click(
-      await screen.findByRole('button', { name: /Export Current Settings to Seed Data/ }),
-    )
-
-    const alert = await screen.findByRole('alert')
-    expect(alert.textContent).toContain('Could not write the current settings to seed data')
-    expect(alert.textContent).toContain('seed_data is read-only')
-  })
-
   it('reports a refused import', async () => {
     serve((url) => {
       if (url === '/api/admin/import') {

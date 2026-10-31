@@ -25,7 +25,7 @@ def links():
 
 @pytest.fixture(scope="module")
 def slipnet():
-    return Slipnet.from_metadata(MetadataProvider.from_seed_data(SEED_DIR))
+    return Slipnet.from_metadata(MetadataProvider.from_standard_configuration(SEED_DIR))
 
 
 def test_link_count_matches_the_scheme(links):

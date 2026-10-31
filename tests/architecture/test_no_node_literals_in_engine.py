@@ -21,7 +21,7 @@ Test 2, ``test_no_seed_file_reads_in_engine``, finds in the same modules
 
 * ``seed-dir-name``   a name or attribute spelled ``..SEED_DIR..``;
 * ``seed-data-literal``  a string literal containing ``seed_data``;
-* ``from-seed-data-call``  a call of ``from_seed_data``;
+* ``from-seed-data-call``  a call of ``from_standard_configuration``;
 * ``file-read-call``  ``open(...)``, ``.read_text()``, ``.read_bytes()``, ``json.load(...)``.
 
 **The allow-list.**  ``no_node_literals_allowlist.txt`` beside this file is the current hit
@@ -152,7 +152,7 @@ class _SeedVisitor(ast.NodeVisitor):
     def visit_Call(self, node: ast.Call) -> None:
         f = node.func
         name = f.id if isinstance(f, ast.Name) else f.attr if isinstance(f, ast.Attribute) else None
-        if name == "from_seed_data":
+        if name == "from_standard_configuration":
             self._hit("from-seed-data-call", ast.unparse(f))
         elif name in ("open", "read_text", "read_bytes") or (
                 name == "load" and isinstance(f, ast.Attribute) and ast.unparse(f.value) == "json"):

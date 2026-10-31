@@ -47,7 +47,7 @@ def parse_param(text: str) -> tuple[str, object]:
         raise argparse.ArgumentTypeError(f"--param wants name=value, got {text!r}")
     name, _, raw = text.partition("=")
     name, raw = name.strip(), raw.strip()
-    shipped = MetadataProvider.from_seed_data(SEED_DIR).params
+    shipped = MetadataProvider.from_standard_configuration(SEED_DIR).params
     if name not in shipped:
         raise argparse.ArgumentTypeError(f"unknown engine parameter {name!r}")
     current = shipped[name]
@@ -91,7 +91,7 @@ def main() -> int:
 
     seeds = parse_seeds(args.seeds) if args.seeds else [args.seed_start + i for i in range(args.count)]
     overrides = dict(args.param)
-    meta = MetadataProvider.from_seed_data(sw.SEED_DIR)
+    meta = MetadataProvider.from_standard_configuration(sw.SEED_DIR)
     backend = args.backend or sw.default_backend(meta)
     tasks = [
         sw.RunTask(*args.problem, args.answer, s, args.max_steps,

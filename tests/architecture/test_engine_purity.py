@@ -2,7 +2,7 @@
 
 `server/engine/` is the cognitive architecture: workspace, slipnet, coderack,
 themespace, trace, memory, temperature. Every module in it is database-free, so
-`EngineRunner(meta)` plus `MetadataProvider.from_seed_data(seed_dir)` runs a
+`EngineRunner(meta)` plus `MetadataProvider.from_standard_configuration(seed_dir)` runs a
 complete problem with no Postgres, no Docker and no FastAPI. That property is
 what lets the engine be benchmarked, fuzzed over hundreds of thousands of runs,
 and eventually parallelised without dragging a session and an event loop along.
@@ -237,7 +237,7 @@ def _codelet_bodies() -> list[tuple[str, str]]:
 
     The seed JSON is the source of truth for the `execute_body` column: it is
     what `main.py` loads into the database at startup, and what
-    `MetadataProvider.from_seed_data` reads directly when running without one.
+    `MetadataProvider.from_standard_configuration` reads directly when running without one.
     """
     with open(CODELET_SEED_FILE, encoding="utf-8") as handle:
         specs = json.load(handle)
@@ -554,7 +554,7 @@ from server.engine.runner import (
     EngineRunner, STATUS_ANSWER_FOUND, STATUS_GAVE_UP, STATUS_HALTED,
 )
 
-runner = EngineRunner(MetadataProvider.from_seed_data(SEED_DIR))
+runner = EngineRunner(MetadataProvider.from_standard_configuration(SEED_DIR))
 runner.init_mcat("abc", "abd", "xyz", seed=42)
 for _ in range(400):
     if runner.status in (STATUS_ANSWER_FOUND, STATUS_GAVE_UP, STATUS_HALTED):

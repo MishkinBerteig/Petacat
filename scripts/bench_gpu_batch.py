@@ -106,7 +106,7 @@ def real_topology():
     from server.engine.numeric.layout import SlipnetTopology
 
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    meta = MetadataProvider.from_seed_data(os.path.join(root, "seed_data"))
+    meta = MetadataProvider.from_standard_configuration(os.path.join(root, "seed_data"))
     runner = EngineRunner(meta)
     runner.init_mcat("abc", "abd", "mrrjjj", seed=1)
     return SlipnetTopology.from_slipnet(runner.ctx.slipnet)

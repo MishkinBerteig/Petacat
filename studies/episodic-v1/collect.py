@@ -249,7 +249,7 @@ def petacat_worker(task_path, output):
             return result
 
     task = read_json(task_path)
-    meta = MetadataProvider.from_seed_data(str(ROOT / "seed_data"))
+    meta = MetadataProvider.from_standard_configuration(str(ROOT / "seed_data"))
     memory = EpisodicMemory()
     row = {"task": task, "status": "complete", "attempted_runs": 0, "answer_runs": 0,
            "capped_runs": 0, "answerless_runs": 0, "codelets": 0}

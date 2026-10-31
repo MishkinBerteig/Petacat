@@ -45,7 +45,7 @@ TEMPERATURES = [0.0, 25.0, 50.0, 75.0, 100.0]
 
 @pytest.fixture(scope="module")
 def meta() -> MetadataProvider:
-    return MetadataProvider.from_seed_data(SEED_DIR)
+    return MetadataProvider.from_standard_configuration(SEED_DIR)
 
 
 # --- the oracle: the Scheme expression, brute-forced ------------------------

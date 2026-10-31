@@ -7,13 +7,27 @@ JSON files and can be edited via the admin panel.
 
 from __future__ import annotations
 
-from sqlalchemy import BigInteger, Column, Float, ForeignKey, Index, Integer, String, Text, Boolean
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import (
+    BigInteger, Boolean, Column, Float, ForeignKey, Index, Integer, String, Text,
+    UniqueConstraint, column, func, select, table,
+)
+from sqlalchemy.dialects.postgresql import JSON, JSONB
 from sqlalchemy.orm import DeclarativeBase
 
 
 class Base(DeclarativeBase):
     pass
+
+
+def _next_after_last(table_name: str, column_name: str = "sort_order"):
+    """A column default: one past the largest value the table holds (0 when empty).
+
+    For the ordinals of tables whose rows an Admin adds one at a time: a new row goes
+    last, as it did when the order was the integer ``id``.  The seeder writes every
+    ordinal explicitly and never relies on this.
+    """
+    t = table(table_name, column(column_name))
+    return select(func.coalesce(func.max(t.c[column_name]), -1) + 1).scalar_subquery()
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -147,20 +161,51 @@ class SlipnetNodeDef(Base):
     # Workspace object (Scheme: define-descriptor-predicate).  Null for the many
     # nodes whose descriptors are read off an object rather than tested.
     descriptor_predicate = Column(Text, nullable=True)
+    #: What code used to read off the name (``name[6:]``).  Names are opaque (plan 3.1).
+    plain_name = Column(String(64), nullable=True)
+    #: The character a letter node stands for.  Case-sensitive; a node with a glyph is a
+    #: letter, and the alphabet is the set of such nodes (plan 3.13).
+    glyph = Column(String(1), nullable=True, unique=True)
+    #: The value of a number node.  Any integers, contiguous or not (plan 3.13).
+    numeric_value = Column(Integer, nullable=True, unique=True)
+    #: Display only; NULL falls back to ``plain_name`` or ``short_name`` (plan 3.3).
+    full_name = Column(String(64), nullable=True)
+    cm_short_name = Column(String(16), nullable=True)
+    article_an = Column(Boolean, nullable=True)
 
 
 class SlipnetLinkDef(Base):
-    """Definition of a slipnet link between two nodes."""
+    """Definition of a slipnet link between two nodes.
+
+    The key is ``(from_node, to_node, link_type, label)`` where the label is the label
+    node, or the empty string for a link with none (a NULL cannot be part of a unique
+    key, so the index is over ``coalesce(label_node, '')``).  Two differently labelled links between the same two nodes can exist.
+    ``sort_order`` carries the file's order, which fixes the float accumulation order of
+    the spread; ``id`` is not stable across configurations.
+    """
 
     __tablename__ = "slipnet_link_defs"
-
     id = Column(Integer, primary_key=True, autoincrement=True)
+    sort_order = Column(
+        Integer, nullable=False, index=True,
+        default=_next_after_last("slipnet_link_defs"),
+    )
     from_node = Column(String(64), nullable=False, index=True)
     to_node = Column(String(64), nullable=False, index=True)
     link_type = Column(String(32), ForeignKey("link_types.name"), nullable=False)
     label_node = Column(String(64), nullable=True)
     link_length = Column(Integer, nullable=True)  # None = dynamic (from label node)
     fixed_length = Column(Boolean, default=True)
+
+
+Index(
+    "uq_slipnet_link_key",
+    SlipnetLinkDef.from_node,
+    SlipnetLinkDef.to_node,
+    SlipnetLinkDef.link_type,
+    func.coalesce(SlipnetLinkDef.label_node, ""),
+    unique=True,
+)
 
 
 class CodeletTypeDef(Base):
@@ -189,6 +234,9 @@ class EngineParam(Base):
     name = Column(String(64), primary_key=True)
     value = Column(Text, nullable=False)  # Stored as text, parsed at load
     value_type = Column(String(16), ForeignKey("param_value_types.name"), default="string")
+    #: The seed file's key order (parameters are looked up by name, but the database keeps
+    #: the order so that it loses nothing the file says).
+    sort_order = Column(Integer, nullable=False, default=_next_after_last("engine_params"))
 
 
 class UrgencyLevel(Base):
@@ -198,6 +246,7 @@ class UrgencyLevel(Base):
 
     name = Column(String(32), primary_key=True)
     value = Column(Integer, nullable=False)
+    sort_order = Column(Integer, nullable=False, default=_next_after_last("urgency_levels"))
 
 
 class FormulaCoefficient(Base):
@@ -207,6 +256,10 @@ class FormulaCoefficient(Base):
 
     name = Column(String(64), primary_key=True)
     value = Column(Float, nullable=False)
+    #: ``int`` or ``float``: the JSON type the seed file gives the number, which a Float
+    #: column alone cannot keep (``5`` against ``5.0``).
+    value_type = Column(String(16), ForeignKey("param_value_types.name"), nullable=False, default="float")
+    sort_order = Column(Integer, nullable=False, default=_next_after_last("formula_coefficients"))
 
 
 class PostingRule(Base):
@@ -215,13 +268,23 @@ class PostingRule(Base):
     __tablename__ = "posting_rules"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
+    #: The rule's natural key, so a rule can be named without its integer ``id``.  Unique;
+    #: when a row is written without one it is the codelet type.
+    rule_key = Column(
+        String(64), nullable=False, unique=True,
+        default=lambda context: context.get_current_parameters()["codelet_type"],
+    )
+    #: The file's order.  The engine consults the rules in sequence and every consultation
+    #: costs a draw from the run's random stream, so the order is behaviour.
+    sort_order = Column(Integer, nullable=False, default=_next_after_last("posting_rules"))
     codelet_type = Column(String(64), nullable=False, index=True)
     direction = Column(String(16), ForeignKey("posting_directions.name"), nullable=False)
     urgency_when_posted = Column(Integer, nullable=True)
     urgency_formula = Column(String(128), nullable=True)
     posting_formula = Column(String(256), default="")
     count_formula = Column(String(128), default="")
-    count_values = Column(JSONB, nullable=True)
+    #: ``json``, not ``jsonb``: JSONB reorders object keys, and key order is read back.
+    count_values = Column(JSON, nullable=True)
     condition = Column(String(128), default="always")
     triggering_slipnodes = Column(JSONB, nullable=True)
 
@@ -245,6 +308,9 @@ class CodeletPatternDef(Base):
     __tablename__ = "codelet_pattern_defs"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
+    #: Position across all patterns, in the file's order: both the order of the patterns
+    #: and the order within each one.
+    ordinal = Column(Integer, nullable=False, default=_next_after_last("codelet_pattern_defs", "ordinal"))
     pattern_name = Column(String(64), nullable=False, index=True)
     codelet_type = Column(String(64), nullable=False)
     #: A *named* tier from ``urgency_levels``, not a number.  A pattern says which
@@ -261,7 +327,8 @@ class CommentaryTemplate(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     template_key = Column(String(64), nullable=False, index=True)
-    template_data = Column(JSONB, nullable=False)
+    #: ``json``, not ``jsonb``: the templates' key order is read back.
+    template_data = Column(JSON, nullable=False)
 
 
 class DemoProblem(Base):
@@ -302,6 +369,64 @@ class SlipnetLayoutPos(Base):
     node_name = Column(String(64), primary_key=True)
     grid_row = Column(Integer, nullable=False)
     grid_col = Column(Integer, nullable=False)
+    sort_order = Column(Integer, nullable=False, default=_next_after_last("slipnet_layout"))
+
+
+class SlipnetNodeRole(Base):
+    """A role bound to a Slipnet node (plan 3.2).
+
+    The engine owns the vocabulary of role names (``server/engine/roles.py``, EN3); the
+    configuration owns which node plays each.  A single-node role has ordinal 0; an ordered
+    role (a list whose order is behaviour) has one row per element, ordinal being the
+    position.  A node may hold several roles.  Deleting a node deletes its bindings.
+    """
+
+    __tablename__ = "slipnet_node_roles"
+    __table_args__ = (UniqueConstraint("node_name", "role", name="uq_slipnet_node_role"),)
+
+    role = Column(String(64), primary_key=True)
+    ordinal = Column(Integer, primary_key=True, default=0)
+    node_name = Column(
+        String(64),
+        ForeignKey("slipnet_node_defs.name", onupdate="CASCADE", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+
+class CodeletTypeRole(Base):
+    """A role bound to a codelet type (plan 3.2); the same shape as ``SlipnetNodeRole``."""
+
+    __tablename__ = "codelet_type_roles"
+    __table_args__ = (UniqueConstraint("codelet_type", "role", name="uq_codelet_type_role"),)
+
+    role = Column(String(64), primary_key=True)
+    ordinal = Column(Integer, primary_key=True, default=0)
+    codelet_type = Column(
+        String(64),
+        ForeignKey("codelet_type_defs.name", onupdate="CASCADE", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+
+class ThemeRelation(Base):
+    """A theme relation: its name, the node that stands for it and its abstractness.
+
+    ``node_name`` is NULL for ``diff``, which has no node.  ``abstractness`` is NULL when
+    it is the node's conceptual depth (identity 0 and diff 50 are fixed).  No row is
+    required; a relation without a row is unavailable.
+    """
+
+    __tablename__ = "theme_relations"
+
+    name = Column(String(32), primary_key=True)
+    ordinal = Column(Integer, nullable=False, default=_next_after_last("theme_relations", "ordinal"))
+    node_name = Column(
+        String(64),
+        ForeignKey("slipnet_node_defs.name", onupdate="CASCADE", ondelete="CASCADE"),
+        nullable=True,
+    )
+    abstractness = Column(Integer, nullable=True)
+    description = Column(Text, default="")
 
 
 class HelpTopic(Base):

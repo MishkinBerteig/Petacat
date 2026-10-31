@@ -149,7 +149,7 @@ def _init_worker(backend: str) -> None:
     """Pin the backend before the first engine object exists, then load the metadata."""
     global _META
     os.environ["PETACAT_NUMERIC_BACKEND"] = backend
-    _META = MetadataProvider.from_seed_data(SEED_DIR)
+    _META = MetadataProvider.from_standard_configuration(SEED_DIR)
 
 
 def _run_one(task: tuple[dict, int]) -> str:

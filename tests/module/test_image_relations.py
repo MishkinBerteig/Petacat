@@ -35,7 +35,7 @@ LETTERS = {f"plato-{c}" for c in "abcdefghijklmnopqrstuvwxyz"}
 
 @pytest.fixture(scope="module")
 def meta() -> MetadataProvider:
-    return MetadataProvider.from_seed_data(SEED_DIR)
+    return MetadataProvider.from_standard_configuration(SEED_DIR)
 
 
 def _ctx(meta: MetadataProvider, initial: str, modified: str, target: str, seed: int):

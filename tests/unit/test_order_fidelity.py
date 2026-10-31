@@ -82,7 +82,7 @@ SEED_DIR = Path(__file__).resolve().parents[2] / "seed_data"
 
 
 def _rack(max_size):
-    rack = Coderack(MetadataProvider.from_seed_data(SEED_DIR))
+    rack = Coderack(MetadataProvider.from_standard_configuration(SEED_DIR))
     rack.max_size = max_size
     return rack
 

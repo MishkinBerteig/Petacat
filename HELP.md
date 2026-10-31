@@ -76,7 +76,7 @@ A refusal is reported where it happened and says what kind of problem it is: a n
 
 A saved change is picked up by the next run created. The run in progress keeps the configuration it started with, so an edit made mid-run takes effect on the run after it.
 
-Two collection-wide operations sit alongside the tabs. 'Export Current Settings to Seed Data' writes the database's configuration back out to seed_data/*.json, which is how a configuration arrived at in the app becomes the project's starting point; each replaced file is copied first, under a timestamp, into seed_data/.backups/. The API's export and import routes carry the same thirteen collections as one JSON object, ordered by primary key, which makes a configuration backup diffable and restorable in a single transaction.
+Two collection-wide operations sit alongside the tabs. The Export and Import buttons carry the same thirteen collections as one JSON object, in the configuration's own order, which makes a configuration backup diffable and restorable in a single transaction. Nothing the application does writes the seed files; they change only by a committed development change.
 
 **Related concepts:** `slipnet`, `coderack`, `themespace`, `commentary`, `problem_input`
 

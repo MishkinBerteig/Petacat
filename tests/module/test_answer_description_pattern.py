@@ -43,7 +43,7 @@ ALLOWED = (ALPH_POS, STRING_POSITION, DIRECTION, GROUP_CATEGORY, BOND_FACET)
 
 @pytest.fixture(scope="module")
 def meta():
-    return MetadataProvider.from_seed_data(SEED_DIR)
+    return MetadataProvider.from_standard_configuration(SEED_DIR)
 
 
 def _engine(meta, initial="abc", modified="abd", target="xyz"):

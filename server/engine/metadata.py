@@ -2,7 +2,7 @@
 
 There is no constants.py. All domain knowledge lives in Postgres and is
 loaded at startup into an immutable MetadataProvider. For REPL/testing,
-from_seed_data() loads from the seed_data/ JSON files directly.
+from_standard_configuration() loads from the seed_data/ JSON files directly.
 
 Scheme source: constants.ss (replaced by seed_data/*.json -> Postgres)
 """
@@ -20,7 +20,7 @@ class ConfigurationRequired(RuntimeError):
 
     The engine takes every parameter, phrase and conceptual depth from the provider its
     run holds.  There is no fallback to the Metacat Standard Configuration files: a
-    caller that has no provider must build one (``MetadataProvider.from_seed_data`` in a
+    caller that has no provider must build one (``MetadataProvider.from_standard_configuration`` in a
     test, the database in a served run) and pass it.
     """
 
@@ -57,6 +57,16 @@ class SlipnodeSpec:
     # the seed data means a new descriptor needs no code change, the same way a
     # new codelet type needs only its ``execute_body``.
     descriptor_predicate: str | None = None
+    #: What code used to read off the name (``name[6:]``).  Names are opaque (plan 3.1).
+    plain_name: str | None = None
+    #: The character a letter node stands for; a node with a glyph is a letter.
+    glyph: str | None = None
+    #: The value of a number node; a node with a value is on the ladder.
+    numeric_value: int | None = None
+    #: Display only.  None falls back to ``plain_name`` or ``short_name``.
+    full_name: str | None = None
+    cm_short_name: str | None = None
+    article_an: bool | None = None
 
 
 @dataclass(frozen=True)
@@ -92,6 +102,39 @@ class PostingRuleSpec:
     count_values: dict[str, int | float] | None
     condition: str
     triggering_slipnodes: list[str] | None
+    #: The rule's natural key (the codelet type when the file gives none).
+    rule_key: str = ""
+
+
+@dataclass(frozen=True)
+class NodeRoleSpec:
+    """A role bound to a Slipnet node.  ``ordinal`` is 0 for a single-node role and the
+    list position for an ordered role."""
+
+    role: str
+    ordinal: int
+    node_name: str
+
+
+@dataclass(frozen=True)
+class CodeletRoleSpec:
+    """A role bound to a codelet type; the same shape as :class:`NodeRoleSpec`."""
+
+    role: str
+    ordinal: int
+    codelet_type: str
+
+
+@dataclass(frozen=True)
+class ThemeRelationSpec:
+    """A theme relation.  ``node_name`` is None for ``diff``; ``abstractness`` None means
+    the node's conceptual depth."""
+
+    name: str
+    ordinal: int
+    node_name: str | None
+    abstractness: int | None
+    description: str
 
 
 @dataclass(frozen=True)
@@ -133,6 +176,12 @@ class MetadataProvider:
     #: named rather than numeric, and ``Coderack._pattern_entry`` resolves it against
     #: ``urgency_levels``; see `server/engine/codelet_patterns.py`.
     codelet_patterns: dict[str, list[tuple[str, str]]] = field(default_factory=dict)
+    #: Role bindings, ordered by ``(role, ordinal)`` (byte order of the role name).  Nothing
+    #: in the engine reads them yet (EN3 adds the mechanism).
+    node_roles: tuple[NodeRoleSpec, ...] = ()
+    codelet_roles: tuple[CodeletRoleSpec, ...] = ()
+    #: Theme relations, ordered by ``ordinal``.
+    theme_relations: tuple[ThemeRelationSpec, ...] = ()
     # Enum values loaded from DB lookup tables (table_name -> set of valid names)
     enum_values: dict[str, set[str]] = field(default_factory=dict)
 
@@ -167,7 +216,7 @@ class MetadataProvider:
         return self.codelet_specs[name]
 
     @classmethod
-    def from_seed_data(cls, seed_dir: str) -> MetadataProvider:
+    def from_standard_configuration(cls, seed_dir: str) -> MetadataProvider:
         """Load metadata from seed_data/ JSON files (no DB needed)."""
 
         def _load(filename: str) -> Any:
@@ -182,6 +231,12 @@ class MetadataProvider:
                 short_name=n["short_name"],
                 conceptual_depth=n["conceptual_depth"],
                 descriptor_predicate=n.get("descriptor_predicate"),
+                plain_name=n.get("plain_name"),
+                glyph=n.get("glyph"),
+                numeric_value=n.get("numeric_value"),
+                full_name=n.get("full_name"),
+                cm_short_name=n.get("cm_short_name"),
+                article_an=n.get("article_an"),
             )
             for n in nodes_data
         }
@@ -240,6 +295,7 @@ class MetadataProvider:
                 count_values=pr.get("count_values"),
                 condition=pr.get("condition", "always"),
                 triggering_slipnodes=pr.get("triggering_slipnodes"),
+                rule_key=pr.get("rule_key", pr["codelet_type"]),
             )
             for pr in posting_data.get("posting_rules", [])
         ]
@@ -293,6 +349,34 @@ class MetadataProvider:
             for name, pos in layout_data.get("node_positions", {}).items()
         }
 
+        # Roles and theme relations.  Ordered the way the database orders them
+        # (``role`` by byte value, then ``ordinal``) so the two loaders agree.
+        roles_data = _load("roles.json")
+        node_roles = tuple(
+            NodeRoleSpec(role=r["role"], ordinal=r["ordinal"], node_name=r["node_name"])
+            for r in sorted(
+                roles_data.get("node_roles", []),
+                key=lambda r: (r["role"].encode(), r["ordinal"]),
+            )
+        )
+        codelet_roles = tuple(
+            CodeletRoleSpec(role=r["role"], ordinal=r["ordinal"], codelet_type=r["codelet_type"])
+            for r in sorted(
+                roles_data.get("codelet_roles", []),
+                key=lambda r: (r["role"].encode(), r["ordinal"]),
+            )
+        )
+        theme_relations = tuple(
+            ThemeRelationSpec(
+                name=r["name"],
+                ordinal=r["ordinal"],
+                node_name=r.get("node_name"),
+                abstractness=r.get("abstractness"),
+                description=r.get("description", ""),
+            )
+            for r in sorted(_load("theme_relations.json"), key=lambda r: r["ordinal"])
+        )
+
         # Enum values
         enum_values: dict[str, set[str]] = {}
         enums_file = os.path.join(seed_dir, "enums.json")
@@ -314,5 +398,8 @@ class MetadataProvider:
             theme_dimensions=theme_dimensions,
             slipnet_layout=slipnet_layout,
             codelet_patterns=codelet_patterns,
+            node_roles=node_roles,
+            codelet_roles=codelet_roles,
+            theme_relations=theme_relations,
             enum_values=enum_values,
         )

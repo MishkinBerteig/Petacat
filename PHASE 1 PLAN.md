@@ -48,7 +48,7 @@ back out as an editable database field, must be implemented with guard tests.**
 The load *path* already exists and is not the problem. `server/main.py` seeds twelve bulk
 JSON files into the metadata tables under a content fingerprint, and
 `metadata_service.load_metadata_from_db` builds the `MetadataProvider` the engine runs
-on. The app reads the database. (`MetadataProvider.from_seed_data` is the test and
+on. The app reads the database. (`MetadataProvider.from_standard_configuration` is the test and
 script path.)
 
 The problem is the other end: **the engine ignores much of what it loads, and other

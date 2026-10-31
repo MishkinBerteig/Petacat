@@ -20,7 +20,7 @@ count every engine-size figure in this document uses. Seed data: 59 slipnet node
 integration + 8 module files run locally; 9 e2e files currently require Docker, which
 WP2.1 removes).
 
-> **As built.** `server/engine/` holds 53 modules and 37,439 lines. The multi-core machinery
+> **As built.** `server/engine/` holds 53 modules and 37,571 lines. The multi-core machinery
 > (`free_running.py`, `coderack_shards.py`, `population.py`) moved out to the detachable
 > plugin package `server/parallel/`, which is not counted here.
 
@@ -96,7 +96,7 @@ inherit a parallel engine and do not touch scheduling.
 
 **The engine is database-free.** All 28 modules of `server/engine/` (16,619 LOC)
 contain **zero** SQLAlchemy imports, zero session handling, and zero awaited I/O.
-`EngineRunner(meta)` plus `MetadataProvider.from_seed_data(seed_dir)` runs a complete
+`EngineRunner(meta)` plus `MetadataProvider.from_standard_configuration(seed_dir)` runs a complete
 problem with no Postgres, no Docker, and no FastAPI — every measurement below was taken
 on a checkout where SQLAlchemy is not installed.
 
@@ -106,7 +106,7 @@ incidental.
 The database boundary is confined to twelve files:
 
 > **As built.** The database boundary spans `api/`, `services/`, `models/` and `db.py`,
-> with 95 endpoints taking `Depends(get_session)`.
+> with 94 endpoints taking `Depends(get_session)`.
 
 | Module | Role at the boundary |
 |--------|----------------------|
@@ -116,7 +116,7 @@ The database boundary is confined to twelve files:
 | `server/services/snapshot_service.py` | State serializers + `save_cycle_snapshot` |
 | `server/services/metadata_service.py` | DB → `MetadataProvider` |
 | `server/models/{run,metadata}.py` | ORM definitions |
-| `server/api/{runs,admin,memory,docs,controls}.py` | 76 endpoints taking `Depends(get_session)` |
+| `server/api/{runs,admin,memory,docs,controls}.py` | 75 endpoints taking `Depends(get_session)` |
 
 `server/api/ws.py` takes **no session at all**, and `controls.py` takes one only for
 `POST /spreading-threshold` — a deliberate choice, since the threshold changes what

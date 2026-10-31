@@ -373,7 +373,7 @@ def _meta() -> Any:
     if _META is None:
         from server.engine.metadata import MetadataProvider
 
-        _META = MetadataProvider.from_seed_data(SEED_DIR)
+        _META = MetadataProvider.from_standard_configuration(SEED_DIR)
     return _META
 
 

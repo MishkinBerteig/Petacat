@@ -19,7 +19,7 @@ SEED_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
 
 
 def _rack():
-    return Coderack(MetadataProvider.from_seed_data(SEED_DIR))
+    return Coderack(MetadataProvider.from_standard_configuration(SEED_DIR))
 
 
 def test_bin_follows_get_coderack_bin_on_unrounded_urgency():
@@ -128,7 +128,7 @@ def test_no_describable_bridges_builds_an_identity_rule():
     from server.engine.rules import build_rule_from_bridges
 
     rule = build_rule_from_bridges(
-        "top", [], slipnet=None, meta=MetadataProvider.from_seed_data(SEED_DIR)
+        "top", [], slipnet=None, meta=MetadataProvider.from_standard_configuration(SEED_DIR)
     )
     assert rule is not None and rule.is_identity_rule
     assert rule.rule_clause_templates == []

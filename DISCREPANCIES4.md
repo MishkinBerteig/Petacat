@@ -418,7 +418,7 @@ Every run above is reproducible from its seed alone.
 import os; os.environ['PETACAT_NUMERIC_BACKEND']='numpy'
 from server.engine.metadata import MetadataProvider
 from server.engine.runner import EngineRunner
-m = MetadataProvider.from_seed_data('seed_data')
+m = MetadataProvider.from_standard_configuration('seed_data')
 r = EngineRunner(m); r.init_mcat('eqe','qeq','abbba', seed=900056)
 r.run_mcat(max_steps=20000)
 print(r.status, r.ctx.workspace.answer_string.text)"

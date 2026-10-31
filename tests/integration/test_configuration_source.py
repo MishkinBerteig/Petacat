@@ -128,7 +128,7 @@ async def test_the_database_is_the_source_not_the_files(scratch):
 
     meta = await _start(url)
 
-    reference = MetadataProvider.from_seed_data(SEED_DIR)
+    reference = MetadataProvider.from_standard_configuration(SEED_DIR)
     assert meta.params[name] == int(edited)
     assert reference.params[name] == int(value)
     assert config_hash(meta) != config_hash(reference)
@@ -149,7 +149,7 @@ async def test_an_empty_database_first_loads(scratch):
     assert (rows[0].id, rows[0].origin, rows[0].load_state) == (1, "metacat_standard", "ready")
     assert len(rows[0].standard_hash) == 64 and rows[0].loaded_at is not None
 
-    unexplained, _ = _classify(provider_differences(MetadataProvider.from_seed_data(SEED_DIR), meta))
+    unexplained, _ = _classify(provider_differences(MetadataProvider.from_standard_configuration(SEED_DIR), meta))
     assert not unexplained, "\n".join(unexplained)
 
 
@@ -234,8 +234,8 @@ async def test_the_reference_equals_the_seed_files_whatever_the_database_holds(s
     meta = await _start(url)
 
     reference = standard_reference()
-    assert not provider_differences(MetadataProvider.from_seed_data(SEED_DIR), reference)
-    assert config_hash(reference) == config_hash(MetadataProvider.from_seed_data(SEED_DIR))
+    assert not provider_differences(MetadataProvider.from_standard_configuration(SEED_DIR), reference)
+    assert config_hash(reference) == config_hash(MetadataProvider.from_standard_configuration(SEED_DIR))
     assert reference is not meta
     assert reference.params[name] == int(value)
 

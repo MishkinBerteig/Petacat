@@ -42,7 +42,7 @@ SEED_DIR = os.path.join(
 
 @pytest.fixture(scope="module")
 def meta() -> MetadataProvider:
-    return MetadataProvider.from_seed_data(SEED_DIR)
+    return MetadataProvider.from_standard_configuration(SEED_DIR)
 
 
 def _run(meta, *, tracked: bool, steps: int = 800, seed: int = 42):

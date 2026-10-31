@@ -18,7 +18,7 @@ from server.engine.commentary import (
 )
 from server.engine.metadata import ConfigurationRequired, MetadataProvider
 
-T = MetadataProvider.from_seed_data(
+T = MetadataProvider.from_standard_configuration(
     os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
 ).commentary_templates
 

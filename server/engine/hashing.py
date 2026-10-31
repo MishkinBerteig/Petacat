@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import asdict, is_dataclass
+from dataclasses import asdict, fields, is_dataclass
 from typing import Any
 
 #: Truncated to keep the column narrow and readable in a listing. 128 bits of SHA-256
@@ -59,31 +59,76 @@ def _digest(payload: Any) -> str:
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()[:_DIGEST_CHARS]
 
 
-def config_hash(meta: Any) -> str:
-    """Identify the metadata a run executed under.
+#: The provider fields ``config_hash`` leaves out, by name.  Everything else the provider
+#: holds is hashed, so a new configuration table or field is covered the day it is added
+#: without anyone remembering to add it.  Adding a name here is a decision, and
+#: ``tests/unit/test_config_hash_guard.py`` pins this exact set.
+#:
+#: * ``demo_problems`` -- a catalogue of examples; editing one changes no run's thinking.
+#: * ``slipnet_layout`` -- where a node is drawn.
+#: * ``enum_values`` -- the engine's own vocabularies, mirrored from lookup tables.
+HASH_EXCLUDED_FIELDS = frozenset({"demo_problems", "slipnet_layout", "enum_values"})
 
-    Covers everything that changes what the engine *does*: the Slipnet's nodes and
-    links, the codelet sources, the posting rules, the parameters, the urgency levels,
-    the formula coefficients and the theme dimensions.
+#: Part of every digest, so a hash of this scheme can never equal a hash of another.
+HASH_SCHEME = 2
 
-    Deliberately excluded: the demo-problem catalogue, the slipnet display layout, the
-    commentary templates and the enum lookup tables. Editing a demo problem or moving a
-    node in the display does not change how any run thinks, and a hash that changed on
-    those would report differences that are not differences — which is exactly how a
-    field like this stops being trusted.
+
+def _canonical_ordered(value: Any) -> Any:
+    """Like :func:`_canonical`, but a dict keeps its order.
+
+    The order of the nodes, the links, the posting rules and the keys of a JSON value is
+    behaviour (it fixes the float accumulation order and which node each random draw is
+    spent on), so a configuration that differs only in order is a different configuration.
+    Sets still sort.
     """
-    return _digest(
-        {
-            "slipnet_nodes": meta.slipnet_node_specs,
-            "slipnet_links": meta.slipnet_link_specs,
-            "codelets": meta.codelet_specs,
-            "posting_rules": meta.posting_rules,
-            "params": meta.params,
-            "urgency_levels": meta.urgency_levels,
-            "formula_coefficients": meta.formula_coefficients,
-            "theme_dimensions": meta.theme_dimensions,
-        }
-    )
+    if is_dataclass(value) and not isinstance(value, type):
+        return _canonical_ordered({f.name: getattr(value, f.name) for f in fields(value)})
+    if isinstance(value, dict):
+        return [[str(k), _canonical_ordered(v)] for k, v in value.items()]
+    if isinstance(value, (set, frozenset)):
+        return sorted(_canonical(v) for v in value)
+    if isinstance(value, (list, tuple)):
+        return [_canonical_ordered(v) for v in value]
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return [type(value).__name__, value] if isinstance(value, (int, float)) and not isinstance(value, bool) else value
+    return repr(value)
+
+
+def _field_digest(value: Any) -> str:
+    encoded = json.dumps(_canonical_ordered(value), separators=(",", ":"))
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()[:_DIGEST_CHARS]
+
+
+def hashed_field_names(meta: Any) -> list[str]:
+    """The provider's field names the hash covers: every field but the excluded ones."""
+    return [f.name for f in fields(meta) if f.name not in HASH_EXCLUDED_FIELDS]
+
+
+def field_digests(meta: Any) -> dict[str, str]:
+    """``{field name: digest of that one field}`` over the hashed provider fields.
+
+    A caller that knows which fields changed recomputes only those digests and
+    :func:`combine` the result.
+    """
+    return {name: _field_digest(getattr(meta, name)) for name in hashed_field_names(meta)}
+
+
+def combine(digests: dict[str, str]) -> str:
+    """The configuration hash from per-field digests (scheme 2)."""
+    return _digest({"scheme": HASH_SCHEME, "fields": digests})
+
+
+def config_hash(meta: Any) -> str:
+    """Identify the metadata a run executed under: ``combine(field_digests(meta))``.
+
+    The hash is taken over every field of the provider except
+    :data:`HASH_EXCLUDED_FIELDS`, by reflection, so it covers the Slipnet (nodes, links,
+    roles, theme relations), the codelet sources, the posting rules and patterns, the
+    parameters, urgency levels, formula coefficients, theme dimensions and the
+    commentary templates (which carry text that changes stored output).  Order and the
+    type of a number (``5`` against ``5.0``) are part of the value.
+    """
+    return combine(field_digests(meta))
 
 
 def memory_hash(memory: Any) -> str:

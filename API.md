@@ -2,7 +2,7 @@
 
 > **Auto-generated.** Run `python scripts/generate_api_docs.py` to regenerate from the FastAPI application.
 
-154 HTTP routes, plus `WS /ws/runs/{run_id}` for live state push.
+153 HTTP routes, plus `WS /ws/runs/{run_id}` for live state push.
 
 Interactive documentation is served at `/docs` while the API is running.
 
@@ -155,7 +155,6 @@ Metacat Mode: the editable copy of the seed data (the global configuration). A T
 | `PUT` | `/api/admin/enums/{table}/{name}` | Update Enum Value |
 | `DELETE` | `/api/admin/enums/{table}/{name}` | Delete Enum Value |
 | `GET` | `/api/admin/export` | Export Metadata |
-| `POST` | `/api/admin/export-to-seed-data` | Export To Seed Data |
 | `GET` | `/api/admin/formula-coefficients` | List Formula Coefficients |
 | `POST` | `/api/admin/formula-coefficients` | Create Formula Coefficient |
 | `PUT` | `/api/admin/formula-coefficients/{name}` | Update Formula Coefficient |

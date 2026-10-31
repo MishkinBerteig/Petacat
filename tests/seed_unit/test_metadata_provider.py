@@ -10,7 +10,7 @@ SEED_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
 
 @pytest.fixture
 def meta():
-    return MetadataProvider.from_seed_data(SEED_DIR)
+    return MetadataProvider.from_standard_configuration(SEED_DIR)
 
 
 def test_loads_slipnet_nodes(meta):
@@ -182,7 +182,7 @@ def test_the_bottom_up_posting_rules_are_in_the_order_the_engine_posts_them():
     from server.engine.metadata import MetadataProvider
 
     seed_dir = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
-    meta = MetadataProvider.from_seed_data(seed_dir)
+    meta = MetadataProvider.from_standard_configuration(seed_dir)
 
     assert [
         rule.codelet_type for rule in meta.posting_rules if rule.direction == "bottom_up"
@@ -216,7 +216,7 @@ def test_every_posting_formula_uses_only_names_the_engine_supplies():
     from server.engine.posting import POSTING_FORMULA_NAMES
 
     seed_dir = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
-    meta = MetadataProvider.from_seed_data(seed_dir)
+    meta = MetadataProvider.from_standard_configuration(seed_dir)
 
     for rule in meta.posting_rules:
         if not rule.posting_formula:
@@ -252,7 +252,7 @@ def test_each_posted_urgency_is_one_of_the_named_urgency_levels():
     from server.engine.metadata import MetadataProvider
 
     seed_dir = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
-    meta = MetadataProvider.from_seed_data(seed_dir)
+    meta = MetadataProvider.from_standard_configuration(seed_dir)
 
     named = set(meta.urgency_levels.values())
     for rule in meta.posting_rules:
@@ -285,7 +285,7 @@ def test_every_condition_is_a_predicate_the_engine_can_evaluate():
     from server.engine.posting import POSTING_FORMULA_NAMES
 
     seed_dir = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
-    meta = MetadataProvider.from_seed_data(seed_dir)
+    meta = MetadataProvider.from_standard_configuration(seed_dir)
 
     for rule in meta.posting_rules:
         if rule.condition in ("", "always"):
@@ -322,7 +322,7 @@ def test_a_codelet_pattern_names_its_urgency_tier_rather_than_a_number():
     from server.engine.metadata import MetadataProvider
 
     seed_dir = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
-    meta = MetadataProvider.from_seed_data(seed_dir)
+    meta = MetadataProvider.from_standard_configuration(seed_dir)
 
     assert meta.codelet_patterns, "no patterns loaded"
     for name, entries in meta.codelet_patterns.items():
@@ -345,7 +345,7 @@ def test_the_clampable_patterns_are_five_of_the_nine():
     from server.engine.metadata import MetadataProvider
 
     seed_dir = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
-    meta = MetadataProvider.from_seed_data(seed_dir)
+    meta = MetadataProvider.from_standard_configuration(seed_dir)
 
     menu = meta.get_param("clampable_codelet_patterns")
     assert list(menu) == ["top_down", "bottom_up", "rule", "bridge", "group"]

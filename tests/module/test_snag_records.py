@@ -48,7 +48,7 @@ class _StagingSession:
 
 @pytest.fixture
 def meta():
-    return MetadataProvider.from_seed_data(SEED_DIR)
+    return MetadataProvider.from_standard_configuration(SEED_DIR)
 
 
 def _inherited_memory() -> tuple[EpisodicMemory, SnagDescription]:

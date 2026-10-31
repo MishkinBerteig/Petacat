@@ -376,7 +376,7 @@ def run_inprocess(
     """
     from server.engine.numeric.backend import use_backend
 
-    meta = meta or MetadataProvider.from_seed_data(SEED_DIR)
+    meta = meta or MetadataProvider.from_standard_configuration(SEED_DIR)
     name = task.backend or backend or default_backend(meta)
     with use_backend(name):
         return _execute(task, meta)
@@ -605,7 +605,7 @@ class Swarm:
     def _bind(self, meta: MetadataProvider | None) -> None:
         """Make *meta* (or the seed data) this pool's configuration.  Lock held."""
         if meta is None:
-            meta = self._bound_meta or MetadataProvider.from_seed_data(self._seed_dir)
+            meta = self._bound_meta or MetadataProvider.from_standard_configuration(self._seed_dir)
         self._bound_meta = meta
         self._bound_hash = config_hash(meta)
         self._blob = pickle.dumps(meta, protocol=pickle.HIGHEST_PROTOCOL)

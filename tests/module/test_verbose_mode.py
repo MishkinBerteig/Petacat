@@ -28,7 +28,7 @@ SEED_DIR = os.path.join(REPO, "seed_data")
 
 @pytest.fixture
 def meta():
-    return MetadataProvider.from_seed_data(SEED_DIR)
+    return MetadataProvider.from_standard_configuration(SEED_DIR)
 
 
 def _run(meta, verbose, steps=400, seed=3, problem=("abc", "abd", "xyz")):

@@ -91,7 +91,7 @@ def main() -> None:
     ap.add_argument("--spin-us", type=float, default=3000.0)
     ap.add_argument("--backends", nargs="+", default=["off", "numpy"])
     a = ap.parse_args()
-    meta = MetadataProvider.from_seed_data("seed_data")
+    meta = MetadataProvider.from_standard_configuration("seed_data")
     seeds = list(range(1, a.seeds + 1))
     out = {
         "python": sys.version, "gil": getattr(sys, "_is_gil_enabled", lambda: True)(),

@@ -1,0 +1,7 @@
+[
+  {"name": "identity", "ordinal": 0, "node_name": "plato-identity", "abstractness": 0, "description": "The same on both sides. The least abstract relation, so it scores 0 rather than its conceptual depth."},
+  {"name": "opposite", "ordinal": 1, "node_name": "plato-opposite", "abstractness": null, "description": "One side is the opposite of the other. Abstractness is the node's conceptual depth."},
+  {"name": "successor", "ordinal": 2, "node_name": "plato-successor", "abstractness": null, "description": "The next one along. Abstractness is the node's conceptual depth."},
+  {"name": "predecessor", "ordinal": 3, "node_name": "plato-predecessor", "abstractness": null, "description": "The one before. Abstractness is the node's conceptual depth."},
+  {"name": "diff", "ordinal": 4, "node_name": null, "abstractness": 50, "description": "Different in some way no other relation names. It has no Slipnet node, and a flat abstractness of 50."}
+]

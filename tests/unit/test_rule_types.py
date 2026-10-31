@@ -13,7 +13,7 @@ from server.engine.rules import (
     RuleClause,
 )
 
-_META = MetadataProvider.from_seed_data(
+_META = MetadataProvider.from_standard_configuration(
     os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
 )
 

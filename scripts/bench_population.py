@@ -43,7 +43,7 @@ def main() -> None:
     args = ap.parse_args()
 
     counts = [int(k) for k in args.k.split(",")]
-    meta = MetadataProvider.from_seed_data(os.path.join(REPO, "seed_data"))
+    meta = MetadataProvider.from_standard_configuration(os.path.join(REPO, "seed_data"))
     nodes = len(meta.slipnet_node_specs)
     machine = hardware.detect()
     pool = hardware.population_worker_count()

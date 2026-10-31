@@ -1,7 +1,7 @@
 """Tests for metadata seeding — verifies seed_data/ JSON files are well-formed
 and the MetadataProvider round-trip works correctly.
 
-These tests don't require Postgres — they use from_seed_data().
+These tests don't require Postgres — they use from_standard_configuration().
 """
 
 import os
@@ -17,7 +17,7 @@ SEED_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
 
 @pytest.fixture
 def meta():
-    return MetadataProvider.from_seed_data(SEED_DIR)
+    return MetadataProvider.from_standard_configuration(SEED_DIR)
 
 
 def test_all_seed_files_valid_json():

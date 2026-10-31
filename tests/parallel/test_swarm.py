@@ -55,7 +55,7 @@ def _demo_problems() -> list[tuple]:
 
 @pytest.fixture(scope="module")
 def meta() -> MetadataProvider:
-    return MetadataProvider.from_seed_data(SEED_DIR)
+    return MetadataProvider.from_standard_configuration(SEED_DIR)
 
 
 @pytest.fixture(scope="module")
@@ -412,7 +412,7 @@ if mode == "swarm":
 else:
     from server.engine.metadata import MetadataProvider
     from server.services.training_executor import SerialExecutor, TrainingTask
-    meta = MetadataProvider.from_seed_data(os.path.join(os.getcwd(), "seed_data"))
+    meta = MetadataProvider.from_standard_configuration(os.path.join(os.getcwd(), "seed_data"))
     SerialExecutor().submit([TrainingTask("abc", "abd", "ijk", None, 1, 50, None, "off")], meta).result(timeout=300)
 print("READY", os.getpid(), flush=True)
 time.sleep(600)

@@ -51,7 +51,7 @@ SEED = 42
 
 @pytest.fixture(scope="module")
 def meta():
-    return MetadataProvider.from_seed_data(SEED_DIR)
+    return MetadataProvider.from_standard_configuration(SEED_DIR)
 
 
 @pytest.fixture

@@ -294,7 +294,7 @@ def petacat_worker(task_path, output):
     sys.path.insert(0, str(ROOT))
     from server.engine.metadata import MetadataProvider
     from server.engine.runner import EngineRunner, STATUS_ANSWER_FOUND, STATUS_GAVE_UP, STATUS_HALTED
-    meta = MetadataProvider.from_seed_data(str(ROOT / "seed_data"))
+    meta = MetadataProvider.from_standard_configuration(str(ROOT / "seed_data"))
     with output.open("x") as stream:
         for i in range(task["count"]):
             started, stage, runner = time.perf_counter(), "initialize", None

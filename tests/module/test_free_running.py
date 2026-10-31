@@ -38,7 +38,7 @@ PROBLEM = ("abc", "abd", "mrrjjj")
 
 @pytest.fixture(scope="module")
 def meta() -> MetadataProvider:
-    return MetadataProvider.from_seed_data(SEED_DIR)
+    return MetadataProvider.from_standard_configuration(SEED_DIR)
 
 
 def _prepared(meta, seed: int = 42) -> EngineRunner:

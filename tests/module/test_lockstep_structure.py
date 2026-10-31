@@ -24,7 +24,7 @@ SEED_DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
 
 @pytest.fixture
 def meta():
-    return MetadataProvider.from_seed_data(SEED_DATA_DIR)
+    return MetadataProvider.from_standard_configuration(SEED_DATA_DIR)
 
 
 @pytest.fixture

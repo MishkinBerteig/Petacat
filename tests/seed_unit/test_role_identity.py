@@ -48,7 +48,7 @@ EN3 = "slipnet.roles does not exist until EN3 (engine/roles.py) adds it"
 def _meta():
     from server.engine.metadata import MetadataProvider
 
-    return MetadataProvider.from_seed_data(str(SEED_DIR))
+    return MetadataProvider.from_standard_configuration(str(SEED_DIR))
 
 
 def todays_lists() -> dict[str, list[str]]:

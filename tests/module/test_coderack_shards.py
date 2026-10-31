@@ -50,7 +50,7 @@ MIX = [
 
 @pytest.fixture(scope="module")
 def meta() -> MetadataProvider:
-    return MetadataProvider.from_seed_data(SEED_DIR)
+    return MetadataProvider.from_standard_configuration(SEED_DIR)
 
 
 def _fill(rack, count: int, rng: RNG) -> None:

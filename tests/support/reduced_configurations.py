@@ -17,7 +17,7 @@ configurations the plan's G9 runs the engine on from EN3 on:
 
 Each returns a ``Reduced`` (``name``, the ``documents``, the cascade ``report``).  Nothing
 here runs the engine; G9 will.  ``provider(reduced)`` builds the ``MetadataProvider`` for
-it through ``from_seed_data`` on a temporary directory, which is the only loader that
+it through ``from_standard_configuration`` on a temporary directory, which is the only loader that
 exists for files, so a reduced configuration is read by the same code as the real one.
 
 ``all_single_role_removals`` and ``all_node_removals`` enumerate the families G9 loops
@@ -127,7 +127,7 @@ def all_node_removals() -> Iterator[Reduced]:
 
 
 def write(reduced: Reduced, directory: Path) -> Path:
-    """Write the documents as a seed-file directory (what ``from_seed_data`` reads)."""
+    """Write the documents as a seed-file directory (what ``from_standard_configuration`` reads)."""
     directory.mkdir(parents=True, exist_ok=True)
     for fname, doc in reduced.documents.items():
         (directory / fname).write_text(json.dumps(doc, indent=1))
@@ -139,4 +139,4 @@ def provider(reduced: Reduced) -> Any:
     from server.engine.metadata import MetadataProvider
 
     with tempfile.TemporaryDirectory(prefix="petacat-reduced-") as tmp:
-        return MetadataProvider.from_seed_data(str(write(reduced, Path(tmp))))
+        return MetadataProvider.from_standard_configuration(str(write(reduced, Path(tmp))))

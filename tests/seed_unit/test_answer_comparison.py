@@ -38,7 +38,7 @@ ALPHABETIC = "plato-alphabetic-position-category"
 
 _SEED_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
 #: The Metacat Standard Configuration as a provider: the run's configuration here.
-_META = MetadataProvider.from_seed_data(_SEED_DIR)
+_META = MetadataProvider.from_standard_configuration(_SEED_DIR)
 
 
 @pytest.fixture

@@ -21,7 +21,7 @@ SEED_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
 
 @pytest.fixture
 def workspace():
-    meta = MetadataProvider.from_seed_data(SEED_DIR)
+    meta = MetadataProvider.from_standard_configuration(SEED_DIR)
     slipnet = Slipnet.from_metadata(meta)
     return Workspace("abc", "abd", "xyz", None, slipnet)
 

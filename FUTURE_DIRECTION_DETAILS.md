@@ -535,7 +535,7 @@ recall. Those are three different persistence regimes over **one engine**.
 **The headline: the engine is already database-free.** All 19 modules of
 `server/engine/` (~14.6k LOC) contain **zero** SQLAlchemy imports, zero session
 handling, and zero `await`ed I/O. `EngineRunner(meta)` plus
-`MetadataProvider.from_seed_data(seed_dir)` runs a complete problem with no
+`MetadataProvider.from_standard_configuration(seed_dir)` runs a complete problem with no
 Postgres, no Docker, and no FastAPI — this is what `smoke_test.py` already does and
 what ~100 unit and module tests already rely on. The measurements below were taken
 on a checkout where **SQLAlchemy is not installed at all**, and the engine ran fine.

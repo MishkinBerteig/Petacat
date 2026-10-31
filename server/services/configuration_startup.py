@@ -70,7 +70,7 @@ def read_standard_reference(seed_dir: str) -> Any:
     from server.engine.metadata import MetadataProvider
 
     try:
-        return MetadataProvider.from_seed_data(seed_dir)
+        return MetadataProvider.from_standard_configuration(seed_dir)
     except Exception as exc:
         raise ConfigurationStartupError(
             f"The Metacat Standard Configuration files in {seed_dir} cannot be read "

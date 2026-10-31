@@ -82,7 +82,7 @@ ALL_ALTERNATIVES = EXACT_BACKENDS + INEXACT_BACKENDS
 
 @pytest.fixture(scope="module")
 def meta() -> MetadataProvider:
-    return MetadataProvider.from_seed_data(SEED_DIR)
+    return MetadataProvider.from_standard_configuration(SEED_DIR)
 
 
 @pytest.fixture(scope="module")
@@ -873,7 +873,7 @@ from server.engine.metadata import MetadataProvider
 from server.engine.numeric import available_backends
 from server.engine.runner import EngineRunner
 
-runner = EngineRunner(MetadataProvider.from_seed_data(SEED_DIR))
+runner = EngineRunner(MetadataProvider.from_standard_configuration(SEED_DIR))
 runner.init_mcat("abc", "abd", "mrrjjj", seed=42)
 runner.run_mcat(max_steps=6000)
 workspace = runner.ctx.workspace
@@ -933,7 +933,7 @@ def test_engine_runs_identically_with_mlx_and_numpy_absent() -> None:
 def _reference_run() -> dict:
     from server.engine.runner import EngineRunner
 
-    runner = EngineRunner(MetadataProvider.from_seed_data(SEED_DIR))
+    runner = EngineRunner(MetadataProvider.from_standard_configuration(SEED_DIR))
     runner.init_mcat("abc", "abd", "mrrjjj", seed=42)
     runner.run_mcat(max_steps=6000)
     workspace = runner.ctx.workspace

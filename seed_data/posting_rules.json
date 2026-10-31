@@ -1,6 +1,7 @@
 {
   "posting_rules": [
     {
+      "rule_key": "bottom-up-bond-scout",
       "codelet_type": "bottom-up-bond-scout",
       "direction": "bottom_up",
       "urgency_when_posted": 35,
@@ -10,6 +11,7 @@
       "condition": "always"
     },
     {
+      "rule_key": "top-down-bond-scout:category",
       "codelet_type": "top-down-bond-scout:category",
       "direction": "top_down",
       "urgency_when_posted": null,
@@ -21,6 +23,7 @@
       "triggering_slipnodes": ["plato-predecessor", "plato-successor", "plato-sameness"]
     },
     {
+      "rule_key": "top-down-bond-scout:direction",
       "codelet_type": "top-down-bond-scout:direction",
       "direction": "top_down",
       "urgency_when_posted": null,
@@ -32,6 +35,7 @@
       "triggering_slipnodes": ["plato-left", "plato-right"]
     },
     {
+      "rule_key": "top-down-group-scout:category",
       "codelet_type": "top-down-group-scout:category",
       "direction": "top_down",
       "urgency_when_posted": null,
@@ -43,6 +47,7 @@
       "triggering_slipnodes": ["plato-predgrp", "plato-succgrp", "plato-samegrp"]
     },
     {
+      "rule_key": "top-down-group-scout:direction",
       "codelet_type": "top-down-group-scout:direction",
       "direction": "top_down",
       "urgency_when_posted": null,
@@ -54,6 +59,7 @@
       "triggering_slipnodes": ["plato-left", "plato-right"]
     },
     {
+      "rule_key": "group-scout:whole-string",
       "codelet_type": "group-scout:whole-string",
       "direction": "bottom_up",
       "urgency_when_posted": 35,
@@ -63,6 +69,7 @@
       "condition": "always"
     },
     {
+      "rule_key": "bottom-up-bridge-scout",
       "codelet_type": "bottom-up-bridge-scout",
       "direction": "bottom_up",
       "urgency_when_posted": 35,
@@ -72,6 +79,7 @@
       "condition": "always"
     },
     {
+      "rule_key": "important-object-bridge-scout",
       "codelet_type": "important-object-bridge-scout",
       "direction": "bottom_up",
       "urgency_when_posted": 35,
@@ -81,6 +89,7 @@
       "condition": "always"
     },
     {
+      "rule_key": "bottom-up-description-scout",
       "codelet_type": "bottom-up-description-scout",
       "direction": "bottom_up",
       "urgency_when_posted": 35,
@@ -90,6 +99,7 @@
       "condition": "always"
     },
     {
+      "rule_key": "top-down-description-scout",
       "codelet_type": "top-down-description-scout",
       "direction": "top_down",
       "urgency_when_posted": null,
@@ -101,6 +111,7 @@
       "triggering_slipnodes": ["plato-string-position-category", "plato-alphabetic-position-category", "plato-length"]
     },
     {
+      "rule_key": "rule-scout",
       "codelet_type": "rule-scout",
       "direction": "bottom_up",
       "urgency_when_posted": 35,
@@ -109,6 +120,7 @@
       "condition": "always"
     },
     {
+      "rule_key": "answer-finder",
       "codelet_type": "answer-finder",
       "direction": "bottom_up",
       "urgency_when_posted": null,
@@ -119,6 +131,7 @@
       "condition": "not justify_mode"
     },
     {
+      "rule_key": "answer-justifier",
       "codelet_type": "answer-justifier",
       "direction": "bottom_up",
       "urgency_when_posted": null,
@@ -129,6 +142,7 @@
       "condition": "justify_mode"
     },
     {
+      "rule_key": "thematic-bridge-scout",
       "codelet_type": "thematic-bridge-scout",
       "direction": "thematic",
       "urgency_when_posted": null,
@@ -138,6 +152,7 @@
       "condition": "self_watching_enabled"
     },
     {
+      "rule_key": "progress-watcher",
       "codelet_type": "progress-watcher",
       "direction": "bottom_up",
       "urgency_when_posted": 49,
@@ -147,6 +162,7 @@
       "condition": "self_watching_enabled"
     },
     {
+      "rule_key": "jootser",
       "codelet_type": "jootser",
       "direction": "bottom_up",
       "urgency_when_posted": 49,
@@ -156,6 +172,7 @@
       "condition": "self_watching_enabled"
     },
     {
+      "rule_key": "breaker",
       "codelet_type": "breaker",
       "direction": "bottom_up",
       "urgency_when_posted": 7,

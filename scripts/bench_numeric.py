@@ -226,7 +226,7 @@ def measure_engine(
     from server.engine.numeric.backend import use_backend
     from server.engine.runner import EngineRunner
 
-    meta = MetadataProvider.from_seed_data(SEED_DIR)
+    meta = MetadataProvider.from_standard_configuration(SEED_DIR)
     results: dict[str, Any] = {}
 
     for label in ["auto (default)"] + list(backend_names):

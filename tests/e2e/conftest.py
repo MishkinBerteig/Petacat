@@ -230,7 +230,7 @@ async def app_client(setup_db, test_engine):
         "SEED_DATA_DIR",
         os.path.join(os.path.dirname(__file__), "..", "..", "seed_data"),
     )
-    meta = MetadataProvider.from_seed_data(seed_dir)
+    meta = MetadataProvider.from_standard_configuration(seed_dir)
     run_service = RunService(meta)
     runs_module._run_service = run_service
 

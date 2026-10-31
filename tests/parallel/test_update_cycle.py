@@ -27,7 +27,7 @@ from server.engine.rng import RNG
 from server.engine.splittable_rng import SplittableRNG
 from server.parallel.update_cycle import UpdateCycle, _label, structure_identity
 
-META = MetadataProvider.from_seed_data("seed_data")
+META = MetadataProvider.from_standard_configuration("seed_data")
 PROBLEMS = [
     ("abc", "abd", "mrrjjj"),
     ("abc", "abd", "xyz"),

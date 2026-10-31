@@ -340,7 +340,7 @@ def _init_worker(
 ) -> None:
     """Load the metadata once per worker rather than once per run.
 
-    ``MetadataProvider.from_seed_data`` costs a couple of milliseconds against a
+    ``MetadataProvider.from_standard_configuration`` costs a couple of milliseconds against a
     ~130 ms run, which is small but not free at 1,300 runs, and it would otherwise
     be paid on every task.
 
@@ -351,7 +351,7 @@ def _init_worker(
     global _META, _RUN_ONE
     if backends:
         os.environ["PETACAT_NUMERIC_BACKEND"] = first_available_backend(backends)
-    _META = MetadataProvider.from_seed_data(seed_dir)
+    _META = MetadataProvider.from_standard_configuration(seed_dir)
     _RUN_ONE = run_one
 
 
@@ -391,7 +391,7 @@ def worker_pool(
 def _local_meta(seed_dir: str) -> MetadataProvider:
     global _LOCAL_META
     if _LOCAL_META is None:
-        _LOCAL_META = MetadataProvider.from_seed_data(seed_dir)
+        _LOCAL_META = MetadataProvider.from_standard_configuration(seed_dir)
     return _LOCAL_META
 
 

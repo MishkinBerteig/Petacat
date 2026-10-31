@@ -38,7 +38,7 @@ SEED_DATA = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
 
 @pytest.fixture(scope="module")
 def meta():
-    return MetadataProvider.from_seed_data(SEED_DATA)
+    return MetadataProvider.from_standard_configuration(SEED_DATA)
 
 
 # -- a small chi-square, since scipy is not a dependency ------------------------------

@@ -41,6 +41,8 @@ BULK_SEED_FILES = (
     "demo_problems.json",
     "commentary_templates.json",
     "posting_rules.json",
+    "roles.json",
+    "theme_relations.json",
 )
 
 #: Metadata tables that are *not* derived from the bulk seed files.
@@ -63,6 +65,15 @@ ENUM_MODELS: dict[str, str] = {
     "param_value_types": "ParamValueTypeDef",
     "demo_modes": "DemoModeDef",
 }
+
+#: Tables whose seed rows are written with explicit integer ids.
+ID_SEQUENCE_TABLES = (
+    "slipnet_link_defs",
+    "demo_problems",
+    "posting_rules",
+    "codelet_pattern_defs",
+    "theme_dimension_defs",
+)
 
 #: The help topics ship in one file, which the `en` suffix names.
 HELP_TOPICS_FILENAME = "help_topics.en.json"
@@ -145,6 +156,12 @@ async def seed_metadata_from_json(session: AsyncSession, seed_dir: str) -> None:
                 conceptual_depth=n["conceptual_depth"],
                 description=n.get("description", ""),
                 descriptor_predicate=n.get("descriptor_predicate"),
+                plain_name=n.get("plain_name"),
+                glyph=n.get("glyph"),
+                numeric_value=n.get("numeric_value"),
+                full_name=n.get("full_name"),
+                cm_short_name=n.get("cm_short_name"),
+                article_an=n.get("article_an"),
             )
         )
 
@@ -152,6 +169,7 @@ async def seed_metadata_from_json(session: AsyncSession, seed_dir: str) -> None:
         session.add(
             models.SlipnetLinkDef(
                 id=position,
+                sort_order=position - 1,
                 from_node=lk["from_node"],
                 to_node=lk["to_node"],
                 link_type=lk["link_type"],
@@ -178,14 +196,23 @@ async def seed_metadata_from_json(session: AsyncSession, seed_dir: str) -> None:
             )
         )
 
-    for k, v in _load("engine_params.json").items():
-        session.add(models.EngineParam(name=k, **_param_columns(v)))
+    # ``sort_order`` keeps each file's key order, which a table keyed by name would lose.
+    for position, (k, v) in enumerate(_load("engine_params.json").items()):
+        session.add(models.EngineParam(name=k, sort_order=position, **_param_columns(v)))
 
-    for k, v in _load("urgency_levels.json").items():
-        session.add(models.UrgencyLevel(name=k, value=v))
+    for position, (k, v) in enumerate(_load("urgency_levels.json").items()):
+        session.add(models.UrgencyLevel(name=k, value=v, sort_order=position))
 
-    for k, v in _load("formula_coefficients.json").items():
-        session.add(models.FormulaCoefficient(name=k, value=v))
+    # ``value_type`` keeps the JSON type of the number (``5`` against ``5.0``).
+    for position, (k, v) in enumerate(_load("formula_coefficients.json").items()):
+        session.add(
+            models.FormulaCoefficient(
+                name=k,
+                value=v,
+                value_type="int" if isinstance(v, int) and not isinstance(v, bool) else "float",
+                sort_order=position,
+            )
+        )
 
     for position, d in enumerate(_load("demo_problems.json"), start=1):
         session.add(
@@ -212,6 +239,8 @@ async def seed_metadata_from_json(session: AsyncSession, seed_dir: str) -> None:
         session.add(
             models.PostingRule(
                 id=position,
+                rule_key=pr.get("rule_key", pr["codelet_type"]),
+                sort_order=position - 1,
                 codelet_type=pr["codelet_type"],
                 direction=pr["direction"],
                 urgency_when_posted=pr.get("urgency_when_posted"),
@@ -234,6 +263,7 @@ async def seed_metadata_from_json(session: AsyncSession, seed_dir: str) -> None:
             session.add(
                 models.CodeletPatternDef(
                     id=entry_id,
+                    ordinal=entry_id - 1,
                     pattern_name=pattern_name,
                     codelet_type=codelet_type,
                     urgency_level=urgency_level,
@@ -251,9 +281,38 @@ async def seed_metadata_from_json(session: AsyncSession, seed_dir: str) -> None:
             )
         )
 
-    for name, pos in _load("slipnet_layout.json").get("node_positions", {}).items():
+    for position, (name, pos) in enumerate(
+        _load("slipnet_layout.json").get("node_positions", {}).items()
+    ):
         session.add(
-            models.SlipnetLayoutPos(node_name=name, grid_row=pos[0], grid_col=pos[1])
+            models.SlipnetLayoutPos(
+                node_name=name, grid_row=pos[0], grid_col=pos[1], sort_order=position
+            )
+        )
+
+    # Role bindings and theme relations reference nodes and codelet types by name; the
+    # rows they reference are flushed first.
+    await session.flush()
+    roles = _load("roles.json")
+    for r in roles.get("node_roles", []):
+        session.add(
+            models.SlipnetNodeRole(role=r["role"], ordinal=r["ordinal"], node_name=r["node_name"])
+        )
+    for r in roles.get("codelet_roles", []):
+        session.add(
+            models.CodeletTypeRole(
+                role=r["role"], ordinal=r["ordinal"], codelet_type=r["codelet_type"]
+            )
+        )
+    for r in _load("theme_relations.json"):
+        session.add(
+            models.ThemeRelation(
+                name=r["name"],
+                ordinal=r["ordinal"],
+                node_name=r.get("node_name"),
+                abstractness=r.get("abstractness"),
+                description=r.get("description", ""),
+            )
         )
 
     session.add(
@@ -261,6 +320,20 @@ async def seed_metadata_from_json(session: AsyncSession, seed_dir: str) -> None:
             template_key="all", template_data=_load("commentary_templates.json")
         )
     )
+
+    # The rows above carry explicit ids, which leave each table's id sequence at its start;
+    # an Admin create that draws from it would collide.  Put every such sequence past the
+    # largest id written, inside the same transaction.
+    await session.flush()
+    from sqlalchemy import text
+
+    for table in ID_SEQUENCE_TABLES:
+        await session.execute(
+            text(
+                f"SELECT setval(pg_get_serial_sequence('{table}', 'id'), "
+                f"(SELECT COALESCE(MAX(id), 1) FROM {table}), true)"
+            )
+        )
 
 
 def _param_columns(value: Any) -> dict[str, str]:

@@ -28,7 +28,7 @@ license change was authorised by Dr. Marshall directly (see
 > end-to-end. Episodic Memory (Metacat-Mode learning) shapes the runs that inherit it: a run
 > declines an answer already held for the same problem and rules, so repeating a
 > problem across Metacat Mode's [episodic runs](#persistence-modes-and-episodic-runs)
-> (which are Metacat Mode and not Training Mode) explores a different answer each time. It ships with 3,405 test cases covering the engine, the API, and the
+> (which are Metacat Mode and not Training Mode) explores a different answer each time. It ships with 3,479 test cases covering the engine, the API, and the
 > help/config system, run on both the CPU and the GPU numeric backends. Underneath the seven components sits an execution
 > substrate — three [persistence modes](#persistence-modes-and-episodic-runs),
 > a [GPU numeric substrate](#the-numeric-substrate), and
@@ -134,11 +134,7 @@ Edit that configuration through the Configuration screen: twelve of the thirteen
 collections have a tab that creates, updates and deletes their rows, and a
 change is written to the database and picked up by the next run created. The
 thirteenth, the codelet patterns, is configured through the API and the seed
-file rather than a tab, and travels the export and import routes with the rest. **Export Current Settings to
-Seed Data** writes the database's configuration back to `seed_data/*.json`,
-which is how a configuration arrived at in the app becomes the project's
-starting point. Each replaced file is copied first, under a timestamp, into
-`seed_data/.backups/`.
+file rather than a tab, and travels the export and import routes with the rest. The seed files change only by a committed development change; nothing the application does writes them.
 
 `GET /api/admin/export` and `POST /api/admin/import` carry the same twelve
 collections as one JSON object — slipnet nodes and links, codelet types, engine
@@ -419,8 +415,7 @@ drives the engine:
 All tables support inline editing (double-click a cell to edit). Changes are
 saved to the database immediately and apply to the next run created; a run keeps
 the configuration it started with for its whole life. Use the **Export** /
-**Import** buttons to move the full configuration as a JSON file, and **Export
-Current Settings to Seed Data** to write it back to `seed_data/*.json`.
+**Import** buttons to move the full configuration as a JSON file.
 
 You can also navigate directly to a node's configuration by double-clicking it
 in the Slipnet graph (to open the node focus view) and clicking **Edit** when
@@ -439,8 +434,8 @@ Petacat has two test suites:
   plugin against the serial runs it claims to equal), `lockstep` (Petacat's decision
   traces against Metacat's), and `e2e` (full HTTP
   stack against a running database). All eight run in a single command against
-  the local Postgres — 3,405 cases, which includes the numeric matrix's second
-  pass over the 511 backend-sensitive tests. See
+  the local Postgres — 3,479 cases, which includes the numeric matrix's second
+  pass over the 519 backend-sensitive tests. See
   [TESTING.md](TESTING.md) for the layer breakdown, the numeric backend matrix,
   the session ceiling, the unit-test rules, determinism requirements, test-double
   conventions, how to run the suite under the free-threaded interpreter, and what
@@ -693,7 +688,7 @@ Kernel timings, milliseconds per update cycle, on an M2 Max, fastest of 25:
 
 | nodes | edges | python | numpy | mlx (GPU) | mlx-cpu |
 |---|---|---|---|---|---|
-| 59 | 202 | 0.011 | 0.007 | 0.187 | 0.050 |
+| 59 | 203 | 0.011 | 0.007 | 0.187 | 0.050 |
 | 10³ | 3,424 | 0.245 | 0.029 | 0.178 | 0.131 |
 | 10⁴ | 34,237 | 2.76 | 0.245 | 0.298 | 1.13 |
 | 10⁵ | 342,373 | 43.10 | 2.54 | 0.324 | 9.70 |

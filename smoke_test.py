@@ -39,7 +39,7 @@ def main() -> None:
 
     # 1. Load metadata from seed JSON
     print("\n[1] Loading metadata from seed_data/ ...")
-    meta = MetadataProvider.from_seed_data(SEED_DIR)
+    meta = MetadataProvider.from_standard_configuration(SEED_DIR)
     print(f"    Loaded {len(meta.slipnet_node_specs)} slipnet nodes, "
           f"{len(meta.slipnet_link_specs)} links, "
           f"{len(meta.codelet_specs)} codelet types")
@@ -177,7 +177,7 @@ def run_problem(initial: str, modified: str, target: str, seed: int, max_steps: 
     """Run a single problem and return True if an answer was found."""
     print(f"\n--- Problem: {initial} -> {modified}; {target} -> ? (seed={seed}) ---")
 
-    meta = MetadataProvider.from_seed_data(SEED_DIR)
+    meta = MetadataProvider.from_standard_configuration(SEED_DIR)
     runner = EngineRunner(meta)
     runner.init_mcat(initial, modified, target, seed=seed)
     ctx = runner.ctx

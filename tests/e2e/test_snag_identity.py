@@ -157,7 +157,7 @@ async def test_rehydrating_the_memory_keeps_one_row_per_snag(db_session):
     await db_session.commit()
 
     seed_dir = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
-    await RunService(MetadataProvider.from_seed_data(seed_dir)).rehydrate_memory(db_session)
+    await RunService(MetadataProvider.from_standard_configuration(seed_dir)).rehydrate_memory(db_session)
 
     assert sorted(
         (s.snag_id, s.run_id) for s in _global_memory.snags if s.run_id != 3
@@ -201,7 +201,7 @@ async def test_rehydrating_keeps_the_explanation_and_falls_back_for_old_rows(db_
     await db_session.commit()
 
     seed_dir = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
-    service = RunService(MetadataProvider.from_seed_data(seed_dir))
+    service = RunService(MetadataProvider.from_standard_configuration(seed_dir))
     await service.rehydrate_memory(db_session)
 
     new, old = sorted(_global_memory.snags, key=lambda s: s.snag_id)[:2]

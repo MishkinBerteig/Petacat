@@ -126,7 +126,7 @@ def test_differing_dimensions_counts_one_per_matching_pair():
 
     from server.engine.metadata import MetadataProvider
 
-    meta = MetadataProvider.from_seed_data(
+    meta = MetadataProvider.from_standard_configuration(
         os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
     )
 
