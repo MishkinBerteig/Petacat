@@ -170,3 +170,7 @@ class TrainingMemoryMerge(Base):
     #: The run's new descriptions, oldest first, as ``state_graph`` records.
     answers = Column(JSONB, nullable=True)
     snags = Column(JSONB, nullable=True)
+
+# Registered here so every drop_all/create_all that imports the runtime models also covers
+# ``configuration_state`` (the start-up load marker; see server/services/configuration_startup.py).
+import server.models.configuration_state  # noqa: E402,F401

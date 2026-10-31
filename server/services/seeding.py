@@ -7,8 +7,9 @@ from `server/main.py`'s startup path because a *second* copy of it had grown in
 could never build.  `PHASE 1 PLAN.md` §0.2(c) names that shape — two sources of
 truth for one concept — and requires it to be resolved rather than re-homed.
 
-Startup still owns the *decision* to seed (the fingerprint check, dropping the
-derived tables, reconciling columns).  What lives here is the writing.
+Start-up (``server/services/configuration_startup.py``) decides whether to load: the
+database is the source of truth, and the files are loaded into it only when it is empty.
+What lives here is the writing, and the help-topic upsert.
 """
 
 from __future__ import annotations
@@ -25,12 +26,8 @@ logger = logging.getLogger("petacat")
 
 #: Seed files whose contents the DB copy of the bulk metadata mirrors.  Help
 #: topics are excluded: they are upserted separately on every startup.
-#:
-#: A file in this tuple is part of the fingerprint, so editing it re-seeds the
-#: derived tables.  That makes membership a claim that `seed_metadata_from_json`
-#: writes the file's rows somewhere — `posting_rules.json` sat here for as long as
-#: it went unwritten, counting towards the hash of a table it never filled, which is
-#: what `tests/integration/test_seed_reconciliation.py` now refuses to allow.
+#: Membership is a claim that `seed_metadata_from_json` writes the file's rows
+#: somewhere (`tests/integration/test_seed_reconciliation.py` enforces it).
 BULK_SEED_FILES = (
     "enums.json",
     "slipnet_nodes.json",
@@ -45,9 +42,6 @@ BULK_SEED_FILES = (
     "commentary_templates.json",
     "posting_rules.json",
 )
-
-#: EngineParam row that records which seed data the DB was last loaded from.
-SEED_FINGERPRINT_PARAM = "__seed_data_fingerprint__"
 
 #: Metadata tables that are *not* derived from the bulk seed files.
 NON_DERIVED_TABLES = frozenset({"help_topics"})
@@ -74,67 +68,25 @@ ENUM_MODELS: dict[str, str] = {
 HELP_TOPICS_FILENAME = "help_topics.en.json"
 
 
-def seed_data_fingerprint(seed_dir: str) -> str:
-    """A digest of the checked-in bulk seed files **and of this seeder**.
+def standard_configuration_hash(seed_dir: str) -> str:
+    """A digest of the bulk Metacat Standard Configuration files, recorded at the first load.
 
-    The seeder's own source is in the digest because a fingerprint over the data
-    alone cannot see a bug in the code that writes it.  When `posting_rules` was
-    added here, every existing database went on serving zero posting rules: the seed
-    files had not changed, so the fingerprints matched and startup skipped the
-    re-seed that would have filled the table.  The fix that fixed nothing until the
-    volume was destroyed is the same silent-divergence failure `PHASE 1 PLAN.md` §0
-    is about, one level up.
-
-    The cost is that editing this file — a comment included — re-seeds the derived
-    metadata on the next startup and so discards admin edits.  That is already what a
-    seed-file edit does, and it is the safe direction to err in: a re-seed loses
-    changes that are recorded in the JSON anyway, while a skipped one leaves the
-    engine running configuration nobody can see.
+    Provenance only (``configuration_state.standard_hash``): nothing compares it with the
+    files at start-up, because the database is the source of truth.
     """
     import hashlib
 
     digest = hashlib.sha256()
     for filename in BULK_SEED_FILES:
-        path = os.path.join(seed_dir, filename)
         digest.update(filename.encode())
-        try:
-            with open(path, "rb") as f:
-                digest.update(f.read())
-        except FileNotFoundError:
-            digest.update(b"<missing>")
-
-    digest.update(b"seeder:")
-    try:
-        with open(__file__, "rb") as f:
+        with open(os.path.join(seed_dir, filename), "rb") as f:
             digest.update(f.read())
-    except OSError:  # pragma: no cover — source is on disk in every real deployment
-        digest.update(b"<unreadable>")
-
     return digest.hexdigest()
 
 
-def tables_referenced_by_runtime(derived_names: set[str]) -> frozenset[str]:
-    """Derived tables that runtime data holds foreign keys into.
-
-    ``runs.status`` points at ``run_statuses`` and ``trace_events.event_type`` at
-    ``event_types``, so clearing those rows while a user's runs exist is refused
-    by the database.  They are stable enum tables, so they get seeded
-    insert-if-missing instead of being cleared.  Computed from the schema rather
-    than hard-coded, so a new runtime foreign key protects itself.
-    """
-    import server.models.run  # noqa: F401 — registers the runtime tables
-
-    from server.models.metadata import Base
-
-    protected: set[str] = set()
-    for table in Base.metadata.sorted_tables:
-        if table.name in derived_names:
-            continue  # only runtime / non-derived tables count as referrers
-        for fk in table.foreign_keys:
-            target = fk.column.table.name
-            if target in derived_names:
-                protected.add(target)
-    return frozenset(protected)
+def configuration_table_names() -> frozenset[str]:
+    """Every table the Metacat Standard Configuration loads into (by model introspection)."""
+    return frozenset(_derived_names())
 
 
 def _derived_names() -> set[str]:
@@ -152,52 +104,14 @@ def _derived_names() -> set[str]:
     }
 
 
-def derived_metadata_tables() -> list:
-    """Derived metadata tables, in safe deletion order (children first).
-
-    Restricted to classes declared in ``server.models.metadata``: the runtime
-    models in ``server.models.run`` share the same declarative ``Base``, so
-    walking ``Base.metadata`` wholesale would have swept up ``runs``,
-    ``trace_events``, ``cycle_snapshots`` and the episodic-memory tables and
-    deleted a user's saved work.
-
-    Ordering comes from SQLAlchemy's own foreign-key sort rather than a
-    hand-written list — hand-listing meant playing whack-a-mole with dependencies
-    (``posting_rules`` → ``posting_directions``, …) and getting it wrong twice.
-    """
-    from server.models.metadata import Base
-
-    derived = _derived_names()
-    protected = tables_referenced_by_runtime(derived)
-    ordered = [
-        t
-        for t in Base.metadata.sorted_tables
-        if t.name in derived and t.name not in protected
-    ]
-    ordered.reverse()  # children first, so foreign keys stay satisfied
-    return ordered
-
-
-def protected_enum_tables() -> frozenset[str]:
-    """Enum tables that runtime foreign keys forbid clearing."""
-    return tables_referenced_by_runtime(_derived_names())
-
-
-async def seed_metadata_from_json(
-    session: AsyncSession,
-    seed_dir: str,
-    *,
-    fingerprint: str | None = None,
-) -> None:
+async def seed_metadata_from_json(session: AsyncSession, seed_dir: str) -> None:
     """Write every bulk seed file into its metadata table.
 
-    Assumes the derived tables have already been emptied by the caller, except for
-    the enum tables `protected_enum_tables()` names, which are seeded
-    insert-if-missing because runtime rows point at them.
+    Plain inserts into **empty** tables: the database is loaded from the files only when
+    it is empty (the first load, or a test database).  The caller owns the transaction.
 
-    *fingerprint* records which seed data this was, as an `EngineParam` row.  Left
-    `None` it is computed from *seed_dir*, which is what a caller that has not
-    already computed it wants.
+    C6 will route this load through the journal layer as the global journal's first entry
+    (``source = standard_load``); until then the rows are written directly.
     """
     from server.models import metadata as models
 
@@ -207,17 +121,9 @@ async def seed_metadata_from_json(
 
     # Enum lookup tables first — the FK constraints below require them.
     enums_data = _load("enums.json")
-    protected = protected_enum_tables()
     for table_name, model_name in ENUM_MODELS.items():
         model_cls = getattr(models, model_name)
         rows = enums_data.get(table_name, [])
-        if model_cls.__tablename__ in protected:
-            # Never cleared, so add only what is missing rather than colliding on
-            # the primary key.
-            present = set(
-                (await session.execute(select(model_cls.name))).scalars().all()
-            )
-            rows = [r for r in rows if r["name"] not in present]
         for row in rows:
             session.add(
                 model_cls(
@@ -274,13 +180,6 @@ async def seed_metadata_from_json(
 
     for k, v in _load("engine_params.json").items():
         session.add(models.EngineParam(name=k, **_param_columns(v)))
-    session.add(
-        models.EngineParam(
-            name=SEED_FINGERPRINT_PARAM,
-            value=fingerprint if fingerprint is not None else seed_data_fingerprint(seed_dir),
-            value_type="string",
-        )
-    )
 
     for k, v in _load("urgency_levels.json").items():
         session.add(models.UrgencyLevel(name=k, value=v))

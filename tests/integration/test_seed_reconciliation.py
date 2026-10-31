@@ -1,7 +1,8 @@
-"""The DB copy of the metadata must track the seed files without eating runtime data.
+"""The seeder writes every configuration table, and the suite keeps no seeder of its own.
 
-These guard the startup reconciliation in ``server.main``.  They need SQLAlchemy,
-which the venv provides via `pip install -e ".[dev]"`.
+The database is loaded from the seed files only when it is empty (C2); there is no
+re-seed, so these guard the single load path.  They need SQLAlchemy, which the venv
+provides via `pip install -e ".[dev]"`.
 """
 
 import pytest
@@ -9,44 +10,21 @@ import pytest
 pytest.importorskip("sqlalchemy", reason="sqlalchemy not available locally")
 
 
-def test_clearing_derived_metadata_never_touches_runtime_tables():
-    """``server.models.run`` shares the declarative ``Base`` with the metadata
-    models, so walking ``Base.metadata`` wholesale would sweep up a user's runs,
-    trace events, snapshots and episodic memory and delete them.
-    """
-    from server.main import _derived_metadata_tables
+def test_configuration_tables_exclude_runtime_tables_and_help_topics():
+    """``server.models.run`` shares the declarative ``Base`` with the metadata models, so
+    the set of configuration tables must come from the metadata module alone."""
+    from server.services.seeding import configuration_table_names
 
-    names = {t.name for t in _derived_metadata_tables()}
+    names = configuration_table_names()
     runtime = {
-        "runs",
-        "trace_events",
-        "cycle_snapshots",
-        "answer_descriptions",
-        "snag_descriptions",
-        "trainings",
-        "training_problems",
-        "training_runs",
-        "training_memory_merges",
+        "runs", "trace_events", "cycle_snapshots", "answer_descriptions",
+        "snag_descriptions", "trainings", "training_problems", "training_runs",
+        "training_memory_merges", "configuration_state",
     }
-    assert not (names & runtime), f"runtime tables would be cleared: {names & runtime}"
-    assert "help_topics" not in names, "help topics are upserted, not cleared"
-    # And it is actually doing something.
+    assert not (names & runtime), f"runtime tables counted as configuration: {names & runtime}"
+    assert "help_topics" not in names, "help topics are upserted, not part of the load"
     assert "slipnet_link_defs" in names
     assert "codelet_type_defs" in names
-
-
-def test_tables_that_runtime_data_points_at_are_protected():
-    """``runs.status`` and ``trace_events.event_type`` are foreign keys onto enum
-    tables, so those rows cannot be cleared while runs exist — Postgres refuses.
-    They are seeded insert-if-missing instead.
-    """
-    from server.main import _derived_metadata_tables, _protected_enum_tables
-
-    protected = _protected_enum_tables()
-    assert {"run_statuses", "event_types"} <= protected
-
-    cleared = {t.name for t in _derived_metadata_tables()}
-    assert not (cleared & protected)
 
 
 def test_every_trace_event_type_the_engine_emits_is_declared():
@@ -115,39 +93,30 @@ class _RecordingSession:
         return _Result()
 
 
-async def test_the_seeder_refills_every_table_it_empties():
-    """A cleared table that is never refilled is how a whole seed file goes missing.
+async def test_the_seeder_writes_every_configuration_table():
+    """A configuration table that is never written is how a whole seed file goes missing.
 
-    ``_derived_metadata_tables`` is the list startup ``DELETE``s before re-seeding, so
-    every name on it is a table the seeder has undertaken to write.  ``posting_rules``
-    was on that list and on ``BULK_SEED_FILES`` — cleared on every seed-data change,
-    counted in the fingerprint, exposed for editing and export through the admin API —
-    and no code path ever inserted a row.  The engine consequently had zero posting
-    rules in production and seventeen everywhere else.
-
-    Stated this way the invariant needs no file-to-table mapping to maintain: it reads
-    both halves off the schema, so a table added later is covered the day it is added.
+    ``posting_rules`` was once on the clear list and on ``BULK_SEED_FILES`` and no code
+    path ever inserted a row, so the engine had zero posting rules in production and
+    seventeen everywhere else.  The invariant reads both halves off the schema, so a table
+    added later is covered the day it is added.
     """
     import os
 
     from server.services.seeding import (
-        derived_metadata_tables,
-        protected_enum_tables,
+        configuration_table_names,
         seed_metadata_from_json,
     )
 
     seed_dir = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
     session = _RecordingSession()
-    await seed_metadata_from_json(session, seed_dir, fingerprint="test")
+    await seed_metadata_from_json(session, seed_dir)
 
-    emptied = {t.name for t in derived_metadata_tables()}
-    # The protected enum tables are never emptied, but they are seeded
-    # insert-if-missing, so they are written too and belong in the expectation.
-    expected = emptied | protected_enum_tables()
+    expected = set(configuration_table_names())
 
     missing = expected - session.written
     assert not missing, (
-        "the seeder empties or owns these tables but writes no row into them: "
+        "the seeder owns these configuration tables but writes no row into them: "
         f"{sorted(missing)}"
     )
 
@@ -196,39 +165,20 @@ def test_the_test_suite_does_not_keep_a_seeder_of_its_own():
     )
 
 
-def test_the_fingerprint_covers_the_seeder_and_not_only_the_seed_files():
-    """A fix to the seeder has to reach databases that already exist.
-
-    Startup re-seeds only when the fingerprint moves.  With the digest taken over the
-    seed files alone, teaching the seeder to write a table it had been skipping
-    changed nothing anywhere: the files were untouched, the fingerprints matched, and
-    every existing database kept its empty table.  Hashing this module's source too
-    is what makes a code fix take effect on the next restart.
-    """
-    import os
-
+def test_nothing_fingerprints_the_seed_files_or_reseeds():
+    """The database is the source of truth: no fingerprint, no re-seed, no delete path."""
     from server.services import seeding
 
-    seed_dir = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
-    before = seeding.seed_data_fingerprint(seed_dir)
-
-    original = seeding.__file__
-    try:
-        # Point the digest at a different file, standing in for an edited seeder.
-        seeding.__file__ = os.path.join(seed_dir, "enums.json")
-        after = seeding.seed_data_fingerprint(seed_dir)
-    finally:
-        seeding.__file__ = original
-
-    assert after != before, "the seeder's own source does not move the fingerprint"
-    assert seeding.seed_data_fingerprint(seed_dir) == before, "digest is not stable"
+    assert not hasattr(seeding, "SEED_FINGERPRINT_PARAM")
+    assert not hasattr(seeding, "seed_data_fingerprint")
+    assert not hasattr(seeding, "derived_metadata_tables")
 
 
 def test_slipnet_node_model_carries_the_descriptor_predicate():
     """The predicate is knowledge about a concept, so the DB mirrors the JSON.
 
-    ``create_all`` never alters an existing table, which is why startup also
-    reconciles missing columns additively.
+    ``create_all`` never alters an existing table; a database that predates a schema
+    change is cleared, not upgraded (C2).
     """
     from server.models.metadata import SlipnetNodeDef
 

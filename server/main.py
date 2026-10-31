@@ -16,240 +16,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from server.config import SEED_DATA_DIR
-from server.engine.metadata import MetadataProvider
-from server.services.seeding import (
-    BULK_SEED_FILES as _BULK_SEED_FILES,
-    HELP_TOPICS_FILENAME,
-    NON_DERIVED_TABLES as _NON_DERIVED_TABLES,
-    SEED_FINGERPRINT_PARAM as _SEED_FINGERPRINT_PARAM,
-    derived_metadata_tables as _derived_metadata_tables,
-    protected_enum_tables as _protected_enum_tables,
-    seed_metadata_from_json,
-    sync_help_topics as _sync_help_topics,
-    tables_referenced_by_runtime as _tables_referenced_by_runtime,
-)
+from server.services.configuration_startup import startup_configuration
 
 logger = logging.getLogger("petacat")
-
-
-def _seed_data_fingerprint() -> str:
-    """A digest of the checked-in bulk seed files."""
-    from server.services.seeding import seed_data_fingerprint
-
-    return seed_data_fingerprint(SEED_DATA_DIR)
-
-
-async def _stored_seed_fingerprint_safe(engine) -> str | None:
-    """The fingerprint the DB was last seeded from, or ``None``.
-
-    Uses raw SQL and swallows failures on purpose: the table may not exist yet,
-    or may predate a column the ORM now expects, and either way the answer we
-    want is "unknown, so re-seed".
-    """
-    from sqlalchemy import text
-
-    try:
-        async with engine.connect() as conn:
-            result = await conn.execute(
-                text("SELECT value FROM engine_params WHERE name = :name"),
-                {"name": _SEED_FINGERPRINT_PARAM},
-            )
-            row = result.first()
-            return row[0] if row else None
-    except Exception:
-        return None
-
-
-async def _reconcile_metadata_columns(engine) -> None:
-    """Add any columns the models declare that the database is missing.
-
-    ``create_all`` creates missing *tables* but never alters an existing one, so a
-    seed file that grows a new field — ``slipnet_nodes.descriptor_predicate`` —
-    left the old column set in place on any pre-existing volume, and every query
-    naming the new column failed.  Dropping the tables instead is not an option:
-    runtime data holds foreign keys into several of them.
-
-    The models share one ``Base``, so this covers the runtime tables too — which
-    matters for a column like ``runs.spreading_threshold`` that existing rows must
-    acquire a sensible value for rather than NULL.
-
-    **Stale columns are dropped, on the derived metadata tables only.**  Adding without
-    ever removing meant a renamed column left its predecessor behind, and a leftover
-    ``NOT NULL`` column that the seeder no longer writes makes every insert into that
-    table fail.  The consequence is worse than the cause: ``_ensure_db_ready`` catches
-    everything and logs "DB setup skipped", so the seeding transaction rolls back whole
-    and the application serves stale or empty metadata with nothing saying the
-    configuration it is running is not the one on disk — the exact condition Step 0
-    exists to remove, one level down in the machinery that delivers it.
-
-    A derived table is emptied and rewritten on every re-seed, so a column it no longer
-    declares holds nothing worth keeping.  Runtime tables are left alone: ``runs``,
-    ``trace_events`` and the episodic-memory tables hold a user's actual work, and a
-    column the models have stopped declaring there is a migration to be written by
-    hand, not something startup should delete.
-    """
-    from sqlalchemy import text
-    from server.models.metadata import Base
-    from server.services.seeding import derived_metadata_tables
-
-    rewritten = {t.name for t in derived_metadata_tables()}
-
-    async with engine.begin() as conn:
-        for table in Base.metadata.sorted_tables:
-            result = await conn.execute(
-                text(
-                    "SELECT column_name FROM information_schema.columns "
-                    "WHERE table_name = :table"
-                ),
-                {"table": table.name},
-            )
-            present = {row[0] for row in result}
-            if not present:
-                continue  # table does not exist yet; create_all will make it
-            for column in table.columns:
-                if column.name in present:
-                    continue
-                # Added nullable regardless of the model's constraint: the
-                # derived tables are re-seeded immediately afterwards, and a NOT
-                # NULL column cannot be added to a populated table without a
-                # default.
-                type_sql = column.type.compile(dialect=conn.dialect)
-                # Carry the model's server_default through, so rows that already
-                # exist get the intended value instead of NULL. Without this a
-                # runtime table gaining a column — where the rows are real data
-                # and are not re-seeded — would read back None everywhere.
-                # Interpolated defaults have to be quoted when they are strings.
-                # Postgres reads an unquoted ``DEFAULT normal`` as a *column
-                # reference* and rejects it — "cannot use column reference in DEFAULT
-                # expression" — which went unnoticed while the only column with a
-                # server_default was ``spreading_threshold``, whose ``"100"`` happens
-                # to be valid unquoted. The first string-valued default (``runs.mode``)
-                # broke it. Numeric literals are still emitted bare so existing
-                # behaviour is unchanged.
-                default_sql = ""
-                if column.server_default is not None:
-                    arg = getattr(column.server_default, "arg", None)
-                    if arg is not None:
-                        literal = str(getattr(arg, "text", arg))
-                        try:
-                            float(literal)
-                        except ValueError:
-                            literal = "'" + literal.replace("'", "''") + "'"
-                        default_sql = f" DEFAULT {literal}"
-                logger.info(
-                    "Adding missing column %s.%s (%s%s)",
-                    table.name, column.name, type_sql, default_sql,
-                )
-                await conn.execute(
-                    text(
-                        f'ALTER TABLE "{table.name}" '
-                        f'ADD COLUMN "{column.name}" {type_sql}{default_sql}'
-                    )
-                )
-
-            if table.name not in rewritten:
-                continue
-            declared = {column.name for column in table.columns}
-            for stale in sorted(present - declared):
-                logger.info("Dropping stale column %s.%s", table.name, stale)
-                await conn.execute(
-                    text(f'ALTER TABLE "{table.name}" DROP COLUMN "{stale}"')
-                )
-
-
-async def _ensure_db_ready():
-    from server.services.episodic_clears_migration import EpisodicClearMigrationError
-
-    """Create tables and seed metadata if they don't exist yet.
-
-    Help topics are always synced on startup (idempotent upsert by topic_key),
-    so JSON updates take effect after a simple restart.
-    """
-    import json
-    from sqlalchemy import select
-    from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-    from sqlalchemy.pool import NullPool
-    from server.config import DATABASE_URL
-
-    try:
-        engine = create_async_engine(DATABASE_URL, poolclass=NullPool)
-
-        from server.models.metadata import Base
-        import server.models.run  # noqa — register runtime tables
-        import server.models.training  # noqa — trainings and their problems, runs, memory merges
-
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-
-        # Metacat Mode has no Training Sessions: convert a database that still records
-        # them into Episodic Memory clears, losslessly and once (no-op afterwards).  The
-        # development database has no ``alembic_version``, so this is how it is converted;
-        # Alembic migration 018 runs the same function.
-        from server.services.episodic_clears_migration import convert_sessions_to_clears
-
-        async with engine.begin() as conn:
-            converted = await conn.run_sync(convert_sessions_to_clears)
-        if converted["converted"]:
-            logger.info(
-                "Converted Training Sessions to %d Episodic Memory clears",
-                converted["clears"],
-            )
-
-        # create_all only creates missing tables; bring existing ones up to date.
-        await _reconcile_metadata_columns(engine)
-
-        # Decide whether the bulk metadata in the DB is still current.
-        #
-        # Checking merely "are there any rows?" meant a database left over
-        # from an earlier build kept serving stale metadata to the admin panel
-        # while the engine ran the new seed files from JSON — a silent divergence
-        # between what you can inspect and what is actually executing.  And
-        # ``create_all`` never alters an existing table, so a seed file that grew
-        # a new field (``slipnet_nodes.descriptor_predicate``) left the old column
-        # set in place and every query against it failed.
-        #
-        # So: fingerprint the seed files, and when they differ, drop the derived
-        # metadata tables and let ``create_all`` rebuild them at the current
-        # schema before re-seeding.  Runtime data is never touched.
-        factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-        fingerprint = _seed_data_fingerprint()
-        stored = await _stored_seed_fingerprint_safe(engine)
-
-        if stored == fingerprint:
-            async with factory() as session:
-                await _sync_help_topics(session, SEED_DATA_DIR)
-                await session.commit()
-            await engine.dispose()
-            return
-
-        if stored is not None:
-            logger.info(
-                "Seed data changed (%s -> %s); re-seeding derived metadata",
-                stored[:12], fingerprint[:12],
-            )
-        from sqlalchemy import delete as _delete
-
-        async with factory() as session:
-            for table in _derived_metadata_tables():
-                await session.execute(_delete(table))
-            await session.commit()
-
-        # Seed from JSON files (help topics handled separately by _sync_help_topics)
-        async with factory() as session:
-            await seed_metadata_from_json(session, SEED_DATA_DIR, fingerprint=fingerprint)
-
-            await session.commit()
-            logger.info("Database tables created and seeded")
-
-            # Sync help topics from the topics JSON (idempotent upsert)
-            await _sync_help_topics(session, SEED_DATA_DIR)
-
-        await engine.dispose()
-    except EpisodicClearMigrationError:
-        # Not "the database may be unavailable": converting would lose a note.  Stop.
-        raise
-    except Exception as e:
-        logger.warning("DB setup skipped (may not be available): %s", e)
 
 
 async def _regenerate_derived_help_docs() -> None:
@@ -284,14 +53,22 @@ async def _regenerate_derived_help_docs() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize services at startup, clean up on shutdown."""
-    # Ensure DB tables exist and are seeded (syncs help topics into the DB)
-    await _ensure_db_ready()
-
     # Regenerate derived help artifacts (HELP.md + TypeScript constants)
     await _regenerate_derived_help_docs()
 
-    # Load metadata from seed_data/ JSON (or DB in production)
-    meta = MetadataProvider.from_seed_data(SEED_DATA_DIR)
+    # The database is the configuration source of truth.  Start-up connects (refusing to
+    # start if it cannot), loads the Metacat Standard Configuration only into an EMPTY
+    # database, syncs the help topics, builds the engine's provider from the database, and
+    # reads the seed files once into the read-only reference
+    # (``configuration_startup.standard_reference()``).  Any failure raises and the
+    # process does not serve.
+    from server.config import DATABASE_URL
+
+    try:
+        meta = await startup_configuration(DATABASE_URL, SEED_DATA_DIR)
+    except Exception:
+        logger.critical("Petacat cannot start: the configuration could not be prepared", exc_info=True)
+        raise
 
     # Create RunService and wire it into the routers
     from server.services.run_service import RunService

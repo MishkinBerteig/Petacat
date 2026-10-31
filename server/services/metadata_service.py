@@ -22,7 +22,6 @@ from server.engine.metadata import (
     SlipnodeSpec,
     ThemeDimensionSpec,
 )
-from server.services.seeding import SEED_FINGERPRINT_PARAM
 from server.models.metadata import (
     BridgeOrientationDef,
     BridgeTypeDef,
@@ -121,16 +120,9 @@ async def load_metadata_from_db(session: AsyncSession) -> MetadataProvider:
     # file's key order is not stored and the query can only be made deterministic, not
     # seed-ordered (the engine looks parameters up by name and never iterates them; see
     # ``tests/integration/test_db_seed_equivalence.py``, which records this limit).
-    #
-    # The seeder's bookkeeping row (``SEED_FINGERPRINT_PARAM``) says which seed data the
-    # database was last loaded from.  It is not an engine parameter and the seed path has
-    # no such key, so it is not part of the provider: left in, it made ``config_hash`` of
-    # the database's provider differ from the seed files' for identical configuration.
     result = await session.execute(select(EngineParam).order_by(EngineParam.name))
     params: dict[str, Any] = {}
     for row in result.scalars():
-        if row.name == SEED_FINGERPRINT_PARAM:
-            continue
         params[row.name] = _parse_param(row.value, row.value_type)
 
     # Urgency levels.  Ordered by name for the same reason as the parameters.

@@ -125,14 +125,14 @@ outside the matrix take it too and the run is entirely what it says it is.
   gpu  mlx      float32    511 tests
   whole suite requested: the full matrix is required of this run
 
-  unit           732 collected    732 run    732 passed      0 failed      0 skipped  complete
-  seed_unit      579 collected    579 run    546 passed      0 failed     33 skipped  complete
-  module        1025 collected   1025 run   1025 passed      0 failed      0 skipped  complete
+  unit           733 collected    733 run    733 passed      0 failed      0 skipped  complete
+  seed_unit      584 collected    584 run    551 passed      0 failed     33 skipped  complete
+  module        1041 collected   1041 run   1041 passed      0 failed      0 skipped  complete
   architecture    42 collected     42 run     42 passed      0 failed      0 skipped  complete
-  integration    180 collected    180 run    179 passed      0 failed      1 skipped  complete
+  integration    194 collected    194 run    193 passed      0 failed      1 skipped  complete
   parallel       244 collected    244 run    244 passed      0 failed      0 skipped  complete
   lockstep       228 collected    228 run    228 passed      0 failed      0 skipped  complete
-  e2e            341 collected    341 run    341 passed      0 failed      0 skipped  complete
+  e2e            339 collected    339 run    339 passed      0 failed      0 skipped  complete
 
   run complete in 13.9 min against a 60 min ceiling
 ```
@@ -180,7 +180,7 @@ A truncated run reports itself as truncated, and the difference from a clean run
 visible three ways:
 
 ```
-  module         1025 collected    198 run    198 passed      0 failed      0 skipped  INCOMPLETE
+  module         1041 collected    198 run    198 passed      0 failed      0 skipped  INCOMPLETE
 
   RUN TRUNCATED: the 60 min ceiling was reached after 60.4 min. Everything above is
   what the run produced before it stopped; the tests it had not reached never ran.
@@ -204,14 +204,14 @@ that allowance.
 
 | Layer | Directory | Scope | May depend on | Cases |
 |-------|-----------|-------|---------------|-------|
-| **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 732 |
-| **seed unit** | `tests/seed_unit/` | One class or function, measured against the values Petacat ships with | Real `seed_data/*.json`, and the machine the process is running on | 579 |
-| **module** | `tests/module/` | Several real components assembled and driven | Real engine objects and `seed_data/*.json`; no DB, no HTTP | 1025 |
+| **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 733 |
+| **seed unit** | `tests/seed_unit/` | One class or function, measured against the values Petacat ships with | Real `seed_data/*.json`, and the machine the process is running on | 584 |
+| **module** | `tests/module/` | Several real components assembled and driven | Real engine objects and `seed_data/*.json`; no DB, no HTTP | 1041 |
 | **architecture** | `tests/architecture/` | How the source tree is allowed to depend on itself | The repository's source, `seed_data/*.json`, child interpreters | 42 |
-| **integration** | `tests/integration/` | Agreement between the repository's artifacts, and the harness's own rules | Real `seed_data/*.json`, the ORM declarations, the generated client files, the documentation, a real pytest session | 180 |
+| **integration** | `tests/integration/` | Agreement between the repository's artifacts, and the harness's own rules | Real `seed_data/*.json`, the ORM declarations, the generated client files, the documentation, a real pytest session | 194 |
 | **parallel** | `tests/parallel/` | The detachable multi-core plugin (`server/parallel/`): each executor against the serial run it claims to equal | Real engine objects and `seed_data/*.json`, worker processes and threads; each test pins the backend it compares on | 244 |
 | **lockstep** | `tests/lockstep/` | Petacat's decision traces against Metacat's: naming, helper conformance, tracing/replay RNGs, determinism guards, the comparer | Real engine in faithful mode (numeric backend off, or a named backend); recorded Metacat traces | 228 |
-| **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 341 |
+| **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 339 |
 
 Those counts are cases, so they include the second pass the numeric matrix makes
 over the 511 backend-sensitive tests.
@@ -246,7 +246,7 @@ first**, then move up toward the API and GUI.
 
 All eight layers run in one command — the
 [required command](#the-required-command) — and, since Petacat runs natively, all
-eight actually run: **3,371 cases**, every one of them executed. A layer that is
+eight actually run: **3,405 cases**, every one of them executed. A layer that is
 normally skipped is not a layer that is normally green, and none of these is.
 
 Wall-clock time depends heavily on the machine and on what else it is doing. The
@@ -351,17 +351,30 @@ changing what it records.
   `RECORDED_STORAGE_LIMITS`; the list can only shrink. The configuration input library
   (`server/services/configuration_input.py`) is tested on its own in
   `test_configuration_input.py`.
+- *C2, start-up.* `tests/integration/test_configuration_source.py` runs the start-up
+  sequence `lifespan` uses against its own scratch database, `petacat_c2` (override with
+  `C2_DATABASE_URL`): the database is the configuration source, the seed files load only
+  into an empty database, and an unreachable or unreadable one refuses to start.
 - *EN0, the golden baseline gate (G3).* `tests/lockstep/golden/` records the engine's
   behaviour before the first configuration-source engine edit, on the CPU numeric backend
   (float64) from the Metacat Standard Configuration. Recapture with
   `.venv/bin/python scripts/capture_golden_baseline.py` only for a deliberate, reviewed
   change of behaviour, stated in the commit; never to turn a red gate green.
+  The baseline records behaviour only, not which configuration produced it (no
+  configuration hash), so behaviour-preserving changes to the Metacat Standard
+  Configuration do not touch it.
 - *EN0, the no-node-literals lint.* `tests/architecture/test_no_node_literals_in_engine.py`
   with `no_node_literals_allowlist.txt`: the allow-list may only shrink.
 - *EN0, role identity and reduced configurations.* `tests/seed_unit/test_role_identity.py`
   is a skeleton whose comparison with `slipnet.roles` skips until EN3;
   `test_reduced_configurations.py` checks the generated reduced configurations that later
   packages run the engine on.
+- *EN1, no run-time seed reads.* `tests/module/test_no_seed_reads_at_run_time.py` arms a
+  `sys.addaudithook` (installed by a fixture local to the module, so no `conftest.py`
+  change) that fails any `open` under `seed_data/` during a run, a swarm call and an
+  episode, and checks that the former fallbacks raise when given no `MetadataProvider`.
+  Tests that call an engine function that now takes the provider build one with
+  `MetadataProvider.from_seed_data`; the engine's own run-time paths never do.
 
 **`tests/unit/` — one class or function, against what the test constructs**
 
@@ -402,7 +415,7 @@ changing what it records.
 | `test_themespace.py` | 31 | Themespace self-watching dynamics: cluster spreading, dominance |
 | `test_trace_event.py` | 6 | `TemporalTrace` event recording |
 | `test_trace_display.py` | 16 | A Trace event's print name and display header against `trace.ss`: every event type, the three group directions, the bridge prefixes, flipped groups, the answer headers; a picture that cannot be taken never stops the trace |
-| `test_verbose.py` | 15 | Scheme's display of values, the bounded narration log (capture and replay, dropped lines), the message-catalogue overlay, and that the narration builtins exist in a codelet's namespace only when Verbose mode is on |
+| `test_verbose.py` | 16 | Scheme's display of values, the bounded narration log (capture and replay, dropped lines), the message-catalogue overlay, and that the narration builtins exist in a codelet's namespace only when Verbose mode is on |
 | `test_workspace_object.py` | 40 | `WorkspaceObject` and `Letter`: geometry, importance, unhappiness |
 | `test_workspace_string.py` | 28 | `WorkspaceString`: bond and group management, spanning, relevance |
 | `test_workspace_structure.py` | 10 | The base structure class and its proposal levels |
@@ -411,16 +424,16 @@ changing what it records.
 
 | File | Fns | Covers |
 |------|----:|--------|
-| `test_answer_comparison.py` | 42 | The answer-comparison and answer-explanation English (`answers.ss:267-882`) |
+| `test_answer_comparison.py` | 44 | The answer-comparison and answer-explanation English (`answers.ss:267-882`) |
 | `test_answer_description.py` | 4 | Storing, reminding and comparing inside `EpisodicMemory` |
 | `test_bridge_types.py` | 4 | Bridge orientation over letters of a real Workspace |
 | `test_codelet_dsl.py` | 2 | The codelet registry built from the seeded codelet types |
 | `test_coderack_bin.py` | 10 | The Coderack's urgency bins and temperature-weighted choice |
 | `test_coderack_clamping.py` | 15 | Codelet-type clamping, against the urgencies Petacat ships with |
 | `test_coderack_eviction.py` | 19 | Incremental eviction picks exactly what the flat scan picked |
-| `test_commentary.py` | 6 | The emit helpers that render from the seeded commentary templates |
+| `test_commentary.py` | 7 | The emit helpers that render from the seeded commentary templates |
 
-| `test_episodic_memory.py` | 20 | Reminding, comparison and the reminding distance, which resolve the seeded templates and the seeded conceptual depths |
+| `test_episodic_memory.py` | 21 | Reminding, comparison and the reminding distance, which resolve the seeded templates and the seeded conceptual depths |
 | `test_fallback_instrumentation.py` | 4 | The silent-fallback observer (EN0, `tests/support/fallback_instrumentation.py`) sees the three blanket `except Exception` blocks of `justify.py` and a lookup of an absent Slipnet node, and changes nothing else; `scripts/count_silent_fallbacks.py` makes the count over the whole baseline set |
 | `test_formulas.py` | 10 | The temperature-dependent formulas against the seeded coefficients |
 | `test_hardware.py` | 21 | The machine description and the sizes derived from it: real probes, faked probes, environment overrides |
@@ -430,7 +443,7 @@ changing what it records.
 | `test_reduced_configurations.py` | 14 | The reduced-configuration fixture generator (EN0, `tests/support/reduced_configurations.py` and `configuration_cascade.py`): nothing left that names a removed node or codelet type, the cascade removes what the plan's rules say, a provider loads from each; the engine is not run on them yet |
 | `test_role_identity.py` | 12 | Role identity (gate G5), the skeleton laid down by EN0: today's side runs now (the role-to-literal table against the Metacat Standard Configuration, the engine's ordered constants and `role_identity_today.json`); the comparison with `slipnet.roles` skips, with a stated reason, until EN3 adds it |
 | `test_rule_english.py` | 10 | A rule's English against Metacat 1.2's own `transcribe-to-english` output: 463 recorded rule shapes, each string state, wrapping, articles, and the text kept from the moment the rule was made |
-| `test_snag_explanation.py` | 19 | A snag's explanation against Metacat 1.2's `get-explanation` (`trace.ss:1097-1125`): every branch of the failure-result, the object phrases, the commentary lines, the template-driven wording, and the fallback for a snag with no stored explanation |
+| `test_snag_explanation.py` | 20 | A snag's explanation against Metacat 1.2's `get-explanation` (`trace.ss:1097-1125`): every branch of the failure-result, the object phrases, the commentary lines, the template-driven wording, and the fallback for a snag with no stored explanation |
 | `test_rule_quality.py` | 13 | Rule uniformity, abstractness and succinctness against the Scheme's formulas, hand-computed from the seeded depths |
 | `test_slipnet_link_lengths.py` | 6 | The Slipnet's link lengths against the reference Scheme |
 | `test_slipnet_node.py` | 23 | The 59-node Slipnet: its nodes, its links, its clamps and its spreading |
@@ -457,6 +470,7 @@ changing what it records.
 | `test_justify_and_jootsing.py` | 14 | Justify mode's verdicts and the jootser's justify outcomes |
 | `test_lockstep_structure.py` | 7 | Structure-building fidelity: bridge-proposal scout scope, bond-builder break order, answer string outside justify mode, concept-activation sampling (DISCREPANCIES5 C-5, D-6…D-10) |
 | `test_numeric_engine.py` | 7 | The engine computes the same thing with the substrate engaged |
+| `test_no_seed_reads_at_run_time.py` | 8 | EN1: the engine takes its configuration from the run's `MetadataProvider` and never reads the Metacat Standard Configuration files at run time. A `sys.addaudithook` fixture (local to the module) fails any `open` under `seed_data/` during a Verbose-mode run, a swarm call, an episode with Episodic Memory carried and the comparison and explanation of its answers; and the former fallbacks (rule English parameters, the Verbose catalogue, commentary templates, conceptual depths, reminding and distance) raise when no provider is given |
 | `test_population.py` | 9 | Population batching: K independent runs together |
 | `test_run_identifiers.py` | 8 | Identifiers depend on the run, not on the process's history |
 | `test_rule_object_descriptions.py` | 8 | What a rule may name its object by, and whether that name finds anything |
@@ -493,6 +507,7 @@ changing what it records.
 | `test_documented_code_shape.py` | 4 | The engine's size, the endpoint count, the builtins module and the Run Controls groups, as the documentation states them |
 | `test_documented_counts.py` | 3 | Every documented layer count, suite total and per-file figure, against the collection that produced it |
 | `test_configuration_input.py` | 31 | The four input-check classes of the configuration input library (C0, `server/services/configuration_input.py`) as pure functions, with no database, engine or routes: unknown reference, key exists, malformed, does-not-compile, stale base version, and applying operations to a copy |
+| `test_configuration_source.py` | 15 | C2, start-up tests 1-6 of the plan's 3.6, through `server/services/configuration_startup.py` (what `lifespan` calls): the database is the source and not the files; an empty database first-loads with a `configuration_state` row; a loaded database is never re-seeded (edits and deletions survive a restart) even when a seed file changes; the start-up reference equals the seed files whatever the database holds; refusals (unreachable database, rows without a state row, a state that is not `ready`, a state row over empty tables, an older schema, an unparseable parameter, an unreadable seed file); two simultaneous start-ups load once; start-up never writes the seed files. Uses its own scratch database `petacat_c2` (`C2_DATABASE_URL` overrides) |
 | `test_db_seed_equivalence.py` | 15 | C0 gate G4: a database loaded from the Metacat Standard Configuration with no edits yields a provider equal, field by field (order and JSON number typing included), to `MetadataProvider.from_seed_data`. `RECORDED_STORAGE_LIMITS` lists what the database cannot carry today and may only shrink: any other difference fails, and so does fixing a recorded limit without removing it. A new table must be added to `COVERED_TABLES`. Uses its own scratch database `petacat_c0` (`C0_HARNESS_DATABASE_URL` overrides), built by `equivalence_harness.py` |
 | `test_db_seed_parallel_equivalence.py` | 2 | C0 gate G4: a swarm (real process pool) and a speculative run with `workers >= 2` equal the seed-file provider's runs on the database-loaded provider; slow, CPU float64 pinned by the tests themselves |
 | `test_db_seed_run_equivalence.py` | 2 | C0 gate G4: Metacat Mode runs per (problem, seed) on the database-loaded provider are identical to the seed-file provider's (answers, codelet count, draw count, final temperature, step/structure/trace hashes, final state); in the numeric matrix, with bit-identity down to the draw asserted on the float64 CPU half |
@@ -500,7 +515,7 @@ changing what it records.
 | `test_help_topics.py` | 13 | The help JSON, the generated TypeScript and the panels that reference them |
 | `test_metadata_seeding.py` | 13 | Every seed file is well-formed, and the `MetadataProvider` round-trip holds |
 | `test_numeric_matrix_harness.py` | 11 | The matrix's own reporting rules and the exit status of a narrowed run |
-| `test_seed_reconciliation.py` | 7 | The DB copy of the metadata tracks the seed files without eating runtime data (the four Training tables are among the runtime tables it must leave alone), and the seeder refills every table it empties |
+| `test_seed_reconciliation.py` | 6 | The seeder writes every configuration table, the configuration tables exclude the runtime tables (the four Training tables among them), and no fingerprint or re-seed path remains |
 
 **`tests/lockstep/` — Petacat's decision traces (the Petacat/Metacat lockstep harness)**
 
@@ -546,7 +561,7 @@ changing what it records.
 | `test_moment_display.py` | 6 | Event, answer and snag redisplay over the API: print names in the listing, the picture served live and from the stored row, the toggle and the switch, rows with no picture |
 | `test_swarm_api.py` | 5 | `POST /api/swarm` equals the serial runs, persists nothing, and rejects bad requests; `GET /api/swarm` reports the pool |
 | `test_trainings_api.py` | 32 | Trainings over HTTP: every stored run is the serial run; the 25 + 5 workflow (problems added while it runs); the finished long-poll; pause, resume, close, cancel, delete; the database written only when a problem finishes; a restart redoes what was cut off to the identical result and rebuilds the shared memory exactly; one worker is a serial episode and many replay from the merge log; fair sharing of the cores; every error policy; worker-failure retries, charged only to the run that broke the pool; a policy pause survives a concurrent status change; live counts never step backwards; a summary's finished cursor comes from the same snapshot as its counts; seed ranges fit the database; configuration change stalls or is adopted; validation, export, defaults and fixed settings |
-| `test_step0_config_from_db.py` | 50 | Step 0's guard tests: a shipped value reproduces the run and a changed one moves it |
+| `test_step0_config_from_db.py` | 48 | Step 0's guard tests: a shipped value reproduces the run and a changed one moves it |
 
 **`tests/parallel/` — the multi-core plugin against the serial runs it claims to equal**
 

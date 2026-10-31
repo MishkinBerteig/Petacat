@@ -159,8 +159,7 @@ def test_config_hash_is_equal(db, seed):
     assert config_hash(db.provider) == config_hash(seed)
 
 
-def test_the_seeders_bookkeeping_row_is_not_an_engine_parameter(db, seed):
-    assert "__seed_data_fingerprint__" not in db.provider.params
+def test_the_database_holds_exactly_the_files_engine_parameters(db, seed):
     assert set(db.provider.params) == set(seed.params)
 
 
@@ -359,7 +358,7 @@ def _expected_tables() -> dict[str, list[dict]]:
 
 
 #: Tables whose rows are not compared one-to-one with a file, and why.
-#: ``engine_params`` carries text ``value`` columns plus the seeder's bookkeeping row;
+#: ``engine_params`` carries text ``value`` columns;
 #: ``commentary_templates`` is one JSONB document.
 COVERED_ELSEWHERE = {"engine_params", "commentary_templates"}
 
@@ -385,8 +384,8 @@ def test_first_load_loses_no_engine_param(db):
         params = json.load(f)
     stored = {r["name"] for r in db.tables["engine_params"]}
     assert set(params) <= stored
-    # exactly one extra row: the seeder's own bookkeeping.
-    assert stored - set(params) == {"__seed_data_fingerprint__"}
+    # exactly the file's keys: the seeder writes no bookkeeping row.
+    assert stored == set(params)
 
 
 def test_first_load_loses_no_commentary_template(db):
