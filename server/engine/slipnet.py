@@ -14,6 +14,7 @@ import math
 from typing import TYPE_CHECKING, Any, Callable
 
 from server.engine.numeric.backend import select_backend
+from server.engine.roles import Roles, resolve_roles
 #: ``(40% ...)`` at ``slipnet.ss:191``.  The fallback for a node built without a
 #: ``MetadataProvider``; the value in force comes from ``shrunk_link_length_factor``.
 DEFAULT_SHRUNK_LINK_FACTOR = 0.4
@@ -190,6 +191,7 @@ class SlipnetNode:
         "_workspace_activation",
         "_full_activation_threshold",
         "_shrunk_link_factor",
+        "roles",
     )
 
     def __init__(
@@ -213,6 +215,9 @@ class SlipnetNode:
         self.lateral_sliplinks: list[SlipnetLink] = []
         self.incoming_links: list[SlipnetLink] = []
         self.intrinsic_link_length: int | None = None
+        #: The names of the roles this node holds (set by ``Slipnet.from_metadata``), for
+        #: code that has a node but no Slipnet.
+        self.roles: frozenset[str] = frozenset()
         self._decay_percent: float = 0.0
         self.descriptor_predicate: Callable[..., bool] | None = None
         # Flat scalars rather than a reference to the params object: these are read on
@@ -229,6 +234,9 @@ class SlipnetNode:
         #: shrunk length from the intrinsic one, so a stored table of shrunk lengths
         #: would be a second place for the same fact to be written.
         self._shrunk_link_factor: float = DEFAULT_SHRUNK_LINK_FACTOR
+
+    def has_role(self, role: str) -> bool:
+        return role in self.roles
 
     def compute_rate_of_decay(self, update_cycle_length: int) -> None:
         """The per-cycle decay rate, held as a *percentage* rather than a fraction.
@@ -840,6 +848,9 @@ class SlipnetLink:
 _UNRESOLVED = object()
 
 
+_NO_ROLES = Roles()
+
+
 class Slipnet:
     """The full semantic network."""
 
@@ -853,6 +864,9 @@ class Slipnet:
         #: ``%update-cycle-length%`` (``run.ss:20``).  Replaced in ``from_metadata``;
         #: the reference cadence stands for a bare ``Slipnet()``.
         self.update_cycle_length: int = 15
+        #: The roles, resolved once in ``from_metadata`` (``engine/roles.py``).  A bare
+        #: ``Slipnet()`` has every role absent.
+        self.roles: Roles = _NO_ROLES
         # Resolved on first use rather than here, because ``from_metadata``
         # computes the decay rates *after* constructing the Slipnet and the
         # numeric layout needs them.
@@ -922,6 +936,14 @@ class Slipnet:
                 from_node.lateral_sliplinks.append(link)
 
             to_node.incoming_links.append(link)
+
+        # Resolve the roles once: the bound node (or the role's Absent token) per role,
+        # and each bound node's frozenset of role names.
+        slipnet.roles, held = resolve_roles(
+            meta.node_roles, meta.codelet_roles, slipnet.nodes, meta.codelet_specs
+        )
+        for node_name, role_names in held.items():
+            slipnet.nodes[node_name].roles = role_names
 
         # Compute decay rates.  Held on the Slipnet as well, because the *spread*
         # scale is computed from the same cycle length once per update and had no

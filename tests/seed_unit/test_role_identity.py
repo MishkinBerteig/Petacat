@@ -7,19 +7,18 @@ found by the old literal* (``is``, not ``==``), and the ordered lists
 (``rule.dimension_order``, ``answer.description_dimension``, the number ladder, the
 alphabet) equal the old tuples, element for element.
 
-``slipnet.roles`` does not exist until EN3.  This module therefore has two halves:
+This module has two halves:
 
-* **Today's side, running now.**  The role-to-literal table (``tests/support/role_table.py``)
+* **Today's side.**  The role-to-literal table (``tests/support/role_table.py``)
   is checked against the Metacat Standard Configuration (every literal names a node or
   codelet type that exists; the roles, the relations, the numbers and the letters
   account for all 59 nodes), against the engine's own constants (the ordered lists), and
   against ``role_identity_today.json``, recorded from today's code, which is what the
   later comparison reads.
-* **The comparison, skipped until EN3.**  Each role, ordered list and codelet role is a
-  test that resolves through ``slipnet.roles`` and asserts identity with today's literal.
-  They skip with a stated reason while ``slipnet.roles`` is absent and start running the
-  moment EN3 adds it.  The one place that knows how to read a role off ``slipnet.roles``
-  is ``_resolve``; EN3 adjusts it (and ``role_attr``) if its names differ.
+* **The comparison, running since EN3.**  Each role, ordered list and codelet role is a
+  test that resolves through ``slipnet.roles`` (``server/engine/roles.py``) and asserts
+  identity with today's literal.  The one place that reads a role off ``slipnet.roles`` is
+  ``_resolve``.
 
 Regenerate the recording after an approved change with
 ``.venv/bin/python tests/seed_unit/test_role_identity.py --write``.
@@ -41,8 +40,6 @@ from tests.support.role_table import (
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SEED_DIR = REPO_ROOT / "seed_data"
 RECORDING = Path(__file__).with_name("role_identity_today.json")
-
-EN3 = "slipnet.roles does not exist until EN3 (engine/roles.py) adds it"
 
 
 def _meta():
@@ -146,15 +143,12 @@ def test_the_recording_matches_todays_code() -> None:
 
 
 # ---------------------------------------------------------------------------
-# The comparison: skipped until EN3
+# The comparison (EN3)
 # ---------------------------------------------------------------------------
 
 
 def _roles(slipnet):
-    roles = getattr(slipnet, "roles", None)
-    if roles is None:
-        pytest.skip(EN3)
-    return roles
+    return slipnet.roles
 
 
 def _resolve(roles, role: str):
@@ -175,12 +169,17 @@ def test_ordered_role_equals_the_old_tuple(slipnet, role) -> None:
     assert all(a is slipnet.nodes[name] for a, name in zip(resolved, ORDERED_ROLES[role]))
 
 
-def test_ladder_and_alphabet_equal_the_old_lists(slipnet) -> None:
-    alphabet = getattr(slipnet, "alphabet", None)
-    if alphabet is None:
-        pytest.skip(EN3 + " (the alphabet and ladder records arrive with EN5b)")
-    assert [n.name for n in alphabet.letters] == list(LETTER_NODES)
-    assert [n.name for n in alphabet.numbers] == list(NUMBER_NODES)
+def test_ladder_and_alphabet_equal_the_old_lists(slipnet, meta) -> None:
+    """The ladder and the alphabet are data, not roles (plan 3.2, 3.13): the nodes that have a
+    ``numeric_value`` ordered by it, the nodes that have a ``glyph`` ordered by it.  EN5b gives
+    them records on the Slipnet; until then the provider's node columns say the same thing."""
+    specs = meta.slipnet_node_specs.values()
+    letters = [s.name for s in sorted((s for s in specs if s.glyph), key=lambda s: s.glyph)]
+    numbers = [s.name for s in sorted((s for s in specs if s.numeric_value is not None),
+                                      key=lambda s: s.numeric_value)]
+    assert letters == list(LETTER_NODES)
+    assert numbers == list(NUMBER_NODES)
+    assert all(slipnet.nodes[n] for n in letters + numbers)
 
 
 @pytest.mark.parametrize("role", sorted(CODELET_ROLES))

@@ -19,6 +19,7 @@ logger = logging.getLogger("petacat.engine")
 from server.engine.codelet_dsl.builtins import get_builtins
 from server.engine.workspace_structures import set_structure_clock
 from server.engine.commentary import CommentaryLog, CommentaryWriter, emit_new_problem
+from server.engine.start_check import require_run_start
 from server.engine.codelet_dsl.interpreter import CodeletInterpreter, CodeletRegistry
 from server.engine.access import AccessRecorder
 from server.engine.coderack import Codelet, Coderack
@@ -391,6 +392,9 @@ class EngineRunner:
             # be able to disagree about the update cycle without disturbing each other.
             if parameters:
                 self.meta = self.meta.with_overrides(parameters)
+            # A configuration that lacks what the engine cannot invent stops the run here,
+            # naming everything missing (configuration-source plan 3.4(c)).
+            require_run_start(self.meta)
             self._init_mcat(
                 initial, modified, target, answer, seed, memory, ids, commentary, sink,
                 rng,

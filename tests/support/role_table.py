@@ -7,8 +7,8 @@ role is bound to exactly that node.  The table is the contract the role-identity
 ``tests/seed_unit/test_role_identity.py``) checks and the source the reduced-configuration
 fixtures use to say which node "one role unbound" removes.
 
-Nothing here is read by the engine.  When EN3 adds ``server/engine/roles.py`` its registry
-must agree with this table; the G5 test then compares the two.
+Nothing here is read by the engine.  ``server/engine/roles.py`` (EN3) has its own registry,
+and ``tests/seed_unit/test_roles.py`` checks that the two agree.
 """
 
 from __future__ import annotations
@@ -78,6 +78,6 @@ LETTER_NODES: tuple[str, ...] = tuple(f"plato-{chr(c)}" for c in range(ord("a"),
 
 def role_attr(role: str) -> str:
     """The attribute of ``slipnet.roles`` a role is read from: dots become underscores
-    (``dimension.length`` -> ``roles.dimension_length``).  A guess until EN3 fixes the
-    names; the G5 test reads it through this one function."""
+    (``dimension.length`` -> ``roles.dimension_length``).  ``RoleSpec.attr`` in
+    ``server/engine/roles.py`` is the same rule, and the G5 test checks they agree."""
     return role.replace(".", "_")
