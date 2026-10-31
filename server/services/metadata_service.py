@@ -22,6 +22,7 @@ from server.engine.metadata import (
     SlipnodeSpec,
     ThemeDimensionSpec,
 )
+from server.services.seeding import SEED_FINGERPRINT_PARAM
 from server.models.metadata import (
     BridgeOrientationDef,
     BridgeTypeDef,
@@ -116,18 +117,30 @@ async def load_metadata_from_db(session: AsyncSession) -> MetadataProvider:
         for row in result.scalars()
     }
 
-    # Engine params
-    result = await session.execute(select(EngineParam))
+    # Engine params.  ``ORDER BY name``: the table has no ordinal column, so the seed
+    # file's key order is not stored and the query can only be made deterministic, not
+    # seed-ordered (the engine looks parameters up by name and never iterates them; see
+    # ``tests/integration/test_db_seed_equivalence.py``, which records this limit).
+    #
+    # The seeder's bookkeeping row (``SEED_FINGERPRINT_PARAM``) says which seed data the
+    # database was last loaded from.  It is not an engine parameter and the seed path has
+    # no such key, so it is not part of the provider: left in, it made ``config_hash`` of
+    # the database's provider differ from the seed files' for identical configuration.
+    result = await session.execute(select(EngineParam).order_by(EngineParam.name))
     params: dict[str, Any] = {}
     for row in result.scalars():
+        if row.name == SEED_FINGERPRINT_PARAM:
+            continue
         params[row.name] = _parse_param(row.value, row.value_type)
 
-    # Urgency levels
-    result = await session.execute(select(UrgencyLevel))
+    # Urgency levels.  Ordered by name for the same reason as the parameters.
+    result = await session.execute(select(UrgencyLevel).order_by(UrgencyLevel.name))
     urgency_levels = {row.name: row.value for row in result.scalars()}
 
-    # Formula coefficients
-    result = await session.execute(select(FormulaCoefficient))
+    # Formula coefficients.  Ordered by name for the same reason as the parameters.
+    result = await session.execute(
+        select(FormulaCoefficient).order_by(FormulaCoefficient.name)
+    )
     formula_coefficients = {row.name: row.value for row in result.scalars()}
 
     # Posting rules.  Ordered explicitly: the engine consults these in sequence and
@@ -155,8 +168,10 @@ async def load_metadata_from_db(session: AsyncSession) -> MetadataProvider:
     # configuration.  The same contract the descriptor predicates get.
     validate_posting_formulas(posting_rules)
 
-    # Commentary templates
-    result = await session.execute(select(CommentaryTemplate))
+    # Commentary templates.  Ordered by `id`, the order the rows were written in.
+    result = await session.execute(
+        select(CommentaryTemplate).order_by(CommentaryTemplate.id)
+    )
     commentary_templates: dict[str, Any] = {}
     for row in result.scalars():
         if row.template_key == "all":
@@ -193,8 +208,11 @@ async def load_metadata_from_db(session: AsyncSession) -> MetadataProvider:
         for row in result.scalars()
     ]
 
-    # Slipnet layout
-    result = await session.execute(select(SlipnetLayoutPos))
+    # Slipnet layout.  Display only; ordered by node name for the same reason as the
+    # parameters.
+    result = await session.execute(
+        select(SlipnetLayoutPos).order_by(SlipnetLayoutPos.node_name)
+    )
     slipnet_layout = {
         row.node_name: (row.grid_row, row.grid_col) for row in result.scalars()
     }
@@ -230,7 +248,7 @@ async def load_metadata_from_db(session: AsyncSession) -> MetadataProvider:
     }
     enum_values: dict[str, set[str]] = {}
     for table_name, model in enum_table_models.items():
-        result = await session.execute(select(model))
+        result = await session.execute(select(model).order_by(model.name))
         enum_values[table_name] = {row.name for row in result.scalars()}
 
     return MetadataProvider(
