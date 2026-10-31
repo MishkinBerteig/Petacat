@@ -121,20 +121,20 @@ outside the matrix take it too and the run is entirely what it says it is.
 
 ```
 ============================= petacat test matrix ==============================
-  cpu  numpy    float64    498 tests
-  gpu  mlx      float32    498 tests
+  cpu  numpy    float64    511 tests
+  gpu  mlx      float32    511 tests
   whole suite requested: the full matrix is required of this run
 
   unit           732 collected    732 run    732 passed      0 failed      0 skipped  complete
-  seed_unit      494 collected    494 run    494 passed      0 failed      0 skipped  complete
+  seed_unit      579 collected    579 run    546 passed      0 failed     33 skipped  complete
   module        1025 collected   1025 run   1025 passed      0 failed      0 skipped  complete
-  architecture    38 collected     38 run     38 passed      0 failed      0 skipped  complete
-  integration     68 collected     68 run     68 passed      0 failed      0 skipped  complete
+  architecture    42 collected     42 run     42 passed      0 failed      0 skipped  complete
+  integration    180 collected    180 run    179 passed      0 failed      1 skipped  complete
   parallel       244 collected    244 run    244 passed      0 failed      0 skipped  complete
-  lockstep       223 collected    223 run    223 passed      0 failed      0 skipped  complete
+  lockstep       228 collected    228 run    228 passed      0 failed      0 skipped  complete
   e2e            341 collected    341 run    341 passed      0 failed      0 skipped  complete
 
-  run complete in 12.5 min against a 60 min ceiling
+  run complete in 13.9 min against a 60 min ceiling
 ```
 
 The first block is what makes "both were run" checkable: it names each backend, its
@@ -205,16 +205,16 @@ that allowance.
 | Layer | Directory | Scope | May depend on | Cases |
 |-------|-----------|-------|---------------|-------|
 | **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 732 |
-| **seed unit** | `tests/seed_unit/` | One class or function, measured against the values Petacat ships with | Real `seed_data/*.json`, and the machine the process is running on | 494 |
+| **seed unit** | `tests/seed_unit/` | One class or function, measured against the values Petacat ships with | Real `seed_data/*.json`, and the machine the process is running on | 579 |
 | **module** | `tests/module/` | Several real components assembled and driven | Real engine objects and `seed_data/*.json`; no DB, no HTTP | 1025 |
-| **architecture** | `tests/architecture/` | How the source tree is allowed to depend on itself | The repository's source, `seed_data/*.json`, child interpreters | 38 |
-| **integration** | `tests/integration/` | Agreement between the repository's artifacts, and the harness's own rules | Real `seed_data/*.json`, the ORM declarations, the generated client files, the documentation, a real pytest session | 68 |
+| **architecture** | `tests/architecture/` | How the source tree is allowed to depend on itself | The repository's source, `seed_data/*.json`, child interpreters | 42 |
+| **integration** | `tests/integration/` | Agreement between the repository's artifacts, and the harness's own rules | Real `seed_data/*.json`, the ORM declarations, the generated client files, the documentation, a real pytest session | 180 |
 | **parallel** | `tests/parallel/` | The detachable multi-core plugin (`server/parallel/`): each executor against the serial run it claims to equal | Real engine objects and `seed_data/*.json`, worker processes and threads; each test pins the backend it compares on | 244 |
-| **lockstep** | `tests/lockstep/` | Petacat's decision traces against Metacat's: naming, helper conformance, tracing/replay RNGs, determinism guards, the comparer | Real engine in faithful mode (numeric backend off, or a named backend); recorded Metacat traces | 223 |
+| **lockstep** | `tests/lockstep/` | Petacat's decision traces against Metacat's: naming, helper conformance, tracing/replay RNGs, determinism guards, the comparer | Real engine in faithful mode (numeric backend off, or a named backend); recorded Metacat traces | 228 |
 | **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 341 |
 
 Those counts are cases, so they include the second pass the numeric matrix makes
-over the 498 backend-sensitive tests.
+over the 511 backend-sensitive tests.
 
 One line decides each layer. Read them as a question about what a new test's
 subject is, and write the test where the answer lands:
@@ -246,7 +246,7 @@ first**, then move up toward the API and GUI.
 
 All eight layers run in one command — the
 [required command](#the-required-command) — and, since Petacat runs natively, all
-eight actually run: **3,165 cases**, every one of them executed. A layer that is
+eight actually run: **3,371 cases**, every one of them executed. A layer that is
 normally skipped is not a layer that is normally green, and none of these is.
 
 Wall-clock time depends heavily on the machine and on what else it is doing. The
@@ -338,6 +338,31 @@ the documentation gives about the source: the engine's module and line counts,
 the number of endpoints taking `Depends(get_session)`, the size of
 `codelet_dsl/builtins.py`, and the number of groups in the Run Controls panel.
 
+**Configuration-source work packages C0 and EN0.** Two groups of tests guard the move of
+the engine's configuration from the seed files to the database, and each has rules about
+changing what it records.
+
+- *C0, the equivalence harness (gate G4).* `tests/integration/equivalence_harness.py` loads
+  an empty scratch database, `petacat_c0` on the local Postgres (override with
+  `C0_HARNESS_DATABASE_URL`), from the Metacat Standard Configuration and compares the
+  provider read back from it with the one built from the seed files: the provider itself,
+  Metacat Mode runs, a swarm and a speculative run. Every package that touches a loader or
+  adds a table re-runs it. What the database cannot yet carry is recorded in
+  `RECORDED_STORAGE_LIMITS`; the list can only shrink. The configuration input library
+  (`server/services/configuration_input.py`) is tested on its own in
+  `test_configuration_input.py`.
+- *EN0, the golden baseline gate (G3).* `tests/lockstep/golden/` records the engine's
+  behaviour before the first configuration-source engine edit, on the CPU numeric backend
+  (float64) from the Metacat Standard Configuration. Recapture with
+  `.venv/bin/python scripts/capture_golden_baseline.py` only for a deliberate, reviewed
+  change of behaviour, stated in the commit; never to turn a red gate green.
+- *EN0, the no-node-literals lint.* `tests/architecture/test_no_node_literals_in_engine.py`
+  with `no_node_literals_allowlist.txt`: the allow-list may only shrink.
+- *EN0, role identity and reduced configurations.* `tests/seed_unit/test_role_identity.py`
+  is a skeleton whose comparison with `slipnet.roles` skips until EN3;
+  `test_reduced_configurations.py` checks the generated reduced configurations that later
+  packages run the engine on.
+
 **`tests/unit/` — one class or function, against what the test constructs**
 
 | File | Fns | Covers |
@@ -394,12 +419,16 @@ the number of endpoints taking `Depends(get_session)`, the size of
 | `test_coderack_clamping.py` | 15 | Codelet-type clamping, against the urgencies Petacat ships with |
 | `test_coderack_eviction.py` | 19 | Incremental eviction picks exactly what the flat scan picked |
 | `test_commentary.py` | 6 | The emit helpers that render from the seeded commentary templates |
+
 | `test_episodic_memory.py` | 20 | Reminding, comparison and the reminding distance, which resolve the seeded templates and the seeded conceptual depths |
+| `test_fallback_instrumentation.py` | 4 | The silent-fallback observer (EN0, `tests/support/fallback_instrumentation.py`) sees the three blanket `except Exception` blocks of `justify.py` and a lookup of an absent Slipnet node, and changes nothing else; `scripts/count_silent_fallbacks.py` makes the count over the whole baseline set |
 | `test_formulas.py` | 10 | The temperature-dependent formulas against the seeded coefficients |
 | `test_hardware.py` | 21 | The machine description and the sizes derived from it: real probes, faked probes, environment overrides |
 | `test_metacat_display_seed.py` | 5 | Seed data that exists so a display can match Metacat: every Metacat demo, the Themespace's dimension and relation names |
 | `test_metadata_provider.py` | 25 | `MetadataProvider` loading every seed collection |
 | `test_numeric_backends.py` | 27 | The numeric backends against the reference (decay and spreading against exact rationals, including spreading's halfway cases), and the engine without them |
+| `test_reduced_configurations.py` | 14 | The reduced-configuration fixture generator (EN0, `tests/support/reduced_configurations.py` and `configuration_cascade.py`): nothing left that names a removed node or codelet type, the cascade removes what the plan's rules say, a provider loads from each; the engine is not run on them yet |
+| `test_role_identity.py` | 12 | Role identity (gate G5), the skeleton laid down by EN0: today's side runs now (the role-to-literal table against the Metacat Standard Configuration, the engine's ordered constants and `role_identity_today.json`); the comparison with `slipnet.roles` skips, with a stated reason, until EN3 adds it |
 | `test_rule_english.py` | 10 | A rule's English against Metacat 1.2's own `transcribe-to-english` output: 463 recorded rule shapes, each string state, wrapping, articles, and the text kept from the moment the rule was made |
 | `test_snag_explanation.py` | 19 | A snag's explanation against Metacat 1.2's `get-explanation` (`trace.ss:1097-1125`): every branch of the failure-result, the object phrases, the commentary lines, the template-driven wording, and the fallback for a snag with no stored explanation |
 | `test_rule_quality.py` | 13 | Rule uniformity, abstractness and succinctness against the Scheme's formulas, hand-computed from the seeded depths |
@@ -454,6 +483,7 @@ the number of endpoints taking `Depends(get_session)`, the size of
 | File | Fns | Covers |
 |------|----:|--------|
 | `test_engine_purity.py` | 18 | Nothing under `server/engine/**` imports `sqlalchemy`, `server.models`, `server.db` or `server.services`, and the serializers run in an interpreter where those cannot be imported |
+| `test_no_node_literals_in_engine.py` | 4 | The EN0 lint: no line of `server/engine/**` names a node or codelet type of the Metacat Standard Configuration (`plato-` literals and compositions, `name[6:]`, node names, codelet types), and none reads the seed files at run time. Known violations are in `no_node_literals_allowlist.txt`, which may only shrink: an entry that no longer matches fails, and a new violation cannot be added to it |
 | `test_parallel_detachable.py` | 4 | Nothing under `server/engine/**` imports the parallel plugin, and a serial run and the service layer work in an interpreter where `server.parallel` cannot be imported; a Training run there chooses the serial executor and produces the plugin's runs, run for run |
 
 **`tests/integration/` — the repository's artifacts agree**
@@ -462,6 +492,10 @@ the number of endpoints taking `Depends(get_session)`, the size of
 |------|----:|--------|
 | `test_documented_code_shape.py` | 4 | The engine's size, the endpoint count, the builtins module and the Run Controls groups, as the documentation states them |
 | `test_documented_counts.py` | 3 | Every documented layer count, suite total and per-file figure, against the collection that produced it |
+| `test_configuration_input.py` | 31 | The four input-check classes of the configuration input library (C0, `server/services/configuration_input.py`) as pure functions, with no database, engine or routes: unknown reference, key exists, malformed, does-not-compile, stale base version, and applying operations to a copy |
+| `test_db_seed_equivalence.py` | 15 | C0 gate G4: a database loaded from the Metacat Standard Configuration with no edits yields a provider equal, field by field (order and JSON number typing included), to `MetadataProvider.from_seed_data`. `RECORDED_STORAGE_LIMITS` lists what the database cannot carry today and may only shrink: any other difference fails, and so does fixing a recorded limit without removing it. A new table must be added to `COVERED_TABLES`. Uses its own scratch database `petacat_c0` (`C0_HARNESS_DATABASE_URL` overrides), built by `equivalence_harness.py` |
+| `test_db_seed_parallel_equivalence.py` | 2 | C0 gate G4: a swarm (real process pool) and a speculative run with `workers >= 2` equal the seed-file provider's runs on the database-loaded provider; slow, CPU float64 pinned by the tests themselves |
+| `test_db_seed_run_equivalence.py` | 2 | C0 gate G4: Metacat Mode runs per (problem, seed) on the database-loaded provider are identical to the seed-file provider's (answers, codelet count, draw count, final temperature, step/structure/trace hashes, final state); in the numeric matrix, with bit-identity down to the draw asserted on the float64 CPU half |
 | `test_enum_constants.py` | 17 | Engine string constants match `seed_data/enums.json` |
 | `test_help_topics.py` | 13 | The help JSON, the generated TypeScript and the panels that reference them |
 | `test_metadata_seeding.py` | 13 | Every seed file is well-formed, and the `MetadataProvider` round-trip holds |
@@ -476,6 +510,7 @@ the number of endpoints taking `Depends(get_session)`, the size of
 | `test_comparer.py` | 29 | The trace comparer: hand-made trace pairs with known faults give the expected classes; the registry's reference-crash class; proposed structures counted apart from state snapshots, and the ratchet on both |
 | `test_desync_fixes.py` | 1 | Prefixes of three Metacat runs beyond the corpus that used to desynchronise the replay (`traces-desync/`) replay to their end with no error and no differing state (DISCREPANCIES5 G-Y2…G-Y4) |
 | `test_episodes.py` | 8 | Episodes and justify mode: recorder driver text, corpus globs, an episode's self-replay with memory carried, a forced fatal, justify self-replay |
+| `test_golden_baseline.py` | 5 | The EN0 golden baseline gate (G3): `tests/lockstep/golden/engine_baseline.jsonl` and `engine_baseline_rng.json.gz`, captured from the Metacat Standard Configuration on the CPU numeric backend (float64), hold for the 19 demo problems and the justify problems at seeds 1-5 and one 8-run episode the answer, codelet count, final temperature, per-codelet RNG call counts, trace and final-state hashes and the English corpus. A quick consistency check and a four-run sample run always; the slow test recomputes everything in a fresh interpreter and compares byte for byte, naming the first differing run and codelet. Outside the numeric matrix (it pins its backend) |
 | `test_event_names.py` | 2 | Every Trace event in eight Metacat runs (all event types, all three group directions, flips, slippages on all three bridges, translated rules, the three answer headers) named and headed exactly as Metacat 1.2 logged them |
 | `test_helpers.py` | 11 | Helper conformance: `prob`, `~`, `weighted_pick` and `pick` give Metacat's results for the same draws |
 | `test_naming.py` | 9 | Canonical names for plain values and every kind of object, and the opening state against Metacat's |
