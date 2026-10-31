@@ -132,7 +132,7 @@ outside the matrix take it too and the run is entirely what it says it is.
   integration    203 collected    203 run    203 passed      0 failed      0 skipped  complete
   parallel       244 collected    244 run    244 passed      0 failed      0 skipped  complete
   lockstep       228 collected    228 run    228 passed      0 failed      0 skipped  complete
-  e2e            339 collected    339 run    339 passed      0 failed      0 skipped  complete
+  e2e            341 collected    341 run    341 passed      0 failed      0 skipped  complete
 
   run complete in 13.9 min against a 60 min ceiling
 ```
@@ -211,7 +211,7 @@ that allowance.
 | **integration** | `tests/integration/` | Agreement between the repository's artifacts, and the harness's own rules | Real `seed_data/*.json`, the ORM declarations, the generated client files, the documentation, a real pytest session | 203 |
 | **parallel** | `tests/parallel/` | The detachable multi-core plugin (`server/parallel/`): each executor against the serial run it claims to equal | Real engine objects and `seed_data/*.json`, worker processes and threads; each test pins the backend it compares on | 244 |
 | **lockstep** | `tests/lockstep/` | Petacat's decision traces against Metacat's: naming, helper conformance, tracing/replay RNGs, determinism guards, the comparer | Real engine in faithful mode (numeric backend off, or a named backend); recorded Metacat traces | 228 |
-| **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 339 |
+| **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 341 |
 
 Those counts are cases, so they include the second pass the numeric matrix makes
 over the 519 backend-sensitive tests.
@@ -246,7 +246,7 @@ first**, then move up toward the API and GUI.
 
 All eight layers run in one command — the
 [required command](#the-required-command) — and, since Petacat runs natively, all
-eight actually run: **3,527 cases**, every one of them executed. A layer that is
+eight actually run: **3,529 cases**, every one of them executed. A layer that is
 normally skipped is not a layer that is normally green, and none of these is.
 
 Wall-clock time depends heavily on the machine and on what else it is doing. The
@@ -559,7 +559,7 @@ changing what it records.
 | `test_api_controls.py` | 29 | Breakpoints, clamping, Clamp theme pattern, Undo last clamp, the mid-run self-watching toggle, and the threshold endpoints |
 | `test_api_displays.py` | 5 | The coderack, EEG and Themespace-name data the Metacat windows need |
 | `test_api_docs.py` | 11 | The documentation endpoints |
-| `test_api_extended.py` | 57 | Extended runs, memory, docs and admin endpoints |
+| `test_api_extended.py` | 59 | Extended runs, memory, docs and admin endpoints |
 | `test_api_review.py` | 26 | The review surfaces read back what the persistence modes wrote, and the episodic-run timeline places each Episodic Memory clear exactly between the runs, page by page, with its note |
 | `test_api_runs.py` | 26 | The runs API with persistence |
 | `test_api_system.py` | 8 | The system endpoints: what is executing, not what was recorded |

@@ -984,6 +984,42 @@ async def test_admin_list_posting_rules(app_client):
     assert len(data) > 0
 
 
+def _posting_rule_body(codelet_type, **extra):
+    return {"codelet_type": codelet_type, "direction": "bottom_up",
+            "urgency_when_posted": 7, "posting_formula": "temperature / 100",
+            "count_formula": "fixed", "count_values": {"fixed": 1},
+            "condition": "always", **extra}
+
+
+@pytest.mark.asyncio
+async def test_a_posting_rule_for_an_existing_codelet_type_gets_a_free_rule_key(app_client):
+    existing = (await app_client.get("/api/admin/posting-rules")).json()[0]
+    ctype = existing["codelet_type"]
+    created = []
+    try:
+        for _ in range(2):
+            resp = await app_client.post(
+                "/api/admin/posting-rules", json=_posting_rule_body(ctype))
+            assert resp.status_code == 201, resp.text
+            created.append(resp.json())
+        keys = [existing["rule_key"]] + [c["rule_key"] for c in created]
+        assert len(set(keys)) == 3
+        assert all(c["codelet_type"] == ctype for c in created)
+    finally:
+        for c in created:
+            await app_client.delete(f"/api/admin/posting-rules/{c['id']}")
+
+
+@pytest.mark.asyncio
+async def test_a_posting_rule_with_an_existing_rule_key_is_refused_with_409(app_client):
+    existing = (await app_client.get("/api/admin/posting-rules")).json()[0]
+    resp = await app_client.post(
+        "/api/admin/posting-rules",
+        json=_posting_rule_body("smoke-test-scout", rule_key=existing["rule_key"]))
+    assert resp.status_code == 409
+    assert existing["rule_key"] in resp.json()["detail"]
+
+
 @pytest.mark.asyncio
 async def test_admin_list_commentary_templates(app_client):
     resp = await app_client.get("/api/admin/commentary-templates")

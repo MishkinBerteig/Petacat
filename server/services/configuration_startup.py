@@ -235,11 +235,14 @@ async def _prepare_locked(engine, seed_dir, Base, load_metadata_from_db, sync_he
                 ) from exc
 
         if kind == EMPTY:
-            logger.info("Empty database: loading the Metacat Standard Configuration")
             async with factory() as session:
                 await first_load(session, seed_dir)
                 await session.commit()
-            logger.info("Database tables created and the Metacat Standard Configuration loaded")
+            logger.info(
+                "Configuration: empty database, loaded the Metacat Standard Configuration")
+        else:
+            logger.info(
+                "Configuration: using the configuration already in the database")
 
         async with factory() as session:
             await sync_help_topics(session, seed_dir)

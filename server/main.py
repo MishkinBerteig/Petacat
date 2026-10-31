@@ -20,6 +20,16 @@ from server.services.configuration_startup import startup_configuration
 
 logger = logging.getLogger("petacat")
 
+# uvicorn configures only its own loggers, so Petacat's INFO messages (the start-up
+# configuration line, "Petacat started", shutdown) would otherwise never be shown.
+# Attach one console handler to the "petacat" logger, laid out like uvicorn's lines.
+if not logger.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter("%(levelname)s:     %(message)s"))
+    logger.addHandler(_handler)
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
+
 
 async def _regenerate_derived_help_docs() -> None:
     """Regenerate HELP.md and helpTopics.ts from the topics JSON.

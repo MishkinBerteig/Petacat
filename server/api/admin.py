@@ -854,6 +854,9 @@ async def delete_theme_dimension(dim_id: int, session: AsyncSession = Depends(ge
 
 
 class PostingRuleRequest(BaseModel):
+    #: Optional.  Left out on create, the server picks a free key (the codelet type, else a
+    #: numbered variant).  Ignored on update: a rule keeps its key.
+    rule_key: str | None = None
     codelet_type: str
     direction: str
     urgency_when_posted: int | None = None
@@ -867,6 +870,7 @@ class PostingRuleRequest(BaseModel):
 
 class PostingRuleResponse(BaseModel):
     id: int
+    rule_key: str
     codelet_type: str
     direction: str
     urgency_when_posted: int | None
@@ -883,7 +887,7 @@ async def list_posting_rules(session: AsyncSession = Depends(get_session)):
     result = await session.execute(select(PostingRule).order_by(PostingRule.id))
     return [
         PostingRuleResponse(
-            id=r.id, codelet_type=r.codelet_type, direction=r.direction,
+            id=r.id, rule_key=r.rule_key, codelet_type=r.codelet_type, direction=r.direction,
             urgency_when_posted=r.urgency_when_posted, urgency_formula=r.urgency_formula,
             posting_formula=r.posting_formula or "", count_formula=r.count_formula or "",
             count_values=r.count_values, condition=r.condition or "always",
@@ -897,7 +901,21 @@ async def list_posting_rules(session: AsyncSession = Depends(get_session)):
 async def create_posting_rule(
     req: PostingRuleRequest, session: AsyncSession = Depends(get_session),
 ):
+    taken = set((await session.execute(select(PostingRule.rule_key))).scalars().all())
+    if req.rule_key:
+        if req.rule_key in taken:
+            raise HTTPException(
+                409, f"A posting rule with rule_key '{req.rule_key}' already exists; "
+                "choose another rule_key, or leave it out to have one picked.")
+        rule_key = req.rule_key
+    else:
+        rule_key = req.codelet_type
+        n = 1
+        while rule_key in taken:
+            n += 1
+            rule_key = f"{req.codelet_type}-{n}"
     row = PostingRule(
+        rule_key=rule_key,
         codelet_type=req.codelet_type, direction=req.direction,
         urgency_when_posted=req.urgency_when_posted, urgency_formula=req.urgency_formula,
         posting_formula=req.posting_formula, count_formula=req.count_formula,
@@ -908,7 +926,7 @@ async def create_posting_rule(
     await session.flush()
     await session.commit()
     return PostingRuleResponse(
-        id=row.id, codelet_type=row.codelet_type, direction=row.direction,
+        id=row.id, rule_key=row.rule_key, codelet_type=row.codelet_type, direction=row.direction,
         urgency_when_posted=row.urgency_when_posted, urgency_formula=row.urgency_formula,
         posting_formula=row.posting_formula or "", count_formula=row.count_formula or "",
         count_values=row.count_values, condition=row.condition or "always",
@@ -934,7 +952,7 @@ async def update_posting_rule(
     row.triggering_slipnodes = req.triggering_slipnodes
     await session.commit()
     return PostingRuleResponse(
-        id=row.id, codelet_type=row.codelet_type, direction=row.direction,
+        id=row.id, rule_key=row.rule_key, codelet_type=row.codelet_type, direction=row.direction,
         urgency_when_posted=row.urgency_when_posted, urgency_formula=row.urgency_formula,
         posting_formula=row.posting_formula or "", count_formula=row.count_formula or "",
         count_values=row.count_values, condition=row.condition or "always",
