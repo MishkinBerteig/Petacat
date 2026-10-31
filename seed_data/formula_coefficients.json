@@ -77,5 +77,6 @@
   "translation_temp_bond_density_very_low": 0.8,
   "translation_temp_bond_density_low": 0.6,
   "translation_temp_bond_density_medium": 0.4,
-  "translation_temp_bond_density_high": 0.2
+  "translation_temp_bond_density_high": 0.2,
+  "theme_relation_default_abstractness": 50.0
 }

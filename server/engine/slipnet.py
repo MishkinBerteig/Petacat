@@ -14,7 +14,7 @@ import math
 from typing import TYPE_CHECKING, Any, Callable
 
 from server.engine.numeric.backend import select_backend
-from server.engine.roles import Roles, resolve_roles
+from server.engine.roles import Roles, absent, resolve_roles
 #: ``(40% ...)`` at ``slipnet.ss:191``.  The fallback for a node built without a
 #: ``MetadataProvider``; the value in force comes from ``shrunk_link_length_factor``.
 DEFAULT_SHRUNK_LINK_FACTOR = 0.4
@@ -167,6 +167,9 @@ def _descriptor_read_from_object(descriptor_name: str, obj: Any) -> bool:
     return _letter_category_name(obj) == descriptor_name
 
 
+_NO_RELATIONS: dict[str, Any] = {}
+
+
 class SlipnetNode:
     """A concept node in the Slipnet."""
 
@@ -192,6 +195,8 @@ class SlipnetNode:
         "_full_activation_threshold",
         "_shrunk_link_factor",
         "roles",
+        "relation",
+        "relations",
     )
 
     def __init__(
@@ -218,6 +223,13 @@ class SlipnetNode:
         #: The names of the roles this node holds (set by ``Slipnet.from_metadata``), for
         #: code that has a node but no Slipnet.
         self.roles: frozenset[str] = frozenset()
+        #: The theme relation this node stands for (``identity``, ``opposite``, ...), from
+        #: the ``theme_relations`` table; ``None`` for a node that is no relation.  Set by
+        #: ``Slipnet.from_metadata``.
+        self.relation: str | None = None
+        #: The Slipnet's relation nodes by relation name (one dict shared by every node of
+        #: the Slipnet), so a node can find ``opposite`` without a Slipnet handle.
+        self.relations: dict[str, SlipnetNode] = _NO_RELATIONS
         self._decay_percent: float = 0.0
         self.descriptor_predicate: Callable[..., bool] | None = None
         # Flat scalars rather than a reference to the params object: these are read on
@@ -604,24 +616,28 @@ class SlipnetNode:
         """Find the neighbor node connected via a link labeled with *relation*.
 
         Scheme: slipnet.ss:114-129.
-        - If *relation* is the identity node, return self.
+        - If *relation* is the identity relation's node, return self.
         - Otherwise, walk outgoing links for ones whose label_node is *relation*.
         - If exactly one match, return it.
         - If multiple matches, prefer the one sharing self's category.
         - If none, return None.
 
-        *relation* may be given as a node **or** as a node name.  Callers deep in
-        the Workspace — group and bond flipping — hold no Slipnet handle to reach
-        ``plato-opposite`` with, and passing the name used to raise
-        ``AttributeError`` into a bare ``except`` at both call sites, so a
-        "flipped" group silently kept its original direction and category.
+        *relation* may be given as a node, as a node name, **or** as a theme relation
+        name (``"opposite"``): callers deep in the Workspace -- group and bond
+        flipping -- hold no Slipnet handle to reach the opposite relation's node with.
+        A relation name is looked up in ``self.relations`` (the ``theme_relations``
+        table), so no node name is spelled in the engine.  A relation the configuration
+        does not have (the ``Absent`` token, an unknown name) relates nothing: ``None``.
         Matching by name is exact: node names are unique within a Slipnet.
         """
-        relation_name = (
-            relation if isinstance(relation, str) else getattr(relation, "name", "")
-        )
+        if isinstance(relation, str):
+            label = self.relations.get(relation)
+            relation_name = label.name if label is not None else relation
+        else:
+            relation_name = getattr(relation, "name", "")
         # Identity relation -> return self
-        if relation_name == "plato-identity":
+        identity = self.relations.get("identity")
+        if identity is not None and relation_name == identity.name:
             return self
 
         related_nodes: list[SlipnetNode] = []
@@ -751,12 +767,18 @@ class SlipnetNode:
 
 
 def opposite_node(node: Any) -> Any:
-    """The concept *node* relates to by ``plato-opposite``, or *node* itself.
+    """The concept *node* relates to by the ``opposite`` relation, or *node* itself.
 
     Scheme: ``(tell node 'get-related-node plato-opposite)`` as used by
     ``make-flipped-version`` (bonds.ss:125, groups.ss:334-338).  A concept with no
-    opposite — sameness, or a group with no direction — is its own reflection, so
+    opposite -- sameness, or a group with no direction -- is its own reflection, so
     returning it unchanged is what "flipping" means for it.
+
+    The same holds when the configuration has no ``opposite`` relation at all (no
+    ``theme_relations`` row, or its node removed): nothing is the opposite of anything,
+    every concept is its own reflection, and a flipped bond or group equals the original.
+    This is the defined behaviour (ABSENCE-BEHAVIOUR.md 2.3), not a silent fallback; a
+    caller that must tell the two cases apart asks ``slipnet.relation("opposite")``.
 
     Resolved through ``getattr`` because flipping is also exercised against
     stand-in descriptor objects that carry a name and nothing else; a stand-in
@@ -768,7 +790,7 @@ def opposite_node(node: Any) -> Any:
     get_related_node = getattr(node, "get_related_node", None)
     if get_related_node is None:
         return node
-    related = get_related_node("plato-opposite")
+    related = get_related_node("opposite")
     return related if related is not None else node
 
 
@@ -867,6 +889,9 @@ class Slipnet:
         #: The roles, resolved once in ``from_metadata`` (``engine/roles.py``).  A bare
         #: ``Slipnet()`` has every role absent.
         self.roles: Roles = _NO_ROLES
+        #: The relation nodes by relation name, from the ``theme_relations`` table: only the
+        #: rows whose node exists (``diff`` has none).  Read through :meth:`relation`.
+        self.relations: dict[str, SlipnetNode] = {}
         # Resolved on first use rather than here, because ``from_metadata``
         # computes the decay rates *after* constructing the Slipnet and the
         # numeric layout needs them.
@@ -945,6 +970,16 @@ class Slipnet:
         for node_name, role_names in held.items():
             slipnet.nodes[node_name].roles = role_names
 
+        # The relation nodes: a ``theme_relations`` row whose node exists.  A row whose node
+        # is absent (or has none, like ``diff``) leaves that relation unavailable.
+        for row in meta.theme_relations:
+            rel_node = slipnet.nodes.get(row.node_name) if row.node_name else None
+            if rel_node is not None and row.name not in slipnet.relations:
+                slipnet.relations[row.name] = rel_node
+                rel_node.relation = row.name
+        for node in slipnet.nodes.values():
+            node.relations = slipnet.relations
+
         # Compute decay rates.  Held on the Slipnet as well, because the *spread*
         # scale is computed from the same cycle length once per update and had no
         # other way to reach it.
@@ -957,6 +992,17 @@ class Slipnet:
 
     def get_node(self, name: str) -> SlipnetNode:
         return self.nodes[name]
+
+    def relation(self, name: str) -> Any:
+        """The node of the theme relation *name* (``identity``, ``opposite``, ``successor``,
+        ``predecessor``, or any other ``theme_relations`` row), or that relation's ``Absent``
+        token when the configuration has no such row or its node is gone.
+
+        The token is falsy and identical only to itself, so ``label is slipnet.relation("x")``
+        is never true of a missing (``None``) label.  Guard with ``if slipnet.relation(x):``.
+        """
+        node = self.relations.get(name)
+        return node if node is not None else absent("relation." + str(name))
 
     def spread_activation(
         self, update_cycle_length: int = 15, threshold: int = 100
@@ -1136,7 +1182,9 @@ class Slipnet:
           matches, and return its label_node.
         """
         if from_node is to_node:
-            return self.nodes.get("plato-identity")
+            # No identity relation in the configuration: no label (``None``), so the
+            # mapping counts as a slippage (ABSENCE-BEHAVIOUR.md 2.3).
+            return self.relations.get("identity")
 
         for link in to_node.incoming_links:
             if link.from_node is from_node:

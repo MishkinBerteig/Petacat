@@ -34,6 +34,11 @@ class _FakeSlipnetNode:
 
     def __init__(self, name: str) -> None:
         self.name = name
+        #: The theme relation the node stands for (``SlipnetNode.relation``).
+        self.relation = {
+            "plato-identity": "identity", "plato-opposite": "opposite",
+            "plato-successor": "successor", "plato-predecessor": "predecessor",
+        }.get(name)
         self.short_name = name
         # ``ClampEvent.activate`` now reports a clamp's moves to the concept-activation
         # monitor (``slipnet.ss:139-140``), which weighs a change by this depth.
@@ -55,6 +60,13 @@ class _FakeSlipnetNode:
 class _FakeSlipnet:
     def __init__(self, *names: str) -> None:
         self.nodes = {name: _FakeSlipnetNode(name) for name in names}
+        #: Relation name -> node, as ``Slipnet.relations``.
+        self.relations: dict = {}
+
+    def relation(self, name: str):
+        from server.engine.roles import absent
+
+        return self.relations.get(name) or absent("relation." + name)
 
 
 class _FakeThemespace:
@@ -314,7 +326,18 @@ def test_a_theme_pattern_pins_its_dimension_nodes():
     ]
 
 
+def _real_slipnet():
+    import os
+
+    from server.engine.metadata import MetadataProvider
+    from server.engine.slipnet import Slipnet
+
+    seed = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
+    return Slipnet.from_metadata(MetadataProvider.from_standard_configuration(seed))
+
+
 def test_a_negative_opposite_theme_suppresses_plato_opposite():
+    slipnet = _real_slipnet()
     """``trace.ss:1512-1514``: ``plato-opposite`` goes to 100 for a positive theme and
     to **0** for a negative one — a negative snag-response clamp actively suppresses
     the concept rather than merely not favouring it."""
@@ -328,7 +351,8 @@ def test_a_negative_opposite_theme_suppresses_plato_opposite():
                     "activation": 100.0,
                 }
             ],
-        }
+        },
+        slipnet,
     )
     negative = get_associated_concept_pattern(
         {
@@ -340,7 +364,8 @@ def test_a_negative_opposite_theme_suppresses_plato_opposite():
                     "activation": -100.0,
                 }
             ],
-        }
+        },
+        slipnet,
     )
     assert {"node": "plato-opposite", "activation": 100.0} in positive["entries"]
     assert {"node": "plato-opposite", "activation": 0.0} in negative["entries"]

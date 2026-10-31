@@ -70,7 +70,7 @@ def test_dimension_removal_reaches_every_table_that_names_it() -> None:
     assert "plato-string-position-category" not in params["theme_dimension_labels"]
     assert "plato-string-position-category" not in params["rule_english_dimension_phrases"]
     tables = {t for t, _, _ in r.report.cascaded}
-    assert {"theme_dimensions", "theme_dimensions.answer_description_theme_types",
+    assert {"theme_dimensions",
             "engine_params.top_down_slipnodes", "engine_params.initially_clamped_slipnodes"} <= tables
     # code that names it cannot be rewritten: it is listed, not hidden
     assert r.report.dangling

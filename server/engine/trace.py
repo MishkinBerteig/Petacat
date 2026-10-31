@@ -304,6 +304,7 @@ class ClampEvent(TraceEvent):
         theme_pattern: Any = None,
         structures: list[Any] | None = None,
         description: str = "",
+        slipnet: Any = None,
     ) -> None:
         super().__init__(
             event_type=CLAMP_START,
@@ -319,8 +320,12 @@ class ClampEvent(TraceEvent):
         # patterns it was handed: it *derives* one from every theme pattern and clamps
         # those too.  That derivation is the theme pattern's grip on the Slipnet, and
         # it was missing entirely — every clamp carrying themes left the Slipnet alone.
+        #
+        # The derivation pins the relation's node too, which only the Slipnet can name:
+        # pass ``slipnet`` and the pin is there from the start; without it the pin is added
+        # when the event is activated (``activate`` derives again with its Slipnet).
         self.clamped_concept_patterns = list(clamped_concept_patterns or []) + [
-            get_associated_concept_pattern(p) for p in self.clamped_theme_patterns
+            get_associated_concept_pattern(p, slipnet) for p in self.clamped_theme_patterns
         ]
         self.clamped_codelet_patterns = clamped_codelet_patterns or []
         self.rules = rules or []
@@ -398,6 +403,13 @@ class ClampEvent(TraceEvent):
         readout; see :meth:`TemporalTrace.undo_snag_condition`.  ``monitor`` is
         forwarded to :func:`clamp_concept_pattern`.
         """
+        # The derived concept patterns also pin the relation's node, which only the Slipnet
+        # can name.  They are the last ones, one per theme pattern (see ``__init__``).
+        given = len(self.clamped_concept_patterns) - len(self.clamped_theme_patterns)
+        self.clamped_concept_patterns = self.clamped_concept_patterns[:given] + [
+            get_associated_concept_pattern(p, slipnet) for p in self.clamped_theme_patterns
+        ]
+
         # The first thing ``activate`` does is say so (``trace.ss:592-612``).
         trace.announce_clamp(self)
 
@@ -891,23 +903,28 @@ def theme_pattern_entries(pattern: Any) -> list[tuple[str, str | None, float]]:
     return []
 
 
-def get_associated_concept_pattern(theme_pattern: Any) -> dict[str, Any]:
+def get_associated_concept_pattern(theme_pattern: Any, slipnet: Any = None) -> dict[str, Any]:
     """The concept pattern a theme pattern drags into the Slipnet with it.
 
     Scheme: ``get-associated-concept-pattern`` (``trace.ss:1503-1516``).  For every
     entry, the theme's **dimension node** is pinned at ``%max-activation%``; and when
-    the relation is ``opposite``, ``plato-opposite`` is pinned at 100 for a positive
+    the relation is ``opposite``, the opposite relation's node is pinned at 100 for a positive
     theme and at **0** for a negative one — a negative snag-response clamp does not
     merely stop favouring "opposite", it actively suppresses the concept.
 
     Without this, clamping a theme pattern left the Slipnet untouched, and a whole
     channel of the clamp's influence (§4.2) simply did not exist.
+
+    The opposite relation's node comes from *slipnet*; with no *slipnet*, or no opposite
+    relation in the configuration, there is no such node to pin and only the dimension
+    nodes are.
     """
+    opposite = slipnet.relation("opposite") if slipnet is not None else None
     pairs: list[tuple[str, float]] = []
     for dimension, relation, activation in theme_pattern_entries(theme_pattern):
         pairs.append((dimension, 100.0))
-        if relation == "opposite":
-            pairs.append(("plato-opposite", 100.0 if activation > 0 else 0.0))
+        if relation == "opposite" and opposite:
+            pairs.append((opposite.name, 100.0 if activation > 0 else 0.0))
     # ``(remove-duplicates (flatmap ...))`` (``trace.ss:1506``): ``remove-duplicates``
     # keeps the LAST occurrence (``utilities.ss:915-929``, DISCREPANCIES5 C-2), so a
     # pair named twice sits where it is named last.  Clamping follows this order and

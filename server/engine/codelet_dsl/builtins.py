@@ -32,6 +32,7 @@ from server.engine.concept_mappings import ConceptMapping
 from server.engine.descriptions import Description
 from server.engine.formulas import temp_adjusted_probability, temp_adjusted_values
 from server.engine.groups import Group
+from server.engine.roles import absent
 from server.engine.rules import Rule
 from server.engine.sink import STRUCTURE_BROKEN, STRUCTURE_BUILT
 from server.engine.staleness import current_view
@@ -200,6 +201,11 @@ class _committing:
             self._lock.release()
 
 
+def _bound(node: Any) -> Any:
+    """The node a role holds, or ``None`` when the role is absent (the guard sites test ``is None``)."""
+    return node if node else None
+
+
 def _read(ctx: EngineContext, *entities: Any) -> None:
     if ctx.track_access and ctx.access is not None:
         ctx.access.read(*entities)
@@ -306,7 +312,7 @@ def choose_directed_neighbor(ctx: EngineContext, obj: Any, direction: Any) -> An
     both hid the groups edged there and paired mismatched nesting levels.
     """
     name = getattr(direction, "name", direction)
-    if name == "plato-left":
+    if name == ctx.slipnet.roles.direction_left.name:
         chooser = getattr(obj, "choose_left_neighbor", None)
     else:
         chooser = getattr(obj, "choose_right_neighbor", None)
@@ -335,8 +341,9 @@ def choose_bond_facet(ctx: EngineContext, object1: Any, object2: Any) -> Any:
     channel once succ/pred or left/right go active.  Weighting by activation alone
     has the same effect by another route: letter-category sits near 100 all run.
     """
-    facets1 = _bond_facets(object1)
-    facets2 = _bond_facets(object2)
+    facet_category = ctx.slipnet.roles.dimension_bond_facet
+    facets1 = _bond_facets(object1, facet_category)
+    facets2 = _bond_facets(object2, facet_category)
     facets = [f for f in facets1 if f in facets2]
     if not facets:
         return None
@@ -357,8 +364,8 @@ def choose_bond_facet(ctx: EngineContext, object1: Any, object2: Any) -> Any:
     return ctx.rng.weighted_pick(facets, weights)
 
 
-def _bond_facets(obj: Any) -> list[Any]:
-    """The description types of *obj* that are instances of ``plato-bond-facet``.
+def _bond_facets(obj: Any, facet_category: Any) -> list[Any]:
+    """The description types of *obj* that are instances of the bond-facet category.
 
     Scheme: ``get-bond-facets`` — the object's descriptions whose type belongs to
     the bond-facet category (``slipnet.ss:856,860``).
@@ -369,7 +376,7 @@ def _bond_facets(obj: Any) -> list[Any]:
         if dtype in facets:
             continue
         if any(
-            link.to_node.name == "plato-bond-facet"
+            link.to_node is facet_category
             for link in getattr(dtype, "category_links", ())
         ):
             facets.append(dtype)
@@ -424,9 +431,10 @@ def choose_string_for(ctx: EngineContext, node: Any) -> Any:
         if workspace.justify_mode
         else [workspace.initial_string, workspace.modified_string, workspace.target_string]
     )
+    roles = ctx.slipnet.roles
     relevance = (
         "get_direction_relevance"
-        if getattr(node, "name", "") in ("plato-left", "plato-right")
+        if getattr(node, "name", "") in (roles.direction_left.name, roles.direction_right.name)
         else "get_bond_category_relevance"
     )
     weights = [
@@ -471,7 +479,7 @@ def propose_bond(
     _read(ctx, from_obj, to_obj)
     post_codelet(
         ctx,
-        "bond-evaluator",
+        ctx.slipnet.roles.evaluator_bond,
         round(bond_degree_of_assoc(bond_category)),
         structure=bond,
     )
@@ -510,15 +518,14 @@ def propose_group(
         ctx.verbose_log.print_object(objects)
     string = objects[0].string
     related = getattr(group_category, "get_related_node", None)
-    bond_category = related("plato-bond-category") if related else None
-    bond_facet = (
-        bonds[0].bond_facet if bonds else ctx.slipnet.nodes.get("plato-letter-category")
-    )
+    roles = ctx.slipnet.roles
+    bond_category = related(roles.dimension_bond_category) if related else None
+    bond_facet = bonds[0].bond_facet if bonds else _bound(roles.dimension_letter_category)
 
     group = Group(string, group_category, bond_facet, direction, objects, bonds)
     group.time_stamp = ctx.codelet_count
 
-    length_node = ctx.slipnet.nodes.get("plato-length")
+    length_node = _bound(roles.dimension_length)
     if length_node is not None:
         probability = length_description_probability(
             group, length_node, ctx.temperature.value, ctx.meta
@@ -532,7 +539,7 @@ def propose_group(
     _read(ctx, *objects)
     post_codelet(
         ctx,
-        "group-evaluator",
+        ctx.slipnet.roles.evaluator_group,
         round(bond_degree_of_assoc(bond_category)),
         structure=group,
     )
@@ -599,8 +606,8 @@ def choose_leftmost_object(ctx: EngineContext, string: Any) -> Any:
     letters: a group edged at position 0 is a candidate, which is what makes a
     spanning group **of groups** reachable from the whole-string scout at all.
     """
-    leftmost = ctx.slipnet.nodes.get("plato-leftmost")
-    position_type = ctx.slipnet.nodes.get("plato-string-position-category")
+    leftmost = _bound(ctx.slipnet.roles.position_leftmost)
+    position_type = _bound(ctx.slipnet.roles.dimension_string_position)
     if leftmost is None or position_type is None:
         return None
     candidates = [
@@ -767,7 +774,7 @@ def propose_description(
     desc = Description(obj, description_type, descriptor)
     desc.time_stamp = ctx.codelet_count
     urgency = round(description_type.activation) if hasattr(description_type, 'activation') else 35
-    post_codelet(ctx, "description-evaluator", urgency, structure=desc)
+    post_codelet(ctx, ctx.slipnet.roles.evaluator_description, urgency, structure=desc)
     return desc
 
 
@@ -1231,17 +1238,18 @@ def _consolidate_group(ctx: EngineContext, group: Group) -> Group | None:
     category_name = getattr(group.group_category, "name", "")
     facet_name = getattr(group.bond_facet, "name", "")
     constituents = list(group.objects)
-    sameness = ctx.slipnet.nodes.get("plato-sameness")
-    length_node = ctx.slipnet.nodes.get("plato-length")
-    letter_category = ctx.slipnet.nodes.get("plato-letter-category")
+    roles = ctx.slipnet.roles
+    sameness = _bound(roles.bond_category_sameness)
+    length_node = _bound(roles.dimension_length)
+    letter_category = _bound(roles.dimension_letter_category)
 
     def _length_group(obj: Any) -> bool:
         # Scheme: ``length-group?`` (groups.ss:793-795).
         return isinstance(obj, GroupClass) and obj.bond_facet is length_node
 
     if (
-        category_name == "plato-samegrp"
-        and facet_name == "plato-letter-category"
+        category_name == roles.group_category_sameness.name
+        and facet_name == roles.dimension_letter_category.name
         and any(isinstance(o, GroupClass) for o in constituents)
     ):
         letters = group.get_letters()
@@ -1264,8 +1272,8 @@ def _consolidate_group(ctx: EngineContext, group: Group) -> Group | None:
         return flat
 
     if (
-        category_name == "plato-samegrp"
-        and facet_name == "plato-length"
+        category_name == roles.group_category_sameness.name
+        and facet_name == roles.dimension_length.name
         and any(_length_group(o) for o in constituents)
     ):
         spliced: list[Any] = []
@@ -1498,7 +1506,7 @@ def _augment_bridge_at_build(ctx: EngineContext, bridge: Bridge) -> None:
     horizontal = bridge.bridge_type != BRIDGE_VERTICAL
 
     if horizontal:
-        object_category = ctx.slipnet.get_node("plato-object-category")
+        object_category = _bound(ctx.slipnet.roles.dimension_object_category)
         if object_category is not None and not any(
             cm.description_type1 is object_category for cm in bridge.concept_mappings
         ):
@@ -1535,7 +1543,7 @@ def _augment_bridge_at_build(ctx: EngineContext, bridge: Bridge) -> None:
                 bridge.add_symmetric_slippage(bond_cm)
 
     if horizontal:
-        length_node = ctx.slipnet.get_node("plato-length")
+        length_node = _bound(ctx.slipnet.roles.dimension_length)
         length1 = platonic_length(bridge.object1)
         length2 = platonic_length(bridge.object2)
         if (
@@ -1648,7 +1656,7 @@ def _has_length_description(ctx: EngineContext, group: Group) -> bool:
     described by its length, because that is what makes "a group of one" an idea rather
     than a bare letter.
     """
-    node = ctx.slipnet.get_node("plato-length")
+    node = _bound(ctx.slipnet.roles.dimension_length)
     present = getattr(group, "description_type_present", None)
     return bool(present(node)) if present is not None else False
 
@@ -1714,7 +1722,7 @@ def _slippage_importance(ctx: EngineContext, bridge: Bridge, cm: Any) -> float:
     """
     cm_type = getattr(cm, "description_type1", None)
     cm_type_name = getattr(cm_type, "name", "")
-    if cm_type_name == "plato-bond-category":
+    if cm_type_name == ctx.slipnet.roles.dimension_bond_category.name:
         return 0.0
 
     def depth(node: Any) -> float:
@@ -1977,7 +1985,7 @@ def _get_incompatible_structures(
         # is worth its **letter span** against 1 apiece.  Won, they are not broken
         # here: the else-branch of the consolidation replaces each one in place
         # (groups.ss:774-786), which is what ``_consolidate_group`` does.
-        if getattr(structure.group_category, "name", "") != "plato-samegrp":
+        if getattr(structure.group_category, "name", "") != ctx.slipnet.roles.group_category_sameness.name:
             span = float(structure.span)
             for bond in structure.group_bonds:
                 flipped = structure.string.get_equivalent_flipped_bond(bond)
@@ -2345,8 +2353,14 @@ def _temp_adjusted_vals(ctx: EngineContext, values: list[float]) -> list[float]:
 # ── Slipnet queries ──
 
 def get_node(ctx: EngineContext, name: str) -> Any:
-    """Get a slipnet node by name."""
-    return ctx.slipnet.nodes.get(name)
+    """Get a slipnet node by name.
+
+    A name the Slipnet does not hold gives that name's ``Absent`` token (falsy, node-shaped:
+    activation 0, no links) rather than ``None``, so a body that names a node the
+    configuration lacks sees a concept that is not perceived and does not raise.
+    """
+    node = ctx.slipnet.nodes.get(name)
+    return node if node is not None else absent(name)
 
 
 def get_activation(ctx: EngineContext, name: str) -> float:
@@ -2374,7 +2388,7 @@ def fully_active(ctx: EngineContext, name: str) -> bool:
 def get_bond_category(ctx: EngineContext, from_desc: Any, to_desc: Any) -> Any:
     """Determine bond category between two descriptors."""
     if from_desc is to_desc:
-        return ctx.slipnet.nodes.get("plato-sameness")
+        return _bound(ctx.slipnet.roles.bond_category_sameness)
     # Look for a labeled link between them
     for link in from_desc.outgoing_links:
         if link.to_node is to_desc and link.label_node is not None:
@@ -2463,7 +2477,7 @@ def single_letter_group_probability(ctx: EngineContext, group: Any) -> float:
     # supporting groups takes the ``else`` (exponent 1); that branch may be
     # unreachable (local support is 0.0 there, and 0.0**n == 0.0), but is kept faithful.
     exponent = {1: 4.0, 2: 2.0}.get(supporting, 1.0)
-    length_activation = ctx.slipnet.nodes["plato-length"].activation
+    length_activation = ctx.slipnet.roles.dimension_length.activation
     base = (group._local_support(ctx.rng) / 100.0) * (length_activation / 100.0)
     return temp_adjusted_probability(
         base ** exponent, ctx.temperature.value, ctx.meta
@@ -2526,7 +2540,14 @@ def post_codelet(
     urgency: int,
     **arguments: Any,
 ) -> None:
-    """Post a new codelet to the coderack."""
+    """Post a new codelet to the coderack.
+
+    *codelet_type* is a type name, or a codelet role's value (a ``CodeletSpec``).  A role
+    nothing holds is falsy and posts nothing: what the configuration lacks is not posted.
+    """
+    if not codelet_type:
+        return
+    codelet_type = getattr(codelet_type, "name", codelet_type)
     ctx.coderack.post(
         Codelet(codelet_type, urgency, arguments=arguments, time_stamp=ctx.codelet_count)
     )

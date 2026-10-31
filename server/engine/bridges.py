@@ -792,6 +792,8 @@ class _IdentitySentinel:
 
     name = "plato-identity"
     short_name = "iden"
+    #: The theme relation it stands for (``relation_name_for_label`` reads it).
+    relation = "identity"
 
 
 _IDENTITY_SENTINEL = _IdentitySentinel()

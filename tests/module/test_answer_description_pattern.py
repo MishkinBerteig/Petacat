@@ -445,7 +445,8 @@ def test_an_unjustified_bond_facet_brings_group_and_direction_with_it(meta):
 
     ctx = _engine(meta)
     themes = _unjustified_themes(
-        [_slippage(ctx, BOND_FACET, "plato-letter-category", "plato-length")]
+        [_slippage(ctx, BOND_FACET, "plato-letter-category", "plato-length")],
+        ctx.workspace.slipnet.roles,
     )
 
     assert themes == {
@@ -464,7 +465,8 @@ def test_the_augmentation_does_not_overwrite_a_slippage_that_is_already_there(me
         [
             _slippage(ctx, BOND_FACET, "plato-letter-category", "plato-length"),
             _slippage(ctx, DIRECTION, "plato-right", "plato-left"),
-        ]
+        ],
+        ctx.workspace.slipnet.roles,
     )
 
     assert themes[DIRECTION] == "opposite"
@@ -477,7 +479,8 @@ def test_without_a_bond_facet_slippage_nothing_is_added(meta):
 
     ctx = _engine(meta)
     themes = _unjustified_themes(
-        [_slippage(ctx, STRING_POSITION, "plato-leftmost", "plato-rightmost")]
+        [_slippage(ctx, STRING_POSITION, "plato-leftmost", "plato-rightmost")],
+        ctx.workspace.slipnet.roles,
     )
 
     assert themes == {STRING_POSITION: "opposite"}

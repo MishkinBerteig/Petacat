@@ -71,6 +71,16 @@ class _FakeWorkspace:
         self.vertical_bridges = []
 
 
+def _standard_slipnet():
+    from server.engine.metadata import MetadataProvider
+    from server.engine.slipnet import Slipnet
+
+    from pathlib import Path
+
+    seed_dir = Path(__file__).resolve().parents[2] / "seed_data"
+    return Slipnet.from_metadata(MetadataProvider.from_standard_configuration(str(seed_dir)))
+
+
 class _FakeCtx:
     """The four attributes ``_get_incompatible_structures``/``_wins_fight`` read."""
 
@@ -79,6 +89,8 @@ class _FakeCtx:
         self.temperature = _FakeTemperature(temperature)
         self.meta = _FakeMeta()
         self.rng = RNG(seed)
+        # The roles the fight reads: the Slipnet under the Metacat Standard Configuration.
+        self.slipnet = _standard_slipnet()
 
 
 class _FixedStrength:

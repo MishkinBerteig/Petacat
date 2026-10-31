@@ -212,7 +212,14 @@ def test_the_concept_pattern_of_a_theme_pattern_keeps_the_last_of_a_repeated_ent
             {"dimension": "plato-string-position-category", "relation": "opposite", "activation": 100.0},
         ],
     }
-    nodes = [e["node"] for e in get_associated_concept_pattern(pattern)["entries"]]
+    import os
+
+    from server.engine.metadata import MetadataProvider
+    from server.engine.slipnet import Slipnet
+
+    seed = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
+    slipnet = Slipnet.from_metadata(MetadataProvider.from_standard_configuration(seed))
+    nodes = [e["node"] for e in get_associated_concept_pattern(pattern, slipnet)["entries"]]
     assert nodes == [
         "plato-direction-category",
         "plato-object-category",

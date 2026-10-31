@@ -20,6 +20,7 @@ import math
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from server.engine.roles import absent
 from server.engine.workspace_structures import WorkspaceStructure
 from server.engine.formulas import sigmoid, temp_adjusted_values, weighted_average
 from server.engine.images import (
@@ -249,7 +250,11 @@ def _translate_object_description(
             if going_down
             else bridge.get_non_symmetric_slippages()
         )
-    opposite = slipnet.nodes.get("plato-opposite") if slipnet is not None else None
+    # With no opposite relation in the configuration the token is falsy and identical only
+    # to itself, so a slippage whose label is missing (``None``) is never taken for one.
+    opposite = (
+        slipnet.relation("opposite") if slipnet is not None else absent("relation.opposite")
+    )
     applicable = [
         s
         for s in all_bridge_slippages

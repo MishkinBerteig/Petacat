@@ -1,5 +1,5 @@
 {
-  "cluster_types": ["top-bridge", "bottom-bridge", "vertical-bridge"],
+  "cluster_types": ["top_bridge", "bottom_bridge", "vertical_bridge"],
   "dimensions": [
     {
       "slipnet_node": "plato-letter-category",
@@ -37,12 +37,5 @@
       "slipnet_node": "plato-bond-facet",
       "valid_relations": ["identity", "diff"]
     }
-  ],
-  "answer_description_theme_types": [
-    "plato-alphabetic-position-category",
-    "plato-string-position-category",
-    "plato-direction-category",
-    "plato-group-category",
-    "plato-bond-facet"
   ]
 }

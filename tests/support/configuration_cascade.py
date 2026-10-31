@@ -16,8 +16,7 @@ Rules implemented (3.12.5):
   link it *labels*; its layout row; its theme-dimension row; its keys in the node-keyed
   parameter maps (``intrinsic_link_lengths``, ``theme_dimension_labels``,
   ``rule_english_dimension_phrases``) and its elements in the node lists
-  (``initially_clamped_slipnodes``, ``top_down_slipnodes``,
-  ``answer_description_theme_types``); its entry in every posting rule's
+  (``initially_clamped_slipnodes``, ``top_down_slipnodes``); its entry in every posting rule's
   ``triggering_slipnodes``; its role bindings and its theme relation (EN2: the database
   deletes both with the node).  Codelet bodies and predicates that mention the name cannot
   be rewritten and are reported as ``dangling``, as are demo problems that use a removed
@@ -112,10 +111,6 @@ def remove_node(docs: Documents, name: str) -> Report:
     if len(kept_rows) != len(rows):
         report.cascaded.append(("theme_dimensions", name, cause))
         theme["dimensions"] = kept_rows
-    listed = theme.get("answer_description_theme_types")
-    if listed and name in listed:
-        theme["answer_description_theme_types"] = [x for x in listed if x != name]
-        report.cascaded.append(("theme_dimensions.answer_description_theme_types", name, cause))
 
     roles = docs["roles.json"]
     bound = roles.get("node_roles", [])

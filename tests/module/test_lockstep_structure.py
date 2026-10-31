@@ -194,7 +194,13 @@ def test_concept_activation_events_are_tested_per_change(runner):
 
 
 def test_answer_description_dimensions_follow_answers_ss_order():
-    from server.engine.answers import _ANSWER_DESCRIPTION_THEME_TYPES as T
+    from server.engine.metadata import MetadataProvider
+    from server.engine.slipnet import Slipnet
+
+    meta = MetadataProvider.from_standard_configuration(
+        os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
+    )
+    T = tuple(n.name for n in Slipnet.from_metadata(meta).roles.answer_description_dimension)
 
     assert T[:2] == (
         "plato-alphabetic-position-category",

@@ -108,12 +108,14 @@ def test_remq_duplicates_keeps_the_last_occurrence():
 
 def test_unjustified_theme_for_a_repeated_dimension_takes_the_first_entry():
     from server.engine.answers import _unjustified_themes
+    from server.engine.roles import Roles
 
+    roles = Roles()
     dim = NS(name="plato-letter-category")
-    cm1 = NS(description_type1=dim, label=NS(name="plato-successor"))
-    cm2 = NS(description_type1=dim, label=NS(name="plato-identity"))
-    assert _unjustified_themes([cm1, cm2]) == _unjustified_themes([cm1])
-    assert _unjustified_themes([cm1]) != _unjustified_themes([cm2])
+    cm1 = NS(description_type1=dim, label=NS(name="plato-successor", relation="successor"))
+    cm2 = NS(description_type1=dim, label=NS(name="plato-identity", relation="identity"))
+    assert _unjustified_themes([cm1, cm2], roles) == _unjustified_themes([cm1], roles)
+    assert _unjustified_themes([cm1], roles) != _unjustified_themes([cm2], roles)
 
 
 # ---- C-4: differing-dimensions is not deduplicated --------------------------------

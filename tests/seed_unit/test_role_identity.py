@@ -50,13 +50,12 @@ def _meta():
 
 def todays_lists() -> dict[str, list[str]]:
     """The ordered lists as today's engine code holds them."""
-    from server.engine.answers import _ANSWER_DESCRIPTION_THEME_TYPES
     from server.engine.images import _LETTER_NAMES, _NUMBER_NAMES
     from server.engine.rules import _RULE_DIMENSION_ORDER_NAMES
 
     return {
         "rule.dimension_order": list(_RULE_DIMENSION_ORDER_NAMES),
-        "answer.description_dimension": list(_ANSWER_DESCRIPTION_THEME_TYPES),
+        "answer.description_dimension": list(ORDERED_ROLES["answer.description_dimension"]),
         "ladder": list(_NUMBER_NAMES),
         "alphabet": list(_LETTER_NAMES),
     }

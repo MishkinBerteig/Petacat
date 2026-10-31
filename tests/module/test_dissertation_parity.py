@@ -27,7 +27,6 @@ from server.engine.themes import (
     Theme,
     ThemeCluster,
     relation_name_for_label,
-    relation_node_name,
 )
 
 # Every test here executes arithmetic the numeric substrate owns, so each one runs
@@ -55,7 +54,7 @@ def _run(meta, initial, modified, target, answer=None, seed=0, steps=4000):
 
 
 class TestThemespaceActivates:
-    def test_relation_names_round_trip_through_slipnet_node_names(self):
+    def test_relation_names_round_trip_through_slipnet_node_names(self, meta):
         """The Themespace speaks bare relation names; the Slipnet speaks node names.
 
         Conflating the two is what silently disabled the whole Themespace: bridges
@@ -63,16 +62,17 @@ class TestThemespaceActivates:
         was ever found and none was ever boosted.
         """
 
-        class FakeLabel:
-            name = "plato-opposite"
+        from server.engine.slipnet import Slipnet
 
-        assert relation_name_for_label(FakeLabel()) == "opposite"
-        assert relation_node_name("opposite") == "plato-opposite"
+        slipnet = Slipnet.from_metadata(meta)
+        opposite = slipnet.relation("opposite")
+        assert opposite.name == "plato-opposite"
+        assert relation_name_for_label(opposite) == "opposite"
 
         # "different" is the *absence* of a relating concept (themes.ss:715), so
         # it has no Slipnet node.
         assert relation_name_for_label(None) == RELATION_DIFFERENT
-        assert relation_node_name(RELATION_DIFFERENT) is None
+        assert not slipnet.relation(RELATION_DIFFERENT)
 
     def test_a_built_bridge_boosts_its_themes(self, meta):
         """§4.1: "Themes receive periodic infusions of activation from the

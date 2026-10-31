@@ -58,11 +58,22 @@ class _ScriptedRNG:
         return max(zip(items, weights), key=lambda pair: pair[1])[0]
 
 
+#: The theme relation a label node stands for (``SlipnetNode.relation``, from the
+#: ``theme_relations`` table), for these stand-in nodes.
+_RELATION_OF = {
+    "plato-identity": "identity",
+    "plato-opposite": "opposite",
+    "plato-successor": "successor",
+    "plato-predecessor": "predecessor",
+}
+
+
 class _Descriptor:
     """A descriptor concept: a name, and the labelled links out of it."""
 
     def __init__(self, name: str) -> None:
         self.name = name
+        self.relation = _RELATION_OF.get(name)
         self.short_name = name
         self.outgoing_links: list[Any] = []
 

@@ -472,6 +472,7 @@ def clamp_rules(
         clamped_codelet_patterns=clamped_codelet_patterns,
         rules=list(rules),
         progress_focus="workspace",
+        slipnet=slipnet,
     )
 
     # Add event first so concept-activation events appear after the clamp

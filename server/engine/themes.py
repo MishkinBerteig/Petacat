@@ -65,54 +65,39 @@ RELATION_SUCCESSOR = "successor"
 RELATION_PREDECESSOR = "predecessor"
 RELATION_DIFFERENT = "diff"
 
-# Bare relation name -> Slipnet node name.  ``diff`` deliberately has no node.
-_RELATION_NODES: dict[str, str] = {
-    RELATION_IDENTITY: "plato-identity",
-    RELATION_OPPOSITE: "plato-opposite",
-    RELATION_SUCCESSOR: "plato-successor",
-    RELATION_PREDECESSOR: "plato-predecessor",
-}
-
-_NODE_RELATIONS: dict[str, str] = {v: k for k, v in _RELATION_NODES.items()}
-
 #: See ``slipnet._UNRESOLVED`` — "not yet decided" is not "decided against".
 _UNRESOLVED = object()
 
-# Bridge-type aliases accepted by the lookup helpers below.
+# Bridge-type spellings accepted by the lookup helpers below.  A hyphen is read as an
+# underscore (``Rule.bridge_theme_type`` and older data spell ``top-bridge``), so the table
+# holds each name once.  Anything else passes through unchanged.
 _BRIDGE_TYPE_TO_THEME_TYPE: dict[str, str] = {
     "top": THEME_TOP_BRIDGE,
-    "top-bridge": THEME_TOP_BRIDGE,
     "top_bridge": THEME_TOP_BRIDGE,
     "bottom": THEME_BOTTOM_BRIDGE,
-    "bottom-bridge": THEME_BOTTOM_BRIDGE,
     "bottom_bridge": THEME_BOTTOM_BRIDGE,
     "vertical": THEME_VERTICAL_BRIDGE,
-    "vertical-bridge": THEME_VERTICAL_BRIDGE,
     "vertical_bridge": THEME_VERTICAL_BRIDGE,
 }
+
+
+def theme_type_for_bridge_type(bridge_type: str) -> str:
+    """The Themespace theme type of a bridge-type spelling (``top``, ``top-bridge``,
+    ``top_bridge``); an unknown spelling is returned as given."""
+    if not isinstance(bridge_type, str):
+        return bridge_type
+    return _BRIDGE_TYPE_TO_THEME_TYPE.get(bridge_type.replace("-", "_"), bridge_type)
 
 
 def relation_name_for_label(label_node: Any) -> str:
     """Map a Slipnet label node (or ``None``) to a bare theme relation name.
 
-    ``None`` — an unlabelled link, or no link at all — maps to ``diff``,
-    matching the Scheme's ``#f`` relation.
+    The node knows the relation it stands for (``SlipnetNode.relation``, from the
+    ``theme_relations`` table).  ``None`` -- an unlabelled link, no link at all, or a
+    label that is no relation -- maps to ``diff``, matching the Scheme's ``#f`` relation.
     """
-    if label_node is None:
-        return RELATION_DIFFERENT
-    name = getattr(label_node, "name", label_node)
-    return _NODE_RELATIONS.get(name, RELATION_DIFFERENT)
-
-
-def relation_node_name(relation: str | None) -> str | None:
-    """Map a bare theme relation name back to its Slipnet node name.
-
-    Returns ``None`` for ``diff`` (and for unknown relations), because the
-    "different" relation is the absence of a concept and so has no node.
-    """
-    if relation is None:
-        return None
-    return _RELATION_NODES.get(relation)
+    relation = getattr(label_node, "relation", None)
+    return relation if relation is not None else RELATION_DIFFERENT
 
 
 class Theme:
@@ -587,7 +572,7 @@ class Themespace:
         Thematic-bridge-scouts "pay attention only to positively-activated
         themes in the Themespace" (§4.1.2, p.144).
         """
-        tt = _BRIDGE_TYPE_TO_THEME_TYPE.get(bridge_type, bridge_type)
+        tt = theme_type_for_bridge_type(bridge_type)
         return [t for t in self.get_active_themes(tt) if t.activation > 0]
 
     def _numeric_backend(self) -> Any:
@@ -651,18 +636,7 @@ class Themespace:
         Returns ``[bridge_type, (dimension, relation), ...]`` matching the
         Scheme list format used by rules, justification, and jootsing.
         """
-        type_map = {
-            "top": THEME_TOP_BRIDGE,
-            "top-bridge": THEME_TOP_BRIDGE,
-            "top_bridge": THEME_TOP_BRIDGE,
-            "bottom": THEME_BOTTOM_BRIDGE,
-            "bottom-bridge": THEME_BOTTOM_BRIDGE,
-            "bottom_bridge": THEME_BOTTOM_BRIDGE,
-            "vertical": THEME_VERTICAL_BRIDGE,
-            "vertical-bridge": THEME_VERTICAL_BRIDGE,
-            "vertical_bridge": THEME_VERTICAL_BRIDGE,
-        }
-        tt = type_map.get(bridge_type, bridge_type)
+        tt = theme_type_for_bridge_type(bridge_type)
         margin = self.meta.get_param("dominant_theme_margin", 90)
         entries: list[tuple[str, str | None]] = []
         for cluster in self.clusters:
@@ -788,7 +762,7 @@ class Themespace:
 
     def get_clusters(self, theme_type: str) -> list[ThemeCluster]:
         """Every cluster of *theme_type*.  Scheme: ``get-clusters`` (themes.ss:190-194)."""
-        tt = _BRIDGE_TYPE_TO_THEME_TYPE.get(theme_type, theme_type)
+        tt = theme_type_for_bridge_type(theme_type)
         return [c for c in self.clusters if c.theme_type == tt]
 
     def has_thematic_pressure(self, types: list[str] | None = None) -> bool:
@@ -886,13 +860,12 @@ class Themespace:
             # ``diff`` has no node — the "different" relation is the absence
             # of a concept — so it contributes nothing here.
             if theme.activation > 0:
-                rel_node_name = relation_node_name(theme.relation)
-                if rel_node_name is None:
+                rel_node = slipnet.relation(theme.relation)
+                if not rel_node:
                     continue
                 rel_prob = (theme.activation / 100.0) ** 3
                 if rng.prob(rel_prob):
-                    rel_node = slipnet.nodes.get(rel_node_name)
-                    if rel_node and not rel_node.frozen:
+                    if not rel_node.frozen:
                         rel_node.activation_buffer += workspace_activation
         rng.trace_about(None)
 
@@ -906,7 +879,7 @@ class Themespace:
         the bottom patterns separately, and the expiry of the first switched pressure
         off globally.
         """
-        tt = _BRIDGE_TYPE_TO_THEME_TYPE.get(theme_type, theme_type)
+        tt = theme_type_for_bridge_type(theme_type)
         for cluster in self.clusters:
             if cluster.theme_type != tt:
                 continue

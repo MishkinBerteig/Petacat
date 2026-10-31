@@ -555,14 +555,18 @@ class EngineRunner:
         from server.engine.descriptions import Description
         from server.engine.workspace_objects import Letter
 
-        letter_cat_node = slipnet.nodes.get("plato-letter-category")
-        obj_cat_node = slipnet.nodes.get("plato-object-category")
-        letter_obj_node = slipnet.nodes.get("plato-letter")
-        str_pos_node = slipnet.nodes.get("plato-string-position-category")
-        leftmost_node = slipnet.nodes.get("plato-leftmost")
-        rightmost_node = slipnet.nodes.get("plato-rightmost")
-        middle_node = slipnet.nodes.get("plato-middle")
-        single_node = slipnet.nodes.get("plato-single")
+        # The description program stays in code, over roles.  A role nothing holds is an
+        # ``Absent`` token (falsy), so each guard below drops that description: what has no
+        # node is not perceived.
+        roles = slipnet.roles
+        letter_cat_node = roles.dimension_letter_category
+        obj_cat_node = roles.dimension_object_category
+        letter_obj_node = roles.object_letter
+        str_pos_node = roles.dimension_string_position
+        leftmost_node = roles.position_leftmost
+        rightmost_node = roles.position_rightmost
+        middle_node = roles.position_middle
+        single_node = roles.position_single
 
         # From the Slipnet the descriptors belong to, not a second read of the
         # parameter: the node already carries the run's ceiling, and two reads of
@@ -1356,33 +1360,44 @@ class EngineRunner:
         if ctx is None:
             return
 
-        thematic_type = "thematic-bridge-scout"
-        thematic_rule = self.posting_rule_for(thematic_type)
-        if thematic_rule is None or not self._rule_condition_holds(thematic_rule):
+        # Scheme iterates a list of thematic codelet types (``coderack.ss:629``): every
+        # rule directed ``thematic``, in file order.  The shipped file has one.
+        thematic_rules = [r for r in self.meta.posting_rules if r.direction == "thematic"]
+        if not thematic_rules:
             return
-
+        eligible = False
         if batch is None:
             batch = []
             deferred = True
         else:
             deferred = False
-        post_prob = self._compute_posting_probability(thematic_rule)
-        ctx.rng.trace_about(thematic_type)
-        if ctx.rng.prob(post_prob):
-            urgency = evaluate_urgency(
-                thematic_rule,
-                PostingContext(ctx),
-                default=self.meta.get_urgency("low"),
-            )
-            num = self._compute_num_to_post(thematic_rule)
-            for _ in range(num):
-                batch.append(
-                    Codelet(thematic_type, urgency, time_stamp=ctx.codelet_count)
+        for thematic_rule in thematic_rules:
+            if not self._rule_condition_holds(thematic_rule):
+                continue
+            eligible = True
+            thematic_type = thematic_rule.codelet_type
+            post_prob = self._compute_posting_probability(thematic_rule)
+            ctx.rng.trace_about(thematic_type)
+            if ctx.rng.prob(post_prob):
+                urgency = evaluate_urgency(
+                    thematic_rule,
+                    PostingContext(ctx),
+                    default=self.meta.get_urgency("low"),
                 )
-        ctx.rng.trace_about(None)
+                num = self._compute_num_to_post(thematic_rule)
+                for _ in range(num):
+                    batch.append(
+                        Codelet(thematic_type, urgency, time_stamp=ctx.codelet_count)
+                    )
+            ctx.rng.trace_about(None)
 
-        if deferred:
+        if deferred and eligible:
             ctx.coderack.post_deferred(batch, ctx.codelet_count, ctx.rng)
+
+    def _plain_name(self, node_name: str) -> str:
+        """A node's plain name (a node column), for the RNG trace's ``about`` label."""
+        spec = self.meta.slipnet_node_specs.get(node_name)
+        return (spec.plain_name if spec is not None and spec.plain_name else node_name)
 
     def _compute_posting_probability(self, rule: PostingRuleSpec | None) -> float:
         """The probability of posting a codelet under *rule*.
@@ -1508,7 +1523,7 @@ class EngineRunner:
                 post_prob = self._compute_posting_probability(rule)
                 # ``about`` for a top-down coin is the codelet that would be posted,
                 # named with its argument: ``<type>(<node>)``.
-                ctx.rng.trace_about(f"{rule.codelet_type}({node_name.removeprefix('plato-')})")
+                ctx.rng.trace_about(f"{rule.codelet_type}({self._plain_name(node_name)})")
                 if not ctx.rng.prob(post_prob):
                     continue
 

@@ -93,18 +93,12 @@ def get_coherence_phrase(answer: Any, meta: MetadataProvider) -> str:
 
 
 # §4.7.1 footnote 18: only these vertical theme categories may appear in an
-# answer description, and Bond-Facet only in its "different" form.  Mirrored in
-# seed_data/theme_dimensions.json as ``answer_description_theme_types``.
+# answer description, and Bond-Facet only in its "different" form.  They are the ordered
+# role ``answer.description_dimension`` (``slipnet.roles.answer_description_dimension``).
 #
 # The order is the reference's (answers.ss:213-218): the pattern is built by
-# iterating this list, in an insertion-ordered dict.
-_ANSWER_DESCRIPTION_THEME_TYPES = (
-    "plato-alphabetic-position-category",
-    "plato-string-position-category",
-    "plato-direction-category",
-    "plato-group-category",
-    "plato-bond-facet",
-)
+# iterating the role's nodes in ordinal order, in an insertion-ordered dict.  A dimension
+# the configuration does not have is not in the role's tuple, so it is not described.
 
 
 def create_answer_description(
@@ -126,11 +120,9 @@ def create_answer_description(
     """
     answer_text = workspace.answer_string.text if workspace.answer_string else ""
 
-    allowed = _ANSWER_DESCRIPTION_THEME_TYPES
-    if meta is not None:
-        allowed = tuple(
-            getattr(meta, "answer_description_theme_types", None) or allowed
-        )
+    allowed = tuple(
+        node.name for node in workspace.slipnet.roles.answer_description_dimension
+    )
 
     # The *whole* dominant vertical pattern, unfiltered: ``answers.ss:157-158`` reads
     # it as it stands and consults exactly one of its entries.
@@ -155,7 +147,9 @@ def create_answer_description(
         top_themes=dict(themes.get("top_bridge", {})),
         vertical_themes=vertical,
         bottom_themes=dict(themes.get("bottom_bridge", {})),
-        unjustified_themes=_unjustified_themes(unjustified_slippages or []),
+        unjustified_themes=_unjustified_themes(
+            unjustified_slippages or [], workspace.slipnet.roles
+        ),
         unjustified_slippages=[str(cm) for cm in (unjustified_slippages or [])],
         top_rule_abstractness=top_rule.abstractness if top_rule else 0.0,
         bottom_rule_abstractness=bottom_rule.abstractness if bottom_rule else 0.0,
@@ -164,14 +158,13 @@ def create_answer_description(
         top_rule_signature=rule_signature(top_rule),
         bottom_rule_signature=rule_signature(bottom_rule),
         theme_abstractness=average_theme_abstractness(
-            vertical, _unjustified_themes(unjustified_slippages or []), meta
+            vertical,
+            _unjustified_themes(unjustified_slippages or [], workspace.slipnet.roles),
+            meta,
         ),
     )
 
 
-_STRING_POSITION = "plato-string-position-category"
-_DIRECTION = "plato-direction-category"
-_BOND_FACET = "plato-bond-facet"
 _IDENTITY = "identity"
 
 
@@ -222,18 +215,24 @@ def _distil_vertical_pattern(
     initial_group = _spanning_group_from_events(events, "initial")
     target_group = _spanning_group_from_events(events, "target")
 
+    roles = workspace.slipnet.roles
+    # An absent role's token has a name no dimension carries, so its branch never matches.
+    string_position = roles.dimension_string_position.name
+    direction = roles.dimension_direction.name
+    bond_facet = roles.dimension_bond_facet.name
+
     pattern: dict[str, Any] = {}
     for dimension in allowed:
         if dimension in cm_entries:
             pattern[dimension] = cm_entries[dimension]
-        elif dimension == _STRING_POSITION:
-            if _DIRECTION in cm_entries:
-                pattern[_STRING_POSITION] = cm_entries[_DIRECTION]
-            elif _STRING_POSITION in dominant:
-                pattern[_STRING_POSITION] = dominant[_STRING_POSITION]
+        elif dimension == string_position:
+            if direction in cm_entries:
+                pattern[string_position] = cm_entries[direction]
+            elif string_position in dominant:
+                pattern[string_position] = dominant[string_position]
             else:
-                pattern[_STRING_POSITION] = _IDENTITY
-        elif dimension == _BOND_FACET:
+                pattern[string_position] = _IDENTITY
+        elif dimension == bond_facet:
             continue
         elif _whole_string_identity_concept_mapping(
             dimension, initial_group, target_group, workspace
@@ -389,35 +388,43 @@ def _whole_string_identity_concept_mapping(
 # §4.7.3 coherence.  These need the Slipnet's conceptual depths, so they run here,
 # where ``meta`` is in scope, and the result is stored on the description.
 
-_RELATION_NODES = {
-    "identity": "plato-identity",
-    "opposite": "plato-opposite",
-    "successor": "plato-successor",
-    "predecessor": "plato-predecessor",
-}
-
-
 def _conceptual_depth(node_name: str, meta: Any) -> float:
     specs = getattr(meta, "slipnet_node_specs", None) or {}
     spec = specs.get(node_name)
     return float(getattr(spec, "conceptual_depth", 0) or 0)
 
 
+def _relation_abstractness(relation: str, meta: Any) -> float:
+    """The abstractness of a theme relation, from its ``theme_relations`` row.
+
+    The row's own abstractness if it has one (``identity`` 0, ``diff`` 50 in the Metacat
+    Standard Configuration); otherwise the conceptual depth of its node; with no row, or
+    a row whose node is gone, the coefficient ``theme_relation_default_abstractness``.
+    """
+    for row in getattr(meta, "theme_relations", ()):
+        if row.name != relation:
+            continue
+        if row.abstractness is not None:
+            return float(row.abstractness)
+        if row.node_name in (getattr(meta, "slipnet_node_specs", None) or {}):
+            return _conceptual_depth(row.node_name, meta)
+        break
+    return float(
+        (getattr(meta, "formula_coefficients", None) or {}).get(
+            "theme_relation_default_abstractness", 0.0
+        )
+    )
+
+
 def _theme_abstractness(dimension: str, relation: str, meta: Any) -> float:
     """Scheme: ``theme-abstractness`` (``answers.ss:895-906``).
 
-    ``identity`` scores 0 — it is the *least* abstract relation, not the most — and
-    ``diff`` scores a flat 50; every other relation uses its own conceptual depth.
+    ``identity`` scores 0 -- it is the *least* abstract relation, not the most -- and
+    ``diff`` scores a flat 50; every other relation uses its own conceptual depth.  All
+    three come from the relation's ``theme_relations`` row.
     """
     dimension_abstractness = _conceptual_depth(dimension, meta)
-    if relation == "identity":
-        relation_abstractness = 0.0
-    elif relation == "diff":
-        relation_abstractness = 50.0
-    else:
-        relation_abstractness = _conceptual_depth(
-            _RELATION_NODES.get(relation, ""), meta
-        )
+    relation_abstractness = _relation_abstractness(relation, meta)
     return round((dimension_abstractness + relation_abstractness) / 2.0)
 
 
@@ -439,7 +446,7 @@ def average_theme_abstractness(
     return round(sum(values) / len(values))
 
 
-def _unjustified_themes(slippages: list[Any]) -> dict[str, Any]:
+def _unjustified_themes(slippages: list[Any], roles: Any) -> dict[str, Any]:
     """The theme-pattern implied by slippages the program failed to justify.
 
     Scheme: ``get-unjustified-theme-pattern`` (``answers.ss:239-264``).  One entry per
@@ -463,12 +470,15 @@ def _unjustified_themes(slippages: list[Any]) -> dict[str, Any]:
         # (it is persisted/serialised as a mapping), so the first one is kept.
         themes.setdefault(dimension, relation_name_for_label(getattr(cm, "label", None)))
 
-    if _BOND_FACET in themes:
+    bond_facet = roles.dimension_bond_facet.name
+    direction = roles.dimension_direction.name
+    group_category = roles.dimension_group_category.name
+    if bond_facet in themes:
         # ``answers.ss:261-264`` conses the two entries onto the *front* of the
         # pattern; a dict keeps insertion order, so build them first.
         augmented = {
-            "plato-group-category": themes.get("plato-group-category", _IDENTITY),
-            _DIRECTION: themes.get(_DIRECTION, _IDENTITY),
+            group_category: themes.get(group_category, _IDENTITY),
+            direction: themes.get(direction, _IDENTITY),
         }
         augmented.update(themes)
         themes = augmented
@@ -726,7 +736,7 @@ def _bridge_to_translation(
                 if not any(o is obj for o in subjects):
                     subjects.append(obj)
 
-    identity = slipnet.nodes.get("plato-identity")
+    identity = slipnet.relations.get("identity")
     bridges = []
     for obj in subjects:
         counterpart = get_instantiated_image_object(obj)
