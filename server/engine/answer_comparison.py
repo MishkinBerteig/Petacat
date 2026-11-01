@@ -27,7 +27,8 @@ Two facts about the shape of the output are worth stating before the code:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from functools import lru_cache
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 if TYPE_CHECKING:
     from server.engine.memory import AnswerDescription, EpisodicMemory
@@ -39,24 +40,46 @@ Theme = tuple[str, str]
 # The five theme dimensions ``theme-phrases`` knows how to talk about
 # (``answers.ss:340-344``).  Direction is looked up nowhere: the Scheme's own comment at
 # ``answers.ss:341`` says "Direction-theme should always be the same as StringPos-theme",
-# and the String-Position phrase carries the direction wording for both.
-STRING_POSITION = "plato-string-position-category"
-ALPHABETIC_POSITION = "plato-alphabetic-position-category"
-GROUP_CATEGORY = "plato-group-category"
-BOND_FACET = "plato-bond-facet"
-DIRECTION = "plato-direction-category"
+# and the String-Position phrase carries the direction wording for both.  Each is a
+# role; the node the configuration binds to it is what a theme's dimension is named.
 
-#: Order of the verdict criteria when the seed data does not supply one.  It is the
-#: order of the ``cond`` at ``answers.ss:824-882``, and the seed data's
-#: ``comparison_judgment_priority`` says the same thing.
-DEFAULT_JUDGMENT_PRIORITY = (
-    "both_incoherent",
-    "one_incoherent_other_not",
-    "fewer_unjustified_themes",
-    "more_abstract_rule",
-    "richer_set_of_ideas",
-    "neither_better",
-)
+
+class ThemeDimensions(NamedTuple):
+    """The names of the five dimensions ``theme-phrases`` describes.
+
+    A dimension the configuration does not have is the name of its role's ``Absent``
+    token, which no stored theme carries, so that dimension is never described.
+    """
+
+    string_position: str
+    alphabetic_position: str
+    group_category: str
+    bond_facet: str
+    direction: str
+
+
+def _bound_node_name(meta: Any, role: str) -> str:
+    """The name of the node *meta* binds to a single-node *role* (ordinal 0), else the
+    name of the role's ``Absent`` token.  A binding whose node is gone is not a binding."""
+    from server.engine.roles import absent
+
+    specs = getattr(meta, "slipnet_node_specs", None)
+    for binding in getattr(meta, "node_roles", ()) or ():
+        if binding.role == role and binding.ordinal == 0:
+            if specs is None or binding.node_name in specs:
+                return binding.node_name
+            break
+    return absent(role).name
+
+
+def theme_dimensions(meta: Any) -> ThemeDimensions:
+    return ThemeDimensions(
+        string_position=_bound_node_name(meta, "dimension.string_position"),
+        alphabetic_position=_bound_node_name(meta, "dimension.alphabetic_position"),
+        group_category=_bound_node_name(meta, "dimension.group_category"),
+        bond_facet=_bound_node_name(meta, "dimension.bond_facet"),
+        direction=_bound_node_name(meta, "dimension.direction"),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -94,6 +117,40 @@ def resolve_templates(templates: dict[str, Any] | None) -> dict[str, Any]:
             "engine does not read the Metacat Standard Configuration files at run time"
         )
     return templates
+
+
+class _Tracked(dict):
+    """A template tree that notes every key a read finds missing.
+
+    ``ABSENCE-BEHAVIOUR.md`` 2.6: a template key the configuration does not have makes
+    the text it produces empty, never changes perception, and is counted once per run as
+    a warning.  Reads go through ``.get`` with the empty default they always had, so the
+    text is unchanged; the path of a missing key is added to the sink (a set, so each key
+    counts once).  Child sections come back tracked too.
+    """
+
+    __slots__ = ("_path", "_sink")
+
+    def __init__(self, data: dict[str, Any], path: tuple[str, ...], sink: set[str]) -> None:
+        super().__init__(data)
+        self._path = path
+        self._sink = sink
+
+    def get(self, key: Any, default: Any = None) -> Any:
+        if key not in self:
+            self._sink.add(".".join((*self._path, str(key))))
+            return default
+        value = dict.__getitem__(self, key)
+        if isinstance(value, dict) and not isinstance(value, _Tracked):
+            return _Tracked(value, (*self._path, str(key)), self._sink)
+        return value
+
+
+def track_templates(templates: dict[str, Any], sink: set[str] | None) -> dict[str, Any]:
+    """*templates* with missing-key reads recorded in *sink* (unchanged when no sink)."""
+    if sink is None or not isinstance(templates, dict):
+        return templates
+    return _Tracked(templates, (), sink)
 
 
 def _section(templates: dict[str, Any], *path: str) -> Any:
@@ -223,6 +280,7 @@ def theme_phrases(
     add_caveats: bool = False,
     the_strings: bool = False,
     two_strings: str | None = None,
+    meta: Any,
 ) -> str:
     """Describe a set of themes as one English clause.
 
@@ -234,6 +292,10 @@ def theme_phrases(
     slots 1 and 2 of "⟨1⟩ see⟨2⟩ ⟨3⟩ as ⟨4⟩ ⟨5⟩ ⟨6⟩" are the ``prep`` and ``ending``
     arguments that make "on seeing" or "of seeing" or "to see" as the context demands.
     """
+    from server.engine.metadata import require_meta
+
+    require_meta(meta, "theme_phrases")
+    dims = theme_dimensions(meta)
     tpl = _section(templates, "theme_phrase_templates")
     all_themes = list(themes) + list(unjustified_themes)
 
@@ -259,10 +321,10 @@ def theme_phrases(
             )
         return ""
 
-    string_position = _lookup(STRING_POSITION, all_themes)
-    group_category = _lookup(GROUP_CATEGORY, all_themes)
-    bond_facet = _lookup(BOND_FACET, all_themes)
-    alphabetic = _lookup(ALPHABETIC_POSITION, all_themes)
+    string_position = _lookup(dims.string_position, all_themes)
+    group_category = _lookup(dims.group_category, all_themes)
+    bond_facet = _lookup(dims.bond_facet, all_themes)
+    alphabetic = _lookup(dims.alphabetic_position, all_themes)
 
     # An unjustified Group-Category theme is not mentioned as a qualifier
     # (``answers.ss:366-368``): the program will not assert an idea it cannot back up.
@@ -395,24 +457,31 @@ def coherence_score(answer: AnswerDescription) -> float:
 # ---------------------------------------------------------------------------
 
 
-#: Every Slipnet node's name begins with this, and nothing else in a rule signature
-#: does.  ``rule_signature`` (``server/engine/rules.py``) renders a clause as a nest of
-#: plain strings, which flattens the Scheme's distinction between a *symbol* leaf (the
-#: clause type ``'intrinsic``) and a *slipnode* leaf (``plato-successor``) —
-#: ``traverse-rule-clauses`` treats the two completely differently, so the walk below
-#: has to recover the distinction, and the prefix is what recovers it.
-_CONCEPT_PREFIX = "plato-"
+#: The symbols a rule signature holds that are not Slipnet nodes: the clause types and the
+#: scope word ``rule_signature`` (``server/engine/rules.py``) writes.  ``rule_signature``
+#: renders a clause as a nest of plain strings, which flattens the Scheme's distinction
+#: between a *symbol* leaf (the clause type ``'intrinsic``) and a *slipnode* leaf;
+#: ``traverse-rule-clauses`` treats the two completely differently, so the walk below has
+#: to recover the distinction.  The symbols are the engine's own closed set; every other
+#: string is read as the name of a node.  A name the configuration no longer has is still
+#: a name (stored memory keeps it), and the depth lookup then says it is not available.
+@lru_cache(maxsize=1)
+def _signature_symbols() -> frozenset[str]:
+    from server.engine.rules import (
+        CLAUSE_EXTRINSIC,
+        CLAUSE_INTRINSIC,
+        CLAUSE_VERBATIM,
+        SCOPE_SUBOBJECTS,
+    )
 
-#: ``_descriptor_key`` collapses ``plato-group`` and the ``'string`` symbol into one
-#: token, honouring the equivalence ``traverse-rule-clauses`` spells out at
-#: ``justify.ss:243-244``.  For a *conceptual depth* the token still has to name a real
-#: node, so it resolves back to the group.
-_COLLAPSED_GROUP_TOKEN = "plato-group|string"
+    return frozenset(
+        {CLAUSE_INTRINSIC, CLAUSE_EXTRINSIC, CLAUSE_VERBATIM, SCOPE_SUBOBJECTS}
+    )
 
 
 def _is_concept(leaf: Any) -> bool:
-    """Is this leaf a Slipnet node, as opposed to one of the Scheme's bare symbols?"""
-    return isinstance(leaf, str) and leaf.startswith(_CONCEPT_PREFIX)
+    """Is this leaf a Slipnet node's name, as opposed to one of the Scheme's bare symbols?"""
+    return isinstance(leaf, str) and leaf not in _signature_symbols()
 
 
 def _is_verbatim_signature(signature: Any) -> bool:
@@ -530,8 +599,18 @@ def compare_rule_signatures(
     return differences
 
 
-def _depth_key(name: str) -> str:
-    return "plato-group" if name == _COLLAPSED_GROUP_TOKEN else name
+def _collapsed_group_token(group_name: str) -> str:
+    """The token ``rule_signature`` writes for the group-or-string descriptor.
+
+    ``_descriptor_key`` collapses the group node and the ``'string`` symbol into one
+    token, honouring the equivalence ``traverse-rule-clauses`` spells out at
+    ``justify.ss:243-244``.  The token is asked of ``rules.py`` for the group node's name
+    rather than written here.  For a *conceptual depth* it still has to name a real node,
+    so a lookup resolves it back to the group.
+    """
+    from server.engine.rules import _descriptor_key
+
+    return _descriptor_key(group_name)
 
 
 def conceptual_depth_lookup(meta: Any):
@@ -544,9 +623,11 @@ def conceptual_depth_lookup(meta: Any):
 
     require_meta(meta, "conceptual_depth_lookup")
     specs = getattr(meta, "slipnet_node_specs", None) or {}
+    group_name = _bound_node_name(meta, "object.group")
+    group_token = _collapsed_group_token(group_name)
 
     def lookup(name: str) -> float | None:
-        spec = specs.get(_depth_key(name))
+        spec = specs.get(group_name if name == group_token else name)
         if spec is None:
             return None
         return float(getattr(spec, "conceptual_depth", 0) or 0)
@@ -598,6 +679,8 @@ def explain_answer(
     answer: AnswerDescription,
     memory: EpisodicMemory | None = None,
     templates: dict[str, Any] | None = None,
+    *,
+    meta: Any = None,
 ) -> dict[str, Any]:
     """Say what one answer rests on, and what the program thinks of it.
 
@@ -606,7 +689,12 @@ def explain_answer(
     "Answer quality = 71." — which is the isomorphism §4.6 describes: the same number of
     paragraphs saying the same things, with the window-dressing stripped out.
     """
+    from server.engine.metadata import require_meta
+
     templates = resolve_templates(templates)
+    require_meta(meta, "explain_answer")
+    warnings: set[str] = set()
+    templates = track_templates(templates, warnings)
     section = _section(templates, "answer_explanation")
     initial, _modified, target, _answer_text = answer.problem
 
@@ -626,6 +714,7 @@ def explain_answer(
         snag_explanation=snag_explanation_for(answer, memory, templates),
         add_caveats=True,
         the_strings=False,
+        meta=meta,
     )
     explanation = _fill(section.get("template", ""), theme_phrases=phrases)
     phrase = quality_phrase(answer.quality, templates)
@@ -644,6 +733,7 @@ def explain_answer(
         "quality_phrase": phrase,
         "coherence_phrase": coherence_phrase(coherence_score(answer), templates),
         "is_coherent": answer.is_coherent,
+        "warnings": sorted(warnings),
     }
 
 
@@ -672,6 +762,42 @@ def compare_answers_text(
     return ctx.render()
 
 
+def _available_check(meta: Any, unresolved: set[str]):
+    """A predicate over a stored ``(dimension, relation)`` theme: does this run's
+    configuration still have both names?  A name it lacks is added to *unresolved*.
+
+    A dimension is a Slipnet node; a relation is a ``theme_relations`` row.  A relation
+    is unavailable when its row is gone (a removal deletes the row with its node) or the
+    row's node is; ``diff``, the relation of an unlabelled link, needs no node.  A
+    provider that lists no node specs at all is not asked.
+    """
+    from server.engine.themes import RELATION_DIFFERENT
+
+    specs = getattr(meta, "slipnet_node_specs", None)
+    if specs is None:
+        return lambda theme: True
+    relation_node = {
+        row.name: row.node_name for row in getattr(meta, "theme_relations", ()) or ()
+    }
+
+    def available(theme: Theme) -> bool:
+        dimension, relation = theme
+        ok = True
+        if dimension not in specs:
+            unresolved.add(dimension)
+            ok = False
+        if relation != RELATION_DIFFERENT:
+            if relation not in relation_node:
+                unresolved.add(str(relation))
+                ok = False
+            elif relation_node[relation] is not None and relation_node[relation] not in specs:
+                unresolved.add(relation_node[relation])
+                ok = False
+        return ok
+
+    return available
+
+
 class AnswerComparison:
     """The ``let*`` block of ``get-answer-comparison-text``, kept in one place.
 
@@ -696,13 +822,23 @@ class AnswerComparison:
         templates = resolve_templates(
             meta.commentary_templates if templates is None else templates
         )
-        self.templates = templates
+        #: Template keys the configuration lacks, each noted once (the text they would
+        #: have produced is omitted; ``ABSENCE-BEHAVIOUR.md`` 2.6).  Only the prose is
+        #: tracked: the reminding distance never reads a template.
+        self.warnings: set[str] = set()
+        self.templates = track_templates(templates, self.warnings)
+        templates = self.templates
         self.meta = meta
         self.memory = memory
         self.a = self_answer
         self.b = other_answer
         cmp_tpl = _section(templates, "comparison_templates")
         self.tpl = cmp_tpl
+        #: Names stored in the two answers that this run's configuration no longer has
+        #: (``ABSENCE-BEHAVIOUR.md`` 2.6): they contribute no match and no distance, are
+        #: never read as depth 0, and are reported.
+        self.unresolved_names: set[str] = set()
+        available = _available_check(meta, self.unresolved_names)
 
         self.initial1, self.modified1, self.target1, self.answer1 = self_answer.problem
         self.initial2, self.modified2, self.target2, self.answer2 = other_answer.problem
@@ -738,15 +874,26 @@ class AnswerComparison:
         self.answer2_phrase = self.answer2 if same_problem else self.full_answer2
 
         # ---- theme classification (answers.ss:455-543) ----
-        self.all_themes1 = all_themes_of(self_answer)
-        self.all_themes2 = all_themes_of(other_answer)
-        self.snag_justified1 = snag_justified_themes(self_answer, memory)
-        self.snag_justified2 = snag_justified_themes(other_answer, memory)
+        # A stored theme whose dimension or relation the configuration no longer has is
+        # not available to this run: it is left out of every list below, so it matches
+        # nothing and adds no distance.  The stored answer itself is untouched.
+        self.all_themes1 = [t for t in all_themes_of(self_answer) if available(t)]
+        self.all_themes2 = [t for t in all_themes_of(other_answer) if available(t)]
+        self.snag_justified1 = [
+            t for t in snag_justified_themes(self_answer, memory) if available(t)
+        ]
+        self.snag_justified2 = [
+            t for t in snag_justified_themes(other_answer, memory) if available(t)
+        ]
         self.unjustified1 = [
-            t for t in unjustified_of(self_answer) if t not in self.snag_justified1
+            t
+            for t in unjustified_of(self_answer)
+            if t not in self.snag_justified1 and available(t)
         ]
         self.unjustified2 = [
-            t for t in unjustified_of(other_answer) if t not in self.snag_justified2
+            t
+            for t in unjustified_of(other_answer)
+            if t not in self.snag_justified2 and available(t)
         ]
         self.all_unjustified = list(self.unjustified1)
         self.all_unjustified += [
@@ -803,9 +950,6 @@ class AnswerComparison:
         self.rule_differences = compare_rule_signatures(
             self_answer.top_rule_signature, other_answer.top_rule_signature
         )
-        #: Names in the rule signatures that the provider has no node for (reported,
-        #: never read as depth 0).
-        self.unresolved_names: set[str] = set()
         self.num_rule_differences = count_rule_differences(
             self.rule_differences, meta, self.unresolved_names
         )
@@ -870,6 +1014,7 @@ class AnswerComparison:
             section.get("similarities", ""),
             theme_phrases=theme_phrases(
                 self.templates,
+                meta=self.meta,
                 prep="on ",
                 conj="and",
                 ending="ing",
@@ -911,6 +1056,7 @@ class AnswerComparison:
                 section.get("no_justification_snag_clause", ""),
                 theme_phrases=theme_phrases(
                     self.templates,
+                    meta=self.meta,
                     prep="",
                     conj="and",
                     ending="ing",
@@ -927,6 +1073,7 @@ class AnswerComparison:
             section.get(key, ""),
             theme_phrases=theme_phrases(
                 self.templates,
+                meta=self.meta,
                 prep="to ",
                 conj="or",
                 ending="",
@@ -971,6 +1118,7 @@ class AnswerComparison:
         if first:
             return theme_phrases(
                 self.templates,
+                meta=self.meta,
                 prep="on ",
                 conj="and",
                 ending="ing",
@@ -984,6 +1132,7 @@ class AnswerComparison:
             )
         return theme_phrases(
             self.templates,
+            meta=self.meta,
             prep="on ",
             conj="and",
             ending="ing",
@@ -1126,6 +1275,7 @@ class AnswerComparison:
             # *other* answer's strings — it is that answer's case being described.
             theme_phrases=theme_phrases(
                 self.templates,
+                meta=self.meta,
                 prep="of ",
                 conj="and",
                 ending="ing",
@@ -1176,6 +1326,7 @@ class AnswerComparison:
             change=change,
             theme_phrases=theme_phrases(
                 self.templates,
+                meta=self.meta,
                 prep="",
                 conj="and",
                 ending="ing",
@@ -1197,9 +1348,10 @@ class AnswerComparison:
         judgement — which is the point of it being data.
         """
         section = _section(self.tpl, "verdict")
-        priority = (self.templates or {}).get("comparison_judgment_priority") or list(
-            DEFAULT_JUDGMENT_PRIORITY
-        )
+        # The key is the only template whose absence decides something stored: with no
+        # ``comparison_judgment_priority`` no criterion is tried, so no preference is
+        # judged and the verdict is "neither".  (The key is noted as missing once.)
+        priority = (self.templates or {}).get("comparison_judgment_priority") or ()
         for criterion in priority:
             handler = _CRITERIA.get(criterion)
             if handler is None:
@@ -1255,6 +1407,7 @@ class AnswerComparison:
                 "answer": verdict.get("answer"),
                 "reason": verdict.get("criterion", ""),
             },
+            "warnings": sorted(self.warnings),
         }
 
 

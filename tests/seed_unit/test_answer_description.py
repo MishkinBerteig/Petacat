@@ -10,6 +10,9 @@ import os
 from server.engine.memory import AnswerDescription, EpisodicMemory
 from server.engine.metadata import MetadataProvider
 
+STRING_POSITION = "plato-string-position-category"
+DIRECTION = "plato-direction-category"
+
 _META = MetadataProvider.from_standard_configuration(
     os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
 )
@@ -64,7 +67,7 @@ def test_comparison():
         bottom_rule_description="change z to d",
         top_rule_quality=60, bottom_rule_quality=50,
         quality=55, temperature=50,
-        themes={"position": "rightmost"},
+        themes={STRING_POSITION: "identity"},
         unjustified_slippages=[],
     )
     desc2 = AnswerDescription(
@@ -73,12 +76,12 @@ def test_comparison():
         bottom_rule_description="change x to w",
         top_rule_quality=85, bottom_rule_quality=85,
         quality=80, temperature=30,
-        themes={"position": "rightmost", "direction": "opposite"},
+        themes={STRING_POSITION: "identity", DIRECTION: "opposite"},
         unjustified_slippages=[],
     )
     result = mem.compare_answers(desc1, desc2, meta=_META)
-    assert "position" in result["common_themes"]
-    assert "direction" in result["b_unique_themes"]
+    assert STRING_POSITION in result["common_themes"]
+    assert DIRECTION in result["b_unique_themes"]
 
 
 def test_clear():

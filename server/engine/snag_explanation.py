@@ -17,7 +17,7 @@ resulting *string* is what is stored and quoted afterwards.
 
 The English is in ``seed_data/commentary_templates.json`` under ``snag_explanation``
 (Step 0), the same place as every other phrase the engine speaks; slipnode names come
-from the nodes as ``get-lowercase-name`` gives them (``rule_english._lc``).
+from the nodes as ``get-lowercase-name`` gives them (``slipnet.lowercase_name``: the node's ``plain_name`` column).
 
 ``capitalize_string`` is ``capitalize-string`` (``utilities.ss:330-336``): the first
 character upper-cased, nothing else touched.
@@ -29,7 +29,7 @@ from typing import Any
 
 from server.engine.answer_comparison import _fill, resolve_templates
 from server.engine.images import ImageFailure, is_platonic_relation
-from server.engine.rule_english import _lc
+from server.engine.slipnet import holds_role, lowercase_name as _lc
 
 
 def capitalize_string(text: str) -> str:
@@ -153,7 +153,7 @@ def explain_failure(
     if not transform or obj is None:
         return None
     string = _print_name(_string_of(obj))
-    if getattr(transform[0], "name", "") == "plato-group-category":
+    if holds_role(transform[0], "dimension.group_category"):
         if len(transform) < 3 or transform[2] is None:
             return None
         return _fill(

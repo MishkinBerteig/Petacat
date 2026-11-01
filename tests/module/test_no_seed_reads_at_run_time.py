@@ -111,7 +111,9 @@ def test_an_episode_and_the_answers_it_leaves_read_no_seed_file(meta, seed_reads
     describe_answer_comparison(
         answers[0], answers[1], memory=memory, meta=meta, templates=meta.commentary_templates
     )
-    describe_answer(answers[0], memory=memory, templates=meta.commentary_templates)
+    describe_answer(
+        answers[0], memory=memory, templates=meta.commentary_templates, meta=meta
+    )
     memory.distance(answers[0], answers[1], meta)
     assert seed_reads_forbidden == []
 

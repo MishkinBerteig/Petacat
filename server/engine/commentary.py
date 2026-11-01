@@ -16,17 +16,26 @@ from typing import Any, Protocol, runtime_checkable
 from server.engine.answer_comparison import _fill
 
 
-def _reporting(templates: dict[str, Any] | None, key: str) -> dict[str, Any]:
+def _reporting(
+    templates: dict[str, Any] | None, key: str, commentary: Any = None
+) -> dict[str, Any]:
     """One ``answer_reporting`` block of the phrase-templates.
 
     Every ``emit_*`` helper below renders from these templates, so the paragraphs a run
     produces are editable in the same place as the comparison prose.  ``templates`` is
     ``meta.commentary_templates`` -- the database, in a served run -- and is mandatory:
     ``None`` raises :class:`~server.engine.metadata.ConfigurationRequired`.
-    """
-    from server.engine.answer_comparison import resolve_templates
 
-    section = (resolve_templates(templates).get("answer_reporting") or {}).get(key)
+    A key the templates lack gives empty text for what it would have said (never a change
+    to perception, ``ABSENCE-BEHAVIOUR.md`` 2.6), and is noted once in the log's
+    ``warnings`` when *commentary* is the run's log.
+    """
+    from server.engine.answer_comparison import resolve_templates, track_templates
+
+    tracked = track_templates(
+        resolve_templates(templates), getattr(commentary, "warnings", None)
+    )
+    section = (tracked.get("answer_reporting") or {}).get(key)
     return section if isinstance(section, dict) else {}
 
 
@@ -80,6 +89,8 @@ class CommentaryLog:
 
     def __init__(self) -> None:
         self._paragraphs: list[CommentaryParagraph] = []
+        #: Template keys this run found missing, each noted once (the run's warning).
+        self.warnings: set[str] = set()
 
     def add_comment(
         self,
@@ -103,10 +114,16 @@ class CommentaryLog:
 
     def clear(self) -> None:
         self._paragraphs.clear()
+        self.warnings.clear()
 
     @property
     def count(self) -> int:
         return len(self._paragraphs)
+
+    @property
+    def warning_count(self) -> int:
+        """How many distinct template keys this run found missing."""
+        return len(self.warnings)
 
 
 # ---- Commentary generation helpers ----------------------------------------
@@ -162,7 +179,7 @@ def emit_answer_discovered(
     program is emphatic about an answer it thinks is terrible as well as one it thinks
     is great.
     """
-    section = _reporting(templates, "discovery")
+    section = _reporting(templates, "discovery", commentary)
     also = section.get("also", "") if prior_answer_count > 0 else ""
     punctuation = "!" if (quality < 30 or quality >= 85) else "."
     suffix = "quality_suffix_bad" if quality < 60 else "quality_suffix_good"
@@ -193,7 +210,7 @@ def emit_answer_justified(
 
     Scheme: answers.ss:47-59.
     """
-    section = _reporting(templates, "justify_success")
+    section = _reporting(templates, "justify_success", commentary)
     if quality < 60:
         suffix = "quality_suffix_bad"
     elif quality >= 85:
@@ -221,7 +238,7 @@ def emit_answer_unjustified(
 
     Scheme: answers.ss:36-45.  "slippage" is pluralised on the number of slippages.
     """
-    section = _reporting(templates, "unjustified_slippages")
+    section = _reporting(templates, "unjustified_slippages", commentary)
     plural = "" if slippage_count == 1 else "s"
     eliza = _fill(
         section.get("eliza", ""), slippage_names=slippage_names, plural=plural
@@ -247,7 +264,7 @@ def emit_snag(
     capitalised (``capitalize-string``); "again" and "another" are chosen by whether
     this is not the run's first snag event.
     """
-    section = _reporting(templates, "snag")
+    section = _reporting(templates, "snag", commentary)
     later = snag_count > 1
     eliza = _fill(
         section.get("eliza", ""),
@@ -273,7 +290,7 @@ def emit_give_up(
 
     Scheme: answers.ss:86-92.
     """
-    section = _reporting(templates, "give_up")
+    section = _reporting(templates, "give_up", commentary)
     commentary.add_comment(
         section.get("eliza", ""),
         section.get("technical", ""),
@@ -296,7 +313,7 @@ def emit_clamp_activate(
     clamp events in the Trace (this one included), for a manual clamp the number of
     manual clamps.
     """
-    section = _reporting(templates, "clamp_activation").get(clamp_type)
+    section = _reporting(templates, "clamp_activation", commentary).get(clamp_type)
     if not isinstance(section, dict):
         return
     word = section.get("another" if clamp_count > 1 else "first", "")
@@ -337,7 +354,7 @@ def emit_clamp_expired(
     Scheme: ``undo-last-clamp`` (``trace.ss:129-170``).  Each of the four clamp types
     has its own wording, built from the same amount and adjective phrases.
     """
-    block = _reporting(templates, "clamp_expiry")
+    block = _reporting(templates, "clamp_expiry", commentary)
     section = block.get(clamp_type)
     if not isinstance(section, dict):
         return
@@ -373,7 +390,7 @@ def emit_frustrated(
     It names the string pair(s) whose rules are unsatisfactory: the top pair, the bottom
     pair (justify mode only), or "either ... or ..." when both are.
     """
-    section = _reporting(templates, "frustrated")
+    section = _reporting(templates, "frustrated", commentary)
 
     def how(a: str, b: str) -> str:
         return _fill(section.get("how_strings_change", ""), from_string=a, to_string=b)
@@ -433,7 +450,7 @@ def emit_reminding(
     ``problem_text`` is the description's ``problem-print-name``,
     ``abc -> abd, mrrjjj -> ?``.
     """
-    section = _reporting(templates, "reminding")
+    section = _reporting(templates, "reminding", commentary)
     if strength > 70:
         how = section.get("strongly", "")
     elif strength > 30:
@@ -462,7 +479,7 @@ def emit_comparing_answers(
     templates: dict[str, Any] | None = None,
 ) -> None:
     """"Let's see..." — said when a second answer is selected (``memory-graphics.ss:56-64``)."""
-    section = _reporting(templates, "comparing")
+    section = _reporting(templates, "comparing", commentary)
     commentary.add_comment(
         section.get("eliza", ""),
         section.get("technical", ""),
@@ -514,6 +531,8 @@ def describe_answer(
     answer: Any,
     memory: Any = None,
     templates: dict[str, Any] | None = None,
+    *,
+    meta: Any = None,
 ) -> dict[str, Any]:
     """Say what a single answer is based on, in both voices.
 
@@ -523,4 +542,4 @@ def describe_answer(
     """
     from server.engine.answer_comparison import explain_answer
 
-    return explain_answer(answer, memory, templates)
+    return explain_answer(answer, memory, templates, meta=meta)

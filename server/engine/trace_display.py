@@ -42,6 +42,13 @@ from __future__ import annotations
 import json
 import logging
 from typing import Any
+from server.engine.slipnet import (
+    cm_short_name_of,
+    full_name_of,
+    holds_role,
+    lowercase_name as _lowercase_name,
+    opposite_node,
+)
 from server.engine.workspace import WorkspaceString
 
 logger = logging.getLogger(__name__)
@@ -71,8 +78,8 @@ ROLE_FADED = "faded"
 # ---------------------------------------------------------------------------
 
 def lowercase_name(node: Any) -> str:
-    """``get-lowercase-name``: the node's name less the six characters of ``plato-``."""
-    return str(getattr(node, "name", node))[6:].lower()
+    """``get-lowercase-name``: the node's plain name (a node column), lower-cased."""
+    return _lowercase_name(node)
 
 
 def uppercase_name(node: Any) -> str:
@@ -80,42 +87,15 @@ def uppercase_name(node: Any) -> str:
     return lowercase_name(node).upper()
 
 
-_NUMBER_NODES = {
-    "plato-one": 1,
-    "plato-two": 2,
-    "plato-three": 3,
-    "plato-four": 4,
-    "plato-five": 5,
-}
-
-_FULL_SLIPNODE_NAMES = {
-    "plato-alphabetic-position-category": "Alphabetic-Position",
-    "plato-bond-facet": "Bond-Facet",
-    "plato-object-category": "Object-Category",
-    "plato-letter-category": "Letter-Category",
-    "plato-length": "Length",
-    "plato-bond-category": "Bond-Category",
-    "plato-group-category": "Group-Category",
-    "plato-direction-category": "Direction",
-    "plato-string-position-category": "String-Position",
-    "plato-opposite": "Opposite",
-    "plato-identity": "Identity",
-    "plato-predgrp": "predecessor-group",
-    "plato-succgrp": "successor-group",
-    "plato-samegrp": "sameness-group",
-}
-
-
 def full_slipnode_name(node: Any) -> str:
-    """``full-slipnode-name`` (``trace.ss:1271``)."""
-    return _FULL_SLIPNODE_NAMES.get(getattr(node, "name", ""), lowercase_name(node))
+    """``full-slipnode-name`` (``trace.ss:1271``): the node's ``full_name`` column."""
+    return full_name_of(node)
 
 
 def cm_short_name(node: Any) -> str:
-    """``get-CM-short-name`` (``slipnet.ss:56``): the letter-category node avoids a clash."""
-    if getattr(node, "name", "") == "plato-letter-category":
-        return "LettCtgy"
-    return str(getattr(node, "short_name", getattr(node, "name", "?")))
+    """``get-CM-short-name`` (``slipnet.ss:56``): the ``cm_short_name`` column, which the
+    letter-category node uses to avoid a clash; NULL is the node's short name."""
+    return cm_short_name_of(node)
 
 
 def concept_mapping_print_name(cm: Any) -> str:
@@ -136,8 +116,8 @@ def group_event_text(group: Any) -> str:
         descriptor = obj.get_descriptor_for(facet) if hasattr(obj, "get_descriptor_for") else None
         if descriptor is None:
             parts.append("?")
-        elif getattr(descriptor, "name", "") in _NUMBER_NODES:
-            parts.append(str(_NUMBER_NODES[descriptor.name]))
+        elif getattr(descriptor, "numeric_value", None) is not None:
+            parts.append(str(descriptor.numeric_value))
         elif hasattr(obj, "objects"):
             parts.append(uppercase_name(descriptor))
         else:
@@ -148,10 +128,10 @@ def group_event_text(group: Any) -> str:
 def group_print_name(group: Any) -> str:
     """``>abc>``, ``<cba<`` or ``[abc]`` by direction (``trace.ss:840-847``)."""
     text = group_event_text(group)
-    name = getattr(getattr(group, "direction", None), "name", None)
-    if name == "plato-right":
+    direction = getattr(group, "direction", None)
+    if holds_role(direction, "direction.right"):
         return f">{text}>"
-    if name == "plato-left":
+    if holds_role(direction, "direction.left"):
         return f"<{text}<"
     return f"[{text}]"
 
@@ -183,18 +163,21 @@ def print_name(event: Any) -> str:
 
 
 def _unflipped_group_name(group: Any) -> str:
-    """``unflipped-group-name`` (``trace.ss:1291``)."""
-    name = getattr(getattr(group, "group_category", None), "name", "")
-    return {"plato-predgrp": "successor-group", "plato-succgrp": "predecessor-group"}.get(
-        name, ""
-    )
+    """``unflipped-group-name`` (``trace.ss:1291``): the full name of the group category's
+    opposite; a category with no opposite (sameness) has none."""
+    category = getattr(group, "group_category", None)
+    flipped = opposite_node(category)
+    if category is None or flipped is category:
+        return ""
+    return full_slipnode_name(flipped)
 
 
 def _full_object_name(obj: Any) -> str:
     """``full-workspace-object-name`` (``trace.ss:1298``)."""
     if not hasattr(obj, "group_category"):
         return "letter"
-    return _FULL_SLIPNODE_NAMES.get(getattr(obj.group_category, "name", ""), "")
+    category = getattr(obj, "group_category", None)
+    return full_slipnode_name(category) if category is not None else ""
 
 
 def header(event: Any, justify_mode: bool = False) -> str:
@@ -675,7 +658,9 @@ def _answer_highlights(ctx: Any, event: Any, highlights: dict, rules: list) -> N
 # Descriptions kept in Episodic Memory (answers and snags)
 # ---------------------------------------------------------------------------
 
-def _theme_supporting(pattern: dict | None, bridges: list) -> list[tuple[Any, Any]]:
+def _theme_supporting(
+    pattern: dict | None, bridges: list, slipnet: Any
+) -> list[tuple[Any, Any]]:
     """``get-theme-supporting-concept-mappings`` (``answers.ss:223``).
 
     The ``(bridge, cm)`` pairs whose ``(dimension, relation)`` the theme pattern names,
@@ -685,17 +670,22 @@ def _theme_supporting(pattern: dict | None, bridges: list) -> list[tuple[Any, An
 
     if not pattern:
         return []
+    roles = slipnet.roles
+    whole, single = roles.position_whole, roles.position_single
+    bond_dimension, group_dimension = roles.dimension_bond_category, roles.dimension_group_category
     out = []
     for bridge in bridges:
         for cm in bridge.get_all_concept_mappings():
-            names = {getattr(cm.descriptor1, "name", ""), getattr(cm.descriptor2, "name", "")}
-            if names == {"plato-whole", "plato-single"}:
+            ends = (cm.descriptor1, cm.descriptor2)
+            if whole and single and (ends == (whole, single) or ends == (single, whole)):
                 continue
             dimension = getattr(cm.description_type1, "name", "")
             relation = relation_name_for_label(cm.label)
             if pattern.get(dimension) == relation or (
-                dimension == "plato-bond-category"
-                and pattern.get("plato-group-category") == relation
+                bond_dimension
+                and cm.description_type1 is bond_dimension
+                and group_dimension
+                and pattern.get(group_dimension.name) == relation
             ):
                 out.append((bridge, cm))
     return out
@@ -734,7 +724,7 @@ def _describe(
         if not any(b is x for x in vertical_all):
             vertical_all.append(b)
     highlight_bridges(highlights, list(vertical), ROLE_VERTICAL)
-    for bridge, cm in _theme_supporting(theme_pattern, theme_bridges):
+    for bridge, cm in _theme_supporting(theme_pattern, theme_bridges, ctx.slipnet):
         highlights["concept_mappings"].append(cm_highlight(bridge, cm, ROLE_THEME_CM))
     highlights["concept_mappings"].extend(applied_slippage_highlights(slippage_log))
     if top_rule is not None:
@@ -804,7 +794,7 @@ def build_answer_description_picture(
     # (``memory.ss:409``): every vertical bridge of the Workspace, not only the supporting ones.
     theme_bridges = [
         b for b in workspace_vertical
-        if _theme_supporting(pattern, [b])
+        if _theme_supporting(pattern, [b], ctx.slipnet)
     ] or []
     top_bridges = list(getattr(top_rule, "supporting_bridges", []) or [])
     bottom_bridges = list(getattr(bottom_rule, "supporting_bridges", []) or [])
@@ -884,7 +874,7 @@ def build_snag_description_picture(
         if isinstance(entry, (list, tuple)) and len(entry) >= 2
     }
     theme_bridges = snag_bridges or [
-        b for b in ws.vertical_bridges if b.is_built and _theme_supporting(pattern, [b])
+        b for b in ws.vertical_bridges if b.is_built and _theme_supporting(pattern, [b], ctx.slipnet)
     ]
     rule = event.snag_rule
     top_bridges = list(getattr(rule, "supporting_bridges", []) or [])

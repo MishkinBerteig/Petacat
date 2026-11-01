@@ -471,14 +471,14 @@ def _unjustified_themes(slippages: list[Any], roles: Any) -> dict[str, Any]:
         themes.setdefault(dimension, relation_name_for_label(getattr(cm, "label", None)))
 
     bond_facet = roles.dimension_bond_facet.name
-    direction = roles.dimension_direction.name
-    group_category = roles.dimension_group_category.name
     if bond_facet in themes:
         # ``answers.ss:261-264`` conses the two entries onto the *front* of the
         # pattern; a dict keeps insertion order, so build them first.
+        # A dimension the configuration lacks is not added (its token is no theme's name).
         augmented = {
-            group_category: themes.get(group_category, _IDENTITY),
-            direction: themes.get(direction, _IDENTITY),
+            node.name: themes.get(node.name, _IDENTITY)
+            for node in (roles.dimension_group_category, roles.dimension_direction)
+            if node
         }
         augmented.update(themes)
         themes = augmented
@@ -573,7 +573,7 @@ def make_translated_string(
 
     # ``answers.ss:1061`` — before the bridges are drawn, whichever groups the rule's
     # Length and BondFacet transforms bear on are given a Length description.
-    _attach_length_to_appropriate_groups(transforms)
+    _attach_length_to_appropriate_groups(transforms, slipnet.roles)
 
     bridges = _bridge_to_translation(
         source,
@@ -598,7 +598,7 @@ def make_translated_string(
     return translated
 
 
-def _attach_length_to_appropriate_groups(transforms: Any) -> None:
+def _attach_length_to_appropriate_groups(transforms: Any, roles: Any) -> None:
     """Scheme: ``attach-length-to-appropriate-groups`` (``answers.ss:1074-1092``).
 
     A Length transform means the rule spoke about how long something is, so the group
@@ -614,6 +614,11 @@ def _attach_length_to_appropriate_groups(transforms: Any) -> None:
     if not transforms:
         return
 
+    # An absent role's token has a name no dimension carries, so with no Length (or no
+    # Bond-Facet) dimension its transform is never found and nothing is attached.
+    length = roles.dimension_length
+    bond_facet = roles.dimension_bond_facet
+
     for entry in transforms:
         if len(entry) != 2:
             continue
@@ -621,19 +626,19 @@ def _attach_length_to_appropriate_groups(transforms: Any) -> None:
         instantiated = get_instantiated_image_object(obj)
         if not isinstance(instantiated, Group):
             continue
-        length_transform = _select_transform(object_transforms, "plato-length")
-        bond_facet_transform = _select_transform(object_transforms, "plato-bond-facet")
+        length_transform = _select_transform(object_transforms, length.name)
+        bond_facet_transform = _select_transform(object_transforms, bond_facet.name)
         # ``if*`` is ``when`` (syntactic-sugar.ss:118-119), so the Length body is two
         # forms — the source-group attach, then an *unconditional* attach to the
         # instantiated group — and the BondFacet test is a separate sibling form
         # (answers.ss:1082-1092).  Sub-objects are not filtered to groups.
         if length_transform is not None:
-            if isinstance(obj, Group) and not _has_length(obj):
+            if isinstance(obj, Group) and not _has_length(obj, length):
                 attach_length_description(obj)
             attach_length_description(instantiated)
         if (
             bond_facet_transform is not None
-            and getattr(bond_facet_transform[1], "name", "") == "plato-length"
+            and getattr(bond_facet_transform[1], "name", "") == length.name
         ):
             for subobject in _get_constituent_objects(instantiated):
                 attach_length_description(subobject)
@@ -647,9 +652,8 @@ def _select_transform(transforms: Any, dimension_name: str) -> Any:
     return None
 
 
-def _has_length(group: Any) -> bool:
-    length_type = group._node("plato-length")
-    return length_type is not None and group.description_type_present(length_type)
+def _has_length(group: Any, length_type: Any) -> bool:
+    return bool(length_type) and group.description_type_present(length_type)
 
 
 def _prune_irrelevant_translated_groups(translated: Any, bridges: list) -> None:
@@ -788,16 +792,16 @@ def _describe_letters(string: Any, slipnet: Any) -> None:
     """
     from server.engine.descriptions import Description
 
-    letter_category = slipnet.nodes.get("plato-letter-category")
-    object_category = slipnet.nodes.get("plato-object-category")
-    letter_node = slipnet.nodes.get("plato-letter")
-    if letter_category is None:
+    letter_category = slipnet.roles.dimension_letter_category
+    object_category = slipnet.roles.dimension_object_category
+    letter_node = slipnet.roles.object_letter
+    if not letter_category:
         return
 
     for letter in string.letters:
         # ``make-letter`` (``workspace-objects.ss:24-25``) describes the object
         # category first and the letter category second.
-        if object_category is not None and letter_node is not None:
+        if object_category and letter_node:
             if not letter.description_type_present(object_category):
                 letter.add_description(
                     Description(letter, object_category, letter_node)

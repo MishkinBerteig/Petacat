@@ -44,6 +44,8 @@ import threading
 from collections import deque
 from typing import TYPE_CHECKING, Any
 
+from server.engine.slipnet import holds_role, lowercase_name
+
 if TYPE_CHECKING:
     from server.engine.metadata import MetadataProvider
 
@@ -120,13 +122,17 @@ def round_to_100ths(n: float) -> float:
 
 
 def _node_name(node: Any) -> str:
-    """``get-lowercase-name``: the symbol without ``plato-``, lower-cased."""
-    from server.engine.trace_display import lowercase_name
-
+    """``get-lowercase-name``: the node's plain name (a node column), lower-cased."""
     return lowercase_name(node)
 
 
 label_name = _node_name
+
+
+def _relation_node(slipnet: Any, name: str) -> Any:
+    """The node of the theme relation *name* (a bare Themespace spelling), or ``None``."""
+    relations = getattr(slipnet, "relations", None) or {}
+    return relations.get(name)
 
 
 def _short(node: Any) -> str:
@@ -146,9 +152,9 @@ def group_letter_name(group: Any) -> str | None:
     upper case; every other group is named by direction or length in ``ascii_name``.
     """
     facet = getattr(group, "bond_facet", None)
-    if getattr(facet, "name", "") != "plato-letter-category":
+    if not holds_role(facet, "dimension.letter_category"):
         return None
-    if getattr(getattr(group, "group_category", None), "name", "") != "plato-samegrp":
+    if not holds_role(getattr(group, "group_category", None), "group_category.sameness"):
         return None
     initial = group._get_initial_letter_category()
     if initial is None:
@@ -165,10 +171,10 @@ def ascii_name(obj: Any) -> str:
     if hasattr(obj, "objects"):  # group
         label = group_letter_name(obj)
         if label is None:
-            direction = getattr(getattr(obj, "direction", None), "name", None)
-            if direction == "plato-right":
+            direction = getattr(obj, "direction", None)
+            if holds_role(direction, "direction.right"):
                 label = ">"
-            elif direction == "plato-left":
+            elif holds_role(direction, "direction.left"):
                 label = "<"
             else:
                 label = str(len(obj.objects))
@@ -234,7 +240,7 @@ def concept_mapping_long_name(cm: Any) -> str:
     else:
         head = "SLIPPAGE"
     label = getattr(cm, "label", None)
-    if label is None or getattr(label, "name", "") == "plato-identity":
+    if label is None or getattr(label, "relation", None) == "identity":
         arrow = "=>"
     else:
         arrow = f"=({_short(label)})=>"
@@ -292,16 +298,15 @@ def _object_text(obj: Any, level: str | None) -> str:
 
 def _bond_text(bond: Any, level: str | None) -> str:
     """``print`` of a bond (``bonds.ss:46``)."""
-    category = getattr(bond.bond_category, "name", "")
-    direction = getattr(getattr(bond, "direction", None), "name", None)
-    word = {"plato-sameness": "same", "plato-successor": "succ", "plato-predecessor": "pred"}.get(
-        category, ""
-    )
-    if category == "plato-sameness":
+    category = bond.bond_category
+    direction = getattr(bond, "direction", None)
+    # The word is the category's own short name ("same", "succ", "pred").
+    word = _short(category) if category is not None else ""
+    if holds_role(category, "bond_category.sameness"):
         arrow = f"={word}="
-    elif direction == "plato-left":
+    elif holds_role(direction, "direction.left"):
         arrow = f"<-{word}-"
-    elif direction == "plato-right":
+    elif holds_role(direction, "direction.right"):
         arrow = f"-{word}->"
     else:
         arrow = ""
@@ -363,7 +368,7 @@ def theme_ascii_name(theme: Any, slipnet: Any) -> str:
     dimension = nodes.get(theme.dimension)
     relation = None
     if theme.relation and theme.relation not in ("diff", "different"):
-        relation = nodes.get(theme.relation) or nodes.get("plato-" + theme.relation)
+        relation = nodes.get(theme.relation) or _relation_node(slipnet, theme.relation)
     return f"{_short(dimension) if dimension is not None else theme.dimension}:" + (
         _node_name(relation) if relation is not None else "different"
     )
@@ -528,7 +533,7 @@ class VerboseLog:
                 continue
             node = nodes.get(name) if isinstance(name, str) else name
             if node is None and isinstance(name, str):
-                node = nodes.get("plato-" + name)  # a Themespace relation is spelled bare
+                node = _relation_node(self.slipnet, name)  # a Themespace relation is spelled bare
             out.append(f"<{_short(node).lower()}>" if node is not None else display(name))
         return out
 

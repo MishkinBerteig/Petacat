@@ -144,7 +144,7 @@ def test_differing_dimensions_counts_one_per_matching_pair():
 
     # Answer 1 states X twice (justified identity, unjustified opposite); answer 2 once.
     a = answer({X: "identity", Y: "identity"}, {X: "opposite"})
-    b = answer({X: "different", Y: "identity"}, {})
+    b = answer({X: "successor", Y: "identity"}, {})
     cmp = AnswerComparison(
         a, b, EpisodicMemory(), meta.commentary_templates, meta=meta
     )
@@ -203,18 +203,19 @@ def test_length_transform_attaches_to_source_and_instantiated_and_bond_facet_is_
 
     attached = []
     monkeypatch.setattr(groups, "attach_length_description", attached.append)
-    monkeypatch.setattr(answers, "_has_length", lambda g: False)
+    monkeypatch.setattr(answers, "_has_length", lambda g, length: False)
     monkeypatch.setattr(rules, "_get_constituent_objects", lambda g: [letter])
 
     letter = NS(name="letter")
     instantiated = groups.Group.__new__(groups.Group)
     source = groups.Group.__new__(groups.Group)
     source.image = NS(instantiated_object=instantiated)
+    roles = NS(dimension_length=NS(name="plato-length"), dimension_bond_facet=NS(name="plato-bond-facet"))
     transforms = [
         (NS(name="plato-length"), NS(name="plato-two")),
         (NS(name="plato-bond-facet"), NS(name="plato-length")),
     ]
-    answers._attach_length_to_appropriate_groups([(source, transforms)])
+    answers._attach_length_to_appropriate_groups([(source, transforms)], roles)
     # source (no Length yet), instantiated (unconditionally), then the sub-object,
     # which is not filtered to groups.
     assert attached == [source, instantiated, letter]

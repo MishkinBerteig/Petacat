@@ -36,15 +36,14 @@ def slippage_english_name(slippage: Any) -> str:
     """``english-name`` of a concept mapping (``concept-mappings.ss:41``): the two
     descriptors' lowercase names around ``<=>``.  Accepts a :class:`ConceptMapping` or
     the ``{"descriptor1": ..., "descriptor2": ...}`` record the unifier returns."""
+    from server.engine.slipnet import lowercase_name
+
     if isinstance(slippage, dict):
         first, second = slippage["descriptor1"], slippage["descriptor2"]
     else:
         first, second = slippage.descriptor1, slippage.descriptor2
 
-    def lowercase(node: Any) -> str:
-        return str(getattr(node, "name", node))[6:].lower()
-
-    return f"{lowercase(first)} <=> {lowercase(second)}"
+    return f"{lowercase_name(first)} <=> {lowercase_name(second)}"
 
 
 class ConceptMapping:

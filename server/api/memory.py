@@ -259,7 +259,10 @@ async def explain_answer(answer_id: int, eliza_mode: bool = False):
     answer = _find_answer(answer_id)
     svc = get_run_service()
     explanation = describe_answer(
-        answer, memory=_global_memory, templates=svc.meta.commentary_templates
+        answer,
+        memory=_global_memory,
+        templates=svc.meta.commentary_templates,
+        meta=svc.meta,
     )
     return {
         "answer_id": answer_id,

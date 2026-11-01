@@ -197,6 +197,12 @@ class SlipnetNode:
         "roles",
         "relation",
         "relations",
+        "plain_name",
+        "glyph",
+        "numeric_value",
+        "full_name",
+        "cm_short_name",
+        "article_an",
     )
 
     def __init__(
@@ -230,6 +236,15 @@ class SlipnetNode:
         #: The Slipnet's relation nodes by relation name (one dict shared by every node of
         #: the Slipnet), so a node can find ``opposite`` without a Slipnet handle.
         self.relations: dict[str, SlipnetNode] = _NO_RELATIONS
+        #: The display columns of the node (``slipnet_nodes``), set by
+        #: ``Slipnet.from_metadata``; ``None`` is NULL.  Read them through
+        #: :func:`plain_name_of` & co., which hold the fallbacks.
+        self.plain_name: str | None = None
+        self.glyph: str | None = None
+        self.numeric_value: int | None = None
+        self.full_name: str | None = None
+        self.cm_short_name: str | None = None
+        self.article_an: bool | None = None
         self._decay_percent: float = 0.0
         self.descriptor_predicate: Callable[..., bool] | None = None
         # Flat scalars rather than a reference to the params object: these are read on
@@ -766,6 +781,45 @@ class SlipnetNode:
         return f"SlipnetNode({self.short_name}, act={self.activation:.0f}, depth={self.conceptual_depth})"
 
 
+def holds_role(node: Any, role: str) -> bool:
+    """Does *node* hold the role *role*?  Anything without ``roles`` (a stand-in, ``None``,
+    an ``Absent`` token) holds none."""
+    return role in (getattr(node, "roles", None) or ())
+
+
+def plain_name_of(node: Any) -> str:
+    """The node's ``plain_name`` column; NULL falls back to ``short_name``, then ``name``
+    (``ABSENCE-BEHAVIOUR.md`` 2.6).  No node name is ever parsed."""
+    value = getattr(node, "plain_name", None) or getattr(node, "short_name", None)
+    if value:
+        return str(value)
+    return str(getattr(node, "name", node))
+
+
+def lowercase_name(node: Any) -> str:
+    """Scheme ``get-lowercase-name``: the plain name, lower-cased."""
+    return plain_name_of(node).lower()
+
+
+def full_name_of(node: Any) -> str:
+    """The node's ``full_name`` column; NULL falls back to its plain name."""
+    return str(getattr(node, "full_name", None) or plain_name_of(node))
+
+
+def cm_short_name_of(node: Any) -> str:
+    """The node's ``cm_short_name`` column; NULL falls back to ``short_name`` (then
+    ``name``, then ``?``)."""
+    value = getattr(node, "cm_short_name", None) or getattr(node, "short_name", None)
+    if value:
+        return str(value)
+    return str(getattr(node, "name", None) or "?")
+
+
+def article_of(node: Any) -> str:
+    """``an`` when the node's ``article_an`` column is true, else ``a`` (NULL is ``a``)."""
+    return "an" if getattr(node, "article_an", None) else "a"
+
+
 def opposite_node(node: Any) -> Any:
     """The concept *node* relates to by the ``opposite`` relation, or *node* itself.
 
@@ -911,6 +965,12 @@ class Slipnet:
                 spec.conceptual_depth,
                 activation_params=slipnet.activation_params,
             )
+            node.plain_name = spec.plain_name
+            node.glyph = spec.glyph
+            node.numeric_value = spec.numeric_value
+            node.full_name = spec.full_name
+            node.cm_short_name = spec.cm_short_name
+            node.article_an = spec.article_an
             if spec.descriptor_predicate:
                 node.descriptor_predicate = compile_descriptor_predicate(
                     spec.descriptor_predicate, spec.name

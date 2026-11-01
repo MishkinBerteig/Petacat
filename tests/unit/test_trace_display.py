@@ -18,8 +18,34 @@ from server.engine import trace as T
 from server.engine import trace_display as D
 
 
+# The display columns, roles and opposite of the Metacat Standard Configuration nodes this
+# file uses, as a stand-in node carries them (the engine reads columns, never names).
+_FULL = {
+    "plato-direction-category": "Direction", "plato-letter-category": "Letter-Category",
+    "plato-opposite": "Opposite", "plato-succgrp": "successor-group",
+    "plato-predgrp": "predecessor-group",
+}
+_NUMBERS = {"plato-two": 2}
+_ROLES = {
+    "plato-right": "direction.right", "plato-left": "direction.left",
+    "plato-letter-category": "dimension.letter_category",
+}
+_OPPOSITE = {"plato-predgrp": "plato-succgrp", "plato-succgrp": "plato-predgrp"}
+
+
 def node(name: str, short: str | None = None):
-    return SimpleNamespace(name=name, short_name=short or name[6:])
+    n = SimpleNamespace(
+        name=name,
+        short_name=short or name[6:],
+        plain_name=name[6:],
+        full_name=_FULL.get(name),
+        cm_short_name="LettCtgy" if name == "plato-letter-category" else None,
+        numeric_value=_NUMBERS.get(name),
+        roles=frozenset([_ROLES[name]]) if name in _ROLES else frozenset(),
+    )
+    if name in _OPPOSITE:
+        n.get_related_node = lambda relation, o=_OPPOSITE[name]: node(o)
+    return n
 
 
 def letter(category: str):

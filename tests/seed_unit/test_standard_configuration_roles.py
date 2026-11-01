@@ -93,14 +93,31 @@ def test_numbers_carry_their_value(meta):
 
 
 def test_display_columns_reproduce_the_tables_they_replace(meta):
-    from server.engine.rule_english import _AN_LETTERS
-    from server.engine.trace_display import _FULL_SLIPNODE_NAMES
+    # The tables the engine held before EN5a (trace_display's full names, rule_english's
+    # ``an-letters``), written out here as the columns' expected content.
+    full_names = {
+        "plato-alphabetic-position-category": "Alphabetic-Position",
+        "plato-bond-facet": "Bond-Facet",
+        "plato-object-category": "Object-Category",
+        "plato-letter-category": "Letter-Category",
+        "plato-length": "Length",
+        "plato-bond-category": "Bond-Category",
+        "plato-group-category": "Group-Category",
+        "plato-direction-category": "Direction",
+        "plato-string-position-category": "String-Position",
+        "plato-opposite": "Opposite",
+        "plato-identity": "Identity",
+        "plato-predgrp": "predecessor-group",
+        "plato-succgrp": "successor-group",
+        "plato-samegrp": "sameness-group",
+    }
+    an_letters = frozenset("aefhilmnorsx")
 
     specs = meta.slipnet_node_specs
-    assert {n: s.full_name for n, s in specs.items() if s.full_name} == _FULL_SLIPNODE_NAMES
+    assert {n: s.full_name for n, s in specs.items() if s.full_name} == full_names
     assert {n: s.cm_short_name for n, s in specs.items() if s.cm_short_name} == {
         "plato-letter-category": "LettCtgy"}
-    assert {s.glyph for s in specs.values() if s.article_an} == set(_AN_LETTERS)
+    assert {s.glyph for s in specs.values() if s.article_an} == set(an_letters)
     assert {n for n, s in specs.items() if s.article_an is not None} == set(LETTER_NODES)
 
 

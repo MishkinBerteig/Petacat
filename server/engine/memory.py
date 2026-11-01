@@ -184,6 +184,16 @@ class EpisodicMemory:
         self.answers: list[AnswerDescription] = []
         self.snags: list[SnagDescription] = []
         self.ids = IdAllocator()
+        #: Names this run's reminding found stored in memory that the run's configuration
+        #: no longer has (``ABSENCE-BEHAVIOUR.md`` 2.6).  Such a name is not available to
+        #: the run: it adds no match, no distance and no activation.  The set is the
+        #: run's one warning; ``clear_activations`` (called at every run start) empties it.
+        self.unresolved_names: set[str] = set()
+
+    @property
+    def unresolved_count(self) -> int:
+        """How many distinct stored names this run could not resolve."""
+        return len(self.unresolved_names)
 
     @property
     def answers_oldest_first(self) -> list[AnswerDescription]:
@@ -353,6 +363,8 @@ class EpisodicMemory:
         comparison = AnswerComparison(
             a, b, self, meta.commentary_templates, meta=meta
         )
+
+        self.unresolved_names |= comparison.unresolved_names
 
         distance = 1.0
 
@@ -547,6 +559,7 @@ class EpisodicMemory:
         """
         for answer in self.answers:
             answer.activation = 0.0
+        self.unresolved_names = set()
 
     def clear(self) -> None:
         """Delete all answer and snag descriptions. Matches Scheme clearmem.

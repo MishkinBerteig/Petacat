@@ -134,7 +134,8 @@ def _phrase(templates, themes, **kwargs):
     kwargs.setdefault("initial", "abc")
     kwargs.setdefault("target", "xyz")
     return theme_phrases(
-        templates, prep="on ", conj="and", ending="ing", themes=themes, **kwargs
+        templates, prep="on ", conj="and", ending="ing", themes=themes,
+        meta=_META, **kwargs
     )
 
 
@@ -256,7 +257,7 @@ def test_caveats_are_omitted_where_the_scheme_omits_them(templates):
 
 def test_explain_names_what_the_answer_rests_on(templates):
     """``answers.ss:321-325``: "This answer is based ⟨theme phrases⟩."."""
-    result = explain_answer(_xyd(), None, templates)
+    result = explain_answer(_xyd(), None, templates, meta=_META)
     assert result["explanation"] == (
         "This answer is based on seeing abc and xyz as groups of the same type "
         "going in the same direction."
@@ -268,7 +269,7 @@ def test_explain_keeps_the_two_voices_isomorphic(templates):
     only in the closing sentence — §4.6 pp. 183-184: "the commentary produced by the
     program when running in one mode is isomorphic to the commentary produced in the
     other mode"."""
-    result = explain_answer(_xyd(), None, templates)
+    result = explain_answer(_xyd(), None, templates, meta=_META)
     assert result["eliza_text"].startswith(result["explanation"])
     assert result["technical_text"].startswith(result["explanation"])
     assert result["eliza_text"].endswith("I think this answer is very good.")

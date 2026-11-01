@@ -11,8 +11,9 @@ keep, and what Episodic Memory displays.  The engine never compares it -- rules 
 compared structurally (``rules_equal`` / ``rule_signature``) -- so this module is
 display-only.
 
-Names come from the slipnodes: Scheme's ``get-lowercase-name`` is the node's symbol
-without its ``plato-`` prefix, lower-cased, which is derived here from ``node.name``.
+Names come from the slipnodes: Scheme's ``get-lowercase-name`` is the node's plain name
+(the ``plain_name`` column, lower-cased) and the article before a letter is its
+``article_an`` column; no node name is parsed.
 The two pieces of genuine data -- the line-length limit and the dimension-name table
 of ``get-dimension-phrase`` -- are the engine parameters
 ``maximum_rule_line_length`` and ``rule_english_dimension_phrases``.
@@ -24,15 +25,11 @@ import math
 from typing import TYPE_CHECKING, Any
 
 from server.engine.images import is_platonic_letter
+from server.engine.slipnet import article_of, lowercase_name as _lc
 
 if TYPE_CHECKING:
     from server.engine.metadata import MetadataProvider
     from server.engine.rules import Rule, RuleChange, RuleClause
-
-
-#: ``new-object-phrase``'s ``an-letters`` (``rules.ss:2044``): the letters whose name
-#: starts with a vowel sound, so "an `e' group" but "a `b' group".
-_AN_LETTERS = frozenset("aefhilmnorsx")
 
 
 def _param(meta: MetadataProvider | None, name: str, default: Any) -> Any:
@@ -44,12 +41,6 @@ def _param(meta: MetadataProvider | None, name: str, default: Any) -> Any:
     from server.engine.metadata import require_meta
 
     return require_meta(meta, f"rule_english parameter {name!r}").get_param(name, default)
-
-
-def _lc(node: Any) -> str:
-    """Scheme ``get-lowercase-name``: the symbol minus ``plato-``, lower-cased."""
-    name = getattr(node, "name", node)
-    return str(name)[6:].lower()
 
 
 def _name(node: Any) -> str | None:
@@ -237,8 +228,7 @@ def _new_object_phrase(new_type: Any, lett: Any, plural: bool) -> str:
         if literal:
             if plural:
                 return f"`{_lc(lett)}' groups"
-            article = "an" if _lc(lett) in _AN_LETTERS and len(_lc(lett)) == 1 else "a"
-            return f"{article} `{_lc(lett)}' group"
+            return f"{article_of(lett)} `{_lc(lett)}' group"
         return "groups" if plural else "a group"
     return ""
 

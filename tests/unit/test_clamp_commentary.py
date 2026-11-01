@@ -114,12 +114,16 @@ def test_a_bare_trace_is_silent():
 
 def test_a_slippage_is_named_from_its_two_descriptors():
     class Node:
-        def __init__(self, name):
+        def __init__(self, name, plain_name):
             self.name = name
+            self.plain_name = plain_name
 
     assert (
         slippage_english_name(
-            {"descriptor1": Node("plato-letter-category"), "descriptor2": Node("plato-length")}
+            {
+                "descriptor1": Node("plato-letter-category", "letter-category"),
+                "descriptor2": Node("plato-length", "length"),
+            }
         )
         == "letter-category <=> length"
     )
