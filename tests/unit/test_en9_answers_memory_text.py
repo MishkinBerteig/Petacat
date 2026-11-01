@@ -308,14 +308,8 @@ def test_a_removed_name_in_a_reminding_is_reported_not_matched(carried, meta) ->
 
 # --- G9 for the roles these files convert -----------------------------------------------
 
-#: ``workspace.py`` still names ``plato-bond-facet`` (not EN9's file): a run on a configuration
-#: without that node cannot start until that package lands.
-_BOND_FACET_PENDING = pytest.param(
-    "dimension.bond_facet",
-    marks=pytest.mark.xfail(reason="workspace.py names plato-bond-facet (not EN9's file)", strict=False),
-)
 G9_ROLES = (
-    "dimension.length", _BOND_FACET_PENDING, "object.letter", "dimension.letter_category",
+    "dimension.length", "dimension.bond_facet", "object.letter", "dimension.letter_category",
     "dimension.object_category", "dimension.string_position", "dimension.alphabetic_position",
     "dimension.group_category", "dimension.direction", "object.group",
 )

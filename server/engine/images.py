@@ -33,15 +33,6 @@ if TYPE_CHECKING:
 # callers do not need to hard-code node names.
 # ---------------------------------------------------------------------------
 
-# Canonical node-name lists (same order as slipnet.ss).
-_LETTER_NAMES: list[str] = [f"plato-{chr(c)}" for c in range(ord("a"), ord("z") + 1)]
-_NUMBER_NAMES: list[str] = [
-    "plato-one",
-    "plato-two",
-    "plato-three",
-    "plato-four",
-    "plato-five",
-]
 _RELATION_NAMES: frozenset[str] = frozenset(
     ["plato-identity", "plato-opposite", "plato-predecessor", "plato-successor"]
 )
@@ -49,12 +40,12 @@ _RELATION_NAMES: frozenset[str] = frozenset(
 
 def is_platonic_letter(node: SlipnetNode | None) -> bool:
     """Scheme: platonic-letter?"""
-    return node is not None and node.name in _LETTER_NAMES
+    return getattr(node, "glyph", None) is not None
 
 
 def is_platonic_number(node: SlipnetNode | None) -> bool:
     """Scheme: platonic-number?"""
-    return node is not None and node.name in _NUMBER_NAMES
+    return getattr(node, "numeric_value", None) is not None
 
 
 def is_platonic_relation(node: SlipnetNode | None) -> bool:
@@ -65,20 +56,15 @@ def is_platonic_relation(node: SlipnetNode | None) -> bool:
 def number_to_platonic_number(n: int, slipnet: Slipnet) -> SlipnetNode | None:
     """Scheme: number->platonic-number.
 
-    Returns the platonic number node for *n* (1-indexed), or ``None`` if
-    *n* is out of range (> 5).
+    Returns the node whose ``numeric_value`` is *n*, or ``None`` when no node names that
+    count (a group of that size then has no Length description).
     """
-    if n < 1 or n > len(_NUMBER_NAMES):
-        return None
-    return slipnet.nodes.get(_NUMBER_NAMES[n - 1])
+    return slipnet.alphabet.number_for(n)
 
 
 def platonic_number_to_number(node: SlipnetNode, slipnet: Slipnet) -> int:
-    """Scheme: platonic-number->number. 1-indexed."""
-    for i, name in enumerate(_NUMBER_NAMES):
-        if slipnet.nodes.get(name) is node:
-            return i + 1
-    raise ValueError(f"{node} is not a platonic number node")
+    """Scheme: platonic-number->number: the node's ``numeric_value``."""
+    return slipnet.alphabet.value_of(node)
 
 
 def get_related_node(
@@ -90,8 +76,7 @@ def get_related_node(
     Otherwise, looks for an outgoing link whose label is *relation* and
     returns the target node (preferring one with the same category as *node*).
     """
-    identity = slipnet.nodes.get("plato-identity")
-    if relation is identity:
+    if relation is slipnet.relation("identity"):
         return node
 
     # Collect all outgoing links labeled with *relation*.
@@ -410,7 +395,7 @@ class Image:
         number of sub-images expressed as a platonic number.
         """
         if self.is_letter_image:
-            return self.slipnet.nodes.get("plato-one")
+            return self.slipnet.alphabet.unit_length_node
         return number_to_platonic_number(len(self.sub_images), self.slipnet)
 
     # -- transformation operations -----------------------------------------
@@ -464,16 +449,25 @@ class Image:
         if arg is None:
             raise ImageFailure("new_alpha_position_category: arg is None")
 
-        alpha_first = self.slipnet.nodes.get("plato-alphabetic-first")
-        alpha_last = self.slipnet.nodes.get("plato-alphabetic-last")
-        opp = self.slipnet.nodes.get("plato-opposite")
-        plato_a = self.slipnet.nodes.get("plato-a")
-        plato_z = self.slipnet.nodes.get("plato-z")
+        # The first and last letters are the letters whose property link reaches the
+        # ``alphabet.first_marker`` / ``last_marker`` node; a marker with no letter linked
+        # to it, or an absent role, is the unhandled case.
+        alpha_first = self.slipnet.roles.alphabet_first_marker
+        alpha_last = self.slipnet.roles.alphabet_last_marker
+        opp = self.slipnet.relation("opposite")
+        first_letter = self.slipnet.alphabet.first_letter
+        last_letter = self.slipnet.alphabet.last_letter
 
-        if arg is alpha_first or (arg is opp and self.start_letter is plato_z):
-            self.new_start_letter(plato_a)
-        elif arg is alpha_last or (arg is opp and self.start_letter is plato_a):
-            self.new_start_letter(plato_z)
+        if first_letter is not None and (
+            arg is alpha_first
+            or (arg is opp and last_letter is not None and self.start_letter is last_letter)
+        ):
+            self.new_start_letter(first_letter)
+        elif last_letter is not None and (
+            arg is alpha_last
+            or (arg is opp and first_letter is not None and self.start_letter is first_letter)
+        ):
+            self.new_start_letter(last_letter)
         else:
             raise ImageFailure(
                 f"new_alpha_position_category: unhandled arg {arg.name}"
@@ -783,7 +777,7 @@ class Image:
         letter_category = self.slipnet.nodes.get("plato-letter-category")
         identity = self.slipnet.nodes.get("plato-identity")
         plato_right = self.slipnet.nodes.get("plato-right")
-        plato_one = self.slipnet.nodes.get("plato-one")
+        plato_one = self.slipnet.alphabet.unit_length_node
 
         self.bond_facet = letter_category
         self.letter_relation = identity
@@ -1148,7 +1142,7 @@ def _platonic_length(obj: Any, slipnet: Slipnet) -> SlipnetNode | None:
         return node
     objects = getattr(obj, "objects", None)
     if not objects:
-        return slipnet.nodes.get("plato-one")
+        return slipnet.alphabet.unit_length_node
     return number_to_platonic_number(len(objects), slipnet)
 
 

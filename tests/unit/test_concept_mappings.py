@@ -185,7 +185,7 @@ def test_distinguishing_false_for_identity_of_whole():
 def test_descriptor_not_distinguishing_for_generic_category_node():
     # plato-letter is a generic category => never distinguishing.
     obj = FakeObject(string=FakeString())
-    assert ConceptMapping._descriptor_is_distinguishing(FakeNode("plato-letter"), obj) is False
+    assert ConceptMapping._descriptor_is_distinguishing(FakeNode("plato-letter", roles={"object.letter"}), obj) is False
 
 
 def test_descriptor_distinguishing_true_when_no_string():

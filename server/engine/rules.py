@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from server.engine.roles import absent
+from server.engine.slipnet import holds_role as _holds
 from server.engine.workspace_structures import WorkspaceStructure
 from server.engine.formulas import sigmoid, temp_adjusted_values, weighted_average
 from server.engine.images import (
@@ -62,18 +63,38 @@ RULE_BOTTOM = "bottom"
 SCOPE_SELF = "self"
 SCOPE_SUBOBJECTS = "subobjects"
 
-# Dimension ordering for sorting rule dimensions and change templates.
-# Matches *rule-dimension-order* in rules.ss:934-943.
-_RULE_DIMENSION_ORDER_NAMES: list[str] = [
-    "plato-direction-category",
-    "plato-group-category",
-    "plato-alphabetic-position-category",
-    "plato-letter-category",
-    "plato-length",
-    "plato-object-category",
-    "plato-string-position-category",
-    "plato-bond-facet",
-]
+# The roles this module reads (``server/engine/roles.py``).  The engine names no node: it asks
+# which node plays a role, either through ``slipnet.roles`` or, where only a node is in scope,
+# through ``node.roles``.  A role nothing holds is never matched, so a case that needs it is
+# simply not met: a clause that needs it cannot be built and a transform on it is not made.
+_DIM_DIRECTION = "dimension.direction"
+_DIM_GROUP_CATEGORY = "dimension.group_category"
+_DIM_ALPHABETIC_POSITION = "dimension.alphabetic_position"
+_DIM_LETTER_CATEGORY = "dimension.letter_category"
+_DIM_LENGTH = "dimension.length"
+_DIM_OBJECT_CATEGORY = "dimension.object_category"
+_DIM_STRING_POSITION = "dimension.string_position"
+_DIM_BOND_FACET = "dimension.bond_facet"
+_POS_WHOLE = "position.whole"
+_DIRECTION_LEFT = "direction.left"
+_OBJECT_LETTER = "object.letter"
+_OBJECT_GROUP = "object.group"
+_GROUP_CATEGORY_SAMENESS = "group_category.sameness"
+
+#: The one stored token of the rule-signature format: the group node and the ``'string``
+#: symbol collapse to it (``_descriptor_key``).  It is written to the database (Episodic
+#: Memory keeps rule signatures), so it is a persisted value, not a node reference.
+_GROUP_OR_STRING_TOKEN = "plato-group|string"
+_GROUP_TOKEN_HEAD = _GROUP_OR_STRING_TOKEN.partition("|")[0]
+
+
+def _slipnet_of(obj: Any) -> Any:
+    """The Slipnet reached from a Workspace object through its string, or ``None``."""
+    string = getattr(obj, "string", None)
+    slipnet = getattr(getattr(string, "workspace", None), "slipnet", None)
+    if slipnet is None:
+        slipnet = getattr(string, "slipnet", None)
+    return slipnet
 
 
 #: ``answers.ss:1365`` — on every translation attempt each conceptual dimension
@@ -279,7 +300,7 @@ def _is_whole_string_object_description(od: tuple) -> bool:
     """Scheme: ``whole-string-object-description?`` (``answers.ss:1500-1503``)."""
     if not od or len(od) < 3:
         return False
-    return od[0] == "string" or getattr(od[2], "name", "") == "plato-whole"
+    return od[0] == "string" or _holds(od[2], _POS_WHOLE)
 
 
 def _translate_whole_string_object_description(
@@ -293,10 +314,15 @@ def _translate_whole_string_object_description(
     target that does have a spanning group aimed its transforms at the string
     image — whose ``new_length`` always fails.
     """
-    str_pos = slipnet.nodes.get("plato-string-position-category") if slipnet else od[1]
-    whole = slipnet.nodes.get("plato-whole") if slipnet else od[2]
+    if slipnet is None:
+        str_pos, whole, group = od[1], od[2], None
+    else:
+        # A role nothing holds gives its Absent token, which fails ``_valid_object_description``
+        # (it is falsy and is no node's category): the rule then fails to translate.
+        str_pos = slipnet.roles.dimension_string_position
+        whole = slipnet.roles.position_whole
+        group = slipnet.roles.object_group
     if to_string is not None and _spanning_group_exists(to_string):
-        group = slipnet.nodes.get("plato-group") if slipnet else None
         return (group, str_pos, whole)
     return ("string", str_pos, whole)
 
@@ -362,7 +388,7 @@ def _valid_rule_clause(clause: RuleClause) -> bool:
             return False
         if len(ods) > 1:
             return True
-        return getattr(ods[0][0], "name", "") != "plato-letter"
+        return not _holds(ods[0][0], _OBJECT_LETTER)
 
     if not ods or not _valid_object_description(ods[0]):
         return False
@@ -446,13 +472,21 @@ def _change_abstractness_uniformity(changes: list[Any]) -> float:
     return 2.0 * abs(relations / len(changes) - 0.5)
 
 
-def _dim_sort_key(dim: SlipnetNode) -> int:
-    """Sort key for a slipnet dimension node according to the canonical order."""
-    name = getattr(dim, "name", "")
-    try:
-        return _RULE_DIMENSION_ORDER_NAMES.index(name)
-    except ValueError:
-        return len(_RULE_DIMENSION_ORDER_NAMES)
+def _dim_sort_key(dim: SlipnetNode, order: tuple = ()) -> int:
+    """Sort key for a slipnet dimension node according to the canonical order.
+
+    *order* is the ordered role ``rule.dimension_order`` (``rules.ss:934-943``): the bound
+    dimensions in ordinal order.  A dimension not in it sorts last.
+    """
+    for index, node in enumerate(order):
+        if node is dim:
+            return index
+    return len(order)
+
+
+def _dimension_order(slipnet: Any) -> tuple:
+    """The ordered role ``rule.dimension_order`` of *slipnet* (empty without a Slipnet)."""
+    return slipnet.roles.rule_dimension_order if slipnet is not None else ()
 
 
 # ---------------------------------------------------------------------------
@@ -479,7 +513,7 @@ class IntrinsicChangeDescription:
     scope : str
         SCOPE_SELF or SCOPE_SUBOBJECTS.
     dimension : SlipnetNode
-        The conceptual dimension that changed (e.g., plato-letter-category).
+        The conceptual dimension that changed (e.g., the letter-category dimension).
     descriptor1 : SlipnetNode | None
         The *from* descriptor (before the change). May be None.
     relation : SlipnetNode | None
@@ -555,12 +589,16 @@ class IntrinsicChangeDescription:
         return _nested_member(self.reference_object, other.reference_object)
 
     def is_lettctgy_or_alphposctgy_dimension(self) -> bool:
-        name = getattr(self.dimension, "name", "")
-        return name in ("plato-letter-category", "plato-alphabetic-position-category")
+        return _holds(self.dimension, _DIM_LETTER_CATEGORY) or _holds(
+            self.dimension, _DIM_ALPHABETIC_POSITION
+        )
+
+    def is_dimension_role(self, role: str) -> bool:
+        """True if this change's dimension plays *role*."""
+        return _holds(self.dimension, role)
 
     def change_to_letter(self) -> bool:
-        d2_name = getattr(self.descriptor2, "name", "") if self.descriptor2 else ""
-        return d2_name == "plato-letter"
+        return bool(self.descriptor2) and _holds(self.descriptor2, _OBJECT_LETTER)
 
     def same_dimension_as_group_category_medium(self, other: IntrinsicChangeDescription) -> bool:
         """True if self.dimension is the bond-facet of other's reference object."""
@@ -578,20 +616,22 @@ class IntrinsicChangeDescription:
         """Scheme: get-BondFacet-change.
 
         If this is a self GroupCtgy change on a group, return a
-        (self, plato-bond-facet, (bond_facet_node,)) change-template entry.
+        (self, <bond-facet dimension>, (bond_facet_node,)) change-template entry.
         """
         if not isinstance(self.reference_object, Group):
             return None
-        dim_name = getattr(self.dimension, "name", "")
-        if dim_name != "plato-group-category" or self.scope != SCOPE_SELF:
+        if not _holds(self.dimension, _DIM_GROUP_CATEGORY) or self.scope != SCOPE_SELF:
             return None
         bf = getattr(self.reference_object, "bond_facet", None)
         if bf is None:
             return None
         # rules.ss:1051-1054: `(self ,plato-bond-facet (,bond-facet))` -- the
-        # dimension is the bond-facet node itself, the descriptor the facet.
-        facet_dim = slipnet.nodes.get("plato-bond-facet") if slipnet is not None else None
-        if facet_dim is None:
+        # dimension is the bond-facet node itself, the descriptor the facet.  With no
+        # bond-facet dimension in the configuration there is no such entry.
+        if slipnet is None:
+            return None
+        facet_dim = slipnet.roles.dimension_bond_facet
+        if not facet_dim:
             return None
         return (SCOPE_SELF, facet_dim, [bf])
 
@@ -601,8 +641,7 @@ class IntrinsicChangeDescription:
         Returns (scope, dimension, descriptors).
         Disallows literal DirCtgy or GroupCtgy changes.
         """
-        dim_name = getattr(self.dimension, "name", "")
-        if dim_name in ("plato-direction-category", "plato-group-category"):
+        if _holds(self.dimension, _DIM_DIRECTION) or _holds(self.dimension, _DIM_GROUP_CATEGORY):
             # Remove descriptor2 from descriptors (keep only the relation)
             return (
                 self.scope,
@@ -639,7 +678,7 @@ class ExtrinsicChangeDescription:
     reference_objects : list[WorkspaceObject]
         The objects involved in the swap.
     dimension : SlipnetNode
-        The dimension being swapped (e.g., plato-length).
+        The dimension being swapped (e.g., the length dimension).
     descriptors : list[SlipnetNode]
         The two descriptor values being swapped.
     """
@@ -734,8 +773,8 @@ def intrinsic_implies_intrinsic(
     if ic1.is_lettctgy_or_alphposctgy_dimension() and ic2.is_lettctgy_or_alphposctgy_dimension():
         if ic1.same_reference_objects(ic2):
             # AlphPosCtgy change implies LettCtgy change on same object
-            if (ic1.is_dimension_by_name("plato-alphabetic-position-category")
-                    and ic2.is_dimension_by_name("plato-letter-category")):
+            if (ic1.is_dimension_role(_DIM_ALPHABETIC_POSITION)
+                    and ic2.is_dimension_role(_DIM_LETTER_CATEGORY)):
                 return True
             # Same dimension: subobjects change is implicit in self change
             if ic1.same_dimension(ic2) and ic2.change_subobjects():
@@ -744,29 +783,29 @@ def intrinsic_implies_intrinsic(
             return True
 
     # Case 2.3: Length change on enclosing group implies LettCtgy change
-    if (ic1.is_dimension_by_name("plato-length")
-            and ic2.is_dimension_by_name("plato-letter-category")
+    if (ic1.is_dimension_role(_DIM_LENGTH)
+            and ic2.is_dimension_role(_DIM_LETTER_CATEGORY)
             and ic1.encloses(ic2) and ic1.change_self()):
         return True
 
     # Case 2.4: GroupCtgy change implies letter changes of group medium
-    if (ic1.is_dimension_by_name("plato-group-category") and ic1.change_self()
+    if (ic1.is_dimension_role(_DIM_GROUP_CATEGORY) and ic1.change_self()
             and ic2.same_dimension_as_group_category_medium(ic1)):
         if ic1.encloses(ic2):
             return True
         if (ic1.same_reference_objects(ic2)
-                and ic2.is_dimension_by_name("plato-letter-category")
+                and ic2.is_dimension_role(_DIM_LETTER_CATEGORY)
                 and ic2.implied_by_opposite_group_category()):
             return True
 
     # Case: StrPosCtgy implies DirCtgy
-    if (ic1.is_dimension_by_name("plato-string-position-category")
-            and ic2.is_dimension_by_name("plato-direction-category")
+    if (ic1.is_dimension_role(_DIM_STRING_POSITION)
+            and ic2.is_dimension_role(_DIM_DIRECTION)
             and ic2.encloses(ic1) and ic2.change_self()):
         return True
 
     # Case 3: ObjCtgy:letter implies Length change
-    if ic1.change_to_letter() and ic2.is_dimension_by_name("plato-length"):
+    if ic1.change_to_letter() and ic2.is_dimension_role(_DIM_LENGTH):
         if ic1.same_reference_objects(ic2) and ic1.same_scope(ic2):
             return True
         if (ic1.encloses(ic2) and ic1.change_subobjects() and ic2.change_self()):
@@ -790,12 +829,6 @@ def extrinsic_implies_extrinsic(
         any(ic1.implies(ic2) for ic2 in ec2.equivalent_intrinsic_changes)
         for ic1 in ec1.equivalent_intrinsic_changes
     )
-
-
-# Monkey-patch a convenience for dimension name checking
-IntrinsicChangeDescription.is_dimension_by_name = (  # type: ignore[attr-defined]
-    lambda self, name: getattr(self.dimension, "name", "") == name
-)
 
 
 # ---------------------------------------------------------------------------
@@ -883,10 +916,10 @@ def _get_ending_letter_category(group: Any) -> SlipnetNode | None:
     objects = getattr(group, "objects", [])
     if not objects:
         return None
-    left = getattr(getattr(group, "direction", None), "name", "") == "plato-left"
+    left = _holds(getattr(group, "direction", None), _DIRECTION_LEFT)
     last = objects[0] if left else objects[-1]
     for d in getattr(last, "descriptions", []):
-        if getattr(d.description_type, "name", "") == "plato-letter-category":
+        if _holds(d.description_type, _DIM_LETTER_CATEGORY):
             return d.descriptor
     return getattr(last, "letter_category", None)
 
@@ -1113,7 +1146,10 @@ class Rule(WorkspaceStructure):
 
     @property
     def bridge_theme_type(self) -> str:
-        """Theme type based on rule type."""
+        """Theme type based on rule type, in the hyphenated spelling this property has always
+        had.  ``themes.theme_type_for_bridge_type`` accepts it, ``top-bridge`` and ``top_bridge``
+        alike, and gives the Themespace's underscore spelling (B3); the value itself is part of
+        a stored theme pattern (``[bridge_theme_type]``) and so is not respelled here."""
         return "top-bridge" if self.rule_type == RULE_TOP else "bottom-bridge"
 
     def get_verbatim_letter_categories(self) -> list[Any]:
@@ -1228,8 +1264,10 @@ class Rule(WorkspaceStructure):
             change
             for clause in intrinsic
             for change in clause.changes
-            if getattr(change.dimension, "name", "")
-            not in ("plato-object-category", "plato-bond-facet")
+            if not (
+                _holds(change.dimension, _DIM_OBJECT_CATEGORY)
+                or _holds(change.dimension, _DIM_BOND_FACET)
+            )
         ]
 
         if not intrinsic:
@@ -1483,8 +1521,9 @@ class Rule(WorkspaceStructure):
         # Length of its groups: any group of such a bridge lacking a Length
         # description gets one attached (fifth site of ``attach-length-description``).
         for bridge in self.supporting_bridges:
-            length_type = Group._node(bridge.object1, "plato-length")
-            if length_type is None or not bridge.slippage_type_present(length_type):
+            slipnet = _slipnet_of(bridge.object1)
+            length_type = slipnet.roles.dimension_length if slipnet is not None else None
+            if not length_type or not bridge.slippage_type_present(length_type):
                 continue
             for obj in (bridge.object1, bridge.object2):
                 if isinstance(obj, Group) and not obj.description_type_present(length_type):
@@ -1583,7 +1622,8 @@ class Rule(WorkspaceStructure):
         those of an undescribed letter.
         """
         from server.engine.bridges import make_concept_mappings
-        identity = slipnet.nodes.get("plato-identity") if slipnet is not None else None
+        # No identity relation in the configuration: no mapping is labelled identity.
+        identity = (slipnet.relation("identity") if slipnet is not None else None) or None
 
         for bridge in bridges:
             fake_object2 = bridge.object2
@@ -1845,9 +1885,7 @@ def _clauses_equal(c1: RuleClause, c2: RuleClause) -> bool:
         for d1, d2 in zip(od1, od2):
             if d1 is not d2:
                 # Allow group/string interchangeability
-                n1 = getattr(d1, "name", d1)
-                n2 = getattr(d2, "name", d2)
-                if not (_is_group_or_string_name(n1) and _is_group_or_string_name(n2)):
+                if not (_is_group_or_string(d1) and _is_group_or_string(d2)):
                     return False
     if c1.is_extrinsic:
         if len(c1.dimensions) != len(c2.dimensions):
@@ -1876,8 +1914,12 @@ def _changes_equal(ch1: RuleChange, ch2: RuleChange) -> bool:
     )
 
 
-def _is_group_or_string_name(name: Any) -> bool:
-    return name in ("plato-group", "string")
+def _is_group_or_string(descriptor: Any) -> bool:
+    """The group node (by its role) or the ``'string`` symbol.  A bare name equal to the
+    head of the stored token is also the group's: ``answer_comparison`` asks by name."""
+    if descriptor == "string" or descriptor == _GROUP_TOKEN_HEAD:
+        return True
+    return _holds(descriptor, _OBJECT_GROUP)
 
 
 def rule_signature(rule: Rule | None) -> list | None:
@@ -1933,11 +1975,11 @@ def _clause_signature(clause: RuleClause) -> list:
 def _descriptor_key(descriptor: Any) -> str | None:
     if descriptor is None:
         return None
-    name = getattr(descriptor, "name", descriptor)
-    if _is_group_or_string_name(name):
-        # ``_clauses_equal`` treats plato-group and string as interchangeable, so the
+    if _is_group_or_string(descriptor):
+        # ``_clauses_equal`` treats the group and string as interchangeable, so the
         # signature must collapse them to one token rather than preserve the difference.
-        return "plato-group|string"
+        return _GROUP_OR_STRING_TOKEN
+    name = getattr(descriptor, "name", descriptor)
     return name if isinstance(name, str) else str(name)
 
 
@@ -1976,11 +2018,10 @@ def _literal_object_description(od: tuple) -> bool:
     if len(od) < 2:
         return False
     dt = od[1]
-    dt_name = getattr(dt, "name", "")
-    return dt_name in (
-        "plato-alphabetic-position-category",
-        "plato-letter-category",
-        "plato-length",
+    return (
+        _holds(dt, _DIM_ALPHABETIC_POSITION)
+        or _holds(dt, _DIM_LETTER_CATEGORY)
+        or _holds(dt, _DIM_LENGTH)
     )
 
 
@@ -2020,14 +2061,12 @@ def rule_describable_bridge(bridge: Bridge) -> bool:
     if is_letter1 and is_group2:
         bf = getattr(o2, "bond_facet", None)
         gc = getattr(o2, "group_category", None)
-        bf_name = getattr(bf, "name", "")
-        gc_name = getattr(gc, "name", "")
-        return bf_name == "plato-letter-category" and gc_name == "plato-samegrp"
+        return _holds(bf, _DIM_LETTER_CATEGORY) and _holds(gc, _GROUP_CATEGORY_SAMENESS)
 
     # group->letter: group must be based on letter-category
     if is_group1 and is_letter2:
         bf = getattr(o1, "bond_facet", None)
-        return getattr(bf, "name", "") == "plato-letter-category"
+        return _holds(bf, _DIM_LETTER_CATEGORY)
 
     # group->group: must have same bond-facet and related group categories
     if is_group1 and is_group2:
@@ -2099,9 +2138,8 @@ def abstract_change_descriptions(
         slippages = _get_non_symmetric_non_bond_slippages(b)
         for slip in slippages:
             dim = slip.description_type1
-            dim_name = getattr(dim, "name", "")
             # Disallow individual StrPosCtgy changes
-            if dim_name == "plato-string-position-category":
+            if _holds(dim, _DIM_STRING_POSITION):
                 continue
             icd = IntrinsicChangeDescription(
                 reference_object=b.object1,
@@ -2121,8 +2159,8 @@ def abstract_change_descriptions(
         )
         for cluster in swap_partition:
             all_swaps = _get_all_swaps(cluster)
-            length_swap = _select_swap("plato-length", all_swaps)
-            objctgy_swap = _select_swap("plato-object-category", all_swaps)
+            length_swap = _select_swap(_DIM_LENGTH, all_swaps)
+            objctgy_swap = _select_swap(_DIM_OBJECT_CATEGORY, all_swaps)
             remaining = [s for s in all_swaps if s is not length_swap and s is not objctgy_swap]
 
             # Add Length and ObjCtgy swaps together or not at all
@@ -2177,16 +2215,14 @@ def abstract_change_descriptions(
                 and _count_strposctgy_opposite_slippages(cluster) == 2):
             should_add = (rng is None) or (rng is not None and rng.prob(subobjects_prob))
             if should_add:
-                # Find direction-category and opposite nodes
-                # rules.ss:614-616 uses the slipnet constants directly; the bridges'
-                # concept mappings (string-position:opposite) never hold them.
-                if slipnet is not None:
-                    dir_dim = slipnet.nodes.get("plato-direction-category")
-                    opp_rel = slipnet.nodes.get("plato-opposite")
-                else:
-                    dir_dim = _find_slipnet_node_in_bridges(cluster, "plato-direction-category")
-                    opp_rel = _find_slipnet_node_in_bridges(cluster, "plato-opposite")
-                if dir_dim is not None and opp_rel is not None:
+                # The direction dimension and the opposite relation.  rules.ss:614-616 uses
+                # the slipnet constants directly; the bridges' concept mappings
+                # (string-position:opposite) never hold them.  Resolved after the draw above
+                # and before nothing else is drawn, so the draw order is unchanged; with
+                # either missing from the configuration no reversal is abstracted.
+                dir_dim = slipnet.roles.dimension_direction if slipnet is not None else None
+                opp_rel = slipnet.relation("opposite") if slipnet is not None else None
+                if dir_dim and opp_rel:
                     all_cds.append(IntrinsicChangeDescription(
                         left_enclosing, SCOPE_SELF, dir_dim, None, opp_rel, None
                     ))
@@ -2203,7 +2239,7 @@ def abstract_change_descriptions(
             # ``add-intrinsic-change-description`` refuses every individual StrPosCtgy
             # change (rules.ss:557-559), the subobjects ones included -- but only after
             # the draw above, which is outside it.
-            if should_add and getattr(s_dim, "name", "") != "plato-string-position-category":
+            if should_add and not _holds(s_dim, _DIM_STRING_POSITION):
                 all_cds.append(IntrinsicChangeDescription(
                     left_enclosing, SCOPE_SUBOBJECTS,
                     s_dim, s_desc1, s_rel, s_desc2,
@@ -2239,7 +2275,7 @@ def remove_redundant_change_descriptions(
     str_pos_cds = [
         cd for cd in cds
         if not cd.is_intrinsic and getattr(cd, "dimension", None) is not None
-        and getattr(cd.dimension, "name", "") == "plato-string-position-category"
+        and _holds(cd.dimension, _DIM_STRING_POSITION)
     ]
     intrinsic_cds = [cd for cd in cds if cd.is_intrinsic]
     other_extrinsic = [
@@ -2398,7 +2434,7 @@ def reference_object_to_object_description(
     Scheme: ``reference-object->object-description`` (``rules.ss:878-886``).
 
     Returns a tuple of (object_type, description_type, descriptor).
-    For a string: ``('string', plato-string-position-category, plato-whole)``.
+    For a string: ``('string', <string-position dimension>, <whole>)``.
     For an object: ``(obj_category_descriptor, chosen_desc_type, chosen_descriptor)``.
 
     There is **no fallback** when the object has no rule-eligible description. The
@@ -2410,18 +2446,21 @@ def reference_object_to_object_description(
     reference cannot express.
     """
     if _is_workspace_string(ref_object):
-        # Need plato-string-position-category and plato-whole nodes
+        # With either role unbound the description holds its Absent token and fails
+        # ``_valid_object_description``, so the template is never instantiated.
         if slipnet is not None:
-            str_pos = slipnet.nodes.get("plato-string-position-category")
-            whole = slipnet.nodes.get("plato-whole")
-            return ("string", str_pos, whole)
+            return (
+                "string",
+                slipnet.roles.dimension_string_position,
+                slipnet.roles.position_whole,
+            )
         return ("string", None, None)
 
     # Get object category descriptor
     obj_ctgy = None
     if slipnet is not None:
-        obj_ctgy_node = slipnet.nodes.get("plato-object-category")
-        if obj_ctgy_node is not None:
+        obj_ctgy_node = slipnet.roles.dimension_object_category
+        if obj_ctgy_node:
             obj_ctgy = _get_descriptor_for(ref_object, obj_ctgy_node)
 
     chosen_desc = _choose_description_for_rule(ref_object, rng, temperature, meta)
@@ -2430,15 +2469,10 @@ def reference_object_to_object_description(
     return (obj_ctgy, chosen_desc.description_type, chosen_desc.descriptor)
 
 
-#: The description types a rule may name its object by, per
+#: The description types (roles) a rule may name its object by, per
 #: ``get-descriptions-for-rule`` (``workspace-objects.ss:260-268``).  Letter-Category
 #: is admissible too, but conditionally — see :func:`descriptions_for_rule`.
-_RULE_OBJECT_DESCRIPTION_TYPES = frozenset(
-    {
-        "plato-string-position-category",
-        "plato-alphabetic-position-category",
-    }
-)
+_RULE_OBJECT_DESCRIPTION_TYPES = (_DIM_STRING_POSITION, _DIM_ALPHABETIC_POSITION)
 
 
 def descriptions_for_rule(obj: Any) -> list[Any]:
@@ -2473,15 +2507,13 @@ def descriptions_for_rule(obj: Any) -> list[Any]:
     for d in getattr(obj, "descriptions", []):
         if not (d.is_relevant() and d.is_distinguishing()):
             continue
-        dt_name = getattr(d.description_type, "name", "")
-        if dt_name in _RULE_OBJECT_DESCRIPTION_TYPES:
+        dt = d.description_type
+        if any(_holds(dt, role) for role in _RULE_OBJECT_DESCRIPTION_TYPES):
             out.append(d)
-        elif dt_name == "plato-letter-category":
+        elif _holds(dt, _DIM_LETTER_CATEGORY):
             if not isinstance(obj, Group):
                 out.append(d)
-            elif getattr(getattr(obj, "group_category", None), "name", "") == (
-                "plato-samegrp"
-            ):
+            elif _holds(getattr(obj, "group_category", None), _GROUP_CATEGORY_SAMENESS):
                 out.append(d)
     return out
 
@@ -2561,7 +2593,7 @@ def instantiate_rule_clause_template(
         obj_desc = reference_object_to_object_description(
             ref_object, slipnet, rng, temperature, meta
         )
-        sorted_cts = _sort_change_templates(change_templates)
+        sorted_cts = _sort_change_templates(change_templates, slipnet)
         changes = _chez_map(
             lambda ct: _instantiate_change_template(
                 ct, obj_desc, slipnet, rng, temperature, meta),
@@ -2582,7 +2614,8 @@ def instantiate_rule_clause_template(
                 r, slipnet, rng, temperature, meta),
             sorted_refs,
         )
-        sorted_dims = sorted(dimensions, key=_dim_sort_key)
+        order = _dimension_order(slipnet)
+        sorted_dims = sorted(dimensions, key=lambda dim: _dim_sort_key(dim, order))
         return RuleClause(
             clause_type=CLAUSE_EXTRINSIC,
             object_description=obj_descs[0] if len(obj_descs) == 1 else None,
@@ -2647,15 +2680,17 @@ def _instantiate_change_template(
     return RuleChange(dimension=dimension, to_descriptor=chosen, referent=scope)
 
 
-def _sort_change_templates(change_templates: list[tuple]) -> list[tuple]:
+def _sort_change_templates(change_templates: list[tuple], slipnet: Any = None) -> list[tuple]:
     """Sort change templates by scope + dimension.
 
     Scheme: sort-change-templates (rules.ss:924-931).
     self < subobjects; within same scope, sort by dimension order.
     """
+    order = _dimension_order(slipnet)
+
     def key(ct: tuple) -> tuple:
         scope_key = 0 if ct[0] == SCOPE_SELF else 1
-        dim_key = _dim_sort_key(ct[1])
+        dim_key = _dim_sort_key(ct[1], order)
         return (scope_key, dim_key)
     return sorted(change_templates, key=key)
 
@@ -2775,7 +2810,7 @@ def apply_rule(
         # Separate StrPosCtgy swaps from other extrinsic transforms
         string_position_swaps = [
             t for t in extrinsic_transforms
-            if len(t) == 3 and getattr(t[0], "name", "") == "plato-string-position-category"
+            if len(t) == 3 and _holds(t[0], _DIM_STRING_POSITION)
         ]
         extrinsic_object_transforms = [
             t for t in extrinsic_transforms if t not in string_position_swaps
@@ -2845,8 +2880,9 @@ def _fresh_string_image(string: WorkspaceString, slipnet: Slipnet) -> StringImag
     """
     for obj in getattr(string, "objects", []):
         obj.image = None  # type: ignore[attr-defined]
-    plato_right = slipnet.nodes.get("plato-right")
-    img = make_string_image(string, plato_right, slipnet)
+    # With no right direction in the configuration the image has no reading direction.
+    direction_right = slipnet.roles.direction_right or None
+    img = make_string_image(string, direction_right, slipnet)
     string.image = img  # type: ignore[attr-defined]
     # Materialise the whole tree now, so that every object — including letters
     # nested inside groups — already holds the image the string will generate
@@ -2926,7 +2962,7 @@ def _get_extrinsic_transforms(
 
         for dim in dimensions:
             dim_name = getattr(dim, "name", "")
-            if dim_name == "plato-string-position-category":
+            if _holds(dim, _DIM_STRING_POSITION):
                 # rules.ss:1444-1447 — a position swap is defined for two objects
                 # only; three or more is a failure, not a silent skip.
                 if len(denoted) > 2:
@@ -2949,7 +2985,7 @@ def _get_extrinsic_transforms(
                 # description attaches one — noticing the group's length is part
                 # of deciding to swap it.
                 descs = [
-                    _swap_descriptor_for(o, dim, dim_name, slipnet) for o in denoted
+                    _swap_descriptor_for(o, dim, slipnet) for o in denoted
                 ]
                 if any(d is None for d in descs):
                     raise ImageFailure(
@@ -2987,7 +3023,7 @@ def _pairwise_disjoint(objects: list[Any]) -> bool:
 
 
 def _swap_descriptor_for(
-    obj: Any, dim: SlipnetNode, dim_name: str, slipnet: Slipnet,
+    obj: Any, dim: SlipnetNode, slipnet: Slipnet,
 ) -> Any:
     """The descriptor of *obj* along *dim*, for an extrinsic swap.
 
@@ -2996,7 +3032,7 @@ def _swap_descriptor_for(
     one has it attached — "this amounts to explicitly noticing the group's
     Length".
     """
-    if dim_name != "plato-length":
+    if not _holds(dim, _DIM_LENGTH):
         return _get_descriptor_for(obj, dim)
 
     if isinstance(obj, Letter):
@@ -3111,12 +3147,14 @@ def _find_matching_objects(
         whole_group = _get_whole_group(string, slipnet)
         return [whole_group] if whole_group is not None else [string]
 
-    obj_type_name = getattr(obj_type, "name", "") if obj_type is not None else ""
+    # The Python class an object type stands for: the engine's own invariant.
+    wants_letter = _holds(obj_type, _OBJECT_LETTER)
+    wants_group = _holds(obj_type, _OBJECT_GROUP)
     candidates = []
     for obj in string.objects:
-        if obj_type_name == "plato-letter" and not isinstance(obj, Letter):
+        if wants_letter and not isinstance(obj, Letter):
             continue
-        if obj_type_name == "plato-group" and not isinstance(obj, Group):
+        if wants_group and not isinstance(obj, Group):
             continue
         if desc_type is not None and descriptor is not None:
             # ``(filter-meth ... 'descriptor-present? descriptor)``
@@ -3136,7 +3174,7 @@ def _find_matching_objects(
     # every match applied the same transform twice and manufactured conflicts.
     if (
         desc_type is not None
-        and getattr(desc_type, "name", "") == "plato-string-position-category"
+        and _holds(desc_type, _DIM_STRING_POSITION)
         and len(candidates) > 1
     ):
         bridged = [o for o in candidates if getattr(o, "vertical_bridge", None) is not None]
@@ -3149,10 +3187,11 @@ def _get_whole_group(string: WorkspaceString, slipnet: Slipnet) -> Any:
     """The group of *string* described as ``whole``, if there is one.
 
     Scheme: ``(select-meth group-list 'descriptor-present? plato-whole)``
-    (``workspace-strings.ss:440-441``).
+    (``workspace-strings.ss:440-441``).  With no ``whole`` in the configuration there is
+    none.
     """
-    whole = slipnet.nodes.get("plato-whole") if slipnet is not None else None
-    if whole is None:
+    whole = slipnet.roles.position_whole if slipnet is not None else None
+    if not whole:
         return None
     for group in getattr(string, "groups", []):
         present = getattr(group, "descriptor_present", None)
@@ -3270,16 +3309,12 @@ def _apply_transforms(
             # failure-result's second element.  A group-category transform is first
             # augmented with the bond-facet: (GroupCtgy Opposite medium).
             if e.transform is None:
-                if getattr(dim, "name", "") == "plato-group-category":
+                if _holds(dim, _DIM_GROUP_CATEGORY):
                     medium = next(
-                        (
-                            d
-                            for td, d in transforms
-                            if getattr(td, "name", "") == "plato-bond-facet"
-                        ),
+                        (d for td, d in transforms if _holds(td, _DIM_BOND_FACET)),
                         None,
                     )
-                    e.transform = (dim, slipnet.nodes.get("plato-opposite"), medium)
+                    e.transform = (dim, slipnet.relation("opposite") or None, medium)
                 else:
                     e.transform = (dim, desc)
             raise
@@ -3295,14 +3330,11 @@ def _apply_before_key(
     then everything else.
     """
     dim, desc = transform
-    dim_name = getattr(dim, "name", "")
-    desc_name = getattr(desc, "name", "")
-
-    if dim_name == "plato-group-category":
+    if _holds(dim, _DIM_GROUP_CATEGORY):
         return (0,)
-    if desc_name == "plato-letter":
+    if _holds(desc, _OBJECT_LETTER):
         return (1,)
-    if dim_name == "plato-length":
+    if _holds(dim, _DIM_LENGTH):
         img_length = getattr(image, "get_length", lambda: None)()
         if change_length_first(desc, img_length, slipnet):
             return (2,)
@@ -3321,42 +3353,43 @@ def _transform_image(
 
     Scheme: transform-image (rules.ss:1366-1388).
     """
-    dim_name = getattr(dimension, "name", "")
-
-    if dim_name == "plato-object-category":
-        if getattr(descriptor, "name", "") == "plato-letter":
+    # The dispatch from a dimension to the image operation is Metacat's case table
+    # (rules.ss:1366-1388), written over roles.  A dimension that plays none of these
+    # roles, or a role nothing holds, makes no change.
+    if _holds(dimension, _DIM_OBJECT_CATEGORY):
+        if _holds(descriptor, _OBJECT_LETTER):
             image.letter()
         else:
             image.group()
 
-    elif dim_name == "plato-letter-category":
+    elif _holds(dimension, _DIM_LETTER_CATEGORY):
         image.new_start_letter(descriptor)
 
-    elif dim_name == "plato-length":
+    elif _holds(dimension, _DIM_LENGTH):
         image.new_length(descriptor)
 
-    elif dim_name == "plato-direction-category":
+    elif _holds(dimension, _DIM_DIRECTION):
         image.reverse_direction()
 
-    elif dim_name == "plato-group-category":
+    elif _holds(dimension, _DIM_GROUP_CATEGORY):
         # GroupCtgy transforms need the bond-facet from a BondFacet "transform"
         medium = None
         if all_transforms:
             for t in all_transforms:
                 td, td_desc = t
-                if getattr(td, "name", "") == "plato-bond-facet":
+                if _holds(td, _DIM_BOND_FACET):
                     medium = td_desc
                     break
         if medium is not None:
             image.reverse_medium(medium)
 
-    elif dim_name == "plato-alphabetic-position-category":
+    elif _holds(dimension, _DIM_ALPHABETIC_POSITION):
         image.new_alpha_position_category(descriptor)
 
-    elif dim_name == "plato-bond-facet":
+    elif _holds(dimension, _DIM_BOND_FACET):
         pass  # BondFacet "transforms" have no direct effect
 
-    elif dim_name == "plato-string-position-category":
+    elif _holds(dimension, _DIM_STRING_POSITION):
         pass  # StrPosCtgy swaps handled separately
 
 
@@ -3708,23 +3741,13 @@ def _count_strposctgy_opposite_slippages(bridges: list[Bridge]) -> int:
     count = 0
     for b in bridges:
         for cm in b.concept_mappings:
-            dt_name = getattr(cm.description_type1, "name", "")
-            label_name = getattr(cm.label, "name", "") if cm.label else ""
-            if dt_name == "plato-string-position-category" and label_name == "plato-opposite":
+            if (
+                _holds(cm.description_type1, _DIM_STRING_POSITION)
+                and getattr(cm.label, "relation", None) == "opposite"
+            ):
                 count += 1
                 break
     return count
-
-
-def _find_slipnet_node_in_bridges(bridges: list[Bridge], node_name: str) -> SlipnetNode | None:
-    """Find a slipnet node by name from any bridge's concept mappings."""
-    for b in bridges:
-        for cm in b.concept_mappings:
-            for node in [cm.description_type1, cm.descriptor1,
-                         cm.description_type2, cm.descriptor2, cm.label]:
-                if node is not None and getattr(node, "name", "") == node_name:
-                    return node
-    return None
 
 
 def _remq_duplicates(items: list) -> list:
@@ -3774,10 +3797,10 @@ def _get_all_swaps(cluster: list[Bridge]) -> list[tuple]:
     return swaps
 
 
-def _select_swap(dim_name: str, swaps: list[tuple]) -> tuple | None:
-    """Select a swap for a given dimension name."""
+def _select_swap(dim_role: str, swaps: list[tuple]) -> tuple | None:
+    """Select a swap for the dimension that plays *dim_role*."""
     for s in swaps:
-        if getattr(s[1], "name", "") == dim_name:
+        if _holds(s[1], dim_role):
             return s
     return None
 
@@ -3788,13 +3811,12 @@ def _get_common_change_schemas(cluster: list[Bridge]) -> list[tuple]:
     Scheme: get-common-change-schemas (rules.ss:702-706).
     Returns schemas where the relation is not identity.
     """
-    # A schema with no common relation (#f) is not eq? to plato-identity, so it
-    # survives (rules.ss:702-706).
+    # A schema with no common relation (#f) is not eq? to the identity relation, so it
+    # survives (rules.ss:702-706).  A node knows the relation it is (``node.relation``).
     common = _get_common_schemas(cluster)
-    identity_names = {"plato-identity"}
     return [
         s for s in common
-        if s[2] is None or getattr(s[2], "name", "") not in identity_names
+        if s[2] is None or getattr(s[2], "relation", None) != "identity"
     ]
 
 
@@ -3867,23 +3889,25 @@ def _all_same(items: list) -> bool:
 # ============================================================================
 
 
-def possible_to_instantiate(templates: list[tuple]) -> bool:
+def possible_to_instantiate(templates: list[tuple], slipnet: Any = None) -> bool:
     """Check if all rule-clause templates can be instantiated.
 
-    Scheme: possible-to-instantiate? (rules.ss:446-458).
+    Scheme: possible-to-instantiate? (rules.ss:446-458).  With a *slipnet*, a template that
+    names the string needs the String-Position dimension and ``whole`` of the configuration
+    to name it by; a configuration without them cannot build such a clause.
     """
     for t in templates:
         if t[0] == CLAUSE_INTRINSIC:
-            if not _object_description_possible(t[1]):
+            if not _object_description_possible(t[1], slipnet):
                 return False
         elif t[0] == CLAUSE_EXTRINSIC:
             for obj in t[1]:
-                if not _object_description_possible(obj):
+                if not _object_description_possible(obj, slipnet):
                     return False
     return True
 
 
-def _object_description_possible(obj: Any) -> bool:
+def _object_description_possible(obj: Any, slipnet: Any = None) -> bool:
     """Can a rule clause name *obj* at all?
 
     Scheme: ``object-description-possible?`` (``rules.ss:455-458``)::
@@ -3898,7 +3922,10 @@ def _object_description_possible(obj: Any) -> bool:
     fixing this gate would only move the illegal description into the fallback.
     """
     if _is_workspace_string(obj):
-        return True
+        if slipnet is None:
+            return True
+        roles = slipnet.roles
+        return bool(roles.dimension_string_position and roles.position_whole)
     return len(descriptions_for_rule(obj)) > 0
 
 
@@ -3973,7 +4000,7 @@ def build_rule_from_bridges(
     templates = sort_templates(templates)
 
     # 5. Check instantiability
-    if not possible_to_instantiate(templates):
+    if not possible_to_instantiate(templates, slipnet):
         return None
 
     # 6. Instantiate templates to clauses

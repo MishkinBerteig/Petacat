@@ -24,6 +24,9 @@ class FakeNode:
     logic is deterministic and independent of real activation thresholds.
     """
 
+    def has_role(self, role: str) -> bool:
+        return role in self.roles
+
     def __init__(
         self,
         name: str = "plato-x",
@@ -35,8 +38,13 @@ class FakeNode:
         intrinsic_link_length: int = 0,
         related: dict[str, FakeNode] | None = None,
         max_activation: float = 100.0,
+        roles: frozenset[str] | set[str] = frozenset(),
+        numeric_value: int | None = None,
     ) -> None:
         self.name = name
+        # The node named plato-sameness holds the role the engine now reads (bond_category.sameness).
+        self.roles = frozenset(roles) | ({"bond_category.sameness"} if name == "plato-sameness" else set())
+        self.numeric_value = numeric_value
         #: Relation name -> neighbour, for ``get_related_node``.  A Group derives
         #: its bond category from its group category this way (groups.ss:79).
         self.related: dict[str, FakeNode] = dict(related) if related else {}

@@ -26,6 +26,7 @@ to the four attributes the two functions under test touch, and — for the
 probability half of each test — a structure that is nothing but a strength.
 """
 
+from server.engine.slipnet import Alphabet
 import pytest
 
 from server.engine.bonds import Bond
@@ -55,6 +56,7 @@ class _FakeMeta:
 class _FakeSlipnet:
     def __init__(self):
         self.nodes = {}
+        self.alphabet = Alphabet()
 
 
 class _FakeTemperature:

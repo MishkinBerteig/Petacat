@@ -17,12 +17,12 @@ from server.engine.rules import (
 )
 
 
-def _node(name):
-    return SimpleNamespace(name=name)
+def _node(name, role=None):
+    return SimpleNamespace(name=name, roles=frozenset({role}) if role else frozenset())
 
 
 def test_bond_facet_change_is_found_when_the_group_category_change_is_not_first():
-    facet_dimension = _node("plato-bond-facet")
+    facet_dimension = _node("plato-bond-facet", "dimension.bond_facet")
     letter_category = _node("plato-letter-category")
     group = object.__new__(Group)
     group.bond_facet = letter_category
@@ -32,13 +32,13 @@ def test_bond_facet_change_is_found_when_the_group_category_change_is_not_first(
         SimpleNamespace(description_type=_node("plato-bond-category")),
         SimpleNamespace(description_type=facet_dimension),
     ]
-    group_category = _node("plato-group-category")
-    length = _node("plato-length")
+    group_category = _node("plato-group-category", "dimension.group_category")
+    length = _node("plato-length", "dimension.length")
     successor, opposite = _node("plato-successor"), _node("plato-opposite")
     first = IntrinsicChangeDescription(group, SCOPE_SUBOBJECTS, length, None, successor, None)
     second = IntrinsicChangeDescription(group, SCOPE_SELF, group_category, None, None, opposite)
 
-    slipnet = SimpleNamespace(nodes={"plato-bond-facet": facet_dimension})
+    slipnet = SimpleNamespace(roles=SimpleNamespace(dimension_bond_facet=facet_dimension))
     kind, reference, templates = change_descriptions_to_rule_clause_template(
         [first, second], slipnet
     )

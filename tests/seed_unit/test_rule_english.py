@@ -24,6 +24,7 @@ import pytest
 
 from server.engine.metadata import MetadataProvider
 from server.engine.rule_english import (
+    _Ctx,
     _new_object_phrase,
     _punctuate,
     transcribe_rule_to_english_lines,
@@ -70,7 +71,7 @@ class _Obj:
 
     def get_all_descriptions(self):
         if self._whole:
-            return [SimpleNamespace(descriptor=SimpleNamespace(name="plato-whole"))]
+            return [SimpleNamespace(descriptor=SimpleNamespace(name="plato-whole", roles=frozenset({"position.whole"})))]
         return []
 
 
@@ -250,7 +251,7 @@ def test_each_dimension_name_and_the_list_punctuation_match_metacat(nodes, meta)
         "plato-object-category": ["object-type", "object-types"],
         "plato-string-position-category": ["position", "positions"],
     }
-    assert [_punctuate(x) for x in ([], ["a"], ["a", "b"], ["a", "b", "c", "d"])] == [
+    assert [_punctuate(_Ctx(None, meta), x) for x in ([], ["a"], ["a", "b"], ["a", "b", "c", "d"])] == [
         "",
         "a",
         "a and b",
@@ -258,19 +259,20 @@ def test_each_dimension_name_and_the_list_punctuation_match_metacat(nodes, meta)
     ]
 
 
-def test_the_article_before_a_new_group_follows_metacats_letter_list(nodes):
+def test_the_article_before_a_new_group_follows_metacats_letter_list(nodes, meta):
     """Probed in Metacat by calling ``new-object-phrase`` on every letter it lists."""
+    ctx = _Ctx(None, meta)
     group = nodes["plato-group"]
     an = "aefhilmnorsx"
     for letter in "abcdefghilmnorstxz":
         expected = ("an" if letter in an else "a") + f" `{letter}' group"
-        assert _new_object_phrase(group, nodes["plato-" + letter], False) == expected
-        assert _new_object_phrase(group, nodes["plato-" + letter], True) == f"`{letter}' groups"
+        assert _new_object_phrase(ctx, group, nodes["plato-" + letter], False) == expected
+        assert _new_object_phrase(ctx, group, nodes["plato-" + letter], True) == f"`{letter}' groups"
     letter = nodes["plato-letter"]
-    assert _new_object_phrase(letter, nodes["plato-c"], False) == "the letter `c'"
-    assert _new_object_phrase(letter, None, False) == "a letter"
-    assert _new_object_phrase(letter, nodes["plato-successor"], True) == "letters"
-    assert _new_object_phrase(group, None, True) == "groups"
+    assert _new_object_phrase(ctx, letter, nodes["plato-c"], False) == "the letter `c'"
+    assert _new_object_phrase(ctx, letter, None, False) == "a letter"
+    assert _new_object_phrase(ctx, letter, nodes["plato-successor"], True) == "letters"
+    assert _new_object_phrase(ctx, group, None, True) == "groups"
 
 
 def test_a_rule_is_described_against_its_own_strings_and_the_text_is_kept(nodes, meta):

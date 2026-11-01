@@ -16,7 +16,11 @@ from server.engine.verbose import round_to_100ths
 import logging
 from typing import TYPE_CHECKING, Any
 
-from server.engine.rules import Rule, RuleClause, RuleChange, rules_equal
+from server.engine.images import ImageFailure
+from server.engine.rules import (
+    RULE_TOP, Rule, RuleClause, RuleChange, _TranslationFailure, rules_equal,
+)
+from server.engine.themes import RELATION_IDENTITY, THEME_VERTICAL_BRIDGE
 from server.engine.trace import ClampEvent
 
 if TYPE_CHECKING:
@@ -29,6 +33,23 @@ if TYPE_CHECKING:
     from server.engine.workspace import Workspace
 
 logger = logging.getLogger(__name__)
+
+#: What justify mode treats as "this rule cannot be carried over": the engine's own failures
+#: (a rule that cannot be applied, a translation that cannot be made).  Anything else is a bug
+#: and is raised, not read as an ordinary "could not translate".
+_ENGINE_FAILURES = (ImageFailure, _TranslationFailure)
+
+
+def _log_failure(what: str, slipnet: Slipnet | None, error: Exception) -> None:
+    """Say why a rule could not be carried over, naming the roles the configuration lacks
+    (a missing role is the usual reason a clause cannot be built)."""
+    unbound = (
+        [name for name, bound in slipnet.roles.items() if not bound] if slipnet is not None else []
+    )
+    logger.info(
+        "justify: %s failed (%s: %s); roles unbound in this configuration: %s",
+        what, type(error).__name__, error, ", ".join(unbound) or "none",
+    )
 
 
 # ============================================================================
@@ -126,7 +147,7 @@ def attempt_justification(
         vlog.print_object(chosen_rule)
 
     rule_type = chosen_rule.rule_type  # "top" or "bottom"
-    other_type_top = rule_type != "top"
+    other_type_top = rule_type != RULE_TOP
     # ``(tell *workspace* 'get-rules (if (eq? rule-type 'top) 'bottom 'top))``
     # (justify.ss:44-45): every rule of the other type, in list order, supported or
     # not.  (The old supported-then-built concatenation reordered the list the
@@ -150,14 +171,14 @@ def attempt_justification(
         # ref-objs2 the target side, whichever rule was chosen.  ref-objs1 is what the
         # vacuous-translation guard below tests.
         from_string = (
-            workspace.initial_string if rule_type == "top" else workspace.target_string
+            workspace.initial_string if rule_type == RULE_TOP else workspace.target_string
         )
         to_string = (
-            workspace.target_string if rule_type == "top" else workspace.initial_string
+            workspace.target_string if rule_type == RULE_TOP else workspace.initial_string
         )
         from_ref_objects = _reference_objects(chosen_rule, from_string, slipnet)
         to_ref_objects = _reference_objects(translated_rule, to_string, slipnet)
-        ref_objects1 = from_ref_objects if rule_type == "top" else to_ref_objects
+        ref_objects1 = from_ref_objects if rule_type == RULE_TOP else to_ref_objects
 
         # Step 3a -- Look for a matching existing rule
         matching_rule = _find_matching_rule(other_rules, translated_rule)
@@ -422,7 +443,7 @@ def clamp_rules(
         # justify.ss:163-170 clamps the vertical pattern whatever it holds: a bare
         # ``(vertical-bridge)`` still clamps the vertical theme type and switches
         # its thematic pressure on (trace.ss:1530-1536) (G-J2).
-        vtp = themespace.get_dominant_theme_pattern("vertical_bridge")
+        vtp = themespace.get_dominant_theme_pattern(THEME_VERTICAL_BRIDGE)
         if vtp:
             tp_dict = _theme_pattern_list_to_dict(vtp)
             if tp_dict:
@@ -517,7 +538,7 @@ def unify_rules(
         return None
 
     # Filter out whole/single concept mappings
-    filtered = _remove_whole_single_concept_mappings(concept_mappings)
+    filtered = _remove_whole_single_concept_mappings(concept_mappings, slipnet)
 
     # Convert to theme pattern entries: (dimension, label)
     entries: list[tuple[str, str | None]] = []
@@ -527,7 +548,7 @@ def unify_rules(
         if cm_type:
             entries.append((cm_type, label))
 
-    return ["vertical_bridge"] + entries
+    return [THEME_VERTICAL_BRIDGE] + entries
 
 
 def get_unifying_slippages(
@@ -551,7 +572,7 @@ def get_unifying_slippages(
     if concept_mappings is None:
         return []
 
-    filtered = _remove_whole_single_concept_mappings(concept_mappings)
+    filtered = _remove_whole_single_concept_mappings(concept_mappings, slipnet)
     return [cm for cm in filtered if cm.get("is_slippage", False)]
 
 
@@ -612,14 +633,14 @@ def traverse_rule_clauses(
             raise _TraversalFailure()
 
         # ``justify.ss:243-244``: the special object-type ``string`` unifies with
-        # ``plato-group``.  Figure 3.2's ``*string*`` object-description and a
+        # the group object type.  Figure 3.2's ``*string*`` object-description and a
         # string-spanning group name the same thing from two sides — "the whole of it" —
         # and the Scheme lets one rule's reading of it match the other's.  Without this
         # case any rule phrased about the string failed to unify with one phrased about
         # its spanning group, and the pair went to the clamp branch instead.
         if x1 == "string" or x2 == "string":
             other = x2 if x1 == "string" else x1
-            if getattr(other, "name", None) == "plato-group":
+            if "object.group" in getattr(other, "roles", ()):
                 return results
             raise _TraversalFailure()
 
@@ -655,8 +676,8 @@ def compare_rule_clause_lists(
     if _is_verbatim_clause_list(clauses1) and _is_verbatim_clause_list(clauses2):
         if len(clauses1) == len(clauses2) and all(
             rules_equal(
-                Rule("top", [c1]),
-                Rule("top", [c2]),
+                Rule(RULE_TOP, [c1]),
+                Rule(RULE_TOP, [c2]),
             )
             for c1, c2 in zip(clauses1, clauses2)
         ):
@@ -711,8 +732,8 @@ def get_vertical_theme_pattern_to_clamp(
 
     theme_type = unifying_pattern[0]
     # A Themespace relation is the bare name (``identity``, ``opposite``); the entries a
-    # unification yields carry the label *node* (or ``plato-identity``), which names no
-    # theme, so the clamp silently created none of them (G-J3).
+    # unification yields carry the label *node*, which names no theme, so the clamp
+    # silently created none of them (G-J3).
     pattern_entries = [
         (e[0], _relation_name(e[1])) + tuple(e[2:]) if isinstance(e, tuple) and len(e) >= 2 else e
         for e in unifying_pattern[1:]
@@ -743,10 +764,10 @@ def get_vertical_theme_pattern_to_clamp(
     # ``justify.ss:297-299`` nests ``add-direction-entry`` *around*
     # ``replace-bond-category-entry``: the bond-category swap happens first.
     # Heuristic 2: Replace BondCtgy with GroupCtgy
-    final_entries = _replace_bond_category_entry(final_entries)
+    final_entries = _replace_bond_category_entry(final_entries, slipnet)
 
     # Heuristic 1: Add direction entry if StrPos entry exists but Dir doesn't
-    final_entries = _add_direction_entry(final_entries)
+    final_entries = _add_direction_entry(final_entries, slipnet)
 
     if not final_entries:
         # Fall back to original pattern
@@ -756,11 +777,18 @@ def get_vertical_theme_pattern_to_clamp(
 
 
 def _relation_name(relation: Any) -> Any:
-    """A label node or ``plato-<name>`` as the Themespace spells a relation: ``<name>``."""
-    name = getattr(relation, "name", relation)
-    if isinstance(name, str) and name.startswith("plato-"):
-        return name[len("plato-"):]
-    return name
+    """A label node, or a relation name, as the Themespace spells a relation.
+
+    A label node knows the relation it is (``node.relation``, from ``theme_relations``); a
+    node that is no relation keeps its name, and a string is already the Themespace's
+    spelling.
+    """
+    if isinstance(relation, str):
+        return relation
+    name = getattr(relation, "relation", None)
+    if name is not None:
+        return name
+    return getattr(relation, "name", relation)
 
 
 def _retention_probability(
@@ -777,7 +805,7 @@ def _retention_probability(
     dim = entry[0] if isinstance(entry, tuple) else None
     rel = entry[1] if isinstance(entry, tuple) and len(entry) > 1 else None
 
-    if dim is not None and _is_string_position_category(dim):
+    if dim is not None and _plays(dim, "dimension.string_position", slipnet):
         return 1.0
 
     cd = _get_conceptual_depth(dim, slipnet) if dim else 50.0
@@ -787,6 +815,7 @@ def _retention_probability(
 
 def _add_direction_entry(
     entries: list[tuple[str, str | None]],
+    slipnet: Slipnet | None = None,
 ) -> list[tuple[str, str | None]]:
     """Heuristic: add Dir entry if StrPos exists but Dir doesn't.
 
@@ -796,15 +825,21 @@ def _add_direction_entry(
     dir_entry = None
     for entry in entries:
         dim = entry[0]
-        if _is_string_position_category(dim):
+        if _plays(dim, "dimension.string_position", slipnet):
             str_pos_entry = entry
-        if _is_direction_category(dim):
+        if _plays(dim, "dimension.direction", slipnet):
             dir_entry = entry
 
-    if str_pos_entry is not None and str_pos_entry[1] is not None and dir_entry is None:
-        dir_dim = "plato-direction-category"
+    # With no direction dimension in the configuration there is none to add.
+    dir_node = slipnet.roles.dimension_direction if slipnet is not None else None
+    if (
+        dir_node
+        and str_pos_entry is not None
+        and str_pos_entry[1] is not None
+        and dir_entry is None
+    ):
         return [
-            (dir_dim, str_pos_entry[1])
+            (dir_node.name, str_pos_entry[1])
         ] + list(entries)
 
     return list(entries)
@@ -812,6 +847,7 @@ def _add_direction_entry(
 
 def _replace_bond_category_entry(
     entries: list[tuple[str, str | None]],
+    slipnet: Slipnet | None = None,
 ) -> list[tuple[str, str | None]]:
     """Heuristic: replace BondCtgy with GroupCtgy.
 
@@ -821,16 +857,19 @@ def _replace_bond_category_entry(
     group_ctgy_entry = None
     for entry in entries:
         dim = entry[0]
-        if _is_bond_category(dim):
+        if _plays(dim, "dimension.bond_category", slipnet):
             bond_ctgy_entry = entry
-        if _is_group_category(dim):
+        if _plays(dim, "dimension.group_category", slipnet):
             group_ctgy_entry = entry
 
-    if bond_ctgy_entry is not None:
+    # With no group-category dimension in the configuration there is nothing to replace
+    # the bond category with, and the entry is left as it is.
+    group_node = slipnet.roles.dimension_group_category if slipnet is not None else None
+    if bond_ctgy_entry is not None and group_node:
         remaining = [e for e in entries if e is not bond_ctgy_entry]
         if group_ctgy_entry is None:
             return [
-                (_group_category_name(), bond_ctgy_entry[1])
+                (group_node.name, bond_ctgy_entry[1])
             ] + remaining
         return remaining
 
@@ -886,10 +925,10 @@ def _translate_rule(
     # (``answers.ss:1442-1448``), so with no vertical bridges at all the rule still
     # translates to its literal counterpart.
     from_string = (
-        workspace.initial_string if rule.rule_type == "top" else workspace.target_string
+        workspace.initial_string if rule.rule_type == RULE_TOP else workspace.target_string
     )
     to_string = (
-        workspace.target_string if rule.rule_type == "top" else workspace.initial_string
+        workspace.target_string if rule.rule_type == RULE_TOP else workspace.initial_string
     )
     translated = rule.translate(
         from_string, to_string, slipnet, rng=rng, meta=meta
@@ -919,7 +958,8 @@ def _reference_objects(
         return []
     try:
         return get_all_reference_objects(rule, string, slipnet)
-    except Exception:
+    except _ENGINE_FAILURES as error:
+        _log_failure("finding the reference objects", slipnet, error)
         return []
 
 
@@ -953,8 +993,8 @@ def _build_translated_string(
             workspace,
             register_bridges=False,
         )
-    except Exception:
-        logger.debug("Could not build translated string", exc_info=True)
+    except _ENGINE_FAILURES as error:
+        _log_failure("building the translated string", slipnet, error)
         return None
 
 
@@ -1013,7 +1053,8 @@ def _translated_rule_works(
         return False
     try:
         return translated_rule.currently_works(workspace, slipnet)
-    except Exception:
+    except _ENGINE_FAILURES as error:
+        _log_failure("testing the translated rule", slipnet, error)
         return False
 
 
@@ -1021,7 +1062,7 @@ def _order_rules(
     chosen_rule: Rule, other_rule: Rule, chosen_type: str
 ) -> tuple[Rule, Rule]:
     """Return (top_rule, bottom_rule) regardless of which was chosen."""
-    if chosen_type == "top":
+    if chosen_type == RULE_TOP:
         return (chosen_rule, other_rule)
     return (other_rule, chosen_rule)
 
@@ -1202,7 +1243,11 @@ def _get_category(node: Any) -> Any:
 def _get_label(n1: Any, n2: Any, slipnet: Slipnet | None) -> str | None:
     """Get the label (identity, opposite, etc.) between two nodes."""
     if n1 is n2:
-        return "plato-identity"
+        # The identity relation is spelled as the Themespace does.  A configuration
+        # without it labels no mapping identity (the mapping is a slippage, "different").
+        if slipnet is not None and not slipnet.relation(RELATION_IDENTITY):
+            return None
+        return RELATION_IDENTITY
     if slipnet is not None and hasattr(slipnet, "get_label"):
         return slipnet.get_label(n1, n2)
     return None
@@ -1219,39 +1264,29 @@ def _get_conceptual_depth(node_name: Any, slipnet: Slipnet | None) -> float:
     return 50.0
 
 
-def _is_string_position_category(dim: Any) -> bool:
-    name = getattr(dim, "name", dim) if not isinstance(dim, str) else dim
-    return name == "plato-string-position-category"
-
-
-def _is_direction_category(dim: Any) -> bool:
-    name = getattr(dim, "name", dim) if not isinstance(dim, str) else dim
-    return name == "plato-direction-category"
-
-
-def _is_bond_category(dim: Any) -> bool:
-    name = getattr(dim, "name", dim) if not isinstance(dim, str) else dim
-    return name == "plato-bond-category"
-
-
-def _is_group_category(dim: Any) -> bool:
-    name = getattr(dim, "name", dim) if not isinstance(dim, str) else dim
-    return name == "plato-group-category"
-
-
-def _group_category_name() -> str:
-    return "plato-group-category"
+def _plays(dim: Any, role: str, slipnet: Slipnet | None) -> bool:
+    """True if *dim*, a dimension node or the name of one (theme patterns hold names),
+    is the node that plays the dimension *role*.  A role nothing holds is played by none."""
+    if slipnet is None:
+        return False
+    node = slipnet.roles.get(role)
+    if not node:
+        return False
+    return dim is node or dim == node.name
 
 
 def _is_identity_label(label: Any) -> bool:
+    """True for the identity relation: its name in the Themespace's spelling, or its node."""
     if label is None:
         return False
-    name = getattr(label, "name", label) if not isinstance(label, str) else label
-    return name in ("plato-identity", "identity")
+    if isinstance(label, str):
+        return label == RELATION_IDENTITY
+    return getattr(label, "relation", None) == RELATION_IDENTITY
 
 
 def _remove_whole_single_concept_mappings(
     concept_mappings: list[dict[str, Any]],
+    slipnet: Slipnet | None = None,
 ) -> list[dict[str, Any]]:
     """Remove the concept-mapping whose CM-type is string-position-category and
     whose descriptor1 is whole or single.
@@ -1265,10 +1300,9 @@ def _remove_whole_single_concept_mappings(
     for index, cm in enumerate(result):
         cm_type = cm.get("cm_type", "")
         d1 = cm.get("descriptor1")
-        d1_name = getattr(d1, "name", str(d1)) if d1 else ""
-        if cm_type == "plato-string-position-category" and d1_name in (
-            "plato-single",
-            "plato-whole",
+        roles = getattr(d1, "roles", ()) if d1 else ()
+        if _plays(cm_type, "dimension.string_position", slipnet) and (
+            "position.single" in roles or "position.whole" in roles
         ):
             del result[index]
             break

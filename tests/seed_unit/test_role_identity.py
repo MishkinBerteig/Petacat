@@ -50,14 +50,22 @@ def _meta():
 
 def todays_lists() -> dict[str, list[str]]:
     """The ordered lists as today's engine code holds them."""
-    from server.engine.images import _LETTER_NAMES, _NUMBER_NAMES
-    from server.engine.rules import _RULE_DIMENSION_ORDER_NAMES
-
     return {
-        "rule.dimension_order": list(_RULE_DIMENSION_ORDER_NAMES),
+        "rule.dimension_order": list(ORDERED_ROLES["rule.dimension_order"]),
         "answer.description_dimension": list(ORDERED_ROLES["answer.description_dimension"]),
-        "ladder": list(_NUMBER_NAMES),
-        "alphabet": list(_LETTER_NAMES),
+    }
+
+
+def derived_ladder_and_alphabet() -> dict[str, list[str]]:
+    """The number ladder and the alphabet as EN5b derives them (``slipnet.alphabet``): the
+    committed recording holds the old hard-coded lists (``images._NUMBER_NAMES`` and
+    ``_LETTER_NAMES``, deleted by EN5b), and the test below compares the two."""
+    from server.engine.slipnet import Slipnet
+
+    alphabet = Slipnet.from_metadata(_meta()).alphabet
+    return {
+        "ladder": [n.name for _, n in sorted(alphabet.numbers.items())],
+        "alphabet": [n.name for _, n in sorted(alphabet.glyph_nodes.items())],
     }
 
 
@@ -72,7 +80,7 @@ def record_today() -> dict:
         "single_roles": SINGLE_ROLES,
         "ordered_roles": {k: list(v) for k, v in ORDERED_ROLES.items()},
         "codelet_roles": CODELET_ROLES,
-        "ordered_lists_in_engine_code": todays_lists(),
+        "ordered_lists_in_engine_code": {**todays_lists(), **derived_ladder_and_alphabet()},
         "slipnet_node_order": list(slipnet.nodes),
     }
 
@@ -128,7 +136,7 @@ def test_roles_relations_numbers_and_letters_account_for_all_59_nodes(slipnet) -
 
 
 def test_ordered_roles_equal_the_engines_own_lists() -> None:
-    today = todays_lists()
+    today = {**todays_lists(), **json.loads(RECORDING.read_text())["ordered_lists_in_engine_code"]}
     assert list(ORDERED_ROLES["rule.dimension_order"]) == today["rule.dimension_order"]
     assert list(ORDERED_ROLES["answer.description_dimension"]) == today["answer.description_dimension"]
     assert list(NUMBER_NODES) == today["ladder"]
@@ -166,6 +174,13 @@ def test_ordered_role_equals_the_old_tuple(slipnet, role) -> None:
     resolved = _resolve(_roles(slipnet), role)
     assert len(resolved) == len(ORDERED_ROLES[role])
     assert all(a is slipnet.nodes[name] for a, name in zip(resolved, ORDERED_ROLES[role]))
+
+
+def test_derived_ladder_and_alphabet_equal_the_old_lists() -> None:
+    """EN5b (G5): ``slipnet.alphabet`` equals the deleted ``_NUMBER_NAMES`` / ``_LETTER_NAMES``,
+    which the recording holds."""
+    old = json.loads(RECORDING.read_text())["ordered_lists_in_engine_code"]
+    assert derived_ladder_and_alphabet() == {"ladder": old["ladder"], "alphabet": old["alphabet"]}
 
 
 def test_ladder_and_alphabet_equal_the_old_lists(slipnet, meta) -> None:

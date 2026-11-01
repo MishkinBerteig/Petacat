@@ -1296,9 +1296,7 @@ def _consolidate_group(ctx: EngineContext, group: Group) -> Group | None:
             spliced,
             sameness,
             length_node,
-            lambda obj: ctx.slipnet.nodes.get(_PLATONIC_LENGTH[getattr(obj, "length", 1)])
-            if getattr(obj, "length", 1) in _PLATONIC_LENGTH
-            else None,
+            lambda obj: ctx.slipnet.alphabet.number_for(getattr(obj, "length", 1)),
         )
         if bonds is None:
             return None
@@ -1342,10 +1340,6 @@ def _consolidate_group(ctx: EngineContext, group: Group) -> Group | None:
     return group
 
 
-#: One definition, in ``groups.py`` — this used to be a second copy of the same five
-#: entries.  Imported rather than re-stated, because two mappings that must agree and
-#: are written down twice is `PHASE 1 PLAN.md` §0.2(c) in miniature.
-from server.engine.groups import PLATONIC_LENGTH_NODES as _PLATONIC_LENGTH
 from server.engine.concept_mappings import slippage_english_name
 from server.engine.formulas import bond_degree_of_assoc, group_evaluation_probability, length_description_probability
 from server.engine.groups import Group as GroupClass, attach_length_description

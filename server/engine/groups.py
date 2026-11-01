@@ -550,21 +550,12 @@ class Group(WorkspaceObject, WorkspaceStructure):
         return f"Group({cat}, {objs} objects, strength={self.strength:.0f})"
 
 
-#: Group length -> the Slipnet node that names it.
-#:
-#: Scheme: ``*slipnet-numbers*`` (``slipnet.ss:476``), five long — there is no
-#: ``plato-six``, so a group of six has no Length descriptor and that is faithful.
-#:
-#: The one definition.  ``codelet_dsl/builtins.py`` held a second copy of the same
-#: five entries, spelled with the ``plato-`` prefix instead of adding it at the use
-#: site; it imports this now.
-PLATONIC_LENGTH_NODES = {
-    1: "plato-one",
-    2: "plato-two",
-    3: "plato-three",
-    4: "plato-four",
-    5: "plato-five",
-}
+def _slipnet_of(group: Any) -> Any:
+    """The Slipnet reached from the group's string, or ``None``."""
+    slipnet = getattr(getattr(group.string, "workspace", None), "slipnet", None)
+    if slipnet is None:
+        slipnet = getattr(group.string, "slipnet", None)
+    return slipnet
 
 
 def attach_length_description(group: Group) -> bool:
@@ -572,7 +563,7 @@ def attach_length_description(group: Group) -> bool:
 
     Scheme: ``attach-length-description`` (groups.ss:831-837) — a no-op when the
     group is already described on Length, and when its length is one the Slipnet
-    cannot name (there are only ``plato-one`` .. ``plato-five``).
+    cannot name (the ladder has no node with that ``numeric_value``).
 
     Deliberately unconditional: *whether* to attach is the caller's decision, and
     the reference makes it in exactly four places — ``propose-group``
@@ -583,13 +574,15 @@ def attach_length_description(group: Group) -> bool:
     # such as the translated-rule pass may hand one in (answers.ss:1090-1091).
     node = lambda name: Group._node(group, name)  # noqa: E731 - needs only ``.string``
     length_type = node("plato-length")
-    descriptor_node = PLATONIC_LENGTH_NODES.get(getattr(group, "length", 1))
-    if length_type is None or descriptor_node is None:
+    slipnet = _slipnet_of(group)
+    # The node whose ``numeric_value`` is the group's length; none (a gapped ladder, or a
+    # group longer than the ladder) means no Length description.
+    descriptor = (
+        slipnet.alphabet.number_for(getattr(group, "length", 1)) if slipnet is not None else None
+    )
+    if length_type is None or descriptor is None:
         return False
     if group.description_type_present(length_type):
-        return False
-    descriptor = node(descriptor_node)
-    if descriptor is None:
         return False
 
     description = Description(group, length_type, descriptor)

@@ -11,7 +11,9 @@ Scheme source: slipnet.ss
 from __future__ import annotations
 
 import math
-from typing import TYPE_CHECKING, Any, Callable
+from dataclasses import dataclass, field
+from types import MappingProxyType
+from typing import TYPE_CHECKING, Any, Callable, Mapping
 
 from server.engine.numeric.backend import select_backend
 from server.engine.roles import Roles, absent, resolve_roles
@@ -65,9 +67,14 @@ def _group_length(obj: Any) -> int | None:
     return len(getattr(obj, "objects", [])) if _is_group(obj) else None
 
 
+def _holds_role(node: Any, role: str) -> bool:
+    has_role = getattr(node, "has_role", None)
+    return bool(has_role(role)) if callable(has_role) else False
+
+
 def _letter_category_name(obj: Any) -> str:
     for d in getattr(obj, "descriptions", []):
-        if getattr(d.description_type, "name", "") == "plato-letter-category":
+        if _holds_role(d.description_type, "dimension.letter_category"):
             return getattr(d.descriptor, "name", "")
     return getattr(getattr(obj, "letter_category", None), "name", "")
 
@@ -927,6 +934,74 @@ _UNRESOLVED = object()
 _NO_ROLES = Roles()
 
 
+@dataclass(frozen=True)
+class Alphabet:
+    """The letters and the numbers, derived once at Slipnet build (absence plan, section 3.3).
+
+    Nothing but two node columns defines them.  A **letter** is a node with a ``glyph``; a
+    **number** is a node with a ``numeric_value``.  There is no role, list or count of either,
+    so an alphabet of a to d and w to z, or a ladder 1, 2, 4, is just data.  If two nodes
+    share a glyph (or a value) the first in node order is kept; the build never raises.
+
+    ``first_letter`` / ``last_letter`` are the first (by node order) letters with a property
+    link to the ``alphabet.first_marker`` / ``alphabet.last_marker`` role node, or ``None``.
+    Order and successor chains are not held here: they are the lateral links the relation
+    labels, which the images walk.
+    """
+
+    glyph_nodes: Mapping[str, SlipnetNode] = field(default_factory=dict)
+    numbers: Mapping[int, SlipnetNode] = field(default_factory=dict)
+    first_letter: SlipnetNode | None = None
+    last_letter: SlipnetNode | None = None
+
+    @classmethod
+    def build(cls, nodes: dict[str, SlipnetNode], roles: Roles) -> Alphabet:
+        glyph_nodes: dict[str, SlipnetNode] = {}
+        numbers: dict[int, SlipnetNode] = {}
+        for node in nodes.values():
+            if node.glyph is not None and node.glyph not in glyph_nodes:
+                glyph_nodes[node.glyph] = node
+            if node.numeric_value is not None and node.numeric_value not in numbers:
+                numbers[node.numeric_value] = node
+
+        def marked(marker: Any) -> SlipnetNode | None:
+            if not marker:
+                return None
+            for node in glyph_nodes.values():
+                if any(link.to_node is marker for link in node.property_links):
+                    return node
+            return None
+
+        # ``glyph_nodes`` is in node order already, so "first by node order" is its order.
+        first = marked(roles.alphabet_first_marker)
+        last = marked(roles.alphabet_last_marker)
+        return cls(MappingProxyType(glyph_nodes), MappingProxyType(numbers), first, last)
+
+    def is_letter(self, node: Any) -> bool:
+        return getattr(node, "glyph", None) is not None
+
+    def is_number(self, node: Any) -> bool:
+        return getattr(node, "numeric_value", None) is not None
+
+    def number_for(self, n: int) -> SlipnetNode | None:
+        """The node whose ``numeric_value`` is *n*, or ``None`` (no node names that count)."""
+        return self.numbers.get(n)
+
+    def value_of(self, node: SlipnetNode) -> int:
+        value = getattr(node, "numeric_value", None)
+        if value is None:
+            raise ValueError(f"{node} is not a number node")
+        return value
+
+    @property
+    def unit_length_node(self) -> SlipnetNode | None:
+        """The node for the count 1: a letter's length descriptor."""
+        return self.numbers.get(1)
+
+
+_NO_ALPHABET = Alphabet()
+
+
 class Slipnet:
     """The full semantic network."""
 
@@ -946,6 +1021,9 @@ class Slipnet:
         #: The relation nodes by relation name, from the ``theme_relations`` table: only the
         #: rows whose node exists (``diff`` has none).  Read through :meth:`relation`.
         self.relations: dict[str, SlipnetNode] = {}
+        #: The letters and the numbers, derived in ``from_metadata`` from the ``glyph`` and
+        #: ``numeric_value`` columns.  A bare ``Slipnet()`` has neither.
+        self.alphabet: Alphabet = _NO_ALPHABET
         # Resolved on first use rather than here, because ``from_metadata``
         # computes the decay rates *after* constructing the Slipnet and the
         # numeric layout needs them.
@@ -1039,6 +1117,8 @@ class Slipnet:
                 rel_node.relation = row.name
         for node in slipnet.nodes.values():
             node.relations = slipnet.relations
+
+        slipnet.alphabet = Alphabet.build(slipnet.nodes, slipnet.roles)
 
         # Compute decay rates.  Held on the Slipnet as well, because the *spread*
         # scale is computed from the same cycle length once per update and had no

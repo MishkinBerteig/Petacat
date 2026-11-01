@@ -118,8 +118,9 @@ class WorkspaceString:
 
         # Create Letter objects
         for i, ch in enumerate(text):
-            node_name = f"plato-{ch}"
-            letter_node = slipnet.nodes.get(node_name)
+            # A character with no glyph node is not perceived: ``None``, as a capital is
+            # under the Metacat Standard Configuration.
+            letter_node = slipnet.alphabet.glyph_nodes.get(ch)
             letter = Letter(self, i, letter_node)
             self.objects.append(letter)
 
@@ -301,7 +302,8 @@ class WorkspaceString:
         consolidation could propose the mirror image of a sameness bond already in
         the string, find no equivalent, and try to build into an occupied slot.
         """
-        symmetric = getattr(bond.bond_category, "name", "") == "plato-sameness"
+        has_role = getattr(bond.bond_category, "has_role", None)
+        symmetric = bool(has_role("bond_category.sameness")) if callable(has_role) else False
         for existing in self.bonds:
             if (
                 existing.bond_category is not bond.bond_category
@@ -397,9 +399,9 @@ class WorkspaceString:
         slipnet = getattr(getattr(self, "workspace", None), "slipnet", None)
         if slipnet is None:
             return
-        middle = slipnet.nodes.get("plato-middle")
-        position_type = slipnet.nodes.get("plato-string-position-category")
-        if middle is None or position_type is None:
+        middle = slipnet.roles.position_middle
+        position_type = slipnet.roles.dimension_string_position
+        if not middle or not position_type:
             return
 
         # The sweep runs over ``get-all-objects`` (workspace-strings.ss:115), which
@@ -1726,10 +1728,10 @@ class Workspace:
             key=lambda o: o.left_string_pos,
         )
 
-        facet_node = self.slipnet.get_node("plato-bond-facet")
+        facet_node = self.slipnet.roles.dimension_bond_facet
         facets = (
             [link.to_node for link in facet_node.instance_links]
-            if facet_node is not None
+            if facet_node
             else []
         )
 

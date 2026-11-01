@@ -14,6 +14,7 @@ real ``WorkspaceString`` over a slipnet faked down to its ``.nodes`` mapping.
 from server.engine.bonds import Bond
 from server.engine.groups import Group
 from server.engine.rng import TraceSeam
+from server.engine.slipnet import Alphabet
 from server.engine.workspace import WorkspaceString
 
 from tests.unit._fakes import FakeNode
@@ -222,6 +223,7 @@ class _FakeSlipnet:
 
     def __init__(self):
         self.nodes = {}
+        self.alphabet = Alphabet()
 
 
 def _real_string(text):

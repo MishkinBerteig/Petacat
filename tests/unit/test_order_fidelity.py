@@ -4,6 +4,7 @@ Each test names the Scheme site it pins (DISCREPANCIES5 C-1, G-Z4, I-4, I-5).  T
 cosmetic: they are the orders of weighted walks, of coin flips and of first-match searches.
 """
 
+from server.engine.slipnet import Alphabet
 import json
 from pathlib import Path
 from types import SimpleNamespace as NS
@@ -39,6 +40,7 @@ def test_chez_sort_agrees_with_chez_on_a_relation_that_is_not_a_strict_order(cas
 
 class _Slipnet:
     nodes: dict = {}
+    alphabet = Alphabet()
 
 
 def _group(first, last):

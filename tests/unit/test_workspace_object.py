@@ -9,6 +9,7 @@ full engine or the database. No randomness is involved.
 
 from server.engine.groups import Group
 from server.engine.rng import RNG
+from server.engine.slipnet import Alphabet
 from server.engine.workspace import WorkspaceString
 from server.engine.workspace_objects import Letter, WorkspaceObject
 from server.engine.slipnet import SlipnetNode
@@ -21,6 +22,7 @@ class _FakeSlipnet:
 
     def __init__(self):
         self.nodes = {}
+        self.alphabet = Alphabet()
 
 
 def test_letter_creation():

@@ -17,6 +17,7 @@ reads, and the slipnet down to the ``.nodes`` mapping ``WorkspaceString`` needs
 to build its letters.  No database, no seed data, no engine run.
 """
 
+from server.engine.slipnet import Alphabet
 import pytest
 
 from server.engine.rng import RNG
@@ -38,6 +39,7 @@ class _FakeSlipnet:
 
     def __init__(self):
         self.nodes = {}
+        self.alphabet = Alphabet()
 
 
 def _string_with_salience(saliences, key="intra"):

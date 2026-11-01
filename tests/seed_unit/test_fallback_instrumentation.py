@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from tests.support.fallback_instrumentation import Observation, blanket_sites
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -24,20 +26,27 @@ def _slipnet():
     return Slipnet.from_metadata(MetadataProvider.from_standard_configuration(str(REPO_ROOT / "seed_data")))
 
 
-def test_justify_has_three_blanket_handlers() -> None:
-    sites = blanket_sites(JUSTIFY)
-    assert len(sites) == 3 and all(clause == "except Exception" for _, clause in sites)
+def test_justify_has_no_blanket_handler_left() -> None:
+    """B10 (EN8): the three blanket handlers were proved unhit under the Metacat Standard
+    Configuration (justify corpus, ``--justify``) and narrowed to the engine's failure types."""
+    assert blanket_sites(JUSTIFY) == []
 
 
-def test_a_blanket_handler_hit_is_counted() -> None:
+def test_a_narrowed_handler_catches_the_engines_failures_only() -> None:
     from server.engine import justify
+    from server.engine.images import ImageFailure
 
-    with Observation() as obs:
-        # a rule that is not a rule makes get_all_reference_objects raise inside the handler's try
-        assert justify._reference_objects(object(), object(), object()) == []
-    report = obs.report()
-    hits = [h for h in report["handled_exceptions"] if h["site"].startswith("server/engine/justify.py")]
-    assert len(hits) == 1 and hits[0]["blanket"] and hits[0]["hits"] == 1
+    class _Raises:
+        def __init__(self, error):
+            self.error = error
+
+        def currently_works(self, workspace, slipnet):
+            raise self.error
+
+    slipnet = _slipnet()
+    assert justify._translated_rule_works(_Raises(ImageFailure("x")), None, slipnet, "top") is False
+    with pytest.raises(AttributeError):
+        justify._translated_rule_works(_Raises(AttributeError("bug")), None, slipnet, "top")
 
 
 def test_a_missing_node_lookup_is_counted_and_behaves_like_a_dict() -> None:

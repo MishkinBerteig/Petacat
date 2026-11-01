@@ -32,18 +32,14 @@ def exact_fraction(value: Any) -> Fraction:
     return Fraction(value)
 
 
-# Names of slipnet nodes considered non-distinguishing for the
-# ``distinguishing_descriptor`` predicate.  Matches *slipnet-numbers*
-# plus plato-letter and plato-group in the Scheme source.
-_NON_DISTINGUISHING_NAMES: set[str] = {
-    "plato-letter",
-    "plato-group",
-    "plato-one",
-    "plato-two",
-    "plato-three",
-    "plato-four",
-    "plato-five",
-}
+def _is_generic_descriptor(descriptor: Any) -> bool:
+    """A node that never distinguishes anything: a number (a node with a ``numeric_value``), or
+    the holder of the ``object.letter`` or ``object.group`` role.  Matches ``*slipnet-numbers*``
+    plus ``plato-letter`` and ``plato-group`` in the Scheme source."""
+    if getattr(descriptor, "numeric_value", None) is not None:
+        return True
+    has_role = getattr(descriptor, "has_role", None)
+    return callable(has_role) and (has_role("object.letter") or has_role("object.group"))
 
 
 class WorkspaceObject:
@@ -876,11 +872,7 @@ def distinguishing_descriptor(obj: Any, descriptor: Any) -> bool:
     — never distinguish anything, and a group's siblings exclude its own enclosing
     group and its own subgroups, both as in the Scheme.
     """
-    try:
-        name = descriptor.name
-    except AttributeError:
-        name = ""
-    if name in _NON_DISTINGUISHING_NAMES:
+    if _is_generic_descriptor(descriptor):
         return False
 
     try:
@@ -944,7 +936,8 @@ def _description_is_relevant(d: Any) -> bool:
 def _is_sameness_bond(bond: Any) -> bool:
     """True if the bond's category is sameness."""
     cat = getattr(bond, "bond_category", None)
-    return getattr(cat, "name", "") == "plato-sameness"
+    has_role = getattr(cat, "has_role", None)
+    return bool(has_role("bond_category.sameness")) if callable(has_role) else False
 
 
 class Letter(WorkspaceObject):

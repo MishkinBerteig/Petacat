@@ -7,6 +7,7 @@ elsewhere) constructed over the string's letters; slipnet nodes are faked.
 No randomness is involved.
 """
 
+from server.engine.slipnet import Alphabet
 import pytest
 
 from server.engine.bonds import Bond
@@ -21,6 +22,7 @@ class _FakeSlipnet:
 
     def __init__(self):
         self.nodes = {}
+        self.alphabet = Alphabet()
 
 
 class _RightBond:

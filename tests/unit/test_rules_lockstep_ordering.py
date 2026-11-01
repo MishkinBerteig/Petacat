@@ -44,8 +44,8 @@ def test_sort_templates_orders_disjoint_objects_by_position_and_intrinsic_first(
 
 def test_a_schema_with_no_common_relation_survives_the_identity_filter(monkeypatch):
     dim, d = NS(name="plato-letter-category"), NS(name="plato-d")
-    ident = NS(name="plato-identity")
-    succ = NS(name="plato-successor")
+    ident = NS(name="plato-identity", relation="identity")
+    succ = NS(name="plato-successor", relation="successor")
     schemas = [(dim, None, None, d), (dim, None, ident, d), (dim, None, succ, d)]
     monkeypatch.setattr(rules, "_get_common_schemas", lambda cluster: schemas)
     assert rules._get_common_change_schemas([]) == [schemas[0], schemas[2]]

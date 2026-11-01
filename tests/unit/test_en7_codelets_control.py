@@ -202,13 +202,7 @@ CONVERTED_NODE_ROLES = (
     "position.single", "object.letter", "bond_category.sameness", "group_category.sameness",
 )
 CONVERTED_CODELET_ROLES = ("evaluator.bond", "evaluator.group", "evaluator.description")
-#: ``workspace.py`` still reads ``plato-bond-facet`` by name (the workspace package, not EN7):
-#: a run on a configuration without that node cannot start until that package lands.
-WORKSPACE_PENDING = pytest.param(
-    "dimension.bond_facet",
-    marks=pytest.mark.xfail(reason="workspace.py names plato-bond-facet (not EN7's file)", strict=False),
-)
-G9_ROLES = (*CONVERTED_NODE_ROLES, WORKSPACE_PENDING)
+G9_ROLES = (*CONVERTED_NODE_ROLES, "dimension.bond_facet")
 G9_STEPS = 150
 
 
