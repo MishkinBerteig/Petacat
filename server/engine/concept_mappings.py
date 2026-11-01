@@ -14,9 +14,20 @@ if TYPE_CHECKING:
     from server.engine.slipnet import Slipnet, SlipnetLink, SlipnetNode
 
 
-# The generic-category node names (plato-letter, plato-group and the five numbers —
-# the Scheme's *slipnet-numbers*) now live beside the one predicate that reads them,
-# in workspace_objects.distinguishing_descriptor.
+# The generic-category descriptors (the nodes holding ``object.letter`` and ``object.group``,
+# and every number) are read by the one predicate that needs them,
+# workspace_objects.distinguishing_descriptor.
+#
+# Every test of "which concept is this" below is a node-side role or relation read
+# (``holds_role``, ``node.relation``): a mapping holds nodes but no Slipnet handle.  A node
+# or label nothing holds (``None``, a stand-in) plays no role.
+from server.engine.slipnet import holds_role
+
+
+def _relation_of(label: Any) -> Any:
+    """The theme-relation name a label node stands for (``identity``, ``opposite`` ...), or
+    ``None`` for no label or a node that is no relation."""
+    return getattr(label, "relation", None) if label else None
 
 
 def _recomputed_label(descriptor1: Any, descriptor2: Any) -> Any:
@@ -164,8 +175,8 @@ class ConceptMapping:
         # For letter-category or length description types, look at lateral links
         # (which include successor/predecessor between adjacent letters/numbers).
         # For all other types, look at lateral sliplinks.
-        dt1_name = getattr(self.description_type1, "name", "")
-        if dt1_name in ("plato-letter-category", "plato-length"):
+        dt1 = self.description_type1
+        if holds_role(dt1, "dimension.letter_category") or holds_role(dt1, "dimension.length"):
             links_to_search = getattr(self.descriptor1, "lateral_links", [])
         else:
             links_to_search = getattr(self.descriptor1, "lateral_sliplinks", [])
@@ -215,7 +226,7 @@ class ConceptMapping:
         if self.object1 is None or self.object2 is None:
             return True  # Conservative default when objects unavailable
         # Identity mapping of 'whole' is not distinguishing
-        if self.is_identity and getattr(self.descriptor1, "name", "") == "plato-whole":
+        if self.is_identity and holds_role(self.descriptor1, "position.whole"):
             return False
         # ``_descriptor_is_distinguishing`` is the one predicate (below); called
         # directly, without the staticmethod hop, on this per-bridge-pair hot path.
@@ -294,7 +305,7 @@ class ConceptMapping:
         predicate the whole/single clause belongs to is
         :attr:`identity_or_opposite_mapping`.
         """
-        return getattr(self.label, "name", "") == "plato-opposite"
+        return _relation_of(self.label) == "opposite"
 
     @property
     def identity_or_opposite_mapping(self) -> bool:
@@ -304,13 +315,11 @@ class ConceptMapping:
         the mappings that relate two descriptors by a *named* correspondence
         rather than by mere linkage.
         """
-        label_name = getattr(self.label, "name", "") if self.label else ""
-        if label_name in ("plato-identity", "plato-opposite"):
+        if _relation_of(self.label) in ("identity", "opposite"):
             return True
-        d1_name = getattr(self.descriptor1, "name", "")
-        d2_name = getattr(self.descriptor2, "name", "")
-        return (d1_name == "plato-whole" and d2_name == "plato-single") or (
-            d1_name == "plato-single" and d2_name == "plato-whole"
+        d1, d2 = self.descriptor1, self.descriptor2
+        return (holds_role(d1, "position.whole") and holds_role(d2, "position.single")) or (
+            holds_role(d1, "position.single") and holds_role(d2, "position.whole")
         )
 
     def distinguishing_identity_or_opposite(self) -> bool:
@@ -331,10 +340,11 @@ class ConceptMapping:
         The three dimensions that reverse together when a group is re-read
         backwards: direction, bond category, group category.
         """
-        return getattr(self.description_type1, "name", "") in (
-            "plato-direction-category",
-            "plato-bond-category",
-            "plato-group-category",
+        dt = self.description_type1
+        return (
+            holds_role(dt, "dimension.direction")
+            or holds_role(dt, "dimension.bond_category")
+            or holds_role(dt, "dimension.group_category")
         )
 
     @property
@@ -343,8 +353,8 @@ class ConceptMapping:
 
         Scheme: concept-mappings.ss:80-82.
         """
-        dt_name = getattr(self.description_type1, "name", "")
-        return dt_name in ("plato-bond-category", "plato-bond-facet")
+        dt = self.description_type1
+        return holds_role(dt, "dimension.bond_category") or holds_role(dt, "dimension.bond_facet")
 
     def activate_descriptions(self) -> None:
         """Activate the description-type and descriptor nodes in the slipnet.

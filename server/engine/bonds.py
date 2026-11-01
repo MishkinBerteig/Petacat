@@ -11,7 +11,7 @@ from __future__ import annotations
 import math
 from typing import TYPE_CHECKING, Any
 
-from server.engine.slipnet import opposite_node
+from server.engine.slipnet import holds_role, opposite_node
 from server.engine.workspace_structures import WorkspaceStructure
 from server.engine.concept_mappings import ConceptMapping
 from server.engine.groups import Group
@@ -75,7 +75,7 @@ class Bond(WorkspaceStructure):
             compat = 0.7
 
         # Bond facet factor: 1.0 for letter-category, 0.7 for others
-        if self.bond_facet.name == "plato-letter-category":
+        if holds_role(self.bond_facet, "dimension.letter_category"):
             facet_factor = 1.0
         else:
             facet_factor = 0.7
@@ -277,7 +277,7 @@ class Bond(WorkspaceStructure):
 
         string_position_cm = None
         for cm in getattr(bridge, "concept_mappings", ()):
-            if getattr(cm.description_type1, "name", "") == "plato-string-position-category":
+            if holds_role(cm.description_type1, "dimension.string_position"):
                 string_position_cm = cm
                 break
         if string_position_cm is None:
@@ -307,18 +307,16 @@ class Bond(WorkspaceStructure):
 
         Scheme: the inline ``make-concept-mapping`` of bonds.ss:108-115.
         """
-        from server.engine.bridges import _IDENTITY_SENTINEL, _label_node
+        from server.engine.bridges import _label_node
         if self.direction is None or other_bond.direction is None:
             return None
         direction_category = getattr(self.direction, "category", None)
         if direction_category is None:
             return None
 
+        # ``_incompatible_cms`` compares labels by identity against the bridge's own
+        # concept-mappings; ``_label_node`` hands back the real identity node.
         label = _label_node(self.direction, other_bond.direction)
-        if label is _IDENTITY_SENTINEL:
-            # ``_incompatible_cms`` compares labels by identity against the
-            # bridge's own concept-mappings, which carry the real Slipnet node.
-            label = self._slipnet_node("plato-identity")
         return ConceptMapping(
             description_type1=direction_category,
             descriptor1=self.direction,
@@ -328,11 +326,6 @@ class Bond(WorkspaceStructure):
             object1=self,
             object2=other_bond,
         )
-
-    def _slipnet_node(self, name: str) -> Any:
-        workspace = getattr(self.string, "workspace", None)
-        slipnet = getattr(workspace, "slipnet", None)
-        return getattr(slipnet, "nodes", {}).get(name) if slipnet is not None else None
 
     def bonds_equal(self, other: Bond) -> bool:
         """Structural equality: same from/to objects, same category, same direction.
@@ -485,14 +478,15 @@ def incompatible_bond_candidates(
         # Scheme: ``directed-group?`` (groups.ss:1050-1055).
         if not isinstance(obj, Group):
             return False
-        name = getattr(obj.group_category, "name", "")
-        return name in ("plato-succgrp", "plato-predgrp")
+        return holds_role(obj.group_category, "group_category.successor") or holds_role(
+            obj.group_category, "group_category.predecessor"
+        )
 
     d1, d2 = directed(object1), directed(object2)
 
-    if getattr(bond_facet, "name", "") == "plato-length":
+    if holds_role(bond_facet, "dimension.length"):
         return d1 and d2 and object1.direction is not object2.direction
-    if getattr(bond_category, "name", "") == "plato-sameness":
+    if holds_role(bond_category, "bond_category.sameness"):
         return d1 or d2
     if d1 and d2:
         return (

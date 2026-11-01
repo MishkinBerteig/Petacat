@@ -73,9 +73,7 @@ def _bridge(ctx, obj1, obj2, bridge_type):
         object1=obj1,
         object2=obj2,
         bridge_type=bridge_type,
-        concept_mappings=make_concept_mappings(
-            obj1, obj2, bridge_type, _node(ctx, "plato-identity")
-        ),
+        concept_mappings=make_concept_mappings(obj1, obj2, bridge_type),
     )
     bridge.proposal_level = bridge.BUILT
     ctx.workspace.add_bridge(bridge)

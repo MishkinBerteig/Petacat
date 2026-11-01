@@ -662,9 +662,19 @@ class SlipnetNode:
         if identity is not None and relation_name == identity.name:
             return self
 
+        return self._related_through(lambda label: label.name == relation_name)
+
+    def get_related_node_by_role(self, role: str) -> SlipnetNode | None:
+        """:meth:`get_related_node`, with the link's label named by the role it plays
+        (``dimension.bond_category``) rather than by node or name.  A node-side read: no
+        Slipnet is needed to find, say, a group category's bond category.  A role nothing
+        holds relates nothing: ``None``."""
+        return self._related_through(lambda label: role in label.roles)
+
+    def _related_through(self, label_matches: Callable[[SlipnetNode], bool]) -> SlipnetNode | None:
         related_nodes: list[SlipnetNode] = []
         for link in self.outgoing_links:
-            if link.label_node is not None and link.label_node.name == relation_name:
+            if link.label_node is not None and label_matches(link.label_node):
                 related_nodes.append(link.to_node)
 
         if not related_nodes:

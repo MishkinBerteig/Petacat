@@ -76,12 +76,18 @@ class _Descriptor:
         self.relation = _RELATION_OF.get(name)
         self.short_name = name
         self.outgoing_links: list[Any] = []
+        #: The Slipnet's relation nodes by name, shared by every node (``SlipnetNode.relations``).
+        self.relations = _RELATIONS
 
     def link(self, other: "_Descriptor", label: str | None) -> None:
         label_node = _Descriptor(label) if label else None
         self.outgoing_links.append(
             type("L", (), {"to_node": other, "label_node": label_node})()
         )
+
+
+_RELATIONS: dict[str, Any] = {}
+_RELATIONS["identity"] = _Descriptor("plato-identity")
 
 
 class _Desc:

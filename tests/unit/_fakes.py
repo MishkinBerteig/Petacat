@@ -16,6 +16,27 @@ from __future__ import annotations
 from typing import Any
 
 
+def _msc_tables() -> tuple[dict[str, frozenset[str]], dict[str, str]]:
+    """The Metacat Standard Configuration's role bindings and relation rows by node name, so
+    a fake named like an MSC node plays the roles and the relation that node plays."""
+    import json
+    from pathlib import Path
+
+    seed = Path(__file__).resolve().parents[2] / "seed_data"
+    roles: dict[str, set[str]] = {}
+    for row in json.loads((seed / "roles.json").read_text())["node_roles"]:
+        roles.setdefault(row["node_name"], set()).add(row["role"])
+    relations = {
+        row["node_name"]: row["name"]
+        for row in json.loads((seed / "theme_relations.json").read_text())
+        if row.get("node_name")
+    }
+    return {k: frozenset(v) for k, v in roles.items()}, relations
+
+
+_MSC_ROLES, _MSC_RELATIONS = _msc_tables()
+
+
 class FakeNode:
     """Stand-in for a slipnet ``SlipnetNode``.
 
@@ -42,8 +63,12 @@ class FakeNode:
         numeric_value: int | None = None,
     ) -> None:
         self.name = name
-        # The node named plato-sameness holds the role the engine now reads (bond_category.sameness).
-        self.roles = frozenset(roles) | ({"bond_category.sameness"} if name == "plato-sameness" else set())
+        # A fake named like an MSC node plays that node's roles and relation (the engine reads
+        # roles and relations, never names).
+        self.roles = frozenset(roles) | _MSC_ROLES.get(name, frozenset())
+        self.relation = _MSC_RELATIONS.get(name)
+        #: The Slipnet's relation nodes by name; a test that wants identity labels sets it.
+        self.relations: dict[str, FakeNode] = {}
         self.numeric_value = numeric_value
         #: Relation name -> neighbour, for ``get_related_node``.  A Group derives
         #: its bond category from its group category this way (groups.ss:79).
@@ -84,6 +109,14 @@ class FakeNode:
         if name == "plato-identity":
             return self
         return self.related.get(name)
+
+    def get_related_node_by_role(self, role: str) -> FakeNode | None:
+        """``get_related_node`` with the link label named by its role: the fake's ``related``
+        is keyed by node name, and the role names the MSC node that plays it."""
+        for name, node in self.related.items():
+            if role in _MSC_ROLES.get(name, ()):
+                return node
+        return None
 
     def activate_from_workspace(self) -> None:
         """Mirror ``SlipnetNode.activate_from_workspace``.

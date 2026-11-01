@@ -125,7 +125,7 @@ outside the matrix take it too and the run is entirely what it says it is.
   gpu  mlx      float32    519 tests
   whole suite requested: the full matrix is required of this run
 
-  unit          1101 collected   1101 run   1099 passed      0 failed      2 skipped  complete
+  unit          1273 collected   1273 run   1273 passed      0 failed      0 skipped  complete
   seed_unit      715 collected    715 run    715 passed      0 failed      0 skipped  complete
   module        1041 collected   1041 run   1041 passed      0 failed      0 skipped  complete
   architecture    42 collected     42 run     42 passed      0 failed      0 skipped  complete
@@ -204,7 +204,7 @@ that allowance.
 
 | Layer | Directory | Scope | May depend on | Cases |
 |-------|-----------|-------|---------------|-------|
-| **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 1101 |
+| **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 1273 |
 | **seed unit** | `tests/seed_unit/` | One class or function, measured against the values Petacat ships with | Real `seed_data/*.json`, and the machine the process is running on | 715 |
 | **module** | `tests/module/` | Several real components assembled and driven | Real engine objects and `seed_data/*.json`; no DB, no HTTP | 1041 |
 | **architecture** | `tests/architecture/` | How the source tree is allowed to depend on itself | The repository's source, `seed_data/*.json`, child interpreters | 42 |
@@ -246,7 +246,7 @@ first**, then move up toward the API and GUI.
 
 All eight layers run in one command — the
 [required command](#the-required-command) — and, since Petacat runs natively, all
-eight actually run: **3,920 cases**, every one of them executed. A layer that is
+eight actually run: **4,092 cases**, every one of them executed. A layer that is
 normally skipped is not a layer that is normally green, and none of these is.
 
 Wall-clock time depends heavily on the machine and on what else it is doing. The
@@ -409,6 +409,7 @@ changing what it records.
 | `test_en9_answers_memory_text.py` | 14 | EN9: answers and comparison read roles and relations; an absent template key gives no text and one warning; `comparison_judgment_priority` absent judges no preference; Episodic Memory carried into a run whose configuration lacks a node, a link label or a codelet type it names completes, and the missing name contributes nothing |
 | `test_en5b_alphabet.py` | 15 | EN5b: the alphabet and numbers as data: `slipnet.alphabet` equals the old letter and number lists, a shared glyph or value goes to the first node, a character with no glyph node is unperceived, and the a-d/w-z alphabet and the 1, 2, 4 ladder (cascaded, or with dangling links) build and step on the demo problems |
 | `test_en8_rules_language.py` | 14 | EN8: rules, justify and rule English read roles and relations; `rule.dimension_order` and its sort; the abstract-change draws and `rng.get_state()` with a role absent; the justify handlers narrowed (B10); each converted role or relation absent on demo and justify problems |
+| `test_en6_perception.py` | 12 | EN6: bonds, groups, bridges, concept mappings and images read roles, relations and the alphabet; the bridge recruitment post sequence is unchanged; identity absent never raises; every dimension, position, direction, object and recruit role unbound or its node removed, and each relation node removed, on the demo and justify problems; and whole runs (discovery, justify, Episodic Memory carried) on a configuration whose role-bound, relation, letter and number nodes are all renamed give the same answers, codelet counts, RNG draws and English |
 | `test_order_fidelity.py` | 10 | The list orders `cons` and vectors fix: Chez Scheme's `sort` (80 cases from the Metacat image), a string's groups, the rule's subobject bridges, the coderack bin and deferred batch, the jootser's event set, and the display-time prints (DISCREPANCIES5 C-1, G-Z4, G-Z5, I-3…I-5) |
 | `test_rng.py` | 17 | The deterministic RNG wrapper |
 | `test_rule_bond_facet_change.py` | 1 | A GroupCtgy self change's BondFacet change is found wherever it sits (KNOWN-FAILURES, G-Q1) |

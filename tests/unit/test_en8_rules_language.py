@@ -265,17 +265,7 @@ def test_g9_each_rule_dimension_order_member_unbound(name) -> None:
 @pytest.mark.slow
 @pytest.mark.parametrize(
     "relation",
-    [
-        "opposite",
-        pytest.param(
-            "identity",
-            marks=pytest.mark.xfail(
-                strict=True,
-                reason="codelet_dsl/builtins.py (_augment_bridge_at_build) still fetches the "
-                "identity node by name; the lead hands it on",
-            ),
-        ),
-    ],
+    ["opposite", "identity"],
 )
 def test_g9_relation_node_removed_builds_rules_and_justifies(relation) -> None:
     provider = rc.provider(rc.node_removed(RELATIONS_READ[relation]))

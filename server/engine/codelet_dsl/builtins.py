@@ -1528,7 +1528,6 @@ def _augment_bridge_at_build(ctx: EngineContext, bridge: Bridge) -> None:
             bridge.object1,
             bridge.object2,
             bridge.bridge_type,
-            ctx.slipnet.get_node("plato-identity"),
             descriptions1=list(getattr(bridge.object1, "bond_descriptions", [])),
             descriptions2=list(getattr(bridge.object2, "bond_descriptions", [])),
         ):

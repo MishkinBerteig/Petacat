@@ -12,6 +12,7 @@ from __future__ import annotations
 import math
 from typing import TYPE_CHECKING, Any
 
+from server.engine.slipnet import holds_role
 from server.engine.workspace_objects import WorkspaceObject
 from server.engine.workspace_structures import WorkspaceStructure
 from server.engine.concept_mappings import ConceptMapping
@@ -70,8 +71,11 @@ class Group(WorkspaceObject, WorkspaceStructure):
         # singleton — which has no bonds at all — a bond category, and hence an
         # internal strength (groups.ss:392-398) and a BondCtgy description
         # (groups.ss:30-31) like any other group.
-        related = getattr(group_category, "get_related_node", None)
-        self.bond_category = related("plato-bond-category") if related else None
+        #
+        # The relation is the link labelled with the node that plays ``dimension.bond_category``;
+        # with no such dimension a group has no bond category.
+        related = getattr(group_category, "get_related_node_by_role", None)
+        self.bond_category = related("dimension.bond_category") if related else None
 
         self._attach_initial_descriptions()
 
@@ -84,18 +88,14 @@ class Group(WorkspaceObject, WorkspaceStructure):
         answer turns on a whole-string group (``abc -> abcd``, ``abc -> aabbcc``)
         could never get off the ground.
         """
-        slipnet = getattr(getattr(self.string, "workspace", None), "slipnet", None)
-        if slipnet is None:
-            slipnet = getattr(self.string, "slipnet", None)
+        slipnet = _slipnet_of(self)
         if slipnet is None:
             return
+        roles = slipnet.roles
 
-        def node(name: str):
-            return slipnet.nodes.get(name)
-
-        def describe(type_name: str, descriptor, *, bond_description: bool = False) -> None:
-            dt = node(type_name)
-            if dt is None or descriptor is None:
+        def describe(dt, descriptor, *, bond_description: bool = False) -> None:
+            # A dimension or a descriptor nothing holds (``Absent``, falsy) describes nothing.
+            if not dt or descriptor is None or not descriptor:
                 return
             desc = Description(self, dt, descriptor)
             desc.proposal_level = Description.BUILT
@@ -104,15 +104,15 @@ class Group(WorkspaceObject, WorkspaceStructure):
             else:
                 self.descriptions.insert(0, desc)
 
-        describe("plato-object-category", node("plato-group"))
-        describe("plato-group-category", self.group_category)
+        describe(roles.dimension_object_category, roles.object_group)
+        describe(roles.dimension_group_category, self.group_category)
         # ``groups.ss:30-31`` attaches the BondCtgy description *unconditionally*,
         # from the category-derived bond category.  Gating it on the presence of
         # constituent bonds left every singleton group without one, so a bridge to
         # a singleton lost its BondCtgy concept-mapping.
-        describe("plato-bond-category", self.bond_category, bond_description=True)
+        describe(roles.dimension_bond_category, self.bond_category, bond_description=True)
         if self.direction is not None:
-            describe("plato-direction-category", self.direction)
+            describe(roles.dimension_direction, self.direction)
 
         # ``make-group`` (groups.ss:34-42) orders these whole -> leftmost ->
         # **middle** -> rightmost, using the object's own position predicates.  The
@@ -120,15 +120,15 @@ class Group(WorkspaceObject, WorkspaceStructure):
         # ``middle`` — closing one of the two avenues by which a middle-to-middle
         # correspondence is reachable.
         if self.spans_whole_string():
-            describe("plato-string-position-category", node("plato-whole"))
+            describe(roles.dimension_string_position, roles.position_whole)
         elif self.leftmost_in_string():
-            describe("plato-string-position-category", node("plato-leftmost"))
+            describe(roles.dimension_string_position, roles.position_leftmost)
         elif self.middle_in_string():
-            describe("plato-string-position-category", node("plato-middle"))
+            describe(roles.dimension_string_position, roles.position_middle)
         elif self.rightmost_in_string():
-            describe("plato-string-position-category", node("plato-rightmost"))
+            describe(roles.dimension_string_position, roles.position_rightmost)
 
-        describe("plato-bond-facet", self.bond_facet, bond_description=True)
+        describe(roles.dimension_bond_facet, self.bond_facet, bond_description=True)
 
         # No Length description here.  ``make-group`` attaches none; the Scheme's
         # single site is ``propose-group`` (groups.ss:816-818), which attaches one
@@ -140,14 +140,14 @@ class Group(WorkspaceObject, WorkspaceStructure):
 
         # A letter-category description on a successor/predecessor group is what
         # makes horizontal bridges like [abc] -> [bcd] possible (groups.ss:44-46).
-        if getattr(self.bond_facet, "name", "") == "plato-letter-category":
+        if holds_role(self.bond_facet, "dimension.letter_category"):
             # ``groups.ss:47`` takes the first object in *direction* order, not the
             # leftmost one.  The difference is the whole point of the description: a
             # leftward group over ``ab`` is the sequence b, a, and its initial letter
             # is ``b``.  Reading the leftmost letter instead hid every relation that
             # runs off the end of a leftward group — including the ``b -> c`` of
             # ``ab -> c``.
-            describe("plato-letter-category", self._get_initial_letter_category())
+            describe(roles.dimension_letter_category, self._get_initial_letter_category())
 
     @property
     def length(self) -> int:
@@ -232,8 +232,8 @@ class Group(WorkspaceObject, WorkspaceStructure):
         """
         assoc = getattr(self.bond_category, "degree_of_assoc", None)
         base = float(assoc()) if assoc is not None else 0.0
-        facet_name = getattr(self.bond_facet, "name", "")
-        bond_factor = base if facet_name == "plato-letter-category" else base * 0.5
+        letter_facet = holds_role(self.bond_facet, "dimension.letter_category")
+        bond_factor = base if letter_facet else base * 0.5
 
         # Length factor
         length_factors = {1: 5, 2: 40, 3: 60}
@@ -404,7 +404,7 @@ class Group(WorkspaceObject, WorkspaceStructure):
 
         string_position_cm = None
         for cm in getattr(bridge, "concept_mappings", ()):
-            if getattr(cm.description_type1, "name", "") == "plato-string-position-category":
+            if holds_role(cm.description_type1, "dimension.string_position"):
                 string_position_cm = cm
                 break
         if string_position_cm is None:
@@ -435,19 +435,16 @@ class Group(WorkspaceObject, WorkspaceStructure):
 
         Scheme: the inline ``make-concept-mapping`` of groups.ss:313-320.
         """
-        from server.engine.bridges import _IDENTITY_SENTINEL, _label_node
+        from server.engine.bridges import _label_node
         if self.direction is None or other_bond.direction is None:
             return None
         direction_category = getattr(self.direction, "category", None)
         if direction_category is None:
             return None
 
+        # ``_incompatible_cms`` compares labels by identity against the bridge's own
+        # concept-mappings; ``_label_node`` hands back the real identity node.
         label = _label_node(self.direction, other_bond.direction)
-        if label is _IDENTITY_SENTINEL:
-            # ``_incompatible_cms`` compares labels by identity against the
-            # bridge's own concept-mappings, which carry the real Slipnet node.
-            slipnet = getattr(getattr(self.string, "workspace", None), "slipnet", None)
-            label = getattr(slipnet, "nodes", {}).get("plato-identity") if slipnet else None
         return ConceptMapping(
             description_type1=direction_category,
             descriptor1=self.direction,
@@ -512,19 +509,11 @@ class Group(WorkspaceObject, WorkspaceStructure):
         # groups.ss:344-345 — a Length description is carried across the flip.
         # Now that ``make-group`` no longer attaches one unconditionally (GR-1),
         # this is the only way the reversed reading keeps it.
-        length_node = self._node("plato-length")
-        if length_node is not None and self.description_type_present(length_node):
+        slipnet = _slipnet_of(self)
+        length_node = slipnet.roles.dimension_length if slipnet is not None else None
+        if length_node and self.description_type_present(length_node):
             attach_length_description(flipped)
         return flipped
-
-    def _node(self, name: str) -> Any:
-        """The Slipnet node called *name*, reached from the group's string."""
-        slipnet = getattr(getattr(self.string, "workspace", None), "slipnet", None)
-        if slipnet is None:
-            slipnet = getattr(self.string, "slipnet", None)
-        if slipnet is None:
-            return None
-        return getattr(slipnet, "nodes", {}).get(name)
 
     def _get_initial_letter_category(self) -> Any:
         """Get the letter-category descriptor of the first object in direction order.
@@ -532,14 +521,14 @@ class Group(WorkspaceObject, WorkspaceStructure):
         Scheme: groups.ss:77 — (tell (1st ordered-objects) 'get-descriptor-for plato-letter-category)
         """
         ordered = self.objects
-        if self.direction is not None and getattr(self.direction, "name", "") == "plato-left":
+        if holds_role(self.direction, "direction.left"):
             ordered = list(reversed(self.objects))
         if not ordered:
             return None
         first = ordered[0]
         # Look for letter-category description
         for d in getattr(first, "descriptions", []):
-            if getattr(d.description_type, "name", "") == "plato-letter-category":
+            if holds_role(d.description_type, "dimension.letter_category"):
                 return d.descriptor
         # Fallback for Letter objects
         return getattr(first, "letter_category", None)
@@ -572,15 +561,14 @@ def attach_length_description(group: Group) -> bool:
     """
     # A letter's platonic length is ``plato-one`` (workspace-objects.ss:57); callers
     # such as the translated-rule pass may hand one in (answers.ss:1090-1091).
-    node = lambda name: Group._node(group, name)  # noqa: E731 - needs only ``.string``
-    length_type = node("plato-length")
     slipnet = _slipnet_of(group)
+    length_type = slipnet.roles.dimension_length if slipnet is not None else None
     # The node whose ``numeric_value`` is the group's length; none (a gapped ladder, or a
     # group longer than the ladder) means no Length description.
     descriptor = (
         slipnet.alphabet.number_for(getattr(group, "length", 1)) if slipnet is not None else None
     )
-    if length_type is None or descriptor is None:
+    if not length_type or descriptor is None:
         return False
     if group.description_type_present(length_type):
         return False

@@ -199,8 +199,11 @@ class Description(WorkspaceStructure):
 
         Scheme: descriptions.ss:69-71.
         """
-        dt_name = getattr(self.description_type, "name", "")
-        return dt_name in ("plato-bond-category", "plato-bond-facet")
+        from server.engine.slipnet import holds_role
+
+        return holds_role(self.description_type, "dimension.bond_category") or holds_role(
+            self.description_type, "dimension.bond_facet"
+        )
 
     def is_relevant(self) -> bool:
         """A description is relevant if its description_type is fully active."""

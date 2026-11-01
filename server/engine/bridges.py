@@ -12,6 +12,7 @@ from __future__ import annotations
 import math
 from typing import TYPE_CHECKING, Any
 
+from server.engine.slipnet import holds_role
 from server.engine.themes import (
     THEME_BOTTOM_BRIDGE,
     THEME_TOP_BRIDGE,
@@ -524,9 +525,9 @@ class Bridge(WorkspaceStructure):
         if possible1 != possible2:
             return True
         return (
-            dim == "plato-string-position-category"
-            and not possible1
+            not possible1
             and not possible2
+            and _dimension_plays(self.object1, dim, "dimension.string_position")
         )
 
     def supported_by_theme(self, theme: Any) -> bool:
@@ -596,7 +597,7 @@ class Bridge(WorkspaceStructure):
         mapping the bridge already carries.  If so the loser is ``bond2``, and
         the builder fights it 3 to 2.
 
-        The probe mapping is built from ``plato-direction-category``
+        The probe mapping is built from the direction dimension
         **unconditionally** (bridges.ss:350-357).  Sourcing that node from a
         Direction CM the bridge already had made the whole method vacuous in the
         case it exists for: a bridge whose mappings are ``StrPosCtgy:
@@ -624,9 +625,7 @@ class Bridge(WorkspaceStructure):
         if dir1 is None or dir2 is None:
             return None
 
-        dir_cat_node = _slipnet_node(obj1, "plato-direction-category") or _slipnet_node(
-            obj2, "plato-direction-category"
-        )
+        dir_cat_node = _role_node(obj1, obj2, "dimension_direction")
         if dir_cat_node is None:
             return None
 
@@ -636,10 +635,6 @@ class Bridge(WorkspaceStructure):
         # declines on the spot, which is the same trap ``Bond`` and ``Group``
         # already had to step around.
         label = _label_node(dir1, dir2)
-        if label is _IDENTITY_SENTINEL:
-            label = _slipnet_node(obj1, "plato-identity") or _slipnet_node(
-                obj2, "plato-identity"
-            )
 
         direction_cm = ConceptMapping(
             description_type1=dir_cat_node,
@@ -777,26 +772,18 @@ def _label_node(descriptor1: Any, descriptor2: Any) -> Any:
     """Scheme: ``get-label`` (slipnet.ss).
 
     Identical descriptors relate by identity; linked descriptors relate by the
-    link's label; anything else has no relating concept at all.
+    link's label; anything else has no relating concept at all.  The identity node is
+    reached through the descriptor's own ``relations`` (the Slipnet's relation nodes, shared
+    by every node), so no Slipnet handle is needed.  With no identity relation in the
+    configuration the same descriptor has no label either (``None``): nothing is labelled
+    "same, no slippage" (ABSENCE-BEHAVIOUR.md 2.3).
     """
     if descriptor1 is descriptor2:
-        return _IDENTITY_SENTINEL
+        return getattr(descriptor1, "relations", {}).get("identity")
     for link in getattr(descriptor1, "outgoing_links", []):
         if link.to_node is descriptor2:
             return link.label_node
     return None
-
-
-class _IdentitySentinel:
-    """Stands in for ``plato-identity`` where no Slipnet handle is available."""
-
-    name = "plato-identity"
-    short_name = "iden"
-    #: The theme relation it stands for (``relation_name_for_label`` reads it).
-    relation = "identity"
-
-
-_IDENTITY_SENTINEL = _IdentitySentinel()
 
 
 def _label_relation(descriptor1: Any, descriptor2: Any) -> str:
@@ -815,20 +802,19 @@ def descriptions_affect_themespace(d1: Any, d2: Any) -> bool:
     if not d1.is_relevant() or not d2.is_relevant():
         return False
 
-    dt_name = getattr(d1.description_type, "name", "")
+    dt = d1.description_type
     o1, o2 = d1.object, d2.object
 
-    if dt_name == "plato-object-category" and (
+    if holds_role(dt, "dimension.object_category") and (
         _string_spanning_group(o1) and _string_spanning_group(o2)
     ):
         return False
-    if dt_name == "plato-string-position-category" and (
+    if holds_role(dt, "dimension.string_position") and (
         _spans_whole_string(o1) and _spans_whole_string(o2)
     ):
         return False
-    if (
-        getattr(d1.descriptor, "name", "") == "plato-middle"
-        and getattr(d2.descriptor, "name", "") == "plato-middle"
+    if holds_role(d1.descriptor, "position.middle") and holds_role(
+        d2.descriptor, "position.middle"
     ):
         return False
     return True
@@ -862,27 +848,29 @@ def _theme_dimension_applies(d1: Any, d2: Any, theme: Any) -> bool:
 def _special_direction_case(d1: Any, d2: Any, theme: Any) -> bool:
     """Direction descriptions on two spanning groups speak for string position."""
     return (
-        getattr(d1.description_type, "name", "") == "plato-direction-category"
+        holds_role(d1.description_type, "dimension.direction")
         and _string_spanning_group(d1.object)
         and _string_spanning_group(d2.object)
-        and theme.dimension == "plato-string-position-category"
+        and _dimension_plays(d1.object, theme.dimension, "dimension.string_position")
     )
 
 
 def _special_spanning_bridge_case(d1: Any, d2: Any, theme: Any) -> bool:
-    dt_name = getattr(d1.description_type, "name", "")
+    dt = d1.description_type
+    # A theme names its dimension; it is the description's own type when the two agree.
+    same_dimension = getattr(dt, "name", "") == theme.dimension
     if (
-        dt_name == "plato-object-category"
+        holds_role(dt, "dimension.object_category")
         and _string_spanning_group(d1.object)
         and _string_spanning_group(d2.object)
-        and theme.dimension == "plato-object-category"
+        and same_dimension
     ):
         return True
     return (
-        dt_name == "plato-string-position-category"
+        holds_role(dt, "dimension.string_position")
         and _spans_whole_string(d1.object)
         and _spans_whole_string(d2.object)
-        and theme.dimension == "plato-string-position-category"
+        and same_dimension
     )
 
 
@@ -890,10 +878,10 @@ def _special_middle_middle_case(d1: Any, d2: Any, theme: Any) -> bool:
     from server.engine.themes import RELATION_OPPOSITE
 
     return (
-        getattr(d1.descriptor, "name", "") == "plato-middle"
-        and getattr(d2.descriptor, "name", "") == "plato-middle"
-        and theme.dimension == "plato-string-position-category"
+        holds_role(d1.descriptor, "position.middle")
+        and holds_role(d2.descriptor, "position.middle")
         and theme.relation == RELATION_OPPOSITE
+        and _dimension_plays(d1.object, theme.dimension, "dimension.string_position")
     )
 
 
@@ -977,6 +965,27 @@ def _slipnet_node(obj: Any, name: str) -> Any:
     return slipnet.nodes.get(name)
 
 
+def _dimension_plays(obj: Any, dimension_name: str, role: str) -> bool:
+    """Is the dimension a theme names (a node name) the node that plays *role*?
+
+    The dimension node is reached through *obj*'s string, since a theme holds no Slipnet
+    handle.  A dimension no node answers to, or that plays no role, is not the one.
+    """
+    return holds_role(_slipnet_node(obj, dimension_name), role)
+
+
+def _role_node(obj1: Any, obj2: Any, attr: str) -> Any:
+    """The node bound to the role ``slipnet.roles.<attr>``, read from the first of the two
+    objects that reaches a Slipnet with it bound; ``None`` when no object does."""
+    for obj in (obj1, obj2):
+        slipnet = _slipnet_of(obj)
+        if slipnet is not None:
+            node = getattr(slipnet.roles, attr)
+            if node:
+                return node
+    return None
+
+
 def _bridge_theme_compatibility_sigmoid(x: float) -> float:
     """Sharpen a raw support value.  Scheme: themes.ss:1115, beta = 4."""
     beta = 4.0
@@ -1014,10 +1023,10 @@ def horizontal_mappable_descriptions(d1: Any, d2: Any, object1: Any, object2: An
     """Scheme: ``horizontal-mappable-descriptions?`` (bridges.ss)."""
     if d1.description_type is not d2.description_type:
         return False
-    dt_name = getattr(d1.description_type, "name", "")
-    if dt_name == "plato-letter-category":
+    dt = d1.description_type
+    if holds_role(dt, "dimension.letter_category"):
         return _letter_category_mappable_objects(object1, object2)
-    if dt_name in ("plato-string-position-category", "plato-length"):
+    if holds_role(dt, "dimension.string_position") or holds_role(dt, "dimension.length"):
         return True
     return d1.descriptor is d2.descriptor or _slip_linked(d1.descriptor, d2.descriptor)
 
@@ -1076,7 +1085,6 @@ def make_concept_mappings(
     object1: Any,
     object2: Any,
     bridge_type: str,
-    identity_node: Any = None,
     descriptions1: list[Any] | None = None,
     descriptions2: list[Any] | None = None,
 ) -> list[ConceptMapping]:
@@ -1092,6 +1100,10 @@ def make_concept_mappings(
 
     Applies the §3.3.1 horizontal/vertical asymmetry, so a vertical a-i bridge
     gets no ``LetterCategory: a => i`` slippage while the horizontal one does.
+
+    The label of two identical descriptors is the identity relation node the descriptors
+    themselves know (``_label_node``), or ``None`` when the configuration has no identity
+    relation.
     """
     if descriptions1 is None:
         descriptions1 = _plain_descriptions(object1)
@@ -1113,8 +1125,6 @@ def make_concept_mappings(
                 continue
             seen.add(key)
             label = _label_node(d1.descriptor, d2.descriptor)
-            if label is _IDENTITY_SENTINEL:
-                label = identity_node
             cms.append(
                 ConceptMapping(
                     d1.description_type,
@@ -1154,12 +1164,14 @@ def possible_bridge_cms(
     (bridges.ss:924-927, 1022-1025) — over both objects' **relevant**
     descriptions, with no spanning-group exception, since nothing is being
     flipped yet.
+
+    *identity_node* is accepted because the seed codelet bodies still pass it, and is not
+    read: the identity label comes from the descriptors (``_label_node``).
     """
     return make_concept_mappings(
         object1,
         object2,
         bridge_type,
-        identity_node,
         descriptions1=_relevant_descriptions(object1),
         descriptions2=_relevant_descriptions(object2),
     )
@@ -1183,17 +1195,19 @@ def reverse_direction_orientation(concept_mappings: list[ConceptMapping]) -> boo
     """
     reversible = [cm for cm in concept_mappings if cm.reversible_cm_type]
     if not any(
-        getattr(cm.description_type1, "name", "") == "plato-direction-category"
-        for cm in concept_mappings
+        holds_role(cm.description_type1, "dimension.direction") for cm in concept_mappings
     ):
         return False
     if not all(cm.opposite_mapping for cm in reversible):
         return False
     opposite = None
     for cm in concept_mappings:
-        opposite = _slipnet_node(cm.object1, "plato-opposite") or _slipnet_node(
-            cm.object2, "plato-opposite"
-        )
+        for obj in (cm.object1, cm.object2):
+            slipnet = _slipnet_of(obj)
+            if slipnet is not None:
+                opposite = slipnet.relations.get("opposite")
+                if opposite is not None:
+                    break
         if opposite is not None:
             break
     if opposite is None:
@@ -1232,6 +1246,9 @@ def propose_bridge(
     string.  That last is the targeted loop for ``mrrjjj``: the moment ``c``
     faces ``jjj``, the program starts looking for a group around ``c``.
 
+    *identity_node* is accepted because the seed codelet bodies still pass it, and is not
+    read (see :func:`possible_bridge_cms`).
+
     *ctx* carries the codelet-posting hook; without one the side-effect block
     still activates the concepts but posts nothing, which is what a
     unit-constructed bridge wants.
@@ -1246,7 +1263,6 @@ def propose_bridge(
             obj1,
             obj2,
             bridge_type,
-            identity_node,
             descriptions1=bridge_cm_descriptions(obj1),
             descriptions2=bridge_cm_descriptions(obj2),
         ),
@@ -1294,24 +1310,30 @@ def _propose_bridge_side_effects(
     if platonic_length(object1) is platonic_length(object2):
         return
 
-    length_node = _slipnet_node(object1, "plato-length") or _slipnet_node(
-        object2, "plato-length"
-    )
+    length_node = _role_node(object1, object2, "dimension_length")
     if length_node is not None and hasattr(length_node, "activate_from_workspace"):
         length_node.activate_from_workspace()
 
     if ctx is None or length_node is None:
         return
     urgency = ctx.meta.get_urgency("very_high")
+    # The codelet types come from the recruit roles; one nothing holds posts nothing
+    # (ABSENCE-BEHAVIOUR.md 2.5).  The order of the ``post`` calls below is the Scheme's
+    # and fixes every later draw: description scouts (object1, then object2), then the
+    # group scouts.
+    roles = ctx.slipnet.roles
+    description_scout = roles.recruit_description_scout
+    group_scout = roles.recruit_group_scout_category
     # bridges.ss:1124-1131: each description scout is scoped to one bridge
     # object's string (object1 first, then object2).
     for obj in (object1, object2):
-        ctx.coderack.post(
-            _top_down_codelet(
-                ctx, "top-down-description-scout", urgency, length_node,
-                getattr(obj, "string", None),
+        if description_scout:
+            ctx.coderack.post(
+                _top_down_codelet(
+                    ctx, description_scout.name, urgency, length_node,
+                    getattr(obj, "string", None),
+                )
             )
-        )
 
     for letter, group in ((object1, object2), (object2, object1)):
         if _is_group(letter) or not _is_group(group):
@@ -1321,13 +1343,14 @@ def _propose_bridge_side_effects(
             continue
         if hasattr(category, "activate_from_workspace"):
             category.activate_from_workspace()
-        ctx.coderack.post(
-            # bridges.ss:1132-1145: scoped to the letter's string.
-            _top_down_codelet(
-                ctx, "top-down-group-scout:category", urgency, category,
-                getattr(letter, "string", None),
+        if group_scout:
+            ctx.coderack.post(
+                # bridges.ss:1132-1145: scoped to the letter's string.
+                _top_down_codelet(
+                    ctx, group_scout.name, urgency, category,
+                    getattr(letter, "string", None),
+                )
             )
-        )
 
 
 def _top_down_codelet(
@@ -1352,18 +1375,18 @@ def _top_down_codelet(
 def platonic_length(obj: Any) -> Any:
     """The Slipnet number node standing for *obj*'s length.
 
-    Scheme: ``get-platonic-length`` — ``plato-one`` for a letter
+    Scheme: ``get-platonic-length`` — the number one for a letter
     (workspace-objects.ss), ``(number->platonic-number group-length)`` for a
     group (groups.ss:81, 230), where the length is the count of *constituent
-    objects*.  ``None`` above five, which is where the Slipnet's numbers stop.
+    objects*.  ``None`` where the Slipnet has no number node for the count.
     """
-    if not _is_group(obj):
-        return _slipnet_node(obj, "plato-one")
-    from server.engine.images import number_to_platonic_number
-
     slipnet = _slipnet_of(obj)
     if slipnet is None:
         return None
+    if not _is_group(obj):
+        return slipnet.alphabet.unit_length_node
+    from server.engine.images import number_to_platonic_number
+
     return number_to_platonic_number(len(getattr(obj, "objects", [])), slipnet)
 
 
@@ -1445,9 +1468,9 @@ def _nodes_related(node1: Any, node2: Any) -> bool:
 
 def _letter_category_or_length_slippage(cm: ConceptMapping) -> bool:
     """Scheme: ``letter-category/length-slippage?`` (bridges.ss:1487-1492)."""
-    return cm.is_slippage and getattr(cm.description_type1, "name", "") in (
-        "plato-letter-category",
-        "plato-length",
+    return cm.is_slippage and (
+        holds_role(cm.description_type1, "dimension.letter_category")
+        or holds_role(cm.description_type1, "dimension.length")
     )
 
 
@@ -1523,7 +1546,7 @@ def _incompatible_bridges(b1: Bridge, b2: Bridge, orientation: str) -> bool:
 
 
 def _is_direction_cm(cm: ConceptMapping) -> bool:
-    return getattr(cm.description_type1, "name", "") == "plato-direction-category"
+    return holds_role(cm.description_type1, "dimension.direction")
 
 
 def direction_incompatible_bridges(
@@ -1542,10 +1565,10 @@ def direction_incompatible_bridges(
     crossing sub-mappings and leave them all standing — the false-negative half
     of BR-8.
     """
-    label_name = getattr(direction_cm.label, "name", "")
-    if label_name == "plato-identity":
+    relation = getattr(direction_cm.label, "relation", None) if direction_cm.label else None
+    if relation == "identity":
         pred1, pred2 = (lambda a, b: a < b), (lambda a, b: a > b)
-    elif label_name == "plato-opposite":
+    elif relation == "opposite":
         pred1, pred2 = (lambda a, b: a > b), (lambda a, b: a < b)
     else:
         return []
@@ -1691,12 +1714,12 @@ def _get_edge_bond(obj: Any) -> Any:
 
 
 def _is_whole_or_single_cm(cm: ConceptMapping) -> bool:
-    """Check if a CM involves plato-whole or plato-single for string-position.
+    """Check if a CM involves the whole or single position for string-position.
 
     Scheme: justify.ss:220-229 (remove-whole/single-concept-mappings).
     """
-    dt_name = getattr(cm.description_type1, "name", "")
-    if dt_name != "plato-string-position-category":
+    if not holds_role(cm.description_type1, "dimension.string_position"):
         return False
-    d1_name = getattr(cm.descriptor1, "name", "")
-    return d1_name in ("plato-whole", "plato-single")
+    return holds_role(cm.descriptor1, "position.whole") or holds_role(
+        cm.descriptor1, "position.single"
+    )

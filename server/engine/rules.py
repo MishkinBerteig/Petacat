@@ -1622,8 +1622,6 @@ class Rule(WorkspaceStructure):
         those of an undescribed letter.
         """
         from server.engine.bridges import make_concept_mappings
-        # No identity relation in the configuration: no mapping is labelled identity.
-        identity = (slipnet.relation("identity") if slipnet is not None else None) or None
 
         for bridge in bridges:
             fake_object2 = bridge.object2
@@ -1640,7 +1638,7 @@ class Rule(WorkspaceStructure):
                         Description(fake_object2, d.description_type, d.descriptor)
                     )
             bridge.concept_mappings = make_concept_mappings(
-                bridge.object1, real_object2, bridge.bridge_type, identity
+                bridge.object1, real_object2, bridge.bridge_type
             )
 
         self.supporting_bridges = list(bridges)
@@ -3036,7 +3034,7 @@ def _swap_descriptor_for(
         return _get_descriptor_for(obj, dim)
 
     if isinstance(obj, Letter):
-        return slipnet.nodes.get("plato-one")
+        return slipnet.alphabet.unit_length_node
     existing = _get_descriptor_for(obj, dim)
     if existing is not None:
         return existing

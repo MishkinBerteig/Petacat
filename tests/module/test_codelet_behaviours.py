@@ -544,7 +544,7 @@ class TestBondBuilder:
 
         bridge = Bridge(
             a, z, "vertical",
-            make_concept_mappings(a, z, "vertical", slipnet.nodes["plato-identity"]),
+            make_concept_mappings(a, z, "vertical"),
         )
         bridge.proposal_level = Bridge.BUILT
         ctx.workspace.add_bridge(bridge)

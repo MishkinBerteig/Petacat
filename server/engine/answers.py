@@ -740,7 +740,6 @@ def _bridge_to_translation(
                 if not any(o is obj for o in subjects):
                     subjects.append(obj)
 
-    identity = slipnet.relations.get("identity")
     bridges = []
     for obj in subjects:
         counterpart = get_instantiated_image_object(obj)
@@ -751,7 +750,7 @@ def _bridge_to_translation(
             object2=counterpart,
             bridge_type=bridge_type,
             concept_mappings=make_concept_mappings(
-                obj, counterpart, bridge_type, identity
+                obj, counterpart, bridge_type
             ),
         )
         bridge.proposal_level = getattr(bridge, "BUILT", bridge.proposal_level)

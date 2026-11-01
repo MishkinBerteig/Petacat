@@ -33,11 +33,6 @@ if TYPE_CHECKING:
 # callers do not need to hard-code node names.
 # ---------------------------------------------------------------------------
 
-_RELATION_NAMES: frozenset[str] = frozenset(
-    ["plato-identity", "plato-opposite", "plato-predecessor", "plato-successor"]
-)
-
-
 def is_platonic_letter(node: SlipnetNode | None) -> bool:
     """Scheme: platonic-letter?"""
     return getattr(node, "glyph", None) is not None
@@ -50,7 +45,7 @@ def is_platonic_number(node: SlipnetNode | None) -> bool:
 
 def is_platonic_relation(node: SlipnetNode | None) -> bool:
     """Scheme: platonic-relation?"""
-    return node is not None and node.name in _RELATION_NAMES
+    return getattr(node, "relation", None) is not None
 
 
 def number_to_platonic_number(n: int, slipnet: Slipnet) -> SlipnetNode | None:
@@ -72,7 +67,7 @@ def get_related_node(
 ) -> SlipnetNode | None:
     """Scheme: slipnet.ss get-related-node method.
 
-    If *relation* is plato-identity, returns *node* itself.
+    If *relation* is the identity relation, returns *node* itself.
     Otherwise, looks for an outgoing link whose label is *relation* and
     returns the target node (preferring one with the same category as *node*).
     """
@@ -109,16 +104,17 @@ def _get_category(node: SlipnetNode) -> SlipnetNode | None:
 def inverse(node: SlipnetNode | None, slipnet: Slipnet) -> SlipnetNode | None:
     """Scheme: inverse.
 
-    Returns the *opposite* of a slipnet node. For plato-identity returns
-    itself; for others, follows the plato-opposite relation.
+    Returns the *opposite* of a slipnet node. For the identity relation returns
+    itself; for others, follows the opposite relation.  With no opposite relation in the
+    configuration there is no opposite: ``None``.
     """
     if node is None:
         return None
-    identity = slipnet.nodes.get("plato-identity")
+    identity = slipnet.relation("identity")
     if node is identity:
-        return identity
-    opposite = slipnet.nodes.get("plato-opposite")
-    if opposite is None:
+        return node
+    opposite = slipnet.relation("opposite")
+    if not opposite:
         return None
     return get_related_node(node, opposite, slipnet)
 
@@ -129,10 +125,12 @@ def get_label(
     """Scheme: get-label.
 
     Returns the label node on the link from *from_node* to *to_node*, or
-    plato-identity if they are the same node, or ``None`` if no link exists.
+    the identity relation if they are the same node, or ``None`` if no link exists.
+    With no identity relation in the configuration the same node has no label either
+    (``None``): the mapping counts as a slippage (ABSENCE-BEHAVIOUR.md 2.3).
     """
     if from_node is to_node:
-        return slipnet.nodes.get("plato-identity")
+        return slipnet.relations.get("identity")
     for link in to_node.incoming_links:
         if link.from_node is from_node:
             return link.label_node
@@ -151,7 +149,7 @@ def relationship_between(
     if not nodes or any(n is None for n in nodes):
         return None
     if len(nodes) == 1:
-        return slipnet.nodes.get("plato-identity")
+        return slipnet.relations.get("identity")
 
     labels: list[SlipnetNode | None] = []
     for a, b in zip(nodes[:-1], nodes[1:]):
@@ -198,13 +196,12 @@ def change_length_first(
 
     Returns ``True`` when a length change should be applied before a letter
     change. This is the case when:
-    - *length_arg* is plato-predecessor, OR
+    - *length_arg* is the predecessor relation, OR
     - *length_arg* is a platonic number that is smaller than *current_length*.
     """
     if length_arg is None:
         return False
-    pred = slipnet.nodes.get("plato-predecessor")
-    if length_arg is pred:
+    if length_arg is slipnet.relation("predecessor"):
         return True
     if is_platonic_number(length_arg):
         if current_length is None:
@@ -482,9 +479,9 @@ class Image:
         if arg is None:
             raise ImageFailure("new_length: arg is None")
 
-        identity = self.slipnet.nodes.get("plato-identity")
-        pred = self.slipnet.nodes.get("plato-predecessor")
-        succ = self.slipnet.nodes.get("plato-successor")
+        identity = self.slipnet.relation("identity")
+        pred = self.slipnet.relation("predecessor")
+        succ = self.slipnet.relation("successor")
 
         if arg is identity:
             return
@@ -529,8 +526,8 @@ class Image:
         if self.is_letter_image:
             return
 
-        letter_category = self.slipnet.nodes.get("plato-letter-category")
-        length_node = self.slipnet.nodes.get("plato-length")
+        letter_category = self.slipnet.roles.dimension_letter_category
+        length_node = self.slipnet.roles.dimension_length
 
         if medium is letter_category:
             letters = [sub.get_letter() for sub in self.sub_images]
@@ -558,8 +555,7 @@ class Image:
         """
         if self.is_letter_image:
             return
-        length_node = self.slipnet.nodes.get("plato-length")
-        if self.bond_facet is length_node:
+        if self.bond_facet is self.slipnet.roles.dimension_length:
             raise ImageFailure("letter: cannot collapse a length-based group image to a letter")
         self.bond_facet = None
         self.letter_relation = None
@@ -652,7 +648,7 @@ class Image:
         if self.is_letter_image:
             return [self.start_letter]
 
-        plato_left = self.slipnet.nodes.get("plato-left")
+        plato_left = self.slipnet.roles.direction_left
         ordered = list(reversed(self.sub_images)) if self.direction is plato_left else self.sub_images
         result: list[SlipnetNode] = []
         for sub in ordered:
@@ -682,11 +678,12 @@ class Image:
         """
         from server.engine.groups import Group
 
-        plato_left = self.slipnet.nodes.get("plato-left")
-        identity = self.slipnet.nodes.get("plato-identity")
-        sameness = self.slipnet.nodes.get("plato-sameness")
-        samegrp = self.slipnet.nodes.get("plato-samegrp")
-        letter_category = self.slipnet.nodes.get("plato-letter-category")
+        roles = self.slipnet.roles
+        plato_left = roles.direction_left
+        identity = self.slipnet.relation("identity")
+        sameness = roles.bond_category_sameness
+        samegrp = roles.group_category_sameness
+        letter_category = roles.dimension_letter_category
 
         # Ordered objects based on direction
         if self.direction is plato_left:
@@ -712,12 +709,16 @@ class Image:
                 bond_category = self.length_relation
 
         # Get related group-category from bond-category
-        group_category_node = self.slipnet.nodes.get("plato-group-category")
+        group_category_node = roles.dimension_group_category
         group_category = None
-        if bond_category is not None and group_category_node is not None:
+        if bond_category is not None and group_category_node:
             group_category = get_related_node(bond_category, group_category_node, self.slipnet)
         if group_category is None:
             group_category = samegrp  # fallback
+        if not group_category:
+            # No group category could be named and the configuration has no sameness group
+            # category to fall back on: a group of that kind cannot be built.
+            raise ImageFailure("instantiate_as_group: no group category")
 
         # Group direction: None for same-groups
         group_direction = None if group_category is samegrp else self.direction
@@ -749,7 +750,7 @@ class Image:
         if self.is_letter_image:
             action(self)
         else:
-            plato_left = self.slipnet.nodes.get("plato-left")
+            plato_left = self.slipnet.roles.direction_left
             ordered = list(reversed(self.sub_images)) if self.direction is plato_left else self.sub_images
             for sub in ordered:
                 sub.leaf_walk(action)
@@ -759,7 +760,7 @@ class Image:
         (group) image, children first."""
         if self.is_letter_image:
             return
-        plato_left = self.slipnet.nodes.get("plato-left")
+        plato_left = self.slipnet.roles.direction_left
         ordered = list(reversed(self.sub_images)) if self.direction is plato_left else self.sub_images
         for sub in ordered:
             sub.postorder_interior_walk(action)
@@ -774,9 +775,11 @@ class Image:
         sub-image that is a copy of this letter.
         """
         sub_image = self.copy()
-        letter_category = self.slipnet.nodes.get("plato-letter-category")
-        identity = self.slipnet.nodes.get("plato-identity")
-        plato_right = self.slipnet.nodes.get("plato-right")
+        # An unbound role or a missing relation leaves the field unset (``None``), never
+        # an ``Absent`` token: the image holds nodes or nothing.
+        letter_category = self.slipnet.roles.dimension_letter_category or None
+        identity = self.slipnet.relations.get("identity")
+        plato_right = self.slipnet.roles.direction_right or None
         plato_one = self.slipnet.alphabet.unit_length_node
 
         self.bond_facet = letter_category
@@ -871,11 +874,12 @@ class StringImage:
 
     def get_ordered_sub_images(self) -> list[Image]:
         """Scheme: get-ordered-sub-images — sub-images in direction order."""
-        plato_right = self.slipnet.nodes.get("plato-right")
         subs = self.get_sub_images()
-        if self.direction is plato_right:
-            return subs
-        return list(reversed(subs))
+        # Read right to left only when the direction is the left direction; with no
+        # ``direction.left`` in the configuration nothing is read reversed.
+        if self.direction is self.slipnet.roles.direction_left:
+            return list(reversed(subs))
+        return subs
 
     # -- generation --------------------------------------------------------
 
@@ -891,8 +895,7 @@ class StringImage:
     def reset(self) -> None:
         """Scheme: reset — restore original state."""
         self._verbatim = False
-        plato_right = self.slipnet.nodes.get("plato-right")
-        self.direction = plato_right  # type: ignore[assignment]
+        self.direction = self.slipnet.roles.direction_right or None  # type: ignore[assignment]
         for img in self.get_sub_images():
             img.reset()
 
@@ -919,8 +922,8 @@ class StringImage:
 
     def reverse_medium(self, medium: SlipnetNode | None) -> None:
         """Scheme: reverse-medium on a string-image."""
-        letter_category = self.slipnet.nodes.get("plato-letter-category")
-        length_node = self.slipnet.nodes.get("plato-length")
+        letter_category = self.slipnet.roles.dimension_letter_category
+        length_node = self.slipnet.roles.dimension_length
 
         if medium is letter_category:
             letters = [sub.get_letter() for sub in self.get_sub_images()]
@@ -939,8 +942,7 @@ class StringImage:
         self._verbatim_images = [
             make_letter_image(lc, self.slipnet) for lc in letter_categories
         ]
-        plato_right = self.slipnet.nodes.get("plato-right")
-        self.direction = plato_right  # type: ignore[assignment]
+        self.direction = self.slipnet.roles.direction_right or None  # type: ignore[assignment]
         self._verbatim = True
 
     def get_length(self) -> SlipnetNode | None:
@@ -1083,7 +1085,7 @@ class StringImage:
             obj.image = img
             return img
 
-        plato_left = self.slipnet.nodes.get("plato-left")
+        plato_left = self.slipnet.roles.direction_left
         direction = getattr(obj, "direction", None)
         ordered_objects = (
             list(reversed(list(sub_objects)))
@@ -1110,7 +1112,7 @@ class StringImage:
             getattr(obj, "bond_facet", None),
             letter_relation,
             length_relation,
-            direction if direction is not None else self.slipnet.nodes.get("plato-right"),
+            direction if direction is not None else (self.slipnet.roles.direction_right or None),
             sub_images,
         )
 
@@ -1171,8 +1173,8 @@ def _group_image_relations(
     through ``extend`` set an image's ``start_letter`` to the relation itself
     and the letter came out as its short name.
     """
-    identity = slipnet.nodes.get("plato-identity")
-    sameness = slipnet.nodes.get("plato-sameness")
+    identity = slipnet.relations.get("identity")
+    sameness = slipnet.roles.bond_category_sameness
 
     if len(ordered_objects) > 1:
         letter_relation = relationship_between(
