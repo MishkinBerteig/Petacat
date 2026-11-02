@@ -127,3 +127,62 @@ async def test_a_run_under_way_keeps_the_configuration_it_started_with(app_clien
         assert resp.json()["codelet_count"] == SHIPPED_CODELETS
     finally:
         await _set_param(app_client, "expiration_period", "500")
+
+
+async def _coefficient(client, name: str) -> dict:
+    rows = (await client.get("/api/admin/formula-coefficients")).json()
+    return next(r for r in rows if r["name"] == name)
+
+
+@pytest.mark.asyncio
+async def test_a_rational_coefficient_edit_reaches_the_next_run_exactly(app_client):
+    name = "enclosed_group_importance_factor"
+    assert await _coefficient(app_client, name) == {
+        "name": name, "value": "2/3", "value_type": "rational",
+    }
+    first = await _run_to_end(app_client)
+    assert first["codelet_count"] == SHIPPED_CODELETS
+    resp = await app_client.put(f"/api/admin/formula-coefficients/{name}", json={"value": "1/2"})
+    assert resp.status_code == 200, resp.text
+    assert resp.json() == {"name": name, "value": "1/2", "value_type": "rational"}
+    try:
+        edited = await _run_to_end(app_client)
+        assert edited["codelet_count"] != SHIPPED_CODELETS
+    finally:
+        # Written another way, stored and shown in lowest terms.
+        resp = await app_client.put(f"/api/admin/formula-coefficients/{name}", json={"value": "4/6"})
+        assert resp.status_code == 200, resp.text
+    assert (await _coefficient(app_client, name))["value"] == "2/3"
+    assert (await _run_to_end(app_client))["codelet_count"] == SHIPPED_CODELETS
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("bad", ["1/0", "0.5", "2", "1/-3", "x/y", ""])
+async def test_a_coefficient_that_is_not_a_rational_is_refused_with_a_message(app_client, bad):
+    name = "edge_object_bond_factor"
+    resp = await app_client.put(f"/api/admin/formula-coefficients/{name}", json={"value": bad})
+    assert resp.status_code == 422
+    assert "n/m" in resp.json()["detail"]
+    assert (await _coefficient(app_client, name))["value"] == "1/3"
+
+
+@pytest.mark.asyncio
+async def test_a_plain_coefficient_keeps_its_kind_and_a_rational_param_is_checked(app_client):
+    name = "bond_degree_of_assoc_scale"
+    before = await _coefficient(app_client, name)
+    assert before["value_type"] == "float"
+    resp = await app_client.put(f"/api/admin/formula-coefficients/{name}", json={"value": "abc"})
+    assert resp.status_code == 422
+    assert await _coefficient(app_client, name) == before
+
+    resp = await app_client.post(
+        "/api/admin/params", json={"name": "zz_rational", "value": "1/0", "value_type": "rational"}
+    )
+    assert resp.status_code == 422
+    resp = await app_client.post(
+        "/api/admin/params", json={"name": "zz_rational", "value": "4/6", "value_type": "rational"}
+    )
+    try:
+        assert resp.status_code == 201 and resp.json()["value"] == "2/3"
+    finally:
+        await app_client.delete("/api/admin/params/zz_rational")

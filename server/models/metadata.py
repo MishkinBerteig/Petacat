@@ -255,9 +255,11 @@ class FormulaCoefficient(Base):
     __tablename__ = "formula_coefficients"
 
     name = Column(String(64), primary_key=True)
-    value = Column(Float, nullable=False)
-    #: ``int`` or ``float``: the JSON type the seed file gives the number, which a Float
-    #: column alone cannot keep (``5`` against ``5.0``).
+    #: The number as text, parsed by ``value_type`` at load (as ``engine_params`` does): a
+    #: Float column keeps neither ``5`` against ``5.0`` nor an exact rational.
+    value = Column(Text, nullable=False)
+    #: ``int``, ``float`` or ``rational`` (written ``n/m``, held exactly): the kind the seed
+    #: file gives the value.
     value_type = Column(String(16), ForeignKey("param_value_types.name"), nullable=False, default="float")
     sort_order = Column(Integer, nullable=False, default=_next_after_last("formula_coefficients"))
 

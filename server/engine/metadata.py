@@ -12,7 +12,10 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import dataclass, field
+from fractions import Fraction
 from typing import Any
+
+from server.engine.rational import parse_rational
 
 
 class ConfigurationRequired(RuntimeError):
@@ -167,7 +170,7 @@ class MetadataProvider:
     posting_rules: list[PostingRuleSpec] = field(default_factory=list)
     params: dict[str, Any] = field(default_factory=dict)
     urgency_levels: dict[str, int] = field(default_factory=dict)
-    formula_coefficients: dict[str, float] = field(default_factory=dict)
+    formula_coefficients: dict[str, int | float | Fraction] = field(default_factory=dict)
     commentary_templates: dict[str, Any] = field(default_factory=dict)
     demo_problems: list[DemoProblem] = field(default_factory=list)
     theme_dimensions: list[ThemeDimensionSpec] = field(default_factory=list)
@@ -216,7 +219,7 @@ class MetadataProvider:
     def get_urgency(self, name: str) -> int:
         return self.urgency_levels[name]
 
-    def get_formula_coeff(self, name: str) -> float:
+    def get_formula_coeff(self, name: str) -> int | float | Fraction:
         return self.formula_coefficients[name]
 
     def get_codelet_spec(self, name: str) -> CodeletSpec:
@@ -270,8 +273,11 @@ class MetadataProvider:
         # Urgency levels
         urgency_levels = _load("urgency_levels.json")
 
-        # Formula coefficients
-        formula_coefficients = _load("formula_coefficients.json")
+        # Formula coefficients.  A JSON string is a rational, ``"n/m"``, held exactly.
+        formula_coefficients = {
+            name: parse_rational(value) if isinstance(value, str) else value
+            for name, value in _load("formula_coefficients.json").items()
+        }
 
         # Codelet types
         codelets_data = _load("codelet_types.json")

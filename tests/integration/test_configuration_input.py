@@ -166,6 +166,9 @@ def test_a_well_formed_batch_is_clean():
         ("true", "bool", True), ("False", "bool", True), ("yes", "bool", False),
         ('{"a": [1]}', "json", True), ("{nope", "json", False),
         ("anything at all", "string", True),
+        ("2/3", "rational", True), ("1/6", "rational", True), ("-1/2", "rational", True),
+        ("2/0", "rational", False), ("2/-3", "rational", False), ("0.5", "rational", False),
+        ("2", "rational", False), ("1 / 2", "rational", False), ("a/b", "rational", False),
     ],
 )
 def test_value_type_must_parse(text, value_type, good):

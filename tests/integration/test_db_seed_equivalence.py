@@ -144,6 +144,25 @@ def test_number_typing_is_preserved_in_parameters(db, seed):
         assert type(got) is type(value), (name, value, got)
     for name, value in seed.urgency_levels.items():
         assert type(db.provider.urgency_levels[name]) is type(value), name
+    for name, value in seed.formula_coefficients.items():
+        got = db.provider.formula_coefficients[name]
+        assert type(got) is type(value) and got == value, (name, value, got)
+
+
+def test_a_rational_survives_seed_to_database_to_provider_unchanged(db, seed):
+    from fractions import Fraction
+
+    for name, expected in (
+        ("enclosed_group_importance_factor", Fraction(2, 3)),
+        ("edge_object_bond_factor", Fraction(1, 3)),
+        ("interior_object_bond_factor", Fraction(1, 6)),
+    ):
+        got = db.provider.formula_coefficients[name]
+        assert type(got) is Fraction and got == expected, name
+        assert seed.formula_coefficients[name] == got
+        row = next(r for r in db.tables["formula_coefficients"] if r["name"] == name)
+        assert row["value_type"] == "rational"
+        assert row["value"] == f"{expected.numerator}/{expected.denominator}"
 
 
 def test_engine_params_value_type_column_is_right(db):
@@ -169,6 +188,17 @@ def test_engine_params_value_type_column_is_right(db):
 # ---------------------------------------------------------------------------
 # Lossless first load: the rows read straight back from the tables equal the files.
 # ---------------------------------------------------------------------------
+
+
+def _coefficient_kind(v):
+    """The kind a seed coefficient is stored as: a JSON string is a rational, ``"n/m"``."""
+    if isinstance(v, str):
+        return "rational"
+    return "int" if isinstance(v, int) else "float"
+
+
+def _coefficient_text(v):
+    return v if isinstance(v, str) else repr(float(v)) if isinstance(v, float) else str(v)
 
 
 def _file(name):
@@ -260,8 +290,8 @@ def _expected_tables() -> dict[str, list[dict]]:
         (
             {
                 "name": k,
-                "value": float(v),
-                "value_type": "int" if isinstance(v, int) else "float",
+                "value": _coefficient_text(v),
+                "value_type": _coefficient_kind(v),
                 "sort_order": i,
             }
             for i, (k, v) in enumerate(_file("formula_coefficients.json").items())

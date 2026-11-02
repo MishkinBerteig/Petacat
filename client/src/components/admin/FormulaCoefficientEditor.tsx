@@ -2,7 +2,11 @@ import { useState, useEffect, useCallback } from 'react'
 import { request, describeApiError } from '@/api/client'
 import { EditableTable, type ColumnDef } from './EditableTable'
 
-interface FormulaCoeff { name: string; value: number }
+/**
+ * ``value`` is text: ``5``, ``0.5`` or an exact rational ``n/m`` (such as ``2/3``), held and
+ * shown exactly, never as a rounded decimal.  ``value_type`` is ``int``, ``float`` or ``rational``.
+ */
+interface FormulaCoeff { name: string; value: string; value_type: string }
 
 /**
  * Send one write, and describe a refusal in terms of what was being attempted.
@@ -19,8 +23,9 @@ async function submit<T>(action: string, path: string, options: RequestInit): Pr
 }
 
 const COLUMNS: ColumnDef[] = [
-  { key: 'name', label: 'Name', type: 'readonly', width: '60%' },
-  { key: 'value', label: 'Value', type: 'number', width: '20%' },
+  { key: 'name', label: 'Name', type: 'readonly', width: '50%' },
+  { key: 'value', label: 'Value', type: 'text', width: '30%' },
+  { key: 'value_type', label: 'Type', type: 'text', width: '20%' },
 ]
 
 export function FormulaCoefficientEditor() {
@@ -50,7 +55,8 @@ export function FormulaCoefficientEditor() {
 
   return (
     <div>
-      <div className="text-xs text-muted mb-2">{coeffs.length} formula coefficients (double-click to edit)</div>
+      <div className="text-xs text-muted mb-2">{coeffs.length} formula coefficients (double-click to edit). A value is a number, or
+        {' '}n/m for an exact rational such as 2/3.</div>
       <EditableTable
         columns={COLUMNS}
         rows={coeffs}
@@ -58,13 +64,29 @@ export function FormulaCoefficientEditor() {
         onCreate={async (row) => submit<FormulaCoeff>(
           'create the formula coefficient',
           '/admin/formula-coefficients',
-          { method: 'POST', body: JSON.stringify(row) },
+          {
+            method: 'POST',
+            body: JSON.stringify({
+              name: row.name ?? '',
+              value: row.value ?? '',
+              value_type: row.value_type || 'float',
+            }),
+          },
         )}
-        onUpdate={async (name, row) => submit<FormulaCoeff>(
-          `save the formula coefficient "${name}"`,
-          `/admin/formula-coefficients/${encodeURIComponent(name)}`,
-          { method: 'PUT', body: JSON.stringify({ value: row.value }) },
-        )}
+        onUpdate={async (name, row) => {
+          const current = coeffs.find(c => c.name === name)
+          return submit<FormulaCoeff>(
+            `save the formula coefficient "${name}"`,
+            `/admin/formula-coefficients/${encodeURIComponent(String(name))}`,
+            {
+              method: 'PUT',
+              body: JSON.stringify({
+                value: row.value ?? current?.value ?? '',
+                value_type: row.value_type ?? current?.value_type ?? 'float',
+              }),
+            },
+          )
+        }}
         onDelete={async (name) => {
           await submit<unknown>(
             `delete the formula coefficient "${name}"`,

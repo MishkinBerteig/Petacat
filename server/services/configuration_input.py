@@ -40,6 +40,8 @@ import json
 from dataclasses import dataclass, field
 from typing import Any, Iterable, Mapping, Sequence
 
+from server.engine.rational import RATIONAL_REFUSAL, parse_rational
+
 # --- the four classes -------------------------------------------------------
 
 MALFORMED = "malformed"
@@ -76,7 +78,7 @@ ENVELOPE_FIELDS = frozenset(
 COLUMN_TYPES = ("str", "int", "float", "bool", "json", "code_exec", "code_eval")
 
 #: Parameter ``value_type`` names (``param_value_types``) and how their text parses.
-VALUE_TYPES = ("int", "float", "bool", "json", "string")
+VALUE_TYPES = ("int", "float", "bool", "json", "string", "rational")
 
 
 @dataclass(frozen=True)
@@ -178,9 +180,12 @@ def parse_param_value(text: str, value_type: str) -> tuple[bool, Any]:
     """Parse engine-parameter text as its ``value_type``; ``(ok, parsed)``.
 
     ``int`` and ``float`` must parse as written; ``bool`` is ``true`` or ``false`` (any case);
-    ``json`` must be valid JSON; ``string`` is any text.
+    ``json`` must be valid JSON; ``string`` is any text; ``rational`` is ``n/m``, two integers
+    with a positive denominator, parsed exactly to a ``Fraction``.
     """
     try:
+        if value_type == "rational":
+            return True, parse_rational(text)
         if value_type == "int":
             return True, int(text)
         if value_type == "float":
@@ -211,8 +216,11 @@ def check_param_value(
         return InputProblem(MALFORMED, "value must be text", op_index, "value", table)
     ok, _ = parse_param_value(text, value_type)
     if not ok:
+        why = f": {RATIONAL_REFUSAL}" if value_type == "rational" else ""
         return InputProblem(
-            MALFORMED, f"value {text!r} does not parse as {value_type}", op_index, "value", table
+            MALFORMED,
+            f"value {text!r} does not parse as {value_type}{why}",
+            op_index, "value", table,
         )
     return None
 

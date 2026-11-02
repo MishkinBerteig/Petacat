@@ -560,7 +560,7 @@ async def test_import_restores_an_edit_in_each_collection(app_client):
     edited["codelet_types"][0]["description"] = "edited codelet"
     edited["engine_params"][0]["value"] = "1"
     edited["urgency_levels"][0]["value"] = 11
-    edited["formula_coefficients"][0]["value"] = 0.5
+    edited["formula_coefficients"][0]["value"] = "0.25"
     edited["demo_problems"][0]["description"] = "edited demo"
     edited["theme_dimensions"][0]["valid_relations"] = ["identity"]
     edited["posting_rules"][0]["condition"] = "never"

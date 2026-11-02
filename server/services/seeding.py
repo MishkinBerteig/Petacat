@@ -22,6 +22,8 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from server.engine.rational import canonical_rational
+
 logger = logging.getLogger("petacat")
 
 #: Seed files whose contents the DB copy of the bulk metadata mirrors.  Help
@@ -203,15 +205,10 @@ async def seed_metadata_from_json(session: AsyncSession, seed_dir: str) -> None:
     for position, (k, v) in enumerate(_load("urgency_levels.json").items()):
         session.add(models.UrgencyLevel(name=k, value=v, sort_order=position))
 
-    # ``value_type`` keeps the JSON type of the number (``5`` against ``5.0``).
+    # ``value_type`` keeps the JSON kind of the value (``5`` against ``5.0`` against ``"2/3"``).
     for position, (k, v) in enumerate(_load("formula_coefficients.json").items()):
         session.add(
-            models.FormulaCoefficient(
-                name=k,
-                value=v,
-                value_type="int" if isinstance(v, int) and not isinstance(v, bool) else "float",
-                sort_order=position,
-            )
+            models.FormulaCoefficient(name=k, sort_order=position, **_coefficient_columns(v))
         )
 
     for position, d in enumerate(_load("demo_problems.json"), start=1):
@@ -334,6 +331,18 @@ async def seed_metadata_from_json(session: AsyncSession, seed_dir: str) -> None:
                 f"(SELECT COALESCE(MAX(id), 1) FROM {table}), true)"
             )
         )
+
+
+def _coefficient_columns(value: Any) -> dict[str, str]:
+    """The `value` / `value_type` pair a formula coefficient is stored as.
+
+    A JSON string is a rational, ``"n/m"``, stored in its canonical text and held exactly.
+    """
+    if isinstance(value, str):
+        return {"value": canonical_rational(value), "value_type": "rational"}
+    if isinstance(value, int) and not isinstance(value, bool):
+        return {"value": str(value), "value_type": "int"}
+    return {"value": repr(float(value)), "value_type": "float"}
 
 
 def _param_columns(value: Any) -> dict[str, str]:

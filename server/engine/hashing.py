@@ -24,6 +24,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import asdict, fields, is_dataclass
+from fractions import Fraction
 from typing import Any
 
 #: Truncated to keep the column narrow and readable in a listing. 128 bits of SHA-256
@@ -49,6 +50,8 @@ def _canonical(value: Any) -> Any:
         return sorted(_canonical(v) for v in value)
     if isinstance(value, (list, tuple)):
         return [_canonical(v) for v in value]
+    if isinstance(value, Fraction):
+        return ["rational", f"{value.numerator}/{value.denominator}"]
     if value is None or isinstance(value, (bool, int, float, str)):
         return value
     return repr(value)
@@ -89,6 +92,8 @@ def _canonical_ordered(value: Any) -> Any:
         return sorted(_canonical(v) for v in value)
     if isinstance(value, (list, tuple)):
         return [_canonical_ordered(v) for v in value]
+    if isinstance(value, Fraction):
+        return ["rational", f"{value.numerator}/{value.denominator}"]
     if value is None or isinstance(value, (bool, int, float, str)):
         return [type(value).__name__, value] if isinstance(value, (int, float)) and not isinstance(value, bool) else value
     return repr(value)

@@ -199,7 +199,7 @@ describe('the configuration lists — a load that fails', () => {
       attempt += 1
       return attempt === 1
         ? reply(500, { detail: 'relation "formula_coefficients" does not exist' })
-        : reply(200, [{ name: 'bond_weight', value: 40 }])
+        : reply(200, [{ name: 'bond_weight', value: '40', value_type: 'float' }])
     })
     render(<FormulaCoefficientEditor />)
 

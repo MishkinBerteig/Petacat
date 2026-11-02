@@ -21,6 +21,7 @@ import { SlipnetLayoutEditor } from './SlipnetLayoutEditor'
 import { CommentaryTemplateEditor } from './CommentaryTemplateEditor'
 import { HelpTopicEditor } from './HelpTopicEditor'
 import { ParamsEditor } from './ParamsEditor'
+import { FormulaCoefficientEditor } from './FormulaCoefficientEditor'
 import { UrgencyLevelEditor } from './UrgencyLevelEditor'
 
 interface Call {
@@ -297,6 +298,38 @@ describe('SlipnetLayoutEditor — grid positions', () => {
 
     await waitFor(() => expect(calls).toHaveLength(1))
     expect(calls[0].body).toEqual({ node_name: 'plato-z', grid_row: 4, grid_col: 2 })
+  })
+})
+
+describe('FormulaCoefficientEditor — exact rationals', () => {
+  const rows = [
+    { name: 'enclosed_group_importance_factor', value: '2/3', value_type: 'rational' },
+    { name: 'bond_degree_of_assoc_scale', value: '11.0', value_type: 'float' },
+  ]
+
+  it('shows a rational as n/m and saves an edit as n/m text with its kind', async () => {
+    serve(rows)
+    render(<FormulaCoefficientEditor />)
+
+    await editCell('2/3', '1/2')
+
+    await waitFor(() => expect(calls).toHaveLength(1))
+    expect(calls[0].method).toBe('PUT')
+    expect(calls[0].url).toBe('/api/admin/formula-coefficients/enclosed_group_importance_factor')
+    expect(calls[0].body).toEqual({ value: '1/2', value_type: 'rational' })
+  })
+
+  it('shows the refusal for a value that is not n/m', async () => {
+    stubFetch((_url, init) =>
+      init?.method === 'PUT'
+        ? refusal(422, 'Unprocessable Entity',
+            "value '1/0' does not parse as rational: a rational is two integers written n/m with a positive denominator, such as 2/3")
+        : ok(rows))
+    render(<FormulaCoefficientEditor />)
+
+    await editCell('2/3', '1/0')
+
+    expect(await screen.findByText(/n\/m with a positive denominator/)).toBeTruthy()
   })
 })
 

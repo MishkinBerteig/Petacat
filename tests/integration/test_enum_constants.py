@@ -160,7 +160,7 @@ def test_posting_directions_match_seed(enums_data):
 
 def test_param_value_types_match_seed(enums_data):
     valid_types = _names(enums_data, "param_value_types")
-    assert {"int", "float", "bool", "string", "json"} <= valid_types
+    assert {"int", "float", "bool", "string", "json", "rational"} <= valid_types
 
 
 # ── Demo modes ──

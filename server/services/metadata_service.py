@@ -7,12 +7,14 @@ for admin operations.
 from __future__ import annotations
 
 import json
+from fractions import Fraction
 from typing import Any
 
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.engine.posting import validate_posting_formulas
+from server.engine.rational import parse_rational
 from server.engine.metadata import (
     CodeletRoleSpec,
     CodeletSpec,
@@ -143,15 +145,14 @@ async def load_metadata_from_db(session: AsyncSession) -> MetadataProvider:
     urgency_levels = {row.name: row.value for row in result.scalars()}
 
     # Formula coefficients, in the seed file's key order; ``value_type`` restores the
-    # int-against-float typing the Float column cannot hold.
+    # int, float or exact rational the text holds.
     result = await session.execute(
         select(FormulaCoefficient).order_by(
             FormulaCoefficient.sort_order, FormulaCoefficient.name
         )
     )
     formula_coefficients = {
-        row.name: int(row.value) if row.value_type == "int" else float(row.value)
-        for row in result.scalars()
+        row.name: _parse_coefficient(row.value, row.value_type) for row in result.scalars()
     }
 
     # Posting rules.  Ordered explicitly: the engine consults these in sequence and
@@ -319,8 +320,19 @@ async def load_metadata_from_db(session: AsyncSession) -> MetadataProvider:
     )
 
 
+def _parse_coefficient(value: str, value_type: str) -> int | float | Fraction:
+    """A stored coefficient as the engine reads it: an int, a float or an exact rational."""
+    if value_type == "int":
+        return int(value)
+    if value_type == "rational":
+        return parse_rational(value)
+    return float(value)
+
+
 def _parse_param(value: str, value_type: str) -> Any:
     """Parse a string parameter value to its typed form."""
+    if value_type == "rational":
+        return parse_rational(value)
     if value_type == "int":
         return int(value)
     elif value_type == "float":

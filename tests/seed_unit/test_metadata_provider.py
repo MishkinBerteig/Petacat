@@ -158,7 +158,7 @@ def test_enum_values_match_expected_counts(meta):
     assert len(meta.enum_values["codelet_families"]) == 8
     assert len(meta.enum_values["codelet_phases"]) == 4
     assert len(meta.enum_values["posting_directions"]) == 3
-    assert len(meta.enum_values["param_value_types"]) == 5
+    assert len(meta.enum_values["param_value_types"]) == 6
     assert len(meta.enum_values["demo_modes"]) == 2
 
 

@@ -15,8 +15,6 @@ if TYPE_CHECKING:
     from server.engine.descriptions import Description
     from server.engine.rng import RNG
 
-_TWO_THIRDS = Fraction(2, 3)
-
 
 def exact_fraction(value: Any) -> Fraction:
     """``Fraction(value)`` without ``numbers.Rational`` in the way.
@@ -31,6 +29,16 @@ def exact_fraction(value: Any) -> Fraction:
         numerator, denominator = value.as_integer_ratio()
         return Fraction(numerator, denominator)
     return Fraction(value)
+
+
+def _exact_coefficient(value: Any) -> Fraction:
+    """A configuration coefficient as an exact rational (``Fraction``).
+
+    The Metacat Standard Configuration stores these as rationals (``"2/3"``); anything
+    else a configuration holds is taken at its exact value.  The caller reads the
+    coefficient by its literal name, which the declared read list checks.
+    """
+    return value if type(value) is Fraction else exact_fraction(value)
 
 
 def _is_generic_descriptor(descriptor: Any) -> bool:
@@ -514,7 +522,9 @@ class WorkspaceObject:
             else cap
         )
         if self.enclosing_group is not None:
-            exact *= _TWO_THIRDS
+            exact *= _exact_coefficient(
+                bound_meta().get_formula_coeff("enclosed_group_importance_factor")
+            )
         return exact
 
     def exact_raw_ratio(self, max_raw: float = 300.0) -> tuple[int, int]:
@@ -548,28 +558,32 @@ class WorkspaceObject:
         if not num * cap_d < cap_n * den:
             num, den = cap_n, cap_d
         if self.enclosing_group is not None:
-            num, den = num * 2, den * 3
+            factor = _exact_coefficient(
+                bound_meta().get_formula_coeff("enclosed_group_importance_factor")
+            )
+            num, den = num * factor.numerator, den * factor.denominator
         return num, den
 
     def update_importance(
-        self, max_raw: float = 300.0, enclosed_factor: float = 2.0 / 3.0
+        self, max_raw: float = 300.0, enclosed_factor: float | None = None
     ) -> None:
         """Scheme: ``update-raw-importance`` (``workspace-objects.ss:425-434``).
 
-        The enclosed-object factor is the exact rational ``2/3``, not the 0.667
-        the seed data carries.  Raw importance is a sum of up to three descriptor
-        activations capped at 300, so the two differ by up to 0.1 of a point
-        before the ratio that becomes relative importance is even taken — small,
-        but it is a number the reference computes exactly and there is no reason
-        to approximate it.  (``enclosed_group_importance_factor`` in
-        ``seed_data/formula_coefficients.json`` is read by nothing; wiring it
-        would mean threading a ``MetadataProvider`` down to every object update.)
+        The enclosed-object factor is the configuration's
+        ``enclosed_group_importance_factor``, an exact rational (``2/3`` in the Metacat
+        Standard Configuration), applied here as its correctly rounded double
+        (``float(Fraction(2, 3))`` is ``2.0 / 3.0``).  *enclosed_factor* overrides it for
+        a caller that supplies its own.
         """
         total = sum(
             getattr(d, "descriptor_activation", 0) for d in self.get_relevant_descriptions()
         )
         raw = min(max_raw, total)
         if self.enclosing_group is not None:
+            if enclosed_factor is None:
+                enclosed_factor = float(_exact_coefficient(
+                    bound_meta().get_formula_coeff("enclosed_group_importance_factor")
+                ))
             raw *= enclosed_factor
         self.raw_importance = raw
 
@@ -588,12 +602,21 @@ class WorkspaceObject:
         if not bonds:
             self.intra_string_unhappiness = 100.0
         elif self.leftmost_in_string() or self.rightmost_in_string():
+            # ``x * numerator / denominator``: with a numerator of 1 this is ``x / 3``.
+            factor = _exact_coefficient(
+                bound_meta().get_formula_coeff("edge_object_bond_factor")
+            )
             self.intra_string_unhappiness = 100.0 - round(
-                getattr(bonds[0], "strength", 0) / 3
+                getattr(bonds[0], "strength", 0) * factor.numerator / factor.denominator
             )
         else:
+            factor = _exact_coefficient(
+                bound_meta().get_formula_coeff("interior_object_bond_factor")
+            )
             total = sum(getattr(b, "strength", 0) for b in bonds)
-            self.intra_string_unhappiness = 100.0 - round(total / 6)
+            self.intra_string_unhappiness = 100.0 - round(
+                total * factor.numerator / factor.denominator
+            )
 
     def update_inter_string_unhappiness(self) -> None:
         """Compute inter-string unhappiness for horizontal and vertical

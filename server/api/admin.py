@@ -14,6 +14,8 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.db import get_session
+from server.engine.rational import canonical_rational
+from server.services.configuration_input import check_param_value
 from server.models.metadata import (
     BridgeOrientationDef,
     BridgeTypeDef,
@@ -118,7 +120,7 @@ class CodeletTypeResponse(BaseModel):
 
 class ParamUpdateRequest(BaseModel):
     value: str
-    #: How the value is read back — ``int``, ``float``, ``bool``, ``json`` or ``string``.
+    #: How the value is read back — ``int``, ``float``, ``bool``, ``json``, ``string`` or ``rational`` (``n/m``).
     #: Sent when the type is being changed alongside the value.
     value_type: str | None = None
 
@@ -139,12 +141,16 @@ class UrgencyLevelResponse(BaseModel):
 
 
 class FormulaCoefficientUpdateRequest(BaseModel):
-    value: float
+    #: The number as text: ``5``, ``0.5`` or an exact rational ``2/3`` (written ``n/m``).
+    value: str
+    #: ``int``, ``float`` or ``rational``; omitted, the coefficient keeps its kind.
+    value_type: str | None = None
 
 
 class FormulaCoefficientResponse(BaseModel):
     name: str
-    value: float
+    value: str
+    value_type: str = "float"
 
 
 class DemoProblemRequest(BaseModel):
@@ -517,7 +523,10 @@ async def create_param(
     existing = await session.get(EngineParam, req.name)
     if existing is not None:
         raise HTTPException(409, f"Parameter '{req.name}' already exists")
-    param = EngineParam(name=req.name, value=req.value, value_type=req.value_type)
+    value = req.value
+    if req.value_type == "rational":
+        value = _checked_number(value, "rational", kinds=("rational",))
+    param = EngineParam(name=req.name, value=value, value_type=req.value_type)
     session.add(param)
     await session.commit()
     return ParamResponse(name=param.name, value=param.value, value_type=param.value_type or "string")
@@ -533,7 +542,10 @@ async def update_param(
     param = await session.get(EngineParam, name)
     if param is None:
         raise HTTPException(404, f"Parameter '{name}' not found")
+    value_type = req.value_type if req.value_type is not None else param.value_type
     param.value = req.value
+    if value_type == "rational":
+        param.value = _checked_number(req.value, "rational", kinds=("rational",))
     if req.value_type is not None:
         param.value_type = req.value_type
     await session.commit()
@@ -629,7 +641,27 @@ async def list_formula_coefficients(session: AsyncSession = Depends(get_session)
         select(FormulaCoefficient).order_by(FormulaCoefficient.name)
     )
     rows = result.scalars().all()
-    return [FormulaCoefficientResponse(name=r.name, value=r.value) for r in rows]
+    return [
+        FormulaCoefficientResponse(name=r.name, value=r.value, value_type=r.value_type)
+        for r in rows
+    ]
+
+
+COEFFICIENT_VALUE_TYPES = ("int", "float", "rational")
+
+
+def _checked_number(text: str, value_type: str, *, kinds: tuple[str, ...]) -> str:
+    """The value text to store, or a 422 saying what is wrong with it.
+
+    A rational is stored in its canonical ``n/m`` (lowest terms), so the Admin view shows
+    what the engine holds; ``int`` and ``float`` keep the text as written.
+    """
+    if value_type not in kinds:
+        raise HTTPException(422, f"value_type must be one of {', '.join(kinds)}, got {value_type!r}")
+    problem = check_param_value(text, value_type)
+    if problem is not None:
+        raise HTTPException(422, problem.message)
+    return canonical_rational(text) if value_type == "rational" else text.strip()
 
 
 @router.post("/formula-coefficients", response_model=FormulaCoefficientResponse, status_code=201)
@@ -641,10 +673,13 @@ async def create_formula_coefficient(
     existing = await session.get(FormulaCoefficient, req.name)
     if existing is not None:
         raise HTTPException(409, f"Formula coefficient '{req.name}' already exists")
-    coeff = FormulaCoefficient(name=req.name, value=req.value)
+    value = _checked_number(req.value, req.value_type, kinds=COEFFICIENT_VALUE_TYPES)
+    coeff = FormulaCoefficient(name=req.name, value=value, value_type=req.value_type)
     session.add(coeff)
     await session.commit()
-    return FormulaCoefficientResponse(name=coeff.name, value=coeff.value)
+    return FormulaCoefficientResponse(
+        name=coeff.name, value=coeff.value, value_type=coeff.value_type
+    )
 
 
 @router.put(
@@ -659,9 +694,13 @@ async def update_formula_coefficient(
     coeff = await session.get(FormulaCoefficient, name)
     if coeff is None:
         raise HTTPException(404, f"Formula coefficient '{name}' not found")
-    coeff.value = req.value
+    value_type = req.value_type if req.value_type is not None else coeff.value_type
+    coeff.value = _checked_number(req.value, value_type, kinds=COEFFICIENT_VALUE_TYPES)
+    coeff.value_type = value_type
     await session.commit()
-    return FormulaCoefficientResponse(name=coeff.name, value=coeff.value)
+    return FormulaCoefficientResponse(
+        name=coeff.name, value=coeff.value, value_type=coeff.value_type
+    )
 
 
 @router.delete("/formula-coefficients/{name}")

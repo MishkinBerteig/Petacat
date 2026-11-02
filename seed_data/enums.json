@@ -407,6 +407,12 @@
       "display_label": "JSON",
       "sort_order": 4,
       "description": "JSON parameter value"
+    },
+    {
+      "name": "rational",
+      "display_label": "Rational",
+      "sort_order": 5,
+      "description": "Exact rational parameter value, written n/m"
     }
   ],
   "demo_modes": [
