@@ -20,6 +20,9 @@ from server.engine.roles import Roles, absent, resolve_roles
 #: ``(40% ...)`` at ``slipnet.ss:191``.  The fallback for a node built without a
 #: ``MetadataProvider``; the value in force comes from ``shrunk_link_length_factor``.
 DEFAULT_SHRUNK_LINK_FACTOR = 0.4
+#: The Scheme's own "15" in ``(/ %update-cycle-length% 15)`` (``slipnet.ss:72-73, 183-185``).
+#: As above, for a bare node; the value in force is ``reference_update_cycle_length``.
+DEFAULT_REFERENCE_UPDATE_CYCLE_LENGTH = 15.0
 
 from server.engine.numeric.layout import (
     DEFAULT_ACTIVATION,
@@ -201,6 +204,7 @@ class SlipnetNode:
         "_workspace_activation",
         "_full_activation_threshold",
         "_shrunk_link_factor",
+        "_reference_cycle_length",
         "roles",
         "relation",
         "relations",
@@ -268,6 +272,8 @@ class SlipnetNode:
         #: shrunk length from the intrinsic one, so a stored table of shrunk lengths
         #: would be a second place for the same fact to be written.
         self._shrunk_link_factor: float = DEFAULT_SHRUNK_LINK_FACTOR
+        #: The update-cycle length the decay and spread rates are expressed against.
+        self._reference_cycle_length: float = DEFAULT_REFERENCE_UPDATE_CYCLE_LENGTH
 
     def has_role(self, role: str) -> bool:
         return role in self.roles
@@ -301,7 +307,7 @@ class SlipnetNode:
         irrational, so there is nothing to be exact about; that path keeps the
         direct float form.
         """
-        exponent = update_cycle_length / 15.0
+        exponent = update_cycle_length / self._reference_cycle_length
         if exponent == 1.0:
             self._decay_percent = float(100 - self.conceptual_depth)
         else:
@@ -433,7 +439,7 @@ class SlipnetNode:
         """
         if self.activation <= 0:
             return
-        scale = update_cycle_length / 15.0
+        scale = update_cycle_length / self._reference_cycle_length
         for link in self.outgoing_links:
             if link.to_node.frozen:
                 continue
@@ -1025,6 +1031,9 @@ class Slipnet:
         #: ``%update-cycle-length%`` (``run.ss:20``).  Replaced in ``from_metadata``;
         #: the reference cadence stands for a bare ``Slipnet()``.
         self.update_cycle_length: int = 15
+        #: ``reference_update_cycle_length``: what ``update_cycle_length`` is divided by
+        #: to scale the decay and spread.  Replaced in ``from_metadata``.
+        self.reference_update_cycle_length: float = DEFAULT_REFERENCE_UPDATE_CYCLE_LENGTH
         #: The roles, resolved once in ``from_metadata`` (``engine/roles.py``).  A bare
         #: ``Slipnet()`` has every role absent.
         self.roles: Roles = _NO_ROLES
@@ -1067,12 +1076,15 @@ class Slipnet:
 
         # Set intrinsic link lengths from engine params
         shrunk_factor = float(
-            meta.get_param("shrunk_link_length_factor", DEFAULT_SHRUNK_LINK_FACTOR)
+            meta.get_param("shrunk_link_length_factor")
         )
+        reference_ucl = float(meta.get_param("reference_update_cycle_length"))
         for node in slipnet.nodes.values():
             node._shrunk_link_factor = shrunk_factor
+            node._reference_cycle_length = reference_ucl
+        slipnet.reference_update_cycle_length = reference_ucl
 
-        intrinsic_lengths = meta.get_param("intrinsic_link_lengths", {})
+        intrinsic_lengths = meta.get_param("intrinsic_link_lengths")
         for node_name, length in intrinsic_lengths.items():
             if node_name in slipnet.nodes:
                 slipnet.nodes[node_name].intrinsic_link_length = length
@@ -1133,7 +1145,7 @@ class Slipnet:
         # Compute decay rates.  Held on the Slipnet as well, because the *spread*
         # scale is computed from the same cycle length once per update and had no
         # other way to reach it.
-        ucl = int(meta.get_param("update_cycle_length", 15))
+        ucl = int(meta.get_param("update_cycle_length"))
         slipnet.update_cycle_length = ucl
         for node in slipnet.nodes.values():
             node.compute_rate_of_decay(ucl)
@@ -1268,7 +1280,7 @@ class Slipnet:
             return
 
         session.load(SlipnetState.from_slipnet(self))
-        session.update(float(threshold), ucl / 15.0)
+        session.update(float(threshold), ucl / self.reference_update_cycle_length)
         if on_flushed is not None:
             session.store().apply_to_slipnet(self)
             on_flushed()
@@ -1291,10 +1303,10 @@ class Slipnet:
         (``slipnet.ss:139-140``) and the opening clamp of a deep concept is a
         concept-activation event in the reference's Trace.
         """
-        initially_clamped = meta.get_param("initially_clamped_slipnodes", [])
+        initially_clamped = meta.get_param("initially_clamped_slipnodes")
         clamp_cycles = (
             cycles if cycles is not None
-            else meta.get_param("initial_slipnode_clamp_cycles", 50)
+            else meta.get_param("initial_slipnode_clamp_cycles")
         )
         for node_name in initially_clamped:
             if node_name in self.nodes:

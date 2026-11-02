@@ -50,15 +50,16 @@ def temp_adjusted_probability(
 
     sqrt_base = meta.get_formula_coeff("low_prob_sqrt_base")  # 100
     scale = meta.get_formula_coeff("low_prob_scale_factor")  # 10
+    threshold = meta.get_formula_coeff("low_prob_threshold")  # 0.5
 
     adjustment = (scale - math.sqrt(sqrt_base - temperature)) / sqrt_base
 
-    if prob <= 0.5:
+    if prob <= threshold:
         low_prob_factor = max(1.0, math.floor(abs(math.log10(prob))))
         target = 10.0 ** (1.0 - low_prob_factor)
-        return min(0.5, prob + adjustment * (target - prob))
+        return min(threshold, prob + adjustment * (target - prob))
     else:
-        return max(0.5, 1.0 - ((1.0 - prob) + adjustment * prob))
+        return max(threshold, 1.0 - ((1.0 - prob) + adjustment * prob))
 
 
 def group_evaluation_probability(
@@ -94,7 +95,7 @@ def group_evaluation_probability(
     )
 
 
-def bond_degree_of_assoc(bond_category: SlipnetNode) -> float:
+def bond_degree_of_assoc(bond_category: SlipnetNode, meta: MetadataProvider) -> float:
     """A bond category's degree of association, scaled for urgencies and strengths.
 
     Scheme: ``bond-degree-of-assoc`` (``bonds.ss:490-492``) —
@@ -107,7 +108,8 @@ def bond_degree_of_assoc(bond_category: SlipnetNode) -> float:
     degree = getattr(bond_category, "degree_of_assoc", None)
     if degree is None:
         return 0.0
-    return min(100.0, round(11.0 * math.sqrt(max(0.0, degree()))))
+    scale = meta.get_formula_coeff("bond_degree_of_assoc_scale")  # 11
+    return min(100.0, round(scale * math.sqrt(max(0.0, degree()))))
 
 
 def temp_adjusted_values(
@@ -263,7 +265,8 @@ def length_description_probability(
 ) -> float:
     """Probability of attaching a length description to a group.
 
-    - Groups longer than 5 objects: probability 0 (never attach).
+    - Groups longer than ``length_description_max_group_length`` (5) objects:
+      probability 0 (never attach).
     - Single-object groups: probability 1 (always attach).
     - Groups of length 2-5: temperature-adjusted probability that decreases
       when the *length* concept is already highly activated (because if
@@ -280,8 +283,10 @@ def length_description_probability(
       ``^3``  → cube
     """
     group_length = group.length  # number of constituent objects
+    max_length = meta.get_formula_coeff("length_description_max_group_length")  # 5
+    base = meta.get_formula_coeff("length_description_base")  # 0.5
 
-    if group_length > 5:
+    if group_length > max_length:
         return 0.0
     if group_length == 1:
         return 1.0
@@ -290,6 +295,6 @@ def length_description_probability(
     #   0.5 ^ (group_length^3 * (100 - activation) / 100)
     activation = plato_length.activation
     exponent = (group_length ** 3) * ((100.0 - activation) / 100.0)
-    base_prob = 0.5 ** exponent
+    base_prob = base ** exponent
 
     return temp_adjusted_probability(base_prob, temperature, meta)

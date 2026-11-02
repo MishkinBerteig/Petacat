@@ -20,6 +20,7 @@ import math
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from server.engine.metadata import require_meta
 from server.engine.roles import absent
 from server.engine.slipnet import holds_role as _holds
 from server.engine.workspace_structures import WorkspaceStructure
@@ -101,8 +102,8 @@ def _slipnet_of(obj: Any) -> Any:
 #: present among a clause's transform slippages is dropped with this probability.
 #: A designed source of answer diversity: the same rule and the same mapping yield
 #: different translated rules on different attempts, which is how a literal answer
-#: and an abstract one coexist for the same problem.
-DEFAULT_SLIPPAGE_IGNORE_PROBABILITY = 0.4
+#: and an abstract one coexist for the same problem.  The value is the engine parameter
+#: ``slippage_ignore_probability``.
 
 
 class _TranslationFailure(Exception):
@@ -152,10 +153,8 @@ def _translate_rule_clause(
     # The p=0.4 per-dimension drop (``answers.ss:1364-1371``).  Note it applies to
     # the *transform* slippages only — the object-descriptions were already
     # translated with the full set.
-    ignore_probability = (
-        meta.get_param("slippage_ignore_probability", DEFAULT_SLIPPAGE_IGNORE_PROBABILITY)
-        if meta is not None
-        else DEFAULT_SLIPPAGE_IGNORE_PROBABILITY
+    ignore_probability = require_meta(meta, "translate-rule-clause").get_param(
+        "slippage_ignore_probability"
     )
     # ``remq-duplicates`` (utilities.ss:915-927) keeps the *last* occurrence of each
     # element, so the dimensions are ordered by where they last appear — which is the
@@ -2105,6 +2104,7 @@ def abstract_change_descriptions(
     bridges: list[Bridge],
     rng: RNG | None = None,
     slipnet: Any = None,
+    meta: MetadataProvider | None = None,
 ) -> list[IntrinsicChangeDescription | ExtrinsicChangeDescription]:
     """Extract change descriptions from a list of horizontal bridges.
 
@@ -2128,8 +2128,10 @@ def abstract_change_descriptions(
     """
     all_cds: list[IntrinsicChangeDescription | ExtrinsicChangeDescription] = []
 
-    swap_prob = 0.75
-    subobjects_prob = 0.75
+    # ``rules.ss:565-566``: two named local bindings, here engine parameters.
+    meta = require_meta(meta, "abstract_change_descriptions")
+    swap_prob = meta.get_param("rule_swap_abstraction_probability")
+    subobjects_prob = meta.get_param("rule_subobjects_abstraction_probability")
 
     # 1. Intrinsic change descriptions from individual bridge slippages
     for b in bridges:
@@ -3974,7 +3976,7 @@ def build_rule_from_bridges(
     describable = [b for b in bridges if rule_describable_bridge(b)]
 
     # 1. Abstract change descriptions from bridges
-    all_cds = abstract_change_descriptions(describable, rng=rng, slipnet=slipnet)
+    all_cds = abstract_change_descriptions(describable, rng=rng, slipnet=slipnet, meta=meta)
 
     # 2. Remove redundant change descriptions
     final_cds = remove_redundant_change_descriptions(all_cds)

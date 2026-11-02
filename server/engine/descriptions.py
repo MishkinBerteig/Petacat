@@ -15,7 +15,7 @@ from server.engine.themes import (
     THEME_TOP_BRIDGE,
     THEME_VERTICAL_BRIDGE,
 )
-from server.engine.workspace_structures import WorkspaceStructure
+from server.engine.workspace_structures import WorkspaceStructure, bound_meta
 
 if TYPE_CHECKING:
     from server.engine.rng import RNG
@@ -113,14 +113,15 @@ class Description(WorkspaceStructure):
 
         if count == 0:
             return 0.0
-        elif count == 1:
-            return 20.0
+        meta = bound_meta()
+        if count == 1:
+            return meta.get_formula_coeff("description_local_support_1")
         elif count == 2:
-            return 60.0
+            return meta.get_formula_coeff("description_local_support_2")
         elif count == 3:
-            return 90.0
+            return meta.get_formula_coeff("description_local_support_3")
         else:
-            return 100.0
+            return meta.get_formula_coeff("description_local_support_4_plus")
 
     @property
     def theme_types(self) -> list[str]:
@@ -185,10 +186,11 @@ class Description(WorkspaceStructure):
             return []
         dt_name = getattr(self.description_type, "name", "")
         values: list[float] = []
+        max_activation = bound_meta().get_param("max_theme_activation")
         for theme_type in self.theme_types:
             for theme in themespace.get_active_themes(theme_type):
                 if theme.dimension == dt_name:
-                    values.append(abs(theme.activation) / 100.0)
+                    values.append(abs(theme.activation) / max_activation)
                 else:
                     values.append(0.0)
         return values

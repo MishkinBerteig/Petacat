@@ -43,7 +43,6 @@ from server.engine.verbose import VerboseLog
 from server.engine.themes import Themespace
 from server.engine.trace import (
     CONCEPT_ACTIVATION,
-    MAX_CLAMP_PERIOD_DEFAULT,
     TemporalTrace,
     TraceEvent,
     concept_activation_importance,
@@ -456,7 +455,7 @@ class EngineRunner:
 
         # Create temperature
         temperature = Temperature(
-            initial=float(self.meta.get_param("initial_temperature", 100))
+            initial=float(self.meta.get_param("initial_temperature"))
         )
 
         # Commentary is injected rather than constructed, so a mode that keeps no
@@ -493,12 +492,8 @@ class EngineRunner:
 
         # Set modes
         self.ctx.justify_mode = answer is not None
-        self.ctx.self_watching_enabled = self.meta.get_param(
-            "self_watching_enabled_default", True
-        )
-        self.ctx.spreading_activation_threshold = self.meta.get_param(
-            "spreading_activation_threshold", 100
-        )
+        self.ctx.self_watching_enabled = self.meta.get_param("self_watching_enabled_default")
+        self.ctx.spreading_activation_threshold = self.meta.get_param("spreading_activation_threshold")
         themespace.set_justify_mode(self.ctx.justify_mode)
 
         # Emit opening commentary (Scheme: run.ss:257-258)
@@ -670,13 +665,13 @@ class EngineRunner:
                 self.ctx.trace,
                 self.ctx.codelet_count,
                 self.ctx.temperature.value,
-                self.meta.get_param("concept_activation_importance_threshold", 85),
+                self.meta.get_param("concept_activation_importance_threshold"),
             )
-        if not self.meta.get_param("initial_clamp_fixed_time", False):
+        if not self.meta.get_param("initial_clamp_fixed_time"):
             slipnet.clamp_initially_relevant(self.meta, monitor=monitor)
             return
-        cycles = self.meta.get_param("initial_slipnode_clamp_cycles", 50)
-        ucl = self.meta.get_param("update_cycle_length", 15)
+        cycles = self.meta.get_param("initial_slipnode_clamp_cycles")
+        ucl = self.meta.get_param("update_cycle_length")
         slipnet.clamp_initially_relevant(self.meta, cycles=0, monitor=monitor)
         self._initial_unclamp_time = (
             (self.ctx.codelet_count if self.ctx is not None else 0) + cycles * ucl
@@ -684,7 +679,7 @@ class EngineRunner:
 
     def _unclamp_initial_slipnodes(self, slipnet: Slipnet) -> None:
         """``(tell node 'unfreeze)`` for each initially clamped node (``run.ss:152-153``)."""
-        for name in self.meta.get_param("initially_clamped_slipnodes", []):
+        for name in self.meta.get_param("initially_clamped_slipnodes"):
             node = slipnet.nodes.get(name)
             if node is not None:
                 node.unclamp()
@@ -725,15 +720,13 @@ class EngineRunner:
         if ctx is None:
             return []
 
-        types = self.meta.get_param(
-            "initial_codelet_types", ["bottom-up-bond-scout", "bottom-up-bridge-scout"]
-        )
+        types = self.meta.get_param("initial_codelet_types")
         urgency = self.meta.get_urgency(
-            self.meta.get_param("initial_codelet_urgency", "very_low")
+            self.meta.get_param("initial_codelet_urgency")
         )
         rounds = int(
             evaluate_posting_formula(
-                self.meta.get_param("initial_codelet_rounds", "2 * num_workspace_objects"),
+                self.meta.get_param("initial_codelet_rounds"),
                 "initial_codelets",
                 PostingContext(ctx),
             )
@@ -927,7 +920,7 @@ class EngineRunner:
             return result
 
         # Check for update cycle
-        ucl = self.meta.get_param("update_cycle_length", 15)
+        ucl = self.meta.get_param("update_cycle_length")
         if ctx.codelet_count % ucl == 0:
             self.update_everything()
             # ``update_everything`` records concept-activation events of its own, and
@@ -1094,7 +1087,7 @@ class EngineRunner:
         # is a worse failure than not reading it at all: half of the mechanism moved.
         if ctx.trace.clamp_period_expired(
             ctx.codelet_count,
-            self.meta.get_param("max_clamp_period", MAX_CLAMP_PERIOD_DEFAULT),
+            self.meta.get_param("max_clamp_period"),
         ):
             ctx.trace.undo_last_clamp(
                 ctx.themespace, ctx.slipnet, ctx.codelet_count, ctx.coderack,
@@ -1200,7 +1193,7 @@ class EngineRunner:
         ctx = self.ctx
         if ctx is None:
             return
-        threshold = self.meta.get_param("concept_activation_importance_threshold", 85)
+        threshold = self.meta.get_param("concept_activation_importance_threshold")
         # Two monitored changes per node, each tested on its own delta
         # (slipnet.ss:140 flush, :153 jump): all the flushes, then all the jumps.
         stages = [(activations_before, activations_flushed)]
@@ -1491,7 +1484,7 @@ class EngineRunner:
         else:
             deferred = False
 
-        top_down_nodes = self.meta.get_param("top_down_slipnodes", [])
+        top_down_nodes = self.meta.get_param("top_down_slipnodes")
 
         for node_name in top_down_nodes:
             node = ctx.slipnet.nodes.get(node_name)

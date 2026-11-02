@@ -33,7 +33,7 @@ if TYPE_CHECKING:
     from server.engine.rules import Rule, RuleChange, RuleClause
 
 
-def _param(meta: MetadataProvider | None, name: str, default: Any) -> Any:
+def _param(meta: MetadataProvider | None, name: str) -> Any:
     """An engine parameter from the run's provider; ``meta`` is mandatory.
 
     Raises :class:`~server.engine.metadata.ConfigurationRequired` when there is no
@@ -41,7 +41,7 @@ def _param(meta: MetadataProvider | None, name: str, default: Any) -> Any:
     """
     from server.engine.metadata import require_meta
 
-    return require_meta(meta, f"rule_english parameter {name!r}").get_param(name, default)
+    return require_meta(meta, f"rule_english parameter {name!r}").get_param(name)
 
 
 def _name(node: Any) -> str | None:
@@ -76,9 +76,9 @@ class _Ctx:
     def __init__(self, string: Any, meta: MetadataProvider | None) -> None:
         self.string = string
         self.phrases: dict[str, list[str]] = _param(
-            meta, "rule_english_dimension_phrases", {}
+            meta, "rule_english_dimension_phrases"
         )
-        self.max_line = int(_param(meta, "maximum_rule_line_length", 60))
+        self.max_line = int(_param(meta, "maximum_rule_line_length"))
         # The grammar: ``commentary_templates["rule_english"]``.  A template the
         # configuration lacks makes the text it produces empty (ABSENCE-BEHAVIOUR 2.6).
         templates = getattr(meta, "commentary_templates", None) or {}

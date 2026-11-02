@@ -19,7 +19,7 @@ from server.engine.themes import (
     THEME_VERTICAL_BRIDGE,
     relation_name_for_label,
 )
-from server.engine.workspace_structures import WorkspaceStructure
+from server.engine.workspace_structures import WorkspaceStructure, bound_meta
 from server.engine.concept_mappings import ConceptMapping
 
 if TYPE_CHECKING:
@@ -259,18 +259,22 @@ class Bridge(WorkspaceStructure):
 
         avg_strength = sum(cm.strength() for cm in rel_dist_cms) / len(rel_dist_cms)
 
+        meta = bound_meta()
+
         # Number-of-CMs factor
         n = len(rel_dist_cms)
         if n == 1:
-            num_factor = 0.8
+            num_factor = meta.get_formula_coeff("bridge_num_cm_factor_1")
         elif n == 2:
-            num_factor = 1.2
+            num_factor = meta.get_formula_coeff("bridge_num_cm_factor_2")
         else:
-            num_factor = 1.6
+            num_factor = meta.get_formula_coeff("bridge_num_cm_factor_3_plus")
 
         # Internal coherence factor
         coherent = self._is_internally_coherent()
-        coherence_factor = 2.5 if coherent else 1.0
+        coherence_factor = meta.get_formula_coeff(
+            "bridge_coherence_factor_coherent" if coherent else "bridge_coherence_factor_incoherent"
+        )
 
         result = avg_strength * num_factor * coherence_factor
 
@@ -316,14 +320,18 @@ class Bridge(WorkspaceStructure):
         """
         o1, o2 = self.object1, self.object2
         if _is_singleton_letter(o1):
-            return 1.0 if not _is_group(o2) else 0.1
+            return 1.0 if not _is_group(o2) else self._singleton_mismatch_factor()
         if _is_singleton_letter(o2):
-            return 1.0 if not _is_group(o1) else 0.1
+            return 1.0 if not _is_group(o1) else self._singleton_mismatch_factor()
         if _is_singleton_group(o1):
-            return 1.0 if _is_group(o2) else 0.1
+            return 1.0 if _is_group(o2) else self._singleton_mismatch_factor()
         if _is_singleton_group(o2):
-            return 1.0 if _is_group(o1) else 0.1
+            return 1.0 if _is_group(o1) else self._singleton_mismatch_factor()
         return 1.0
+
+    @staticmethod
+    def _singleton_mismatch_factor() -> float:
+        return bound_meta().get_formula_coeff("bridge_singleton_letter_mismatch_factor")
 
     def calculate_external_strength(self, rng: RNG | None = None) -> float:
         """External strength from supporting bridges.
@@ -476,7 +484,9 @@ class Bridge(WorkspaceStructure):
         values = self.get_theme_support_values()
         if not values:
             return 0.0
-        neg_weight = 2.0 * len(values)
+        neg_weight = bound_meta().get_formula_coeff(
+            "bridge_theme_negative_weight_multiplier"
+        ) * len(values)
         weights = [(neg_weight if v < 0 else 1.0) * abs(v) for v in values]
         if not any(weights):
             return 0.0
@@ -496,11 +506,12 @@ class Bridge(WorkspaceStructure):
         if themespace is None:
             return []
         values: list[float] = []
+        max_activation = bound_meta().get_param("max_theme_activation")
         for theme in themespace.get_active_themes(self.theme_type):
             if self.incompatible_with_theme(theme):
-                values.append(-theme.activation / 100.0)
+                values.append(-theme.activation / max_activation)
             elif self.supported_by_theme(theme):
-                values.append(theme.activation / 100.0)
+                values.append(theme.activation / max_activation)
             else:
                 values.append(0.0)
         return values
@@ -987,8 +998,9 @@ def _role_node(obj1: Any, obj2: Any, attr: str) -> Any:
 
 
 def _bridge_theme_compatibility_sigmoid(x: float) -> float:
-    """Sharpen a raw support value.  Scheme: themes.ss:1115, beta = 4."""
-    beta = 4.0
+    """Sharpen a raw support value.  Scheme: themes.ss:1115, beta = 4 (the coefficient
+    ``bridge_theme_compatibility_sigmoid_beta``)."""
+    beta = bound_meta().get_formula_coeff("bridge_theme_compatibility_sigmoid_beta")
     try:
         return 2.0 / (1.0 + math.exp(-2.0 * beta * x)) - 1.0
     except OverflowError:  # pragma: no cover - x is always within -1..+1
@@ -1316,7 +1328,7 @@ def _propose_bridge_side_effects(
 
     if ctx is None or length_node is None:
         return
-    urgency = ctx.meta.get_urgency("very_high")
+    urgency = ctx.meta.get_urgency(ctx.meta.get_param("bridge_recruit_urgency_level"))
     # The codelet types come from the recruit roles; one nothing holds posts nothing
     # (ABSENCE-BEHAVIOUR.md 2.5).  The order of the ``post`` calls below is the Scheme's
     # and fixes every later draw: description scouts (object1, then object2), then the

@@ -76,12 +76,14 @@ def test_theme_overlap_is_rounded_like_100_star():
 
 
 def _ctx(length_activation=50.0):
+    from server.engine.metadata import MetadataProvider
+
     return SimpleNamespace(
         slipnet=SimpleNamespace(
             roles=SimpleNamespace(dimension_length=SimpleNamespace(activation=length_activation))
         ),
         temperature=SimpleNamespace(value=50.0),
-        meta=None,
+        meta=MetadataProvider.from_standard_configuration(SEED_DIR),
         rng=None,
     )
 

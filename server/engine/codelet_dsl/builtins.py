@@ -480,7 +480,7 @@ def propose_bond(
     post_codelet(
         ctx,
         ctx.slipnet.roles.evaluator_bond,
-        round(bond_degree_of_assoc(bond_category)),
+        round(bond_degree_of_assoc(bond_category, ctx.meta)),
         structure=bond,
     )
     return bond
@@ -540,7 +540,7 @@ def propose_group(
     post_codelet(
         ctx,
         ctx.slipnet.roles.evaluator_group,
-        round(bond_degree_of_assoc(bond_category)),
+        round(bond_degree_of_assoc(bond_category, ctx.meta)),
         structure=group,
     )
     return group
@@ -1572,7 +1572,7 @@ def _label_monitor(ctx: EngineContext) -> Any:
         ctx.trace,
         ctx.codelet_count,
         ctx.temperature.value,
-        ctx.meta.get_param("concept_activation_importance_threshold", 85),
+        ctx.meta.get_param("concept_activation_importance_threshold"),
     )
 
 
@@ -1673,7 +1673,7 @@ def _record_group_event(
     maximally important whatever its strength, because re-perceiving a string in the
     opposite direction is one of the twelve milestones Figure 4.12 records.
     """
-    threshold = ctx.meta.get_param("group_importance_threshold", 100)
+    threshold = ctx.meta.get_param("group_importance_threshold")
     singleton_with_length = group.length == 1 and _has_length_description(ctx, group)
     if flipped or group.spans_whole_string() or singleton_with_length:
         importance = 100.0
@@ -1800,7 +1800,7 @@ def _record_slippage_events(
     just the newly-added ones from the duplicate branch of ``bridge-builder``
     (bridges.ss:1221-1222).  *concept_mappings* is that second case.
     """
-    threshold = ctx.meta.get_param("concept_mapping_importance_threshold", 65)
+    threshold = ctx.meta.get_param("concept_mapping_importance_threshold")
     under_pressure = ctx.themespace.has_thematic_pressure([bridge.theme_type])
 
     if concept_mappings is None:
@@ -1846,7 +1846,7 @@ def _slippage_matches_active_theme(
     themespace = ctx.themespace
     if bridge.theme_type not in themespace.active_theme_types:
         return False
-    margin = themespace.meta.get_param("dominant_theme_margin", 90)
+    margin = themespace.meta.get_param("dominant_theme_margin")
     for cluster in themespace.clusters:
         if cluster.theme_type != bridge.theme_type or cluster.dimension != dimension:
             continue
@@ -1858,7 +1858,7 @@ def _slippage_matches_active_theme(
 def _record_rule_event(ctx: EngineContext, rule: Rule) -> None:
     """Record an important rule.  §4.4: importance is "a function of the relative
     quality of a rule with respect to all other rules that already exist"."""
-    threshold = ctx.meta.get_param("rule_importance_threshold", 67)
+    threshold = ctx.meta.get_param("rule_importance_threshold")
     relative_quality = rule.get_relative_quality(ctx.workspace)
     # ``trace.ss:1359-1363``: a perfectly uniform rule is maximally important whatever
     # its relative quality — uniformity is what makes a rule say one thing about the
@@ -2469,7 +2469,12 @@ def single_letter_group_probability(ctx: EngineContext, group: Any) -> float:
     # workspace-structure-formulas.ss:34-37: case 1 -> 4, 2 -> 2, else -> 1.  Zero
     # supporting groups takes the ``else`` (exponent 1); that branch may be
     # unreachable (local support is 0.0 there, and 0.0**n == 0.0), but is kept faithful.
-    exponent = {1: 4.0, 2: 2.0}.get(supporting, 1.0)
+    if supporting == 1:
+        exponent = ctx.meta.get_formula_coeff("single_letter_group_exponent_1_supporting")
+    elif supporting == 2:
+        exponent = ctx.meta.get_formula_coeff("single_letter_group_exponent_2_supporting")
+    else:
+        exponent = ctx.meta.get_formula_coeff("single_letter_group_exponent_3_plus_supporting")
     length_activation = ctx.slipnet.roles.dimension_length.activation
     base = (group._local_support(ctx.rng) / 100.0) * (length_activation / 100.0)
     return temp_adjusted_probability(
@@ -2701,7 +2706,9 @@ def record_snag(ctx: EngineContext, top_rule: Any, translated_rule: Any) -> None
         snag_bridges=snag_bridges,
         snag_concept_mappings=snag_concept_mappings,
         snag_theme_pattern=theme_pattern,
-        snag_concept_pattern=get_snag_concept_pattern(snag_objects),
+        snag_concept_pattern=get_snag_concept_pattern(
+            snag_objects, ctx.slipnet.activation_params.max_activation
+        ),
         snag_rule=top_rule,
         translated_rule=translated_rule,
         supporting_vertical_bridges=(
@@ -2736,7 +2743,7 @@ def record_snag(ctx: EngineContext, top_rule: Any, translated_rule: Any) -> None
     # temperature — so clamping at the *current* value, as this used to, pinned the
     # run greedy on the interpretation that had just failed.  100 is the maximally
     # random escape regime the whole post-snag search depends on.
-    ctx.temperature.clamp(100.0)
+    ctx.temperature.clamp(ctx.meta.get_param("snag_clamp_temperature"))
 
     # ``answers.ss:1187``: undo any live clamp, pull attention back to the snag
     # objects, and pin their descriptors in the Slipnet.
@@ -2750,7 +2757,7 @@ def record_snag(ctx: EngineContext, top_rule: Any, translated_rule: Any) -> None
             ctx.trace,
             ctx.codelet_count,
             ctx.temperature.value,
-            ctx.meta.get_param("concept_activation_importance_threshold", 85),
+            ctx.meta.get_param("concept_activation_importance_threshold"),
         ),
     )
 
@@ -3088,6 +3095,7 @@ def _report_answer_locked(
         bottom_rule_ref_objects=_answer_ref_objects(translation, False) if logged else None,
         slippage_log=translation.slippage_log if logged else None,
         unjustified_slippages=list(unjustified_slippages or []),
+        meta=ctx.meta,
         description=f"Answer '{answer_string}' found with quality {quality:.0f}",
     )
     answer_desc.picture = _answer_description_picture(
@@ -3133,7 +3141,7 @@ def _report_answer_locked(
     # decides how readily a past answer comes to mind was unreachable.
     remindings = ctx.memory.find_remindings(
         answer_desc,
-        ctx.meta.get_param("distance_threshold", 5.0),
+        ctx.meta.get_param("distance_threshold"),
         meta=ctx.meta,
     )
     for past_answer in remindings:

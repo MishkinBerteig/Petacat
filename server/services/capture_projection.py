@@ -382,7 +382,7 @@ def project_coderack(state: dict, meta: Any = None) -> dict:
         from server.engine.coderack import urgency_value_table
 
         table = urgency_value_table(
-            meta.get_param("num_coderack_bins", 7),
+            meta.get_param("num_coderack_bins"),
             meta.get_formula_coeff("coderack_bin_urgency_exponent_offset"),
             meta.get_formula_coeff("coderack_bin_urgency_exponent_divisor"),
         )
@@ -408,7 +408,7 @@ def project_themespace(state: dict, meta: Any) -> dict:
     letting the client decide keeps the recorded view and the live view saying the same
     thing about which themes were locked in.
     """
-    margin = meta.get_param("dominant_theme_margin", 90)
+    margin = meta.get_param("dominant_theme_margin")
     justify_mode = state["runner"]["justify_mode"]
 
     clusters = []

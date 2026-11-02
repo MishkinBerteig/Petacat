@@ -248,7 +248,7 @@ class FreeRunningEngine:
     def _worker(self, index: int, max_steps: int) -> None:
         runner = self.runner
         ctx = runner.ctx
-        update_cycle = ctx.meta.get_param("update_cycle_length", 15)
+        update_cycle = ctx.meta.get_param("update_cycle_length")
 
         # Wait for the rest of the pool before touching the rack.  See
         # ``_all_started``: without this the first worker starves the main thread of

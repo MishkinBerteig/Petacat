@@ -12,6 +12,7 @@ import math
 from typing import TYPE_CHECKING, Any
 
 from server.engine.formulas import temp_adjusted_values, weighted_average
+from server.engine.metadata import require_meta
 from server.engine.numeric.backend import select_backend
 from server.engine.numeric.layout import (
     gather_object_values,
@@ -1561,14 +1562,9 @@ class Workspace:
     # Workspace activity
     # ------------------------------------------------------------------
 
-    #: ``%expiration-period%`` (``workspace.ss:30``) and
-    #: ``%num-youngest-structures%`` (``workspace.ss:31``).
-    #:
-    #: Fallbacks, not the values in force.  Both are engine parameters and
-    #: ``get_activity`` takes them from the caller's ``MetadataProvider``; these stand
-    #: in for a Workspace driven without one, which is a unit test rather than a run.
-    EXPIRATION_PERIOD = 500
-    NUM_YOUNGEST_STRUCTURES = 3
+    # ``%expiration-period%`` (``workspace.ss:30``) and ``%num-youngest-structures%``
+    # (``workspace.ss:31``) are the engine parameters ``expiration_period`` and
+    # ``num_youngest_structures``; ``get_activity`` takes them from the caller's provider.
 
     def get_activity(self, codelet_count: int = 0, meta: Any = None) -> float:
         """Measure of how much structure has been built recently.
@@ -1581,23 +1577,19 @@ class Workspace:
         from three strings and a Slipnet — so the two parameters arrive from the
         caller, which is the progress-watcher and has one.
         """
-        expiration = self.EXPIRATION_PERIOD
-        youngest = self.NUM_YOUNGEST_STRUCTURES
-        if meta is not None:
-            expiration = meta.get_param("expiration_period", expiration)
-            youngest = meta.get_param("num_youngest_structures", youngest)
+        meta = require_meta(meta, "Workspace.get_activity")
+        expiration = meta.get_param("expiration_period")
+        youngest = meta.get_param("num_youngest_structures")
         avg_age = self._get_youngest_structures_average_age(codelet_count, youngest)
         return round(100.0 - 100.0 * min(1.0, avg_age / expiration))
 
     def _get_youngest_structures_average_age(
-        self, codelet_count: int, num_youngest: int | None = None
+        self, codelet_count: int, num_youngest: int
     ) -> float:
         """Average age of the N youngest structures.
 
         Scheme: workspace.ss:183-192.
         """
-        if num_youngest is None:
-            num_youngest = self.NUM_YOUNGEST_STRUCTURES
         structures = self.all_structures
         if not structures:
             return 0.0

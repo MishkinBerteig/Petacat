@@ -264,7 +264,7 @@ class ThemeCluster:
             self.themes, [max(0.0, t.activation) for t in self.themes]
         )
 
-    def get_dominant_theme(self, margin: float = 90.0) -> Theme | None:
+    def get_dominant_theme(self, margin: float) -> Theme | None:
         """A theme is dominant if it leads its cluster by more than *margin*.
 
         Scheme: ``update-dominant-theme`` (themes.ss:503-518).  All themes are
@@ -300,21 +300,23 @@ class ThemeCluster:
         if self.frozen:
             return
 
-        decay = meta.get_param("theme_decay_amount", 25)
+        decay = meta.get_param("theme_decay_amount")
         nn_weight = meta.get_formula_coeff("theme_intra_cluster_neg_to_neg_weight")
         np_weight = meta.get_formula_coeff("theme_intra_cluster_neg_to_pos_weight")
         pn_weight = meta.get_formula_coeff("theme_intra_cluster_pos_to_neg_weight")
         pp_weight = meta.get_formula_coeff("theme_intra_cluster_pos_to_pos_weight")
         self_weight = meta.get_formula_coeff("theme_intra_cluster_self_weight")
-        spread_amount = meta.get_param("theme_spread_amount", 20)
-        max_activation = meta.get_param(
-            "max_theme_activation", DEFAULT_MAX_THEME_ACTIVATION
-        )
+        spread_amount = meta.get_param("theme_spread_amount")
+        max_activation = meta.get_param("max_theme_activation")
 
         # ``num-relations`` is the count of *possible* relations (``themes.ss:420``).
         n_relations = max(1, len(self.valid_relations))
         sensitivity = meta.get_formula_coeff("theme_net_effect_default_sensitivity")
-        alpha = sensitivity * (1.0 / 50.0) * (1.0 / n_relations)
+        alpha = (
+            sensitivity
+            * meta.get_formula_coeff("theme_net_effect_alpha_scale")  # 1/50
+            * (1.0 / n_relations)
+        )
 
         # ``themes.ss:520-527`` is three passes over the cluster, not one:
         #
@@ -620,7 +622,7 @@ class Themespace:
             return {}
 
         pressure: dict[str, Any] = {}
-        margin = self.meta.get_param("dominant_theme_margin", 90)
+        margin = self.meta.get_param("dominant_theme_margin")
         for cluster in self.clusters:
             if cluster.theme_type != tt:
                 continue
@@ -637,7 +639,7 @@ class Themespace:
         Scheme list format used by rules, justification, and jootsing.
         """
         tt = theme_type_for_bridge_type(bridge_type)
-        margin = self.meta.get_param("dominant_theme_margin", 90)
+        margin = self.meta.get_param("dominant_theme_margin")
         entries: list[tuple[str, str | None]] = []
         for cluster in self.clusters:
             if cluster.theme_type != tt:
@@ -713,7 +715,7 @@ class Themespace:
         for answer descriptions and for the UI, so it spans the *possible*
         theme types rather than the ones exerting pressure.
         """
-        margin = self.meta.get_param("dominant_theme_margin", 90)
+        margin = self.meta.get_param("dominant_theme_margin")
         pattern: dict[str, dict[str, str | None]] = {}
         for tt in self.possible_theme_types:
             pattern[tt] = {}
@@ -797,8 +799,8 @@ class Themespace:
             return
         theme.boost(
             factor,
-            self.meta.get_param("theme_boost_amount", 7),
-            self.meta.get_param("max_theme_activation", DEFAULT_MAX_THEME_ACTIVATION),
+            self.meta.get_param("theme_boost_amount"),
+            self.meta.get_param("max_theme_activation"),
         )
 
     def clamp_negative_pattern(
@@ -821,7 +823,7 @@ class Themespace:
                     theme_type, cluster.dimension, pattern[cluster.dimension], False
                 )
                 if theme:
-                    theme.clamp(-100.0)
+                    theme.clamp(-float(self.meta.get_param("max_theme_activation")))
                     clamped = True
         if clamped:
             self.thematic_pressure_on([theme_type])
@@ -838,7 +840,10 @@ class Themespace:
         # ``slipnet.ss:171-172``.  Read from the parameter rather than written here:
         # this was one of two places the value was a literal, and the two could have
         # drifted apart with nothing to notice.
-        workspace_activation = self.meta.get_param("workspace_activation", 100)
+        workspace_activation = self.meta.get_param("workspace_activation")
+        # ``%max-theme-activation%``: a theme's probability of firing is its activation as
+        # a fraction of the ceiling, cubed.
+        max_theme_activation = float(self.meta.get_param("max_theme_activation"))
 
         # ``update-slipnet-activations`` (``slipnet.ss:379``): ``get-all-active-themes``,
         # i.e. the existing themes of pressured types in ``all-themes`` order.
@@ -850,7 +855,7 @@ class Themespace:
             rng.trace_about(theme)
 
             # Activate dimension node: probability = (|activation|/100)^3
-            abs_prob = (abs(theme.activation) / 100.0) ** 3
+            abs_prob = (abs(theme.activation) / max_theme_activation) ** 3
             if rng.prob(abs_prob):
                 dim_node = slipnet.nodes.get(theme.dimension)
                 if dim_node and not dim_node.frozen:
@@ -863,7 +868,7 @@ class Themespace:
                 rel_node = slipnet.relation(theme.relation)
                 if not rel_node:
                     continue
-                rel_prob = (theme.activation / 100.0) ** 3
+                rel_prob = (theme.activation / max_theme_activation) ** 3
                 if rng.prob(rel_prob):
                     if not rel_node.frozen:
                         rel_node.activation_buffer += workspace_activation

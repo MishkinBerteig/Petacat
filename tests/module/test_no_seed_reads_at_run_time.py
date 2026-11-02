@@ -123,7 +123,7 @@ def test_an_episode_and_the_answers_it_leaves_read_no_seed_file(meta, seed_reads
 
 def test_rule_english_without_a_provider_raises():
     with pytest.raises(ConfigurationRequired):
-        _param(None, "maximum_rule_line_length", 60)
+        _param(None, "maximum_rule_line_length")
     rule = Rule(rule_type=RULE_TOP, clauses=[RuleClause(clause_type="intrinsic")])
     with pytest.raises(ConfigurationRequired):
         transcribe_rule_to_english_lines(rule, None)

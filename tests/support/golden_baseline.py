@@ -11,7 +11,9 @@ deterministic:
   refactor that moves one draw between codelets is caught even when the totals agree),
   kept in full in a gzip sidecar and as a digest in the main file;
 * a hash of the trace events and a hash of the final state (the complete state graph
-  plus the lockstep snapshot);
+  plus the lockstep snapshot, but not the graph's ``parameters`` entry: the parameter table
+  is configuration, not run state, and is excluded as the configuration hash was in /2, so
+  adding or retuning a configuration key does not touch the baseline; format /3);
 * the English corpus of the run: rule English, commentary, Verbose-mode narration, the
   trace display (print name and picture of every event) and the snag text, each as a
   count and a digest.
@@ -48,7 +50,7 @@ GOLDEN_DIR = REPO_ROOT / "tests" / "lockstep" / "golden"
 BASELINE_PATH = GOLDEN_DIR / "engine_baseline.jsonl"
 RNG_DETAIL_PATH = GOLDEN_DIR / "engine_baseline_rng.json.gz"
 
-FORMAT = "petacat-golden-baseline/2"
+FORMAT = "petacat-golden-baseline/3"
 
 #: The CPU role's float64 backend, pinned by name.  ``numpy`` agrees with the pure-Python
 #: reference exactly (same values, same number of draws; TESTING.md, numeric backend
@@ -212,11 +214,16 @@ def english_corpus(runner: Any, meta: Any) -> dict[str, list[str]]:
 
 
 def state_digest(ctx: Any) -> str:
-    """The final state: the complete state graph and the lockstep snapshot, hashed."""
+    """The final state: the state graph and the lockstep snapshot, hashed.
+
+    The graph's ``parameters`` entry (the parameter table) is dropped first: it is
+    configuration, not run state, so it is excluded like the configuration hash in /2.
+    Everything else of the graph and the whole snapshot stays in the digest.
+    """
     from server.engine.state_graph import capture_run_state
     from tests.lockstep.snapshot import snapshot_record
 
-    graph = capture_run_state(ctx)
+    graph = {k: v for k, v in capture_run_state(ctx).items() if k != "parameters"}
     snap = snapshot_record(ctx, None, ctx.codelet_count)
     return sha(canonical({"graph": graph, "snapshot": snap}))
 

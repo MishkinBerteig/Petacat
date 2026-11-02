@@ -60,6 +60,7 @@ from typing import Any, Iterable, Iterator, Sequence
 from server.engine import hardware
 from server.engine.hashing import config_hash
 from server.engine.metadata import MetadataProvider
+from server.engine.start_check import require_run_start
 from server.parallel import qos as _qos
 
 #: Repository seed data: the default configuration of a swarm.
@@ -377,6 +378,10 @@ def run_inprocess(
     from server.engine.numeric.backend import use_backend
 
     meta = meta or MetadataProvider.from_standard_configuration(SEED_DIR)
+    # The run-start check comes first: a configuration that lacks a name the engine reads
+    # gives the check's one message, not a failed run (``run_one`` reports any exception
+    # as a failed outcome).
+    require_run_start(meta)
     name = task.backend or backend or default_backend(meta)
     with use_backend(name):
         return _execute(task, meta)
@@ -696,6 +701,8 @@ class Swarm:
             payload: bytes | None = None
             cfg = self._bound_hash
             if meta is not None:
+                # First, before the configuration is hashed, bound or sent to a worker.
+                require_run_start(meta)
                 cfg = config_hash(meta)
                 if self._bound_hash and cfg != self._bound_hash:
                     if self._inflight == 0:

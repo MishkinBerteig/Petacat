@@ -32,6 +32,7 @@ class _FakeMeta:
             "max_clamp_period": 750,
             "grace_period": 100,
             "satisfactory_rule_quality": 80,
+            "jootsing_count_scale": 10,
         }.get(name, default)
 
 
@@ -131,7 +132,7 @@ def test_jootsing_from_a_justify_clamp_is_barred_while_the_clamp_is_producing_ev
         trace.record_event(clamp)
     trace.record_event(TraceEvent(BOND_BUILT, codelet_count=350, temperature=50.0))
 
-    assert get_clamp_jootsing_probability(clamps, 400, trace) == 0.0
+    assert get_clamp_jootsing_probability(clamps, 400, trace, meta=_FakeMeta()) == 0.0
 
 
 def test_jootsing_from_a_justify_clamp_is_allowed_when_nothing_followed_it():
@@ -140,7 +141,7 @@ def test_jootsing_from_a_justify_clamp_is_allowed_when_nothing_followed_it():
     for clamp in clamps:
         trace.record_event(clamp)
 
-    assert get_clamp_jootsing_probability(clamps, 400, trace) > 0.0
+    assert get_clamp_jootsing_probability(clamps, 400, trace, meta=_FakeMeta()) > 0.0
 
 
 # --- JO-2: failing to choose pattern entries is a fizzle, not a give-up -----

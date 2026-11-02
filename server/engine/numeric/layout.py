@@ -104,10 +104,10 @@ class ActivationParams:
     @classmethod
     def from_metadata(cls, meta: Any) -> ActivationParams:
         return cls(
-            max_activation=float(meta.get_param("max_activation", 100)),
-            workspace_activation=float(meta.get_param("workspace_activation", 100)),
+            max_activation=float(meta.get_param("max_activation")),
+            workspace_activation=float(meta.get_param("workspace_activation")),
             full_activation_threshold=float(
-                meta.get_param("full_activation_threshold", 50)
+                meta.get_param("full_activation_threshold")
             ),
         )
 
@@ -389,6 +389,8 @@ class ThemeParams:
     self_weight: float
     spread_amount: float
     sensitivity: float
+    #: ``theme_net_effect_alpha_scale`` (1/50, ``themes.ss:445``).
+    alpha_scale: float
     #: ``%max-theme-activation%`` — the clip both poles use.  Here rather than read
     #: per theme for the same reason the coefficients are: it cannot change during a
     #: run, and the clips run twice per theme per cycle.
@@ -397,15 +399,16 @@ class ThemeParams:
     @classmethod
     def from_metadata(cls, meta: Any) -> ThemeParams:
         return cls(
-            decay=meta.get_param("theme_decay_amount", 25),
+            decay=meta.get_param("theme_decay_amount"),
             neg_to_neg=meta.get_formula_coeff("theme_intra_cluster_neg_to_neg_weight"),
             neg_to_pos=meta.get_formula_coeff("theme_intra_cluster_neg_to_pos_weight"),
             pos_to_neg=meta.get_formula_coeff("theme_intra_cluster_pos_to_neg_weight"),
             pos_to_pos=meta.get_formula_coeff("theme_intra_cluster_pos_to_pos_weight"),
             self_weight=meta.get_formula_coeff("theme_intra_cluster_self_weight"),
-            spread_amount=meta.get_param("theme_spread_amount", 20),
+            spread_amount=meta.get_param("theme_spread_amount"),
             sensitivity=meta.get_formula_coeff("theme_net_effect_default_sensitivity"),
-            max_activation=meta.get_param("max_theme_activation", 100),
+            alpha_scale=meta.get_formula_coeff("theme_net_effect_alpha_scale"),
+            max_activation=meta.get_param("max_theme_activation"),
         )
 
 

@@ -673,7 +673,7 @@ class SpeculativeEngine:
             self._installed = True
             return
         self._eligible = self._eligible_run() and not self.inline
-        self.ucl = runner.meta.get_param("update_cycle_length", 15)
+        self.ucl = runner.meta.get_param("update_cycle_length")
 
         # Plugin classes: step-relative codelet_count; guards on ids, the trace, the rack.
         self._orig_classes = (ctx.__class__, ctx.ids.__class__, ctx.trace.__class__)

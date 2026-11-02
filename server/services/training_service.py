@@ -73,6 +73,7 @@ from server.engine.hashing import config_hash
 from server.engine.memory import EpisodicMemory
 from server.engine.metadata import MetadataProvider
 from server.engine.parameters import UnknownParameter, validate_overrides
+from server.engine.start_check import RunStartError, require_run_start
 from server.models.training import Training, TrainingMemoryMerge, TrainingProblem, TrainingRun
 from server.services import training_memory as tm
 from server.services.training_executor import (
@@ -1429,6 +1430,12 @@ class TrainingService:
             raise TrainingError(400, str(exc)) from exc
         full_policy = normalize_policy(policy)
         meta = self._meta_provider()
+        # A Training Mode Session whose configuration cannot start a run is not created
+        # (the executor makes the same check again at each dispatch).
+        try:
+            require_run_start(meta)
+        except RunStartError as exc:
+            raise TrainingError(422, str(exc)) from exc
         backend_name = self.resolve_backend(meta, settings.get("backend"))
         cfg = self._config_hash(meta)
         async with self._factory() as s:

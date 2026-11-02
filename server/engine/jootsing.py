@@ -43,13 +43,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Scheme constants from jootsing.ss
-_SATISFACTORY_RULE_QUALITY = 80
-_SETTLING_PERIOD = 250
-_MAX_CLAMP_PERIOD = 750
-_GRACE_PERIOD = 100
-
-
 # ============================================================================
 #  Result types  (backward compatible)
 # ============================================================================
@@ -138,11 +131,9 @@ def check_progress(
     if not self_watching_enabled:
         return ProgressWatcherResult(progress_detected=True)
 
-    settling = meta.get_param("settling_period", _SETTLING_PERIOD)
-    max_clamp = meta.get_param("max_clamp_period", _MAX_CLAMP_PERIOD)
-    satisfactory_quality = meta.get_param(
-        "satisfactory_rule_quality", _SATISFACTORY_RULE_QUALITY
-    )
+    settling = meta.get_param("settling_period")
+    max_clamp = meta.get_param("max_clamp_period")
+    satisfactory_quality = meta.get_param("satisfactory_rule_quality")
 
     # ── Within a clamp period ──
     if trace.within_clamp_period:
@@ -233,7 +224,7 @@ def check_progress(
     if not trace.permission_to_clamp(
         self_watching_enabled=self_watching_enabled,
         codelet_count=codelet_count,
-        grace_period=meta.get_param("grace_period", _GRACE_PERIOD),
+        grace_period=meta.get_param("grace_period"),
     ):
         if vlog is not None:
             vlog.say("permission-to-clamp-pattern-denied")
@@ -366,7 +357,7 @@ def attempt_jootsing(
     if len(clamps) >= 3:
         clamp_type = clamps[0].clamp_type if isinstance(clamps[0], ClampEvent) else ""
         jootsing_prob = get_clamp_jootsing_probability(
-            clamps, codelet_count, trace, vlog=vlog
+            clamps, codelet_count, trace, vlog=vlog, meta=meta
         )
         if vlog is not None:
             vlog.say("noticing-clamping-pattern")
@@ -455,7 +446,7 @@ def attempt_jootsing(
     if not trace.permission_to_clamp(
         self_watching_enabled=self_watching_enabled,
         codelet_count=codelet_count,
-        grace_period=meta.get_param("grace_period", _GRACE_PERIOD),
+        grace_period=meta.get_param("grace_period"),
     ):
         if vlog is not None:
             vlog.say("permission-to-clamp-themes-denied")
@@ -499,7 +490,8 @@ def attempt_jootsing(
         return JootserResult(pattern_detected=False)
 
     # Negate the chosen entries
-    negative_entries = [negate_theme_pattern_entry(e) for e in chosen_entries]
+    max_theme_activation = meta.get_param("max_theme_activation")
+    negative_entries = [negate_theme_pattern_entry(e, max_theme_activation) for e in chosen_entries]
 
     negative_theme_pattern: dict[str, Any] = {
         "type": "vertical_bridge",
@@ -612,6 +604,8 @@ def get_clamp_jootsing_probability(
     codelet_count: int = 0,
     trace: TemporalTrace | None = None,
     vlog: Any = None,
+    *,
+    meta: MetadataProvider,
 ) -> float:
     """Compute jootsing probability from clamp history.
 
@@ -674,7 +668,7 @@ def get_clamp_jootsing_probability(
 
     # Final probability
     progress_factor = 1.0 - average_progress / 100.0
-    count_factor = min(1.0, 10 * num_clamps / 100.0)
+    count_factor = min(1.0, meta.get_param("jootsing_count_scale") * num_clamps / 100.0)
     jootsing_probability = progress_factor * count_factor * clamp_type_factor
 
     if vlog is not None:

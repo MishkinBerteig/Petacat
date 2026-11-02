@@ -22,6 +22,7 @@ if TYPE_CHECKING:
 # (``holds_role``, ``node.relation``): a mapping holds nodes but no Slipnet handle.  A node
 # or label nothing holds (``None``, a stand-in) plays no role.
 from server.engine.slipnet import holds_role
+from server.engine.workspace_structures import bound_meta
 
 
 def _relation_of(label: Any) -> Any:
@@ -132,7 +133,9 @@ class ConceptMapping:
             return 100.0
 
         depth = self.conceptual_depth
-        bonus = 1.0 + (depth / 100.0) ** 2
+        bonus = 1.0 + (depth / 100.0) ** bound_meta().get_formula_coeff(
+            "concept_mapping_depth_bonus_exponent"
+        )
         return round(assoc * bonus)
 
     def slippability(self) -> float:
@@ -146,7 +149,9 @@ class ConceptMapping:
             return 100.0
 
         depth = self.conceptual_depth
-        penalty = 1.0 - (depth / 100.0) ** 2
+        penalty = 1.0 - (depth / 100.0) ** bound_meta().get_formula_coeff(
+            "concept_mapping_depth_penalty_exponent"
+        )
         return max(0.0, round(assoc * penalty))
 
     @property
@@ -191,14 +196,14 @@ class ConceptMapping:
         Scheme: concept-mappings.ss:119-125.
         - Identity: 100
         - Has slipnet link: link's degree of association
-        - Unlabeled slippage (no link): 5
+        - Unlabeled slippage (no link): ``concept_mapping_unlinked_association`` (5)
         """
         if self.is_identity:
             return 100.0
         if self.slipnet_link is not None:
             return self.slipnet_link.degree_of_association()
         # Unlabeled LettCtgy/Length "slippage" such as LettCtgy:m=>j
-        return 5.0
+        return bound_meta().get_formula_coeff("concept_mapping_unlinked_association")
 
     def relevant(self) -> bool:
         """True if both description types are fully active in the slipnet.

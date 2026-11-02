@@ -27,6 +27,18 @@ def set_structure_clock(codelet_count: int) -> None:
     _clock.now = codelet_count
 
 
+def bound_meta() -> MetadataProvider:
+    """The running engine's ``MetadataProvider``, for the coefficients a structure or an
+    object reads when it computes a strength or an importance.
+
+    Raises :class:`~server.engine.metadata.ConfigurationRequired` when no run has bound one:
+    nothing falls back to the Metacat Standard Configuration files.
+    """
+    from server.engine.metadata import require_meta
+
+    return require_meta(WorkspaceStructure._meta, "a workspace structure's coefficient")  # type: ignore[return-value]
+
+
 class WorkspaceStructure:
     """Base class for bonds, groups, bridges, descriptions, rules."""
 
@@ -53,10 +65,29 @@ class WorkspaceStructure:
         #: field set is the same on every structure the state graph captures.
         self.enclosing_group: object | None = None
 
+    #: The run's ``MetadataProvider``, which the Themespace holds.  Structure strengths,
+    #: object importances and mapping strengths read their coefficients from it at the
+    #: moment they are computed; nothing is cached, so a run with another configuration
+    #: (or per-run overrides) sees its own values.  Bound with the Themespace, once per run.
+    _meta: object | None = None
+
     @classmethod
     def set_themespace(cls, themespace: object | None) -> None:
-        """Bind the Themespace structures consult for thematic compatibility."""
+        """Bind the Themespace structures consult for thematic compatibility.
+
+        The run's provider travels with it (``Themespace.meta``); binding ``None``
+        leaves the provider alone, since the next run binds its own before it builds
+        anything.
+        """
         cls._themespace = themespace
+        held = getattr(themespace, "meta", None)
+        if held is not None:
+            cls._meta = held
+
+    @classmethod
+    def bind_meta(cls, meta: object | None) -> None:
+        """Bind the run's provider directly (a test that builds structures without a run)."""
+        cls._meta = meta
 
     @classmethod
     def get_themespace(cls) -> object | None:
@@ -154,7 +185,7 @@ class WorkspaceStructure:
 
     def weakness(self) -> float:
         """Probability-of-breaking measure. Scheme: workspace-structures.ss:41."""
-        return 100.0 - self.strength**0.95
+        return 100.0 - self.strength ** bound_meta().get_formula_coeff("weakness_exponent")
 
     def __repr__(self) -> str:
         return (

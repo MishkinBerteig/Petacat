@@ -156,10 +156,10 @@ def _first_reversal_call(meta):
     seen: dict = {}
     real = rules.abstract_change_descriptions
 
-    def spy(bridges, rng=None, slipnet=None):
+    def spy(bridges, rng=None, slipnet=None, meta=None):
         if "args" not in seen and rules._count_strposctgy_opposite_slippages(bridges) == 2:
             seen["args"] = (list(bridges), slipnet)
-        return real(bridges, rng=rng, slipnet=slipnet)
+        return real(bridges, rng=rng, slipnet=slipnet, meta=meta)
 
     rules.abstract_change_descriptions = spy
     try:
@@ -189,10 +189,10 @@ def test_the_draws_of_abstract_change_descriptions_do_not_depend_on_a_role(meta)
         "opposite": Slipnet.from_metadata(rc.provider(rc.node_removed("plato-opposite"))),
     }
     full_rng = RNG(5)
-    full = rules.abstract_change_descriptions(bridges, rng=full_rng, slipnet=slipnet)
+    full = rules.abstract_change_descriptions(bridges, rng=full_rng, slipnet=slipnet, meta=meta)
     for name, s in reduced.items():
         rng = RNG(5)
-        got = rules.abstract_change_descriptions(bridges, rng=rng, slipnet=s)
+        got = rules.abstract_change_descriptions(bridges, rng=rng, slipnet=s, meta=meta)
         assert rng.get_state() == full_rng.get_state(), name
         assert len(got) <= len(full), name
 

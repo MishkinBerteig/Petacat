@@ -626,3 +626,33 @@ def pytest_terminal_summary(
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     if _verdict() and session.exitstatus == pytest.ExitCode.OK:
         session.exitstatus = pytest.ExitCode.TESTS_FAILED
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# The provider structures read their coefficients from
+# ═══════════════════════════════════════════════════════════════════════════
+_STRUCTURE_META: list = []
+
+
+def pytest_sessionstart(session: pytest.Session) -> None:
+    """Load the Metacat Standard Configuration once, before any test runs.
+
+    A bond, a group, a bridge or a concept mapping reads its coefficients from the
+    provider the running engine bound (``WorkspaceStructure.bind_meta``); a test that
+    builds one without running an engine gets the standard configuration bound here.
+    """
+    from server.engine.metadata import MetadataProvider
+
+    _STRUCTURE_META.append(MetadataProvider.from_standard_configuration(SEED_DATA_DIR))
+
+
+@pytest.fixture(autouse=True)
+def _structure_coefficients() -> Iterator[None]:
+    """Bind the standard configuration for the body of every test, then unbind."""
+    from server.engine.workspace_structures import WorkspaceStructure
+
+    WorkspaceStructure.bind_meta(_STRUCTURE_META[0])
+    try:
+        yield
+    finally:
+        WorkspaceStructure.bind_meta(None)

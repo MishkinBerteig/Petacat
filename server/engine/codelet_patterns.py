@@ -48,7 +48,7 @@ def pattern_key(name: str) -> str:
 
 def clampable_patterns(meta: Any) -> dict[str, str]:
     """Menu name -> label, in the order ``gui.ss:599-603`` lists them."""
-    return dict(meta.get_param("clampable_codelet_patterns", {}) or {})
+    return dict(meta.get_param("clampable_codelet_patterns") or {})
 
 
 def pattern_names(meta: Any) -> list[str]:

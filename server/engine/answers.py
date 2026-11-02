@@ -409,11 +409,7 @@ def _relation_abstractness(relation: str, meta: Any) -> float:
         if row.node_name in (getattr(meta, "slipnet_node_specs", None) or {}):
             return _conceptual_depth(row.node_name, meta)
         break
-    return float(
-        (getattr(meta, "formula_coefficients", None) or {}).get(
-            "theme_relation_default_abstractness", 0.0
-        )
-    )
+    return float(meta.get_formula_coeff("theme_relation_default_abstractness"))
 
 
 def _theme_abstractness(dimension: str, relation: str, meta: Any) -> float:

@@ -12,7 +12,7 @@ import math
 from typing import TYPE_CHECKING, Any
 
 from server.engine.slipnet import holds_role, opposite_node
-from server.engine.workspace_structures import WorkspaceStructure
+from server.engine.workspace_structures import WorkspaceStructure, bound_meta
 from server.engine.concept_mappings import ConceptMapping
 from server.engine.groups import Group
 
@@ -66,19 +66,21 @@ class Bond(WorkspaceStructure):
         Scheme: bonds.ss:169-181.
         compatibility_factor * bond_facet_factor * bond_degree_of_assoc
         """
-        # Compatibility factor: 1.0 if same object type, 0.7 if different
+        meta = bound_meta()
+        # Compatibility factor: the same-type value if same object type, else the
+        # different-type value (``bond_compatibility_factor_*``)
         from_is_letter = not hasattr(self.from_object, "objects")
         to_is_letter = not hasattr(self.to_object, "objects")
         if from_is_letter == to_is_letter:
-            compat = 1.0
+            compat = meta.get_formula_coeff("bond_compatibility_factor_same_type")
         else:
-            compat = 0.7
+            compat = meta.get_formula_coeff("bond_compatibility_factor_different_type")
 
-        # Bond facet factor: 1.0 for letter-category, 0.7 for others
+        # Bond facet factor: the letter-category value for it, the other value for others
         if holds_role(self.bond_facet, "dimension.letter_category"):
-            facet_factor = 1.0
+            facet_factor = meta.get_formula_coeff("bond_facet_factor_letter_category")
         else:
-            facet_factor = 0.7
+            facet_factor = meta.get_formula_coeff("bond_facet_factor_other")
 
         assoc = self._bond_degree_of_assoc()
 
@@ -102,7 +104,10 @@ class Bond(WorkspaceStructure):
         """
         return min(
             100.0,
-            round(11.0 * math.sqrt(max(0.0, self.bond_category.degree_of_assoc()))),
+            round(
+                bound_meta().get_formula_coeff("bond_degree_of_assoc_scale")
+                * math.sqrt(max(0.0, self.bond_category.degree_of_assoc()))
+            ),
         )
 
     def calculate_external_strength(self, rng: RNG | None = None) -> float:
@@ -127,7 +132,11 @@ class Bond(WorkspaceStructure):
 
         density = self.get_local_density(rng)
         adjusted_density = 100.0 * math.sqrt(density / 100.0)
-        number_factor = min(1.0, 0.6 ** (1.0 / max(1, num_supporting ** 3)))
+        number_factor = min(
+            1.0,
+            bound_meta().get_formula_coeff("local_support_number_factor_base")
+            ** (1.0 / max(1, num_supporting ** 3)),
+        )
         return round(adjusted_density * number_factor)
 
     def get_num_of_local_supporting_bonds(self) -> int:

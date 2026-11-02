@@ -36,6 +36,7 @@ from typing import Any, Callable, Sequence
 from server.engine import hardware
 from server.engine.metadata import MetadataProvider
 from server.engine.runner import EngineRunner
+from server.engine.start_check import require_run_start
 
 #: Below this many Slipnet nodes, batching the numeric substrate cannot repay a GPU
 #: dispatch. Measured in WP4.5: the kernel crossover against vectorised float64 CPU is
@@ -104,6 +105,7 @@ _META: MetadataProvider | None = None
 def _init_worker(seed_dir: str) -> None:
     global _META
     _META = MetadataProvider.from_standard_configuration(seed_dir)
+    require_run_start(_META)
 
 
 def _run_one(task: tuple) -> str:
@@ -204,7 +206,9 @@ def run_population_batched(
             "seed_data",
         )
     )
-    update_cycle = meta.get_param("update_cycle_length", 15)
+    # The run-start check comes first: the read below is the run's, before any runner.
+    require_run_start(meta)
+    update_cycle = meta.get_param("update_cycle_length")
 
     runners: list[EngineRunner] = []
     for index in range(count):

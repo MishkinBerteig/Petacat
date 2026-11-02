@@ -121,14 +121,14 @@ outside the matrix take it too and the run is entirely what it says it is.
 
 ```
 ============================= petacat test matrix ==============================
-  cpu  numpy    float64    519 tests
-  gpu  mlx      float32    519 tests
+  cpu  numpy    float64    789 tests
+  gpu  mlx      float32    789 tests
   whole suite requested: the full matrix is required of this run
 
-  unit          1273 collected   1273 run   1273 passed      0 failed      0 skipped  complete
-  seed_unit      715 collected    715 run    715 passed      0 failed      0 skipped  complete
+  unit          1297 collected   1297 run   1297 passed      0 failed      0 skipped  complete
+  seed_unit      937 collected    937 run    937 passed      0 failed      0 skipped  complete
   module        1041 collected   1041 run   1041 passed      0 failed      0 skipped  complete
-  architecture    42 collected     42 run     42 passed      0 failed      0 skipped  complete
+  architecture    49 collected     49 run     49 passed      0 failed      0 skipped  complete
   integration    203 collected    203 run    203 passed      0 failed      0 skipped  complete
   parallel       244 collected    244 run    244 passed      0 failed      0 skipped  complete
   lockstep       228 collected    228 run    228 passed      0 failed      0 skipped  complete
@@ -204,10 +204,10 @@ that allowance.
 
 | Layer | Directory | Scope | May depend on | Cases |
 |-------|-----------|-------|---------------|-------|
-| **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 1273 |
-| **seed unit** | `tests/seed_unit/` | One class or function, measured against the values Petacat ships with | Real `seed_data/*.json`, and the machine the process is running on | 715 |
+| **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 1297 |
+| **seed unit** | `tests/seed_unit/` | One class or function, measured against the values Petacat ships with | Real `seed_data/*.json`, and the machine the process is running on | 937 |
 | **module** | `tests/module/` | Several real components assembled and driven | Real engine objects and `seed_data/*.json`; no DB, no HTTP | 1041 |
-| **architecture** | `tests/architecture/` | How the source tree is allowed to depend on itself | The repository's source, `seed_data/*.json`, child interpreters | 42 |
+| **architecture** | `tests/architecture/` | How the source tree is allowed to depend on itself | The repository's source, `seed_data/*.json`, child interpreters | 49 |
 | **integration** | `tests/integration/` | Agreement between the repository's artifacts, and the harness's own rules | Real `seed_data/*.json`, the ORM declarations, the generated client files, the documentation, a real pytest session | 203 |
 | **parallel** | `tests/parallel/` | The detachable multi-core plugin (`server/parallel/`): each executor against the serial run it claims to equal | Real engine objects and `seed_data/*.json`, worker processes and threads; each test pins the backend it compares on | 244 |
 | **lockstep** | `tests/lockstep/` | Petacat's decision traces against Metacat's: naming, helper conformance, tracing/replay RNGs, determinism guards, the comparer | Real engine in faithful mode (numeric backend off, or a named backend); recorded Metacat traces | 228 |
@@ -246,7 +246,7 @@ first**, then move up toward the API and GUI.
 
 All eight layers run in one command — the
 [required command](#the-required-command) — and, since Petacat runs natively, all
-eight actually run: **4,092 cases**, every one of them executed. A layer that is
+eight actually run: **4,345 cases**, every one of them executed. A layer that is
 normally skipped is not a layer that is normally green, and none of these is.
 
 Wall-clock time depends heavily on the machine and on what else it is doing. The
@@ -410,6 +410,7 @@ changing what it records.
 | `test_en5b_alphabet.py` | 15 | EN5b: the alphabet and numbers as data: `slipnet.alphabet` equals the old letter and number lists, a shared glyph or value goes to the first node, a character with no glyph node is unperceived, and the a-d/w-z alphabet and the 1, 2, 4 ladder (cascaded, or with dangling links) build and step on the demo problems |
 | `test_en8_rules_language.py` | 14 | EN8: rules, justify and rule English read roles and relations; `rule.dimension_order` and its sort; the abstract-change draws and `rng.get_state()` with a role absent; the justify handlers narrowed (B10); each converted role or relation absent on demo and justify problems |
 | `test_en6_perception.py` | 12 | EN6: bonds, groups, bridges, concept mappings and images read roles, relations and the alphabet; the bridge recruitment post sequence is unchanged; identity absent never raises; every dimension, position, direction, object and recruit role unbound or its node removed, and each relation node removed, on the demo and justify problems; and whole runs (discovery, justify, Episodic Memory carried) on a configuration whose role-bound, relation, letter and number nodes are all renamed give the same answers, codelet counts, RNG draws and English |
+| `test_en10b_scalars.py` | 8 | EN10: the rules, justify and perception scalars read from the configuration with today's values and types (the two rule abstraction probabilities, the justify identity retention, the bridge-recruit urgency level, description local support, concept-mapping and bridge coefficients); a configuration lacking one stops the run at its start naming it |
 | `test_order_fidelity.py` | 10 | The list orders `cons` and vectors fix: Chez Scheme's `sort` (80 cases from the Metacat image), a string's groups, the rule's subobject bridges, the coderack bin and deferred batch, the jootser's event set, and the display-time prints (DISCREPANCIES5 C-1, G-Z4, G-Z5, I-3…I-5) |
 | `test_rng.py` | 17 | The deterministic RNG wrapper |
 | `test_rule_bond_facet_change.py` | 1 | A GroupCtgy self change's BondFacet change is found wherever it sits (KNOWN-FAILURES, G-Q1) |
@@ -459,6 +460,8 @@ changing what it records.
 | `test_reduced_configurations.py` | 14 | The reduced-configuration fixture generator (EN0, `tests/support/reduced_configurations.py` and `configuration_cascade.py`): nothing left that names a removed node or codelet type, the cascade removes what the plan's rules say, a provider loads from each; the engine is not run on them yet |
 | `test_standard_configuration_roles.py` | 14 | EN2: the Metacat Standard Configuration binds every role of `tests/support/role_table.py` to the node or codelet type today's code names (the two ordered roles in today's order), carries the five theme relations, `plain_name`, `glyph`, `numeric_value` and the display columns that reproduce the tables they replace, unique `rule_key`s and unique link keys, and the provider loads them |
 | `test_display_names.py` | 4 | EN5a: display text comes from the node columns: renamed nodes keep their printed text byte for byte, all-NULL columns fall back, and unbound roles or removed nodes still print |
+| `test_declared_names_stop_the_run.py` | 12 | EN10: every name on the declared read list (`server/engine/start_check.py`), removed from the Metacat Standard Configuration, is named by the run-start check, and the run stops before its first codelet on the Metacat Mode, Swarm, Training Mode and population paths |
+| `test_g9_any_configuration.py` | 8 | Gate G9 complete: every node removed with its cascade, random node subsets, the a-d/w-z alphabet, a gapped ladder and no alphabet successor, on discovery and justify demos, with Episodic Memory carried in from a full-configuration run and a small Swarm; only the run-start error may stop a run, and a symbol with no node is never perceived (an exhaustive sweep runs under the `slow` marker) |
 | `test_role_identity.py` | 13 | Role identity (gate G5): the role-to-literal table against the Metacat Standard Configuration, the engine's ordered constants and `role_identity_today.json`; and, since EN3, every role resolved through `slipnet.roles` is the node (or codelet type) the old literal finds, the ordered roles equal the old tuples, and the ladder and alphabet (the nodes with a `numeric_value` or a `glyph`) equal the old lists |
 | `test_roles.py` | 20 | The role mechanism (EN3): the vocabulary against the role table and `roles.json`; the `Absent` token (falsy, frozen, one per role, identical only to itself, node-shaped); `Roles` never holds `None`; resolution skips unknown role names and missing targets; the run-start check (I-1, I-2) and its declared read list; and the G9 skeleton, building the Slipnet and resolving roles on every reduced configuration |
 | `test_rule_english.py` | 10 | A rule's English against Metacat 1.2's own `transcribe-to-english` output: 463 recorded rule shapes, each string state, wrapping, articles, and the text kept from the moment the rule was made |
@@ -516,6 +519,7 @@ changing what it records.
 | File | Fns | Covers |
 |------|----:|--------|
 | `test_engine_purity.py` | 18 | Nothing under `server/engine/**` imports `sqlalchemy`, `server.models`, `server.db` or `server.services`, and the serializers run in an interpreter where those cannot be imported |
+| `test_declared_read_list.py` | 7 | EN10: every literal name passed to `get_param`, `get_formula_coeff` or `get_urgency` in `server/` is on the declared read list, and every declared name exists in the Metacat Standard Configuration |
 | `test_no_node_literals_in_engine.py` | 4 | The EN0 lint: no line of `server/engine/**` names a node or codelet type of the Metacat Standard Configuration (`plato-` literals and compositions, `name[6:]`, node names, codelet types), and none reads the seed files at run time. Known violations are in `no_node_literals_allowlist.txt`, which may only shrink: an entry that no longer matches fails, and a new violation cannot be added to it |
 | `test_parallel_detachable.py` | 4 | Nothing under `server/engine/**` imports the parallel plugin, and a serial run and the service layer work in an interpreter where `server.parallel` cannot be imported; a Training run there chooses the serial executor and produces the plugin's runs, run for run |
 

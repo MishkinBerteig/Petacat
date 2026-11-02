@@ -23,6 +23,7 @@ from server.engine.serialization import (
     serialize_themespace_state,
     serialize_workspace_state,
 )
+from server.engine.start_check import require_run_start
 from server.engine.snag_explanation import fallback_explanation, snag_explanation_text
 from server.engine.verbose import VERBOSE_STEP_LIMIT, narrate_event_display
 from server.engine.trace import SNAG
@@ -297,6 +298,9 @@ class RunService:
         # half-built Run behind. Raises ValueError, which the API turns into a 400.
         overrides = validate_overrides(parameters)
         run_meta = self.meta.with_overrides(overrides)
+        # The run-start check comes first, before any parameter is read below: a
+        # configuration that lacks a name gives the check's one message, not a KeyError.
+        require_run_start(run_meta)
 
         # 0 means "this machine's count": one worker per performance core, from
         # ``server.engine.hardware``. Resolved here rather than in the engine so the
@@ -315,7 +319,7 @@ class RunService:
                 "for a parallel run."
             )
         threshold = (
-            run_meta.get_param("spreading_activation_threshold", 100)
+            run_meta.get_param("spreading_activation_threshold")
             if spreading_threshold is None
             else max(0, min(100, spreading_threshold))
         )
@@ -819,7 +823,7 @@ class RunService:
         # never yields never lets them be served — the run would become uninterruptible.
         # Yielding once per update cycle keeps the pause and stop controls responsive
         # to within about a millisecond while removing fourteen fifteenths of the cost.
-        ucl = runner.ctx.meta.get_param("update_cycle_length", 15)
+        ucl = runner.ctx.meta.get_param("update_cycle_length")
         step = 0
 
         while runner.status == STATUS_RUNNING:

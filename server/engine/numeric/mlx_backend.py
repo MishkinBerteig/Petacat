@@ -341,7 +341,7 @@ class MlxBackend(Backend):
 
             alpha = (
                 params.sensitivity
-                * (1.0 / 50.0)
+                * params.alpha_scale
                 * (1.0 / mx.array(list(layout.n_relations), dtype=dt))
             )
             self_term = params.self_weight / 100.0

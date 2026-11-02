@@ -371,6 +371,16 @@ _READ_BY_THE_ENGINE_BUT_NOT_OFFERED = {
     "max_theme_activation",
     "distance_threshold",
     "slippage_ignore_probability",
+    # Rule abstraction, justify's retention and the bridge-recruit urgency level.
+    "rule_swap_abstraction_probability",
+    "rule_subobjects_abstraction_probability",
+    "justify_retention_identity_percent",
+    "bridge_recruit_urgency_level",
+    # The snag's escape temperature, the jootser's clamp-count scale, and the Scheme's
+    # reference update-cycle length (the 15 in ``ucl/15``).
+    "snag_clamp_temperature",
+    "jootsing_count_scale",
+    "reference_update_cycle_length",
     # A faithful-mode switch for the lockstep harness (``tests/lockstep/``), set by
     # ``tests/lockstep/faithful.py`` and not offered as a Run control: the default
     # (``false``) is Petacat's own update-cycle countdown, ``true`` is Metacat's fixed

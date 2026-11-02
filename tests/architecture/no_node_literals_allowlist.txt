@@ -2,7 +2,5 @@
 # It may only shrink: each engine package deletes the entries it resolves; EN11
 # requires it empty.  Columns (tab separated): lint, file, category, count, text.
 names	server/engine/rules.py	plato-literal	1	"plato-group|string"
-names	server/engine/runner.py	codelet-type	1	"bottom-up-bond-scout"
-names	server/engine/runner.py	codelet-type	1	"bottom-up-bridge-scout"
 seed-reads	server/engine/metadata.py	file-read-call	1	"json.load"
 seed-reads	server/engine/metadata.py	file-read-call	1	"open"

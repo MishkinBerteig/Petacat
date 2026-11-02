@@ -246,7 +246,7 @@ def min_shard_capacity(meta: MetadataProvider) -> int:
     divide by zero, and a shard that may hold nothing is not a configuration to honour
     faithfully.
     """
-    return max(1, int(meta.get_param("min_shard_capacity", DEFAULT_MIN_SHARD_CAPACITY)))
+    return max(1, int(meta.get_param("min_shard_capacity")))
 
 
 #: The shard count follows from it: ``max_coderack_size // min_shard_capacity``, which is
@@ -260,8 +260,13 @@ class _ShardBase(ShardedCoderack):
     """Shared machinery for the two genuinely sharded candidates."""
 
     def __init__(self, meta: MetadataProvider, shards: int) -> None:
+        # The run-start check comes first, so a lacking configuration gives its one
+        # message and not a ``TypeError`` from the arithmetic below.
+        from server.engine.start_check import require_run_start
+
+        require_run_start(meta)
         self.meta = meta
-        capacity = meta.get_param("max_coderack_size", 100)
+        capacity = meta.get_param("max_coderack_size")
         # Shard count is bounded by capacity, not by worker count.  More workers than
         # shards means some share, which costs contention; more shards than the capacity
         # supports costs *cognition*, and that is not a trade worth making.

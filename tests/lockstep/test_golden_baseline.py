@@ -7,6 +7,9 @@ They hold, for the 19 demo problems at seeds 1-5, the justify problems at seeds 
 8-run episode with Episodic Memory carried: the answer, codelet count, final temperature,
 the RNG call count of every codelet, the trace-event and final-state hashes, and the
 English corpus (rule English, commentary, Verbose narration, trace display, snag text).
+The final-state hash covers the state graph (without its ``parameters`` entry) and the
+lockstep snapshot.  The parameter table is configuration, not run state, and is excluded
+like the configuration hash in format /2; this is format /3.
 
 * ``test_the_baseline_files_are_consistent`` and ``test_a_sample_of_runs_reproduces`` are
   quick: the committed files agree with each other, and four runs recomputed in this process

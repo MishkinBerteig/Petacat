@@ -78,5 +78,14 @@
   "translation_temp_bond_density_low": 0.6,
   "translation_temp_bond_density_medium": 0.4,
   "translation_temp_bond_density_high": 0.2,
-  "theme_relation_default_abstractness": 50.0
+  "theme_relation_default_abstractness": 50.0,
+  "description_local_support_1": 20.0,
+  "description_local_support_2": 60.0,
+  "description_local_support_3": 90.0,
+  "description_local_support_4_plus": 100.0,
+  "concept_mapping_unlinked_association": 5.0,
+  "bridge_theme_compatibility_sigmoid_beta": 4.0,
+  "answer_distance_unique_theme_weight": 2.0,
+  "answer_distance_rule_difference_weight": 2.0,
+  "answer_distance_abstractness_divisor": 10.0
 }

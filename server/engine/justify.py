@@ -17,6 +17,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from server.engine.images import ImageFailure
+from server.engine.metadata import require_meta
 from server.engine.rules import (
     RULE_TOP, Rule, RuleClause, RuleChange, _TranslationFailure, rules_equal,
 )
@@ -334,7 +335,7 @@ def attempt_justification(
     # happen.  Both call sites have the real count in scope.
     if trace is not None and not trace.permission_to_clamp(
         codelet_count=codelet_count,
-        grace_period=meta.get_param("grace_period", 100),
+        grace_period=meta.get_param("grace_period"),
     ):
         if vlog is not None:
             vlog.say("permission-to-clamp-patterns-denied")
@@ -367,7 +368,7 @@ def attempt_justification(
         vlog.say("rules-can-be-unified")
 
     vertical_pattern = get_vertical_theme_pattern_to_clamp(
-        unifying_pattern, slipnet, rng=rng, vlog=vlog
+        unifying_pattern, slipnet, rng=rng, vlog=vlog, meta=meta
     )
     return _attempt_clamp_rules(
         [chosen_rule, other_rule],
@@ -422,7 +423,7 @@ def clamp_rules(
     # default count this test passed exactly once per run.
     if not trace.permission_to_clamp(
         codelet_count=codelet_count,
-        grace_period=meta.get_param("grace_period", 100),
+        grace_period=meta.get_param("grace_period"),
     ):
         return None
 
@@ -714,6 +715,7 @@ def get_vertical_theme_pattern_to_clamp(
     *,
     rng: RNG | None = None,
     vlog: Any = None,
+    meta: Any = None,
 ) -> dict[str, Any]:
     """Compute the vertical theme pattern to clamp from a unifying pattern.
 
@@ -742,11 +744,14 @@ def get_vertical_theme_pattern_to_clamp(
     # Compute retention probability for each entry and filter
     final_entries: list[tuple[str, str | None]] = []
     retention: list[float] = []
+    identity_percent = require_meta(meta, "justify retention probability").get_param(
+        "justify_retention_identity_percent"
+    )
     for entry in pattern_entries:
         if not isinstance(entry, tuple) or len(entry) < 2:
             continue
         dim, rel = entry[0], entry[1]
-        prob = _retention_probability(entry, pattern_entries, slipnet)
+        prob = _retention_probability(entry, pattern_entries, slipnet, identity_percent)
         retention.append(prob)
         retained = rng.prob(prob) if rng is not None else prob >= 0.5
         if retained:
@@ -795,12 +800,13 @@ def _retention_probability(
     entry: tuple,
     all_entries: list[tuple],
     slipnet: Slipnet | None,
+    identity_percent: float,
 ) -> float:
     """Compute the retention probability for a single pattern entry.
 
     Scheme: justify.ss ``retention-probability``.
     StrPos entries always retained (probability 1).
-    Others: cd(dimension) * (50 if identity else 100) / 100.
+    Others: cd(dimension) * (``justify_retention_identity_percent`` if identity else 100) / 100.
     """
     dim = entry[0] if isinstance(entry, tuple) else None
     rel = entry[1] if isinstance(entry, tuple) and len(entry) > 1 else None
@@ -809,7 +815,7 @@ def _retention_probability(
         return 1.0
 
     cd = _get_conceptual_depth(dim, slipnet) if dim else 50.0
-    identity_factor = 50.0 if _is_identity_label(rel) else 100.0
+    identity_factor = float(identity_percent) if _is_identity_label(rel) else 100.0
     return (cd / 100.0) * (identity_factor / 100.0)
 
 
@@ -1018,7 +1024,7 @@ def _monitor_new_rule(
         return
     relative_quality = rule.get_relative_quality(workspace)
     importance = 100.0 if rule.uniformity == 100 else float(relative_quality)
-    if importance < meta.get_param("rule_importance_threshold", 67):
+    if importance < meta.get_param("rule_importance_threshold"):
         return
     trace.record_event(
         TraceEvent(
@@ -1122,7 +1128,7 @@ def _attempt_clamp_rules(
         vlog.say("attempting-to-clamp-rules")
         if trace.permission_to_clamp(
             codelet_count=codelet_count,
-            grace_period=meta.get_param("grace_period", 100),
+            grace_period=meta.get_param("grace_period"),
         ):
             vlog.say("permission-granted-clamping-rules")
 

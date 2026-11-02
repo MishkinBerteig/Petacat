@@ -87,7 +87,7 @@ def theme_display_labels(meta: Any) -> dict:
     vocabulary.  A dimension without an entry falls back to its Slipnet node's short
     name, as the Scheme's ``else`` branch does (``(tell dimension 'get-short-name)``).
     """
-    configured = meta.get_param("theme_dimension_labels", {}) or {}
+    configured = meta.get_param("theme_dimension_labels") or {}
     dimensions: dict[str, dict[str, str]] = {}
     for spec in meta.theme_dimensions:
         entry = configured.get(spec.slipnet_node)
@@ -99,7 +99,7 @@ def theme_display_labels(meta: Any) -> dict:
         dimensions[spec.slipnet_node] = {"name": name, "abbreviation": abbreviation}
     return {
         "dimension_labels": dimensions,
-        "relation_labels": dict(meta.get_param("theme_relation_labels", {}) or {}),
+        "relation_labels": dict(meta.get_param("theme_relation_labels") or {}),
     }
 
 
@@ -110,7 +110,7 @@ def serialize_themespace_state(ctx: EngineContext) -> dict:
     absolute activation) so the UI shows the same "locked-in" themes the engine
     acts on, rather than recomputing it with a different rule.
     """
-    margin = ctx.meta.get_param("dominant_theme_margin", 90)
+    margin = ctx.meta.get_param("dominant_theme_margin")
     clusters = []
     for cluster in ctx.themespace.clusters:
         dominant = cluster.get_dominant_theme(margin)

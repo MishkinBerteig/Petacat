@@ -55,8 +55,12 @@ _SPREAD_COEFFS = {
     "theme_intra_cluster_pos_to_pos_weight": 0.0,
     "theme_intra_cluster_self_weight": 50.0,
     "theme_net_effect_default_sensitivity": 1.0,
+    "theme_net_effect_alpha_scale": 0.02,
 }
-_SPREAD_PARAMS = {"theme_decay_amount": 25, "theme_spread_amount": 20}
+_SPREAD_PARAMS = {
+    "theme_decay_amount": 25, "theme_spread_amount": 20, "max_theme_activation": 100,
+    "theme_boost_amount": 7, "workspace_activation": 100, "dominant_theme_margin": 90,
+}
 
 
 # --- Theme: sign predicates ------------------------------------------------
@@ -200,7 +204,7 @@ def test_spread_activation_applies_decay_and_self_excitation():
 
 def _themespace():
     dims = [_FakeDim("direction", ["identity", "opposite"])]
-    meta = _FakeMeta(dims, {"dominant_theme_margin": 90, "theme_boost_amount": 7}, _SPREAD_COEFFS)
+    meta = _FakeMeta(dims, _SPREAD_PARAMS, _SPREAD_COEFFS)
     return Themespace(meta).populate()
 
 

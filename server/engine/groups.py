@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any
 
 from server.engine.slipnet import holds_role
 from server.engine.workspace_objects import WorkspaceObject
-from server.engine.workspace_structures import WorkspaceStructure
+from server.engine.workspace_structures import WorkspaceStructure, bound_meta
 from server.engine.concept_mappings import ConceptMapping
 from server.engine.descriptions import Description
 
@@ -233,17 +233,27 @@ class Group(WorkspaceObject, WorkspaceStructure):
         assoc = getattr(self.bond_category, "degree_of_assoc", None)
         base = float(assoc()) if assoc is not None else 0.0
         letter_facet = holds_role(self.bond_facet, "dimension.letter_category")
-        bond_factor = base if letter_facet else base * 0.5
+        meta = bound_meta()
+        bond_factor = (
+            base if letter_facet else base * meta.get_formula_coeff("group_bond_facet_other_multiplier")
+        )
 
-        # Length factor
-        length_factors = {1: 5, 2: 40, 3: 60}
-        length_factor = length_factors.get(self.length, 90)
+        # Length factor: a step table (1, 2, 3) with a tail (4 or more)
+        length = self.length
+        if length == 1:
+            length_factor = meta.get_formula_coeff("group_length_factor_1")
+        elif length == 2:
+            length_factor = meta.get_formula_coeff("group_length_factor_2")
+        elif length == 3:
+            length_factor = meta.get_formula_coeff("group_length_factor_3")
+        else:
+            length_factor = meta.get_formula_coeff("group_length_factor_4_plus")
 
         # Weighted combination with self-weighting exponent
         if bond_factor <= 0:
             return float(length_factor)
 
-        bf_weight = bond_factor ** 0.98
+        bf_weight = bond_factor ** meta.get_formula_coeff("group_bond_factor_weight_exponent")
         lf_weight = 100.0 - bf_weight
         total = bf_weight + lf_weight
         if total == 0:
@@ -274,7 +284,11 @@ class Group(WorkspaceObject, WorkspaceStructure):
 
         density = self.get_local_density(rng)
         adjusted_density = 100.0 * math.sqrt(density / 100.0)
-        number_factor = min(1.0, 0.6 ** (1.0 / max(1, num_supporting ** 3)))
+        number_factor = min(
+            1.0,
+            bound_meta().get_formula_coeff("local_support_number_factor_base")
+            ** (1.0 / max(1, num_supporting ** 3)),
+        )
         return round(adjusted_density * number_factor)
 
     def get_num_of_local_supporting_groups(self) -> int:

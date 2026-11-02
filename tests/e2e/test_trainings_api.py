@@ -782,7 +782,13 @@ async def test_policy_error_limits(app_client, trainings):
 
     made = await create(app_client, 1, seeds_per_problem=60, policy={"max_errors_total": 2})
     paused = await until_state(app_client, made["training"]["id"], "paused")
-    assert "max_errors_total" in paused["last_event"] and paused["runs"]["errors"] >= 2
+    assert "max_errors_total" in paused["last_event"]
+    # The pause is effective at once and its runs are persisted right after it, so under
+    # load the persisted error count can trail the pause by a moment.
+    async def _errors_persisted():
+        b = await training_state(app_client, made["training"]["id"])
+        return b if b["runs"]["errors"] >= 2 else None
+    await wait_for(_errors_persisted)
     await app_client.post(f"/api/trainings/{made['training']['id']}/cancel")
 
 

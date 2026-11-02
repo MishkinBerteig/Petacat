@@ -297,8 +297,8 @@ class Coderack:
     """The coderack: holds codelets in urgency-weighted bins."""
 
     def __init__(self, meta: MetadataProvider) -> None:
-        self.num_bins = meta.get_param("num_coderack_bins", 7)
-        self.max_size = meta.get_param("max_coderack_size", 100)
+        self.num_bins = meta.get_param("num_coderack_bins")
+        self.max_size = meta.get_param("max_coderack_size")
         self.bins = [CoderackBin(i) for i in range(self.num_bins)]
         self.meta = meta
         self.urgency_table = urgency_value_table(

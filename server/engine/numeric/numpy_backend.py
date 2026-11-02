@@ -189,7 +189,7 @@ class NumpyBackend(Backend):
 
         alpha = (
             params.sensitivity
-            * (1.0 / 50.0)
+            * params.alpha_scale
             * (1.0 / np.asarray(layout.n_relations, dtype=np.float64))
         )
         self_term = params.self_weight / 100.0

@@ -37,6 +37,7 @@ from typing import Any
 
 from server.engine.hashing import config_hash
 from server.engine.metadata import MetadataProvider
+from server.engine.start_check import require_run_start
 
 logger = logging.getLogger("petacat.training")
 
@@ -292,6 +293,7 @@ class SerialExecutor(_Counting):
             return entry
 
     def submit(self, tasks: list[TrainingTask], meta: MetadataProvider) -> Future:
+        require_run_start(meta)  # first: before a child process is started for it
         pool, count = self._pool(meta)
         future = pool.submit(_child_run, list(tasks))
         count._track(future, len(tasks))
@@ -334,6 +336,7 @@ class SwarmExecutor(_Counting):
         return self.swarm.workers
 
     def submit(self, tasks: list[TrainingTask], meta: MetadataProvider) -> Future:
+        require_run_start(meta)  # first: before a run task is built
         run_tasks = [
             self._mod.RunTask(
                 t.initial, t.modified, t.target, t.answer, t.seed, t.max_steps,

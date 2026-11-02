@@ -8,6 +8,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from server.engine.ids import KIND_OBJECT, next_id
+from server.engine.workspace_structures import bound_meta
 from fractions import Fraction
 
 if TYPE_CHECKING:
@@ -802,7 +803,9 @@ class WorkspaceObject:
                          if orientation == "horizontal"
                          else getattr(self.enclosing_group, "vertical_bridge", None))
             if eg_bridge is not None:
-                return 100.0 - 0.5 * getattr(eg_bridge, "strength", 0)
+                return 100.0 - bound_meta().get_formula_coeff(
+                    "enclosed_group_bridge_factor"
+                ) * getattr(eg_bridge, "strength", 0)
         return 100.0
 
     def __repr__(self) -> str:

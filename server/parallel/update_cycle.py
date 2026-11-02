@@ -116,7 +116,6 @@ from server.engine.posting import (
     evaluate_count_formula,
     evaluate_urgency,
 )
-from server.engine.trace import MAX_CLAMP_PERIOD_DEFAULT
 
 POLICIES = ("faithful", "stream")
 
@@ -500,7 +499,7 @@ class UpdateCycle:
         rng.trace_unit(c, "update", "clamp-expiry", u)
         if ctx.trace.clamp_period_expired(
             ctx.codelet_count,
-            runner.meta.get_param("max_clamp_period", MAX_CLAMP_PERIOD_DEFAULT),
+            runner.meta.get_param("max_clamp_period"),
         ):
             ctx.trace.undo_last_clamp(
                 ctx.themespace, ctx.slipnet, ctx.codelet_count, ctx.coderack,
@@ -752,7 +751,7 @@ class UpdateCycle:
         tasks: list[tuple] = []  # (kind, rule, node, key)
         for rule in runner.bottom_up_posting_rules():
             tasks.append(("bu", rule, None, rule.codelet_type))
-        top_down_nodes = meta.get_param("top_down_slipnodes", [])
+        top_down_nodes = meta.get_param("top_down_slipnodes")
         for node_name in top_down_nodes:
             node = ctx.slipnet.nodes.get(node_name)
             if node is None or not node.above_threshold():

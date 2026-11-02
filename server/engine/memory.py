@@ -367,12 +367,16 @@ class EpisodicMemory:
         self.unresolved_names |= comparison.unresolved_names
 
         distance = 1.0
+        unique_theme_weight = meta.get_formula_coeff("answer_distance_unique_theme_weight")
+        rule_difference_weight = meta.get_formula_coeff(
+            "answer_distance_rule_difference_weight"
+        )
 
         # 1. Differing themes count once; themes unique to one side count double.
         distance += float(
             len(comparison.differing_dimensions)
-            + 2 * len(comparison.unique1)
-            + 2 * len(comparison.unique2)
+            + unique_theme_weight * len(comparison.unique1)
+            + unique_theme_weight * len(comparison.unique2)
         )
 
         # 2/3. The *top* rules, and abstractness only as their alternative.
@@ -383,10 +387,13 @@ class EpisodicMemory:
             # Python's ``round`` breaks ties to even, as Chez's does on the exact
             # rational ``(/ (abs (- a1 a2)) 10)``: a gap of 25 is 2, not 3.
             distance += float(
-                round(abs(a.top_rule_abstractness - b.top_rule_abstractness) / 10.0)
+                round(
+                    abs(a.top_rule_abstractness - b.top_rule_abstractness)
+                    / meta.get_formula_coeff("answer_distance_abstractness_divisor")
+                )
             )
         else:
-            distance += 2.0 * comparison.num_rule_differences
+            distance += rule_difference_weight * comparison.num_rule_differences
 
         # 4. Ideas common to both answers that only one of them could justify.
         distance += float(

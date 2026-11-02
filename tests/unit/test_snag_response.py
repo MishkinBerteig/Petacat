@@ -168,7 +168,7 @@ def test_a_snag_during_a_clamp_undoes_it_and_pins_the_impasse():
         codelet_count=30,
         temperature=100.0,
         snag_objects=[obj],
-        snag_concept_pattern=get_snag_concept_pattern([obj]),
+        snag_concept_pattern=get_snag_concept_pattern([obj], 100.0),
     )
     trace.add_snag_event(snag)
     snag.activate(trace, themespace, slipnet, None, 30)
@@ -198,7 +198,7 @@ def test_the_snag_concept_pattern_is_the_snag_objects_descriptors():
         _FakeDescription(_FakeSlipnetNode("plato-rightmost")),
         _FakeDescription(_FakeSlipnetNode("plato-z")),  # duplicate, collapsed
     ]
-    pattern = get_snag_concept_pattern([obj])
+    pattern = get_snag_concept_pattern([obj], 100.0)
     assert pattern["type"] == "concepts"
     assert pattern["entries"] == [
         {"node": "plato-z", "activation": 100.0},
@@ -447,7 +447,7 @@ def test_an_empty_concept_pattern_clamps_and_unclamps_without_raising():
     from server.engine.trace import clamp_concept_pattern, unclamp_concept_pattern
 
     slipnet = _FakeSlipnet("plato-a")
-    empty = get_snag_concept_pattern([])
+    empty = get_snag_concept_pattern([], 100.0)
     assert empty == {"type": "concepts", "entries": []}
 
     clamp_concept_pattern(empty, slipnet)
@@ -466,7 +466,7 @@ def test_a_snag_with_no_objects_survives_activation_and_deactivation():
         codelet_count=10,
         temperature=100.0,
         snag_objects=[],
-        snag_concept_pattern=get_snag_concept_pattern([]),
+        snag_concept_pattern=get_snag_concept_pattern([], 100.0),
     )
     trace.add_snag_event(snag)
     snag.activate(trace, _FakeThemespace(), slipnet, None, 10)

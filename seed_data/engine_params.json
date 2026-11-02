@@ -92,5 +92,12 @@
     "plato-identity": 0,
     "plato-opposite": 80
   },
-  "shrunk_link_length_factor": 0.4
+  "shrunk_link_length_factor": 0.4,
+  "rule_swap_abstraction_probability": 0.75,
+  "rule_subobjects_abstraction_probability": 0.75,
+  "justify_retention_identity_percent": 50,
+  "bridge_recruit_urgency_level": "very_high",
+  "snag_clamp_temperature": 100.0,
+  "jootsing_count_scale": 10,
+  "reference_update_cycle_length": 15
 }

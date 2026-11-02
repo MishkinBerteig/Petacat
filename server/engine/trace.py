@@ -57,28 +57,16 @@ COGNITIVE_EVENT_TYPES = (
     CLAMP_START,
 )
 
-#: ``answer_quality_rule_weight`` / ``answer_quality_temperature_weight``, the
-#: shipped 60/40.  The fallback for an event asked for its quality without a
-#: ``MetadataProvider``; the coefficients are the value in force.
-DEFAULT_ANSWER_QUALITY_WEIGHTS = (60.0, 40.0)
-
-
 def _answer_quality_weights(meta: Any) -> list[float]:
-    if meta is None:
-        return list(DEFAULT_ANSWER_QUALITY_WEIGHTS)
+    """``answer_quality_rule_weight`` and ``answer_quality_temperature_weight``."""
+    from server.engine.metadata import require_meta
+
+    require_meta(meta, "AnswerEvent quality")
     return [
         meta.get_formula_coeff("answer_quality_rule_weight"),
         meta.get_formula_coeff("answer_quality_temperature_weight"),
     ]
 
-
-# Default grace period (codelets after unclamping before allowing a new clamp).
-# Matches Scheme constant %grace-period% in jootsing.ss:252.
-GRACE_PERIOD_DEFAULT = 100
-
-# Default max clamp duration (codelets).
-# Matches Scheme constant %max-clamp-period% in jootsing.ss:248.
-MAX_CLAMP_PERIOD_DEFAULT = 750
 
 #: The urgency level each clamp type puts its codelet pattern *against* — the Scheme's
 #: ``against-background`` (``trace.ss:1578-1581``), applied at the clamp site rather
@@ -204,6 +192,7 @@ class AnswerEvent(TraceEvent):
         theme_pattern: Any = None,
         structures: list[Any] | None = None,
         description: str = "",
+        meta: Any = None,
     ) -> None:
         super().__init__(
             event_type=ANSWER_FOUND,
@@ -226,12 +215,14 @@ class AnswerEvent(TraceEvent):
         self.slippage_log = slippage_log
         self.unjustified_slippages = unjustified_slippages or []
         self.answer_description: Any = None
+        #: The run's configuration: the answer-quality weights are read from it.
+        self.meta = meta
 
     # ------------------------------------------------------------------
     # Quality metrics  (Scheme: trace.ss make-answer-event)
     # ------------------------------------------------------------------
 
-    def get_absolute_quality(self, meta: Any = None) -> float:
+    def get_absolute_quality(self) -> float:
         """Scheme: ``get-absolute-quality``.
 
         ``weighted-average([top-rule-quality, 100-temperature], [60, 40])``
@@ -239,33 +230,32 @@ class AnswerEvent(TraceEvent):
         The weights are ``answer_quality_rule_weight`` and
         ``answer_quality_temperature_weight``, which ``answers.compute_answer_quality``
         reads for the engine's own copy of this formula.  They were written here as
-        ``[60.0, 40.0]`` — a third record of the same two numbers.  *meta* is optional
-        because this path is the event's own reporting rather than cognition, and its
-        callers are ``__repr__`` and the summary line; without it the shipped weights
-        stand in and are named rather than typed as a bare pair.
+        ``[60.0, 40.0]`` — a third record of the same two numbers.  They are read from
+        the configuration the event was made with (``meta``); an event made without
+        one cannot be asked for its quality.
         """
         rule_quality = _rule_quality(self.top_rule)
         return round(
             weighted_average(
                 [rule_quality, 100.0 - self.temperature],
-                _answer_quality_weights(meta),
+                _answer_quality_weights(self.meta),
             )
         )
 
-    def get_relative_quality(self, meta: Any = None) -> float:
+    def get_relative_quality(self) -> float:
         """Scheme: ``get-relative-quality``.  Weights as in
         :meth:`get_absolute_quality`."""
         rel_quality = _rule_relative_quality(self.top_rule)
         return round(
             weighted_average(
                 [rel_quality, 100.0 - self.temperature],
-                _answer_quality_weights(meta),
+                _answer_quality_weights(self.meta),
             )
         )
 
-    def get_quality(self, meta: Any = None) -> float:
+    def get_quality(self) -> float:
         """Alias for ``get_absolute_quality`` (matches Scheme ``get-quality``)."""
-        return self.get_absolute_quality(meta)
+        return self.get_absolute_quality()
 
     def get_strength(self) -> float:
         """Override — answer strength is its quality."""
@@ -275,10 +265,8 @@ class AnswerEvent(TraceEvent):
         return len(self.unjustified_slippages) > 0
 
     def __repr__(self) -> str:
-        return (
-            f"AnswerEvent(t={self.codelet_count}, T={self.temperature:.0f}, "
-            f"quality={self.get_quality():.0f})"
-        )
+        quality = f", quality={self.get_quality():.0f}" if self.meta is not None else ""
+        return f"AnswerEvent(t={self.codelet_count}, T={self.temperature:.0f}{quality})"
 
 
 class ClampEvent(TraceEvent):
@@ -970,7 +958,7 @@ def get_snag_theme_pattern(concept_mappings: list[Any]) -> list[Any]:
     return [THEME_VERTICAL_BRIDGE, *entries]
 
 
-def get_snag_concept_pattern(snag_objects: list[Any]) -> dict[str, Any]:
+def get_snag_concept_pattern(snag_objects: list[Any], max_activation: float) -> dict[str, Any]:
     """Every descriptor of every snag object, pinned at max activation.
 
     Scheme: ``get-snag-concept-pattern`` (``trace.ss:1042-1048``).  Clamped by
@@ -985,7 +973,7 @@ def get_snag_concept_pattern(snag_objects: list[Any]) -> dict[str, Any]:
             if name is None or name in seen:
                 continue
             seen.add(name)
-            entries.append({"node": name, "activation": 100.0})
+            entries.append({"node": name, "activation": max_activation})
     return {"type": "concepts", "entries": entries}
 
 
@@ -1037,18 +1025,20 @@ def make_concept_activation_monitor(
     return monitor
 
 
-def negate_theme_pattern_entry(entry: dict[str, Any]) -> dict[str, Any]:
+def negate_theme_pattern_entry(
+    entry: dict[str, Any], max_theme_activation: float
+) -> dict[str, Any]:
     """Negate a theme pattern entry (for negative/inhibitory clamping).
 
     Scheme: trace.ss ``negate-theme-pattern-entry`` (line 1432).
     If the entry has an explicit activation, negate it. Otherwise
-    use -100 (negative max-theme-activation).
+    use the negative of ``max_theme_activation``.
     """
     result = dict(entry)
     if "activation" in result:
         result["activation"] = -result["activation"]
     else:
-        result["activation"] = -100.0
+        result["activation"] = -float(max_theme_activation)
     return result
 
 
@@ -1260,7 +1250,8 @@ class TemporalTrace:
         self,
         self_watching_enabled: bool = True,
         codelet_count: int = 0,
-        grace_period: int = GRACE_PERIOD_DEFAULT,
+        *,
+        grace_period: int,
     ) -> bool:
         """Return True if a new clamp period is permitted.
 
@@ -1276,8 +1267,8 @@ class TemporalTrace:
 
     def within_grace_period(
         self,
-        codelet_count: int = 0,
-        grace_period: int = GRACE_PERIOD_DEFAULT,
+        codelet_count: int,
+        grace_period: int,
     ) -> bool:
         """True for N events after the last clamp ended.
 
@@ -1291,8 +1282,8 @@ class TemporalTrace:
 
     def clamp_period_expired(
         self,
-        codelet_count: int = 0,
-        max_clamp_period: int = MAX_CLAMP_PERIOD_DEFAULT,
+        codelet_count: int,
+        max_clamp_period: int,
     ) -> bool:
         """True when the current clamp's duration has elapsed.
 

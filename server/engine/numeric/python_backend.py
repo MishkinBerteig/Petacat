@@ -262,7 +262,7 @@ class PythonBackend(Backend):
             if state.cluster_frozen[c]:
                 continue
             base = c * n_slots
-            alpha = params.sensitivity * (1.0 / 50.0) * (1.0 / layout.n_relations[c])
+            alpha = params.sensitivity * params.alpha_scale * (1.0 / layout.n_relations[c])
 
             # Pass one and two: read only the activations as they stand now.
             snapshot = [act[base + s] for s in range(n_slots)]

@@ -31,6 +31,8 @@ class _FakeMeta:
         self._coeffs = {
             "low_prob_sqrt_base": sqrt_base,
             "low_prob_scale_factor": scale,
+            "low_prob_threshold": 0.5,
+            "bond_degree_of_assoc_scale": 11.0,
         }
 
     def get_formula_coeff(self, name):
@@ -345,9 +347,9 @@ class _AssocNode:
     ],
 )
 def test_bond_degree_of_assoc(degree, expected):
-    assert bond_degree_of_assoc(_AssocNode(degree)) == expected
+    assert bond_degree_of_assoc(_AssocNode(degree), _FakeMeta()) == expected
 
 
 def test_bond_degree_of_assoc_of_nothing_is_zero():
     """``propose-group`` reads it off a category that may not resolve."""
-    assert bond_degree_of_assoc(None) == 0.0
+    assert bond_degree_of_assoc(None, _FakeMeta()) == 0.0
