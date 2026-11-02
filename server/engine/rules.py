@@ -82,11 +82,25 @@ _OBJECT_LETTER = "object.letter"
 _OBJECT_GROUP = "object.group"
 _GROUP_CATEGORY_SAMENESS = "group_category.sameness"
 
-#: The one stored token of the rule-signature format: the group node and the ``'string``
-#: symbol collapse to it (``_descriptor_key``).  It is written to the database (Episodic
-#: Memory keeps rule signatures), so it is a persisted value, not a node reference.
-_GROUP_OR_STRING_TOKEN = "plato-group|string"
-_GROUP_TOKEN_HEAD = _GROUP_OR_STRING_TOKEN.partition("|")[0]
+#: The tail of the one stored token of the rule-signature format: the group node and the
+#: ``'string`` symbol collapse to ``<group node name>|string`` (``group_or_string_token``).
+#: It is written to the database (Episodic Memory keeps rule signatures), so it is a
+#: persisted value, not a node reference.
+_GROUP_OR_STRING_TAIL = "|string"
+
+
+def group_or_string_token(meta: Any = None) -> str:
+    """The signature token for the group node and the ``'string`` symbol: the name of the
+    node holding ``object.group`` followed by ``|string``.  A configuration with no such
+    node gives ``|string`` (there is no group to collapse; the ``'string`` symbol alone)."""
+    if meta is None:
+        from server.engine.workspace_structures import bound_meta
+
+        meta = bound_meta()
+    for spec in getattr(meta, "node_roles", ()) or ():
+        if spec.role == _OBJECT_GROUP:
+            return spec.node_name + _GROUP_OR_STRING_TAIL
+    return _GROUP_OR_STRING_TAIL
 
 
 def _slipnet_of(obj: Any) -> Any:
@@ -313,14 +327,11 @@ def _translate_whole_string_object_description(
     target that does have a spanning group aimed its transforms at the string
     image — whose ``new_length`` always fails.
     """
-    if slipnet is None:
-        str_pos, whole, group = od[1], od[2], None
-    else:
-        # A role nothing holds gives its Absent token, which fails ``_valid_object_description``
-        # (it is falsy and is no node's category): the rule then fails to translate.
-        str_pos = slipnet.roles.dimension_string_position
-        whole = slipnet.roles.position_whole
-        group = slipnet.roles.object_group
+    # A role nothing holds gives its Absent token, which fails ``_valid_object_description``
+    # (it is falsy and is no node's category): the rule then fails to translate.
+    str_pos = slipnet.roles.dimension_string_position
+    whole = slipnet.roles.position_whole
+    group = slipnet.roles.object_group
     if to_string is not None and _spanning_group_exists(to_string):
         return (group, str_pos, whole)
     return ("string", str_pos, whole)
@@ -627,8 +638,6 @@ class IntrinsicChangeDescription:
         # rules.ss:1051-1054: `(self ,plato-bond-facet (,bond-facet))` -- the
         # dimension is the bond-facet node itself, the descriptor the facet.  With no
         # bond-facet dimension in the configuration there is no such entry.
-        if slipnet is None:
-            return None
         facet_dim = slipnet.roles.dimension_bond_facet
         if not facet_dim:
             return None
@@ -1368,7 +1377,7 @@ class Rule(WorkspaceStructure):
         beta = meta.get_formula_coeff("rule_abstractness_sigmoid_beta")  # 3
         mid = meta.get_formula_coeff("rule_abstractness_sigmoid_midpoint")  # 40
         mean = _average([c for c in categories if c != 0.0])
-        self.abstractness = round(100.0 * sigmoid(mean, beta, mid))
+        self.abstractness = round(100.0 * sigmoid(mean, beta, mid, meta.get_formula_coeff("sigmoid_divisor")))
 
     def _compute_succinctness(self, meta: MetadataProvider) -> None:
         """§3.3.5 "Succinctness" — ``compute-rule-succinctness`` (``rules.ss:1628-1637``).
@@ -1479,7 +1488,7 @@ class Rule(WorkspaceStructure):
             return False
         try:
             result = apply_rule(self, source, slipnet)
-        except (ImageFailure, Exception):
+        except (ImageFailure, _TranslationFailure):
             return False
         if result is None:
             return False
@@ -1912,9 +1921,8 @@ def _changes_equal(ch1: RuleChange, ch2: RuleChange) -> bool:
 
 
 def _is_group_or_string(descriptor: Any) -> bool:
-    """The group node (by its role) or the ``'string`` symbol.  A bare name equal to the
-    head of the stored token is also the group's: ``answer_comparison`` asks by name."""
-    if descriptor == "string" or descriptor == _GROUP_TOKEN_HEAD:
+    """The group node (by its role) or the ``'string`` symbol."""
+    if descriptor == "string":
         return True
     return _holds(descriptor, _OBJECT_GROUP)
 
@@ -1935,30 +1943,31 @@ def rule_signature(rule: Rule | None) -> list | None:
     """
     if rule is None:
         return None
-    return [_clause_signature(clause) for clause in rule.clauses]
+    token = group_or_string_token()
+    return [_clause_signature(clause, token) for clause in rule.clauses]
 
 
-def _clause_signature(clause: RuleClause) -> list:
+def _clause_signature(clause: RuleClause, token: str) -> list:
     if clause.is_verbatim:
         return [
             clause.clause_type,
-            [_descriptor_key(letter) for letter in (clause.verbatim_letters or [])],
+            [_descriptor_key(letter, token) for letter in (clause.verbatim_letters or [])],
         ]
     if clause.is_extrinsic:
         return [
             clause.clause_type,
-            [[_descriptor_key(d) for d in od] for od in clause.object_descriptions],
-            [_descriptor_key(dim) for dim in clause.dimensions],
+            [[_descriptor_key(d, token) for d in od] for od in clause.object_descriptions],
+            [_descriptor_key(dim, token) for dim in clause.dimensions],
         ]
     return [
         clause.clause_type,
-        [_descriptor_key(d) for d in (clause.object_description or ())],
+        [_descriptor_key(d, token) for d in (clause.object_description or ())],
         [
             [
-                _descriptor_key(change.dimension),
-                _descriptor_key(change.from_descriptor),
-                _descriptor_key(change.to_descriptor),
-                _descriptor_key(change.relation),
+                _descriptor_key(change.dimension, token),
+                _descriptor_key(change.from_descriptor, token),
+                _descriptor_key(change.to_descriptor, token),
+                _descriptor_key(change.relation, token),
                 # ``self`` vs ``subobjects`` (``rules.ss:381``).  Written only for the
                 # non-default scope, so signatures already stored in a database for
                 # ``self`` changes keep matching.
@@ -1969,13 +1978,13 @@ def _clause_signature(clause: RuleClause) -> list:
     ]
 
 
-def _descriptor_key(descriptor: Any) -> str | None:
+def _descriptor_key(descriptor: Any, token: str) -> str | None:
     if descriptor is None:
         return None
     if _is_group_or_string(descriptor):
         # ``_clauses_equal`` treats the group and string as interchangeable, so the
         # signature must collapse them to one token rather than preserve the difference.
-        return _GROUP_OR_STRING_TOKEN
+        return token
     name = getattr(descriptor, "name", descriptor)
     return name if isinstance(name, str) else str(name)
 
@@ -3922,8 +3931,6 @@ def _object_description_possible(obj: Any, slipnet: Any = None) -> bool:
     fixing this gate would only move the illegal description into the fallback.
     """
     if _is_workspace_string(obj):
-        if slipnet is None:
-            return True
         roles = slipnet.roles
         return bool(roles.dimension_string_position and roles.position_whole)
     return len(descriptions_for_rule(obj)) > 0

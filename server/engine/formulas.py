@@ -166,12 +166,12 @@ def weighted_average(values: list[float], weights: list[float]) -> float:
     return sum(v * w for v, w in zip(values, weights)) / total_weight
 
 
-def sigmoid(x: float, beta: float, midpoint: float) -> float:
+def sigmoid(x: float, beta: float, midpoint: float, divisor: float) -> float:
     """General-purpose sigmoid on [0, 100] -> [0, 1].
 
-    Scheme: utilities.ss:488-491.
+    Scheme: utilities.ss:488-491.  *divisor* is the coefficient ``sigmoid_divisor``.
     """
-    return 1.0 / (1.0 + math.exp(beta * (midpoint - x) / 25.0))
+    return 1.0 / (1.0 + math.exp(beta * (midpoint - x) / divisor))
 
 
 # ---------------------------------------------------------------------------

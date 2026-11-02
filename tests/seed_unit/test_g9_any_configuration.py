@@ -14,6 +14,9 @@ stepped.  Nothing may raise except the named run-start message (``RunStartError`
 The default suite runs a rotating sample of the demo problems per configuration; the whole
 sweep (every demo problem) is ``@pytest.mark.slow`` like the older G9 sweeps and runs with
 ``-m slow`` or in a full run.
+
+The default tests are in the numeric matrix, like ``test_en6_perception.py``; the slow sweep is
+not, so it runs once.
 """
 
 from __future__ import annotations
@@ -115,6 +118,7 @@ def subset_configuration(seed: int, size: int) -> rc.Reduced:
 
 @pytest.mark.parametrize(
     "index,node", [pytest.param(i, n, id=n, marks=_mark(f"node:{n}")) for i, n in enumerate(NODES)])
+@pytest.mark.numeric_matrix
 def test_g9_each_node_removed_runs_a_sample_of_demos(index, node) -> None:
     run_configuration(rc.node_removed(node), index)
 
@@ -129,6 +133,7 @@ def test_g9_each_node_removed_runs_every_demo(index, node) -> None:
 # --- the plan's named configurations on every demo problem -----------------------------
 
 @pytest.mark.parametrize("name", ["a-d/w-z", "ladder-gap", "no-alphabet-successor"])
+@pytest.mark.numeric_matrix
 def test_g9_named_configuration_runs_every_demo_with_unperceived_symbols(name) -> None:
     reduced = {"a-d/w-z": rc.a_d_w_z, "ladder-gap": rc.ladder_with_gap,
                "no-alphabet-successor": lambda: rc.node_removed("plato-successor")}[name]()
@@ -155,6 +160,7 @@ def test_subsets_are_deterministic_and_distinct() -> None:
 @pytest.mark.parametrize(
     "seed,size", [pytest.param(s, n, id=f"seed{s}-size{n}", marks=_mark(f"subset:{s}:{n}"))
                   for s, n in SUBSET_CASES])
+@pytest.mark.numeric_matrix
 def test_g9_random_subset_runs_a_sample_of_demos(seed, size) -> None:
     run_configuration(subset_configuration(seed, size), seed + size)
 
@@ -194,6 +200,7 @@ def _copy(memory):
 
 @pytest.mark.parametrize(
     "node", [pytest.param(n, id=n, marks=_mark(f"carry:{n}")) for n in CARRY_NODES if n in NODES])
+@pytest.mark.numeric_matrix
 def test_g9_memory_carried_into_a_reduced_configuration(carried, node) -> None:
     provider = rc.provider(rc.node_removed(node))
     step_run(provider, CARRY_PROBLEM, seed=5, steps=CARRY_STEPS, memory=_copy(carried))
@@ -204,6 +211,7 @@ def test_g9_memory_carried_into_a_reduced_configuration(carried, node) -> None:
 @pytest.mark.parametrize(
     "reduced_name", [pytest.param("a-d/w-z", marks=_mark("swarm:a-d-w-z")),
                      pytest.param("no-opposite", marks=_mark("swarm:no-opposite"))])
+@pytest.mark.numeric_matrix
 def test_g9_a_small_swarm_call_under_a_reduced_configuration(reduced_name) -> None:
     from server.parallel.swarm import Swarm
 

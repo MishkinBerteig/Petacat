@@ -270,7 +270,7 @@ class EpisodicMemory:
     def find_remindings(
         self,
         new_desc: AnswerDescription,
-        distance_threshold: float = 5.0,
+        distance_threshold: float,
         *,
         meta: Any,
     ) -> list[AnswerDescription]:
@@ -286,7 +286,7 @@ class EpisodicMemory:
 
         require_meta(meta, "EpisodicMemory.find_remindings")
         remindings = []
-        threshold = distance_threshold or 5.0
+        threshold = distance_threshold
         # Newest answer first: ``add-answer-description`` conses the new description onto
         # the front of the list (``memory.ss:102-104``) and the new answer is compared
         # with each of the others in that order (``memory.ss:101-103``), so the reminding
@@ -299,9 +299,9 @@ class EpisodicMemory:
             # — reaches zero *at* the threshold rather than crossing it linearly.
             # ``100*`` rounds (``utilities.ss:544``), so the activation is a whole number
             # and that is the strength the commentary quotes.
-            past.activation = max(
-                0, 100 - round(100 * min(1.0, distance / threshold))
-            )
+            # A threshold of zero (or less) reminds of nothing: the ratio is already 1.
+            ratio = 1.0 if threshold <= 0 else min(1.0, distance / threshold)
+            past.activation = max(0, 100 - round(100 * ratio))
             # ``memory.ss:214`` reports a reminding only for a non-zero activation.
             if past.activation > 0:
                 remindings.append(past)

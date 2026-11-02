@@ -18,7 +18,12 @@ from server.engine.workspace import (
     unrelated,
 )
 
+from server.engine.metadata import MetadataProvider
 from tests.unit._fakes import FakeString
+
+_META = MetadataProvider.from_standard_configuration(
+    __import__("os").path.join(__import__("os").path.dirname(__file__), "..", "..", "seed_data")
+)
 
 
 class _FakeObj:
@@ -141,13 +146,13 @@ def test_target_object_needs_both_bridges_when_justifying():
 def test_zero_objects_is_always_few():
     """``(~ 2)`` stays strictly above 0, so a count of 0 is below it every time."""
     rng = RNG(7)
-    assert all(rough_num_of_objects(0, rng) == "few" for _ in range(200))
+    assert all(rough_num_of_objects(0, rng, _META) == "few" for _ in range(200))
 
 
 def test_a_large_count_is_always_many():
     """``(~ 4)`` is at best 4 + 2 = 6, so 7 clears both thresholds every time."""
     rng = RNG(7)
-    assert all(rough_num_of_objects(7, rng) == "many" for _ in range(200))
+    assert all(rough_num_of_objects(7, rng, _META) == "many" for _ in range(200))
 
 
 @pytest.mark.parametrize("count", [1, 2, 3, 4, 5])
@@ -160,7 +165,7 @@ def test_the_thresholds_are_blurred_not_fixed(count):
     identical number of bond scouts every cycle for the length of the run.
     """
     rng = RNG(1234)
-    seen = {rough_num_of_objects(count, rng) for _ in range(400)}
+    seen = {rough_num_of_objects(count, rng, _META) for _ in range(400)}
     assert len(seen) > 1, f"count {count} always gave {seen}"
 
 
@@ -175,8 +180,8 @@ def test_blur_stays_within_the_reachable_band():
     """
     rng = RNG(99)
     # 3 clears every draw of ~2 (at most 3), so it is never 'few'.
-    assert all(rough_num_of_objects(3, rng) != "few" for _ in range(400))
+    assert all(rough_num_of_objects(3, rng, _META) != "few" for _ in range(400))
     # 2 is 'few' only when the delta is 1 on the upward side: sometimes, not always.
-    twos = [rough_num_of_objects(2, rng) == "few" for _ in range(400)]
+    twos = [rough_num_of_objects(2, rng, _META) == "few" for _ in range(400)]
     assert any(twos) and not all(twos)
-    assert all(rough_num_of_objects(1, rng) != "many" for _ in range(400))
+    assert all(rough_num_of_objects(1, rng, _META) != "many" for _ in range(400))

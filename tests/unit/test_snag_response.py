@@ -319,7 +319,8 @@ def test_a_theme_pattern_pins_its_dimension_nodes():
         {
             "type": "vertical_bridge",
             "entries": [{"dimension": "plato-direction-category", "relation": "identity"}],
-        }
+        },
+        _real_slipnet(),
     )
     assert pattern["entries"] == [
         {"node": "plato-direction-category", "activation": 100.0}

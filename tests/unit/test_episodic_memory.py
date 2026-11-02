@@ -248,4 +248,4 @@ def test_remindings_are_reported_newest_first():
     mem.store_answer(newer)
     new = _answer({"a": "1"})
     mem.store_answer(new)
-    assert mem.find_remindings(new, meta=_META) == [newer, older]
+    assert mem.find_remindings(new, 5.0, meta=_META) == [newer, older]

@@ -34,9 +34,12 @@ def bound_meta() -> MetadataProvider:
     Raises :class:`~server.engine.metadata.ConfigurationRequired` when no run has bound one:
     nothing falls back to the Metacat Standard Configuration files.
     """
-    from server.engine.metadata import require_meta
+    meta = WorkspaceStructure._meta
+    if meta is None:  # the hot path (weakness, strengths) skips the import below
+        from server.engine.metadata import require_meta
 
-    return require_meta(WorkspaceStructure._meta, "a workspace structure's coefficient")  # type: ignore[return-value]
+        require_meta(meta, "a workspace structure's coefficient")
+    return meta  # type: ignore[return-value]
 
 
 class WorkspaceStructure:

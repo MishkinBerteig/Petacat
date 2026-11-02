@@ -98,13 +98,13 @@ _COUNT_BUILTINS: dict[str, Any] = {
 #: when is part of the engine's behaviour and not only of its arithmetic.
 _COUNT_BUCKETS: dict[str, Callable[["PostingContext"], str]] = {
     "num_unrelated_objects_based": (
-        lambda c: c.workspace.get_rough_num_of_unrelated_objects(c.ctx.rng)
+        lambda c: c.workspace.get_rough_num_of_unrelated_objects(c.ctx.rng, c.ctx.meta)
     ),
     "num_ungrouped_objects_based": (
-        lambda c: c.workspace.get_rough_num_of_ungrouped_objects(c.ctx.rng)
+        lambda c: c.workspace.get_rough_num_of_ungrouped_objects(c.ctx.rng, c.ctx.meta)
     ),
     "num_unmapped_objects_based": (
-        lambda c: c.workspace.get_rough_num_of_unmapped_objects(c.ctx.rng)
+        lambda c: c.workspace.get_rough_num_of_unmapped_objects(c.ctx.rng, c.ctx.meta)
     ),
 }
 

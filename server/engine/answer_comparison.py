@@ -599,18 +599,18 @@ def compare_rule_signatures(
     return differences
 
 
-def _collapsed_group_token(group_name: str) -> str:
+def _collapsed_group_token(meta: Any) -> str:
     """The token ``rule_signature`` writes for the group-or-string descriptor.
 
-    ``_descriptor_key`` collapses the group node and the ``'string`` symbol into one
+    ``rule_signature`` collapses the group node and the ``'string`` symbol into one
     token, honouring the equivalence ``traverse-rule-clauses`` spells out at
-    ``justify.ss:243-244``.  The token is asked of ``rules.py`` for the group node's name
-    rather than written here.  For a *conceptual depth* it still has to name a real node,
-    so a lookup resolves it back to the group.
+    ``justify.ss:243-244``.  The token is asked of ``rules.py`` rather than written here.
+    For a *conceptual depth* it still has to name a real node, so a lookup resolves it
+    back to the group.
     """
-    from server.engine.rules import _descriptor_key
+    from server.engine.rules import group_or_string_token
 
-    return _descriptor_key(group_name)
+    return group_or_string_token(meta)
 
 
 def conceptual_depth_lookup(meta: Any):
@@ -624,7 +624,7 @@ def conceptual_depth_lookup(meta: Any):
     require_meta(meta, "conceptual_depth_lookup")
     specs = getattr(meta, "slipnet_node_specs", None) or {}
     group_name = _bound_node_name(meta, "object.group")
-    group_token = _collapsed_group_token(group_name)
+    group_token = _collapsed_group_token(meta)
 
     def lookup(name: str) -> float | None:
         spec = specs.get(group_name if name == group_token else name)

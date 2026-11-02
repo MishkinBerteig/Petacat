@@ -1105,12 +1105,15 @@ def conditions_for_bridge(
         # more-committed group costs more, so it is tried second.
         num1 = object1.get_num_of_spanning_bridges()
         num2 = object2.get_num_of_spanning_bridges()
+        from server.engine.workspace_structures import bound_meta
+
+        meta = bound_meta()
         if num1 > num2:
-            object1_bias = 0.20
+            object1_bias = meta.get_param("flip_first_probability_more_spanning")
         elif num1 < num2:
-            object1_bias = 0.80
+            object1_bias = meta.get_param("flip_first_probability_fewer_spanning")
         else:
-            object1_bias = 0.50
+            object1_bias = meta.get_param("flip_first_probability_equal_spanning")
 
         first, second = (
             (object1, object2) if rng.prob(object1_bias) else (object2, object1)

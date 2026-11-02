@@ -99,5 +99,10 @@
   "bridge_recruit_urgency_level": "very_high",
   "snag_clamp_temperature": 100.0,
   "jootsing_count_scale": 10,
-  "reference_update_cycle_length": 15
+  "reference_update_cycle_length": 15,
+  "flip_first_probability_more_spanning": 0.2,
+  "flip_first_probability_fewer_spanning": 0.8,
+  "flip_first_probability_equal_spanning": 0.5,
+  "rough_count_few_threshold": 2,
+  "rough_count_some_threshold": 4
 }

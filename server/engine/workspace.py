@@ -1609,22 +1609,22 @@ class Workspace:
     # Rough object counts — the scout-count aggregates
     # ------------------------------------------------------------------
 
-    def get_rough_num_of_unrelated_objects(self, rng: RNG) -> str:
+    def get_rough_num_of_unrelated_objects(self, rng: RNG, meta: Any) -> str:
         """Scheme: ``workspace.ss:683-684``."""
         return rough_num_of_objects(
-            sum(1 for o in self.all_objects if unrelated(o)), rng
+            sum(1 for o in self.all_objects if unrelated(o)), rng, meta
         )
 
-    def get_rough_num_of_ungrouped_objects(self, rng: RNG) -> str:
+    def get_rough_num_of_ungrouped_objects(self, rng: RNG, meta: Any) -> str:
         """Scheme: ``workspace.ss:685-686``."""
         return rough_num_of_objects(
-            sum(1 for o in self.all_objects if ungrouped(o)), rng
+            sum(1 for o in self.all_objects if ungrouped(o)), rng, meta
         )
 
-    def get_rough_num_of_unmapped_objects(self, rng: RNG) -> str:
+    def get_rough_num_of_unmapped_objects(self, rng: RNG, meta: Any) -> str:
         """Scheme: ``workspace.ss:687-688``."""
         return rough_num_of_objects(
-            sum(1 for o in self.all_objects if unmapped(o, self.justify_mode)), rng
+            sum(1 for o in self.all_objects if unmapped(o, self.justify_mode)), rng, meta
         )
 
     # ------------------------------------------------------------------
@@ -1802,7 +1802,7 @@ class Workspace:
 # ======================================================================
 
 
-def rough_num_of_objects(num_of_objects: int, rng: RNG) -> str:
+def rough_num_of_objects(num_of_objects: int, rng: RNG, meta: Any) -> str:
     """``few`` / ``some`` / ``many`` from an *absolute* count.
 
     Scheme: ``rough-num-of-objects`` (``workspace.ss:678-683``)::
@@ -1821,9 +1821,10 @@ def rough_num_of_objects(num_of_objects: int, rng: RNG) -> str:
     Note the reference draws ``(~ 2)`` first and only draws ``(~ 4)`` if the
     first test fails, so a large count costs two draws and a small one costs one.
     """
-    if num_of_objects < rng.perturb(2):
+    meta = require_meta(meta, "rough_num_of_objects")
+    if num_of_objects < rng.perturb(meta.get_param("rough_count_few_threshold")):
         return "few"
-    if num_of_objects < rng.perturb(4):
+    if num_of_objects < rng.perturb(meta.get_param("rough_count_some_threshold")):
         return "some"
     return "many"
 

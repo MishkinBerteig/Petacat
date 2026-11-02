@@ -960,7 +960,7 @@ def _reference_objects(
     """
     from server.engine.rules import get_all_reference_objects
 
-    if string is None or slipnet is None:
+    if string is None:
         return []
     try:
         return get_all_reference_objects(rule, string, slipnet)
@@ -989,7 +989,7 @@ def _build_translated_string(
     """
     from server.engine.answers import make_translated_string
 
-    if slipnet is None or source_string is None:
+    if source_string is None:
         return None
     try:
         return make_translated_string(
@@ -1055,8 +1055,6 @@ def _translated_rule_works(
     original_rule_type: str,
 ) -> bool:
     """Check if the translated rule actually works on the other string pair."""
-    if slipnet is None:
-        return False
     try:
         return translated_rule.currently_works(workspace, slipnet)
     except _ENGINE_FAILURES as error:
@@ -1118,7 +1116,7 @@ def _attempt_clamp_rules(
     vlog: Any = None,
 ) -> JustificationResult:
     """Attempt to clamp rules and return a JustificationResult."""
-    if trace is None or themespace is None or slipnet is None:
+    if trace is None or themespace is None:
         return JustificationResult(
             justified=False,
             explanation="Missing components for clamping",
@@ -1273,8 +1271,6 @@ def _get_conceptual_depth(node_name: Any, slipnet: Slipnet | None) -> float:
 def _plays(dim: Any, role: str, slipnet: Slipnet | None) -> bool:
     """True if *dim*, a dimension node or the name of one (theme patterns hold names),
     is the node that plays the dimension *role*.  A role nothing holds is played by none."""
-    if slipnet is None:
-        return False
     node = slipnet.roles.get(role)
     if not node:
         return False

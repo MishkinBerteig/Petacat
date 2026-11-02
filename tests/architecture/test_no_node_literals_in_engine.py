@@ -124,10 +124,22 @@ class _NameVisitor(ast.NodeVisitor):
         self.generic_visit(node)
 
 
+# The one door (plan 3.5): this method reads the Metacat Standard Configuration files for the
+# first load into an empty database, for tests and for CLI helpers.  No run reads them.  Its body
+# is the only seed read the lint permits; the same name in any other file or function is not.
+DOOR_FILE = "server/engine/metadata.py"
+DOOR_FUNCTION = "from_standard_configuration"
+
+
 class _SeedVisitor(ast.NodeVisitor):
     def __init__(self, rel: str):
         self.rel = rel
         self.hits: list[Hit] = []
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+        if self.rel == DOOR_FILE and node.name == DOOR_FUNCTION:
+            return
+        self.generic_visit(node)
 
     def _hit(self, category: str, text: str) -> None:
         self.hits.append(("seed-reads", self.rel, category, text))
@@ -272,6 +284,34 @@ def f(x, name):
         ("slice-6", "name[6:]"),
         ("codelet-type", "bond-evaluator"),
     ])
+
+
+def test_the_seed_lint_permits_only_the_one_door() -> None:
+    """A seed read is a hit anywhere but the door; the door itself is not."""
+    source = """
+class P:
+    @classmethod
+    def from_standard_configuration(cls, d):
+        with open(d) as f:
+            return json.load(f)
+
+    def elsewhere(self, d):
+        with open(d) as f:
+            return json.load(f)
+"""
+    def hits(rel: str) -> list[tuple[str, str]]:
+        v = _SeedVisitor(rel)
+        v.visit(ast.parse(source))
+        return sorted((c, t) for (_, _, c, t) in v.hits)
+
+    assert hits(DOOR_FILE) == [("file-read-call", "json.load"), ("file-read-call", "open")]
+    # The same method name in another file is not the door.
+    assert len(hits("server/engine/other.py")) == 4
+    # And a planted read in a copy of the real door file, outside the door, is caught.
+    real = (REPO_ROOT / DOOR_FILE).read_text() + "\n\ndef planted(d):\n    return open(d).read()\n"
+    v = _SeedVisitor(DOOR_FILE)
+    v.visit(ast.parse(real))
+    assert [(c, t) for (_, _, c, t) in v.hits] == [("file-read-call", "open")]
 
 
 if __name__ == "__main__":

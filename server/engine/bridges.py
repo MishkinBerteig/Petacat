@@ -970,10 +970,7 @@ def _description_possible(dimension_name: str, obj: Any) -> bool:
 
 def _slipnet_node(obj: Any, name: str) -> Any:
     """The Slipnet node called *name*, reached from a Workspace object."""
-    slipnet = _slipnet_of(obj)
-    if slipnet is None:
-        return None
-    return slipnet.nodes.get(name)
+    return _slipnet_of(obj).nodes.get(name)
 
 
 def _dimension_plays(obj: Any, dimension_name: str, role: str) -> bool:
@@ -1393,8 +1390,6 @@ def platonic_length(obj: Any) -> Any:
     objects*.  ``None`` where the Slipnet has no number node for the count.
     """
     slipnet = _slipnet_of(obj)
-    if slipnet is None:
-        return None
     if not _is_group(obj):
         return slipnet.alphabet.unit_length_node
     from server.engine.images import number_to_platonic_number

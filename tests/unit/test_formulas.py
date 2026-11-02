@@ -165,7 +165,7 @@ def test_weighted_average_empty_is_zero():
 
 def test_sigmoid_midpoint():
     """At midpoint, sigmoid should be ~0.5."""
-    result = sigmoid(40.0, 3.0, 40.0)
+    result = sigmoid(40.0, 3.0, 40.0, 25.0)
     assert abs(result - 0.5) < 0.01
 
 
@@ -173,7 +173,7 @@ def test_sigmoid_monotonic():
     """Sigmoid should be monotonically increasing."""
     prev = 0.0
     for x in range(0, 101, 5):
-        val = sigmoid(float(x), 3.0, 50.0)
+        val = sigmoid(float(x), 3.0, 50.0, 25.0)
         assert val >= prev
         prev = val
 

@@ -381,6 +381,13 @@ _READ_BY_THE_ENGINE_BUT_NOT_OFFERED = {
     "snag_clamp_temperature",
     "jootsing_count_scale",
     "reference_update_cycle_length",
+    # The flip-first biases of the thematic bridge conditions, and the few/some/many
+    # thresholds of the scout counts.
+    "flip_first_probability_more_spanning",
+    "flip_first_probability_fewer_spanning",
+    "flip_first_probability_equal_spanning",
+    "rough_count_few_threshold",
+    "rough_count_some_threshold",
     # A faithful-mode switch for the lockstep harness (``tests/lockstep/``), set by
     # ``tests/lockstep/faithful.py`` and not offered as a Run control: the default
     # (``false``) is Petacat's own update-cycle countdown, ``true`` is Metacat's fixed

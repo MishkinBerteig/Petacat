@@ -275,7 +275,7 @@ def test_justify_mode_rule_factor_needs_both_pairs(slipnet):
     assert w.rule_established() is True
 
 
-def test_rough_counts_cover_groups_as_well_as_letters(slipnet):
+def test_rough_counts_cover_groups_as_well_as_letters(slipnet, meta):
     """``get-rough-num-of-*`` counts over ``get-objects`` — every object of every
     string, letters and groups alike.  The per-string counters it replaced
     filtered to ``isinstance(o, Letter)``."""
@@ -300,7 +300,7 @@ def test_rough_counts_cover_groups_as_well_as_letters(slipnet):
     assert ungrouped_count == 8
 
     rng = RNG(3)
-    assert w.get_rough_num_of_ungrouped_objects(rng) == "many"
+    assert w.get_rough_num_of_ungrouped_objects(rng, meta) == "many"
 
 
 def _is_ungrouped(obj):

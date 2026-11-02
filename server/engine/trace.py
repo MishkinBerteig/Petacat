@@ -312,8 +312,9 @@ class ClampEvent(TraceEvent):
         # The derivation pins the relation's node too, which only the Slipnet can name:
         # pass ``slipnet`` and the pin is there from the start; without it the pin is added
         # when the event is activated (``activate`` derives again with its Slipnet).
+        opposite = slipnet.relation("opposite") if slipnet is not None else None
         self.clamped_concept_patterns = list(clamped_concept_patterns or []) + [
-            get_associated_concept_pattern(p, slipnet) for p in self.clamped_theme_patterns
+            _associated_concept_pattern(p, opposite) for p in self.clamped_theme_patterns
         ]
         self.clamped_codelet_patterns = clamped_codelet_patterns or []
         self.rules = rules or []
@@ -891,7 +892,7 @@ def theme_pattern_entries(pattern: Any) -> list[tuple[str, str | None, float]]:
     return []
 
 
-def get_associated_concept_pattern(theme_pattern: Any, slipnet: Any = None) -> dict[str, Any]:
+def get_associated_concept_pattern(theme_pattern: Any, slipnet: Any) -> dict[str, Any]:
     """The concept pattern a theme pattern drags into the Slipnet with it.
 
     Scheme: ``get-associated-concept-pattern`` (``trace.ss:1503-1516``).  For every
@@ -903,11 +904,15 @@ def get_associated_concept_pattern(theme_pattern: Any, slipnet: Any = None) -> d
     Without this, clamping a theme pattern left the Slipnet untouched, and a whole
     channel of the clamp's influence (§4.2) simply did not exist.
 
-    The opposite relation's node comes from *slipnet*; with no *slipnet*, or no opposite
-    relation in the configuration, there is no such node to pin and only the dimension
-    nodes are.
+    The opposite relation's node comes from *slipnet*; with no opposite relation in the
+    configuration there is no such node to pin and only the dimension nodes are.
     """
-    opposite = slipnet.relation("opposite") if slipnet is not None else None
+    return _associated_concept_pattern(theme_pattern, slipnet.relation("opposite"))
+
+
+def _associated_concept_pattern(theme_pattern: Any, opposite: Any) -> dict[str, Any]:
+    """:func:`get_associated_concept_pattern` given the opposite relation's node, or
+    ``None`` where there is none (a clamp event built before its Slipnet is known)."""
     pairs: list[tuple[str, float]] = []
     for dimension, relation, activation in theme_pattern_entries(theme_pattern):
         pairs.append((dimension, 100.0))

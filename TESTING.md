@@ -121,18 +121,18 @@ outside the matrix take it too and the run is entirely what it says it is.
 
 ```
 ============================= petacat test matrix ==============================
-  cpu  numpy    float64    789 tests
-  gpu  mlx      float32    789 tests
+  cpu  numpy    float64    873 tests
+  gpu  mlx      float32    873 tests
   whole suite requested: the full matrix is required of this run
 
-  unit          1297 collected   1297 run   1297 passed      0 failed      0 skipped  complete
-  seed_unit      937 collected    937 run    937 passed      0 failed      0 skipped  complete
+  unit          1311 collected   1311 run   1311 passed      0 failed      0 skipped  complete
+  seed_unit     1021 collected   1021 run   1021 passed      0 failed      0 skipped  complete
   module        1041 collected   1041 run   1041 passed      0 failed      0 skipped  complete
-  architecture    49 collected     49 run     49 passed      0 failed      0 skipped  complete
+  architecture    50 collected     50 run     50 passed      0 failed      0 skipped  complete
   integration    203 collected    203 run    203 passed      0 failed      0 skipped  complete
   parallel       244 collected    244 run    244 passed      0 failed      0 skipped  complete
   lockstep       228 collected    228 run    228 passed      0 failed      0 skipped  complete
-  e2e            346 collected    346 run    346 passed      0 failed      0 skipped  complete
+  e2e            349 collected    349 run    349 passed      0 failed      0 skipped  complete
 
   run complete in 13.9 min against a 60 min ceiling
 ```
@@ -204,14 +204,14 @@ that allowance.
 
 | Layer | Directory | Scope | May depend on | Cases |
 |-------|-----------|-------|---------------|-------|
-| **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 1297 |
-| **seed unit** | `tests/seed_unit/` | One class or function, measured against the values Petacat ships with | Real `seed_data/*.json`, and the machine the process is running on | 937 |
+| **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 1311 |
+| **seed unit** | `tests/seed_unit/` | One class or function, measured against the values Petacat ships with | Real `seed_data/*.json`, and the machine the process is running on | 1021 |
 | **module** | `tests/module/` | Several real components assembled and driven | Real engine objects and `seed_data/*.json`; no DB, no HTTP | 1041 |
-| **architecture** | `tests/architecture/` | How the source tree is allowed to depend on itself | The repository's source, `seed_data/*.json`, child interpreters | 49 |
+| **architecture** | `tests/architecture/` | How the source tree is allowed to depend on itself | The repository's source, `seed_data/*.json`, child interpreters | 50 |
 | **integration** | `tests/integration/` | Agreement between the repository's artifacts, and the harness's own rules | Real `seed_data/*.json`, the ORM declarations, the generated client files, the documentation, a real pytest session | 203 |
 | **parallel** | `tests/parallel/` | The detachable multi-core plugin (`server/parallel/`): each executor against the serial run it claims to equal | Real engine objects and `seed_data/*.json`, worker processes and threads; each test pins the backend it compares on | 244 |
 | **lockstep** | `tests/lockstep/` | Petacat's decision traces against Metacat's: naming, helper conformance, tracing/replay RNGs, determinism guards, the comparer | Real engine in faithful mode (numeric backend off, or a named backend); recorded Metacat traces | 228 |
-| **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 346 |
+| **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 349 |
 
 Those counts are cases, so they include the second pass the numeric matrix makes
 over the 519 backend-sensitive tests.
@@ -246,7 +246,7 @@ first**, then move up toward the API and GUI.
 
 All eight layers run in one command — the
 [required command](#the-required-command) — and, since Petacat runs natively, all
-eight actually run: **4,345 cases**, every one of them executed. A layer that is
+eight actually run: **4,447 cases**, every one of them executed. A layer that is
 normally skipped is not a layer that is normally green, and none of these is.
 
 Wall-clock time depends heavily on the machine and on what else it is doing. The
@@ -364,7 +364,9 @@ changing what it records.
   configuration hash), so behaviour-preserving changes to the Metacat Standard
   Configuration do not touch it.
 - *EN0, the no-node-literals lint.* `tests/architecture/test_no_node_literals_in_engine.py`
-  with `no_node_literals_allowlist.txt`: the allow-list may only shrink.
+  with `no_node_literals_allowlist.txt`: the allow-list may only shrink, and since EN11 it is
+  empty. The one seed-file read the lint permits is the door,
+  `MetadataProvider.from_standard_configuration` in `server/engine/metadata.py`.
 - *EN0, role identity and reduced configurations.* `tests/seed_unit/test_role_identity.py`
   held a skeleton whose comparison with `slipnet.roles` EN3 turned on (it runs now);
   `test_reduced_configurations.py` checks the generated reduced configurations that later
@@ -411,6 +413,7 @@ changing what it records.
 | `test_en8_rules_language.py` | 14 | EN8: rules, justify and rule English read roles and relations; `rule.dimension_order` and its sort; the abstract-change draws and `rng.get_state()` with a role absent; the justify handlers narrowed (B10); each converted role or relation absent on demo and justify problems |
 | `test_en6_perception.py` | 12 | EN6: bonds, groups, bridges, concept mappings and images read roles, relations and the alphabet; the bridge recruitment post sequence is unchanged; identity absent never raises; every dimension, position, direction, object and recruit role unbound or its node removed, and each relation node removed, on the demo and justify problems; and whole runs (discovery, justify, Episodic Memory carried) on a configuration whose role-bound, relation, letter and number nodes are all renamed give the same answers, codelet counts, RNG draws and English |
 | `test_en10b_scalars.py` | 8 | EN10: the rules, justify and perception scalars read from the configuration with today's values and types (the two rule abstraction probabilities, the justify identity retention, the bridge-recruit urgency level, description local support, concept-mapping and bridge coefficients); a configuration lacking one stops the run at its start naming it |
+| `test_en11a_engine_closeout.py` | 5 | EN11: the rule-signature token comes from the `object.group` role (exactly the old token under the Metacat Standard Configuration, following a rename, defined when the role is absent); the remaining scalars (`sigmoid_divisor`, the theme flip probabilities, the reminding threshold, the rough-count thresholds) are read from the configuration and a configuration lacking one stops at the run's start |
 | `test_order_fidelity.py` | 10 | The list orders `cons` and vectors fix: Chez Scheme's `sort` (80 cases from the Metacat image), a string's groups, the rule's subobject bridges, the coderack bin and deferred batch, the jootser's event set, and the display-time prints (DISCREPANCIES5 C-1, G-Z4, G-Z5, I-3…I-5) |
 | `test_rng.py` | 17 | The deterministic RNG wrapper |
 | `test_rule_bond_facet_change.py` | 1 | A GroupCtgy self change's BondFacet change is found wherever it sits (KNOWN-FAILURES, G-Q1) |
@@ -520,7 +523,7 @@ changing what it records.
 |------|----:|--------|
 | `test_engine_purity.py` | 18 | Nothing under `server/engine/**` imports `sqlalchemy`, `server.models`, `server.db` or `server.services`, and the serializers run in an interpreter where those cannot be imported |
 | `test_declared_read_list.py` | 7 | EN10: every literal name passed to `get_param`, `get_formula_coeff` or `get_urgency` in `server/` is on the declared read list, and every declared name exists in the Metacat Standard Configuration |
-| `test_no_node_literals_in_engine.py` | 4 | The EN0 lint: no line of `server/engine/**` names a node or codelet type of the Metacat Standard Configuration (`plato-` literals and compositions, `name[6:]`, node names, codelet types), and none reads the seed files at run time. Known violations are in `no_node_literals_allowlist.txt`, which may only shrink: an entry that no longer matches fails, and a new violation cannot be added to it |
+| `test_no_node_literals_in_engine.py` | 5 | The EN0 lint: no line of `server/engine/**` names a node or codelet type of the Metacat Standard Configuration (`plato-` literals and compositions, `name[6:]`, node names, codelet types), and none reads the seed files outside the one door (`MetadataProvider.from_standard_configuration`); a read anywhere else, even in `metadata.py`, is caught. The allow-list `no_node_literals_allowlist.txt` is empty and may only shrink: an entry that no longer matches fails, and a new violation cannot be added to it |
 | `test_parallel_detachable.py` | 4 | Nothing under `server/engine/**` imports the parallel plugin, and a serial run and the service layer work in an interpreter where `server.parallel` cannot be imported; a Training run there chooses the serial executor and produces the plugin's runs, run for run |
 
 **`tests/integration/` — the repository's artifacts agree**
@@ -568,6 +571,7 @@ changing what it records.
 | File | Fns | Covers |
 |------|----:|--------|
 | `test_admin_reload.py` | 5 | An Admin write is in force for the next run, the Swarm and the parameter listings with no restart; a run under way keeps its configuration; a rebuild that fails keeps the previous one |
+| `test_configuration_stamp_link.py` | 2 | The configuration stamp (plan 3.8): every answer description, snag description and state capture a Normal or Audit run stores carries its run's id, and so the run's `config_hash`; the Training Mode tables carry theirs by construction |
 | `test_api_controls.py` | 29 | Breakpoints, clamping, Clamp theme pattern, Undo last clamp, the mid-run self-watching toggle, and the threshold endpoints |
 | `test_api_displays.py` | 5 | The coderack, EEG and Themespace-name data the Metacat windows need |
 | `test_api_docs.py` | 11 | The documentation endpoints |

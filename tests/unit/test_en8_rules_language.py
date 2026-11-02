@@ -88,14 +88,16 @@ def test_the_dimension_order_without_a_member_keeps_the_others_in_order() -> Non
 def test_the_rule_signature_token_is_unchanged(slipnet) -> None:
     group = slipnet.nodes["plato-group"]
     token = "plato-group|string"
-    assert rules._descriptor_key(group) == token
-    assert rules._descriptor_key("string") == token
-    assert rules._descriptor_key(slipnet.nodes["plato-letter"]) == "plato-letter"
-    assert rules._descriptor_key(None) is None
-    # the caller in answer_comparison asks by the group node's name
+    assert rules._descriptor_key(group, token) == token
+    assert rules._descriptor_key("string", token) == token
+    assert rules._descriptor_key(slipnet.nodes["plato-letter"], token) == "plato-letter"
+    assert rules._descriptor_key(None, token) is None
+    assert rules.group_or_string_token() == token
+    # the caller in answer_comparison asks with the provider
     from server.engine.answer_comparison import _collapsed_group_token
+    from server.engine.workspace_structures import bound_meta
 
-    assert _collapsed_group_token("plato-group") == token
+    assert _collapsed_group_token(bound_meta()) == token
 
 
 def test_a_node_that_plays_no_role_is_matched_by_none(slipnet) -> None:
@@ -202,7 +204,7 @@ def test_resolving_roles_draws_nothing(meta, slipnet) -> None:
     state = rng.get_state()
     rules._dimension_order(slipnet)
     rules._dim_sort_key(slipnet.nodes["plato-length"], slipnet.roles.rule_dimension_order)
-    rules._descriptor_key(slipnet.nodes["plato-group"])
+    rules._descriptor_key(slipnet.nodes["plato-group"], "t")
     assert rng.get_state() == state
 
 
