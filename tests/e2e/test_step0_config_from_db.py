@@ -143,7 +143,7 @@ async def db_session(step0_engine, step0_lock):
     """
     from server.models.metadata import Base
     import server.models.run  # noqa: F401 — registers the runtime tables
-    from server.services.seeding import seed_metadata_from_json
+    from server.services.standard_configuration import seed_metadata_from_json
 
     async with step0_engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)

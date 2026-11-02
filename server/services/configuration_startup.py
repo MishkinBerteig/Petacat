@@ -103,7 +103,7 @@ async def classify_database(session: AsyncSession) -> str:
     """``EMPTY`` or ``COMPLETE``; raises :class:`ConfigurationStartupError` otherwise."""
     from server.models import metadata as models
     from server.models.configuration_state import ConfigurationState, LOAD_STATE_READY
-    from server.services.seeding import _derived_names
+    from server.services.standard_configuration import _derived_names
 
     populated: list[str] = []
     for cls in _configuration_classes(models, _derived_names()):
@@ -161,7 +161,7 @@ async def first_load(session: AsyncSession, seed_dir: str) -> None:
         LOAD_STATE_READY,
         ORIGIN_METACAT_STANDARD,
     )
-    from server.services.seeding import seed_metadata_from_json, standard_configuration_hash
+    from server.services.standard_configuration import seed_metadata_from_json, standard_configuration_hash
 
     # C6: route this load through the journal layer, as the global journal's first entry
     # (source = standard_load), instead of writing the rows directly.
@@ -191,7 +191,7 @@ async def prepare_database(database_url: str, seed_dir: str) -> Any:
     import server.models.run  # noqa: F401 — registers the runtime tables
     import server.models.training  # noqa: F401 — and configuration_state
     from server.services.metadata_service import load_metadata_from_db
-    from server.services.seeding import sync_help_topics
+    from server.services.standard_configuration import sync_help_topics
 
     engine = create_async_engine(database_url, poolclass=NullPool)
     try:

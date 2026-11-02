@@ -157,7 +157,7 @@ async def load_fresh_database(engine: Any, seed_dir: str = SEED_DIR) -> None:
     import server.models.run  # noqa: F401 -- registers the runtime tables
     import server.models.training  # noqa: F401
     from server.models.metadata import Base
-    from server.services.seeding import seed_metadata_from_json
+    from server.services.standard_configuration import seed_metadata_from_json
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
     async with engine.begin() as conn:
@@ -204,7 +204,7 @@ async def _read_tables(engine: Any) -> dict[str, list[dict[str, Any]]]:
     import inspect
 
     from server.models import metadata as models
-    from server.services.seeding import _derived_names
+    from server.services.standard_configuration import _derived_names
     from sqlalchemy import select
     from sqlalchemy.ext.asyncio import AsyncSession
 

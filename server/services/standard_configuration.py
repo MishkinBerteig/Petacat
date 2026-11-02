@@ -1,4 +1,4 @@
-"""Seeding the metadata tables from `seed_data/`.
+"""Loading the Metacat Standard Configuration (`seed_data/`) into the database.
 
 This is the one place the checked-in JSON becomes database rows.  It was extracted
 from `server/main.py`'s startup path because a *second* copy of it had grown in

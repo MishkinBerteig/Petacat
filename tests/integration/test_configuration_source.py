@@ -104,7 +104,7 @@ async def _edit_param(engine, name: str, value: str) -> None:
 
 async def _row_counts(engine) -> dict[str, int]:
     from server.models import metadata as models
-    from server.services.seeding import _derived_names
+    from server.services.standard_configuration import _derived_names
     from server.services.configuration_startup import _configuration_classes
 
     async with AsyncSession(engine) as session:
@@ -283,7 +283,7 @@ async def test_a_state_row_over_empty_tables_refuses(scratch):
     from server.models.metadata import Base
     from server.services.configuration_startup import ConfigurationStartupError, _configuration_classes
     from server.models import metadata as models
-    from server.services.seeding import _derived_names
+    from server.services.standard_configuration import _derived_names
 
     url, engine = scratch
     await _start(url)

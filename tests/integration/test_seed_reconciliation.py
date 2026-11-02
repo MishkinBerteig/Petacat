@@ -13,7 +13,7 @@ pytest.importorskip("sqlalchemy", reason="sqlalchemy not available locally")
 def test_configuration_tables_exclude_runtime_tables_and_help_topics():
     """``server.models.run`` shares the declarative ``Base`` with the metadata models, so
     the set of configuration tables must come from the metadata module alone."""
-    from server.services.seeding import configuration_table_names
+    from server.services.standard_configuration import configuration_table_names
 
     names = configuration_table_names()
     runtime = {
@@ -103,7 +103,7 @@ async def test_the_seeder_writes_every_configuration_table():
     """
     import os
 
-    from server.services.seeding import (
+    from server.services.standard_configuration import (
         configuration_table_names,
         seed_metadata_from_json,
     )
@@ -160,14 +160,14 @@ def test_the_test_suite_does_not_keep_a_seeder_of_its_own():
 
     assert not constructed, (
         "tests/e2e/conftest.py constructs metadata rows itself: "
-        f"{sorted(constructed)}. Seed through server.services.seeding instead, so the "
+        f"{sorted(constructed)}. Seed through server.services.standard_configuration instead, so the "
         "suite and the application are seeded by the same code."
     )
 
 
 def test_nothing_fingerprints_the_seed_files_or_reseeds():
     """The database is the source of truth: no fingerprint, no re-seed, no delete path."""
-    from server.services import seeding
+    from server.services import standard_configuration as seeding
 
     assert not hasattr(seeding, "SEED_FINGERPRINT_PARAM")
     assert not hasattr(seeding, "seed_data_fingerprint")

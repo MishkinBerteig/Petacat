@@ -133,7 +133,7 @@ def test_the_link_key_is_unique_in_the_standard_configuration(meta):
 
 
 def test_the_files_the_loader_reads_are_all_in_the_bulk_list():
-    from server.services.seeding import BULK_SEED_FILES
+    from server.services.standard_configuration import BULK_SEED_FILES
 
     assert {"roles.json", "theme_relations.json"} <= set(BULK_SEED_FILES)
     for name in BULK_SEED_FILES:

@@ -220,7 +220,7 @@ def _enum_rows(enums, table):
 
 def _expected_tables() -> dict[str, list[dict]]:
     """Each table's rows as the seed files say they should read back, by primary key."""
-    from server.services.seeding import ENUM_MODELS
+    from server.services.standard_configuration import ENUM_MODELS
     from server.models import metadata as models
 
     out: dict[str, list[dict]] = {}

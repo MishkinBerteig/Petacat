@@ -163,7 +163,7 @@ async def _seed_metadata(session: AsyncSession):
     """
     seed_dir = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
 
-    from server.services.seeding import seed_metadata_from_json, sync_help_topics
+    from server.services.standard_configuration import seed_metadata_from_json, sync_help_topics
 
     await seed_metadata_from_json(session, seed_dir)
     await session.flush()
