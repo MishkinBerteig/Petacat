@@ -4,9 +4,9 @@ opaque names (plan 4.2, "Rename invariance").
 ``renamed(docs)`` gives every node that plays a role, is a relation, is a letter (has a
 ``glyph``) or is a number (has a ``numeric_value``) a name like ``n17`` and rewrites every
 document that names it: node rows, links, role bindings, relation rows, layouts, parameter
-maps, posting rules, and the names spelled inside code strings (codelet bodies and
-descriptor predicates; a rename does not rewrite code in the change API, the test does
-so that only the engine's own reading of names is tested).  The display columns
+maps and posting rules.  Code strings (codelet bodies and descriptor predicates) are left
+exactly as shipped: a rename does not rewrite code in the change API, and the bodies and
+predicates name no node.  The display columns
 (``plain_name``, ``full_name``, ``cm_short_name``, ``short_name``) keep the old text.
 """
 
@@ -35,16 +35,10 @@ def _renamed_names(docs: Documents) -> dict[str, str]:
     return {name: f"n{order.index(name)}" for name in order if name in chosen}
 
 
-#: Code that builds a node name from data cannot be rewritten by a rename.  The one such
-#: line in the Metacat Standard Configuration is in the ``rule-scout`` body (the verbatim
-#: rule's letters, ``get_node('plato-' + ch)``); a renamed copy reads the same letters
-#: through the alphabet.  The body itself is the configuration's, not the engine's.
-CODE_PATCHES = {
-    "rule-scout": (
-        "get_node('plato-' + ch)",
-        "slipnet.alphabet.glyph_nodes.get(ch)",
-    ),
-}
+#: Keys whose text is code (codelet bodies, descriptor predicates).  A rename does not rewrite
+#: code: the bodies and predicates refer to concepts through roles, relations and glyphs, so
+#: they run unchanged on a renamed configuration.
+CODE_KEYS = {"execute_body", "descriptor_predicate"}
 
 
 def renamed(docs: Documents) -> tuple[Documents, dict[str, str]]:
@@ -69,15 +63,9 @@ def renamed(docs: Documents) -> tuple[Documents, dict[str, str]]:
             }
         if isinstance(value, list):
             return [walk(v, key) for v in value]
-        if isinstance(value, str) and key not in PROSE_KEYS:
+        if isinstance(value, str) and key not in PROSE_KEYS and key not in CODE_KEYS:
             return sub(value)
         return value
-
-    for row in docs["codelet_types.json"]:
-        patch = CODE_PATCHES.get(row["name"])
-        if patch:
-            assert patch[0] in row["execute_body"]
-            row["execute_body"] = row["execute_body"].replace(*patch)
 
     out: Documents = {}
     for fname, doc in docs.items():

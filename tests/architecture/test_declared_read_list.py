@@ -43,11 +43,9 @@ _COMPUTED_READS: dict[tuple[str, str, str], str] = {
     ("services/run_service.py", "get_urgency", "level"): "a level a codelet pattern names (checked per entry)",
 }
 
-#: Reads made by the seed codelet bodies (``seed_data/codelet_types.json``), which stage 3 does
-#: not change.  They are declared like the engine's own.  ``rule-scout`` still passes a code
-#: default for ``verbatim_rule_probability``; it goes when the bodies are converted.
+#: Reads made by the seed codelet bodies (``seed_data/codelet_types.json``).  They are declared like the
+#: engine's own, and no body passes a code default.
 _BODY_READ = re.compile(r"meta\.(get_param|get_formula_coeff|get_urgency)\('([a-z_0-9]+)'(,)?")
-_BODY_DEFAULTS = {("rule-scout", "verbatim_rule_probability")}
 
 #: Helper wrappers that take the name as their second argument: ``_param(meta, "name")``.
 _WRAPPERS = {("engine/rule_english.py", "_param")}
@@ -84,7 +82,7 @@ def _reads() -> tuple[dict[tuple[str, str], set[str]], list[tuple[str, str, str]
     for body in json.loads((SEED / "codelet_types.json").read_text()):
         for accessor, name, comma in _BODY_READ.findall(body.get("execute_body", "")):
             literal.setdefault((accessor, name), set()).add(f"codelet body {body['name']}")
-            if comma and (body["name"], name) not in _BODY_DEFAULTS:
+            if comma:
                 defaults.append(f"codelet body {body['name']}: {name}")
     return literal, computed, defaults
 

@@ -90,13 +90,16 @@ def _ctx(length_activation=50.0):
 
 def test_descriptor_support_is_rounded_like_100_star():
     # workspace-structure-formulas.ss:44-54: 2 of 3 groups is 67, not 66.667.
+    left = SimpleNamespace(name="left")
+    other = SimpleNamespace(name="other")
+
     def group(has):
-        d = SimpleNamespace(descriptor=SimpleNamespace(name="plato-left" if has else "x"))
+        d = SimpleNamespace(descriptor=left if has else other)
         return SimpleNamespace(is_built=True, get_all_descriptions=lambda: [d])
 
     string = SimpleNamespace(groups=[group(True), group(True), group(False)])
-    assert builtins.descriptor_support(_ctx(), string, "plato-left") == 67
-    assert builtins.descriptor_support(_ctx(), SimpleNamespace(groups=[]), "plato-left") == 0
+    assert builtins.descriptor_support(_ctx(), string, left) == 67
+    assert builtins.descriptor_support(_ctx(), SimpleNamespace(groups=[]), left) == 0
 
 
 def test_single_letter_group_exponent_is_one_for_zero_supporting(monkeypatch):

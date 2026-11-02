@@ -264,7 +264,7 @@ def test_an_empty_rack_is_refilled_before_the_update_cycle_runs(runner):
     """
     runner.init_mcat("abc", "abd", "xyz", seed=42)
     ctx = runner.ctx
-    ucl = runner.meta.get_param("update_cycle_length", 15)
+    ucl = runner.meta.get_param("update_cycle_length")
 
     # Drive to one codelet short of a boundary, so the step below is the one whose
     # increment crosses it.
@@ -288,5 +288,5 @@ def test_an_empty_rack_is_refilled_before_the_update_cycle_runs(runner):
     assert not ctx.coderack.is_empty
     # ``clamp-initial-slipnodes`` ran alongside the repost.
     assert {n.name for n in ctx.slipnet.nodes.values() if n.frozen} == set(
-        runner.meta.get_param("initially_clamped_slipnodes", [])
+        runner.meta.get_param("initially_clamped_slipnodes")
     )

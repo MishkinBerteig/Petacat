@@ -931,7 +931,7 @@ class TestUiSurface:
         """ThemespaceView used to recompute dominance with its own rule
         (max |activation|, threshold 5) rather than the engine's margin of 90."""
         runner = _run(meta, "abc", "abd", "ijk", steps=400)
-        margin = meta.get_param("dominant_theme_margin", 90)
+        margin = meta.get_param("dominant_theme_margin")
         for cluster in runner.ctx.themespace.clusters:
             dominant = cluster.get_dominant_theme(margin)
             assert dominant is None or dominant in cluster.themes

@@ -75,11 +75,21 @@ def _holds_role(node: Any, role: str) -> bool:
     return bool(has_role(role)) if callable(has_role) else False
 
 
-def _letter_category_name(obj: Any) -> str:
+def _letter_category_node(obj: Any) -> Any:
     for d in getattr(obj, "descriptions", []):
         if _holds_role(d.description_type, "dimension.letter_category"):
-            return getattr(d.descriptor, "name", "")
-    return getattr(getattr(obj, "letter_category", None), "name", "")
+            return d.descriptor
+    return getattr(obj, "letter_category", None)
+
+
+def _letter_category_name(obj: Any) -> str:
+    return getattr(_letter_category_node(obj), "name", "")
+
+
+def _letter_glyph(obj: Any) -> str:
+    """The glyph of the object's letter-category node (``"a"``), or ``""`` when the object
+    has none or its node carries no glyph."""
+    return getattr(_letter_category_node(obj), "glyph", None) or ""
 
 
 def _middle_in_string(obj: Any) -> bool:
@@ -135,7 +145,7 @@ DESCRIPTOR_PREDICATE_NAMESPACE: dict[str, Any] = {
     "string_spanning_group": _string_spanning_group,
     "position_in_string": _position_in_string,
     "middle_in_string": _middle_in_string,
-    "letter_category_name": _letter_category_name,
+    "letter_glyph": _letter_glyph,
 }
 
 

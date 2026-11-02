@@ -185,17 +185,15 @@ class MetadataProvider:
     # Enum values loaded from DB lookup tables (table_name -> set of valid names)
     enum_values: dict[str, set[str]] = field(default_factory=dict)
 
-    def get_param(self, name: str, default: Any = None) -> Any:
-        """The engine parameter *name*; ``default`` (``None``) when the configuration lacks it.
+    def get_param(self, name: str) -> Any:
+        """The engine parameter *name*; ``None`` when the configuration lacks it.
 
-        No engine code in ``server/`` passes a default (bug B12: a code default hides a
-        missing key and keeps a second copy of the value in the code).  Every name the engine
-        reads is on the declared read list in ``start_check.py``, which stops a run at its
-        start when one is missing.  The parameter stays only because the seed codelet body
-        ``rule-scout`` still calls ``meta.get_param('verbatim_rule_probability', 0.01)``;
-        codelet bodies are not changed in stage 3.  Remove it when that body is converted.
+        There is no default argument (bug B12: a code default hides a missing key and keeps a
+        second copy of the value in the code).  Every name the engine or a codelet body reads is
+        on the declared read list in ``start_check.py``, which stops a run at its start when one
+        is missing.
         """
-        return self.params.get(name, default)
+        return self.params.get(name)
 
     def with_overrides(self, overrides: dict[str, Any] | None) -> MetadataProvider:
         """A view of this metadata with some parameters replaced, for one Run.

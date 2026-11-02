@@ -299,7 +299,7 @@ def main() -> None:
     # the candidates are actually built with.
     requested = args.shards if args.shards else hardware.shard_count()
     supported = max(
-        1, meta.get_param("max_coderack_size", 100) // MIN_SHARD_CAPACITY
+        1, meta.get_param("max_coderack_size") // MIN_SHARD_CAPACITY
     )
     shards = max(1, min(requested, supported))
 

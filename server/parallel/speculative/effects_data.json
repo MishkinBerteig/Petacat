@@ -283,6 +283,24 @@
    "writes": [],
    "why": "slipnet.nodes.get(name): the node dict is immutable after build."
   },
+  "role": {
+   "kind": "READ",
+   "reads": [],
+   "writes": [],
+   "why": "slipnet.roles attribute: the resolved Roles record is frozen after build."
+  },
+  "relation": {
+   "kind": "READ",
+   "reads": [],
+   "writes": [],
+   "why": "slipnet.relation(name): the relations dict is immutable after build."
+  },
+  "letter_node": {
+   "kind": "READ",
+   "reads": [],
+   "writes": [],
+   "why": "slipnet.alphabet.glyph_nodes.get(ch): the alphabet is frozen after build."
+  },
   "get_activation": {
    "kind": "READ",
    "reads": [

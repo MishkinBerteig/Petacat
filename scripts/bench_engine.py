@@ -389,7 +389,7 @@ def _fresh_runner(problem: dict[str, Any]) -> Any:
 
 def _run_outcome(runner: Any) -> dict[str, Any]:
     ctx = runner.ctx
-    ucl = ctx.meta.get_param("update_cycle_length", 15)
+    ucl = ctx.meta.get_param("update_cycle_length")
     return {
         "status": runner.status,
         "codelets": ctx.codelet_count,
@@ -586,7 +586,7 @@ def task_snapshot(problem: dict[str, Any]) -> dict[str, Any]:
 
     runner = _fresh_runner(problem)
     ctx = runner.ctx
-    ucl = ctx.meta.get_param("update_cycle_length", 15)
+    ucl = ctx.meta.get_param("update_cycle_length")
 
     serialize_ms: list[float] = []
     encode_ms: list[float] = []

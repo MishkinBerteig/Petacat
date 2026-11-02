@@ -92,7 +92,7 @@ def test_a_clamped_type_is_reported_with_its_urgency(meta):
 
 def test_the_eeg_is_sampled_once_per_update_cycle(meta):
     runner = _runner(meta)
-    cycle = meta.get_param("update_cycle_length", 15)
+    cycle = meta.get_param("update_cycle_length")
     for _ in range(cycle * 3 + 2):
         runner.step_mcat()
     samples = runner.ctx.eeg.history()["samples"]
@@ -107,7 +107,7 @@ def test_the_eeg_is_sampled_once_per_update_cycle(meta):
 
 def test_the_eeg_records_what_the_workspace_reported(meta):
     runner = _runner(meta)
-    cycle = meta.get_param("update_cycle_length", 15)
+    cycle = meta.get_param("update_cycle_length")
     for _ in range(cycle):
         runner.step_mcat()
     ctx = runner.ctx
@@ -125,4 +125,4 @@ def test_a_free_running_rack_serves_the_same_display(meta):
     assert d["last_codelet_type"] in meta.codelet_specs
     if d["total_count"]:
         assert sum(d["type_probabilities"].values()) == pytest.approx(1.0)
-    assert len(ctx.eeg.history()["samples"]) >= 300 // meta.get_param("update_cycle_length", 15) - 1
+    assert len(ctx.eeg.history()["samples"]) >= 300 // meta.get_param("update_cycle_length") - 1

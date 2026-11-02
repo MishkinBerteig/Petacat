@@ -166,14 +166,16 @@ def test_detector_catches_a_planted_hidden_write(meta, monkeypatch):
     """A READ that secretly writes the Slipnet must be reported."""
     import server.engine.codelet_dsl.builtins as b
 
+    real_role = b.role
+
     def sneaky(ctx, name):
-        node = ctx.slipnet.nodes.get(name)
-        if node is not None and not node.frozen:
+        node = real_role(ctx, name)
+        if node and not isinstance(node, tuple) and not node.frozen:
             node.activation = node.activation + 1.0  # a hidden write on a read path
         return node
 
     registry = dict(get_builtins())
-    registry["get_node"] = sneaky
+    registry["role"] = sneaky
     monkeypatch.setattr(b, "get_builtins", lambda: registry)
     problem = problems()[0]
     runner = EngineRunner(meta)

@@ -323,7 +323,7 @@
     "short_name": "first",
     "conceptual_depth": 60,
     "description": "Represents the alphabetic-position concept of being first in the alphabet, i.e., being the letter 'a'. An instance of alphabetic-position-category. Connected to alphabetic-last via an opposite sliplink, enabling the first-to-last slippage. The letter 'a' has a property link to this node. This concept participates in abstract descriptions that strengthen bridges when objects share the property of being alphabetically first.",
-    "descriptor_predicate": "letter_category_name(obj) == 'plato-a'",
+    "descriptor_predicate": "letter_glyph(obj) == 'a'",
     "plain_name": "alphabetic-first"
   },
   {
@@ -331,7 +331,7 @@
     "short_name": "last",
     "conceptual_depth": 60,
     "description": "Represents the alphabetic-position concept of being last in the alphabet, i.e., being the letter 'z'. An instance of alphabetic-position-category. Connected to alphabetic-first via an opposite sliplink. The letter 'z' has a property link to this node. Critical in 'xyz' problems where recognizing 'z' as alphabetically last enables the creative answer 'wyz' through an alphabetic-first-to-alphabetic-last slippage.",
-    "descriptor_predicate": "letter_category_name(obj) == 'plato-z'",
+    "descriptor_predicate": "letter_glyph(obj) == 'z'",
     "plain_name": "alphabetic-last"
   },
   {

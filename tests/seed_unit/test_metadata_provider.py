@@ -96,8 +96,8 @@ def test_loads_codelet_patterns(meta):
     assert meta.get_urgency(rule_pattern[0][1]) == 77
 
 
-def test_get_param_default(meta):
-    assert meta.get_param("nonexistent", 42) == 42
+def test_get_param_of_a_missing_key_is_none(meta):
+    assert meta.get_param("nonexistent") is None
 
 
 def test_fixed_length_false_loaded_correctly(meta):

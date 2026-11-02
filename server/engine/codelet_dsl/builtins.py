@@ -32,7 +32,7 @@ from server.engine.concept_mappings import ConceptMapping
 from server.engine.descriptions import Description
 from server.engine.formulas import temp_adjusted_probability, temp_adjusted_values
 from server.engine.groups import Group
-from server.engine.roles import absent
+from server.engine.roles import ROLE_BY_NAME, absent
 from server.engine.rules import Rule
 from server.engine.sink import STRUCTURE_BROKEN, STRUCTURE_BUILT
 from server.engine.staleness import current_view
@@ -96,6 +96,9 @@ def get_builtins() -> dict[str, Any]:
         "temp_adjusted_vals": _temp_adjusted_vals,
         # Slipnet queries
         "get_node": get_node,
+        "role": role,
+        "relation": relation,
+        "letter_node": letter_node,
         "get_activation": get_activation,
         "fully_active": fully_active,
         "get_bond_category": get_bond_category,
@@ -2351,9 +2354,40 @@ def get_node(ctx: EngineContext, name: str) -> Any:
     A name the Slipnet does not hold gives that name's ``Absent`` token (falsy, node-shaped:
     activation 0, no links) rather than ``None``, so a body that names a node the
     configuration lacks sees a concept that is not perceived and does not raise.
+
+    For a name a body holds as *data* (a theme's ``dimension``).  A literal name written in a
+    body does not follow a rename of the node: refer to a concept through :func:`role`,
+    :func:`relation` or :func:`letter_node` instead.
     """
     node = ctx.slipnet.nodes.get(name)
     return node if node is not None else absent(name)
+
+
+def role(ctx: EngineContext, name: str) -> Any:
+    """What the configuration binds to the role *name* (``"direction.left"``).
+
+    The node; for an ordered role the tuple of what is bound, in ordinal order; for a
+    codelet-type role the type's spec; or the role's ``Absent`` token when nothing is bound
+    (falsy, node-shaped).  A name outside the role vocabulary is a mistake in the body and
+    raises ``ValueError`` naming it.
+    """
+    spec = ROLE_BY_NAME.get(name)
+    if spec is None:
+        raise ValueError(f"role({name!r}): not a name of the role vocabulary")
+    return getattr(ctx.slipnet.roles, spec.attr)
+
+
+def relation(ctx: EngineContext, name: str) -> Any:
+    """The node of the theme relation *name* (``"identity"``), or the relation's ``Absent``
+    token when the configuration has no such relation."""
+    return ctx.slipnet.relation(name)
+
+
+def letter_node(ctx: EngineContext, ch: str) -> Any:
+    """The node whose glyph is *ch*, or a falsy ``Absent`` token when no node has that glyph
+    (a capital letter, a digit: a symbol with no node is not perceived)."""
+    node = ctx.slipnet.alphabet.glyph_nodes.get(ch)
+    return node if node is not None else absent("letter." + str(ch))
 
 
 def get_activation(ctx: EngineContext, name: str) -> float:
@@ -2433,11 +2467,13 @@ def possible_descriptor(
     return ctx.rng.weighted_pick(candidates, weights)
 
 
-def descriptor_support(ctx: EngineContext, string: Any, descriptor_name: str) -> float:
-    """Fraction of the string's groups carrying *descriptor_name*, as 0-100.
+def descriptor_support(ctx: EngineContext, string: Any, descriptor: Any) -> float:
+    """Fraction of the string's groups carrying the descriptor *node*, as 0-100.
 
     Scheme: ``descriptor-support`` (workspace-structure-formulas.ss:44-55).
-    Used to pick which way a new singleton group should face.
+    Used to pick which way a new singleton group should face.  The node is compared by
+    identity, so an ``Absent`` token (no such node in the configuration) is carried by no
+    group and the support is 0.
     """
     groups = [g for g in getattr(string, "groups", []) if g.is_built]
     if not groups:
@@ -2445,10 +2481,7 @@ def descriptor_support(ctx: EngineContext, string: Any, descriptor_name: str) ->
     described = sum(
         1
         for g in groups
-        if any(
-            getattr(d.descriptor, "name", "") == descriptor_name
-            for d in g.get_all_descriptions()
-        )
+        if any(d.descriptor is descriptor for d in g.get_all_descriptions())
     )
     # 100* rounds (workspace-structure-formulas.ss:44-54, utilities.ss:544).
     return float(round(Fraction(100 * described, len(groups))))
