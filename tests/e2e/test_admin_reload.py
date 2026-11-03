@@ -100,21 +100,24 @@ async def test_swarm_runs_under_the_edited_configuration(app_client, db_session)
 
 
 @pytest.mark.asyncio
-async def test_unbuildable_configuration_keeps_the_previous_provider(app_client):
+async def test_a_value_the_change_api_refuses_keeps_the_previous_provider(app_client):
     from server.api.runs import get_run_service
 
     before = get_run_service().meta
     resp = await app_client.put(
         "/api/admin/params/expiration_period", json={"value": "not a number", "value_type": "int"}
     )
-    assert resp.status_code == 500
-    assert "previous configuration" in resp.json()["detail"]
+    # the change API refuses a value that is not an int before anything is written, so the
+    # provider is never rebuilt
+    assert resp.status_code == 422
     assert get_run_service().meta is before
     assert (await app_client.post("/api/runs", json=PROBLEM)).status_code == 200
 
-    await app_client.put(
-        "/api/admin/params/expiration_period", json={"value": "500", "value_type": "int"}
-    )
+    for value in ("501", "500"):  # a real change rebuilds the provider; put the value back
+        resp = await app_client.put(
+            "/api/admin/params/expiration_period", json={"value": value, "value_type": "int"}
+        )
+        assert resp.status_code == 200, resp.text
     assert get_run_service().meta is not before
 
 

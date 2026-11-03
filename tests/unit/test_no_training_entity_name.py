@@ -32,7 +32,7 @@ SUFFIXES = {".py", ".ts", ".tsx", ".json", ".md", ".sh", ".css", ".html"}
 ALLOWED = re.compile(
     r"Training[ -][Mm]ode|training[ -]mode|training_mode|TRAINING_MODE|TrainingMode|trainingMode"
     r"|[Tt]raining episodes?|training_memory_merges|[Cc]orpus[ -]training|training\s+(?:#\s*)?population"
-    r"|pre-training"
+    r"|pre-training|test_no_training_entity_name"
 )
 FORBIDDEN = re.compile(r"training", re.IGNORECASE)
 

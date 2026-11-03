@@ -672,6 +672,33 @@ _WRITABLE_COLLECTIONS = [
 async def test_a_configuration_collection_can_be_created_updated_and_deleted(
     app_client, path, key_field, row, update_field, update_value
 ):
+    # the change API refuses a row that names a node or codelet type that is not there, so
+    # the rows these collections point at are created first and removed at the end
+    prerequisites = _prerequisites(path, row)
+    for route, body in prerequisites:
+        assert (await app_client.post(f"/api/admin/{route}", json=body)).status_code == 201
+    try:
+        await _create_update_delete(app_client, path, key_field, row, update_field, update_value)
+    finally:
+        for route, body in reversed(prerequisites):
+            await app_client.delete(f"/api/admin/{route}/{body['name']}")
+
+
+def _prerequisites(path: str, row: dict) -> list[tuple[str, dict]]:
+    node = {"short_name": "e2e", "conceptual_depth": 50, "description": ""}
+    if path == "theme-dimensions":
+        return [("slipnet/nodes", {"name": row["slipnet_node"], **node})]
+    if path == "slipnet-layout":
+        return [("slipnet/nodes", {"name": row["node_name"], **node})]
+    if path == "posting-rules":
+        return [("codelets", {
+            "name": row["codelet_type"], "family": "bond", "phase": "scout",
+            "default_urgency": 30, "execute_body": "fizzle()",
+        })]
+    return []
+
+
+async def _create_update_delete(app_client, path, key_field, row, update_field, update_value):
     created = await app_client.post(f"/api/admin/{path}", json=row)
     assert created.status_code in (200, 201), created.text
     key = created.json()[key_field]
@@ -740,8 +767,8 @@ async def test_a_codelet_type_can_be_created_and_deleted(app_client):
 
 
 @pytest.mark.asyncio
-async def test_an_unknown_codelet_family_is_answered_with_the_ones_that_exist(app_client):
-    """Family and phase are foreign keys, and the reply names the available values."""
+async def test_an_unknown_codelet_family_is_refused_by_the_change_api(app_client):
+    """Family and phase are references, and the change API refuses one that is not there."""
     resp = await app_client.post(
         "/api/admin/codelets",
         json={
@@ -751,8 +778,8 @@ async def test_an_unknown_codelet_family_is_answered_with_the_ones_that_exist(ap
         },
     )
 
-    assert resp.status_code == 400
-    assert "bond" in resp.json()["detail"]
+    assert resp.status_code == 422
+    assert "not-a-family" in resp.json()["detail"]
 
 
 @pytest.mark.asyncio

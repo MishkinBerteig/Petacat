@@ -10,8 +10,9 @@ The steps, in order:
 1. **The envelope** (400 ``malformed``): the batch is an object with only the known fields, each of
    the right type.  The ops themselves are read by ``resolve``.
 2. **The target** is locked (``SELECT ... FOR UPDATE`` on its ``configurations`` row), so the
-   compare-and-set below cannot race.  Only the global configuration is handled: a session's
-   configuration raises ``NotImplementedError`` until C8.
+   compare-and-set below cannot race.  It is the global configuration (its tables) or a
+   Training Mode Session's (its stored current state; the batch is written at once, as for a
+   Stopped session).  A live session is held in memory by the session service (S3, S5), not here.
 3. **The source**: the global configuration (Metacat Mode) refuses ``learner`` and ``external``
    (M2), so a refused batch never reaches ``resolve`` and a ``dry_run`` is refused too.
 4. **The compare-and-set** on ``base_version``.  Under ``strict`` a stale base is 409 ``stale``.
@@ -292,17 +293,12 @@ class ChangeService:
 
 
 async def _apply(session: AsyncSession, batch: Mapping[str, Any], configuration_id: int) -> dict[str, Any]:
-    from server.services import config_document
+    from server.services import config_document, configurations
 
     try:
         locked = await journal._lock_configuration(session, configuration_id)
     except journal.JournalError as exc:
         raise ChangeError(UNKNOWN_CONFIGURATION, str(exc)) from exc
-    if locked["kind"] != KIND_GLOBAL:
-        raise NotImplementedError(
-            "ChangeService.apply handles the global configuration; a session's configuration "
-            "is written by the configuration entity (C8)"
-        )
     source = batch["source"]
     journal._check_source(locked["kind"], source)
 
@@ -312,7 +308,10 @@ async def _apply(session: AsyncSession, batch: Mapping[str, Any], configuration_
     if stale is not None:
         raise ChangeError(stale.kind, stale.message, [stale.as_dict()])
 
-    cfg = await config_document.document_from_db(session, version=revision)
+    if locked["kind"] == KIND_GLOBAL:
+        cfg = await config_document.document_from_db(session, version=revision)
+    else:
+        cfg = await configurations.current_document(session, configuration_id)
     resolve_batch = {name: batch[name] for name in _RESOLVE_FIELDS if name in batch}
     resolve_batch.setdefault("configuration_id", configuration_id)
     resolved_ops, resolve_report = _resolve_function()(cfg, resolve_batch)

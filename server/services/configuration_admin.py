@@ -2,7 +2,8 @@
 
 The Admin view's configuration-wide actions and the command line
 (``python -m server.config ...``) share these functions.  Each takes a configuration (the
-global one, id 1, by default; a session's configuration arrives with C8).
+global one, id 1, by default, or a Training Mode Session's configuration).  The Metacat
+Standard Configuration is the reference for both.
 
 * The *reference* is the Metacat Standard Configuration as the seed files hold it, read once
   and kept read only (``document_from_standard_files``).  Nothing here writes the files.
@@ -30,7 +31,7 @@ from server.config import SEED_DATA_DIR
 from server.models.configuration_state import ConfigurationState
 from server.models.journal import GLOBAL_CONFIGURATION_ID, KIND_GLOBAL, Configuration
 from server.services import config_document as cd
-from server.services import journal, journal_views
+from server.services import configurations, journal, journal_views
 
 SOURCE_RESET = "reset"
 SOURCE_RESTORE = "restore"
@@ -44,12 +45,7 @@ class ConfigurationAdminError(Exception):
     """A request these functions cannot carry out; the message says why."""
 
 
-class UnknownConfiguration(ConfigurationAdminError):
-    """No configuration has that id."""
-
-
-class NotYetSupported(ConfigurationAdminError):
-    """The configuration exists but is not the global one (session configurations come with C8)."""
+UnknownConfiguration = configurations.UnknownConfiguration
 
 
 class UnknownRow(ConfigurationAdminError):
@@ -71,17 +67,12 @@ def reference_document(seed_dir: str | None = None) -> cd.ConfigDocument:
     return _reference_cache[seed_dir]
 
 
-async def _require_global(session: AsyncSession, configuration_id: int) -> Configuration:
+async def _require(session: AsyncSession, configuration_id: int) -> Configuration:
     row = (
         await session.execute(select(Configuration).where(Configuration.id == configuration_id))
     ).scalar_one_or_none()
     if row is None:
         raise UnknownConfiguration(f"configuration {configuration_id} does not exist")
-    if row.kind != KIND_GLOBAL:
-        raise NotYetSupported(
-            f"configuration {configuration_id} is a session's configuration; only the global "
-            "configuration can be compared or reset until session configurations land"
-        )
     return row
 
 
@@ -173,12 +164,13 @@ async def status(
     was first loaded from (provenance only).  ``standard_config_hash`` is the ``config_hash``
     of the start-up reference, which is what ``config_hash`` is compared with.
     """
-    row = await _require_global(session, configuration_id)
-    current = await cd.document_from_db(session)
+    row = await _require(session, configuration_id)
+    current = await configurations.current_document(session, configuration_id)
     reference = reference_document()
+    # The files digest and origin are the global configuration's first load (provenance only).
     state = (
         await session.execute(select(ConfigurationState).where(ConfigurationState.id == 1))
-    ).scalar_one_or_none()
+    ).scalar_one_or_none() if row.kind == KIND_GLOBAL else None
     differing = len(compare(current, reference))
     config_hash = cd.config_hash(current)
     standard_config_hash = cd.config_hash(reference)
@@ -200,8 +192,8 @@ async def diff(
     session: AsyncSession, configuration_id: int = GLOBAL_CONFIGURATION_ID
 ) -> dict[str, Any]:
     """Rows added, removed or changed against the start-up reference."""
-    row = await _require_global(session, configuration_id)
-    changes = compare(await cd.document_from_db(session), reference_document())
+    row = await _require(session, configuration_id)
+    changes = compare(await configurations.current_document(session, configuration_id), reference_document())
     return {
         "configuration_id": configuration_id,
         "revision": row.revision,
@@ -238,10 +230,10 @@ async def reset_to_standard(
     ``source = reset``.  A configuration that already equals the reference gets no entry
     (nothing changed).  Runs, Episodic Memory and sessions are untouched.
     """
-    await _require_global(session, configuration_id)
-    ops = _order(cd.diff(await cd.document_from_db(session), reference_document()))
+    await _require(session, configuration_id)
+    ops = _order(cd.diff(await configurations.current_document(session, configuration_id), reference_document()))
     if not ops:
-        row = await _require_global(session, configuration_id)
+        row = await _require(session, configuration_id)
         return {"configuration_id": configuration_id, "revision": row.revision, "wrote": False,
                 "entry_id": None, "ops": 0, "config_hash": row.config_hash}
     result = await journal.write_immediate(
@@ -266,8 +258,8 @@ async def restore_selected(
     equals the reference is listed in ``skipped``.  A table or key that does not exist in
     either the configuration or the reference raises :class:`UnknownRow`.
     """
-    await _require_global(session, configuration_id)
-    current = await cd.document_from_db(session)
+    await _require(session, configuration_id)
+    current = await configurations.current_document(session, configuration_id)
     reference = reference_document()
     by_row = {(c["table"], tuple(c["key"].values())): c for c in compare(current, reference)}
     chosen: list[dict[str, Any]] = []
@@ -290,7 +282,7 @@ async def restore_selected(
                              "or the Metacat Standard Configuration")
     ops = _ops_for_rows(current, reference, chosen)
     if not ops:
-        row = await _require_global(session, configuration_id)
+        row = await _require(session, configuration_id)
         return {"configuration_id": configuration_id, "revision": row.revision, "wrote": False,
                 "entry_id": None, "ops": 0, "config_hash": row.config_hash, "skipped": skipped}
     result = await journal.write_immediate(
@@ -304,6 +296,53 @@ async def restore_selected(
 async def verify_journal(
     session: AsyncSession, configuration_id: int = GLOBAL_CONFIGURATION_ID
 ) -> dict[str, Any]:
-    """Replay the journal and compare with the current-state tables and ``config_hash``."""
-    await _require_global(session, configuration_id)
-    return asdict(await journal_views.verify_journal(session, configuration_id))
+    """Replay the journal and compare with the stored current state and ``config_hash``.
+
+    The global configuration replays from nothing and compares with its tables.  A session's
+    configuration replays its entries after the base snapshot onto the base and compares with
+    its stored current state, then undoes them by their before-images and compares with the
+    base.
+    """
+    row = await _require(session, configuration_id)
+    if row.kind == KIND_GLOBAL:
+        return asdict(await journal_views.verify_journal(session, configuration_id))
+    return asdict(await _verify_session(session, row))
+
+
+def _rows_equal(a: cd.ConfigDocument, b: cd.ConfigDocument) -> bool:
+    """Same rows in every table, without regard to the order of a table."""
+    return all(dict(a.tables[t]) == dict(b.tables[t]) for t in cd.TABLE_NAMES)
+
+
+async def _verify_session(session: AsyncSession, row: Configuration) -> journal_views.VerifyReport:
+    configuration_id = row.id
+    entries = await journal_views.read_entries(session, configuration_id)
+    report = journal_views.VerifyReport(True, configuration_id, row.revision, len(entries))
+    problems = report.problems
+    if [e["revision"] for e in entries] != list(range(1, len(entries) + 1)):
+        problems.append("the entries' revisions are not 1..n without a gap")
+    if row.revision != len(entries):
+        problems.append(f"configuration revision {row.revision} but {len(entries)} entries")
+    base = await configurations.base_document(session, configuration_id)
+    current = await configurations.current_document(session, configuration_id)
+    if not problems:
+        after = [e for e in entries if e["revision"] > base.version]
+        ops = [op for e in after for op in e["resolved"]]
+        try:
+            replayed = cd.apply_resolved(base, ops, version=row.revision)
+            if not replayed.content_equals(current):
+                problems.append("replaying the journal onto the base snapshot does not give "
+                                "the stored current state")
+            back = cd.apply_resolved(current, journal_views.inverse_ops(after))
+            if not _rows_equal(back, base):
+                problems.append("undoing the journal by its before-images does not reach the "
+                                "base snapshot")
+        except Exception as exc:  # the recorded ops do not apply
+            problems.append(f"the recorded ops do not replay: {exc}")
+    digest = cd.config_hash(current)
+    if row.config_hash != digest:
+        problems.append(f"stored config_hash {row.config_hash} but the state hashes to {digest}")
+    if row.base_snapshot_hash != cd.config_hash(base):
+        problems.append("the base snapshot does not hash to base_snapshot_hash")
+    report.ok = not problems
+    return report

@@ -4,7 +4,11 @@ problems over many seeds.
 See ``server/services/training_mode_session_service.py`` for the design.  A Training Mode Session is created Stopped
 and is started, paused, resumed and stopped any number of times (``POST /{id}/start``,
 ``/pause``, ``/resume``, ``/stop``); ``POST /{id}/cancel`` is an action that cancels every
-queued and in-flight problem and changes no state.  Problems can be added in any state
+queued and in-flight problem and changes no state.  Its states are stopped, starting,
+running, paused and stopping; a live session writes nothing to the database until it is
+Stopped, so every summary and change report of a live session says ``persisted: false`` and
+carries ``saved_through`` and ``unsaved``, and a change to a session that is starting or
+stopping is refused with 409 ``busy``.  Problems can be added in any other state
 (``POST /{id}/problems``); they report their answer distribution as they finish, and
 ``GET /{id}/finished`` is a long-poll cursor over the order in which they finished -- the
 surface an ML layer drives.  Every Training Mode Session has one Episodic Memory that its runs share (a
@@ -143,7 +147,8 @@ async def training_mode_session_memory(session_id: int) -> dict[str, Any]:
 
 @router.post("/{session_id}/problems", status_code=201)
 async def add_problems(session_id: int, req: AddProblemsRequest) -> dict[str, Any]:
-    """Insert problems into a session in any state: a Stopped one stores them, a live one queues them."""
+    """Insert problems: a Stopped session stores them at once, a live one queues them in memory
+    (``persisted: false``, written at Stop); 409 ``busy`` while starting or stopping."""
     return await _call(_service().add_problems(session_id, _dump(req.problems)))
 
 
@@ -195,7 +200,8 @@ async def finished(
 
 @router.post("/{session_id}/start")
 async def start(session_id: int, req: StartRequest | None = None) -> dict[str, Any]:
-    """Stopped to Running (or Paused when ``paused`` is true); a live Training Mode Session is unchanged."""
+    """Stopped to Running (or Paused when ``paused`` is true); a live session is unchanged.
+    It reads the database and writes nothing; 409 ``busy`` while the session is stopping."""
     return await _call(_service().start_session(session_id, paused=bool(req and req.paused)))
 
 
@@ -213,8 +219,9 @@ async def resume(session_id: int) -> dict[str, Any]:
 
 @router.post("/{session_id}/stop")
 async def stop(session_id: int) -> dict[str, Any]:
-    """Running or Paused to Stopped: runs in flight are dropped, the rest is written, and the
-    Training Mode Session can be started again. A Stopped Training Mode Session is unchanged."""
+    """Running or Paused to Stopped: runs in flight are drained (up to the drain timeout), then
+    everything the session produced is written in one transaction, and it can be started again.
+    A failed write leaves it Paused with its work intact (500). A Stopped session is unchanged."""
     return await _call(_service().stop_session(session_id))
 
 
@@ -320,7 +327,9 @@ async def export(
     what: Literal["problems", "distribution", "runs"] = "problems",
     format: Literal["csv", "json"] = "csv",
 ) -> StreamingResponse:
-    """Download a session: its problems, answer distributions, or every run (NDJSON for json)."""
+    """Download a session: its problems, answer distributions, or every run (NDJSON for json).
+    For a live session the stored rows are followed by a tail from memory, and the header
+    ``X-Export-Source: stored+live-tail`` says so."""
     service = _service()
     await _call(service.summary(session_id))  # 404 before the stream starts
     if format == "csv":
@@ -329,8 +338,7 @@ async def export(
         media, ext = "application/x-ndjson", "ndjson"
     else:
         media, ext = "application/json", "json"
-    return StreamingResponse(
-        _export_stream(service, session_id, what, format),
-        media_type=media,
-        headers={"Content-Disposition": f'attachment; filename="session-{session_id}-{what}.{ext}"'},
-    )
+    headers = {"Content-Disposition": f'attachment; filename="session-{session_id}-{what}.{ext}"'}
+    if service.is_live(session_id):
+        headers["X-Export-Source"] = "stored+live-tail"
+    return StreamingResponse(_export_stream(service, session_id, what, format), media_type=media, headers=headers)

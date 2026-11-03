@@ -136,9 +136,11 @@ const STATE_COLOUR: Record<string, string> = {
   idle: 'var(--text-secondary)',
   paused: 'var(--warning)',
   stalled: 'var(--error)',
+  starting: 'var(--warning)',
+  stopping: 'var(--warning)',
 };
 
-/** The Training Mode Session's state (stopped, running, paused); inside Running its activity (idle or stalled) when it has one. */
+/** The Training Mode Session's state (stopped, starting, running, paused, stopping); inside Running its activity (idle or stalled) when it has one. */
 export function StateBadge({ state, activity }: { state: SessionState; activity: SessionActivity }) {
   const label = state === 'running' && activity ? activity : state;
   return (

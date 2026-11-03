@@ -2,7 +2,7 @@
 
 > **Auto-generated.** Run `python scripts/generate_api_docs.py` to regenerate from the FastAPI application.
 
-158 HTTP routes, plus `WS /ws/runs/{run_id}` for live state push.
+170 HTTP routes, plus `WS /ws/runs/{run_id}` for live state push.
 
 Interactive documentation is served at `/docs` while the API is running.
 
@@ -146,6 +146,11 @@ Metacat Mode: the editable copy of the seed data (the global configuration). A T
 | `POST` | `/api/admin/commentary-templates` | Create Commentary Template |
 | `PUT` | `/api/admin/commentary-templates/{template_id}` | Update Commentary Template |
 | `DELETE` | `/api/admin/commentary-templates/{template_id}` | Delete Commentary Template |
+| `POST` | `/api/admin/db/changes` | Apply a configuration edit as a journaled batch (channel admin_database) |
+| `POST` | `/api/admin/db/edit` | Edit one content or runtime row (runtime needs expert mode) |
+| `POST` | `/api/admin/db/sql` | Run one read-only SELECT or WITH statement |
+| `GET` | `/api/admin/db/tables` | List every table with its class (Database tab) |
+| `GET` | `/api/admin/db/tables/{name}/rows` | Page through a table's rows, with a filter |
 | `GET` | `/api/admin/demos` | List Demos |
 | `POST` | `/api/admin/demos` | Create Demo |
 | `PUT` | `/api/admin/demos/{demo_id}` | Update Demo |
@@ -220,9 +225,16 @@ What the process resolved at startup.
 
 | Method | Path | Purpose |
 |---|---|---|
+| `GET` | `/api/configurations` | List Configurations |
+| `GET` | `/api/configurations/{configuration_id}` | Get Configuration |
+| `PATCH` | `/api/configurations/{configuration_id}` | Patch Configuration |
+| `POST` | `/api/configurations/{configuration_id}/changes` | Post Changes |
 | `GET` | `/api/configurations/{configuration_id}/diff` | Get Diff |
+| `GET` | `/api/configurations/{configuration_id}/export` | Get Export |
 | `POST` | `/api/configurations/{configuration_id}/reset-to-standard` | Post Reset |
 | `POST` | `/api/configurations/{configuration_id}/restore-selected` | Post Restore Selected |
+| `GET` | `/api/configurations/{configuration_id}/rows` | Get Rows |
+| `GET` | `/api/configurations/{configuration_id}/schema` | Get Schema |
 | `GET` | `/api/configurations/{configuration_id}/status` | Get Status |
 | `GET` | `/api/configurations/{configuration_id}/verify-journal` | Get Verify Journal |
 | `GET` | `/healthz` | Healthz |

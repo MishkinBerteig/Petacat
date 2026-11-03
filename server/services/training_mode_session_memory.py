@@ -37,7 +37,7 @@ from __future__ import annotations
 
 import pickle
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Iterable, Iterator, Protocol
 
 from server.engine.ids import KIND_ANSWER, KIND_SNAG, IdAllocator
 from server.engine.memory import AnswerDescription, EpisodicMemory, SnagDescription
@@ -248,3 +248,56 @@ def end(copy: EpisodicMemory, base_answers: int, base_snags: int) -> bytes:
 
 def forget_worker_cache() -> None:
     _CACHE.clear()
+
+
+# ---------------------------------------------------------------------------
+# Replay
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ReplayEntry:
+    """One entry of a session's record, in ``seq`` order.  ``kind`` names what ``data`` is
+    (``memory_merge``: an :class:`Additions`)."""
+
+    seq: int
+    kind: str
+    data: Any
+
+
+class ReplaySource(Protocol):
+    """Where a replay reads its entries from: the stored rows or a live in-memory list.
+
+    Pure: it holds no connection and does no work but hand entries over in ``seq`` order, so
+    a replay is the same code over either (the stored rows are read into a
+    :class:`ListReplaySource`)."""
+
+    def entries(self, after: int = 0, upto: int | None = None) -> Iterator[ReplayEntry]:
+        """The entries with ``after < seq <= upto`` (no upper bound when ``upto`` is None), by ``seq``."""
+        ...
+
+
+class ListReplaySource:
+    """The in-memory :class:`ReplaySource`."""
+
+    def __init__(self, entries: Iterable[ReplayEntry] = ()) -> None:
+        self._entries = sorted(entries, key=lambda e: e.seq)
+
+    def append(self, entry: ReplayEntry) -> None:
+        self._entries.append(entry)
+        if len(self._entries) > 1 and self._entries[-2].seq > entry.seq:
+            self._entries.sort(key=lambda e: e.seq)
+
+    def entries(self, after: int = 0, upto: int | None = None) -> Iterator[ReplayEntry]:
+        for e in self._entries:
+            if e.seq > after and (upto is None or e.seq <= upto):
+                yield e
+
+
+def replay_memory(source: ReplaySource, upto: int | None = None) -> EpisodicMemory:
+    """Rebuild the Episodic Memory by applying the ``memory_merge`` entries (to version *upto*)."""
+    memory = EpisodicMemory()
+    for e in source.entries(upto=upto):
+        if e.kind == "memory_merge":
+            apply_merge(memory, e.data)
+    return memory

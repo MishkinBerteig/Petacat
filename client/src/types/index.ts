@@ -1009,8 +1009,12 @@ export interface SwarmResult {
 // dashboard runs. A Training Mode Session is a long-lived, database-backed Training Mode Session
 // episode with one Episodic Memory of its own, never cleared.
 
-/** Stopped, or live and either Running or Paused. */
-export type SessionState = 'stopped' | 'running' | 'paused';
+/**
+ * Stopped (a record in the database), or live: Starting (being loaded), Running, Paused, or Stopping
+ * (the Stop write). A live session writes nothing to the database until it is Stopped; Starting and
+ * Stopping are transient and refuse every change with 409 `busy`.
+ */
+export type SessionState = 'stopped' | 'starting' | 'running' | 'paused' | 'stopping';
 /** Inside Running only: nothing left to run (`idle`) or unable to run (`stalled`). */
 export type SessionActivity = 'idle' | 'stalled' | null;
 export type SessionProblemStatus = 'queued' | 'running' | 'finished' | 'cancelled';
@@ -1021,7 +1025,6 @@ export interface SessionErrorPolicy {
   max_errors_total: number | null;
   on_worker_failure: 'retry' | 'pause';
   max_retries: number;
-  on_config_change: 'pause' | 'adopt';
 }
 
 /** Fixed at creation: they shape what a run is. */
@@ -1072,6 +1075,23 @@ export interface SessionSummary {
   memory_version: number;
   finished_cursor: number;
   last_event: string | null;
+  /** Where the numbers come from: memory ("live") or the database ("stored"). */
+  source: 'live' | 'stored';
+  /** False for a live session: what it shows is not all in the database. */
+  persisted: boolean;
+  /** What the database holds: the last Stop. `configuration_revision` arrives with the session's own configuration. */
+  saved_through: { stopped_at: string | null; configuration_revision: number | null; episode_version: number };
+  /** What only memory holds (a live session); null for a Stopped one. */
+  unsaved: SessionUnsaved | null;
+}
+
+export interface SessionUnsaved {
+  runs: number;
+  merges: number;
+  problems: number;
+  outcomes: number;
+  edits: number;
+  configuration_batches: number;
 }
 
 export interface SessionAnswerShare {
@@ -1167,7 +1187,10 @@ export interface UpdateSessionRequest {
 export interface SessionAddResponse {
   session: SessionSummary;
   added: number;
+  /** Per-session ordinals: the identifier a live session hands out is the stored one. */
   problem_ids: number[];
+  /** False when the session is live: the problems are in memory until it is Stopped. */
+  persisted: boolean;
 }
 
 export type SessionProblemSort =

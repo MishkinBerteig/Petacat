@@ -28,7 +28,7 @@ license change was authorised by Dr. Marshall directly (see
 > end-to-end. Episodic Memory (Metacat-Mode learning) shapes the runs that inherit it: a run
 > declines an answer already held for the same problem and rules, so repeating a
 > problem across Metacat Mode's [episodic runs](#persistence-modes-and-episodic-runs)
-> (which are Metacat Mode and not Training Mode) explores a different answer each time. It ships with 5,003 test cases covering the engine, the API, and the
+> (which are Metacat Mode and not Training Mode) explores a different answer each time. It ships with 5,134 test cases covering the engine, the API, and the
 > help/config system, run on both the CPU and the GPU numeric backends. Underneath the seven components sits an execution
 > substrate — three [persistence modes](#persistence-modes-and-episodic-runs),
 > a [GPU numeric substrate](#the-numeric-substrate), and
@@ -434,7 +434,7 @@ Petacat has two test suites:
   plugin against the serial runs it claims to equal), `lockstep` (Petacat's decision
   traces against Metacat's), and `e2e` (full HTTP
   stack against a running database). All eight run in a single command against
-  the local Postgres — 5,003 cases, which includes the numeric matrix's second
+  the local Postgres — 5,134 cases, which includes the numeric matrix's second
   pass over the 519 backend-sensitive tests. See
   [TESTING.md](TESTING.md) for the layer breakdown, the numeric backend matrix,
   the session ceiling, the unit-test rules, determinism requirements, test-double
@@ -1023,7 +1023,7 @@ problems, each run over a number of seeds, spread across every core. It belongs 
 runs and share Metacat Mode's Episodic Memory; a Training Mode Session is a job Petacat runs by itself, with its own
 Episodic Memory, and it lives in its own tables (`server/models/training_mode_session.py`).
 
-**Problems can be added in any state.** Create a Training Mode Session with 25 problems and start it;
+**Problems can be added in any state but Starting and Stopping.** Create a Training Mode Session with 25 problems and start it;
 whenever five have finished, add five more. Problems start roughly in
 the order they arrive, so they finish steadily, but the order is not guaranteed and a
 client must not depend on it. Each run is the run the Run button would make with that
@@ -1031,27 +1031,35 @@ seed, started from the Training Mode Session's Episodic Memory as of the run's `
 
 ### The states
 
-A Training Mode Session is **Stopped**, **Running** or **Paused**.
+A Training Mode Session is **Stopped**, **Starting**, **Running**, **Paused** or **Stopping**.
 
 - **Created Stopped.** `POST /api/training-mode/sessions` stores it and its first problems and runs nothing.
   `POST /api/training-mode/sessions/{id}/start` loads it and runs it (`{"paused": true}` starts it Paused).
-- **Stopped is a record in the database.** Only Running and Paused Training Mode Sessions are live in
-  the server process, and **after a server restart every Training Mode Session is Stopped**. Starting
-  rebuilds the Episodic Memory from the stored merges and resumes each unfinished problem at
-  the seeds not yet stored.
-- **Stop** (`POST /api/training-mode/sessions/{id}/stop`) writes every run and merge still held in memory and
-  drops the live part. Runs in flight are dropped and their seeds run again after the next
-  start. The row records `stopped_at`, `stopped_from` (`running` or `paused`) and
-  `stop_reason` (`user`, `shutdown` or `error`; a server shutdown records `shutdown`).
+- **Stopped is a record in the database.** Only the other four states are live in the server process, and
+  **after a server restart every Training Mode Session is Stopped**. Starting (the load) rebuilds the
+  Episodic Memory from the stored merges and resumes each unfinished problem at the seeds not yet stored.
+  It only reads: a failed Start leaves the session Stopped exactly as it was (500).
+- **Stop** (`POST /api/training-mode/sessions/{id}/stop`) is the save point. The session is Stopping while
+  the runs in flight are allowed a short drain time to finish and merge (the rest are discarded and their
+  seeds run again after the next start); then everything the session produced is written in **one
+  transaction** and the live part is dropped. If that write fails nothing is written, the session returns
+  to **Paused** with its memory intact, `last_event` says why, and Stop may be retried (500).
+  The row records `stopped_at`, `stopped_from` (`running` or `paused`) and `stop_reason` (`user`,
+  `shutdown` or `error`; a server shutdown records `shutdown`).
+- **Starting and Stopping refuse every change with 409 `busy`:** adding problems, `PATCH`, `pause`,
+  `resume`, `cancel`, a problem's `cancel`, `delete`, and a second `start` or `stop`. Reads are never refused.
 - **Pause and resume** act on a live Training Mode Session and answer 409 for a Stopped one.
 - **Cancel** (`POST /api/training-mode/sessions/{id}/cancel`) is an action, not a state. It cancels every
   queued and in-flight problem, keeps the finished runs and changes no state; problems can be
   added afterwards. There are no `closed` or `cancelled` Training Mode Sessions, and no `close` route.
 - **Inside Running** the summary's `activity` is `idle` (nothing left to run) or `stalled`
-  (it cannot run; `stalled_reason` says why) and is `null` while there is work. Problems are
-  accepted in every state.
+  (the current engine configuration cannot start a run; `stalled_reason` says why) and is `null`
+  while there is work.
 - **Delete** removes everything: the Episodic Memory, the problems and runs and, for a live
-  Training Mode Session, its live state (settled first, with no Stop write). It leaves no tombstone.
+  Training Mode Session, its live state (discarded with no Stop write). It leaves no tombstone.
+- **A graceful server shutdown** refuses new Starts and Stops every live session (`stop_reason`
+  `shutdown`), several at a time. A shutdown that cannot finish in time loses the sessions it did not reach
+  back to their last Stop, exactly as a crash does, and logs which ones and how much.
 
 ### The Episodic Memory
 
@@ -1091,7 +1099,7 @@ Training Mode Session is deleted.
 | `parameters` | none | Engine parameter overrides, validated like `POST /api/runs` |
 | `backend` | resolved at creation | The numeric backend |
 
-**The error policy can be edited at any time** (`PATCH /api/training-mode/sessions/{id}`):
+**The error policy can be edited at any time but Starting and Stopping** (`PATCH /api/training-mode/sessions/{id}`). There is no policy for an engine-configuration change (`on_config_change` is removed, and a field of that name is a 400): nothing pauses, adopts or rebases, and the next run starts under the configuration current then and records its `config_hash`:
 
 | Field | Default | Meaning |
 |---|---|---|
@@ -1100,25 +1108,32 @@ Training Mode Session is deleted.
 | `max_errors_total` | none | Reaching it pauses the Training Mode Session |
 | `on_worker_failure` | `retry` | A worker process died (killed, out of memory). Its runs are resubmitted, which is exact because runs are deterministic. A broken pool takes every run in flight with it, so the affected runs are re-run one at a time, and only a run that breaks the pool on its own is charged a retry. `pause` pauses at once |
 | `max_retries` | 3 | Per run; when exhausted, the Training Mode Session pauses |
-| `on_config_change` | `pause` | The engine configuration differs from the one the Training Mode Session was created under. `pause` stalls it until the configuration returns, which is checked every 1.5 s; `adopt` continues under the new one, and each run records its `config_hash` |
 
 **Outcome keys.** A run's key is its answer when it found one, and otherwise
 `*CAP*` (it reached `max_codelets` without an answer), `*ERROR*` (it raised) or
 `*NONE*` (the engine gave up or halted without one). Answer distributions count
 these keys alongside the answers.
 
-### The database is written only at milestones
+### A live session writes to the database only when it is Stopped
 
-The database is written when a Training Mode Session is created or renamed, when problems are
-added, when its policy changes, when it is stopped, and **when a problem finishes all its
-seeds**. That last write is one transaction holding the problem's summary, every run
-committed since the last write (from any problem) and the memory merges since the last
-write, in `seq` order. Progress inside a problem lives in memory and is served from
-there; Running and Paused are live states that are never stored.
+The user's decision (2026-10-30): "a Training Mode Session only does database writes when it is put into a
+'Stopped' state. It may do database reads at other times."
 
-On start the memory is rebuilt from the stored merges, problems resume at the seeds
-they have not stored, and anything after the last milestone is redone. Runs are
-deterministic, so the redone work gives the identical result.
+- **A Stopped session is a record.** Creating it, renaming it, changing its policy, adding problems, cancelling
+  a problem and deleting it are API writes, each in its own transaction.
+- **A live session writes nothing.** Its runs, Episodic Memory merges, problems, problem outcomes and name,
+  note and policy edits grow in memory until Stop, and every read of it (summary, problem list, runs, the
+  `finished` long-poll, the export) is served from there. The scheduler's own work (dispatch, merge, a
+  problem finishing) issues no database statement at all.
+- **Every summary and change report says so.** `persisted` is false for a live session; `source` is `live`
+  or `stored`; `saved_through` is what the database holds (`stopped_at`, `configuration_revision`, `episode_version`);
+  `unsaved` counts what only memory holds (`runs`, `merges`, `problems`, `outcomes`, `edits`,
+  `configuration_batches`) and is null for a Stopped session. The Training Mode Session view shows it.
+- **Problem ids are per-session ordinals** (1, 2, 3 ... within a session), so the id a live session hands out
+  is the id the row is stored with.
+- **If the process dies, everything since the last Stop is lost.** The database stays consistent, and the
+  session is Stopped at its last Stop. Runs are deterministic, so work redone after a Start gives the
+  identical result.
 
 ### With and without the plugin
 

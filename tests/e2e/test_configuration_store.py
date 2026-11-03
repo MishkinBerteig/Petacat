@@ -131,14 +131,23 @@ async def test_the_hook_runs_only_after_a_committed_change_to_the_global_configu
 
 
 @pytest.mark.asyncio
-async def test_a_failed_refresh_keeps_the_previous_provider_and_says_so(app_client):
+async def test_a_failed_refresh_keeps_the_previous_provider_and_says_so(app_client, monkeypatch):
+    from server.services import journal
     from server.services.configuration_store import get_configuration_store
 
     store = get_configuration_store()
     before = store.current()
-    resp = await app_client.put(
-        "/api/admin/params/expiration_period", json={"value": "not a number", "value_type": "int"}
-    )
+
+    async def cannot_load(session):
+        raise RuntimeError("the configuration cannot be built")
+
+    # the change API refuses a value that is not an int, so the refusal this test needs is
+    # made by a hook that cannot load the configuration the (valid) change leaves
+    with monkeypatch.context() as patched:
+        patched.setattr(journal, "_global_commit_hook", cannot_load)
+        resp = await app_client.put(
+            "/api/admin/params/expiration_period", json={"value": "501", "value_type": "int"}
+        )
     assert resp.status_code == 500
     assert "previous configuration" in resp.json()["detail"]
     assert store.current() is before

@@ -15,6 +15,7 @@ import { UrgencyLevelEditor } from './UrgencyLevelEditor'
 import { FormulaCoefficientEditor } from './FormulaCoefficientEditor'
 import { ConfigurationPanel } from './ConfigurationPanel'
 import { ConfigurationBanner } from './ConfigurationBanner'
+import { DatabasePanel } from './database/DatabasePanel'
 
 const TABS = [
   { key: 'configuration', label: 'Configuration' },
@@ -31,6 +32,7 @@ const TABS = [
   { key: 'commentary', label: 'Commentary Templates' },
   { key: 'layout', label: 'Slipnet Layout' },
   { key: 'help', label: 'Help Topics' },
+  { key: 'database', label: 'Database (all modes)' },
 ] as const
 
 type TabKey = typeof TABS[number]['key']
@@ -203,6 +205,7 @@ export function AdminLayout({ editNodeName, onClearEditNode }: AdminLayoutProps)
         {activeTab === 'commentary' && <CommentaryTemplateEditor />}
         {activeTab === 'layout' && <SlipnetLayoutEditor />}
         {activeTab === 'help' && <HelpTopicEditor />}
+        {activeTab === 'database' && <DatabasePanel />}
       </div>
     </div>
   )

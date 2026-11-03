@@ -11,10 +11,14 @@ memory can be rebuilt exactly.
 clears are ``episodic_memory_clears`` in ``server/models/run.py``.  A Training Mode Session is a different
 thing.)
 
-The database is written only at milestones (see ``server/services/training_mode_session_service.py``):
-a Training Mode Session or its problems are created or changed, and **once when a problem finishes** --
-that problem's summary, every run committed since the last write from any problem, and the
-memory merges since the last write, in one transaction.  ``running`` is live-only.
+The database is written only when a Training Mode Session is Stopped (see
+``server/services/training_mode_session_service.py``): the Stop write puts the session row, new
+problems, outcomes, runs and memory merges in one transaction.  A Stopped session's record is
+written at once (creating it, renaming it, adding problems).  ``running`` is live-only.
+
+A problem's identifier is a per-session **ordinal**: ``(session_id, problem_id)`` is its key,
+so the identifier a live session hands out is the stored one.  Runs and merges name their
+problem by the same ordinal.
 
 A Training Mode Session row carries no live state.  Its state (Stopped, Running or Paused) is held by the
 service: a Training Mode Session that is not live is **Stopped**, which is every Training Mode Session after a server
@@ -29,7 +33,7 @@ runtime tables whose value sets are fixed by the service.
 from __future__ import annotations
 
 from sqlalchemy import (
-    BigInteger, CheckConstraint, Column, DateTime, Float, ForeignKey, Index, Integer,
+    BigInteger, CheckConstraint, Column, DateTime, Float, ForeignKey, ForeignKeyConstraint, Index, Integer,
     String, Text, UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import JSONB
@@ -64,8 +68,10 @@ class TrainingModeSession(Base):
     policy = Column(JSONB, nullable=False)
     #: ``hashing.config_hash`` of the metadata the Training Mode Session runs under.
     config_hash = Column(String(64), nullable=False, default="")
-    #: The last ``finished_seq`` handed out; incremented in the finishing transaction.
+    #: The last ``finished_seq`` handed out, as of the last Stop.
     finished_count = Column(Integer, nullable=False, default=0)
+    #: The next per-session problem ordinal, as of the last Stop.
+    next_problem_id = Column(Integer, nullable=False, default=1)
     #: A human sentence for the last time a policy acted ("paused: 5 errors ...").
     last_event = Column(Text, nullable=True)
     created_at = Column(DateTime, nullable=False, default=_utcnow)
@@ -86,10 +92,11 @@ class TrainingModeSessionProblem(Base):
         Index("ix_training_mode_session_problems_session_seq", "session_id", "finished_seq"),
     )
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
     session_id = Column(
-        Integer, ForeignKey("training_mode_sessions.id", ondelete="CASCADE"), nullable=False, index=True
+        Integer, ForeignKey("training_mode_sessions.id", ondelete="CASCADE"), primary_key=True
     )
+    #: The problem's ordinal within its session (the API's ``problem_id``).
+    problem_id = Column(Integer, primary_key=True, autoincrement=False)
     initial = Column(String(64), nullable=False)
     modified = Column(String(64), nullable=False)
     target = Column(String(64), nullable=False)
@@ -125,7 +132,12 @@ class TrainingModeSessionProblem(Base):
 class TrainingModeSessionRun(Base):
     __tablename__ = "training_mode_session_runs"
     __table_args__ = (
-        UniqueConstraint("problem_id", "seed", name="uq_training_mode_session_runs_problem_seed"),
+        ForeignKeyConstraint(
+            ["session_id", "problem_id"],
+            ["training_mode_session_problems.session_id", "training_mode_session_problems.problem_id"],
+            ondelete="CASCADE",
+        ),
+        UniqueConstraint("session_id", "problem_id", "seed", name="uq_training_mode_session_runs_problem_seed"),
         Index("ix_training_mode_session_runs_session_seq", "session_id", "seq"),
     )
 
@@ -133,9 +145,8 @@ class TrainingModeSessionRun(Base):
     session_id = Column(
         Integer, ForeignKey("training_mode_sessions.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    problem_id = Column(
-        Integer, ForeignKey("training_mode_session_problems.id", ondelete="CASCADE"), nullable=False
-    )
+    #: The problem's ordinal in the session.
+    problem_id = Column(Integer, nullable=False)
     seed = Column(Integer, nullable=False)
     status = Column(String(16), nullable=False)
     #: ``answer`` | ``*CAP*`` | ``*ERROR*`` | ``*NONE*``.

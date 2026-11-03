@@ -34,7 +34,7 @@ from pathlib import Path
 
 import pytest
 
-from server.models.journal import Configuration, JournalEntry
+from server.models.journal import Configuration, ConfigurationSnapshot, JournalEntry
 from server.services import config_registry
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -53,13 +53,15 @@ WRITE_DEFERRED_CALLERS: set[tuple[str, str]] = set()
 #: speculative executor (3.11).
 NEVER_WRITE_JOURNAL = ("engine/", "parallel/")
 
-_JOURNAL_TABLES = {Configuration.__tablename__, JournalEntry.__tablename__}
+_JOURNAL_TABLES = {
+    Configuration.__tablename__, ConfigurationSnapshot.__tablename__, JournalEntry.__tablename__,
+}
 PROTECTED_TABLES = set(config_registry.configuration_table_names()) | _JOURNAL_TABLES
 PROTECTED_CLASSES = {m.__name__ for m in config_registry.configuration_models().values()} | {
-    Configuration.__name__, JournalEntry.__name__,
+    Configuration.__name__, ConfigurationSnapshot.__name__, JournalEntry.__name__,
 }
 #: The module-level names of the layer's table objects, which a caller could import.
-PROTECTED_OBJECTS = {"_CONFIGURATIONS", "_JOURNAL"}
+PROTECTED_OBJECTS = {"_CONFIGURATIONS", "_JOURNAL", "_SNAPSHOTS"}
 
 _BUILDERS = {"insert", "update", "delete", "pg_insert", "sa_insert", "sa_update", "sa_delete"}
 _SESSION_WRITES = {"add", "add_all", "delete", "merge"}
@@ -224,7 +226,7 @@ def test_the_table_list_is_computed_by_introspection_and_covers_every_configurat
     }
     assert PROTECTED_TABLES >= names - {"help_topics"}
     assert "help_topics" not in PROTECTED_TABLES  # content, not configuration (3.6)
-    assert _JOURNAL_TABLES == {"configurations", "configuration_journal"}
+    assert _JOURNAL_TABLES == {"configurations", "configuration_snapshots", "configuration_journal"}
 
 
 @pytest.mark.parametrize(
@@ -300,7 +302,8 @@ def test_the_layer_has_exactly_the_two_doors():
             for c in ast.walk(n)
         )
     }
-    assert writers == {"_write", "write_deferred"}
+    # a configuration's meta edit (name, note, frozen) is a journal entry with no ops (C8)
+    assert writers == {"_write", "write_deferred", "update_configuration_meta"}
 
 
 def test_write_deferred_is_called_only_from_the_stop_write():

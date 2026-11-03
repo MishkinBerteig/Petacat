@@ -56,6 +56,8 @@ export function SessionDetail({ session, limits, notice, onSessionChanged, onDel
   const [newName, setNewName] = useState('');
 
   const live = session.state !== 'stopped';
+  // Starting and Stopping are transient: the server refuses every change in them (409 busy).
+  const transient = session.state === 'starting' || session.state === 'stopping';
   const label = session.name || `Training Mode Session ${session.id}`;
 
   const act = async (what: string, fn: () => Promise<SessionSummary>) => {
@@ -102,7 +104,7 @@ export function SessionDetail({ session, limits, notice, onSessionChanged, onDel
   const handleDelete = async () => {
     if (
       !window.confirm(
-        `Delete "${label}"? Its problems, runs and Episodic Memory are removed from the database${live ? ', and its live state is discarded' : ''}. This cannot be undone.`,
+        `Delete "${label}"? Its problems, runs and Episodic Memory are removed from the database${live ? ', and its live state is discarded without being saved' : ''}. This cannot be undone.`,
       )
     )
       return;
@@ -185,6 +187,7 @@ export function SessionDetail({ session, limits, notice, onSessionChanged, onDel
             {session.last_event}
           </div>
         )}
+        <SavedLine session={session} />
         {session.state === 'stopped' && session.stopped_at && (
           <div className="text-xs text-muted" data-testid="stopped-line">
             Stopped {fmtTime(session.stopped_at)}
@@ -229,10 +232,14 @@ export function SessionDetail({ session, limits, notice, onSessionChanged, onDel
             <button
               disabled={busy}
               onClick={() => void act('start the Training Mode Session', () => startSession(session.id))}
-              title="Run the Training Mode Session from where it stopped"
+              title="Load the Training Mode Session from the database and run it from where it stopped"
             >
               Start
             </button>
+          ) : session.state === 'starting' ? (
+            <button disabled>Starting…</button>
+          ) : session.state === 'stopping' ? (
+            <button disabled>Stopping…</button>
           ) : session.state === 'paused' ? (
             <button disabled={busy} onClick={() => void act('resume the Training Mode Session', () => resumeSession(session.id))}>
               Resume
@@ -247,16 +254,20 @@ export function SessionDetail({ session, limits, notice, onSessionChanged, onDel
             </button>
           )}
           <button
-            disabled={busy || !live}
+            disabled={busy || !live || transient}
             onClick={() => void act('stop the Training Mode Session', () => stopSession(session.id))}
-            title="Return to Stopped: runs in flight are dropped, everything else is kept, and Start continues from there"
+            title="Save the Training Mode Session to the database and return to Stopped: runs in flight get a short time to finish, and Start continues from there"
           >
             Stop
           </button>
-          <button disabled={busy} onClick={handleCancel} title="Cancel every queued and running problem; the state does not change">
+          <button
+            disabled={busy || transient}
+            onClick={handleCancel}
+            title="Cancel every queued and running problem; the state does not change"
+          >
             Cancel
           </button>
-          <button disabled={busy} onClick={() => void handleDelete()}>
+          <button disabled={busy || transient} onClick={() => void handleDelete()}>
             Delete
           </button>
           <ControlHelp topic="session_run_state" label="start, pause, resume, stop and cancel" />
@@ -413,16 +424,21 @@ function AddProblems({
     setError(null);
     setDone(null);
     let added = 0;
+    let persisted = true;
     try {
       let latest = session;
       for (const part of chunk(parsed.problems, limits?.max_problems_per_request ?? FALLBACK_REQUEST_SIZE)) {
         if (part.length === 0) continue;
         const res = await addSessionProblems(session.id, part);
         added += res.added;
+        persisted = res.persisted;
         latest = res.session;
         onSessionChanged(latest);
       }
-      setDone(`Added ${added.toLocaleString()} problems.`);
+      setDone(
+        `Added ${added.toLocaleString()} problems.` +
+          (persisted ? '' : ' They are held in memory until the session is Stopped.'),
+      );
       setText('');
     } catch (err) {
       setError(
@@ -446,6 +462,11 @@ function AddProblems({
           This Training Mode Session is stopped: problems are stored now and run when it is started.
         </div>
       )}
+      {(session.state === 'starting' || session.state === 'stopping') && (
+        <div className="text-xs text-muted" style={{ margin: '4px 0' }} data-testid="add-problems-busy">
+          This Training Mode Session is {session.state}: it takes no changes until that finishes.
+        </div>
+      )}
       <div style={{ marginTop: 6 }}>
         <ProblemTextInput id="add-problems-text" value={text} onChange={setText} disabled={busy} demos rows={3} />
         <ProblemPreview parsed={parsed} seedsPerProblem={session.settings.seeds_per_problem} />
@@ -461,10 +482,44 @@ function AddProblems({
         </div>
       )}
       <div style={{ marginTop: 8 }}>
-        <button disabled={busy || parsed.problems.length === 0} onClick={() => void add()}>
+        <button
+          disabled={busy || parsed.problems.length === 0 || session.state === 'starting' || session.state === 'stopping'}
+          onClick={() => void add()}
+        >
           {busy ? 'Adding…' : `Add ${parsed.problems.length.toLocaleString()} problems`}
         </button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Where what is shown comes from. A live session is held in memory and writes nothing to the
+ * database until it is Stopped, so it says what the database holds (`saved_through`) and what only
+ * memory holds (`unsaved`); a Stopped one is the database.
+ */
+function SavedLine({ session }: { session: SessionSummary }) {
+  const u = session.unsaved;
+  if (session.source === 'stored' || u === null) {
+    return (
+      <div className="text-xs text-muted" data-testid="session-saved-line">
+        Stored: this is what the database holds.
+      </div>
+    );
+  }
+  const through = session.saved_through;
+  const held: string[] = [];
+  if (u.runs > 0) held.push(`${fmtInt(u.runs)} runs`);
+  if (u.merges > 0) held.push(`${fmtInt(u.merges)} Episodic Memory merges`);
+  if (u.problems > 0) held.push(`${fmtInt(u.problems)} added problems`);
+  if (u.outcomes > 0) held.push(`${fmtInt(u.outcomes)} finished or cancelled problems`);
+  if (u.edits > 0) held.push(`${fmtInt(u.edits)} edits`);
+  if (u.configuration_batches > 0) held.push(`${fmtInt(u.configuration_batches)} configuration changes`);
+  return (
+    <div className="text-xs text-muted" data-testid="session-saved-line">
+      Live: held in memory, and written to the database only when it is Stopped. The database holds it as of{' '}
+      {through.stopped_at ? `the Stop of ${fmtTime(through.stopped_at)}` : 'creation'} (Episodic Memory version{' '}
+      {fmtInt(through.episode_version)}). Not yet saved: {held.length > 0 ? held.join(', ') : 'nothing'}.
     </div>
   );
 }

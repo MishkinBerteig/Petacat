@@ -468,9 +468,13 @@ async def test_write_deferred_refuses_a_gap_the_global_configuration_and_a_faile
         assert await read_entries(session, cid) == []
 
 
-async def test_write_immediate_is_for_the_global_configuration_until_c8(loaded):
+async def test_write_immediate_to_a_session_configuration_needs_its_stored_state(loaded):
+    """A session configuration is written to its stored current state (C8); a bare row
+    without one (as ``_session_configuration`` makes) is refused, not written."""
+    from server.services.journal import JournalError
+
     cid = await _session_configuration(loaded)
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(JournalError, match="stored current state"):
         await _write(loaded, [_node("plato-zz")], configuration_id=cid)
 
 

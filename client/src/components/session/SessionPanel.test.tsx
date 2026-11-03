@@ -78,7 +78,6 @@ const POLICY: SessionErrorPolicy = {
   max_errors_total: null,
   on_worker_failure: 'retry',
   max_retries: 3,
-  on_config_change: 'pause',
 }
 
 function session(over: Partial<SessionSummary> = {}): SessionSummary {
@@ -112,6 +111,10 @@ function session(over: Partial<SessionSummary> = {}): SessionSummary {
     runs_per_second: 42.5,
     eta_seconds: 125,
     finished_cursor: 2,
+    source: 'live',
+    persisted: false,
+    saved_through: { stopped_at: null, configuration_revision: null, episode_version: 0 },
+    unsaved: { runs: 250, merges: 250, problems: 0, outcomes: 2, edits: 0, configuration_batches: 0 },
     ...over,
   }
 }
@@ -297,7 +300,7 @@ describe('SessionPanel: creating a session', () => {
   }
 
   it('previews what was parsed and creates the session with the form values', async () => {
-    m.createSession.mockResolvedValue({ session: session({ id: 7, name: 'Fresh' }), added: 2, problem_ids: [1, 2] })
+    m.createSession.mockResolvedValue({ session: session({ id: 7, name: 'Fresh' }), added: 2, problem_ids: [1, 2], persisted: true })
     m.getSession.mockResolvedValue(session({ id: 7, name: 'Fresh' }))
     await openForm()
 
@@ -331,7 +334,7 @@ describe('SessionPanel: creating a session', () => {
 
   it('sends the dashboard overrides only when the box is ticked', async () => {
     useRunStore.setState({ parameterOverrides: { some_param: 3 } })
-    m.createSession.mockResolvedValue({ session: session({ id: 7 }), added: 1, problem_ids: [1] })
+    m.createSession.mockResolvedValue({ session: session({ id: 7 }), added: 1, problem_ids: [1], persisted: true })
     await openForm()
     user.type(screen.getByLabelText('Problems'), 'abc abd xyz')
     fireEvent.click(screen.getByLabelText(/Use the dashboard's parameter overrides/))
@@ -345,8 +348,8 @@ describe('SessionPanel: creating a session', () => {
       ...LIST,
       limits: { ...LIST.limits, max_problems_per_request: 2 },
     })
-    m.createSession.mockResolvedValue({ session: session({ id: 7 }), added: 2, problem_ids: [1, 2] })
-    m.addSessionProblems.mockResolvedValue({ session: session({ id: 7 }), added: 2, problem_ids: [3, 4] })
+    m.createSession.mockResolvedValue({ session: session({ id: 7 }), added: 2, problem_ids: [1, 2], persisted: true })
+    m.addSessionProblems.mockResolvedValue({ session: session({ id: 7 }), added: 2, problem_ids: [3, 4], persisted: true })
     await openForm()
     user.type(
       screen.getByLabelText('Problems'),
@@ -363,7 +366,7 @@ describe('SessionPanel: creating a session', () => {
 
   it('selects the session and says so when a later request fails', async () => {
     m.listSessions.mockResolvedValue({ ...LIST, limits: { ...LIST.limits, max_problems_per_request: 1 } })
-    m.createSession.mockResolvedValue({ session: session({ id: 7 }), added: 1, problem_ids: [1] })
+    m.createSession.mockResolvedValue({ session: session({ id: 7 }), added: 1, problem_ids: [1], persisted: true })
     m.addSessionProblems.mockRejectedValue(apiError(422, 'too many'))
     m.getSession.mockResolvedValue(session({ id: 7 }))
     await openForm()
@@ -509,7 +512,7 @@ describe('SessionPanel: the session detail', () => {
 
 describe('SessionPanel: adding problems', () => {
   it('adds the parsed problems to an open session', async () => {
-    m.addSessionProblems.mockResolvedValue({ session: session(), added: 2, problem_ids: [5, 6] })
+    m.addSessionProblems.mockResolvedValue({ session: session(), added: 2, problem_ids: [5, 6], persisted: false })
     m.getSession.mockResolvedValue(session())
     render(<SessionPanel initialSessionId={1} />)
     const box = await screen.findByTestId('add-problems')
@@ -521,7 +524,25 @@ describe('SessionPanel: adding problems', () => {
       { initial: 'abc', modified: 'abd', target: 'ijk', answer: null },
       { initial: 'abc', modified: 'abd', target: 'xyz', answer: 'wyz' },
     ])
-    expect(await within(box).findByText('Added 2 problems.')).toBeInTheDocument()
+    // A live session holds them in memory until it is Stopped, and says so.
+    expect(
+      await within(box).findByText('Added 2 problems. They are held in memory until the session is Stopped.'),
+    ).toBeInTheDocument()
+  })
+
+  it('says nothing about memory when the session is Stopped and the problems are stored at once', async () => {
+    m.addSessionProblems.mockResolvedValue({
+      session: session({ state: 'stopped', source: 'stored', persisted: true, unsaved: null }),
+      added: 1,
+      problem_ids: [3],
+      persisted: true,
+    })
+    m.getSession.mockResolvedValue(session({ state: 'stopped', source: 'stored', persisted: true, unsaved: null }))
+    render(<SessionPanel initialSessionId={1} />)
+    const box = await screen.findByTestId('add-problems')
+    user.type(within(box).getByLabelText('Problems'), 'abc abd xyz')
+    fireEvent.click(within(box).getByRole('button', { name: 'Add 1 problems' }))
+    expect(await within(box).findByText('Added 1 problems.')).toBeInTheDocument()
   })
 
   it('is enabled in every state: stopped, running and paused', async () => {
@@ -803,7 +824,7 @@ describe('SessionPanel: v2 features', () => {
     m.updateSession.mockRejectedValue(apiError(400, 'bad policy value'))
     await open()
     const editor = screen.getByTestId('policy-editor')
-    fireEvent.change(within(editor).getByLabelText('When the engine configuration changes'), { target: { value: 'adopt' } })
+    fireEvent.change(within(editor).getByLabelText('When a run raises an error'), { target: { value: 'pause' } })
     fireEvent.click(within(editor).getByRole('button', { name: 'Save policy' }))
     expect(await within(editor).findByRole('alert')).toHaveTextContent('bad policy value')
   })
@@ -988,7 +1009,7 @@ describe('SessionPanel: the new-session form (v2)', () => {
   })
 
   it('sends the max codelets, backend and policy, and no memory setting', async () => {
-    m.createSession.mockResolvedValue({ session: session({ id: 8 }), added: 1, problem_ids: [1] })
+    m.createSession.mockResolvedValue({ session: session({ id: 8 }), added: 1, problem_ids: [1], persisted: true })
     await openForm()
     user.type(screen.getByLabelText('Name (required)'), 'Ep')
     user.type(screen.getByLabelText('Max codelets per run'), '5000')
@@ -996,7 +1017,6 @@ describe('SessionPanel: the new-session form (v2)', () => {
     fireEvent.change(screen.getByLabelText('Backend (advanced)'), { target: { value: 'numpy' } })
     fireEvent.change(screen.getByLabelText('When a run raises an error'), { target: { value: 'skip_problem' } })
     fireEvent.change(screen.getByLabelText('Max errors per problem'), { target: { value: '3' } })
-    fireEvent.change(screen.getByLabelText('When the engine configuration changes'), { target: { value: 'adopt' } })
     user.type(screen.getByLabelText('Problems'), 'abc abd xyz')
     fireEvent.click(screen.getByRole('button', { name: 'Create session' }))
     await waitFor(() => expect(m.createSession).toHaveBeenCalled())
@@ -1011,7 +1031,6 @@ describe('SessionPanel: the new-session form (v2)', () => {
       ...POLICY,
       on_run_error: 'skip_problem',
       max_errors_per_problem: 3,
-      on_config_change: 'adopt',
     })
   })
 
@@ -1027,5 +1046,68 @@ describe('SessionPanel: the new-session form (v2)', () => {
     const section = screen.getByTestId('policy-section')
     expect(section.tagName).toBe('DETAILS')
     expect(within(section).getByText('When things go wrong')).toBeInTheDocument()
+  })
+})
+
+describe('SessionPanel: the Stopped rule (live and stored, saved_through, unsaved, busy)', () => {
+  async function open(b: Partial<SessionSummary> = {}) {
+    m.getSession.mockResolvedValue(session(b))
+    render(<SessionPanel initialSessionId={1} />)
+    return screen.findByTestId('session-detail')
+  }
+
+  it('says a live session is held in memory, what the database holds and what is not yet saved', async () => {
+    await open({
+      saved_through: { stopped_at: '2026-10-30T09:00:00', configuration_revision: null, episode_version: 7 },
+      unsaved: { runs: 250, merges: 250, problems: 3, outcomes: 2, edits: 1, configuration_batches: 0 },
+    })
+    const line = screen.getByTestId('session-saved-line')
+    expect(line).toHaveTextContent('Live: held in memory, and written to the database only when it is Stopped')
+    expect(line).toHaveTextContent('Episodic Memory version 7')
+    expect(line).toHaveTextContent(
+      'Not yet saved: 250 runs, 250 Episodic Memory merges, 3 added problems, 2 finished or cancelled problems, 1 edits.',
+    )
+  })
+
+  it('says nothing is unsaved for a live session that has not changed since the Stop', async () => {
+    await open({ unsaved: { runs: 0, merges: 0, problems: 0, outcomes: 0, edits: 0, configuration_batches: 0 } })
+    expect(screen.getByTestId('session-saved-line')).toHaveTextContent('Not yet saved: nothing.')
+  })
+
+  it('says a Stopped session is what the database holds', async () => {
+    await open({ state: 'stopped', source: 'stored', persisted: true, unsaved: null })
+    expect(screen.getByTestId('session-saved-line')).toHaveTextContent('Stored: this is what the database holds.')
+  })
+
+  it.each(['starting', 'stopping'] as const)('freezes every control while %s, because the server answers busy', async (state) => {
+    const detailBox = await open({ state })
+    expect(within(detailBox).getByTestId('state-badge')).toHaveTextContent(state)
+    expect(screen.getByRole('button', { name: state === 'starting' ? 'Starting…' : 'Stopping…' })).toBeDisabled()
+    for (const name of ['Stop', 'Cancel', 'Delete']) expect(screen.getByRole('button', { name })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: 'Pause' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Resume' })).not.toBeInTheDocument()
+    const box = screen.getByTestId('add-problems')
+    expect(within(box).getByTestId('add-problems-busy')).toHaveTextContent(`is ${state}`)
+    user.type(within(box).getByLabelText('Problems'), 'abc abd xyz')
+    expect(within(box).getByRole('button', { name: 'Add 1 problems' })).toBeDisabled()
+  })
+
+  it('shows the server busy refusal when a change is refused', async () => {
+    m.pauseSession.mockRejectedValue(apiError(409, 'busy: session 1 is stopping; wait for it to finish before you pause it'))
+    await open()
+    fireEvent.click(screen.getByRole('button', { name: 'Pause' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('busy: session 1 is stopping')
+  })
+
+  it('has no control for what a configuration change does (on_config_change is gone)', async () => {
+    await open()
+    expect(screen.queryByLabelText('When the engine configuration changes')).not.toBeInTheDocument()
+  })
+
+  it('says a live delete discards the unsaved state', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    await open()
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining('discarded without being saved'))
   })
 })

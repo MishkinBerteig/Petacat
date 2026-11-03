@@ -12,9 +12,11 @@ Two doors
     Any route, in its own transaction: applies a batch of resolved ops to the
     configuration's current-state tables, bumps the configuration's ``revision`` and
     appends the entry, all in one transaction.  The global configuration (Metacat Mode,
-    configuration 1) is written this way.  A session's configuration state belongs to the
-    configuration entity (C8); until it lands, ``write_immediate`` refuses a non-global
-    configuration.
+    configuration 1) is written this way, to its relational tables.  A Training Mode
+    Session's configuration is written the same way to its stored current state (a
+    ``ConfigDocument`` in ``configuration_snapshots``, role ``current``): the ops are applied
+    to the document, and the entry, the revision and the new state commit together.  Both
+    produce the same resolved ops and before-images.
 
 ``write_deferred(session, ...)``
     Callable only from a session's Stop write.  Appends entries that were produced in
@@ -47,6 +49,13 @@ A ``before`` list parallels ``resolved``: the old row of an update or a delete, 
 Re-keying a row that other rows reference by ``ON UPDATE CASCADE`` is refused here; the
 change API's rename (C14) must list the dependents itself.
 
+A session configuration is created by :func:`create_session_configuration_rows` (its row, its
+stored current state, the creation batch as revision 1 and the immutable base snapshot) and
+its meta fields (name, note, ``frozen``) are changed by :func:`update_configuration_meta`
+(an entry with no ops; it takes the next revision).  A Stop write rewrites the stored current
+state with :func:`store_current_state`.  Deleting the session deletes its configuration, both
+snapshots and the journal by the database cascade, and nothing else removes a journal entry.
+
 Concurrency: the configuration's row is locked ``FOR UPDATE`` for the batch, so two
 writers of one configuration take consecutive revisions.
 """
@@ -64,11 +73,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.models.journal import (
     GLOBAL_CONFIGURATION_ID,
+    GLOBAL_CONFIGURATION_NAME,
     KIND_GLOBAL,
     KIND_SESSION,
+    SNAPSHOT_BASE,
+    SNAPSHOT_CURRENT,
     SOURCES,
     TRAINING_MODE_SOURCES,
     Configuration,
+    ConfigurationSnapshot,
     JournalEntry,
 )
 from server.services.config_registry import LAYER_REGISTRY, TableSpec
@@ -77,6 +90,7 @@ logger = logging.getLogger("petacat")
 
 _CONFIGURATIONS = Configuration.__table__
 _JOURNAL = JournalEntry.__table__
+_SNAPSHOTS = ConfigurationSnapshot.__table__
 
 #: The post-commit hook for the global configuration: ``await hook(session)``, called by
 #: ``write_immediate`` only after a change to the global configuration has committed (never
@@ -372,6 +386,124 @@ class _Applier:
         self._record({"op": "delete", "table": spec.name, "key": key}, _stored(spec, old))
 
 
+class _DocApplier:
+    """Applies a batch to a session configuration's ``ConfigDocument``: the same ops, the same
+    resolved ops and before-images as :class:`_Applier`, with no tables and no foreign keys."""
+
+    def __init__(self, document):
+        self.doc = document
+        self.resolved: list[dict] = []
+        self.before: list[dict | None] = []
+        self.rows: list[dict | None] = []
+
+    def _table(self, spec: TableSpec) -> Mapping:
+        return self.doc.tables[spec.name]
+
+    def _dkey(self, spec: TableSpec, mapping: Mapping[str, Any]) -> tuple:
+        return tuple("" if mapping.get(c) is None else mapping[c] for c in spec.key)
+
+    def _push(self, op: dict, before: dict | None) -> None:
+        from server.services import config_document as cd
+
+        self.doc = cd.apply_resolved(self.doc, [op], version=self.doc.version)
+        self.resolved.append(op)
+        self.before.append(before)
+
+    def _columns(self, spec: TableSpec, values: Mapping[str, Any]) -> dict:
+        unknown = set(values) - set(spec.columns)
+        if unknown:
+            raise JournalError(f"{spec.name}: no such column {sorted(unknown)}")
+        return {c: v for c, v in values.items() if c != spec.surrogate}
+
+    async def apply(self, op: Mapping[str, Any]) -> None:
+        kind = op.get("op")
+        spec = _spec(op.get("table", ""))
+        if spec.name not in self.doc.tables:
+            raise JournalError(f"{spec.name!r} is not held by a session configuration")
+        if kind == "insert":
+            self.rows.append(self._insert(spec, op))
+        elif kind == "update":
+            self.rows.append(self._update(spec, op))
+        elif kind == "delete":
+            self._delete(spec, self._existing(spec, op.get("key") or {}))
+            self.rows.append(None)
+        else:
+            raise JournalError(f"unknown op {kind!r}")
+
+    def _existing(self, spec: TableSpec, key: Mapping[str, Any]) -> dict:
+        old = self._table(spec).get(self._dkey(spec, key))
+        if old is None:
+            raise MissingKey(f"{spec.name}: {dict(key)!r} does not exist")
+        return dict(old)
+
+    def _default(self, spec: TableSpec, column_name: str, row: Mapping[str, Any]) -> Any:
+        column = spec.table.c[column_name]
+        default = column.default
+        if default is not None and getattr(default, "is_scalar", False):
+            return default.arg
+        if default is not None and getattr(default, "is_clause_element", False):
+            # ``_next_after_last``: one past the largest value the table holds (0 when empty).
+            values = [r[column_name] for r in self._table(spec).values()
+                      if r.get(column_name) is not None]
+            return (max(values) + 1) if values else 0
+        if column.nullable:
+            return None
+        raise JournalError(f"{spec.name}: the column {column_name!r} needs a value")
+
+    def _insert(self, spec: TableSpec, op: Mapping[str, Any]) -> dict:
+        given = self._columns(spec, {**(op.get("key") or {}), **(op.get("row") or {})})
+        row = {
+            c: given[c] if c in given else self._default(spec, c, given)
+            for c in spec.stored_columns
+        }
+        key = self._dkey(spec, row)
+        if key in self._table(spec):
+            raise KeyExists(f"{spec.name}: {spec.key_of(row)!r} already exists")
+        self._push({"op": "insert", "table": spec.name, "key": spec.key_of(row), "row": row}, None)
+        return dict(row)
+
+    def _update(self, spec: TableSpec, op: Mapping[str, Any]) -> dict:
+        old = self._existing(spec, op.get("key") or {})
+        changed = {
+            c: v for c, v in self._columns(spec, op.get("set") or {}).items() if old.get(c) != v
+        }
+        if not changed:
+            return old
+        if set(changed) & set(spec.key):
+            self._check_rekey(spec, old, changed)
+        self._push(
+            {"op": "update", "table": spec.name, "key": spec.key_of(old), "set": changed}, old
+        )
+        return {**old, **changed}
+
+    def _check_rekey(self, spec: TableSpec, old: dict, changed: dict) -> None:
+        new_key = self._dkey(spec, {**old, **changed})
+        if new_key != self._dkey(spec, old) and new_key in self._table(spec):
+            raise KeyExists(f"{spec.name}: {spec.key_of({**old, **changed})!r} already exists")
+        for child in LAYER_REGISTRY.values():
+            if child.name not in self.doc.tables:
+                continue
+            for fk in child.table.foreign_keys:
+                if fk.column.table is spec.table and fk.column.name in changed:
+                    if any(r.get(fk.parent.name) == old[fk.column.name]
+                           for r in self._table(child).values()):
+                        raise JournalError(
+                            f"{spec.name}: re-keying {fk.column.name!r} would cascade to "
+                            f"{child.name}; list the dependents' updates explicitly"
+                        )
+
+    def _delete(self, spec: TableSpec, old: dict) -> None:
+        for child, child_column, parent_column in _cascade_children(spec):
+            if child.name not in self.doc.tables:
+                continue
+            for dependent in [
+                dict(r) for r in self._table(child).values()
+                if r.get(child_column) == old[parent_column]
+            ]:
+                self._delete(child, dependent)
+        self._push({"op": "delete", "table": spec.name, "key": spec.key_of(old)}, old)
+
+
 # ──────────────────────────────────────────────────────────────────
 # The configuration row
 # ──────────────────────────────────────────────────────────────────
@@ -382,7 +514,8 @@ async def _lock_configuration(session: AsyncSession, configuration_id: int) -> d
     if configuration_id == GLOBAL_CONFIGURATION_ID:
         created = await session.execute(
             pg_insert(_CONFIGURATIONS)
-            .values(id=GLOBAL_CONFIGURATION_ID, kind=KIND_GLOBAL, revision=0)
+            .values(id=GLOBAL_CONFIGURATION_ID, kind=KIND_GLOBAL, revision=0,
+                    name=GLOBAL_CONFIGURATION_NAME)
             .on_conflict_do_nothing()
         )
         if created.rowcount:
@@ -494,12 +627,14 @@ async def _write(
             f"configuration {configuration_id} is at revision {configuration['revision']}, "
             f"not the expected {expected_revision}"
         )
-    if configuration["kind"] != KIND_GLOBAL:
-        raise NotImplementedError(
-            "write_immediate writes the global configuration; a session's configuration "
-            "state is written by the configuration entity (C8)"
-        )
-    applier = _Applier(session)
+    is_session = configuration["kind"] == KIND_SESSION
+    if is_session:
+        from server.services import config_document as cd
+
+        snapshot = await _current_snapshot(session, configuration_id)
+        applier = _DocApplier(cd.from_data(snapshot["data"]))
+    else:
+        applier = _Applier(session)
     for op in ops:
         await applier.apply(op)
     revision = configuration["revision"]
@@ -509,7 +644,11 @@ async def _write(
             configuration["config_hash"],
         )
     revision += 1
-    digest = await compute_config_hash(session) if compute_hash else None
+    if is_session:
+        new_document = cd.apply_resolved(applier.doc, [], version=revision)
+        digest = cd.config_hash(new_document) if compute_hash else None
+    else:
+        digest = await compute_config_hash(session) if compute_hash else None
     now = _now()
     entry_id = (
         await session.execute(
@@ -532,10 +671,197 @@ async def _write(
         .where(_CONFIGURATIONS.c.id == configuration_id)
         .values(revision=revision, config_hash=digest)
     )
+    if is_session:
+        await _save_current(session, configuration_id, new_document, revision, digest)
     return WriteResult(
         configuration_id, revision, entry_id, True, applier.resolved, applier.before,
         applier.rows, digest,
     )
+
+
+# ──────────────────────────────────────────────────────────────────
+# A session configuration: its stored states, creation and meta fields
+# ──────────────────────────────────────────────────────────────────
+
+
+async def _current_snapshot(session: AsyncSession, configuration_id: int) -> dict:
+    row = (
+        await session.execute(
+            select(_SNAPSHOTS).where(
+                _SNAPSHOTS.c.configuration_id == configuration_id,
+                _SNAPSHOTS.c.role == SNAPSHOT_CURRENT,
+            )
+        )
+    ).mappings().first()
+    if row is None:
+        raise JournalError(f"configuration {configuration_id} has no stored current state")
+    return dict(row)
+
+
+async def _save_current(
+    session: AsyncSession, configuration_id: int, document, revision: int, digest: str | None
+) -> None:
+    from server.services import config_document as cd
+
+    await session.execute(
+        update(_SNAPSHOTS)
+        .where(_SNAPSHOTS.c.configuration_id == configuration_id,
+               _SNAPSHOTS.c.role == SNAPSHOT_CURRENT)
+        .values(data=cd.to_data(document), revision=revision, config_hash=digest)
+    )
+
+
+async def store_current_state(
+    session: AsyncSession, configuration_id: int, document, *, revision: int,
+    config_hash: str | None,
+) -> None:
+    """Replace a session configuration's stored current state.  For a session's Stop write
+    (S5), in the same transaction as ``write_deferred`` of the entries that produced
+    ``document``; ``revision`` and ``config_hash`` are those of the last entry."""
+    configuration = await _lock_configuration(session, configuration_id)
+    if configuration["kind"] != KIND_SESSION:
+        raise JournalError("only a session configuration has a stored current state")
+    await _save_current(session, configuration_id, document, revision, config_hash)
+
+
+async def create_session_configuration_rows(
+    session: AsyncSession,
+    *,
+    session_id: int,
+    name: str,
+    document,
+    creation_ops: Sequence[Mapping[str, Any]] = (),
+    proposed: Any = None,
+    actor: str = "system",
+    note: str = "",
+    created_from_configuration_id: int | None = None,
+    created_from_revision: int | None = None,
+) -> WriteResult:
+    """Create a Training Mode Session's configuration in the caller's transaction (no commit).
+
+    ``document`` is the base (a ``ConfigDocument``).  The row, the stored current state at
+    revision 0 and, when ``creation_ops`` (resolved ops) is not empty, the creation batch
+    (``source = creation``, revision 1) are written; then the immutable base snapshot is the
+    state they leave: the Starting Conceptual State.  The result's ``configuration_id`` is the
+    new configuration.
+    """
+    from server.services import config_document as cd
+
+    digest = cd.config_hash(document)
+    configuration_id = (
+        await session.execute(
+            insert(_CONFIGURATIONS)
+            .values(
+                name=name, note="", kind=KIND_SESSION, session_id=session_id, revision=0,
+                config_hash=digest, frozen=False,
+                created_from_configuration_id=created_from_configuration_id,
+                created_from_revision=created_from_revision,
+            )
+            .returning(_CONFIGURATIONS.c.id)
+        )
+    ).scalar_one()
+    await session.execute(
+        insert(_SNAPSHOTS).values(
+            configuration_id=configuration_id, role=SNAPSHOT_CURRENT, revision=0,
+            config_hash=digest, data=cd.to_data(document),
+        )
+    )
+    creation_ops = list(creation_ops)
+    result = WriteResult(configuration_id, 0, None, False, config_hash=digest)
+    if creation_ops:
+        async with session.begin_nested():
+            result = await _write(
+                session, creation_ops, "creation", actor, configuration_id, "creation", note,
+                proposed, None, None, None, True,
+            )
+    snapshot = await _current_snapshot(session, configuration_id)
+    await session.execute(
+        insert(_SNAPSHOTS).values(
+            configuration_id=configuration_id, role=SNAPSHOT_BASE, revision=snapshot["revision"],
+            config_hash=snapshot["config_hash"], data=snapshot["data"],
+        )
+    )
+    await session.execute(
+        update(_CONFIGURATIONS)
+        .where(_CONFIGURATIONS.c.id == configuration_id)
+        .values(base_snapshot_hash=snapshot["config_hash"])
+    )
+    await session.flush()
+    return result
+
+
+META_FIELDS = ("name", "note", "frozen")
+
+
+async def update_configuration_meta(
+    session: AsyncSession,
+    configuration_id: int,
+    fields: Mapping[str, Any],
+    *,
+    actor: str,
+    source: str = "admin",
+    channel: str = "admin_configurations",
+    note: str = "",
+    commit: bool = True,
+) -> WriteResult:
+    """Change a configuration's ``name``, ``note`` or ``frozen`` as a journaled entry.
+
+    The entry has no ops (``resolved`` and ``before`` are empty; ``proposed`` records the
+    new values under ``meta`` and the old ones under ``was``) and takes the next revision;
+    the configuration's content and ``config_hash`` are unchanged.  A change that alters
+    nothing writes nothing.
+    """
+    unknown = set(fields) - set(META_FIELDS)
+    if unknown:
+        raise JournalError(f"not a meta field: {sorted(unknown)}")
+    try:
+        configuration = await _lock_configuration(session, configuration_id)
+        _check_source(configuration["kind"], source)
+        changed = {k: v for k, v in fields.items() if configuration[k] != v}
+        if not changed:
+            result = WriteResult(
+                configuration_id, configuration["revision"], None, False,
+                config_hash=configuration["config_hash"],
+            )
+        else:
+            revision = configuration["revision"] + 1
+            now = _now()
+            entry_id = (
+                await session.execute(
+                    insert(_JOURNAL)
+                    .values(
+                        **_entry_values(
+                            configuration_id, revision, source=source, actor=actor,
+                            channel=channel, note=note,
+                            proposed={"meta": changed,
+                                      "was": {k: configuration[k] for k in changed}},
+                            resolved=[], before=[], config_hash=configuration["config_hash"],
+                            occurred_at=now, recorded_at=now,
+                        )
+                    )
+                    .returning(_JOURNAL.c.id)
+                )
+            ).scalar_one()
+            await session.execute(
+                update(_CONFIGURATIONS)
+                .where(_CONFIGURATIONS.c.id == configuration_id)
+                .values(revision=revision, **changed)
+            )
+            result = WriteResult(
+                configuration_id, revision, entry_id, True,
+                config_hash=configuration["config_hash"],
+            )
+        if commit:
+            await session.commit()
+        else:
+            await session.flush()
+    except BaseException:
+        if commit:
+            await session.rollback()
+        raise
+    if commit and result.changed and configuration_id == GLOBAL_CONFIGURATION_ID:
+        await _run_global_commit_hook(session)  # the store's revision follows the row's
+    return result
 
 
 # ──────────────────────────────────────────────────────────────────

@@ -15,7 +15,6 @@ export const FALLBACK_POLICY: SessionErrorPolicy = {
   max_errors_total: null,
   on_worker_failure: 'retry',
   max_retries: 3,
-  on_config_change: 'pause',
 };
 
 function numOrNull(text: string): number | null {
@@ -111,20 +110,6 @@ export function PolicyFields({ idPrefix, policy, onChange, disabled }: Props) {
             onChange={(e) => set({ max_retries: numOrNull(e.target.value) ?? 0 })}
             style={{ width: 70 }}
           />
-        </div>
-        <div style={fieldGroupStyle}>
-          <label style={labelStyle} htmlFor={id('on-config')}>
-            When the engine configuration changes
-          </label>
-          <select
-            id={id('on-config')}
-            value={policy.on_config_change}
-            disabled={disabled}
-            onChange={(e) => set({ on_config_change: e.target.value as SessionErrorPolicy['on_config_change'] })}
-          >
-            <option value="pause">Pause</option>
-            <option value="adopt">Continue under the new configuration</option>
-          </select>
         </div>
       </div>
     </div>

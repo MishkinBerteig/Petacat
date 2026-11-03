@@ -124,3 +124,56 @@ def test_a_worker_reaches_a_version_from_its_cache_and_the_tail(additions):
     snap = tm.MemoryRef(7, "other-epoch", 3, snapshot=tm.snapshot_blob(master))
     assert tm.memory_fingerprint(tm.worker_master(snap)) == tm.memory_fingerprint(master)
     tm.forget_worker_cache()
+
+
+# ---------------------------------------------------------------------------
+# The pure ReplaySource interface and its in-memory implementation
+# ---------------------------------------------------------------------------
+
+
+def _entries(additions):
+    return [tm.ReplayEntry(i + 1, "memory_merge", pickle.loads(tm.dump_additions(a)))
+            for i, a in enumerate(additions)]
+
+
+def test_a_list_replay_source_hands_entries_over_in_seq_order_within_the_bounds(additions):
+    entries = _entries(additions)
+    source = tm.ListReplaySource(reversed(entries))  # given out of order, served by seq
+    assert [e.seq for e in source.entries()] == [1, 2, 3]
+    assert [e.seq for e in source.entries(after=1)] == [2, 3]
+    assert [e.seq for e in source.entries(upto=2)] == [1, 2]
+    assert [e.seq for e in source.entries(after=1, upto=2)] == [2]
+    assert list(source.entries(after=3)) == []
+    source.append(tm.ReplayEntry(4, "memory_merge", additions[0]))
+    assert [e.seq for e in source.entries(after=2)] == [3, 4]
+
+
+def test_replaying_the_entries_rebuilds_the_memory_that_merging_them_gives(additions):
+    merged = EpisodicMemory()
+    for adds in additions:
+        tm.apply_merge(merged, pickle.loads(tm.dump_additions(adds)))
+    source = tm.ListReplaySource(_entries(additions))
+    assert tm.memory_fingerprint(tm.replay_memory(source)) == tm.memory_fingerprint(merged)
+    first = EpisodicMemory()
+    tm.apply_merge(first, pickle.loads(tm.dump_additions(additions[0])))
+    assert tm.memory_fingerprint(tm.replay_memory(source, upto=1)) == tm.memory_fingerprint(first)
+    assert tm.memory_fingerprint(tm.replay_memory(source, upto=0)) == tm.memory_fingerprint(EpisodicMemory())
+
+
+def test_replay_ignores_entries_that_are_not_memory_merges(additions):
+    entries = _entries(additions) + [tm.ReplayEntry(4, "configuration", object())]
+    plain = tm.replay_memory(tm.ListReplaySource(_entries(additions)))
+    assert tm.memory_fingerprint(tm.replay_memory(tm.ListReplaySource(entries))) == tm.memory_fingerprint(plain)
+
+
+def test_a_replay_source_holds_no_connection_and_the_module_imports_no_database():
+    import server.services.training_mode_session_memory as module
+
+    source = inspect_source(module)
+    assert "sqlalchemy" not in source and "asyncio" not in source
+
+
+def inspect_source(module) -> str:
+    import inspect
+
+    return inspect.getsource(module)

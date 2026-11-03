@@ -24,43 +24,59 @@ with one worker each run starts after the previous one merged: Metacat's serial 
 
 States
 ------
-A Training Mode Session is **Stopped**, **Running** or **Paused**.  Only Running and Paused Training Mode Sessions are
-live (held in ``TrainingModeSessionService._live``); a Stopped one is a record in the database, and every
-Training Mode Session is Stopped after a server restart.  ``start`` loads a Stopped Training Mode Session (its memory
-rebuilt from the stored merges, its unfinished problems resumed at the seeds not stored);
-``stop`` writes what is still pending and drops the live part, recording ``stopped_from``
-(``running`` or ``paused``) and ``stop_reason`` (``user``, ``shutdown`` or ``error``).
-``cancel`` is an action, not a state: it cancels every queued and in-flight problem and
-changes no state.  Inside Running the activity is derived: ``idle`` (nothing unfinished) or
-``stalled`` (it cannot run: ``stalled_reason``).
+A Training Mode Session is **Stopped**, **Starting**, **Running**, **Paused** or **Stopping**.
+Only the last four are live (held in ``TrainingModeSessionService._live``, Starting being
+the load that precedes it); a Stopped one is a record in the database, and every session
+is Stopped after a server restart.  ``start`` loads a Stopped session (its
+memory rebuilt from the stored merges, its unfinished problems resumed at the seeds not
+stored); ``stop`` drains the runs in flight (up to ``drain_timeout``), writes everything
+the session produced since it started in one transaction and drops the live part,
+recording ``stopped_from`` (``running`` or ``paused``) and ``stop_reason`` (``user``,
+``shutdown`` or ``error``).  A failed Start leaves the session Stopped; a failed Stop
+returns it to Paused with its memory intact.  ``cancel`` is an action, not a state: it
+cancels every queued and in-flight problem and changes no state.  Inside Running the
+activity is derived: ``idle`` (nothing unfinished) or ``stalled`` (it cannot run:
+``stalled_reason``).  Starting and Stopping are transient and refuse every mutation with
+409 ``busy``.
 
-The database is written only at milestones
-------------------------------------------
-* a Training Mode Session is created or renamed, problems are added, its policy changes, it is stopped;
-* **a problem finishes all its seeds (or is cancelled)**: in one transaction, that problem's
-  summary, *every run committed since the last write from any problem*, and the memory
-  merges since the last write.
+The database is written only when a session is Stopped
+------------------------------------------------------
+The user's decision (2026-10-30): "a Training Mode Session only does database writes when
+it is put into a 'Stopped' state.  It may do database reads at other times."
 
-Progress inside a problem lives in memory and the API reports it from there.  The stored
-problem status is ``queued | finished | cancelled``; ``running`` is live-only.  On start
-the memory is rebuilt from the stored merges, each queued problem resumes at the seeds it
-has not stored, and anything after the last milestone is redone.
+* A *live* session (Running, Paused, Starting, Stopping) writes nothing.  Its runs, memory
+  merges, problems, problem outcomes and name, note and policy changes grow in memory
+  (``LiveSession``) until Stop, and the API reports them from there with
+  ``persisted: false``, ``saved_through`` (what the database holds) and ``unsaved`` (what
+  only memory holds).  A crash loses everything since the last Stop.
+* A *Stopped* session is a record: creating it, renaming it, adding problems and deleting
+  it are API writes, each in its own transaction.
+* The **Stop write** is the one write of a live session: the session row, new problems,
+  outcomes, runs and memory merges, in one transaction (``_write_stop``).  S5 adds the
+  journal entries, the configuration's stored current state and the memory snapshot to the
+  same transaction, and replaces the Start read's merge replay.
+
+A problem's identifier is a per-session **ordinal** (``(session, ordinal)`` is its key and
+the API's ``problem_id``), so an identifier handed out while live is the stored one.  The
+stored problem status is ``queued | finished | cancelled``; ``running`` is live-only.
 
 The scheduler
 -------------
-One asyncio task keeps the executor fed from the problems of every live Training Mode Session: seeds
+One asyncio task keeps the executor fed from the problems of every Running session: seeds
 of problems already started first (so they finish steadily), then the oldest queued
-problem, round-robin across Training Mode Sessions so a huge one cannot starve a small one.  Inserting
-a problem wakes it.
+problem, round-robin across sessions so a huge one cannot starve a small one.  Inserting
+a problem wakes it.  Nothing in its hot path (dispatch, merge, problem completion) reads
+or writes the database.
 
 Configuration and errors
 ------------------------
-A Training Mode Session runs under the ``MetadataProvider`` current at creation.  If the current
-configuration's ``config_hash`` differs, ``on_config_change`` decides: ``pause`` (the
-Training Mode Session is ``stalled`` until the configuration returns) or ``adopt`` (continue under the
-new one; each run records its ``config_hash``).  The rest of the error policy
-(``on_run_error``, ``max_errors_*``, ``on_worker_failure``, ``max_retries``) acts as the
-API contract says and writes a human sentence to ``last_event``.
+A session runs under the ``MetadataProvider`` current when each run is dispatched; each
+run records the ``config_hash`` it ran under.  Nothing pauses, adopts or rebases
+automatically (``on_config_change`` is removed): a session stalls only when the current
+configuration cannot start a run (the run-start check), and resumes when it can.  The rest
+of the error policy (``on_run_error``, ``max_errors_*``, ``on_worker_failure``,
+``max_retries``) acts as the API contract says and writes a human sentence to
+``last_event``.
 """
 
 from __future__ import annotations
@@ -77,7 +93,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, AsyncIterator, Callable
 
-from sqlalchemy import case, delete, func, insert, select, update
+from sqlalchemy import case, delete, false, func, insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from server.engine.hashing import config_hash
@@ -109,6 +125,12 @@ RUN_ROW_CHUNK = 2000
 #: Merge blobs the scheduler keeps for task tails.
 MERGE_KEEP = 1024
 INT32_MAX = 2_147_483_647
+#: Seconds a Stop waits for runs in flight to finish and merge before it discards them.
+DRAIN_TIMEOUT = 10.0
+#: Seconds a graceful shutdown waits for every live session to be stopped.
+SHUTDOWN_STOP_TIMEOUT = 120.0
+#: Sessions a graceful shutdown stops at once.
+SHUTDOWN_STOP_CONCURRENCY = 4
 
 DEFAULT_POLICY: dict[str, Any] = {
     "on_run_error": "record",
@@ -116,18 +138,12 @@ DEFAULT_POLICY: dict[str, Any] = {
     "max_errors_total": None,
     "on_worker_failure": "retry",
     "max_retries": 3,
-    "on_config_change": "pause",
 }
 _POLICY_CHOICES = {
     "on_run_error": ("record", "skip_problem", "pause", "cancel"),
     "on_worker_failure": ("retry", "pause"),
-    "on_config_change": ("pause", "adopt"),
 }
 _SETTINGS_KEYS = ("seeds_per_problem", "seed_start", "max_codelets", "parameters", "backend")
-
-
-class _Skip(Exception):
-    pass
 
 
 class SessionError(Exception):
@@ -137,6 +153,11 @@ class SessionError(Exception):
         super().__init__(detail)
         self.status = status
         self.detail = detail
+
+
+def _busy(session_id: int, what: str, state: str) -> SessionError:
+    """409 ``busy``: the session is Starting or Stopping and refuses *what* until that ends."""
+    return SessionError(409, f"busy: session {session_id} is {state}; wait for it to finish before you {what}")
 
 
 def _utcnow() -> datetime:
@@ -261,6 +282,8 @@ def _shares(distribution: list[dict] | None, runs_done: int, limit: int | None) 
 
 @dataclass
 class LiveProblem:
+    """A problem of a live session.  ``id`` is its per-session ordinal (the API's ``problem_id``)."""
+
     id: int
     session_id: int
     initial: str
@@ -269,6 +292,12 @@ class LiveProblem:
     answer: str | None
     seeds: int
     seed_start: int
+    tag: Any = None
+    added_at: datetime = field(default_factory=_utcnow)
+    #: ``queued`` (which includes running: see ``started``), ``finished`` or ``cancelled``.
+    status: str = "queued"
+    #: The database holds a row for it (it existed at Start); otherwise the Stop write inserts it.
+    stored: bool = False
     #: Seeds not yet dispatched (a failed one goes back on the front).
     todo: deque = field(default_factory=deque)
     inflight: int = 0
@@ -276,18 +305,26 @@ class LiveProblem:
     #: Failed attempts per seed (worker failures), for ``max_retries``.
     failures: dict[int, int] = field(default_factory=dict)
     started_at: datetime | None = None
+    finished_at: datetime | None = None
+    finished_seq: int | None = None
     cancelled: bool = False
-    finishing: bool = False
-    written: asyncio.Event | None = None
+    #: ``summarize`` of the outcomes and the counts the session summary adds, fixed when the
+    #: problem finishes or is cancelled.
+    tally: dict | None = None
+    counts: tuple = (0, 0, 0, 0, 0)
 
     @property
     def started(self) -> bool:
         return self.started_at is not None
 
+    @property
+    def settled(self) -> bool:
+        return self.status != "queued"
 
-@dataclass
+
+@dataclass(eq=False)
 class Sub:
-    """One dispatched run."""
+    """One dispatched run (compared and hashed by identity)."""
 
     lt: "LiveSession"
     lp: LiveProblem
@@ -297,13 +334,25 @@ class Sub:
     failures: int
     #: Re-run alone after a pool break (see ``_worker_failed``).
     isolated: bool = False
+    #: A Stop discarded it: its outcome is ignored when it arrives.
+    dropped: bool = False
 
 
 @dataclass
 class LiveSession:
+    """Everything a live (Starting-loaded, Running, Paused or Stopping) session holds.
+
+    Nothing here is in the database until the Stop write: the pending lists, the problems and
+    their outcomes, the name, note and policy as edited, the counters.  ``base`` is the
+    stored tally of the problems that were finished or cancelled at Start, which a live
+    session never changes.
+    """
+
     id: int
-    #: ``running`` or ``paused``; a Training Mode Session that is not live is Stopped.
+    #: ``running``, ``paused`` or ``stopping``; a session that is not live is Stopped.
     status: str
+    name: str
+    note: str
     seeds_per_problem: int
     seed_start: int
     max_codelets: int
@@ -312,15 +361,34 @@ class LiveSession:
     policy: dict
     config_hash: str
     meta: MetadataProvider | None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+    #: The last Stop the database holds (what ``saved_through`` reports).
+    stopped_at: datetime | None = None
+    stopped_from: str | None = None
+    stop_reason: str | None = None
+    saved_version: int = 0
     stalled_reason: str | None = None
     last_event: str | None = None
     queue: deque = field(default_factory=deque)        # LiveProblem not yet started
-    active: dict = field(default_factory=dict)         # pid -> LiveProblem, started and unwritten
-    problems: dict = field(default_factory=dict)       # pid -> LiveProblem, every unwritten one
+    active: dict = field(default_factory=dict)         # pid -> LiveProblem, started and unfinished
+    problems: dict = field(default_factory=dict)       # pid -> LiveProblem, every one since Start
     unsubmitted: int = 0
     completions: deque = field(default_factory=deque)
     cancelled: bool = False
     errors_total: int = 0
+    #: Next per-session problem ordinal and next ``finished_seq`` to hand out.
+    next_problem_id: int = 1
+    finished_count: int = 0
+    #: Problems finished or cancelled since Start that were given a ``finished_seq``, in order.
+    finished_log: list = field(default_factory=list)
+    #: Stored tally of the problems finished (``fin``) and cancelled (``can``) at Start:
+    #: (problems, seeds, runs_done, errors, codelets, capped, retries).
+    base_fin: tuple = (0,) * 7
+    base_can: tuple = (0,) * 7
+    #: Name, note and policy edits held in memory.
+    edits: int = 0
+    inflight_subs: set = field(default_factory=set)
     # -- the Episodic Memory --
     memory: EpisodicMemory = field(default_factory=EpisodicMemory)
     version: int = 0
@@ -368,6 +436,18 @@ class LiveSession:
         span = now - self.completions[0]
         return len(self.completions) / span if span > 0 else None
 
+    def unsaved(self) -> dict[str, int]:
+        """What only memory holds: the Stop write would write it."""
+        return {
+            "runs": len(self.pending_runs),
+            "merges": len(self.pending_merges),
+            "problems": sum(1 for lp in self.problems.values() if not lp.stored),
+            "outcomes": sum(1 for lp in self.problems.values() if lp.settled),
+            "edits": self.edits,
+            # The session's own configuration batches: held here once S3 gives a session a configuration.
+            "configuration_batches": 0,
+        }
+
     def memory_ref(self, tail_depth: int, snapshot: bool) -> tm.MemoryRef:
         """The memory a run dispatched now starts from."""
         ref = tm.MemoryRef(self.id, self.epoch, self.version)
@@ -397,6 +477,8 @@ class TrainingModeSessionService:
         self._meta_provider = meta_provider
         self._executor = executor
         self._live: dict[int, LiveSession] = {}
+        #: Sessions being loaded by ``start_session`` (the Starting state).
+        self._starting: set[int] = set()
         self._rr = 0
         self._inflight_runs = 0
         #: Runs to re-run one at a time after a pool break: (session, problem, seed).
@@ -404,16 +486,21 @@ class TrainingModeSessionService:
         self._isolated_inflight = 0
         #: Completed futures handed over by the executor's threads, merged by ``_drain``.
         self._done_queue: deque = deque()
-        self._status_locks: dict[int, asyncio.Lock] = {}
         self._wake: asyncio.Event | None = None
         self._task: asyncio.Task | None = None
         self._tasks: set[asyncio.Task] = set()
-        self._write_lock: asyncio.Lock | None = None
         self._versions: dict[int, int] = {}
         self._conds: dict[int, asyncio.Condition] = {}
         self._loop: asyncio.AbstractEventLoop | None = None
         self._stopped = True
+        #: True once a graceful shutdown has begun: no session may be started.
+        self._closing = False
         self._hashes: tuple[MetadataProvider, str] | None = None
+        self._start_checks: tuple[MetadataProvider, str | None] | None = None
+        #: Seconds a Stop waits for runs in flight before it discards them.
+        self.drain_timeout = DRAIN_TIMEOUT
+        #: Seconds a graceful shutdown waits for the live sessions to be stopped.
+        self.shutdown_stop_timeout = SHUTDOWN_STOP_TIMEOUT
         #: Test hook: ``(problem, seed, failures) -> "error" | "kill" | None``.
         self.fault_hook: Callable[[LiveProblem, int, int], str | None] | None = None
         #: Bytes of memory shipped with tasks (sum, count), for the overhead measurement.
@@ -429,17 +516,39 @@ class TrainingModeSessionService:
         """Start the scheduler.  Every Training Mode Session is Stopped: nothing is loaded until it is started."""
         self._loop = asyncio.get_running_loop()
         self._wake = asyncio.Event()
-        self._write_lock = asyncio.Lock()
         if self._executor is None:
             self._executor = create_executor()
         self._stopped = False
+        self._closing = False
         self._task = asyncio.create_task(self._run(), name="session-scheduler")
         self._wake.set()
 
     async def stop(self) -> None:
-        """Stop scheduling.  Progress after the last milestone is dropped; unfinished
-        problems resume from their stored seeds when the Training Mode Session is next started.  Each live
-        Training Mode Session is recorded as stopped by the shutdown, from its state."""
+        """Graceful shutdown: refuse new Starts, Stop every live session (concurrently, up to a
+        limit, each with ``stop_reason = shutdown``), then close the scheduler and the executor.
+
+        ``shutdown_stop_timeout`` abandons the sessions still being stopped; they are lost back to
+        their last Stop, exactly as in a crash, and the log says which and how much."""
+        self._closing = True
+        live = list(self._live.values())
+        if live and not self._stopped:
+            gate = asyncio.Semaphore(SHUTDOWN_STOP_CONCURRENCY)
+
+            async def one(lt: LiveSession) -> None:
+                async with gate:
+                    try:
+                        await self.stop_session(lt.id, reason="shutdown")
+                        logger.info("shutdown: session %d stopped", lt.id)
+                    except Exception:  # noqa: BLE001 - one failed Stop must not keep the others waiting
+                        logger.exception("shutdown: stopping session %d failed", lt.id)
+
+            try:
+                await asyncio.wait_for(asyncio.gather(*(one(lt) for lt in live)), self.shutdown_stop_timeout)
+            except asyncio.TimeoutError:
+                pass
+            for lt in self._live.values():
+                logger.error("shutdown: session %d was not stopped; its unsaved work (%s) is lost",
+                             lt.id, lt.unsaved())
         self._stopped = True
         tasks = [t for t in [self._task, *self._tasks] if t is not None]
         for t in tasks:
@@ -451,10 +560,8 @@ class TrainingModeSessionService:
                 pass
         self._task = None
         self._tasks.clear()
-        for lt in list(self._live.values()):
-            await self._persist(lt, stopped_at=_utcnow(), stopped_from=lt.status,
-                                stop_reason="shutdown")
         self._live.clear()
+        self._starting.clear()
         if self._executor is not None:
             self._executor.close()
 
@@ -464,35 +571,72 @@ class TrainingModeSessionService:
             cached = self._hashes = (meta, config_hash(meta))
         return cached[1]
 
+    def _start_problem(self, meta: MetadataProvider) -> str | None:
+        """Why the configuration cannot start a run (the run-start check), or ``None``."""
+        cached = self._start_checks
+        if cached is None or cached[0] is not meta:
+            try:
+                require_run_start(meta)
+                reason = None
+            except RunStartError as exc:
+                reason = str(exc)
+            cached = self._start_checks = (meta, reason)
+        return cached[1]
+
     def _new_live(self, t: TrainingModeSession, meta: MetadataProvider | None) -> LiveSession:
         return LiveSession(
-            id=t.id, status="running",
+            id=t.id, status="running", name=t.name, note=t.note or "",
             seeds_per_problem=t.seeds_per_problem, seed_start=t.seed_start,
             max_codelets=t.max_codelets, parameters=t.parameters, backend=t.backend,
             policy=normalize_policy(t.policy), config_hash=t.config_hash, meta=meta,
-            last_event=t.last_event,
+            created_at=t.created_at, updated_at=t.updated_at, stopped_at=t.stopped_at,
+            stopped_from=t.stopped_from, stop_reason=t.stop_reason, last_event=t.last_event,
+            next_problem_id=t.next_problem_id, finished_count=t.finished_count,
         )
 
-    def _enqueue(self, lt: LiveSession, p: Any, stored: dict[int, RunRec] | None = None) -> LiveProblem:
+    def _add_live_problem(self, lt: LiveSession, *, problem_id: int, spec: Any, stored: bool,
+                          done: dict[int, RunRec] | None = None) -> LiveProblem:
+        """Queue a problem in memory.  *spec* is a stored row or a request dict (both give the fields)."""
+        get = spec.get if isinstance(spec, dict) else (lambda k, d=None: getattr(spec, k, d))
+        seeds = get("seeds") or lt.seeds_per_problem
+        seed_start = get("seed_start") if get("seed_start") is not None else lt.seed_start
         lp = LiveProblem(
-            id=p.id, session_id=lt.id, initial=p.initial, modified=p.modified, target=p.target,
-            answer=p.answer, seeds=p.seeds, seed_start=p.seed_start,
+            id=problem_id, session_id=lt.id, initial=get("initial"), modified=get("modified"),
+            target=get("target"), answer=get("answer"), seeds=seeds, seed_start=seed_start,
+            tag=get("tag"), added_at=get("added_at") or _utcnow(), stored=stored,
         )
-        if stored:
-            lp.outcomes.update(stored)
-        lp.todo = deque(
-            s for s in range(p.seed_start, p.seed_start + p.seeds) if s not in lp.outcomes
-        )
+        if done:
+            lp.outcomes.update(done)
+        lp.todo = deque(s for s in range(seed_start, seed_start + seeds) if s not in lp.outcomes)
         lt.queue.append(lp)
         lt.problems[lp.id] = lp
         lt.unsubmitted += len(lp.todo)
         return lp
 
-    async def _load_one(self, s: AsyncSession, t: TrainingModeSession) -> tuple[LiveSession, list[LiveProblem]]:
-        """Build the live part of a Stopped Training Mode Session from the database: its Episodic Memory
-        rebuilt from the stored merges and its unfinished problems at the seeds not stored.
-        Returns it with the problems whose every seed was stored but whose own write was not."""
-        resumed: list[LiveProblem] = []
+    @staticmethod
+    async def _stored_totals(s: AsyncSession, ids: list[int]) -> dict[int, dict[str, tuple]]:
+        """Per session and stored status: (problems, seeds, runs_done, errors, codelets, capped, retries)."""
+        P = TrainingModeSessionProblem
+        rows = (await s.execute(
+            select(
+                P.session_id, P.status, func.count(),
+                func.coalesce(func.sum(P.seeds), 0), func.coalesce(func.sum(P.runs_done), 0),
+                func.coalesce(func.sum(P.errors), 0), func.coalesce(func.sum(P.codelets_total), 0),
+                func.coalesce(func.sum(P.capped), 0), func.coalesce(func.sum(P.retries), 0),
+            ).where(P.session_id.in_(ids)).group_by(P.session_id, P.status)
+        )).all()
+        out: dict[int, dict[str, tuple]] = {}
+        for sid, status, *vals in rows:
+            out.setdefault(sid, {})[status] = tuple(int(v) for v in vals)
+        return out
+
+    async def _load_one(self, s: AsyncSession, t: TrainingModeSession) -> LiveSession:
+        """The Start read: build the live part of a Stopped session from the database.
+
+        Reads only.  The Episodic Memory is rebuilt from the stored merges and the unfinished
+        problems come back with the runs stored for them, so they resume at the seeds not stored.
+        (S5 replaces the merge replay with the memory snapshot the Stop write stores, adds the
+        configuration's stored current state, and checks its ``config_hash``.)"""
         lt = self._new_live(t, None)
         merges = (await s.execute(
             select(SessionMemoryMerge).where(SessionMemoryMerge.session_id == t.id)
@@ -508,29 +652,30 @@ class TrainingModeSessionService:
                            t.id, len(merges), lt.version)
         for k in sorted(lt.merge_blobs)[:-MERGE_KEEP]:
             del lt.merge_blobs[k]
+        lt.saved_version = lt.version
+        P = TrainingModeSessionProblem
         problems = (await s.execute(
-            select(TrainingModeSessionProblem).where(
-                TrainingModeSessionProblem.session_id == t.id, TrainingModeSessionProblem.status == "queued"
-            ).order_by(TrainingModeSessionProblem.id)
+            select(P).where(P.session_id == t.id, P.status == "queued").order_by(P.problem_id)
         )).scalars().all()
         stored: dict[int, dict[int, RunRec]] = {}
         if problems:
             runs = (await s.execute(
-                select(TrainingModeSessionRun).join(TrainingModeSessionProblem, TrainingModeSessionProblem.id == TrainingModeSessionRun.problem_id)
-                .where(TrainingModeSessionRun.session_id == t.id, TrainingModeSessionProblem.status == "queued")
+                select(TrainingModeSessionRun).join(
+                    P, (P.session_id == TrainingModeSessionRun.session_id)
+                    & (P.problem_id == TrainingModeSessionRun.problem_id))
+                .where(TrainingModeSessionRun.session_id == t.id, P.status == "queued")
             )).scalars().all()
             for r in runs:
                 stored.setdefault(r.problem_id, {})[r.seed] = self._rec_from_row(r)
         for p in problems:
-            lp = self._enqueue(lt, p, stored.get(p.id))
+            lp = self._add_live_problem(lt, problem_id=p.problem_id, spec=p, stored=True,
+                                        done=stored.get(p.problem_id))
             lt.errors_total += sum(1 for r in lp.outcomes.values() if r.error)
-            if not lp.todo and lp.inflight == 0:
-                resumed.append(lp)
-        lt.errors_total += int((await s.execute(
-            select(func.coalesce(func.sum(TrainingModeSessionProblem.errors), 0)).where(
-                TrainingModeSessionProblem.session_id == t.id, TrainingModeSessionProblem.status != "queued")
-        )).scalar_one())
-        return lt, resumed
+        totals = (await self._stored_totals(s, [t.id])).get(t.id, {})
+        zero = (0,) * 7
+        lt.base_fin, lt.base_can = totals.get("finished", zero), totals.get("cancelled", zero)
+        lt.errors_total += lt.base_fin[3] + lt.base_can[3]
+        return lt
 
     @staticmethod
     def _rec_from_row(r: Any) -> RunRec:
@@ -546,65 +691,34 @@ class TrainingModeSessionService:
         if self._wake is not None:
             self._wake.set()
 
-    # -- configuration policy -----------------------------------------------
+    # -- the configuration a run starts under -------------------------------
 
-    def _check_configs(self, initial: bool = False) -> None:
-        """Apply ``on_config_change``: stall, adopt, or resume when the configuration returns."""
+    def _bind_configs(self) -> None:
+        """Each live session's next run starts under the current configuration (nothing pauses,
+        adopts or rebases: ``on_config_change`` is gone).  It stalls only while the current
+        configuration cannot start a run, and resumes when it can."""
         current = self._meta_provider()
         h = self._config_hash(current)
+        problem = self._start_problem(current)
         for lt in self._live.values():
             if lt.cancelled:
                 continue
-            if h == lt.config_hash:
-                lt.meta = current
-                if lt.stalled_reason is not None:
-                    lt.stalled_reason = None
-                    lt.last_event = "resumed: the engine configuration matches again"
-                continue
-            if lt.policy["on_config_change"] == "adopt":
-                old = lt.config_hash
-                lt.meta, lt.config_hash, lt.stalled_reason = current, h, None
-                lt.last_event = f"adopted a new engine configuration ({old[:12]} -> {h[:12]})"
-                self._spawn(self._persist(lt, config_hash=h, last_event=lt.last_event))
-            else:
+            lt.meta, lt.config_hash = current, h
+            if problem is not None:
                 if lt.stalled_reason is None:
-                    lt.last_event = "stalled: the engine configuration changed"
-                lt.meta = None
-                lt.stalled_reason = (
-                    "the engine configuration changed since the Training Mode Session was created "
-                    f"(Training Mode Session {lt.config_hash[:12]}, current {h[:12]}); its runs would not be "
-                    "comparable, so it is not scheduled (policy on_config_change = pause)"
-                )
-
-    async def _persist(self, lt: LiveSession, **values: Any) -> None:
-        try:
-            async with self._factory() as s:
-                async with s.begin():
-                    await s.execute(update(TrainingModeSession).where(TrainingModeSession.id == lt.id)
-                                    .values(updated_at=_utcnow(), **values))
-        except Exception:  # noqa: BLE001
-            logger.exception("persisting session %d failed", lt.id)
-
-    def _status_lock(self, session_id: int) -> asyncio.Lock:
-        lock = self._status_locks.get(session_id)
-        if lock is None:
-            lock = self._status_locks[session_id] = asyncio.Lock()
-        return lock
-
-    async def _sync_live(self, lt: LiveSession) -> None:
-        """Write the live event to the row (the state itself is live-only).  It writes what
-        the event is *now*, under the Training Mode Session's status lock, so a pause made by a policy
-        cannot be overwritten by (or overwrite) a user's change."""
-        async with self._status_lock(lt.id):
-            await self._persist(lt, last_event=lt.last_event)
+                    lt.last_event = f"stalled: {problem}"
+                lt.stalled_reason = problem
+            elif lt.stalled_reason is not None:
+                lt.stalled_reason = None
+                lt.last_event = "resumed: the engine configuration can start a run again"
 
     # -- the scheduler ------------------------------------------------------
 
     async def _run(self) -> None:
         assert self._wake is not None
         while True:
-            # Also on a timer: a stalled Training Mode Session must notice the configuration returning
-            # without anything else happening (``_fill`` re-checks the configurations).
+            # Also on a timer: a stalled session must notice the configuration returning
+            # without anything else happening (``_fill`` re-checks the configuration).
             try:
                 await asyncio.wait_for(self._wake.wait(), timeout=1.5)
             except asyncio.TimeoutError:
@@ -644,10 +758,10 @@ class TrainingModeSessionService:
 
     async def _fill(self) -> None:
         self._drain()
-        self._check_configs()
+        self._bind_configs()
         while not self._stopped:
             self._drain()
-            self._check_configs()  # cheap (hash compare): a long dispatch run must notice too
+            self._bind_configs()  # cheap (identity compare): a long dispatch run must notice too
             if self._isolation:
                 # After a pool break the affected runs go one at a time, ahead of
                 # everything else, so the run that breaks the pool is identified.
@@ -681,7 +795,7 @@ class TrainingModeSessionService:
         **When a run's memory copy is taken.**  A run starts from the master
         as it is *at the moment this method builds the run's* ``MemoryRef`` (below): every
         outcome that had completed has been merged first (``_fill`` drains them), and the
-        version is recorded as the run's ``memory_version``.  The Training Mode Session owns its pool
+        version is recorded as the run's ``memory_version``.  The session owns its pool
         and keeps at most one run per worker in flight, so a dispatched run starts at once
         and no merge can land between this moment and the worker beginning it; the worker
         takes its copy of exactly that version when it begins.  A merge that completes
@@ -701,6 +815,7 @@ class TrainingModeSessionService:
             lt.parameters, lt.backend, memory=ref, fault=fault,
         )
         sub = Sub(lt, lp, seed, ref.version, lt.config_hash, failures, isolated)
+        lt.inflight_subs.add(sub)
         self._inflight_runs += 1
         if isolated:
             self._isolated_inflight += 1
@@ -713,7 +828,9 @@ class TrainingModeSessionService:
             self._inflight_runs -= 1
             if isolated:
                 self._isolated_inflight -= 1
-            self._worker_failed(sub, exc)
+            lt.inflight_subs.discard(sub)
+            if not sub.dropped:
+                self._worker_failed(sub, exc)
             await asyncio.sleep(0.2)
             return
         loop = self._loop
@@ -733,6 +850,9 @@ class TrainingModeSessionService:
         self._inflight_runs -= 1
         if sub.isolated:
             self._isolated_inflight -= 1
+        sub.lt.inflight_subs.discard(sub)
+        if sub.dropped:
+            return  # a Stop discarded it; its seed was put back
         if fut.cancelled() or fut.exception() is not None:
             self._worker_failed(sub, None if fut.cancelled() else fut.exception())
             return
@@ -793,7 +913,7 @@ class TrainingModeSessionService:
     def _record(self, sub: Sub, o: Any) -> None:
         lt, lp = sub.lt, sub.lp
         lp.inflight -= 1
-        if lp.cancelled:
+        if lp.cancelled or lt.cancelled:
             return  # the problem was cancelled while this run was in flight: dropped
         rec = RunRec(
             seed=o.seed, status=o.status, key=run_key(o, lt.max_codelets), answer=o.answer,
@@ -814,9 +934,9 @@ class TrainingModeSessionService:
         lp.failures.pop(o.seed, None)
         lt.pending_runs.append(rec)
         lt.note_completion()
+        if len(lp.outcomes) >= lp.seeds and lp.status == "queued":
+            self._finish_problem(lt, lp, "finished")
         self._apply_error_policy(lt, lp, rec)
-        if len(lp.outcomes) >= lp.seeds and not lp.finishing and not lp.cancelled:
-            self._begin_finish(lt, lp)
 
     def _apply_error_policy(self, lt: LiveSession, lp: LiveProblem, rec: RunRec) -> None:
         if not rec.error:
@@ -827,55 +947,30 @@ class TrainingModeSessionService:
         where = f"problem {lp.id} seed {rec.seed}"
         action = policy["on_run_error"]
         if action == "cancel":
-            self._spawn(self._policy_cancel_session(lt, f"cancelled: a run raised ({where}), on_run_error = cancel"))
+            lt.last_event = f"cancelled: a run raised ({where}), on_run_error = cancel"
+            self._cancel_all_live(lt)
             return
         if action == "pause":
             self._trigger_pause(lt, f"paused: a run raised ({where}), on_run_error = pause")
-        elif action == "skip_problem" and not lp.finishing:
-            self._spawn(self._policy_cancel_problem(
-                lt, lp, f"cancelled problem {lp.id}: a run raised (seed {rec.seed}), on_run_error = skip_problem"))
+        elif action == "skip_problem" and lp.status == "queued":
+            lt.last_event = f"cancelled problem {lp.id}: a run raised (seed {rec.seed}), on_run_error = skip_problem"
+            self._finish_problem(lt, lp, "cancelled")
             return
         limit = policy["max_errors_per_problem"]
-        if limit is not None and errs >= limit and not lp.finishing:
-            self._spawn(self._policy_cancel_problem(
-                lt, lp, f"cancelled problem {lp.id}: {errs} errors reached max_errors_per_problem"))
+        if limit is not None and errs >= limit and lp.status == "queued":
+            lt.last_event = f"cancelled problem {lp.id}: {errs} errors reached max_errors_per_problem"
+            self._finish_problem(lt, lp, "cancelled")
             return
         total_limit = policy["max_errors_total"]
         if total_limit is not None and lt.errors_total >= total_limit:
             self._trigger_pause(lt, f"paused: {lt.errors_total} errors reached max_errors_total")
 
     def _trigger_pause(self, lt: LiveSession, event: str) -> None:
-        """Pause from inside the scheduler: effective at once, its event persisted right after."""
-        if lt.status == "paused":
+        """Pause from inside the scheduler: effective at once, in memory only."""
+        if lt.status != "running":
             return
         lt.status = "paused"
         lt.last_event = event
-        self._spawn(self._sync_live(lt))
-
-    async def _policy_cancel_problem(self, lt: LiveSession, lp: LiveProblem, event: str) -> None:
-        if lp.cancelled or lp.finishing:
-            return
-        lt.last_event = event
-        try:
-            await self._cancel_live(lt, lp)
-            await self._sync_live(lt)
-        except asyncio.CancelledError:
-            raise
-        except Exception:  # noqa: BLE001 - the problem is rerun from its stored seeds on restart
-            logger.exception("policy cancel of problem %d failed", lp.id)
-        await self._announce(lt.id)
-
-    async def _policy_cancel_session(self, lt: LiveSession, event: str) -> None:
-        lt.last_event = event
-        try:
-            await self.cancel_session(lt.id, event)
-        except SessionError:
-            pass
-
-    async def _persist_event(self, tid: int, event: str) -> None:
-        async with self._factory() as s:
-            async with s.begin():
-                await s.execute(update(TrainingModeSession).where(TrainingModeSession.id == tid).values(last_event=event))
 
     def _spawn(self, coro) -> asyncio.Task:
         task = asyncio.create_task(coro)
@@ -883,98 +978,39 @@ class TrainingModeSessionService:
         task.add_done_callback(self._tasks.discard)
         return task
 
-    # -- the milestone write ----------------------------------------------------
+    # -- problems finishing, in memory --------------------------------------
 
-    def _begin_finish(self, lt: LiveSession, lp: LiveProblem) -> None:
-        lp.finishing = True
-        lp.written = asyncio.Event()
-        self._spawn(self._finish(lt, lp, "finished"))
-
-    async def _write_problem(self, lt: LiveSession, lp: LiveProblem, status: str) -> int | None:
-        """The milestone: the problem's summary, every run committed since the last write
-        (from any problem) and the memory merges since the last write, in one transaction.
-        Returns the problem's ``finished_seq`` (0 when it gets none)."""
-        tally = summarize(list(lp.outcomes.values()))
-        wants_seq = status == "finished" or lp.started or bool(lp.outcomes)
-        assert self._write_lock is not None
-        async with self._write_lock:
-            # Taken under the lock so writes commit in order and nothing is written twice.
-            n_runs, n_merges = len(lt.pending_runs), len(lt.pending_merges)
-            runs = lt.pending_runs[:n_runs]
-            merges = lt.pending_merges[:n_merges]
-            run_rows = [self._run_row(lt, r) for r in runs]
-            merge_rows = await asyncio.to_thread(self._merge_rows, lt, merges)
-            try:
-                async with self._factory() as s:
-                    async with s.begin():
-                        seq = None
-                        if wants_seq:
-                            seq = (await s.execute(
-                                update(TrainingModeSession).where(TrainingModeSession.id == lt.id)
-                                .values(finished_count=TrainingModeSession.finished_count + 1)
-                                .returning(TrainingModeSession.finished_count)
-                            )).scalar_one_or_none()
-                            if seq is None:
-                                return None  # the Training Mode Session was deleted
-                        res = await s.execute(
-                            update(TrainingModeSessionProblem)
-                            .where(TrainingModeSessionProblem.id == lp.id, TrainingModeSessionProblem.status == "queued")
-                            .values(status=status, finished_seq=seq, started_at=lp.started_at,
-                                    finished_at=_utcnow(), **tally)
-                        )
-                        if res.rowcount == 0:
-                            raise _Skip()  # cancelled or deleted meanwhile: write nothing
-                        for i in range(0, len(run_rows), RUN_ROW_CHUNK):
-                            await s.execute(insert(TrainingModeSessionRun), run_rows[i:i + RUN_ROW_CHUNK])
-                        for i in range(0, len(merge_rows), RUN_ROW_CHUNK):
-                            await s.execute(insert(SessionMemoryMerge), merge_rows[i:i + RUN_ROW_CHUNK])
-            except _Skip:
-                return None
-            del lt.pending_runs[:n_runs]
-            del lt.pending_merges[:n_merges]
-            return seq if seq is not None else 0
-
-    @staticmethod
-    def _run_row(lt: LiveSession, r: RunRec) -> dict[str, Any]:
-        return {
-            "session_id": lt.id, "problem_id": r.problem_id, "seed": r.seed, "status": r.status,
-            "key": r.key, "answer": r.answer, "answers": list(r.answers), "codelets": r.codelets,
-            "seconds": r.seconds, "temperature": r.temperature, "answer_quality": r.answer_quality,
-            "error": r.error, "config_hash": r.config_hash, "attempts": r.attempts, "seq": r.seq,
-            "memory_version": r.memory_version, "added_answers": r.added_answers,
-            "added_snags": r.added_snags,
-        }
-
-    @staticmethod
-    def _merge_rows(lt: LiveSession, merges: list) -> list[dict[str, Any]]:
-        rows = []
-        for seq, pid, seed, adds in merges:
-            answers, snags = tm.encode_additions(adds)
-            rows.append({"session_id": lt.id, "seq": seq, "problem_id": pid, "seed": seed,
-                         "answers": answers, "snags": snags})
-        return rows
-
-    def _forget(self, lt: LiveSession, lp: LiveProblem) -> None:
-        lt.problems.pop(lp.id, None)
+    def _finish_problem(self, lt: LiveSession, lp: LiveProblem, status: str) -> None:
+        """A problem finishes (all its seeds ran) or is cancelled.  Held in memory until the
+        Stop write: its tally, its place in the ``finished_seq`` order and its place in the
+        session summary are fixed here."""
+        if lp.status != "queued":
+            return
+        recs = list(lp.outcomes.values())
+        lp.status = status
+        lp.tally = summarize(recs)
+        lp.counts = (
+            len(recs), sum(1 for r in recs if r.error), sum(r.codelets for r in recs),
+            sum(1 for r in recs if r.key == CAP_KEY), sum(max(r.attempts - 1, 0) for r in recs),
+        )
+        lp.finished_at = _utcnow()
+        if status == "cancelled":
+            lp.cancelled = True
+            lt.unsubmitted -= len(lp.todo)
+            lp.todo.clear()
+        if status == "finished" or lp.started or recs:
+            lt.finished_count += 1
+            lp.finished_seq = lt.finished_count
+            lt.finished_log.append(lp)
         lt.active.pop(lp.id, None)
-        if lp.written is not None:
-            lp.written.set()
-
-    async def _finish(self, lt: LiveSession, lp: LiveProblem, status: str) -> None:
-        delay = 0.5
-        while True:
-            try:
-                await self._write_problem(lt, lp, status)
-                break
-            except asyncio.CancelledError:
-                raise
-            except Exception:  # noqa: BLE001
-                logger.exception("writing problem %d failed; retrying", lp.id)
-                await asyncio.sleep(delay)
-                delay = min(delay * 2, 10.0)
-        self._forget(lt, lp)
-        await self._announce(lt.id)
+        self._spawn(self._announce(lt.id))
         self.wake()
+
+    def _cancel_all_live(self, lt: LiveSession) -> None:
+        """Cancel every unfinished problem of a live session (an action, not a state)."""
+        for lp in list(lt.problems.values()):
+            self._finish_problem(lt, lp, "cancelled")
+        lt.unsubmitted = sum(1 for (l, _, _) in self._isolation if l is lt)
 
     async def _announce(self, session_id: int) -> None:
         self._versions[session_id] = self._versions.get(session_id, 0) + 1
@@ -984,6 +1020,10 @@ class TrainingModeSessionService:
                 cond.notify_all()
 
     # -- reading ----------------------------------------------------------------
+    #
+    # Reads of a live session are served from memory; a Stopped session is read from the
+    # database.  (Reads are the only database use a live session makes, and only for what it
+    # did not load at Start.)
 
     def executor_info(self) -> dict[str, Any]:
         queued = sum(lt.unsubmitted for lt in self._live.values() if lt.schedulable)
@@ -1011,72 +1051,111 @@ class TrainingModeSessionService:
             "policy": dict(DEFAULT_POLICY),
         }
 
-    async def _summaries(self, s: AsyncSession, sessions: list[TrainingModeSession]) -> list[dict[str, Any]]:
-        """Summaries from the database plus the live problems.
+    @staticmethod
+    def _shape(*, id: int, name: str, note: str, state: str, activity: str | None,
+               stalled: str | None, settings: dict, policy: dict, config_hash: str,
+               created_at: datetime | None, updated_at: datetime | None, stopped_at: datetime | None,
+               stopped_from: str | None, stop_reason: str | None, problems: dict, runs: dict,
+               memory: dict, codelets: int, rate: float | None, memory_version: int, cursor: int,
+               last_event: str | None, live: bool, saved_version: int,
+               unsaved: dict | None, saved_stopped_at: datetime | None) -> dict[str, Any]:
+        remaining = max(runs["total"] - runs["done"], 0)
+        if state != "running" or activity is not None:
+            rate = None
+        return {
+            "id": id, "name": name, "note": note, "state": state, "activity": activity,
+            "stalled_reason": stalled if activity == "stalled" else None,
+            "settings": settings, "policy": policy, "config_hash": config_hash,
+            "created_at": _iso(created_at), "updated_at": _iso(updated_at),
+            "stopped_at": _iso(stopped_at), "stopped_from": stopped_from, "stop_reason": stop_reason,
+            "problems": problems, "runs": runs, "memory": memory, "codelets": codelets,
+            "runs_per_second": round(rate, 3) if rate else None,
+            "eta_seconds": round(remaining / rate, 1) if rate and remaining else None,
+            "memory_version": memory_version, "finished_cursor": cursor, "last_event": last_event,
+            # Where the numbers come from, and what the database holds (3.13, 3.16):
+            "source": "live" if live else "stored",
+            "persisted": not live,
+            "saved_through": {
+                "stopped_at": _iso(saved_stopped_at),
+                # The session's own configuration arrives with S3 (and its stored state with S5).
+                "configuration_revision": None,
+                "episode_version": saved_version,
+            },
+            "unsaved": unsaved,
+        }
 
-        **Consistency.**  The live state is read first (synchronously, so it is one
-        instant), then the database in one REPEATABLE READ snapshot.  A live problem the
-        snapshot already shows as written is counted from the database only; one it still
-        shows as queued is counted from memory.  Counts therefore never step backwards:
-        a problem is always in exactly one of the two.
+    def _live_summary(self, lt: LiveSession) -> dict[str, Any]:
+        """A live session's summary, from memory alone.
 
-        **Which runs count.**  ``runs.total/done/errors/capped/retries`` and ``codelets``
-        all count the runs of problems that are not cancelled (a cancelled problem leaves
-        the totals; its runs stay available on the problem itself).
-        """
+        **Which runs count.**  ``runs.total/done/errors/capped/retries`` and ``codelets`` count
+        the runs of problems that are not cancelled (a cancelled problem leaves the totals; its
+        runs stay available on the problem itself)."""
+        fin, can = lt.base_fin, lt.base_can
+        total = fin[1]
+        done, errors, codelets, capped, retries = fin[2:7]
+        queued = running = finished = cancelled = 0
+        for lp in lt.problems.values():
+            if lp.status == "cancelled":
+                cancelled += 1
+                continue
+            total += lp.seeds
+            if lp.status == "finished":
+                finished += 1
+                n, e, cl, cap, rt = lp.counts
+            else:
+                if lp.started:
+                    running += 1
+                else:
+                    queued += 1
+                if not (lp.started or lp.outcomes):
+                    continue
+                recs = list(lp.outcomes.values())
+                n, e, cl = len(recs), sum(1 for r in recs if r.error), sum(r.codelets for r in recs)
+                cap, rt = sum(1 for r in recs if r.key == CAP_KEY), sum(max(r.attempts - 1, 0) for r in recs)
+            done, errors, codelets, capped, retries = done + n, errors + e, codelets + cl, capped + cap, retries + rt
+        unfinished = queued + running
+        state, stalled = lt.status, lt.stalled_reason
+        activity = None
+        if state == "running":
+            activity = "stalled" if stalled else ("idle" if unfinished == 0 else None)
+        return self._shape(
+            id=lt.id, name=lt.name, note=lt.note, state=state, activity=activity, stalled=stalled,
+            settings={
+                "seeds_per_problem": lt.seeds_per_problem, "seed_start": lt.seed_start,
+                "max_codelets": lt.max_codelets, "parameters": lt.parameters, "backend": lt.backend,
+            },
+            policy=normalize_policy(lt.policy), config_hash=lt.config_hash,
+            created_at=lt.created_at, updated_at=lt.updated_at, stopped_at=lt.stopped_at,
+            stopped_from=lt.stopped_from, stop_reason=lt.stop_reason,
+            problems={"total": queued + running + finished + fin[0] + cancelled + can[0],
+                      "queued": queued, "running": running, "finished": fin[0] + finished,
+                      "cancelled": can[0] + cancelled},
+            runs={"total": total, "done": done, "errors": errors, "capped": capped, "retries": retries},
+            memory={"answers": len(lt.memory.answers), "snags": len(lt.memory.snags)},
+            codelets=codelets, rate=lt.rate(), memory_version=lt.version, cursor=lt.finished_count,
+            last_event=lt.last_event, live=True, saved_version=lt.saved_version,
+            unsaved=lt.unsaved(), saved_stopped_at=lt.stopped_at,
+        )
+
+    async def _stored_summaries(self, s: AsyncSession, sessions: list[TrainingModeSession]) -> list[dict[str, Any]]:
+        """Summaries of Stopped (and Starting) sessions, from the database.
+
+        **Which runs count.**  As for a live session; a Stopped session's unfinished problems
+        keep the runs the Stop wrote, and those count too."""
         if not sessions:
             return []
         ids = [t.id for t in sessions]
-        P = TrainingModeSessionProblem
-        live: dict[int, dict[int, tuple]] = {}
-        for t in sessions:
-            lt = self._live.get(t.id)
-            if lt is None:
-                continue
-            live[t.id] = {}
-            for lp in lt.problems.values():
-                if lp.cancelled or not (lp.started or lp.outcomes):
-                    continue
-                recs = list(lp.outcomes.values())
-                live[t.id][lp.id] = (
-                    len(recs), sum(1 for r in recs if r.error), sum(r.codelets for r in recs),
-                    sum(1 for r in recs if r.key == CAP_KEY),
-                    sum(max(r.attempts - 1, 0) for r in recs), lp.started,
-                )
-        s = self._factory()
-        await s.connection(execution_options={"isolation_level": "REPEATABLE READ"})
-        rows = (await s.execute(
-            select(
-                P.session_id, P.status, func.count(),
-                func.coalesce(func.sum(P.seeds), 0), func.coalesce(func.sum(P.runs_done), 0),
-                func.coalesce(func.sum(P.errors), 0), func.coalesce(func.sum(P.codelets_total), 0),
-                func.coalesce(func.sum(P.capped), 0), func.coalesce(func.sum(P.retries), 0),
-            ).where(P.session_id.in_(ids)).group_by(P.session_id, P.status)
-        )).all()
-        by_t: dict[int, dict[str, tuple]] = {}
-        for tid, status, *vals in rows:
-            by_t.setdefault(tid, {})[status] = tuple(int(v) for v in vals)
-        live_ids = [pid for per in live.values() for pid in per]
-        written: set[int] = set()
-        if live_ids:
-            written = set((await s.execute(
-                select(P.id).where(P.id.in_(live_ids), P.status != "queued"))).scalars())
-        # The cursor comes from the same snapshot as the counts: the Training Mode Session rows the caller
-        # loaded may predate it, and a summary must not count a problem as finished while
-        # its finished_seq is still beyond finished_cursor.
-        cursors = dict((await s.execute(
-            select(TrainingModeSession.id, TrainingModeSession.finished_count).where(TrainingModeSession.id.in_(ids)))).all())
-        # A Stopped Training Mode Session holds no memory in the process: its size is what its stored
+        P, R = TrainingModeSessionProblem, TrainingModeSessionRun
+        by_t = await self._stored_totals(s, ids)
+        # A Stopped session holds no memory in the process: its size is what its stored
         # runs added, and its version the last stored merge.
         stored_mem = {
             tid: (int(a), int(sn)) for tid, a, sn in (await s.execute(
-                select(TrainingModeSessionRun.session_id, func.coalesce(func.sum(TrainingModeSessionRun.added_answers), 0),
-                       func.coalesce(func.sum(TrainingModeSessionRun.added_snags), 0))
-                .where(TrainingModeSessionRun.session_id.in_(ids)).group_by(TrainingModeSessionRun.session_id)
+                select(R.session_id, func.coalesce(func.sum(R.added_answers), 0),
+                       func.coalesce(func.sum(R.added_snags), 0))
+                .where(R.session_id.in_(ids)).group_by(R.session_id)
             )).all()
         }
-        # A Stopped Training Mode Session's unfinished problems keep the runs the Stop wrote; count them.
-        R = TrainingModeSessionRun
         partial = {
             tid: tuple(int(v) for v in vals) for tid, *vals in (await s.execute(
                 select(
@@ -1085,7 +1164,7 @@ class TrainingModeSessionService:
                     func.coalesce(func.sum(R.codelets), 0),
                     func.coalesce(func.sum(case((R.key == CAP_KEY, 1), else_=0)), 0),
                     func.coalesce(func.sum(R.attempts - 1), 0),
-                ).join(P, P.id == R.problem_id)
+                ).join(P, (P.session_id == R.session_id) & (P.problem_id == R.problem_id))
                 .where(R.session_id.in_(ids), P.status == "queued")
                 .group_by(R.session_id)
             )).all()
@@ -1094,77 +1173,39 @@ class TrainingModeSessionService:
             select(SessionMemoryMerge.session_id, func.max(SessionMemoryMerge.seq))
             .where(SessionMemoryMerge.session_id.in_(ids)).group_by(SessionMemoryMerge.session_id)
         )).all())
-        await s.close()
         zero = (0,) * 7
         out = []
         for t in sessions:
             c = by_t.get(t.id, {})
             q, f, x = c.get("queued", zero), c.get("finished", zero), c.get("cancelled", zero)
-            queued, running = q[0], 0
-            total = q[1] + f[1]
-            done, errors, codelets, capped, retries = f[2], f[3], f[4], f[5], f[6]
-            lt = self._live.get(t.id)
-            if t.id not in live:
-                n, e, cl, cap, rt = partial.get(t.id, (0,) * 5)
-                done, errors, codelets, capped, retries = done + n, errors + e, codelets + cl, capped + cap, retries + rt
-            for pid, (n, e, cl, cap, rt, started) in live.get(t.id, {}).items():
-                if pid in written:
-                    continue
-                if started:
-                    running += 1
-                    queued -= 1
-                done += n
-                errors += e
-                codelets += cl
-                capped += cap
-                retries += rt
-            unfinished = queued + running
-            if lt is None:
-                state, activity, stalled = "stopped", None, None
-            else:
-                state, stalled = lt.status, lt.stalled_reason
-                activity = None
-                if state == "running":
-                    activity = "stalled" if stalled else ("idle" if unfinished == 0 else None)
-            rate = lt.rate() if lt is not None else None
-            if state != "running" or activity is not None:
-                rate = None
-            remaining = max(total - done, 0)
-            if lt is not None:
-                memory = {"answers": len(lt.memory.answers), "snags": len(lt.memory.snags)}
-                memory_version = lt.version
-            else:
-                a_n, s_n = stored_mem.get(t.id, (0, 0))
-                memory = {"answers": a_n, "snags": s_n}
-                memory_version = stored_version.get(t.id) or 0
-            out.append({
-                "id": t.id, "name": t.name, "note": t.note, "state": state, "activity": activity,
-                "stalled_reason": stalled if activity == "stalled" else None,
-                "settings": {
-                    "seeds_per_problem": t.seeds_per_problem,
-                    "seed_start": t.seed_start, "max_codelets": t.max_codelets,
-                    "parameters": t.parameters, "backend": t.backend,
+            n, e, cl, cap, rt = partial.get(t.id, (0,) * 5)
+            a_n, s_n = stored_mem.get(t.id, (0, 0))
+            version = stored_version.get(t.id) or 0
+            out.append(self._shape(
+                id=t.id, name=t.name, note=t.note, state="starting" if t.id in self._starting else "stopped",
+                activity=None, stalled=None,
+                settings={
+                    "seeds_per_problem": t.seeds_per_problem, "seed_start": t.seed_start,
+                    "max_codelets": t.max_codelets, "parameters": t.parameters, "backend": t.backend,
                 },
-                "policy": normalize_policy(lt.policy if lt is not None else t.policy),
-                "config_hash": lt.config_hash if lt is not None else t.config_hash,
-                "created_at": _iso(t.created_at), "updated_at": _iso(t.updated_at),
-                "stopped_at": _iso(t.stopped_at), "stopped_from": t.stopped_from,
-                "stop_reason": t.stop_reason,
-                "problems": {
-                    "total": queued + running + f[0] + x[0], "queued": queued,
-                    "running": running, "finished": f[0], "cancelled": x[0],
-                },
-                "runs": {"total": total, "done": done, "errors": errors, "capped": capped,
-                         "retries": retries},
-                "memory": memory,
-                "codelets": codelets,
-                "runs_per_second": round(rate, 3) if rate else None,
-                "eta_seconds": round(remaining / rate, 1) if rate and remaining else None,
-                "memory_version": memory_version,
-                "finished_cursor": cursors.get(t.id, t.finished_count),
-                "last_event": (lt.last_event if lt is not None else None) or t.last_event,
-            })
+                policy=normalize_policy(t.policy), config_hash=t.config_hash,
+                created_at=t.created_at, updated_at=t.updated_at, stopped_at=t.stopped_at,
+                stopped_from=t.stopped_from, stop_reason=t.stop_reason,
+                problems={"total": q[0] + f[0] + x[0], "queued": q[0], "running": 0,
+                          "finished": f[0], "cancelled": x[0]},
+                runs={"total": q[1] + f[1], "done": f[2] + n, "errors": f[3] + e, "capped": f[5] + cap,
+                      "retries": f[6] + rt},
+                memory={"answers": a_n, "snags": s_n}, codelets=f[4] + cl, rate=None,
+                memory_version=version, cursor=t.finished_count, last_event=t.last_event,
+                live=False, saved_version=version, unsaved=None, saved_stopped_at=t.stopped_at,
+            ))
         return out
+
+    async def _summaries(self, s: AsyncSession, sessions: list[TrainingModeSession]) -> list[dict[str, Any]]:
+        """Summaries in the order given: a live session from memory, a Stopped one from the database."""
+        stored = await self._stored_summaries(s, [t for t in sessions if t.id not in self._live])
+        by_id = {d["id"]: d for d in stored}
+        return [self._live_summary(self._live[t.id]) if t.id in self._live else by_id[t.id] for t in sessions]
 
     async def _get_session(self, s: AsyncSession, session_id: int) -> TrainingModeSession:
         t = await s.get(TrainingModeSession, session_id)
@@ -1178,70 +1219,91 @@ class TrainingModeSessionService:
             return await self._summaries(s, list(ts))
 
     async def summary(self, session_id: int) -> dict[str, Any]:
+        lt = self._live.get(session_id)
+        if lt is not None:
+            return self._live_summary(lt)
         async with self._factory() as s:
             return (await self._summaries(s, [await self._get_session(s, session_id)]))[0]
 
     # -- problem rows ---------------------------------------------------------
 
-    def _problem_dict(self, p: TrainingModeSessionProblem, detail: bool) -> dict[str, Any]:
-        lt = self._live.get(p.session_id)
-        lp = lt.problems.get(p.id) if lt is not None and p.status == "queued" else None
-        status = p.status
-        if lp is not None and (lp.started or lp.outcomes) and not lp.cancelled:
-            status = "running" if lp.started else "queued"
-            t = summarize(list(lp.outcomes.values()))
-            finished_seq = None
-        else:
-            t = {
-                "runs_done": p.runs_done, "errors": p.errors, "capped": p.capped,
-                "mean_codelets": p.mean_codelets, "none_fraction": p.none_fraction,
-                "distinct_answers": p.distinct_answers, "distribution": p.distribution,
-                "statuses": p.statuses, "first_error": p.first_error,
-            }
-            finished_seq = p.finished_seq
+    @staticmethod
+    def _problem_view(*, p: Any, status: str, t: dict, finished_seq: int | None, started_at: datetime | None,
+                      finished_at: datetime | None, detail: bool) -> dict[str, Any]:
         done = t["runs_done"]
         row = {
-            "id": p.id, "session_id": p.session_id, "initial": p.initial,
-            "modified": p.modified, "target": p.target, "answer": p.answer, "seeds": p.seeds,
-            "seed_start": p.seed_start, "tag": p.tag, "status": status, "runs_done": done,
-            "errors": t["errors"], "capped": t["capped"], "mean_codelets": t["mean_codelets"],
-            "top": _shares(t["distribution"], done, 3), "none_fraction": t["none_fraction"],
-            "distinct": t["distinct_answers"] or 0, "statuses": t["statuses"] or {},
-            "finished_seq": finished_seq, "added_at": _iso(p.added_at),
-            "started_at": _iso(lp.started_at if lp is not None and lp.started else p.started_at),
-            "finished_at": _iso(p.finished_at),
+            "id": p.problem_id if hasattr(p, "problem_id") else p.id, "session_id": p.session_id,
+            "initial": p.initial, "modified": p.modified, "target": p.target, "answer": p.answer,
+            "seeds": p.seeds, "seed_start": p.seed_start, "tag": p.tag, "status": status,
+            "runs_done": done, "errors": t["errors"], "capped": t["capped"],
+            "mean_codelets": t["mean_codelets"], "top": _shares(t["distribution"], done, 3),
+            "none_fraction": t["none_fraction"], "distinct": t["distinct_answers"] or 0,
+            "statuses": t["statuses"] or {}, "finished_seq": finished_seq, "added_at": _iso(p.added_at),
+            "started_at": _iso(started_at), "finished_at": _iso(finished_at),
         }
         if detail:
             row["distribution"] = _shares(t["distribution"], done, None)
             row["first_error"] = t["first_error"]
         return row
 
-    def _running_ids(self, session_id: int) -> list[int]:
-        lt = self._live.get(session_id)
-        return [i for i, lp in lt.active.items() if not lp.cancelled] if lt is not None else []
+    def _stored_problem_dict(self, p: TrainingModeSessionProblem, detail: bool) -> dict[str, Any]:
+        t = {
+            "runs_done": p.runs_done, "errors": p.errors, "capped": p.capped,
+            "mean_codelets": p.mean_codelets, "none_fraction": p.none_fraction,
+            "distinct_answers": p.distinct_answers, "distribution": p.distribution,
+            "statuses": p.statuses, "first_error": p.first_error,
+        }
+        return self._problem_view(p=p, status=p.status, t=t, finished_seq=p.finished_seq,
+                                  started_at=p.started_at, finished_at=p.finished_at, detail=detail)
+
+    def _live_problem_dict(self, lp: LiveProblem, detail: bool) -> dict[str, Any]:
+        if lp.settled:
+            t, status = lp.tally, lp.status
+        else:
+            t = summarize(list(lp.outcomes.values()))
+            status = "running" if lp.started else "queued"
+        return self._problem_view(p=lp, status=status, t=t, finished_seq=lp.finished_seq,
+                                  started_at=lp.started_at, finished_at=lp.finished_at, detail=detail)
 
     SORTS = {
-        "id": TrainingModeSessionProblem.id, "runs_done": TrainingModeSessionProblem.runs_done,
+        "id": TrainingModeSessionProblem.problem_id, "runs_done": TrainingModeSessionProblem.runs_done,
         "top_fraction": TrainingModeSessionProblem.top_fraction, "none_fraction": TrainingModeSessionProblem.none_fraction,
         "distinct": TrainingModeSessionProblem.distinct_answers, "errors": TrainingModeSessionProblem.errors,
         "mean_codelets": TrainingModeSessionProblem.mean_codelets, "finished_seq": TrainingModeSessionProblem.finished_seq,
     }
 
-    def _problem_filter(self, session_id: int, status: str | None, q: str | None):
+    @staticmethod
+    def _sort_value(sort: str, d: dict[str, Any]) -> Any:
+        if sort == "top_fraction":
+            return d["top"][0]["fraction"] if d["top"] else None
+        return d["id" if sort == "id" else sort]
+
+    @staticmethod
+    def _live_matches(lp: LiveProblem, status: str | None, q: str | None) -> bool:
+        if status == "running" and not (lp.status == "queued" and lp.started):
+            return False
+        if status == "queued" and not (lp.status == "queued" and not lp.started):
+            return False
+        if status in ("finished", "cancelled") and lp.status != status:
+            return False
+        if q and q.lower() not in f"{lp.initial} {lp.modified} {lp.target}".lower():
+            return False
+        return True
+
+    def _problem_filter(self, session_id: int, status: str | None, q: str | None, live: bool):
+        """SQL conditions over the stored rows.  For a live session the rows that were queued
+        at Start are all in memory, so only its finished and cancelled stored rows are read."""
         P = TrainingModeSessionProblem
         conds = [P.session_id == session_id]
-        if status:
-            running = self._running_ids(session_id)
-            if status == "running":
-                conds += [P.status == "queued", P.id.in_(running or [-1])]
-            elif status == "queued":
-                conds += [P.status == "queued"]
-                if running:
-                    conds.append(P.id.not_in(running))
-            elif status in ("finished", "cancelled"):
-                conds.append(P.status == status)
-            else:
-                raise SessionError(422, f"unknown status {status!r}")
+        if status in ("running", "queued"):
+            # Nothing stored is running; a live session holds every row that was queued at Start.
+            conds.append(false() if live or status == "running" else P.status == "queued")
+        elif status in ("finished", "cancelled"):
+            conds.append(P.status == status)
+        elif status:
+            raise SessionError(422, f"unknown status {status!r}")
+        elif live:
+            conds.append(P.status != "queued")
         if q:
             conds.append(func.concat_ws(" ", P.initial, P.modified, P.target).icontains(q, autoescape=True))
         return conds
@@ -1255,36 +1317,59 @@ class TrainingModeSessionService:
         if order not in ("asc", "desc"):
             raise SessionError(422, "order must be asc or desc")
         P = TrainingModeSessionProblem
+        lt = self._live.get(session_id)
         async with self._factory() as s:
             await self._get_session(s, session_id)
-            conds = self._problem_filter(session_id, status, q)
+            conds = self._problem_filter(session_id, status, q, lt is not None)
             total = (await s.execute(select(func.count()).select_from(P).where(*conds))).scalar_one()
             col = self.SORTS[sort]
             ordering = col.desc().nulls_last() if order == "desc" else col.asc().nulls_last()
+            take = offset + limit if lt is not None else limit
             rows = (await s.execute(
-                select(P).where(*conds).order_by(ordering, P.id.asc()).offset(offset).limit(limit)
+                select(P).where(*conds).order_by(ordering, P.problem_id.asc())
+                .offset(0 if lt is not None else offset).limit(take)
             )).scalars().all()
-            return {"total": total, "problems": [self._problem_dict(p, False) for p in rows]}
+        dicts = [self._stored_problem_dict(p, False) for p in rows]
+        if lt is None:
+            return {"total": total, "problems": dicts}
+        mine = [self._live_problem_dict(lp, False) for lp in lt.problems.values()
+                if self._live_matches(lp, status, q)]
+        sign = -1 if order == "desc" else 1
+
+        def key(d: dict) -> tuple:
+            v = self._sort_value(sort, d)
+            return (v is None, sign * v if v is not None else 0, d["id"])
+
+        merged = sorted(dicts + mine, key=key)
+        return {"total": total + len(mine), "problems": merged[offset:offset + limit]}
 
     async def _get_problem(self, s: AsyncSession, session_id: int, pid: int) -> TrainingModeSessionProblem:
-        p = await s.get(TrainingModeSessionProblem, pid)
-        if p is None or p.session_id != session_id:
+        p = await s.get(TrainingModeSessionProblem, (session_id, pid))
+        if p is None:
             raise SessionError(404, f"problem {pid} not found in session {session_id}")
         return p
 
     async def get_problem(self, session_id: int, pid: int) -> dict[str, Any]:
+        lt = self._live.get(session_id)
+        lp = lt.problems.get(pid) if lt is not None else None
+        if lp is not None:
+            return self._live_problem_dict(lp, True)
         async with self._factory() as s:
-            return self._problem_dict(await self._get_problem(s, session_id, pid), True)
+            await self._get_session(s, session_id)
+            return self._stored_problem_dict(await self._get_problem(s, session_id, pid), True)
 
     async def problem_runs(self, session_id: int, pid: int) -> list[dict[str, Any]]:
+        lt = self._live.get(session_id)
+        lp = lt.problems.get(pid) if lt is not None else None
+        if lp is not None:
+            return [self._run_dict(r) for r in sorted(lp.outcomes.values(), key=lambda r: r.seed)]
         async with self._factory() as s:
-            p = await self._get_problem(s, session_id, pid)
-            lt = self._live.get(session_id)
-            lp = lt.problems.get(pid) if lt is not None else None
-            if lp is not None and p.status == "queued":
-                return [self._run_dict(r) for r in sorted(lp.outcomes.values(), key=lambda r: r.seed)]
+            await self._get_session(s, session_id)
+            await self._get_problem(s, session_id, pid)
             rows = (await s.execute(
-                select(TrainingModeSessionRun).where(TrainingModeSessionRun.problem_id == pid).order_by(TrainingModeSessionRun.seed)
+                select(TrainingModeSessionRun).where(
+                    TrainingModeSessionRun.session_id == session_id, TrainingModeSessionRun.problem_id == pid
+                ).order_by(TrainingModeSessionRun.seed)
             )).scalars().all()
             return [self._run_dict(r) for r in rows]
 
@@ -1304,9 +1389,12 @@ class TrainingModeSessionService:
 
     async def finished(self, session_id: int, after: int = 0, limit: int = 100,
                        wait: float = 0.0) -> dict[str, Any]:
+        """Problems finished after a cursor, in the order they finished.  A live session's
+        finishes since its Start are served from memory, the earlier ones from the database."""
         deadline = time.monotonic() + max(0.0, min(wait, 60.0))
-        async with self._factory() as s:
-            await self._get_session(s, session_id)
+        if session_id not in self._live:
+            async with self._factory() as s:
+                await self._get_session(s, session_id)
         cond = self._conds.get(session_id)
         if cond is None:
             cond = self._conds[session_id] = asyncio.Condition()
@@ -1318,10 +1406,18 @@ class TrainingModeSessionService:
                     select(P).where(P.session_id == session_id, P.finished_seq > after)
                     .order_by(P.finished_seq).limit(limit)
                 )).scalars().all()
+            lt = self._live.get(session_id)  # it may have been stopped while the rows were read
+            items = [self._stored_problem_dict(p, False) for p in rows]
+            if lt is not None:
+                seen = {d["id"] for d in items}
+                items += [self._live_problem_dict(lp, False) for lp in lt.finished_log
+                          if lp.finished_seq > after and lp.id not in seen][:max(limit - len(items), 0)]
+                items.sort(key=lambda d: d["finished_seq"])
+                items = items[:limit]
             remaining = deadline - time.monotonic()
-            if rows or remaining <= 0 or self._stopped:
-                cursor = rows[-1].finished_seq if rows else after
-                return {"cursor": cursor, "problems": [self._problem_dict(p, False) for p in rows]}
+            if items or remaining <= 0 or self._stopped:
+                cursor = items[-1]["finished_seq"] if items else after
+                return {"cursor": cursor, "problems": items}
             async with cond:
                 if self._versions.get(session_id, 0) == version:
                     try:
@@ -1333,28 +1429,37 @@ class TrainingModeSessionService:
 
     async def memory_of(self, session_id: int) -> EpisodicMemory:
         """The Episodic Memory (live if started, else rebuilt from the stored merges)."""
+        lt = self._live.get(session_id)
+        if lt is not None:
+            return tm.copy_for_run(lt.memory)
         async with self._factory() as s:
             await self._get_session(s, session_id)
-            lt = self._live.get(session_id)
-            if lt is not None:
-                return tm.copy_for_run(lt.memory)
             return await self.rebuild_memory(s, session_id)
+
+    @staticmethod
+    async def stored_replay_source(s: AsyncSession, session_id: int) -> tm.ListReplaySource:
+        """The stored memory merges of a session as a :class:`~server.services.training_mode_session_memory.ReplaySource`."""
+        rows = (await s.execute(
+            select(SessionMemoryMerge).where(SessionMemoryMerge.session_id == session_id)
+            .order_by(SessionMemoryMerge.seq)
+        )).scalars().all()
+        return tm.ListReplaySource([
+            tm.ReplayEntry(m.seq, "memory_merge", tm.decode_additions(m.answers, m.snags)) for m in rows
+        ])
 
     @staticmethod
     async def rebuild_memory(s: AsyncSession, session_id: int, upto: int | None = None) -> EpisodicMemory:
         """Replay the stored merges (to version *upto*, default all) into a fresh memory."""
-        mem = EpisodicMemory()
-        q = select(SessionMemoryMerge).where(SessionMemoryMerge.session_id == session_id)
-        if upto is not None:
-            q = q.where(SessionMemoryMerge.seq <= upto)
-        for m in (await s.execute(q.order_by(SessionMemoryMerge.seq))).scalars():
-            tm.apply_merge(mem, tm.decode_additions(m.answers, m.snags))
-        return mem
+        source = await TrainingModeSessionService.stored_replay_source(s, session_id)
+        return tm.replay_memory(source, upto)
 
     def live_memory(self, session_id: int) -> EpisodicMemory | None:
-        """The live Episodic Memory, or ``None`` for a Stopped Training Mode Session."""
+        """The live Episodic Memory, or ``None`` for a Stopped session."""
         lt = self._live.get(session_id)
         return lt.memory if lt is not None else None
+
+    def is_live(self, session_id: int) -> bool:
+        return session_id in self._live
 
     # -- writing: create / add -------------------------------------------------
 
@@ -1371,26 +1476,24 @@ class TrainingModeSessionService:
             if n is not None and not (1 <= n <= MAX_SEEDS_PER_PROBLEM):
                 raise SessionError(422, f"seeds must be 1..{MAX_SEEDS_PER_PROBLEM}")
 
-    async def _insert_problems(self, s: AsyncSession, t: TrainingModeSession, problems: list[dict]) -> list[TrainingModeSessionProblem]:
+    async def _insert_problems(self, s: AsyncSession, t: TrainingModeSession, problems: list[dict]) -> list[int]:
+        """Store problems for a Stopped session, giving them the next per-session ordinals."""
         now = _utcnow()
+        first = t.next_problem_id
         values = [
             {
-                "session_id": t.id, "initial": p["initial"], "modified": p["modified"],
-                "target": p["target"], "answer": p.get("answer"),
+                "session_id": t.id, "problem_id": first + i, "initial": p["initial"],
+                "modified": p["modified"], "target": p["target"], "answer": p.get("answer"),
                 "seeds": p.get("seeds") or t.seeds_per_problem, "seed_start": t.seed_start,
                 "tag": p.get("tag"), "status": "queued", "runs_done": 0, "errors": 0, "capped": 0,
                 "retries": 0, "codelets_total": 0, "distinct_answers": 0, "added_at": now,
             }
-            for p in problems
+            for i, p in enumerate(problems)
         ]
-        ids: list[int] = []
         for i in range(0, len(values), INSERT_CHUNK):
-            res = await s.execute(
-                insert(TrainingModeSessionProblem).returning(TrainingModeSessionProblem.id, sort_by_parameter_order=True),
-                values[i:i + INSERT_CHUNK],
-            )
-            ids.extend(r[0] for r in res)
-        return [TrainingModeSessionProblem(id=pid, **v) for pid, v in zip(ids, values)]
+            await s.execute(insert(TrainingModeSessionProblem), values[i:i + INSERT_CHUNK])
+        t.next_problem_id = first + len(values)
+        return [v["problem_id"] for v in values]
 
     @staticmethod
     def _check_seed_range(seed_start: int, seed_counts: list[int]) -> None:
@@ -1415,6 +1518,7 @@ class TrainingModeSessionService:
         self, *, name: str, note: str = "", settings: dict | None = None,
         policy: dict | None = None, problems: list[dict] | None = None,
     ) -> dict[str, Any]:
+        """Create a Stopped session: a record, written at once in its own transaction."""
         name = (name or "").strip()
         if not 1 <= len(name) <= 200:
             raise SessionError(422, "name is required (1..200 characters)")
@@ -1441,7 +1545,7 @@ class TrainingModeSessionService:
             raise SessionError(400, str(exc)) from exc
         full_policy = normalize_policy(policy)
         meta = self._meta_provider()
-        # A Training Mode Session whose configuration cannot start a run is not created
+        # A session whose configuration cannot start a run is not created
         # (the executor makes the same check again at each dispatch).
         try:
             require_run_start(meta)
@@ -1455,16 +1559,40 @@ class TrainingModeSessionService:
                     name=name, note=note or "",
                     seeds_per_problem=spp, seed_start=seed_start, max_codelets=max_codelets,
                     parameters=overrides or None, backend=backend_name, policy=full_policy,
-                    config_hash=cfg, finished_count=0,
+                    config_hash=cfg, finished_count=0, next_problem_id=1,
                 )
                 s.add(t)
                 await s.flush()
-                created = await self._insert_problems(s, t, problems)
-            summary = (await self._summaries(s, [t]))[0]  # a new Training Mode Session is Stopped
-        return {"session": summary, "added": len(created), "problem_ids": [p.id for p in created]}
+                ids = await self._insert_problems(s, t, problems)
+            summary = (await self._summaries(s, [t]))[0]  # a new session is Stopped
+        return {"session": summary, "added": len(ids), "problem_ids": ids, "persisted": True}
+
+    def _refuse_if_busy(self, session_id: int, what: str) -> LiveSession | None:
+        """The live part of a session for a mutation (``None`` when Stopped), or 409 ``busy``
+        while it is Starting or Stopping."""
+        if session_id in self._starting:
+            raise _busy(session_id, what, "starting")
+        lt = self._live.get(session_id)
+        if lt is not None and lt.status == "stopping":
+            raise _busy(session_id, what, "stopping")
+        return lt
 
     async def add_problems(self, session_id: int, problems: list[dict]) -> dict[str, Any]:
+        """Add problems.  To a live session they go into memory with the next ordinals (written at
+        Stop, ``persisted: false``); to a Stopped one they are written at once."""
         self._validate_problems(problems)
+        lt = self._refuse_if_busy(session_id, "add problems to it")
+        if lt is not None:
+            self._check_seed_range(
+                lt.seed_start, [lt.seeds_per_problem] + [p.get("seeds") or 0 for p in problems])
+            ids = []
+            for p in problems:
+                lp = self._add_live_problem(lt, problem_id=lt.next_problem_id, spec=p, stored=False)
+                lt.next_problem_id += 1
+                ids.append(lp.id)
+            self.wake()
+            return {"session": self._live_summary(lt), "added": len(ids), "problem_ids": ids,
+                    "persisted": False}
         async with self._factory() as s:
             async with s.begin():
                 t = (await s.execute(
@@ -1474,78 +1602,98 @@ class TrainingModeSessionService:
                     raise SessionError(404, f"session {session_id} not found")
                 self._check_seed_range(
                     t.seed_start, [t.seeds_per_problem] + [p.get("seeds") or 0 for p in problems])
-                created = await self._insert_problems(s, t, problems)
-            lt = self._live.get(session_id)
-            if lt is not None:
-                for p in created:
-                    self._enqueue(lt, p)
+                ids = await self._insert_problems(s, t, problems)
             summary = (await self._summaries(s, [t]))[0]
-        self.wake()
-        return {"session": summary, "added": len(created), "problem_ids": [p.id for p in created]}
+        return {"session": summary, "added": len(ids), "problem_ids": ids, "persisted": True}
 
     # -- control -----------------------------------------------------------------
 
-    async def _change_row(self, session_id: int, fn) -> dict[str, Any]:
-        """Apply a change to the Training Mode Session's row (name, note, policy) and, if it is live, to
-        its live part.  Serialised per Training Mode Session."""
-        async with self._status_lock(session_id):
-            async with self._factory() as s:
-                async with s.begin():
-                    t = (await s.execute(
-                        select(TrainingModeSession).where(TrainingModeSession.id == session_id).with_for_update()
-                    )).scalar_one_or_none()
-                    if t is None:
-                        raise SessionError(404, f"session {session_id} not found")
-                    fn(t)
-                    t.updated_at = _utcnow()
-                lt = self._live.get(session_id)
-                if lt is not None:
-                    lt.policy = normalize_policy(t.policy)
-                summary = (await self._summaries(s, [t]))[0]
-        await self._announce(session_id)
-        self.wake()
-        return summary
-
     async def update(self, session_id: int, name: str | None = None, note: str | None = None,
                      policy: dict | None = None) -> dict[str, Any]:
+        """Change name, note or policy: in memory for a live session, at once for a Stopped one."""
         if name is not None:
             name = name.strip()
             if not 1 <= len(name) <= 200:
                 raise SessionError(422, "name must be 1..200 characters")
-        async with self._factory() as s:
-            current = await self._get_session(s, session_id)
-            new_policy = normalize_policy(policy, current.policy) if policy is not None else None
-
-        def fn(t: TrainingModeSession) -> None:
+        lt = self._refuse_if_busy(session_id, "change it")
+        if lt is not None:
+            if policy is not None:
+                lt.policy = normalize_policy(policy, lt.policy)
             if name is not None:
-                t.name = name
+                lt.name = name
             if note is not None:
-                t.note = note
-            if new_policy is not None:
-                t.policy = new_policy
-
-        return await self._change_row(session_id, fn)
+                lt.note = note
+            lt.edits += 1
+            lt.updated_at = _utcnow()
+            await self._announce(session_id)
+            self.wake()
+            return self._live_summary(lt)
+        async with self._factory() as s:
+            async with s.begin():
+                t = (await s.execute(
+                    select(TrainingModeSession).where(TrainingModeSession.id == session_id).with_for_update()
+                )).scalar_one_or_none()
+                if t is None:
+                    raise SessionError(404, f"session {session_id} not found")
+                if policy is not None:
+                    t.policy = normalize_policy(policy, t.policy)
+                if name is not None:
+                    t.name = name
+                if note is not None:
+                    t.note = note
+                t.updated_at = _utcnow()
+            summary = (await self._summaries(s, [t]))[0]
+        await self._announce(session_id)
+        return summary
 
     async def start_session(self, session_id: int, paused: bool = False) -> dict[str, Any]:
-        """Stopped -> Running (or Paused).  Starting a live Training Mode Session changes nothing."""
-        async with self._status_lock(session_id):
-            if session_id not in self._live:
-                async with self._factory() as s:
-                    t = await self._get_session(s, session_id)
-                    lt, resumed = await self._load_one(s, t)
-                lt.status = "paused" if paused else "running"
-                self._live[session_id] = lt
-                self._check_configs()
-                for lp in resumed:  # every seed was stored but the problem's own write was not
-                    lt.active[lp.id] = lp
-                    lp.started_at = lp.started_at or _utcnow()
-                    self._begin_finish(lt, lp)
+        """Stopped -> Starting -> Running (or Paused).  Starting a live session changes nothing.
+
+        The Start only reads: a failed Start leaves the session Stopped, exactly as it was."""
+        lt = self._live.get(session_id)
+        if lt is not None:
+            if lt.status == "stopping":
+                raise _busy(session_id, "start it", "stopping")
+            return self._live_summary(lt)
+        if session_id in self._starting:
+            raise _busy(session_id, "start it", "starting")
+        if self._closing:
+            raise SessionError(409, "busy: the server is shutting down and starts no session")
+        self._starting.add(session_id)
+        try:
+            async with self._factory() as s:
+                # The row lock holds off a write to a Stopped record (new problems, a rename)
+                # that began just before this Start, so the load sees it.
+                t = (await s.execute(
+                    select(TrainingModeSession).where(TrainingModeSession.id == session_id).with_for_update()
+                )).scalar_one_or_none()
+                if t is None:
+                    raise SessionError(404, f"session {session_id} not found")
+                lt = await self._load_one(s, t)
+            lt.status = "paused" if paused else "running"
+            self._live[session_id] = lt
+        except SessionError:
+            raise
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:  # noqa: BLE001 - the load only read: the session is still Stopped
+            logger.exception("starting session %d failed", session_id)
+            raise SessionError(
+                500, f"starting session {session_id} failed; it is still Stopped, exactly as it was: {exc}"
+            ) from exc
+        finally:
+            self._starting.discard(session_id)
+        self._bind_configs()
+        for lp in list(lt.problems.values()):
+            if lp.status == "queued" and not lp.todo:  # every seed was stored: it only has to finish
+                lp.started_at = lp.started_at or _utcnow()
+                self._finish_problem(lt, lp, "finished")
         await self._announce(session_id)
         self.wake()
-        return await self.summary(session_id)
+        return self._live_summary(lt)
 
     def _live_or_409(self, session_id: int, action: str) -> LiveSession:
-        lt = self._live.get(session_id)
+        lt = self._refuse_if_busy(session_id, action)
         if lt is None:
             raise SessionError(409, f"session {session_id} is stopped; start it before you {action} it")
         return lt
@@ -1553,9 +1701,10 @@ class TrainingModeSessionService:
     async def pause(self, session_id: int) -> dict[str, Any]:
         async with self._factory() as s:
             await self._get_session(s, session_id)
-        self._live_or_409(session_id, "pause").status = "paused"
+        lt = self._live_or_409(session_id, "pause")
+        lt.status = "paused"
         await self._announce(session_id)
-        return await self.summary(session_id)
+        return self._live_summary(lt)
 
     async def resume(self, session_id: int) -> dict[str, Any]:
         async with self._factory() as s:
@@ -1567,76 +1716,171 @@ class TrainingModeSessionService:
             lt.status = "running"
         await self._announce(session_id)
         self.wake()
-        return await self.summary(session_id)
+        return self._live_summary(lt)
+
+    async def _drain_session(self, lt: LiveSession) -> None:
+        """Let the runs in flight finish and merge, up to ``drain_timeout``; discard the rest.
+
+        A discarded run's seed is put back with its problem, so it runs after the next Start
+        (or after a Resume, if the Stop fails)."""
+        deadline = time.monotonic() + self.drain_timeout
+        while lt.inflight_subs and time.monotonic() < deadline:
+            self.wake()
+            await asyncio.sleep(0.02)
+        for sub in list(lt.inflight_subs):
+            sub.dropped = True
+            lt.inflight_subs.discard(sub)
+            sub.lp.inflight -= 1
+            if sub.lp.status == "queued":
+                self._requeue(lt, sub.lp, sub.seed)
 
     async def stop_session(self, session_id: int, reason: str = "user") -> dict[str, Any]:
-        """Running or Paused -> Stopped.  Runs in flight are dropped (their seeds run again
-        after the next start); every run and merge committed in memory is written, and the
-        row records ``stopped_at``, ``stopped_from`` and ``stop_reason``.  A Stopped
-        Training Mode Session is left as it is."""
-        async with self._factory() as s:
-            await self._get_session(s, session_id)
-        async with self._status_lock(session_id):
-            lt = self._live.pop(session_id, None)
-            if lt is not None:
-                lt.cancelled = True
-                await self._quiesce(lt)
-                async with self._factory() as s:
-                    async with s.begin():
-                        await s.execute(update(TrainingModeSession).where(TrainingModeSession.id == session_id).values(
-                            updated_at=_utcnow(), stopped_at=_utcnow(), stopped_from=lt.status,
-                            stop_reason=reason, last_event=lt.last_event))
+        """Running or Paused -> Stopping -> Stopped.  Runs in flight are drained (up to
+        ``drain_timeout``) and merged, the rest are discarded; then everything the session
+        produced is written in one transaction (``_write_stop``).  If the write fails nothing
+        is written and the session returns to Paused with its memory intact (``last_event``
+        says why); Stop may be retried.  A Stopped session is left as it is."""
+        if session_id in self._starting:
+            raise _busy(session_id, "stop it", "starting")
+        lt = self._live.get(session_id)
+        if lt is None:
+            async with self._factory() as s:
+                await self._get_session(s, session_id)
+            return await self.summary(session_id)
+        if lt.status == "stopping":
+            raise _busy(session_id, "stop it", "stopping")
+        was = lt.status
+        lt.status = "stopping"
+        try:
+            await self._drain_session(lt)
+            await self._write_stop(lt, stopped_from=was, reason=reason)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:  # noqa: BLE001 - nothing was written: back to Paused, memory intact
+            logger.exception("stopping session %d failed", session_id)
+            lt.status = "paused"
+            lt.last_event = f"stop failed, nothing was written: {exc}"
+            await self._announce(session_id)
+            raise SessionError(
+                500, f"stopping session {session_id} failed; it is Paused with its work intact "
+                     f"and Stop may be retried: {exc}") from exc
+        lt.cancelled = True
+        self._live.pop(session_id, None)
         await self._announce(session_id)
         return await self.summary(session_id)
 
-    async def cancel_problem(self, session_id: int, pid: int) -> dict[str, Any]:
+    @staticmethod
+    def _problem_row(lt: LiveSession, lp: LiveProblem) -> dict[str, Any]:
+        tally = lp.tally or {}
+        return {
+            "session_id": lt.id, "problem_id": lp.id, "initial": lp.initial, "modified": lp.modified,
+            "target": lp.target, "answer": lp.answer, "seeds": lp.seeds, "seed_start": lp.seed_start,
+            "tag": lp.tag, "status": lp.status, "runs_done": tally.get("runs_done", 0),
+            "errors": tally.get("errors", 0), "capped": tally.get("capped", 0),
+            "retries": tally.get("retries", 0), "codelets_total": tally.get("codelets_total", 0),
+            "mean_codelets": tally.get("mean_codelets"), "top_answer": tally.get("top_answer"),
+            "top_fraction": tally.get("top_fraction"), "none_fraction": tally.get("none_fraction"),
+            "distinct_answers": tally.get("distinct_answers", 0), "distribution": tally.get("distribution"),
+            "statuses": tally.get("statuses"), "first_error": tally.get("first_error"),
+            "finished_seq": lp.finished_seq, "added_at": lp.added_at, "started_at": lp.started_at,
+            "finished_at": lp.finished_at,
+        }
+
+    async def _write_stop(self, lt: LiveSession, *, stopped_from: str, reason: str) -> None:
+        """The Stop write: the one database write of a live session, in one transaction.
+
+        It writes what exists today: the session row, new problems, outcomes (finished and
+        cancelled problems), runs and Episodic Memory merges.  Nothing is removed from the live
+        part until it commits, so a failure leaves the session exactly as it was.
+
+        Seam for S5, in this same transaction: the journal entries (``journal.write_deferred``),
+        the configuration's stored current state and revision and the memory snapshot.  The
+        Start read (``_load_one``) is its counterpart."""
+        P, R = TrainingModeSessionProblem, TrainingModeSessionRun
+        now = _utcnow()
+        problems = sorted(lt.problems.values(), key=lambda lp: lp.id)
+        new_rows = [self._problem_row(lt, lp) for lp in problems if not lp.stored]
+        settled = [lp for lp in problems if lp.stored and lp.settled]
+        run_rows = [self._run_row(lt, r) for r in lt.pending_runs]
+        merge_rows = await asyncio.to_thread(self._merge_rows, lt, list(lt.pending_merges))
         async with self._factory() as s:
-            p = await self._get_problem(s, session_id, pid)
-        lt = self._live.get(session_id)
-        lp = lt.problems.get(pid) if lt is not None else None
-        if p.status == "queued":
-            if lp is not None and lp.finishing and lp.written is not None:
-                await lp.written.wait()
-            elif lp is not None:
-                await self._cancel_live(lt, lp)
-            else:
+            async with s.begin():
+                for i in range(0, len(new_rows), INSERT_CHUNK):
+                    await s.execute(insert(P), new_rows[i:i + INSERT_CHUNK])
+                for lp in settled:
+                    row = self._problem_row(lt, lp)
+                    for k in ("session_id", "problem_id", "initial", "modified", "target", "answer",
+                              "seeds", "seed_start", "tag", "added_at"):
+                        row.pop(k)
+                    await s.execute(update(P).where(
+                        P.session_id == lt.id, P.problem_id == lp.id, P.status == "queued").values(**row))
+                for i in range(0, len(run_rows), RUN_ROW_CHUNK):
+                    await s.execute(insert(R), run_rows[i:i + RUN_ROW_CHUNK])
+                for i in range(0, len(merge_rows), RUN_ROW_CHUNK):
+                    await s.execute(insert(SessionMemoryMerge), merge_rows[i:i + RUN_ROW_CHUNK])
+                res = await s.execute(update(TrainingModeSession).where(TrainingModeSession.id == lt.id).values(
+                    name=lt.name, note=lt.note, policy=lt.policy, config_hash=lt.config_hash,
+                    last_event=lt.last_event, finished_count=lt.finished_count,
+                    next_problem_id=lt.next_problem_id, updated_at=now, stopped_at=now,
+                    stopped_from=stopped_from, stop_reason=reason))
+                if res.rowcount == 0:
+                    raise SessionError(404, f"session {lt.id} was deleted")
+
+    @staticmethod
+    def _run_row(lt: LiveSession, r: RunRec) -> dict[str, Any]:
+        return {
+            "session_id": lt.id, "problem_id": r.problem_id, "seed": r.seed, "status": r.status,
+            "key": r.key, "answer": r.answer, "answers": list(r.answers), "codelets": r.codelets,
+            "seconds": r.seconds, "temperature": r.temperature, "answer_quality": r.answer_quality,
+            "error": r.error, "config_hash": r.config_hash, "attempts": r.attempts, "seq": r.seq,
+            "memory_version": r.memory_version, "added_answers": r.added_answers,
+            "added_snags": r.added_snags,
+        }
+
+    @staticmethod
+    def _merge_rows(lt: LiveSession, merges: list) -> list[dict[str, Any]]:
+        rows = []
+        for seq, pid, seed, adds in merges:
+            answers, snags = tm.encode_additions(adds)
+            rows.append({"session_id": lt.id, "seq": seq, "problem_id": pid, "seed": seed,
+                         "answers": answers, "snags": snags})
+        return rows
+
+    async def cancel_problem(self, session_id: int, pid: int) -> dict[str, Any]:
+        lt = self._refuse_if_busy(session_id, "cancel a problem of it")
+        if lt is not None:
+            lp = lt.problems.get(pid)
+            if lp is None:  # a finished or cancelled stored problem: nothing to cancel
                 async with self._factory() as s:
-                    async with s.begin():
-                        await s.execute(update(TrainingModeSessionProblem).where(
-                            TrainingModeSessionProblem.id == pid, TrainingModeSessionProblem.status == "queued"
-                        ).values(status="cancelled", finished_at=_utcnow()))
+                    await self._get_problem(s, session_id, pid)
+            else:
+                self._finish_problem(lt, lp, "cancelled")
+                await self._announce(session_id)
+            return await self.get_problem(session_id, pid)
+        async with self._factory() as s:
+            async with s.begin():
+                p = await self._get_problem(s, session_id, pid)
+                if p.status == "queued":
+                    await s.execute(update(TrainingModeSessionProblem).where(
+                        TrainingModeSessionProblem.session_id == session_id,
+                        TrainingModeSessionProblem.problem_id == pid,
+                        TrainingModeSessionProblem.status == "queued",
+                    ).values(status="cancelled", finished_at=_utcnow()))
         await self._announce(session_id)
         return await self.get_problem(session_id, pid)
 
-    async def _cancel_live(self, lt: LiveSession, lp: LiveProblem) -> None:
-        lp.cancelled = True
-        lt.unsubmitted -= len(lp.todo)
-        lp.todo.clear()
-        try:
-            for attempt in range(3):  # a transient database error must not lose the write
-                try:
-                    await self._write_problem(lt, lp, "cancelled")
-                    break
-                except asyncio.CancelledError:
-                    raise
-                except Exception:  # noqa: BLE001
-                    logger.exception("writing cancelled problem %d failed (attempt %d)", lp.id, attempt + 1)
-                    if attempt == 2:
-                        raise
-                    await asyncio.sleep(0.5 * (attempt + 1))
-        finally:
-            self._forget(lt, lp)
-
     async def cancel_session(self, session_id: int, event: str | None = None) -> dict[str, Any]:
-        """Cancel every queued and in-flight problem.  An action, not a state: the Training Mode Session
+        """Cancel every queued and in-flight problem.  An action, not a state: the session
         keeps its state and accepts new problems afterwards."""
         async with self._factory() as s:
             await self._get_session(s, session_id)
-        lt = self._live.get(session_id)
+        lt = self._refuse_if_busy(session_id, "cancel its problems")
         if lt is not None:
             if event is not None:
                 lt.last_event = event
-            await self._settle(lt, keep_results=True)
+            self._cancel_all_live(lt)
+            await self._announce(session_id)
+            return self._live_summary(lt)
         async with self._factory() as s:
             async with s.begin():
                 await s.execute(update(TrainingModeSessionProblem).where(
@@ -1648,125 +1892,85 @@ class TrainingModeSessionService:
         await self._announce(session_id)
         return await self.summary(session_id)
 
-    def _after_settle(self, lt: LiveSession) -> None:
-        """Nothing of the live problems is left; only runs queued for isolation remain counted."""
-        lt.unsubmitted = sum(1 for (l, _, _) in self._isolation if l is lt)
-
-    async def _settle(self, lt: LiveSession, keep_results: bool) -> None:
-        """Cancel a Training Mode Session's live problems: wait for those being written, write the started
-        ones as cancelled (or drop them), and forget the rest."""
-        waiting = []
-        for lp in list(lt.problems.values()):
-            if lp.finishing and lp.written is not None:
-                waiting.append(lp)
-            else:
-                lp.cancelled = True  # later outcomes of this problem are dropped
-        for lp in waiting:
-            await lp.written.wait()
-        for lp in list(lt.problems.values()):
-            lp.cancelled = True
-            if keep_results and (lp.started or lp.outcomes):
-                await self._cancel_live(lt, lp)
-            else:
-                self._forget(lt, lp)
-        if keep_results and lt.pending_runs:
-            await self._flush_pending(lt)
-        self._after_settle(lt)
-
-    async def _quiesce(self, lt: LiveSession) -> None:
-        """Drop a Training Mode Session's live part for a Stop: wait for the problems being written, then
-        write every run and merge still pending and forget the problems, which stay queued in
-        the database with their stored runs.  Runs in flight are dropped."""
-        waiting = []
-        for lp in list(lt.problems.values()):
-            lp.cancelled = lp.cancelled or not lp.finishing  # later outcomes are dropped
-            if lp.finishing and lp.written is not None:
-                waiting.append(lp)
-        for lp in waiting:
-            await lp.written.wait()
-        for lp in list(lt.problems.values()):
-            self._forget(lt, lp)
-        if lt.pending_runs or lt.pending_merges:
-            await self._flush_pending(lt)
-        self._after_settle(lt)
-
-    async def _flush_pending(self, lt: LiveSession) -> None:
-        """Write runs that are still pending (their problem is already settled)."""
-        # Reuses the milestone write on a throw-away, already-written problem.
-        async with self._factory() as s:
-            row = (await s.execute(select(TrainingModeSessionProblem.id).where(
-                TrainingModeSessionProblem.session_id == lt.id).limit(1))).first()
-        if row is None:
-            return
-        # Every pending run belongs to a problem that exists; write them on their own.
-        n_runs, n_merges = len(lt.pending_runs), len(lt.pending_merges)
-        run_rows = [self._run_row(lt, r) for r in lt.pending_runs[:n_runs]]
-        merge_rows = await asyncio.to_thread(self._merge_rows, lt, lt.pending_merges[:n_merges])
-        async with self._write_lock:
-            async with self._factory() as s:
-                async with s.begin():
-                    for i in range(0, len(run_rows), RUN_ROW_CHUNK):
-                        await s.execute(insert(TrainingModeSessionRun), run_rows[i:i + RUN_ROW_CHUNK])
-                    for i in range(0, len(merge_rows), RUN_ROW_CHUNK):
-                        await s.execute(insert(SessionMemoryMerge), merge_rows[i:i + RUN_ROW_CHUNK])
-        del lt.pending_runs[:n_runs]
-        del lt.pending_merges[:n_merges]
-
     async def delete_session(self, session_id: int) -> None:
-        """Delete a Training Mode Session and everything it owns: its Episodic Memory, problems and runs
-        (the foreign keys cascade) and its live part, which is settled first with no Stop
+        """Delete a session and everything it owns: its Episodic Memory, problems and runs
+        (the foreign keys cascade) and its live part, which is discarded with no Stop
         write.  Nothing is left behind.  This is the only act that removes its memory."""
         async with self._factory() as s:
             await self._get_session(s, session_id)
-        lt = self._live.pop(session_id, None)
+        lt = self._refuse_if_busy(session_id, "delete it")
         if lt is not None:
             lt.cancelled = True
-            await self._settle(lt, keep_results=False)
+            for lp in lt.problems.values():
+                lp.cancelled = True  # later outcomes of runs in flight are dropped
+            self._live.pop(session_id, None)
         async with self._factory() as s:
             async with s.begin():
                 await s.execute(delete(TrainingModeSession).where(TrainingModeSession.id == session_id))
         self._versions.pop(session_id, None)
         await self._announce(session_id)
         self._conds.pop(session_id, None)
-        self._status_locks.pop(session_id, None)
 
     # -- export streams ---------------------------------------------------------
+    #
+    # A Stopped session streams its stored rows.  A live session streams the stored rows (as of
+    # its last Stop) and then a labelled tail from memory (the API says so in a header).
 
     async def iter_problem_dicts(self, session_id: int) -> AsyncIterator[list[dict[str, Any]]]:
         P = TrainingModeSessionProblem
+        lt = self._live.get(session_id)
         last = 0
         while True:
             async with self._factory() as s:
-                rows = (await s.execute(
-                    select(P).where(P.session_id == session_id, P.id > last).order_by(P.id).limit(1000)
-                )).scalars().all()
+                conds = [P.session_id == session_id, P.problem_id > last]
+                if lt is not None:
+                    conds.append(P.status != "queued")  # every queued stored row is in memory
+                rows = (await s.execute(select(P).where(*conds).order_by(P.problem_id).limit(1000))).scalars().all()
             if not rows:
-                return
-            last = rows[-1].id
-            yield [self._problem_dict(p, True) for p in rows]
+                break
+            last = rows[-1].problem_id
+            yield [self._stored_problem_dict(p, True) for p in rows]
+        if lt is not None:
+            mem = [self._live_problem_dict(lp, True) for lp in sorted(lt.problems.values(), key=lambda lp: lp.id)]
+            for i in range(0, len(mem), 1000):
+                yield mem[i:i + 1000]
 
     async def iter_run_rows(self, session_id: int) -> AsyncIterator[list[dict[str, Any]]]:
-        """Run rows with their problem's identity, in (problem, seed) order."""
+        """Run rows with their problem's identity, in (problem, seed) order (stored rows first,
+        then, for a live session, the runs only memory holds)."""
         from sqlalchemy import tuple_
 
         R, P = TrainingModeSessionRun, TrainingModeSessionProblem
+        lt = self._live.get(session_id)
         last = (0, -(2 ** 62))
         while True:
             async with self._factory() as s:
                 rows = (await s.execute(
                     select(R, P.initial, P.modified, P.target, P.answer)
-                    .join(P, P.id == R.problem_id)
+                    .join(P, (P.session_id == R.session_id) & (P.problem_id == R.problem_id))
                     .where(R.session_id == session_id, tuple_(R.problem_id, R.seed) > tuple_(*last))
                     .order_by(R.problem_id, R.seed).limit(2000)
                 )).all()
             if not rows:
-                return
+                break
             last = (rows[-1][0].problem_id, rows[-1][0].seed)
             yield [
                 {"problem_id": r.problem_id, "initial": i, "modified": m, "target": t,
                  "problem_answer": a, **self._run_dict(r)}
                 for r, i, m, t, a in rows
             ]
+        if lt is not None:
+            tail = sorted(lt.pending_runs, key=lambda r: (r.problem_id, r.seed))
+            for i in range(0, len(tail), 2000):
+                out = []
+                for r in tail[i:i + 2000]:
+                    lp = lt.problems.get(r.problem_id)
+                    out.append({
+                        "problem_id": r.problem_id, "initial": lp.initial if lp else None,
+                        "modified": lp.modified if lp else None, "target": lp.target if lp else None,
+                        "problem_answer": lp.answer if lp else None, **self._run_dict(r),
+                    })
+                yield out
 
 
 # ---------------------------------------------------------------------------

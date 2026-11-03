@@ -164,6 +164,12 @@ async def service():
 
     engine = create_async_engine(url, poolclass=NullPool)
     async with engine.begin() as conn:
+        # ``create_all`` never alters a table, and the test database outlives schema changes:
+        # start these tables from the current models.
+        from sqlalchemy import text
+        await conn.execute(text(
+            "DROP TABLE IF EXISTS training_memory_merges, training_mode_session_runs, "
+            "training_mode_session_problems, training_mode_sessions CASCADE"))
         await conn.run_sync(lambda c: Base.metadata.create_all(c, tables=[
             tr.TrainingModeSession.__table__, tr.TrainingModeSessionProblem.__table__, tr.TrainingModeSessionRun.__table__,
             tr.SessionMemoryMerge.__table__]))

@@ -253,13 +253,16 @@ async def test_the_other_sources_are_accepted_on_the_global_configuration(loaded
     assert report["persisted"] is True
 
 
-async def test_a_session_configuration_is_not_handled_until_c8(loaded):
+async def test_a_session_configuration_without_stored_state_is_not_written(loaded):
+    """A session configuration is written through the funnel (C8, tests/integration/
+    test_session_configurations.py); a bare row with no stored current state is not."""
     from server.services.configuration_writer import ChangeService
+    from server.services.configurations import ConfigurationError
 
     async with _s(loaded) as session:
         await session.execute(text("INSERT INTO configurations (id, kind, revision) VALUES (7, 'session', 0)"))
         await session.commit()
-        with pytest.raises(NotImplementedError):
+        with pytest.raises(ConfigurationError):
             await ChangeService.apply(session, batch(node("c5-sess"), configuration_id=7, source="creation"))
 
 

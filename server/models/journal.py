@@ -1,9 +1,14 @@
 """The journal tables (configuration plan 3.11) and the ``configurations`` row they hang from.
 
-* ``configurations``: the minimum of the configuration entity (3.10.1) that the journal
-  needs: ``id``, ``kind``, ``revision`` and ``config_hash``.  The global configuration is
-  always id 1.  C8 adds the rest of the entity (name, note, base snapshot, ``frozen``,
-  lineage) to this table.
+* ``configurations``: the configuration entity (3.10.1): ``id``, ``name``, ``note``,
+  ``kind``, ``session_id`` (a Training Mode Session's configuration; unique, deleted with the
+  session), ``revision``, ``config_hash``, ``base_snapshot_hash``, ``frozen`` and the lineage
+  (``created_from_configuration_id``, ``created_from_revision``).  The global configuration
+  is always id 1.
+* ``configuration_snapshots``: a session configuration's two stored documents (S0's codec data
+  and its ``config_hash``): the immutable ``base`` (its Starting Conceptual State) and the
+  stored ``current`` state, which the layer rewrites with every write to a Stopped session's
+  configuration and a Stop write rewrites later (S5).  Deleted with the configuration.
 * ``configuration_journal``: one append-only record per configuration.  An entry holds the
   ops as proposed, the resolved ops with their cascades, the before-images and provenance.
   Only ``server/services/journal.py`` writes either table, and it has no update or delete
@@ -18,7 +23,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from sqlalchemy import (
-    CheckConstraint, Column, DateTime, ForeignKey, Index, Integer, String, Text,
+    Boolean, CheckConstraint, Column, DateTime, ForeignKey, Index, Integer, String, Text,
     UniqueConstraint, event, text,
 )
 from sqlalchemy.dialects.postgresql import JSON
@@ -31,6 +36,12 @@ GLOBAL_CONFIGURATION_ID = 1
 
 KIND_GLOBAL = "global"
 KIND_SESSION = "session"
+
+GLOBAL_CONFIGURATION_NAME = "Metacat Mode: global configuration"
+
+#: ``configuration_snapshots.role``.
+SNAPSHOT_BASE = "base"
+SNAPSHOT_CURRENT = "current"
 
 #: ``source`` of a journal entry (3.12.0).  Provenance only.
 SOURCES = (
@@ -56,12 +67,47 @@ class Configuration(Base):
     )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(200), nullable=False, default="", server_default="")
+    note = Column(Text, nullable=False, default="", server_default="")
     kind = Column(String(8), nullable=False)
+    #: The Training Mode Session this is the configuration of (``NULL`` for the global one).
+    #: Deleting the session deletes the configuration, its snapshots and its journal.
+    session_id = Column(
+        Integer, ForeignKey("training_mode_sessions.id", ondelete="CASCADE"), nullable=True,
+        unique=True,
+    )
     #: Counts the committed batches that changed this configuration; the compare-and-set token.
     revision = Column(Integer, nullable=False, default=0)
     #: The effective hash at ``revision`` (``server.engine.hashing.config_hash``); ``NULL``
     #: when the configuration at that revision could not be loaded.
     config_hash = Column(String(64), nullable=True)
+    #: A session configuration: the ``config_hash`` of its base snapshot (its Starting
+    #: Conceptual State).  ``NULL`` for the global configuration.
+    base_snapshot_hash = Column(String(64), nullable=True)
+    #: A default-selection flag: edit-all skips a frozen configuration.  Nothing is refused.
+    frozen = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+    #: Lineage.  Plain integers, not foreign keys: the source configuration may be deleted.
+    created_from_configuration_id = Column(Integer, nullable=True)
+    created_from_revision = Column(Integer, nullable=True)
+
+
+class ConfigurationSnapshot(Base):
+    __tablename__ = "configuration_snapshots"
+    __table_args__ = (
+        UniqueConstraint("configuration_id", "role", name="uq_configuration_snapshots_role"),
+        CheckConstraint("role IN ('base','current')", name="ck_configuration_snapshots_role"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    configuration_id = Column(
+        Integer, ForeignKey("configurations.id", ondelete="CASCADE"), nullable=False
+    )
+    role = Column(String(8), nullable=False)
+    #: The configuration's ``revision`` this document is at.
+    revision = Column(Integer, nullable=False)
+    config_hash = Column(String(64), nullable=True)
+    #: ``config_document.to_data`` of the document.
+    data = Column(JSON, nullable=False)
 
 
 class JournalEntry(Base):
@@ -133,3 +179,5 @@ def _refuse_bulk_change(state):
 
 # The tables register on the shared ``Base`` when this module is imported;
 # ``server/models/configuration_state.py`` imports it, as ``training_mode_session.py`` imports that.
+# ``configurations.session_id`` refers to ``training_mode_sessions``, so that module registers too.
+import server.models.training_mode_session  # noqa: E402,F401
