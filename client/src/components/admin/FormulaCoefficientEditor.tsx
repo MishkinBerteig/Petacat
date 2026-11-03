@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
-import { request, describeApiError } from '@/api/client'
+import { describeApiError, GLOBAL_CONFIGURATION_ID } from '@/api/client'
+import { useAdminRequest, type AdminRequest, type ConfigurationProp } from './adminRequest'
 import { EditableTable, type ColumnDef } from './EditableTable'
 
 /**
@@ -14,13 +15,14 @@ interface FormulaCoeff { name: string; value: string; value_type: string }
  * The table shows the thrown message beside the row that was edited, so the sentence it
  * throws is the sentence the reader gets.
  */
-async function submit<T>(action: string, path: string, options: RequestInit): Promise<T> {
-  try {
-    return await request<T>(path, options)
-  } catch (err) {
-    throw new Error(describeApiError(err, action))
+const submitWith = (request: AdminRequest) =>
+  async function submit<T>(action: string, path: string, options: RequestInit): Promise<T> {
+    try {
+      return await request<T>(path, options)
+    } catch (err) {
+      throw new Error(describeApiError(err, action))
+    }
   }
-}
 
 const COLUMNS: ColumnDef[] = [
   { key: 'name', label: 'Name', type: 'readonly', width: '50%' },
@@ -28,7 +30,9 @@ const COLUMNS: ColumnDef[] = [
   { key: 'value_type', label: 'Type', type: 'text', width: '20%' },
 ]
 
-export function FormulaCoefficientEditor() {
+export function FormulaCoefficientEditor({ configuration = GLOBAL_CONFIGURATION_ID }: ConfigurationProp) {
+  const request = useAdminRequest(configuration)
+  const submit = submitWith(request)
   const [coeffs, setCoeffs] = useState<FormulaCoeff[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -39,7 +43,7 @@ export function FormulaCoefficientEditor() {
       .then(data => { setCoeffs(data); setError(null) })
       .catch(err => setError(describeApiError(err, 'load the formula coefficients')))
       .finally(() => setLoading(false))
-  }, [])
+  }, [request])
 
   useEffect(() => { load() }, [load])
   if (loading) return <div className="text-muted">Loading formula coefficients...</div>

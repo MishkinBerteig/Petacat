@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { request, describeApiError } from '@/api/client'
+import { describeApiError, GLOBAL_CONFIGURATION_ID } from '@/api/client'
+import { useAdminRequest, type AdminRequest, type ConfigurationProp } from './adminRequest'
 import { EditableTable, type ColumnDef } from './EditableTable'
+import { NodeHistory } from './history/NodeHistory'
 
 /**
  * Send one write, and describe a refusal in terms of what was being attempted.
@@ -8,13 +10,14 @@ import { EditableTable, type ColumnDef } from './EditableTable'
  * The table shows the thrown message beside the row that was edited, so the sentence it
  * throws is the sentence the reader gets.
  */
-async function submit<T>(action: string, path: string, options: RequestInit): Promise<T> {
-  try {
-    return await request<T>(path, options)
-  } catch (err) {
-    throw new Error(describeApiError(err, action))
+const submitWith = (request: AdminRequest) =>
+  async function submit<T>(action: string, path: string, options: RequestInit): Promise<T> {
+    try {
+      return await request<T>(path, options)
+    } catch (err) {
+      throw new Error(describeApiError(err, action))
+    }
   }
-}
 
 interface NodeDef {
   name: string
@@ -30,12 +33,14 @@ const COLUMNS: ColumnDef[] = [
   { key: 'description', label: 'Description', type: 'text' },
 ]
 
-interface Props {
+interface Props extends ConfigurationProp {
   editNodeName?: string | null;
   onClearEditNode?: () => void;
 }
 
-export function SlipnetEditor({ editNodeName, onClearEditNode }: Props) {
+export function SlipnetEditor({ editNodeName, onClearEditNode, configuration = GLOBAL_CONFIGURATION_ID }: Props) {
+  const request = useAdminRequest(configuration)
+  const submit = submitWith(request)
   const [nodes, setNodes] = useState<NodeDef[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -48,7 +53,7 @@ export function SlipnetEditor({ editNodeName, onClearEditNode }: Props) {
       .then(data => { setNodes(data); setError(null) })
       .catch(err => setError(describeApiError(err, 'load the slipnet nodes')))
       .finally(() => setLoading(false))
-  }, [])
+  }, [request])
 
   useEffect(() => { load() }, [load])
 
@@ -113,6 +118,10 @@ export function SlipnetEditor({ editNodeName, onClearEditNode }: Props) {
         }}
         onRefresh={load}
       />
+      <details style={{ marginTop: 8 }}>
+        <summary className="text-xs" style={{ cursor: 'pointer' }}>Node History (restore a deleted node, preview a deletion)</summary>
+        <NodeHistory configurationId={configuration} initialName={editNodeName} onChanged={load} />
+      </details>
     </div>
   )
 }

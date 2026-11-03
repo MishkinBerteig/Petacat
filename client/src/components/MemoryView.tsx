@@ -23,6 +23,8 @@ import {
 import { useMomentStore } from '@/store/momentStore';
 import { useRunStore } from '@/store/runStore';
 import type { AnswerComparisonResult, AnswerExplanation, MemoryState } from '@/types';
+import { NamesPanel } from './admin/history/NamesPanel';
+import { memoryNames } from './admin/history/memoryNames';
 
 function qualityColor(quality: number): string {
   if (quality > 70) return 'var(--success)';
@@ -307,6 +309,12 @@ export function MemoryView() {
       >
         Metacat Mode&apos;s Episodic Memory — Metacat-Mode learning, shared by successive runs.
       </div>
+
+      <NamesPanel
+        configurationId={1}
+        names={memoryNames(memory)}
+        memoryLabel="Metacat Mode's Episodic Memory"
+      />
 
       {/* Header with counts and clear button */}
       <div

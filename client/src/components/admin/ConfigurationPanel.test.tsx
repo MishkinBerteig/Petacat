@@ -149,10 +149,10 @@ describe('ConfigurationPanel', () => {
 })
 
 describe('AdminLayout', () => {
-  it('has a Configuration tab and no seed-data export', async () => {
+  it('has a Status and reset tab and no seed-data export', async () => {
     serve()
     render(<AdminLayout />)
-    fireEvent.click(screen.getByText('Configuration'))
+    fireEvent.click(screen.getByText('Status and reset'))
     expect(await screen.findByText(/Configuration status \(Metacat Mode\)/)).toBeTruthy()
     expect(screen.queryByText(/seed data/i)).toBeNull()
   })

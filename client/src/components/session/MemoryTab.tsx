@@ -10,6 +10,8 @@
 import { useState } from 'react';
 import { describeApiError, getSessionMemory } from '@/api/client';
 import type { SessionMemory, SessionSummary } from '@/types';
+import { NamesPanel } from '../admin/history/NamesPanel';
+import { memoryNames } from '../admin/history/memoryNames';
 import { errorStyle, fmtInt, usePolling } from './shared';
 
 const POLL_RUNNING_MS = 3000;
@@ -56,6 +58,13 @@ export function MemoryTab({ session }: { session: SessionSummary }) {
         <div role="alert" style={errorStyle}>
           {error}
         </div>
+      )}
+      {memory && (
+        <NamesPanel
+          sessionId={session.id}
+          names={memoryNames(memory)}
+          memoryLabel="This Training Mode Session's Episodic Memory"
+        />
       )}
       {memory && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 10 }}>

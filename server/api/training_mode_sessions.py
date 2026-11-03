@@ -13,7 +13,11 @@ stopping is refused with 409 ``busy``.  Problems can be added in any other state
 ``GET /{id}/finished`` is a long-poll cursor over the order in which they finished -- the
 surface an ML layer drives.  Every Training Mode Session has one Episodic Memory that its runs share (a
 run copies it at its start and merges its additions when it finishes); ``GET /{id}/memory``
-serves it.  No route clears it: deleting the whole Training Mode Session removes it.
+serves it.  No route clears it: deleting the whole Training Mode Session removes it.  Every
+Training Mode Session also has its own evolving configuration, starting from its Starting
+Conceptual State (``settings.configuration_base`` plus ``settings.parameters`` folded in at
+creation); every summary carries its ``configuration`` block, and every run its
+``configuration_revision``, ``episode_version`` and ``config_hash``.
 
 The routes work with or without the parallel plugin: without it the runs execute serially
 in one child process, with identical results.
@@ -60,8 +64,8 @@ class CreateSessionRequest(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     note: str = Field(default="", max_length=10_000)
     #: Partial ``SessionSettings``: seeds_per_problem, seed_start, max_codelets,
-    #: parameters, backend.  Each is validated by the service (422, or 400 for parameters
-    #: and backend); omitted ones take the defaults.
+    #: parameters, backend, configuration_base.  Each is validated by the service (422, or 400
+    #: for parameters and backend); omitted ones take the defaults.
     settings: dict[str, Any] | None = None
     #: Partial ``ErrorPolicy``; a bad value is a 400.
     policy: dict[str, Any] | None = None
@@ -107,7 +111,7 @@ async def list_sessions() -> dict[str, Any]:
     """Every Training Mode Session (newest first), the executor's state, the limits and the defaults."""
     service = _service()
     return {
-        "training_mode_sessions": await service.list_sessions(),
+        "sessions": await service.list_sessions(),
         "executor": service.executor_info(),
         "limits": service.limits(),
         "defaults": service.defaults(),

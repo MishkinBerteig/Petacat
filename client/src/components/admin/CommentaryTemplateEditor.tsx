@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 
-import { request, describeApiError } from '@/api/client'
+import { describeApiError, GLOBAL_CONFIGURATION_ID } from '@/api/client'
+import { useAdminRequest, type AdminRequest, type ConfigurationProp } from './adminRequest'
 import { LoadFailure } from './EditableTable'
 
 interface Template {
@@ -16,7 +17,8 @@ const EMPTY: Template = { id: -1, template_key: '', template_data: {} }
  * "an illusion arising from a flexible set of phrase-templates" — so editing one here
  * changes what the program says in the next commentary it writes.
  */
-export function CommentaryTemplateEditor() {
+export function CommentaryTemplateEditor({ configuration = GLOBAL_CONFIGURATION_ID }: ConfigurationProp) {
+  const request = useAdminRequest(configuration)
   const [templates, setTemplates] = useState<Template[]>([])
   const [selected, setSelected] = useState<Template | null>(null)
   const [draftKey, setDraftKey] = useState('')
@@ -32,7 +34,7 @@ export function CommentaryTemplateEditor() {
       .then(data => { setTemplates(data); setLoadError(null) })
       .catch(e => setLoadError(describeApiError(e, 'load the commentary templates')))
       .finally(() => setLoading(false))
-  }, [])
+  }, [request])
 
   useEffect(() => { load() }, [load])
 

@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { request, describeApiError } from '@/api/client'
+import { request, describeApiError, getConfigurationSummary, GLOBAL_CONFIGURATION_ID } from '@/api/client'
+import type { ConfigurationSummary } from '@/types/configuration'
 import { SlipnetEditor } from './SlipnetEditor'
 import { CodeletEditor } from './CodeletEditor'
 import { ParamsEditor } from './ParamsEditor'
@@ -16,9 +17,14 @@ import { FormulaCoefficientEditor } from './FormulaCoefficientEditor'
 import { ConfigurationPanel } from './ConfigurationPanel'
 import { ConfigurationBanner } from './ConfigurationBanner'
 import { DatabasePanel } from './database/DatabasePanel'
+import { HistoryPanel } from './history/HistoryPanel'
+import { ConfigurationChip } from './ConfigurationChip'
+import { ConfigurationsTab } from './ConfigurationsTab'
+import { isChangingState } from './configurationLabels'
 
 const TABS = [
-  { key: 'configuration', label: 'Configuration' },
+  { key: 'configurations', label: 'Configurations' },
+  { key: 'configuration', label: 'Status and reset' },
   { key: 'slipnet', label: 'Slipnet Nodes' },
   { key: 'links', label: 'Slipnet Links' },
   { key: 'codelets', label: 'Codelet Types' },
@@ -32,8 +38,15 @@ const TABS = [
   { key: 'commentary', label: 'Commentary Templates' },
   { key: 'layout', label: 'Slipnet Layout' },
   { key: 'help', label: 'Help Topics' },
+  { key: 'history', label: 'History' },
   { key: 'database', label: 'Database (all modes)' },
 ] as const
+
+/** The tabs that show the configuration manager itself rather than edit the open configuration. */
+const MANAGER_TABS: readonly string[] = ['configurations']
+
+/** The tabs that belong to the global configuration only: the engine's vocabulary and content. */
+const GLOBAL_ONLY_TABS: readonly string[] = ['enums', 'help']
 
 type TabKey = typeof TABS[number]['key']
 
@@ -91,6 +104,9 @@ export function AdminLayout({ editNodeName, onClearEditNode }: AdminLayoutProps)
   const [activeTab, setActiveTab] = useState<TabKey>('slipnet')
   const [flash, setFlash] = useState<Flash | null>(null)
   const [configurationChanges, setConfigurationChanges] = useState(0)
+  // The configuration the editors below are changing; 1 is the global one (Metacat Mode).
+  const [openId, setOpenId] = useState(GLOBAL_CONFIGURATION_ID)
+  const [summary, setSummary] = useState<ConfigurationSummary | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // A success announces itself and goes; a failure stays until it is read and dismissed.
@@ -99,6 +115,25 @@ export function AdminLayout({ editNodeName, onClearEditNode }: AdminLayoutProps)
     const timer = setTimeout(() => setFlash(null), 4000)
     return () => clearTimeout(timer)
   }, [flash])
+
+  // What the header chip says is the open configuration's own summary; if it cannot be read the
+  // chip falls back to wording that is true without it.
+  useEffect(() => {
+    let live = true
+    setSummary(null)
+    getConfigurationSummary(openId)
+      .then(s => { if (live) setSummary(s) })
+      .catch(() => { if (live) setSummary(null) })
+    return () => { live = false }
+  }, [openId, configurationChanges, activeTab])
+
+  const bump = useCallback(() => setConfigurationChanges(n => n + 1), [])
+
+  /** Open a configuration in the editors (the Slipnet Nodes tab). */
+  const open = useCallback((id: number, tab: TabKey = 'slipnet') => {
+    setOpenId(id)
+    setActiveTab(tab)
+  }, [])
 
   // Auto-switch to slipnet tab when editNodeName arrives
   useEffect(() => {
@@ -160,7 +195,8 @@ export function AdminLayout({ editNodeName, onClearEditNode }: AdminLayoutProps)
           )}
         </div>
       )}
-      <ConfigurationBanner refreshKey={`${activeTab}:${configurationChanges}`} />
+      {!MANAGER_TABS.includes(activeTab) && <ConfigurationBanner configuration={openId} refreshKey={`${activeTab}:${configurationChanges}`} />}
+      {!MANAGER_TABS.includes(activeTab) && <ConfigurationChip configuration={openId} summary={summary} />}
       <div style={{
         display: 'flex',
         gap: 2,
@@ -189,23 +225,58 @@ export function AdminLayout({ editNodeName, onClearEditNode }: AdminLayoutProps)
         <input ref={fileInputRef} type="file" accept=".json" onChange={handleImport} style={{ display: 'none' }} />
       </div>
       <div style={{ flex: 1, overflow: 'auto', padding: 8 }}>
-        {activeTab === 'configuration' && (
-          <ConfigurationPanel onChanged={() => setConfigurationChanges(n => n + 1)} />
+        {activeTab === 'configurations' && (
+          <ConfigurationsTab
+            openId={openId}
+            onOpen={id => open(id)}
+            onHistory={id => open(id, 'history')}
+            onChanged={bump}
+            refreshKey={configurationChanges}
+          />
         )}
-        {activeTab === 'slipnet' && <SlipnetEditor editNodeName={editNodeName} onClearEditNode={onClearEditNode} />}
-        {activeTab === 'links' && <SlipnetLinkEditor />}
-        {activeTab === 'codelets' && <CodeletEditor />}
-        {activeTab === 'params' && <ParamsEditor />}
-        {activeTab === 'urgency' && <UrgencyLevelEditor />}
-        {activeTab === 'formulas' && <FormulaCoefficientEditor />}
-        {activeTab === 'demos' && <DemoEditor />}
-        {activeTab === 'enums' && <EnumEditor />}
-        {activeTab === 'theme-dims' && <ThemeDimensionEditor />}
-        {activeTab === 'posting' && <PostingRuleEditor />}
-        {activeTab === 'commentary' && <CommentaryTemplateEditor />}
-        {activeTab === 'layout' && <SlipnetLayoutEditor />}
-        {activeTab === 'help' && <HelpTopicEditor />}
-        {activeTab === 'database' && <DatabasePanel />}
+        {activeTab !== 'configurations' && summary && isChangingState(summary) && (
+          <div role="status" data-testid="changing-state">
+            This session is changing state ({summary.session_state}); its configuration is read-only until it has finished.
+          </div>
+        )}
+        {activeTab !== 'configurations' && !(summary && isChangingState(summary)) && (
+          GLOBAL_ONLY_TABS.includes(activeTab) && openId !== GLOBAL_CONFIGURATION_ID ? (
+            <div role="status" data-testid="global-only">
+              {activeTab === 'enums'
+                ? "The enum tables are the engine's vocabulary, and only the global configuration (Metacat Mode) has them."
+                : 'Help topics are content shared by every mode, not part of a configuration. Open the global configuration to edit them.'}
+            </div>
+          ) : (
+            <>
+              {activeTab === 'configuration' && (
+                <ConfigurationPanel
+                  onChanged={bump}
+                  configuration={openId}
+                  modeLabel={summary?.mode_label ?? (openId === GLOBAL_CONFIGURATION_ID ? 'Metacat Mode' : 'Training Mode')}
+                />
+              )}
+              {activeTab === 'slipnet' && <SlipnetEditor configuration={openId} editNodeName={editNodeName} onClearEditNode={onClearEditNode} />}
+              {activeTab === 'links' && <SlipnetLinkEditor configuration={openId} />}
+              {activeTab === 'codelets' && <CodeletEditor configuration={openId} />}
+              {activeTab === 'params' && <ParamsEditor configuration={openId} />}
+              {activeTab === 'urgency' && <UrgencyLevelEditor configuration={openId} />}
+              {activeTab === 'formulas' && <FormulaCoefficientEditor configuration={openId} />}
+              {activeTab === 'demos' && <DemoEditor configuration={openId} />}
+              {activeTab === 'enums' && <EnumEditor />}
+              {activeTab === 'theme-dims' && <ThemeDimensionEditor configuration={openId} />}
+              {activeTab === 'posting' && <PostingRuleEditor configuration={openId} />}
+              {activeTab === 'commentary' && <CommentaryTemplateEditor configuration={openId} />}
+              {activeTab === 'layout' && <SlipnetLayoutEditor configuration={openId} />}
+              {activeTab === 'help' && <HelpTopicEditor />}
+              {activeTab === 'history' && (
+                <div data-testid="history-slot">
+                  <HistoryPanel configurationId={openId} onChanged={() => setConfigurationChanges(n => n + 1)} />
+                </div>
+              )}
+              {activeTab === 'database' && <DatabasePanel />}
+            </>
+          )
+        )}
       </div>
     </div>
   )

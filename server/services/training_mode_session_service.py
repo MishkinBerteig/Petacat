@@ -49,12 +49,14 @@ it is put into a 'Stopped' state.  It may do database reads at other times."
   (``LiveSession``) until Stop, and the API reports them from there with
   ``persisted: false``, ``saved_through`` (what the database holds) and ``unsaved`` (what
   only memory holds).  A crash loses everything since the last Stop.
-* A *Stopped* session is a record: creating it, renaming it, adding problems and deleting
-  it are API writes, each in its own transaction.
+* A *Stopped* session is a record: creating it, renaming it, adding problems, changing its
+  configuration and deleting it are API writes, each in its own transaction.
 * The **Stop write** is the one write of a live session: the session row, new problems,
   outcomes, runs and memory merges, in one transaction (``_write_stop``).  S5 adds the
-  journal entries, the configuration's stored current state and the memory snapshot to the
-  same transaction, and replaces the Start read's merge replay.
+  journal entries (``lt.config.pending_entries()``), the configuration's stored current state
+  (``lt.config.document``) and the memory snapshot to the same transaction, and replaces the
+  Start read's merge replay.  Until it does, the session's configuration batches are held in
+  memory and are not stored at Stop.
 
 A problem's identifier is a per-session **ordinal** (``(session, ordinal)`` is its key and
 the API's ``problem_id``), so an identifier handed out while live is the stored one.  The
@@ -68,15 +70,37 @@ problem, round-robin across sessions so a huge one cannot starve a small one.  I
 a problem wakes it.  Nothing in its hot path (dispatch, merge, problem completion) reads
 or writes the database.
 
-Configuration and errors
-------------------------
-A session runs under the ``MetadataProvider`` current when each run is dispatched; each
-run records the ``config_hash`` it ran under.  Nothing pauses, adopts or rebases
-automatically (``on_config_change`` is removed): a session stalls only when the current
-configuration cannot start a run (the run-start check), and resumes when it can.  The rest
-of the error policy (``on_run_error``, ``max_errors_*``, ``on_worker_failure``,
-``max_retries``) acts as the API contract says and writes a human sentence to
-``last_event``.
+The session's own configuration
+-------------------------------
+Each session has its own evolving configuration (the configuration entity of
+``server/services/configurations.py``), created with the session in its creation transaction:
+the base (``settings.configuration_base``: ``global``, ``standard`` or ``{"session_id": n}``)
+plus the creation overrides, which are ``settings.parameters`` folded in once as one creation
+batch.  The result is the session's Starting Conceptual State; the stored ``settings.parameters``
+stays as the record, and a task carries no overrides.  Nothing in a session reads or writes
+Metacat Mode's configuration apart from that one read of the global configuration at creation.
+
+A live session holds that configuration in memory as a ``LiveConfiguration``
+(``session_live_config.py``) on an ``EpisodeLog``: one counter, the episode version, over
+Episodic Memory and the whole configuration, and the configuration revision (the entity's own
+counter, the compare-and-set token).  A run takes a ``ConfigRef`` with its ``MemoryRef`` when it
+is dispatched (the provider, its ``config_hash`` and revision, the episode version) and records
+them.  When a run finishes (``_record``) one entry is made, in completion order: the memory
+merge, then the batch of the after-run seam (``set_after_run``; none ships) if any, then one
+version.  An external or Admin batch (``submit_changes`` / ``apply_live``) is an entry with no
+memory part; it reaches runs dispatched after it, never one in flight.  Every entry that
+changed the configuration is held as a ``journal.PendingEntry`` until the Stop write, which is
+S5's.  The configuration store reads a live session through the live source this service
+registers (``LiveState``), and ``ChangeService.apply`` hands a live session's batch to
+``apply_live``.
+
+Errors
+------
+Nothing pauses, adopts or rebases automatically (``on_config_change`` is removed): a session
+stalls only when its own configuration cannot start a run (the run-start check), and resumes when
+a change makes it able to.  The rest of the error policy (``on_run_error``, ``max_errors_*``,
+``on_worker_failure``, ``max_retries``) acts as the API contract says and writes a human sentence
+to ``last_event``.
 """
 
 from __future__ import annotations
@@ -93,16 +117,23 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, AsyncIterator, Callable
 
-from sqlalchemy import case, delete, false, func, insert, select, update
+from sqlalchemy import case, cast, delete, false, func, insert, select, update
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from server.engine.hashing import config_hash
 from server.engine.memory import EpisodicMemory
 from server.engine.metadata import MetadataProvider
 from server.engine.parameters import UnknownParameter, validate_overrides
 from server.engine.start_check import RunStartError, require_run_start
+from server.models.journal import (
+    Configuration, ConfigurationSnapshot, JournalEntry, KIND_SESSION,
+)
 from server.models.training_mode_session import TrainingModeSession, SessionMemoryMerge, TrainingModeSessionProblem, TrainingModeSessionRun
+from server.services import config_document as cd
+from server.services import configuration_store as store
+from server.services import configurations
 from server.services import training_mode_session_memory as tm
+from server.services.session_live_config import ConfigRef, LiveConfiguration
 from server.services.training_mode_session_executor import (
     SessionTask,
     available_backend_names,
@@ -143,7 +174,9 @@ _POLICY_CHOICES = {
     "on_run_error": ("record", "skip_problem", "pause", "cancel"),
     "on_worker_failure": ("retry", "pause"),
 }
-_SETTINGS_KEYS = ("seeds_per_problem", "seed_start", "max_codelets", "parameters", "backend")
+_SETTINGS_KEYS = (
+    "seeds_per_problem", "seed_start", "max_codelets", "parameters", "backend", "configuration_base",
+)
 
 
 class SessionError(Exception):
@@ -214,6 +247,7 @@ class RunRec:
     error: str | None
     config_hash: str
     attempts: int = 1
+    configuration_revision: int | None = None
     seq: int = 0
     memory_version: int = 0
     added_answers: int = 0
@@ -336,6 +370,9 @@ class Sub:
     isolated: bool = False
     #: A Stop discarded it: its outcome is ignored when it arrives.
     dropped: bool = False
+    #: The configuration the run was dispatched under (a ``ConfigRef``'s revision and provider).
+    configuration_revision: int | None = None
+    provider: Any = None
 
 
 @dataclass
@@ -359,8 +396,6 @@ class LiveSession:
     parameters: dict | None
     backend: str
     policy: dict
-    config_hash: str
-    meta: MetadataProvider | None
     created_at: datetime | None = None
     updated_at: datetime | None = None
     #: The last Stop the database holds (what ``saved_through`` reports).
@@ -370,6 +405,12 @@ class LiveSession:
     saved_version: int = 0
     stalled_reason: str | None = None
     last_event: str | None = None
+    #: The session's own evolving configuration (``None`` only while it is being loaded).
+    config: LiveConfiguration | None = None
+    #: ``(provider, why a run cannot start under it or None)``: the run-start check, once per
+    #: configuration.
+    start_check: tuple | None = None
+    configuration_base: Any = "global"
     queue: deque = field(default_factory=deque)        # LiveProblem not yet started
     active: dict = field(default_factory=dict)         # pid -> LiveProblem, started and unfinished
     problems: dict = field(default_factory=dict)       # pid -> LiveProblem, every one since Start
@@ -400,9 +441,18 @@ class LiveSession:
     want_snapshot: set = field(default_factory=set)    # (pid, seed) whose worker needs one
 
     @property
+    def meta(self) -> MetadataProvider | None:
+        """The provider of the configuration as it stands (what the next run is dispatched under)."""
+        return self.config.provider if self.config is not None else None
+
+    @property
+    def config_hash(self) -> str:
+        return self.config.config_hash if self.config is not None else ""
+
+    @property
     def schedulable(self) -> bool:
         return (
-            self.meta is not None and not self.cancelled and self.stalled_reason is None
+            self.config is not None and not self.cancelled and self.stalled_reason is None
             and self.status == "running"
         )
 
@@ -444,8 +494,7 @@ class LiveSession:
             "problems": sum(1 for lp in self.problems.values() if not lp.stored),
             "outcomes": sum(1 for lp in self.problems.values() if lp.settled),
             "edits": self.edits,
-            # The session's own configuration batches: held here once S3 gives a session a configuration.
-            "configuration_batches": 0,
+            "configuration_batches": len(self.config.changes) if self.config is not None else 0,
         }
 
     def memory_ref(self, tail_depth: int, snapshot: bool) -> tm.MemoryRef:
@@ -495,8 +544,9 @@ class TrainingModeSessionService:
         self._stopped = True
         #: True once a graceful shutdown has begun: no session may be started.
         self._closing = False
-        self._hashes: tuple[MetadataProvider, str] | None = None
-        self._start_checks: tuple[MetadataProvider, str | None] | None = None
+        #: The after-run seam, one optional callable per session (none ships): see
+        #: :meth:`set_after_run`.
+        self._after_run: dict[int, Callable[..., Any]] = {}
         #: Seconds a Stop waits for runs in flight before it discards them.
         self.drain_timeout = DRAIN_TIMEOUT
         #: Seconds a graceful shutdown waits for the live sessions to be stopped.
@@ -520,6 +570,9 @@ class TrainingModeSessionService:
             self._executor = create_executor()
         self._stopped = False
         self._closing = False
+        # Live sessions' configurations are read, and their batches applied, through the one
+        # configuration store and writer; a session is found here while it is live.
+        store.set_live_source(self._live_state, self.apply_live)
         self._task = asyncio.create_task(self._run(), name="session-scheduler")
         self._wake.set()
 
@@ -562,33 +615,32 @@ class TrainingModeSessionService:
         self._tasks.clear()
         self._live.clear()
         self._starting.clear()
+        store.set_live_source(None)
         if self._executor is not None:
             self._executor.close()
 
-    def _config_hash(self, meta: MetadataProvider) -> str:
-        cached = self._hashes
-        if cached is None or cached[0] is not meta:
-            cached = self._hashes = (meta, config_hash(meta))
-        return cached[1]
+    @staticmethod
+    def _start_problem(lt: LiveSession) -> str | None:
+        """Why the session's configuration cannot start a run (the run-start check), or ``None``.
 
-    def _start_problem(self, meta: MetadataProvider) -> str | None:
-        """Why the configuration cannot start a run (the run-start check), or ``None``."""
-        cached = self._start_checks
+        Computed once per provider: the configuration changes only when an entry changes it."""
+        meta = lt.meta
+        cached = lt.start_check
         if cached is None or cached[0] is not meta:
             try:
                 require_run_start(meta)
                 reason = None
             except RunStartError as exc:
                 reason = str(exc)
-            cached = self._start_checks = (meta, reason)
+            cached = lt.start_check = (meta, reason)
         return cached[1]
 
-    def _new_live(self, t: TrainingModeSession, meta: MetadataProvider | None) -> LiveSession:
+    def _new_live(self, t: TrainingModeSession) -> LiveSession:
         return LiveSession(
             id=t.id, status="running", name=t.name, note=t.note or "",
             seeds_per_problem=t.seeds_per_problem, seed_start=t.seed_start,
             max_codelets=t.max_codelets, parameters=t.parameters, backend=t.backend,
-            policy=normalize_policy(t.policy), config_hash=t.config_hash, meta=meta,
+            policy=normalize_policy(t.policy), configuration_base=t.configuration_base,
             created_at=t.created_at, updated_at=t.updated_at, stopped_at=t.stopped_at,
             stopped_from=t.stopped_from, stop_reason=t.stop_reason, last_event=t.last_event,
             next_problem_id=t.next_problem_id, finished_count=t.finished_count,
@@ -635,9 +687,11 @@ class TrainingModeSessionService:
 
         Reads only.  The Episodic Memory is rebuilt from the stored merges and the unfinished
         problems come back with the runs stored for them, so they resume at the seeds not stored.
-        (S5 replaces the merge replay with the memory snapshot the Stop write stores, adds the
-        configuration's stored current state, and checks its ``config_hash``.)"""
-        lt = self._new_live(t, None)
+        The session's own configuration is read here too: its stored current state, at its
+        revision, becomes the live ``LiveConfiguration``.  (S5 replaces the merge replay with the
+        memory snapshot the Stop write stores and checks the configuration's ``config_hash``;
+        until then the Stop write stores no configuration state.)"""
+        lt = self._new_live(t)
         merges = (await s.execute(
             select(SessionMemoryMerge).where(SessionMemoryMerge.session_id == t.id)
             .order_by(SessionMemoryMerge.seq)
@@ -675,7 +729,31 @@ class TrainingModeSessionService:
         zero = (0,) * 7
         lt.base_fin, lt.base_can = totals.get("finished", zero), totals.get("cancelled", zero)
         lt.errors_total += lt.base_fin[3] + lt.base_can[3]
+        await self._load_configuration(s, lt, t)
         return lt
+
+    @staticmethod
+    async def _load_configuration(s: AsyncSession, lt: LiveSession, t: TrainingModeSession) -> None:
+        """Load the session's configuration into ``lt.config`` (a read).
+
+        The configuration's row is locked first, so a stored write to a Stopped session's
+        configuration that began just before this Start is complete before the document is read,
+        and one that begins after it finds the session live and goes to memory."""
+        C, J = Configuration.__table__, JournalEntry.__table__
+        row = (await s.execute(
+            select(C).where(C.c.session_id == t.id, C.c.kind == KIND_SESSION).with_for_update()
+        )).mappings().first()
+        if row is None:
+            raise SessionError(500, f"session {t.id} has no configuration; clear the database and recreate it")
+        document = await configurations.current_document(s, row["id"])
+        last = (await s.execute(
+            select(func.max(J.c.episode_version)).where(J.c.configuration_id == row["id"])
+        )).scalar_one()
+        lt.config = LiveConfiguration(
+            document, configuration_id=row["id"], revision=row["revision"],
+            episode_version=lt.version, base_hash=row["base_snapshot_hash"], frozen=row["frozen"],
+            last_change_version=last, saved_at=t.stopped_at,
+        )
 
     @staticmethod
     def _rec_from_row(r: Any) -> RunRec:
@@ -685,25 +763,25 @@ class TrainingModeSessionService:
             answer_quality=r.answer_quality, error=r.error, config_hash=r.config_hash,
             attempts=r.attempts, seq=r.seq, memory_version=r.memory_version,
             added_answers=r.added_answers, added_snags=r.added_snags, problem_id=r.problem_id,
+            configuration_revision=r.configuration_revision,
         )
 
     def wake(self) -> None:
         if self._wake is not None:
             self._wake.set()
 
-    # -- the configuration a run starts under -------------------------------
+    # -- the configuration a run starts under: the session's own -------------
 
-    def _bind_configs(self) -> None:
-        """Each live session's next run starts under the current configuration (nothing pauses,
-        adopts or rebases: ``on_config_change`` is gone).  It stalls only while the current
-        configuration cannot start a run, and resumes when it can."""
-        current = self._meta_provider()
-        h = self._config_hash(current)
-        problem = self._start_problem(current)
+    def _check_configs(self) -> None:
+        """Stall a session whose own configuration cannot start a run, and resume it when it can.
+
+        Each live session runs under its own configuration (``lt.config``), which only its own
+        entries change; nothing here binds a configuration to it (``on_config_change`` is gone).
+        """
         for lt in self._live.values():
-            if lt.cancelled:
+            if lt.cancelled or lt.config is None:
                 continue
-            lt.meta, lt.config_hash = current, h
+            problem = self._start_problem(lt)
             if problem is not None:
                 if lt.stalled_reason is None:
                     lt.last_event = f"stalled: {problem}"
@@ -758,10 +836,10 @@ class TrainingModeSessionService:
 
     async def _fill(self) -> None:
         self._drain()
-        self._bind_configs()
+        self._check_configs()
         while not self._stopped:
             self._drain()
-            self._bind_configs()  # cheap (identity compare): a long dispatch run must notice too
+            self._check_configs()  # cheap (identity compare): a long dispatch run must notice too
             if self._isolation:
                 # After a pool break the affected runs go one at a time, ahead of
                 # everything else, so the run that breaks the pool is identified.
@@ -805,22 +883,28 @@ class TrainingModeSessionService:
         snapshot = (lp.id, seed) in lt.want_snapshot
         lt.want_snapshot.discard((lp.id, seed))
         depth = max(tm.MIN_TAIL, 4 * self._executor.workers)
+        # The run's two inputs, taken at one moment (nothing awaits between them): the Episodic
+        # Memory and the session's configuration, both as of the same episode version.
         ref = lt.memory_ref(depth, snapshot)
+        cref = lt.config.ref(lt.id)
         blob = len(ref.snapshot) if ref.snapshot is not None else sum(len(b) for b in ref.tail)
         self.task_memory_bytes[0] += blob
         self.task_memory_bytes[1] += 1
         fault = self.fault_hook(lp, seed, failures) if self.fault_hook else None
+        # The task carries no parameter overrides: ``settings.parameters`` was folded into the
+        # session's configuration at creation, and learning may have changed it since.
         task = SessionTask(
             lp.initial, lp.modified, lp.target, lp.answer, seed, lt.max_codelets,
-            lt.parameters, lt.backend, memory=ref, fault=fault,
+            None, lt.backend, memory=ref, fault=fault,
         )
-        sub = Sub(lt, lp, seed, ref.version, lt.config_hash, failures, isolated)
+        sub = Sub(lt, lp, seed, ref.version, cref.config_hash, failures, isolated,
+                  configuration_revision=cref.configuration_revision, provider=cref.provider)
         lt.inflight_subs.add(sub)
         self._inflight_runs += 1
         if isolated:
             self._isolated_inflight += 1
         try:
-            future = await asyncio.to_thread(self._executor.submit, [task], lt.meta)
+            future = await asyncio.to_thread(self._executor.submit, [task], cref.provider)
         except asyncio.CancelledError:
             raise
         except Exception as exc:  # noqa: BLE001
@@ -920,12 +1004,19 @@ class TrainingModeSessionService:
             answers=list(o.answers), codelets=o.codelets, seconds=o.seconds,
             temperature=o.temperature, answer_quality=o.answer_quality, error=o.error,
             config_hash=sub.config_hash, attempts=sub.failures + 1, problem_id=lp.id,
-            memory_version=sub.version,
+            memory_version=sub.version, configuration_revision=sub.configuration_revision,
         )
         blob = o.additions
         adds = pickle.loads(blob) if blob else tm.Additions()
-        n_a, n_s = tm.apply_merge(lt.memory, adds)
-        lt.version += 1
+        # One entry, in completion order (the scheduler is one thread of control, so this is
+        # the session's lock): the memory merge, then the learner's batch, then one version.
+        batch = self._learner_batch(sub, o)
+        finished = lt.config.finish_run(
+            memory_merge=lambda: tm.apply_merge(lt.memory, adds), batch=batch,
+            run=(lp.id, o.seed), started_revision=sub.configuration_revision,
+        )
+        n_a, n_s = finished.memory
+        lt.version = finished.version
         rec.seq, rec.added_answers, rec.added_snags = lt.version, n_a, n_s
         lt.merge_blobs[lt.version] = blob or tm.dump_additions(adds)
         lt.merge_blobs.pop(lt.version - MERGE_KEEP, None)
@@ -937,6 +1028,41 @@ class TrainingModeSessionService:
         if len(lp.outcomes) >= lp.seeds and lp.status == "queued":
             self._finish_problem(lt, lp, "finished")
         self._apply_error_policy(lt, lp, rec)
+
+    def set_after_run(self, session_id: int, learner: Callable[..., Any] | None) -> None:
+        """Set (or, with ``None``, remove) a session's after-run seam: one callable per session.
+
+        After each of the session's runs it is called with ``(outcome, provider)``: the finished
+        run's outcome and the provider that run used (read-only; a learner never sees or edits
+        run state).  It returns a change batch (a mapping with ``ops``; ``source``, ``actor``,
+        ``base_version`` and so on are filled in) or ``None``.  None ships in v2.0, so with none
+        nothing is computed.  A learner that raises, or returns something that is not a batch,
+        never fails its run: the entry is taken without a batch and a diagnostic is kept.
+        The seam may be set before the session is started and lasts until it is removed or the
+        session is deleted."""
+        if learner is None:
+            self._after_run.pop(session_id, None)
+        else:
+            self._after_run[session_id] = learner
+
+    def _learner_batch(self, sub: Sub, outcome: Any) -> dict[str, Any] | None:
+        learner = self._after_run.get(sub.lt.id)
+        if learner is None:
+            return None
+        where = (sub.lp.id, outcome.seed)
+        try:
+            batch = learner(outcome, sub.provider)
+        except Exception as exc:  # noqa: BLE001 - a learner never fails its run
+            sub.lt.config.diagnose("learner_raised", f"{type(exc).__name__}: {exc}", run=where)
+            return None
+        if batch is None:
+            return None
+        if not isinstance(batch, dict) or not isinstance(batch.get("ops"), list):
+            sub.lt.config.diagnose(
+                "learner_batch_malformed", "the after-run seam must return a dict with a list `ops`",
+                run=where)
+            return None
+        return batch
 
     def _apply_error_policy(self, lt: LiveSession, lp: LiveProblem, rec: RunRec) -> None:
         if not rec.error:
@@ -1058,7 +1184,8 @@ class TrainingModeSessionService:
                stopped_from: str | None, stop_reason: str | None, problems: dict, runs: dict,
                memory: dict, codelets: int, rate: float | None, memory_version: int, cursor: int,
                last_event: str | None, live: bool, saved_version: int,
-               unsaved: dict | None, saved_stopped_at: datetime | None) -> dict[str, Any]:
+               unsaved: dict | None, saved_stopped_at: datetime | None,
+               configuration: dict | None, saved_revision: int | None) -> dict[str, Any]:
         remaining = max(runs["total"] - runs["done"], 0)
         if state != "running" or activity is not None:
             rate = None
@@ -1077,11 +1204,14 @@ class TrainingModeSessionService:
             "persisted": not live,
             "saved_through": {
                 "stopped_at": _iso(saved_stopped_at),
-                # The session's own configuration arrives with S3 (and its stored state with S5).
-                "configuration_revision": None,
+                "configuration_revision": saved_revision,
                 "episode_version": saved_version,
             },
             "unsaved": unsaved,
+            # The session's own configuration: ``version`` is its revision (the token an editor
+            # sends as ``base_version``), ``last_change_version`` the episode version of its last
+            # change; for a live session it is the configuration in memory.
+            "configuration": configuration,
         }
 
     def _live_summary(self, lt: LiveSession) -> dict[str, Any]:
@@ -1123,6 +1253,7 @@ class TrainingModeSessionService:
             settings={
                 "seeds_per_problem": lt.seeds_per_problem, "seed_start": lt.seed_start,
                 "max_codelets": lt.max_codelets, "parameters": lt.parameters, "backend": lt.backend,
+                "configuration_base": lt.configuration_base,
             },
             policy=normalize_policy(lt.policy), config_hash=lt.config_hash,
             created_at=lt.created_at, updated_at=lt.updated_at, stopped_at=lt.stopped_at,
@@ -1135,6 +1266,7 @@ class TrainingModeSessionService:
             codelets=codelets, rate=lt.rate(), memory_version=lt.version, cursor=lt.finished_count,
             last_event=lt.last_event, live=True, saved_version=lt.saved_version,
             unsaved=lt.unsaved(), saved_stopped_at=lt.stopped_at,
+            configuration=lt.config.summary(), saved_revision=lt.config.saved_revision,
         )
 
     async def _stored_summaries(self, s: AsyncSession, sessions: list[TrainingModeSession]) -> list[dict[str, Any]]:
@@ -1173,10 +1305,12 @@ class TrainingModeSessionService:
             select(SessionMemoryMerge.session_id, func.max(SessionMemoryMerge.seq))
             .where(SessionMemoryMerge.session_id.in_(ids)).group_by(SessionMemoryMerge.session_id)
         )).all())
+        configs = await self._stored_configurations(s, ids)
         zero = (0,) * 7
         out = []
         for t in sessions:
             c = by_t.get(t.id, {})
+            config = configs.get(t.id)
             q, f, x = c.get("queued", zero), c.get("finished", zero), c.get("cancelled", zero)
             n, e, cl, cap, rt = partial.get(t.id, (0,) * 5)
             a_n, s_n = stored_mem.get(t.id, (0, 0))
@@ -1187,8 +1321,10 @@ class TrainingModeSessionService:
                 settings={
                     "seeds_per_problem": t.seeds_per_problem, "seed_start": t.seed_start,
                     "max_codelets": t.max_codelets, "parameters": t.parameters, "backend": t.backend,
+                    "configuration_base": t.configuration_base,
                 },
-                policy=normalize_policy(t.policy), config_hash=t.config_hash,
+                policy=normalize_policy(t.policy),
+                config_hash=config["hash"] if config else t.config_hash,
                 created_at=t.created_at, updated_at=t.updated_at, stopped_at=t.stopped_at,
                 stopped_from=t.stopped_from, stop_reason=t.stop_reason,
                 problems={"total": q[0] + f[0] + x[0], "queued": q[0], "running": 0,
@@ -1198,8 +1334,33 @@ class TrainingModeSessionService:
                 memory={"answers": a_n, "snags": s_n}, codelets=f[4] + cl, rate=None,
                 memory_version=version, cursor=t.finished_count, last_event=t.last_event,
                 live=False, saved_version=version, unsaved=None, saved_stopped_at=t.stopped_at,
+                configuration=config, saved_revision=config["version"] if config else None,
             ))
         return out
+
+    @staticmethod
+    async def _stored_configurations(s: AsyncSession, ids: list[int]) -> dict[int, dict[str, Any]]:
+        """The ``configuration`` block of Stopped sessions, from the database: one query for the
+        rows and their sizes, one for the episode version of each one's last journalled change."""
+        C, N, J = Configuration.__table__, ConfigurationSnapshot.__table__, JournalEntry.__table__
+        tables = cast(N.c.data, JSONB)["tables"]
+        rows = (await s.execute(
+            select(
+                C.c.session_id, C.c.id, C.c.revision, C.c.config_hash, C.c.base_snapshot_hash, C.c.frozen,
+                func.jsonb_array_length(tables["slipnet_node_defs"]),
+                func.jsonb_array_length(tables["slipnet_link_defs"]),
+            ).join(N, (N.c.configuration_id == C.c.id) & (N.c.role == "current"))
+            .where(C.c.session_id.in_(ids))
+        )).all()
+        last = dict((await s.execute(
+            select(J.c.configuration_id, func.max(J.c.episode_version))
+            .where(J.c.configuration_id.in_([r[1] for r in rows])).group_by(J.c.configuration_id)
+        )).all()) if rows else {}
+        return {
+            sid: {"id": cid, "version": revision, "hash": digest, "base_hash": base, "nodes": nodes,
+                  "links": links, "last_change_version": last.get(cid), "frozen": frozen}
+            for sid, cid, revision, digest, base, frozen, nodes, links in rows
+        }
 
     async def _summaries(self, s: AsyncSession, sessions: list[TrainingModeSession]) -> list[dict[str, Any]]:
         """Summaries in the order given: a live session from memory, a Stopped one from the database."""
@@ -1376,7 +1537,12 @@ class TrainingModeSessionService:
     @staticmethod
     def _run_dict(r: Any) -> dict[str, Any]:
         return {
-            "seq": r.seq, "memory_version": r.memory_version, "seed": r.seed, "status": r.status,
+            "seq": r.seq, "memory_version": r.memory_version,
+            # The Training episode version the run started from (one counter over Episodic
+            # Memory and the whole configuration) and the configuration revision it ran under;
+            # ``config_hash`` below is the hash of that configuration.
+            "episode_version": r.memory_version, "configuration_revision": r.configuration_revision,
+            "seed": r.seed, "status": r.status,
             "key": r.key, "answer": r.answer, "answers": list(r.answers or []),
             "codelets": r.codelets, "seconds": round(r.seconds, 4), "temperature": r.temperature,
             "answer_quality": r.answer_quality, "error": r.error, "config_hash": r.config_hash,
@@ -1504,6 +1670,17 @@ class TrainingModeSessionService:
                 422, f"seed_start {seed_start} with {max(seed_counts)} seeds runs past the "
                      f"largest seed, {INT32_MAX}")
 
+    @staticmethod
+    def _check_configuration_base(base: Any) -> Any:
+        """``settings.configuration_base``: ``'global'``, ``'standard'`` or ``{"session_id": n}``."""
+        if base in ("global", "standard"):
+            return base
+        if (isinstance(base, dict) and set(base) == {"session_id"}
+                and isinstance(base["session_id"], int) and not isinstance(base["session_id"], bool)):
+            return base
+        raise SessionError(
+            422, "settings.configuration_base must be 'global', 'standard' or {\"session_id\": <number>}")
+
     def resolve_backend(self, meta: MetadataProvider, requested: str | None) -> str:
         if requested is not None:
             allowed = available_backend_names()
@@ -1543,26 +1720,46 @@ class TrainingModeSessionService:
             overrides = validate_overrides(settings.get("parameters"))
         except (UnknownParameter, ValueError) as exc:
             raise SessionError(400, str(exc)) from exc
+        base = self._check_configuration_base(settings.get("configuration_base", "global"))
         full_policy = normalize_policy(policy)
-        meta = self._meta_provider()
-        # A session whose configuration cannot start a run is not created
-        # (the executor makes the same check again at each dispatch).
-        try:
-            require_run_start(meta)
-        except RunStartError as exc:
-            raise SessionError(422, str(exc)) from exc
-        backend_name = self.resolve_backend(meta, settings.get("backend"))
-        cfg = self._config_hash(meta)
+        requested_backend = settings.get("backend")
+        # A requested backend is checked now; the default depends on the configuration the
+        # session starts with, so it is chosen once that exists.
+        backend_name = self.resolve_backend(self._meta_provider(), requested_backend)
+        # ``settings.parameters`` is folded into the Starting Conceptual State once, here: the
+        # session's configuration is the base plus these overrides (as one creation batch), the
+        # task carries none, and the stored ``settings.parameters`` stays as the record.
+        creation_ops = [{"op": "set_param", "name": n, "to": v} for n, v in overrides.items()]
+        from server.services.configuration_writer import ChangeError
+
         async with self._factory() as s:
             async with s.begin():
                 t = TrainingModeSession(
                     name=name, note=note or "",
                     seeds_per_problem=spp, seed_start=seed_start, max_codelets=max_codelets,
                     parameters=overrides or None, backend=backend_name, policy=full_policy,
-                    config_hash=cfg, finished_count=0, next_problem_id=1,
+                    configuration_base=base, config_hash="", finished_count=0, next_problem_id=1,
                 )
                 s.add(t)
                 await s.flush()
+                try:
+                    cid = await configurations.create_session_configuration(
+                        s, t.id, base, creation_ops, name=name, actor="system")
+                except configurations.ConfigurationError as exc:
+                    raise SessionError(422, f"settings.configuration_base: {exc}") from exc
+                except ChangeError as exc:
+                    raise SessionError(422, f"the creation overrides were refused ({exc.code}): {exc.message}") from exc
+                document = await configurations.current_document(s, cid)
+                meta = cd.provider(document)
+                # A session whose configuration cannot start a run is not created
+                # (the executor makes the same check again at each dispatch).
+                try:
+                    require_run_start(meta)
+                except RunStartError as exc:
+                    raise SessionError(422, str(exc)) from exc
+                if requested_backend is None:
+                    t.backend = default_session_backend(meta)
+                t.config_hash = cd.config_hash(document)
                 ids = await self._insert_problems(s, t, problems)
             summary = (await self._summaries(s, [t]))[0]  # a new session is Stopped
         return {"session": summary, "added": len(ids), "problem_ids": ids, "persisted": True}
@@ -1670,8 +1867,11 @@ class TrainingModeSessionService:
                 if t is None:
                     raise SessionError(404, f"session {session_id} not found")
                 lt = await self._load_one(s, t)
-            lt.status = "paused" if paused else "running"
-            self._live[session_id] = lt
+                lt.status = "paused" if paused else "running"
+                # Live before the configuration's row lock is released (this block's exit): a
+                # change that was waiting for the lock finds the session live and goes to memory.
+                self._live[session_id] = lt
+                self._starting.discard(session_id)
         except SessionError:
             raise
         except asyncio.CancelledError:
@@ -1683,7 +1883,7 @@ class TrainingModeSessionService:
             ) from exc
         finally:
             self._starting.discard(session_id)
-        self._bind_configs()
+        self._check_configs()
         for lp in list(lt.problems.values()):
             if lp.status == "queued" and not lp.todo:  # every seed was stored: it only has to finish
                 lp.started_at = lp.started_at or _utcnow()
@@ -1691,6 +1891,107 @@ class TrainingModeSessionService:
         await self._announce(session_id)
         self.wake()
         return self._live_summary(lt)
+
+    # -- the session's configuration: changes from every learning source -----------------------
+
+    def _live_state(self, session_id: int) -> store.LiveState | None:
+        """The configuration store's live source: the session's configuration as memory holds it,
+        or ``None`` when the session is Stopped.  A session that is Starting has no document yet."""
+        if session_id in self._starting:
+            return store.LiveState("starting", None, 0, 0, 0)
+        lt = self._live.get(session_id)
+        if lt is None or lt.config is None:
+            return None
+        c = lt.config
+        return store.LiveState(
+            state=lt.status, document=c.document, revision=c.revision,
+            saved_through=c.saved_revision, unsaved=len(c.changes), saved_at=lt.stopped_at,
+            pending=c.pending_entries(),
+        )
+
+    @staticmethod
+    def _busy_change(session_id: int, state: str) -> Exception:
+        from server.services.configuration_writer import BUSY, ChangeError
+
+        return ChangeError(
+            BUSY, f"busy: session {session_id} is {state}; wait for it to finish before you "
+                  "change its configuration")
+
+    async def apply_live(self, session_id: int, batch: dict[str, Any]) -> dict[str, Any]:
+        """Apply *batch* to a live session's configuration, in memory.
+
+        The one door for an external or Admin batch on a live session (``ChangeService.apply``
+        and :meth:`submit_changes` both come here).  It goes through the session's episode log:
+        it takes the next episode version and the next revision at once, reaches every run
+        dispatched afterward (and none already in flight), and is held for the Stop write.  The
+        report is the change API's, with ``persisted: false``, ``version_before`` and
+        ``version_after`` the configuration revisions, and ``episode_version``.  A batch that
+        applies nothing takes no version (a diagnostic).  Refusals are ``ChangeError``s (the
+        change API's codes: ``malformed``, ``unknown_reference``, ``stale``, ``key_exists``, ...),
+        and ``busy`` while the session is Starting or Stopping.
+        """
+        from server.services import configuration_writer as writer
+
+        if session_id in self._starting:
+            raise self._busy_change(session_id, "starting")
+        lt = self._live.get(session_id)
+        if lt is None:
+            return await self.submit_changes(session_id, batch)
+        if lt.status == "stopping":
+            raise self._busy_change(session_id, "stopping")
+        writer.check_envelope(batch)
+        given = batch.get("configuration_id")
+        if given is not None and given != lt.config.configuration_id:
+            raise writer._malformed(
+                f"configuration_id {given} is not session {session_id}'s configuration "
+                f"({lt.config.configuration_id})", "configuration_id")
+        try:
+            out = lt.config.submit(batch)
+        except Exception as exc:  # noqa: BLE001 - mapped to the change API's codes, or re-raised
+            translated = writer._translate(exc)
+            if translated is not None and translated is not exc:
+                raise translated from exc
+            raise
+        if out.applied:
+            # The entry took an episode version and has no memory part: an empty merge keeps the
+            # version stream, the tail and the stored merge log contiguous.
+            lt.version = lt.config.version
+            empty = tm.Additions()
+            lt.merge_blobs[lt.version] = tm.dump_additions(empty)
+            lt.merge_blobs.pop(lt.version - MERGE_KEEP, None)
+            lt.pending_merges.append((lt.version, None, None, empty))
+            lt.updated_at = _utcnow()
+            self.wake()
+        return out.report
+
+    async def submit_changes(self, session_id: int, batch: dict[str, Any]) -> dict[str, Any]:
+        """A change batch for session ``session_id``'s configuration, in any state.
+
+        The function behind the external route (S6's ``POST /api/training-mode/sessions/{id}/changes``;
+        the route sets ``source = external``) and used by every other writer of a session's
+        configuration.  Running or Paused: applied in memory (:meth:`apply_live`),
+        ``persisted: false``.  Stopped: the stored record is written at once, in its own
+        transaction, through ``ChangeService.apply`` (``persisted: true``).  Starting or Stopping:
+        409 ``busy``.  Raises :class:`SessionError` 404 for an unknown session, otherwise
+        ``configuration_writer.ChangeError``.
+        """
+        from server.services import configuration_writer as writer
+
+        if session_id in self._starting:
+            raise self._busy_change(session_id, "starting")
+        lt = self._live.get(session_id)
+        if lt is not None:
+            return await self.apply_live(session_id, batch)
+        writer.check_envelope(batch)
+        async with self._factory() as s:
+            await self._get_session(s, session_id)
+            row = await configurations.row_for_session(s, session_id)
+            given = batch.get("configuration_id")
+            if given is not None and given != row["id"]:
+                raise writer._malformed(
+                    f"configuration_id {given} is not session {session_id}'s configuration "
+                    f"({row['id']})", "configuration_id")
+            return await writer.ChangeService.apply(s, {**batch, "configuration_id": row["id"]})
 
     def _live_or_409(self, session_id: int, action: str) -> LiveSession:
         lt = self._refuse_if_busy(session_id, action)
@@ -1833,6 +2134,7 @@ class TrainingModeSessionService:
             "key": r.key, "answer": r.answer, "answers": list(r.answers), "codelets": r.codelets,
             "seconds": r.seconds, "temperature": r.temperature, "answer_quality": r.answer_quality,
             "error": r.error, "config_hash": r.config_hash, "attempts": r.attempts, "seq": r.seq,
+            "configuration_revision": r.configuration_revision,
             "memory_version": r.memory_version, "added_answers": r.added_answers,
             "added_snags": r.added_snags,
         }
@@ -1907,6 +2209,7 @@ class TrainingModeSessionService:
         async with self._factory() as s:
             async with s.begin():
                 await s.execute(delete(TrainingModeSession).where(TrainingModeSession.id == session_id))
+        self._after_run.pop(session_id, None)
         self._versions.pop(session_id, None)
         await self._announce(session_id)
         self._conds.pop(session_id, None)

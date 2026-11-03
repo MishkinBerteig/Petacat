@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
-import { request, describeApiError } from '@/api/client'
+import { describeApiError, GLOBAL_CONFIGURATION_ID } from '@/api/client'
+import { useAdminRequest, type AdminRequest, type ConfigurationProp } from './adminRequest'
 import { EditableTable, type ColumnDef } from './EditableTable'
 
 interface UrgencyLevel { name: string; value: number }
@@ -10,20 +11,23 @@ interface UrgencyLevel { name: string; value: number }
  * The table shows the thrown message beside the row that was edited, so the sentence it
  * throws is the sentence the reader gets.
  */
-async function submit<T>(action: string, path: string, options: RequestInit): Promise<T> {
-  try {
-    return await request<T>(path, options)
-  } catch (err) {
-    throw new Error(describeApiError(err, action))
+const submitWith = (request: AdminRequest) =>
+  async function submit<T>(action: string, path: string, options: RequestInit): Promise<T> {
+    try {
+      return await request<T>(path, options)
+    } catch (err) {
+      throw new Error(describeApiError(err, action))
+    }
   }
-}
 
 const COLUMNS: ColumnDef[] = [
   { key: 'name', label: 'Name', type: 'readonly', width: '40%' },
   { key: 'value', label: 'Value', type: 'number', width: '20%' },
 ]
 
-export function UrgencyLevelEditor() {
+export function UrgencyLevelEditor({ configuration = GLOBAL_CONFIGURATION_ID }: ConfigurationProp) {
+  const request = useAdminRequest(configuration)
+  const submit = submitWith(request)
   const [levels, setLevels] = useState<UrgencyLevel[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -43,7 +47,7 @@ export function UrgencyLevelEditor() {
       })
       .catch(err => setError(describeApiError(err, 'load the urgency levels')))
       .finally(() => setLoading(false))
-  }, [])
+  }, [request])
 
   useEffect(() => { load() }, [load])
   if (loading) return <div className="text-muted">Loading urgency levels...</div>

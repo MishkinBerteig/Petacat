@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { EditableTable, LoadFailure, type ColumnDef } from './EditableTable'
-import { request, describeApiError } from '@/api/client'
+import { describeApiError, GLOBAL_CONFIGURATION_ID } from '@/api/client'
+import { useAdminRequest, type AdminRequest, type ConfigurationProp } from './adminRequest'
 import type { DemoProblem } from '@/types'
 
 const COLUMNS: ColumnDef[] = [
@@ -41,7 +42,8 @@ const ACTIONS = {
   delete: 'delete the demo problem',
 }
 
-export function DemoEditor() {
+export function DemoEditor({ configuration = GLOBAL_CONFIGURATION_ID }: ConfigurationProp) {
+  const request = useAdminRequest(configuration)
   const [demos, setDemos] = useState<DemoProblem[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -53,7 +55,7 @@ export function DemoEditor() {
       .then(data => { setDemos(data); setLoadError(null) })
       .catch(e => setLoadError(describeApiError(e, 'load the demo problems')))
       .finally(() => setLoading(false))
-  }, [])
+  }, [request])
 
   useEffect(() => { load() }, [load])
   if (loading) return <div className="text-muted">Loading demos...</div>

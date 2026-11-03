@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   describeApiError,
+  GLOBAL_CONFIGURATION_ID,
   getConfigurationDiff,
   getConfigurationStatus,
   resetConfigurationToStandard,
@@ -35,7 +36,17 @@ function describeChange(r: ConfigurationDiffRow): string {
  * Configuration status card, Compare, Reset and Restore selected, for the global configuration
  * (Metacat Mode). Reset and restore are journaled changes; the server writes them.
  */
-export function ConfigurationPanel({ onChanged }: { onChanged?: () => void }) {
+export function ConfigurationPanel({
+  onChanged,
+  configuration = GLOBAL_CONFIGURATION_ID,
+  modeLabel = 'Metacat Mode',
+}: {
+  onChanged?: () => void
+  /** The configuration whose status, comparison and reset this shows (default: the global one). */
+  configuration?: number
+  /** `Metacat Mode`, or `Training Mode: <session name>`. */
+  modeLabel?: string
+}) {
   const [status, setStatus] = useState<ConfigurationStatus | null>(null)
   const [diff, setDiff] = useState<ConfigurationDiff | null>(null)
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -46,21 +57,23 @@ export function ConfigurationPanel({ onChanged }: { onChanged?: () => void }) {
 
   const loadStatus = useCallback(async () => {
     try {
-      setStatus(await getConfigurationStatus())
+      setStatus(await getConfigurationStatus(configuration))
     } catch (err) {
       setNote({ kind: 'error', text: describeApiError(err, 'load the configuration status') })
     }
-  }, [])
+  }, [configuration])
 
   const loadDiff = useCallback(async () => {
     try {
-      setDiff(await getConfigurationDiff())
+      setDiff(await getConfigurationDiff(configuration))
       setSelected(new Set())
     } catch (err) {
       setNote({ kind: 'error', text: describeApiError(err, 'compare with the Metacat Standard Configuration') })
     }
-  }, [])
+  }, [configuration])
 
+  // Another configuration is another status: drop the comparison and selection of the last one.
+  useEffect(() => { setDiff(null); setSelected(new Set()); setConfirming(false); setTyped('') }, [configuration])
   useEffect(() => { void loadStatus() }, [loadStatus])
 
   const afterChange = async (text: string) => {
@@ -73,7 +86,7 @@ export function ConfigurationPanel({ onChanged }: { onChanged?: () => void }) {
   const doReset = async () => {
     setBusy(true)
     try {
-      const res = await resetConfigurationToStandard(typed)
+      const res = await resetConfigurationToStandard(typed, configuration)
       setConfirming(false)
       setTyped('')
       await afterChange(
@@ -93,7 +106,7 @@ export function ConfigurationPanel({ onChanged }: { onChanged?: () => void }) {
     setBusy(true)
     try {
       const rows = diff.rows.filter(r => selected.has(rowId(r))).map(r => ({ table: r.table, key: r.key }))
-      const res = await restoreConfigurationRows(rows)
+      const res = await restoreConfigurationRows(rows, configuration)
       await afterChange(
         res.wrote
           ? `Restored ${rows.length} ${rows.length === 1 ? 'row' : 'rows'} (revision ${res.revision}).`
@@ -108,7 +121,7 @@ export function ConfigurationPanel({ onChanged }: { onChanged?: () => void }) {
 
   const doVerify = async () => {
     try {
-      const report = await verifyConfigurationJournal()
+      const report = await verifyConfigurationJournal(configuration)
       setNote(report.ok
         ? { kind: 'success', text: `The journal verifies: ${report.entries} entries replay to the current configuration.` }
         : { kind: 'error', text: `The journal does not verify: ${report.problems.join('; ')}` })
@@ -143,7 +156,7 @@ export function ConfigurationPanel({ onChanged }: { onChanged?: () => void }) {
       )}
 
       <section aria-label="Configuration status" style={{ border: '1px solid var(--border)', borderRadius: 4, padding: 8 }}>
-        <h3 style={{ margin: '0 0 6px', fontSize: 12 }}>Configuration status (Metacat Mode)</h3>
+        <h3 style={{ margin: '0 0 6px', fontSize: 12 }}>Configuration status ({modeLabel})</h3>
         {status ? (
           <dl style={{ display: 'grid', gridTemplateColumns: 'max-content 1fr', gap: '2px 12px', margin: 0 }}>
             <dt>Revision</dt><dd style={{ margin: 0 }}>{status.revision}</dd>

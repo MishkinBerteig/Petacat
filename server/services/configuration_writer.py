@@ -12,7 +12,11 @@ The steps, in order:
 2. **The target** is locked (``SELECT ... FOR UPDATE`` on its ``configurations`` row), so the
    compare-and-set below cannot race.  It is the global configuration (its tables) or a
    Training Mode Session's (its stored current state; the batch is written at once, as for a
-   Stopped session).  A live session is held in memory by the session service (S3, S5), not here.
+   Stopped session).  A **live** session (Running, Paused or Stopping) is held in memory by the
+   session service, which writes nothing until it is Stopped: its batches are applied there
+   (``configuration_store.live_apply``), the report says ``persisted: false``, and a session
+   that is Starting or Stopping answers 409 ``busy``.  The check is made under the row lock, so
+   a Start cannot slip between it and a stored write.
 3. **The source**: the global configuration (Metacat Mode) refuses ``learner`` and ``external``
    (M2), so a refused batch never reaches ``resolve`` and a ``dry_run`` is refused too.
 4. **The compare-and-set** on ``base_version``.  Under ``strict`` a stale base is 409 ``stale``.
@@ -56,12 +60,15 @@ from server.services.configuration_input import (
     UNKNOWN_REFERENCE,
     check_base_version,
 )
+from server.services.configuration_store import live_apply, live_state
 
 logger = logging.getLogger(__name__)
 
 #: The codes besides the four classes of ``configuration_input``.
 SOURCE_REFUSED = "source_refused"
 UNKNOWN_CONFIGURATION = "unknown_configuration"
+#: A session that is Starting or Stopping refuses every change until that ends.
+BUSY = "busy"
 
 #: HTTP status per code.  ``source_refused`` is the M2 refusal: the global configuration does not
 #: take Training Mode sources.
@@ -69,6 +76,7 @@ HTTP_STATUS: dict[str, int] = {
     **STATUS,
     SOURCE_REFUSED: 403,
     UNKNOWN_CONFIGURATION: 404,
+    BUSY: 409,
 }
 
 #: The batch fields ``resolve`` knows (``configuration_input.ENVELOPE_FIELDS``).
@@ -301,6 +309,19 @@ async def _apply(session: AsyncSession, batch: Mapping[str, Any], configuration_
         raise ChangeError(UNKNOWN_CONFIGURATION, str(exc)) from exc
     source = batch["source"]
     journal._check_source(locked["kind"], source)
+
+    if locked["kind"] != KIND_GLOBAL:
+        live = live_state(locked["session_id"])
+        if live is not None:
+            # A live session writes nothing to the database until it is Stopped.
+            await session.rollback()
+            if live.state in ("starting", "stopping"):
+                raise ChangeError(
+                    BUSY,
+                    f"busy: session {locked['session_id']} is {live.state}; wait for it to finish "
+                    "before you change its configuration",
+                )
+            return await live_apply(locked["session_id"], batch)
 
     revision = locked["revision"]
     base_mode = batch.get("base_mode", "strict")

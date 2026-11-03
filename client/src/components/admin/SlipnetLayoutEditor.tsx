@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { EditableTable, LoadFailure, type ColumnDef } from './EditableTable'
-import { request, describeApiError } from '@/api/client'
+import { describeApiError, GLOBAL_CONFIGURATION_ID } from '@/api/client'
+import { useAdminRequest, type AdminRequest, type ConfigurationProp } from './adminRequest'
 
 interface LayoutPos {
   node_name: string
@@ -31,7 +32,8 @@ const ACTIONS = {
   delete: 'delete the grid position',
 }
 
-export function SlipnetLayoutEditor() {
+export function SlipnetLayoutEditor({ configuration = GLOBAL_CONFIGURATION_ID }: ConfigurationProp) {
+  const request = useAdminRequest(configuration)
   const [positions, setPositions] = useState<LayoutPos[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -43,7 +45,7 @@ export function SlipnetLayoutEditor() {
       .then(data => { setPositions(data); setLoadError(null) })
       .catch(e => setLoadError(describeApiError(e, 'load the slipnet layout')))
       .finally(() => setLoading(false))
-  }, [])
+  }, [request])
 
   useEffect(() => { load() }, [load])
   if (loading) return <div className="text-muted">Loading slipnet layout...</div>

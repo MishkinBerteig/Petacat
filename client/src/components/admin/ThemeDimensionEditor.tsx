@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { EditableTable, LoadFailure, type ColumnDef } from './EditableTable'
-import { request, describeApiError } from '@/api/client'
+import { describeApiError, GLOBAL_CONFIGURATION_ID } from '@/api/client'
+import { useAdminRequest, type AdminRequest, type ConfigurationProp } from './adminRequest'
 
 interface ThemeDim {
   id: number
@@ -30,7 +31,8 @@ const ACTIONS = {
   delete: 'delete the theme dimension',
 }
 
-export function ThemeDimensionEditor() {
+export function ThemeDimensionEditor({ configuration = GLOBAL_CONFIGURATION_ID }: ConfigurationProp) {
+  const request = useAdminRequest(configuration)
   const [dims, setDims] = useState<ThemeDim[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -42,7 +44,7 @@ export function ThemeDimensionEditor() {
       .then(data => { setDims(data); setLoadError(null) })
       .catch(e => setLoadError(describeApiError(e, 'load the theme dimensions')))
       .finally(() => setLoading(false))
-  }, [])
+  }, [request])
 
   useEffect(() => { load() }, [load])
   if (loading) return <div className="text-muted">Loading theme dimensions...</div>

@@ -63,10 +63,16 @@ class TrainingModeSession(Base):
     max_codelets = Column(Integer, nullable=False, default=20000)
     parameters = Column(JSONB, nullable=True)
     backend = Column(String(32), nullable=False)
+    #: Where the session's configuration came from, fixed at creation: ``"global"``,
+    #: ``"standard"`` or ``{"session_id": n}``.  The session's own configuration is the
+    #: ``configurations`` row whose ``session_id`` is this session's; ``parameters`` above is
+    #: folded into it at creation and stays here as the record.
+    configuration_base = Column(JSONB, nullable=False, default="global")
 
     #: The error policy (``ErrorPolicy`` in the API contract); changeable at any time.
     policy = Column(JSONB, nullable=False)
-    #: ``hashing.config_hash`` of the metadata the Training Mode Session runs under.
+    #: ``hashing.config_hash`` of the session's own configuration, as of the last Stop (or its
+    #: creation).  A live session's current hash is in memory.
     config_hash = Column(String(64), nullable=False, default="")
     #: The last ``finished_seq`` handed out, as of the last Stop.
     finished_count = Column(Integer, nullable=False, default=0)
@@ -158,11 +164,16 @@ class TrainingModeSessionRun(Base):
     temperature = Column(Float, nullable=False, default=0.0)
     answer_quality = Column(Float, nullable=True)
     error = Column(Text, nullable=True)
+    #: The hash of the session's configuration at the run's episode version.
     config_hash = Column(String(64), nullable=False, default="")
+    #: The revision of that configuration (``configurations.revision`` of the session's own
+    #: configuration): the last configuration change at or before the run's episode version.
+    configuration_revision = Column(Integer, nullable=True)
     attempts = Column(Integer, nullable=False, default=1)
     #: Merge order in the Training episode.
     seq = Column(Integer, nullable=False)
-    #: The Episodic Memory version the run started with.
+    #: The Training episode version the run started from (the API's ``episode_version``): one
+    #: counter over Episodic Memory and the whole configuration.
     memory_version = Column(Integer, nullable=False)
     #: What the merge actually added to the episode after the presence checks.
     added_answers = Column(Integer, nullable=False)

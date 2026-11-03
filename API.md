@@ -2,7 +2,7 @@
 
 > **Auto-generated.** Run `python scripts/generate_api_docs.py` to regenerate from the FastAPI application.
 
-170 HTTP routes, plus `WS /ws/runs/{run_id}` for live state push.
+178 HTTP routes, plus `WS /ws/runs/{run_id}` for live state push.
 
 Interactive documentation is served at `/docs` while the API is running.
 
@@ -226,15 +226,23 @@ What the process resolved at startup.
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/api/configurations` | List Configurations |
+| `GET` | `/api/configurations/compare` | Get Compare |
 | `GET` | `/api/configurations/{configuration_id}` | Get Configuration |
 | `PATCH` | `/api/configurations/{configuration_id}` | Patch Configuration |
+| `POST` | `/api/configurations/{configuration_id}/apply-from` | Post Apply From |
+| `GET` | `/api/configurations/{configuration_id}/as-of` | Get As Of |
 | `POST` | `/api/configurations/{configuration_id}/changes` | Post Changes |
 | `GET` | `/api/configurations/{configuration_id}/diff` | Get Diff |
 | `GET` | `/api/configurations/{configuration_id}/export` | Get Export |
 | `POST` | `/api/configurations/{configuration_id}/reset-to-standard` | Post Reset |
+| `POST` | `/api/configurations/{configuration_id}/restore` | Post Restore |
 | `POST` | `/api/configurations/{configuration_id}/restore-selected` | Post Restore Selected |
 | `GET` | `/api/configurations/{configuration_id}/rows` | Get Rows |
 | `GET` | `/api/configurations/{configuration_id}/schema` | Get Schema |
 | `GET` | `/api/configurations/{configuration_id}/status` | Get Status |
 | `GET` | `/api/configurations/{configuration_id}/verify-journal` | Get Verify Journal |
+| `GET` | `/api/journal` | Get Journal |
+| `POST` | `/api/journal/check-names` | Check Names |
+| `GET` | `/api/journal/where-did-name-go` | Where Did Name Go |
+| `GET` | `/api/journal/{entry_id}` | Get Journal Entry |
 | `GET` | `/healthz` | Healthz |

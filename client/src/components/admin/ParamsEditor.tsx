@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { EditableTable, LoadFailure, type ColumnDef } from './EditableTable'
-import { request, describeApiError } from '@/api/client'
+import { describeApiError, GLOBAL_CONFIGURATION_ID } from '@/api/client'
+import { useAdminRequest, type AdminRequest, type ConfigurationProp } from './adminRequest'
 
 interface Param {
   name: string
@@ -21,7 +22,8 @@ const ACTIONS = {
   delete: 'delete the parameter',
 }
 
-export function ParamsEditor() {
+export function ParamsEditor({ configuration = GLOBAL_CONFIGURATION_ID }: ConfigurationProp) {
+  const request = useAdminRequest(configuration)
   const [params, setParams] = useState<Param[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -33,7 +35,7 @@ export function ParamsEditor() {
       .then(data => { setParams(data); setLoadError(null) })
       .catch(e => setLoadError(describeApiError(e, 'load the engine parameters')))
       .finally(() => setLoading(false))
-  }, [])
+  }, [request])
 
   useEffect(() => { load() }, [load])
   if (loading) return <div className="text-muted">Loading parameters...</div>

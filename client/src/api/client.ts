@@ -3,8 +3,11 @@
 // ---------------------------------------------------------------------------
 
 import type {
+  ApplyFromReport,
+  ConfigurationCompare,
   ConfigurationDiff,
   ConfigurationRowRef,
+  ConfigurationSummary,
   ConfigurationStatus,
   ConfigurationWriteResult,
   JournalVerifyReport,
@@ -1107,4 +1110,49 @@ export async function verifyConfigurationJournal(
   id: number = GLOBAL_CONFIGURATION_ID,
 ): Promise<JournalVerifyReport> {
   return request<JournalVerifyReport>(`/configurations/${id}/verify-journal`);
+}
+
+// ---------------------------------------------------------------------------
+// The configuration manager (C9a)
+// ---------------------------------------------------------------------------
+
+/** Every configuration: the global one (Metacat Mode), then each Training Mode Session's. */
+export async function listConfigurations(): Promise<ConfigurationSummary[]> {
+  return (await request<{ configurations: ConfigurationSummary[] }>('/configurations')).configurations;
+}
+
+export async function getConfigurationSummary(id: number): Promise<ConfigurationSummary> {
+  return request<ConfigurationSummary>(`/configurations/${id}`);
+}
+
+/** Name, note or `frozen`: a journaled edit of the `configurations` row. */
+export async function patchConfiguration(
+  id: number,
+  fields: { name?: string; note?: string; frozen?: boolean },
+): Promise<ConfigurationSummary> {
+  return request<ConfigurationSummary>(`/configurations/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(fields),
+  });
+}
+
+/** `b` may be `'standard'` (the Metacat Standard Configuration). */
+export async function compareConfigurations(
+  a: number | 'standard',
+  b: number | 'standard',
+): Promise<ConfigurationCompare> {
+  return request<ConfigurationCompare>(`/configurations/compare?a=${a}&b=${b}`);
+}
+
+/** Make the chosen rows of `target` equal `source`'s (`dryRun` previews and writes nothing). */
+export async function applyConfigurationFrom(
+  target: number,
+  source: number | 'standard',
+  rows: ConfigurationRowRef[],
+  options: { note?: string; dryRun?: boolean } = {},
+): Promise<ApplyFromReport> {
+  return request<ApplyFromReport>(`/configurations/${target}/apply-from`, {
+    method: 'POST',
+    body: JSON.stringify({ source, rows, note: options.note ?? '', dry_run: options.dryRun ?? false }),
+  });
 }

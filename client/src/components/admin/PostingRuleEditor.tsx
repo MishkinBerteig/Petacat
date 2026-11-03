@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { EditableTable, LoadFailure, type ColumnDef } from './EditableTable'
-import { request, describeApiError } from '@/api/client'
+import { describeApiError, GLOBAL_CONFIGURATION_ID } from '@/api/client'
+import { useAdminRequest, type AdminRequest, type ConfigurationProp } from './adminRequest'
 
 interface PostingRule {
   id: number
@@ -57,7 +58,8 @@ const ACTIONS = {
   delete: 'delete the posting rule',
 }
 
-export function PostingRuleEditor() {
+export function PostingRuleEditor({ configuration = GLOBAL_CONFIGURATION_ID }: ConfigurationProp) {
+  const request = useAdminRequest(configuration)
   const [rules, setRules] = useState<PostingRule[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -69,7 +71,7 @@ export function PostingRuleEditor() {
       .then(data => { setRules(data); setLoadError(null) })
       .catch(e => setLoadError(describeApiError(e, 'load the posting rules')))
       .finally(() => setLoading(false))
-  }, [])
+  }, [request])
 
   useEffect(() => { load() }, [load])
   if (loading) return <div className="text-muted">Loading posting rules...</div>

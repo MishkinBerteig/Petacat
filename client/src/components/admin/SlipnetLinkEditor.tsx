@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
-import { request, describeApiError } from '@/api/client'
+import { describeApiError, GLOBAL_CONFIGURATION_ID } from '@/api/client'
+import { useAdminRequest, type AdminRequest, type ConfigurationProp } from './adminRequest'
 import { EditableTable, type ColumnDef } from './EditableTable'
 
 /**
@@ -8,13 +9,14 @@ import { EditableTable, type ColumnDef } from './EditableTable'
  * The table shows the thrown message beside the row that was edited, so the sentence it
  * throws is the sentence the reader gets.
  */
-async function submit<T>(action: string, path: string, options: RequestInit): Promise<T> {
-  try {
-    return await request<T>(path, options)
-  } catch (err) {
-    throw new Error(describeApiError(err, action))
+const submitWith = (request: AdminRequest) =>
+  async function submit<T>(action: string, path: string, options: RequestInit): Promise<T> {
+    try {
+      return await request<T>(path, options)
+    } catch (err) {
+      throw new Error(describeApiError(err, action))
+    }
   }
-}
 
 interface LinkDef {
   id: number
@@ -41,7 +43,9 @@ const COLUMNS: ColumnDef[] = [
   { key: 'link_length', label: 'Length', type: 'number', width: '8%', nullable: true },
 ]
 
-export function SlipnetLinkEditor() {
+export function SlipnetLinkEditor({ configuration = GLOBAL_CONFIGURATION_ID }: ConfigurationProp) {
+  const request = useAdminRequest(configuration)
+  const submit = submitWith(request)
   const [links, setLinks] = useState<LinkDef[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -53,7 +57,7 @@ export function SlipnetLinkEditor() {
       .then(data => { setLinks(data); setError(null) })
       .catch(err => setError(describeApiError(err, 'load the slipnet links')))
       .finally(() => setLoading(false))
-  }, [])
+  }, [request])
 
   useEffect(() => { load() }, [load])
   if (loading) return <div className="text-muted">Loading slipnet links...</div>

@@ -106,7 +106,7 @@ incidental.
 The database boundary is confined to twelve files:
 
 > **As built.** The database boundary spans `api/`, `services/`, `models/` and `db.py`,
-> with 110 endpoints taking `Depends(get_session)`.
+> with 118 endpoints taking `Depends(get_session)`.
 
 | Module | Role at the boundary |
 |--------|----------------------|

@@ -10,6 +10,10 @@
   actor A, at version V".
 * ``verify_journal`` replays the journal and compares the result with the current-state
   tables and ``config_hash``.
+* ``list_entries``, ``get_entry`` and ``name_story`` are the History views (C13): the
+  filtered journal (a live session's pending entries merged in, labelled "not yet saved"),
+  one entry in full, and "where did this name go".  ``check_names`` says which names a
+  memory holds that the configuration no longer has.
 
 A *state* is ``{table: {key tuple: row}}`` where a row holds every column but the surrogate
 ``id`` (the same shape a journal records), so states from replay, reconstruction and the
@@ -19,6 +23,7 @@ tables compare with ``==``.
 from __future__ import annotations
 
 import copy
+from datetime import datetime
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Sequence
 
@@ -181,6 +186,23 @@ async def _kind(session: AsyncSession, configuration_id: int) -> str:
     return kind
 
 
+def state_of_document(document: Any) -> State:
+    """A ``ConfigDocument``'s tables as a state (the same shape the journal records)."""
+    state = empty_state()
+    for name in state:
+        state[name] = {kt: dict(row) for kt, row in document.tables[name].items()}
+    return state
+
+
+async def current_state_for(session: AsyncSession, configuration_id: int) -> State:
+    """The stored current state of any configuration (a live session's memory is not here)."""
+    from server.services import configurations
+
+    if await _kind(session, configuration_id) == KIND_GLOBAL:
+        return await current_state(session)
+    return state_of_document(await configurations.current_document(session, configuration_id))
+
+
 async def as_of(
     session: AsyncSession,
     configuration_id: int,
@@ -193,19 +215,37 @@ async def as_of(
     """The whole configuration (a state), one table, or one row, as of ``revision``.
 
     The global configuration is reconstructed from its current tables by the before-images.
-    Any other is replayed from ``base`` (its Starting Conceptual State, from C8).  A row
-    that did not exist then is ``None``.
+    A session's is read through ``configurations.config_at`` (its base snapshot plus the
+    resolved ops), or, when ``base`` is given, replayed from that state.  A row that did
+    not exist then is ``None``.  Stored revisions only: a live session's pending entries
+    are not in the database.
     """
-    entries = await read_entries(session, configuration_id)
     if await _kind(session, configuration_id) == KIND_GLOBAL:
+        entries = await read_entries(session, configuration_id)
         state = reconstruct(await current_state(session), entries, revision)
+    elif base is not None:
+        state = replay(await read_entries(session, configuration_id), base=base, upto=revision)
     else:
-        state = replay(entries, base=base, upto=revision)
+        from server.services import configurations
+
+        state = state_of_document(await configurations.config_at(session, configuration_id, revision))
     if table is None:
         return state
+    if table not in state:
+        raise JournalError(f"{table!r} is not a configuration table")
     if key is None:
         return state[table]
     return state[table].get(_kt(table, key))
+
+
+async def revision_at_time(session: AsyncSession, configuration_id: int, when: datetime) -> int:
+    """The configuration's revision at ``when``: its last stored entry that happened (by
+    ``occurred_at``) at or before it, or 0."""
+    revision = 0
+    for entry in await read_entries(session, configuration_id):
+        if entry["occurred_at"] <= when:
+            revision = entry["revision"]
+    return revision
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -248,7 +288,7 @@ async def restore_entity(
     old = then[table].get(kt)
     if old is None:
         raise MissingKey(f"{table}: {dict(key)!r} did not exist at revision {as_of_revision}")
-    now = await current_state(session)
+    now = await current_state_for(session, configuration_id)
     ops: list[dict] = []
     if kt not in now[table]:
         for name, row in [(table, old)] + _dependents(then, table, old):
@@ -446,3 +486,374 @@ async def verify_journal(
             )
     report.ok = not problems
     return report
+
+
+# ──────────────────────────────────────────────────────────────────
+# History views (C13): the filtered journal, one entry, a name's story
+# ──────────────────────────────────────────────────────────────────
+
+#: The tables whose rows are the names an Episodic Memory can hold, and what to call one.
+NAME_TABLES: Mapping[str, str] = {
+    "slipnet_node_defs": "node",
+    "theme_relations": "theme relation",
+    "codelet_type_defs": "codelet type",
+}
+
+NOT_YET_SAVED = "not yet saved"
+
+
+def _op_counts(resolved: Sequence[Mapping[str, Any]]) -> dict[str, int]:
+    counts = {"insert": 0, "update": 0, "delete": 0}
+    for op in resolved:
+        counts[op["op"]] = counts.get(op["op"], 0) + 1
+    return counts
+
+
+def _entry_view(entry: Mapping[str, Any], *, detail: bool, pending: bool) -> dict:
+    """One entry as the History shows it: the summary, plus the three bodies when ``detail``."""
+    resolved = entry["resolved"] or []
+    out = {
+        "id": None if pending else entry["id"],
+        "configuration_id": entry["configuration_id"],
+        "revision": entry["revision"],
+        "group_id": entry["group_id"],
+        "source": entry["source"],
+        "actor": entry["actor"],
+        "channel": entry["channel"],
+        "note": entry["note"],
+        "causing_run_id": entry["causing_run_id"],
+        "episode_version": entry["episode_version"],
+        "config_hash": entry["config_hash"],
+        "occurred_at": entry["occurred_at"],
+        "recorded_at": None if pending else entry["recorded_at"],
+        "counts": _op_counts(resolved),
+        "tables": sorted({op["table"] for op in resolved}),
+        "pending": pending,
+        "saved": not pending,
+        "label": NOT_YET_SAVED if pending else "",
+    }
+    if detail:
+        out.update(proposed=entry["proposed"], resolved=resolved, before=entry["before"] or [])
+    return out
+
+
+def _key_filter(table: str | None, key: Mapping[str, Any] | None) -> tuple | None:
+    if key is None:
+        return None
+    if table is None:
+        raise JournalError("a key filter needs its table")
+    if table not in LAYER_REGISTRY:
+        raise JournalError(f"{table!r} is not a configuration table")
+    spec = LAYER_REGISTRY[table]
+    if set(key) != set(spec.key):
+        raise JournalError(f"{table}: the key columns are {list(spec.key)}, not {sorted(key)}")
+    return spec.key_tuple(key)
+
+
+def _entry_matches(entry: Mapping[str, Any], table: str | None, wanted: tuple | None) -> bool:
+    if table is None:
+        return True
+    before = entry["before"] or []
+    for i, op in enumerate(entry["resolved"] or []):
+        if op["table"] != table:
+            continue
+        if wanted is None or _touches(op, before[i] if i < len(before) else None, wanted, table):
+            return True
+    return False
+
+
+def _pending_entries(session_id: int | None, stored_revisions: set[int]) -> tuple[list[dict], Any]:
+    """A live session's pending entries (as dicts shaped like stored ones) and its live state.
+
+    The live source's state carries them as ``pending`` (a list of ``journal.PendingEntry``);
+    a source that reports none gives an empty list.  Entries whose revision is already stored
+    are not repeated.
+    """
+    from dataclasses import asdict, is_dataclass
+
+    from server.services.configuration_store import live_state
+
+    live = live_state(session_id)
+    if live is None:
+        return [], None
+    out = []
+    for p in getattr(live, "pending", None) or []:
+        d = asdict(p) if is_dataclass(p) else dict(p)
+        if d["revision"] in stored_revisions:
+            continue
+        for k in ("channel", "note", "group_id", "causing_run_id", "episode_version", "config_hash"):
+            d.setdefault(k, "" if k in ("channel", "note") else None)
+        d["id"] = None
+        out.append(d)
+    return out, live
+
+
+async def list_entries(
+    session: AsyncSession,
+    *,
+    configuration_id: int | None = None,
+    table: str | None = None,
+    key: Mapping[str, Any] | None = None,
+    source: str | None = None,
+    actor: str | None = None,
+    group_id: str | None = None,
+    revision_from: int | None = None,
+    revision_to: int | None = None,
+    time_from: datetime | None = None,
+    time_to: datetime | None = None,
+    limit: int = 100,
+    offset: int = 0,
+    detail: bool = False,
+) -> dict:
+    """The journal, filtered, newest first.
+
+    Order: one configuration by revision; several by ``occurred_at`` then ``(configuration,
+    revision)`` (never by row id or ``recorded_at``).  ``table`` keeps the entries that touch
+    that table, and ``table`` with ``key`` those that touch that row (a re-key included).
+    For one session configuration that is live, the pending entries are merged in with
+    ``pending: true`` and the label "not yet saved"; ``live`` then says where it stands.
+    """
+    wanted = _key_filter(table, key)
+    if table is not None and table not in LAYER_REGISTRY:
+        raise JournalError(f"{table!r} is not a configuration table")
+    stmt = select(_JOURNAL)
+    for column, value in (
+        (_JOURNAL.c.configuration_id, configuration_id), (_JOURNAL.c.source, source),
+        (_JOURNAL.c.actor, actor), (_JOURNAL.c.group_id, group_id),
+    ):
+        if value is not None:
+            stmt = stmt.where(column == value)
+    if revision_from is not None:
+        stmt = stmt.where(_JOURNAL.c.revision >= revision_from)
+    if revision_to is not None:
+        stmt = stmt.where(_JOURNAL.c.revision <= revision_to)
+    if time_from is not None:
+        stmt = stmt.where(_JOURNAL.c.occurred_at >= time_from)
+    if time_to is not None:
+        stmt = stmt.where(_JOURNAL.c.occurred_at <= time_to)
+    rows = [dict(r) for r in (await session.execute(stmt)).mappings().all()]
+    views = [(e, False) for e in rows if _entry_matches(e, table, wanted)]
+
+    live_info = None
+    if configuration_id is not None:
+        from server.services import configurations
+
+        row = await configurations.get_row(session, configuration_id)
+        if row["kind"] != KIND_GLOBAL:
+            stored = {e["revision"] for e in await read_entries(session, configuration_id)}
+            pending, live = _pending_entries(row["session_id"], stored)
+            if live is not None:
+                live_info = {"state": live.state, "revision": live.revision,
+                             "saved_through": live.saved_through, "unsaved": live.unsaved}
+            for p in pending:
+                p["configuration_id"] = configuration_id
+                if source not in (None, p["source"]) or actor not in (None, p["actor"]):
+                    continue
+                if group_id is not None and p["group_id"] != group_id:
+                    continue
+                if revision_from is not None and p["revision"] < revision_from:
+                    continue
+                if revision_to is not None and p["revision"] > revision_to:
+                    continue
+                if time_from is not None and p["occurred_at"] < time_from:
+                    continue
+                if time_to is not None and p["occurred_at"] > time_to:
+                    continue
+                if _entry_matches(p, table, wanted):
+                    views.append((p, True))
+
+    if configuration_id is not None:
+        views.sort(key=lambda v: v[0]["revision"], reverse=True)
+    else:
+        views.sort(key=lambda v: (v[0]["occurred_at"], v[0]["configuration_id"], v[0]["revision"]),
+                   reverse=True)
+    page = views[offset: offset + limit]
+    return {
+        "entries": [_entry_view(e, detail=detail, pending=pending) for e, pending in page],
+        "total": len(views),
+        "limit": limit,
+        "offset": offset,
+        "live": live_info,
+    }
+
+
+async def get_entry(session: AsyncSession, entry_id: int) -> dict:
+    """One stored entry in full: what was proposed, what changed, and the before-images."""
+    row = (
+        await session.execute(select(_JOURNAL).where(_JOURNAL.c.id == entry_id))
+    ).mappings().first()
+    if row is None:
+        raise MissingKey(f"no journal entry {entry_id}")
+    return _entry_view(dict(row), detail=True, pending=False)
+
+
+def _proposed_ops(proposed: Any) -> list[dict]:
+    if isinstance(proposed, Mapping):
+        proposed = proposed.get("ops", [])
+    if not isinstance(proposed, (list, tuple)):
+        return []
+    return [p for p in proposed if isinstance(p, Mapping)]
+
+
+def _name_events(entry: Mapping[str, Any], name: str) -> list[dict]:
+    """What one entry did to ``name`` (a node, theme relation or codelet type)."""
+    resolved = entry["resolved"] or []
+    before = entry["before"] or []
+    asked = _proposed_ops(entry["proposed"])
+    events: list[dict] = []
+    for i, op in enumerate(resolved):
+        table = op["table"]
+        if table not in NAME_TABLES:
+            continue
+        kind = NAME_TABLES[table]
+        key_name = op["key"].get("name")
+        if op["op"] == "insert" and key_name == name:
+            events.append({"event": "created", "kind": kind, "table": table})
+        elif op["op"] == "delete" and key_name == name:
+            into = None
+            for q in asked:
+                if q.get("op") == "merge_nodes" and q.get("drop") == name:
+                    into = q.get("keep")
+            if into is None:  # a merge not asked as one: references moved from this name
+                for j, other in enumerate(resolved):
+                    was = before[j] if j < len(before) else None
+                    if other["op"] == "update" and was:
+                        for col, new in other["set"].items():
+                            if was.get(col) == name and isinstance(new, str) and new != name:
+                                into = new
+            events.append({"event": "merged_into" if into else "deleted", "kind": kind,
+                           "table": table, "into": into})
+        elif op["op"] == "update" and "name" in op["set"]:
+            if key_name == name and op["set"]["name"] != name:
+                events.append({"event": "renamed", "kind": kind, "table": table,
+                               "to": op["set"]["name"]})
+            elif op["set"]["name"] == name and key_name != name:
+                events.append({"event": "renamed_from", "kind": kind, "table": table,
+                               "from": key_name})
+        elif op["op"] == "update" and key_name == name:
+            events.append({"event": "edited", "kind": kind, "table": table,
+                           "columns": sorted(op["set"])})
+    return _net_reinserts(events, resolved, before, name)
+
+
+def _net_reinserts(events: list[dict], resolved: Sequence[Mapping[str, Any]],
+                   before: Sequence[Any], name: str) -> list[dict]:
+    """A delete and an insert of the same row in one entry is a rewrite (the cascade of a
+    node rename re-keys the theme relation that names the node): report one ``edited``."""
+    out: list[dict] = []
+    for table in {e["table"] for e in events}:
+        gone = [e for e in events if e["table"] == table and e["event"] in ("deleted", "merged_into")]
+        made = [e for e in events if e["table"] == table and e["event"] == "created"]
+        if gone and made:
+            old = next((before[i] for i, op in enumerate(resolved)
+                        if op["table"] == table and op["op"] == "delete"
+                        and op["key"].get("name") == name), None) or {}
+            new = next((op["row"] for op in resolved
+                        if op["table"] == table and op["op"] == "insert"
+                        and op["key"].get("name") == name), {})
+            columns = sorted(c for c in new if new[c] != old.get(c))
+            out.append({"event": "edited", "kind": gone[0]["kind"], "table": table,
+                        "columns": columns})
+            events = [e for e in events if e not in gone and e not in made]
+    return events + out
+
+
+def _describe(event: Mapping[str, Any], name: str) -> str:
+    e = event["event"]
+    kind = event["kind"]
+    if e == "created":
+        return f"the {kind} {name!r} was created"
+    if e == "deleted":
+        return f"the {kind} {name!r} was deleted"
+    if e == "merged_into":
+        return f"the {kind} {name!r} was merged into {event['into']!r}"
+    if e == "renamed":
+        return f"the {kind} {name!r} was renamed {event['to']!r}"
+    if e == "renamed_from":
+        return f"the {kind} {event['from']!r} was renamed {name!r}"
+    return f"the {kind} {name!r} was edited ({', '.join(event['columns'])})"
+
+
+async def _names_present(session: AsyncSession, configuration_id: int) -> dict[str, str]:
+    """``{name: kind}`` for every name the configuration has now (a live session's memory
+    state when it is live, else the stored one)."""
+    from server.services import configurations
+    from server.services.configuration_store import live_state
+
+    row = await configurations.get_row(session, configuration_id)
+    live = live_state(row["session_id"]) if row["kind"] != KIND_GLOBAL else None
+    if live is not None:
+        tables = {t: live.document.tables[t].values() for t in NAME_TABLES}
+    else:
+        state = await current_state_for(session, configuration_id)
+        tables = {t: state[t].values() for t in NAME_TABLES}
+    present: dict[str, str] = {}
+    for table, rows in tables.items():
+        for r in rows:
+            present.setdefault(r["name"], NAME_TABLES[table])
+    return present
+
+
+async def name_story(
+    session: AsyncSession, name: str, configuration_id: int = GLOBAL_CONFIGURATION_ID,
+    *, _present: dict[str, str] | None = None, _depth: int = 0,
+) -> dict:
+    """Where a node, theme relation or codelet type name went: its events from the journal,
+    oldest first, whether it resolves now, the name it carries now (after renames and
+    merges) and, when it is gone, the revision to restore it from."""
+    present = _present if _present is not None else await _names_present(session, configuration_id)
+    entries = await read_entries(session, configuration_id)
+    events: list[dict] = []
+    for entry in entries:
+        for ev in _name_events(entry, name):
+            events.append({
+                **ev, "text": _describe(ev, name),
+                "entry_id": entry["id"], "revision": entry["revision"],
+                "source": entry["source"], "actor": entry["actor"], "channel": entry["channel"],
+                "note": entry["note"], "group_id": entry["group_id"],
+                "occurred_at": entry["occurred_at"],
+            })
+    resolves = name in present
+    current_name = name if resolves else None
+    restorable = None
+    last = next((e for e in reversed(events) if e["event"] != "edited"), None)
+    if not resolves and last is not None:
+        successor = last.get("to") or last.get("into")
+        if successor is not None and _depth < 20:
+            current_name = (await name_story(
+                session, successor, configuration_id, _present=present, _depth=_depth + 1
+            ))["current_name"]
+        if last["event"] in ("deleted", "merged_into", "renamed"):
+            table = next(t for t, k in NAME_TABLES.items() if k == last["kind"])
+            restorable = {"table": table, "key": {"name": name},
+                          "as_of_revision": last["revision"] - 1, "entry_id": last["entry_id"]}
+    if resolves:
+        text = f"{name!r} is in the configuration"
+        if events:
+            text += f"; {events[-1]['text']} at revision {events[-1]['revision']}"
+    elif not events:
+        text = f"{name!r} is not in the configuration and the journal has no record of it"
+    else:
+        at = last or events[-1]
+        text = (f"{at['text']} at revision {at['revision']} by source {at['source']}, "
+                f"actor {at['actor']}")
+        if current_name and current_name != name:
+            text += f"; it is now {current_name!r}"
+    return {
+        "name": name, "configuration_id": configuration_id, "resolves": resolves,
+        "kind": present.get(name), "current_name": current_name, "events": events,
+        "restorable": restorable, "text": text,
+    }
+
+
+async def check_names(
+    session: AsyncSession, names: Sequence[str], configuration_id: int = GLOBAL_CONFIGURATION_ID
+) -> dict:
+    """Which of ``names`` the configuration lacks, each with its story.  The panels call it
+    with the names found in an Episodic Memory: ``unresolved`` is the panel's list."""
+    present = await _names_present(session, configuration_id)
+    unique = sorted({n for n in names if isinstance(n, str) and n})
+    unresolved = [await name_story(session, n, configuration_id, _present=present)
+                  for n in unique if n not in present]
+    return {"configuration_id": configuration_id, "checked": len(unique),
+            "unresolved": unresolved}

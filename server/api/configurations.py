@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.db import get_session
 from server.services import configuration_admin as admin
+from server.services import configuration_compare as compare_service
 from server.services import configurations, journal
 from server.services.configuration_writer import ChangeError, ChangeService, error_response
 
@@ -63,6 +64,21 @@ class PatchRequest(BaseModel):
     name: str | None = None
     note: str | None = None
     frozen: bool | None = None
+
+
+@router.get("/compare")
+async def get_compare(a: str, b: str, session: AsyncSession = Depends(get_session)):
+    """A row-level diff, by table and natural key, of configuration ``a`` against ``b``.
+
+    Either is a configuration id or ``standard`` (the Metacat Standard Configuration).  A row
+    is ``added`` when only ``a`` has it, ``removed`` when only ``b`` has it, and ``changed``
+    (with the differing columns on both sides) when both do.  Declared before the
+    ``/{configuration_id}`` routes so ``compare`` is not read as an id.
+    """
+    try:
+        return await compare_service.compare(session, a, b)
+    except Exception as exc:
+        raise _http(exc)
 
 
 @router.get("")
@@ -161,6 +177,38 @@ async def post_restore_selected(
     try:
         return await admin.restore_selected(
             session, [r.model_dump() for r in body.rows], configuration_id, note=body.note)
+    except Exception as exc:
+        await session.rollback()
+        raise _http(exc)
+
+
+class ApplyFromRequest(BaseModel):
+    #: A configuration id or ``"standard"``.
+    source: int | str
+    rows: list[RowRef] = Field(min_length=1)
+    #: The reason, kept in the journal entry.
+    note: str = ""
+    #: Resolve and report without writing (the preview).
+    dry_run: bool = False
+
+
+@router.post("/{configuration_id}/apply-from")
+async def post_apply_from(
+    configuration_id: int, body: ApplyFromRequest, session: AsyncSession = Depends(get_session)
+):
+    """Make the chosen rows of this configuration equal another's (or the standard's).
+
+    Restore-selected generalised: ``source`` is a configuration id or ``standard``.  It is a
+    change batch (``source = restore``, ``actor = admin``) through the change API, so it has a
+    preview (``dry_run``), the reason (``note``), a journal entry and a revision.  The answer
+    is the change API's report, with ``wrote``, ``ops`` and ``skipped_rows``.
+    """
+    try:
+        return await compare_service.apply_from(
+            session, configuration_id, body.source, [r.model_dump() for r in body.rows],
+            note=body.note, dry_run=body.dry_run)
+    except ChangeError as exc:
+        return error_response(exc)
     except Exception as exc:
         await session.rollback()
         raise _http(exc)

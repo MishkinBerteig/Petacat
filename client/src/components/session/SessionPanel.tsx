@@ -15,7 +15,7 @@ import { ApiError, describeApiError, getSession, listSessions } from '@/api/clie
 import type { SessionListResponse, SessionSummary } from '@/types';
 import { SessionDetail } from './SessionDetail';
 import { SessionList, describeExecutor } from './SessionList';
-import { NewSessionForm } from './NewSessionForm';
+import { NewSessionForm, type ConfigurationBase } from './NewSessionForm';
 import { ControlHelp, errorStyle, noticeStyle, sectionLabelStyle, usePolling } from './shared';
 
 const LIST_POLL_MS = 3000;
@@ -35,6 +35,25 @@ function unavailableText(err: unknown): string | null {
   return null;
 }
 
+/**
+ * The configuration manager's "New session from this configuration" lands here:
+ * `#/training-mode/new?base=global` or `base=session:7&name=Name`.
+ */
+function parseNewSessionBase(): ConfigurationBase | null {
+  const match = window.location.hash.match(/^#\/training-mode\/new\?(.*)$/);
+  if (!match) return null;
+  const params = new URLSearchParams(match[1]);
+  const base = params.get('base') ?? '';
+  if (base === 'global') return { value: 'global', label: 'the global configuration (Metacat Mode)' };
+  const session = base.match(/^session:(\d+)$/);
+  if (!session) return null;
+  const name = params.get('name');
+  return {
+    value: { session_id: Number(session[1]) },
+    label: name ? `Training Mode Session '${name}' configuration` : `Training Mode Session ${session[1]} configuration`,
+  };
+}
+
 export function SessionPanel({ initialSessionId = null }: SessionPanelProps) {
   const [list, setList] = useState<SessionListResponse | null>(null);
   const [listError, setListError] = useState<string | null>(null);
@@ -42,7 +61,8 @@ export function SessionPanel({ initialSessionId = null }: SessionPanelProps) {
   const [selectedId, setSelectedId] = useState<number | null>(initialSessionId);
   const [selected, setSelected] = useState<SessionSummary | null>(null);
   const [selectedError, setSelectedError] = useState<string | null>(null);
-  const [creating, setCreating] = useState(false);
+  const [newBase] = useState<ConfigurationBase | null>(parseNewSessionBase);
+  const [creating, setCreating] = useState(newBase !== null);
   const [notice, setNotice] = useState<string | null>(null);
 
   // `#/training-mode/<id>` can change under us (a link followed while the view is open).
@@ -147,7 +167,11 @@ export function SessionPanel({ initialSessionId = null }: SessionPanelProps) {
           <NewSessionForm
             limits={list?.limits ?? null}
             defaults={list?.defaults ?? null}
-            onCancel={() => setCreating(false)}
+            configurationBase={newBase}
+            onCancel={() => {
+              setCreating(false);
+              if (newBase) window.location.hash = '/training-mode';
+            }}
             onCreated={(session, warning) => {
               void refreshList();
               select(session.id);

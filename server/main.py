@@ -178,6 +178,7 @@ from server.api.memory import router as memory_router
 from server.api.admin import router as admin_router
 from server.api.configurations import router as configurations_router
 from server.api.database import router as database_router
+from server.api.journal import router as journal_router
 from server.api.docs import router as docs_router
 from server.api.ws import router as ws_router
 from server.api.review import router as review_router
@@ -206,6 +207,7 @@ app.include_router(memory_router)
 app.include_router(admin_router)
 app.include_router(configurations_router)
 app.include_router(database_router)
+app.include_router(journal_router)
 app.include_router(docs_router)
 app.include_router(ws_router)
 app.include_router(review_router)

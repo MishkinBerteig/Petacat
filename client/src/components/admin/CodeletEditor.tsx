@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 
-import { request, describeApiError } from '@/api/client'
+import { describeApiError, GLOBAL_CONFIGURATION_ID } from '@/api/client'
+import { useAdminRequest, type AdminRequest, type ConfigurationProp } from './adminRequest'
 import { LoadFailure } from './EditableTable'
 
 interface CodeletDef {
@@ -17,7 +18,8 @@ const EMPTY: CodeletDef = {
   name: '', family: '', phase: '', default_urgency: null, description: '', execute_body: '',
 }
 
-export function CodeletEditor() {
+export function CodeletEditor({ configuration = GLOBAL_CONFIGURATION_ID }: ConfigurationProp) {
+  const request = useAdminRequest(configuration)
   const [codelets, setCodelets] = useState<CodeletDef[]>([])
   const [selected, setSelected] = useState<CodeletDef | null>(null)
   const [editing, setEditing] = useState<CodeletDef | null>(null)
@@ -35,7 +37,7 @@ export function CodeletEditor() {
       .then(data => { setCodelets(data); setLoadError(null) })
       .catch(e => setLoadError(describeApiError(e, 'load the codelet types')))
       .finally(() => setLoading(false))
-  }, [])
+  }, [request])
 
   useEffect(() => { load() }, [load])
   // A success announces itself and gets out of the way; a failure stays until the next

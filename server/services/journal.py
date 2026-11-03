@@ -416,6 +416,9 @@ class _DocApplier:
         return {c: v for c, v in values.items() if c != spec.surrogate}
 
     async def apply(self, op: Mapping[str, Any]) -> None:
+        self.apply_now(op)
+
+    def apply_now(self, op: Mapping[str, Any]) -> None:
         kind = op.get("op")
         spec = _spec(op.get("table", ""))
         if spec.name not in self.doc.tables:
@@ -502,6 +505,21 @@ class _DocApplier:
             ]:
                 self._delete(child, dependent)
         self._push({"op": "delete", "table": spec.name, "key": spec.key_of(old)}, old)
+
+
+def normalize_ops(document, ops: Sequence[Mapping[str, Any]]) -> tuple[list[dict], list[dict | None]]:
+    """``(resolved, before)`` for *ops* applied to a session configuration's *document*.
+
+    Pure, and exactly what a session's write (``write_immediate``) stores for the same ops:
+    inserts completed with the stored defaults, the cascades of a delete made explicit, an update
+    that changes nothing dropped, and ``before[i]`` the old row of ``resolved[i]``.  A live
+    session uses it so that the entry it holds in memory is the entry the Stop write stores.
+    Raises :class:`KeyExists` and :class:`MissingKey` as the write would.
+    """
+    applier = _DocApplier(document)
+    for op in ops:
+        applier.apply_now(op)
+    return applier.resolved, applier.before
 
 
 # ──────────────────────────────────────────────────────────────────

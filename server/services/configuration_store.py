@@ -30,16 +30,26 @@ Session's, now or at an earlier revision or Training episode version, with a
   :func:`set_live_source`.  Asked for its configuration now, the store then returns the live
   document with ``source = "live"``, ``saved_through`` (the last Stop's revision) and
   ``unsaved`` (batches held in memory).  An earlier revision is always read from the database.
-  No live source is registered until S3 fills it in.
+  The Training Mode Session service registers the source when it starts and removes it when it
+  stops; with none registered every session is read from the database.
+
+The live session's own batches: :func:`live_apply`
+==================================================
+A live session writes nothing to the database until it is Stopped, so a batch for its
+configuration must not take the stored path.  :func:`set_live_source` registers, with the source,
+the function that applies a batch in memory (the session service's ``apply_live``);
+``ChangeService.apply`` calls :func:`live_apply` first for any session configuration whose
+session is live, and so every writer of batches (the external route, the Admin editors, a
+learner) reaches a live session by the one door.
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Callable
+from typing import Any, Awaitable, Callable
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -77,18 +87,34 @@ class LiveState:
     #: Batches held in memory, not yet stored.
     unsaved: int
     saved_at: datetime | None = None
+    #: The ``journal.PendingEntry`` list held in memory (revision order): the live part of the
+    #: session's History, which is the stored entries plus these.
+    pending: list = field(default_factory=list)
 
 
 #: ``source(session_id) -> LiveState | None``.
 LiveSource = Callable[[int], "LiveState | None"]
+#: ``apply(session_id, batch) -> report``: applies a batch to a live session in memory.
+LiveApply = Callable[[int, Any], Awaitable[dict]]
 
 _LIVE_SOURCE: LiveSource | None = None
+_LIVE_APPLY: LiveApply | None = None
 
 
-def set_live_source(source: LiveSource | None) -> None:
-    """Register (or, with ``None``, remove) the source of live sessions' configurations (S3)."""
-    global _LIVE_SOURCE
+def set_live_source(source: LiveSource | None, apply: LiveApply | None = None) -> None:
+    """Register (or, with ``None``, remove) the source of live sessions' configurations (S3),
+    and the function that applies a batch to a live session in memory."""
+    global _LIVE_SOURCE, _LIVE_APPLY
     _LIVE_SOURCE = source
+    _LIVE_APPLY = apply if source is not None else None
+
+
+async def live_apply(session_id: int, batch: Any) -> dict:
+    """Apply *batch* to live session ``session_id``'s configuration, in memory (the report says
+    ``persisted: false``).  Raises ``RuntimeError`` when no live source is registered."""
+    if _LIVE_APPLY is None:
+        raise RuntimeError("no live session source is registered")
+    return await _LIVE_APPLY(session_id, batch)
 
 
 def live_state(session_id: int | None) -> LiveState | None:
@@ -154,7 +180,7 @@ class ConfigurationStore:
                 )
         elif now:
             live = live_state(row["session_id"])
-            if live is not None:
+            if live is not None and live.document is not None:
                 return ConfigurationView(
                     configuration_id, cd.provider(live.document), cd.config_hash(live.document),
                     live.revision, source="live", saved_through=live.saved_through,

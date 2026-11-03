@@ -27,7 +27,17 @@ const DEFAULT_SEEDS = 100;
 const DEFAULT_MAX_CODELETS = 20_000;
 const FALLBACK_REQUEST_SIZE = 500;
 
+/** The configuration a new session starts from, when the manager chose one (not the default). */
+export interface ConfigurationBase {
+  /** `settings.configuration_base`: `'global'`, `'standard'` or `{ session_id }`. */
+  value: 'global' | 'standard' | { session_id: number };
+  /** For the person reading the form. */
+  label: string;
+}
+
 interface Props {
+  /** Set by the Admin view's "New session from this configuration". */
+  configurationBase?: ConfigurationBase | null;
   limits: SessionLimits | null;
   /** The server's defaults for the settings and the policy, when it has said. */
   defaults: { settings: SessionSettings; policy: SessionErrorPolicy } | null;
@@ -36,7 +46,7 @@ interface Props {
   onCancel: () => void;
 }
 
-export function NewSessionForm({ limits, defaults, onCreated, onCancel }: Props) {
+export function NewSessionForm({ configurationBase = null, limits, defaults, onCreated, onCancel }: Props) {
   const overrides = useRunStore((s) => s.parameterOverrides);
   const overrideCount = Object.keys(overrides).length;
 
@@ -118,7 +128,8 @@ export function NewSessionForm({ limits, defaults, onCreated, onCancel }: Props)
           max_codelets: codeletsN,
           ...(useOverrides && overrideCount > 0 ? { parameters: overrides } : {}),
           ...(backend !== '' ? { backend } : {}),
-        },
+          ...(configurationBase ? { configuration_base: configurationBase.value } : {}),
+        } as Partial<SessionSettings>,
         policy,
         problems: parts[0],
       });
@@ -153,8 +164,14 @@ export function NewSessionForm({ limits, defaults, onCreated, onCancel }: Props)
       </div>
       <div className="text-xs text-muted" style={{ marginTop: 4 }}>
         A Training Mode Session is a named episode: many problems, each over many seeds. The settings below are fixed once it
-        is created. It copies the global configuration that Metacat Mode uses and never changes it.
+        is created. {configurationBase ? 'It never changes Metacat Mode.' : 'It copies the global configuration that Metacat Mode uses and never changes it.'}
       </div>
+
+      {configurationBase && (
+        <div className="text-xs" role="note" data-testid="configuration-base-line" style={{ marginTop: 6 }}>
+          Its Starting Conceptual State is a copy of {configurationBase.label}.
+        </div>
+      )}
 
       <div style={{ ...fieldGroupStyle, marginTop: 8 }}>
         <label style={labelStyle} htmlFor="session-name">

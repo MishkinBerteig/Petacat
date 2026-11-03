@@ -527,47 +527,35 @@ async def session_state_via_db(engine, bid: int) -> dict:
     return {status: n for status, n in rows}
 
 
+def _external(*ops, **extra) -> dict:
+    """A change batch as the external route submits it."""
+    return {"source": "external", "actor": "test", "ops": list(ops), **extra}
+
+
 @pytest.mark.asyncio
 async def test_a_configuration_that_cannot_start_a_run_stalls_the_session_and_resumes(
-        app_client, sessions, test_engine, monkeypatch):
-    """With ``on_config_change`` gone nothing pauses or adopts: a session stalls only while the
-    current configuration cannot start a run (the run-start check), and carries on when it can."""
-    from server.engine.start_check import RunStartError
-
-    original = sessions.test_meta
-    broken = original.with_overrides({"update_cycle_length": 16})
-    current = {"meta": original}
-    svc = bs.TrainingModeSessionService(
-        async_sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False),
-        lambda: current["meta"], executor=create_executor())
-    real_check = bs.require_run_start
-
-    def check(meta):
-        if meta is broken:
-            raise RunStartError("injected: this configuration cannot start a run")
-        return real_check(meta)
-
-    monkeypatch.setattr(bs, "require_run_start", check)
-    await svc.start()
-    bs.set_training_mode_session_service(svc)
-    try:
-        made = await create(app_client, 1, seeds_per_problem=60000)
-        tid = made["session"]["id"]
-        current["meta"] = broken
-        svc.wake()
-        stalled = await until_state(app_client, tid, "stalled")
-        assert "cannot start a run" in stalled["stalled_reason"] and "stalled" in stalled["last_event"]
-        done_while_stalled = stalled["runs"]["done"]
-        await asyncio.sleep(0.5)
-        assert (await session_state(app_client, tid))["runs"]["done"] == done_while_stalled
-        # The configuration returns: the stalled session carries on (the scheduler's own timer notices).
-        current["meta"] = original
-        resumed = await until_state(app_client, tid, "running", timeout=30)
-        assert resumed["stalled_reason"] is None and resumed["last_event"].startswith("resumed")
-        await app_client.post(f"/api/training-mode/sessions/{tid}/cancel")
-    finally:
-        bs.set_training_mode_session_service(sessions)
-        await svc.stop()
+        app_client, sessions):
+    """With ``on_config_change`` gone nothing pauses or adopts: a session stalls only while its own
+    configuration cannot start a run (the run-start check), and carries on when a change restores it.
+    The change is a batch to the live session, held in memory."""
+    made = await create(app_client, 1, seeds_per_problem=60000)
+    tid = made["session"]["id"]
+    table = sessions._live[tid].config.document.tables["engine_params"]
+    row = dict(table[("update_cycle_length",)])
+    report = await sessions.submit_changes(tid, _external(
+        {"op": "delete", "table": "engine_params", "key": {"name": "update_cycle_length"}}))
+    assert report["persisted"] is False and report["effects"], report
+    stalled = await until_state(app_client, tid, "stalled")
+    assert "update_cycle_length" in stalled["stalled_reason"] and "stalled" in stalled["last_event"]
+    done_while_stalled = stalled["runs"]["done"]
+    await asyncio.sleep(0.5)
+    assert (await session_state(app_client, tid))["runs"]["done"] == done_while_stalled
+    # The configuration is repaired: the stalled session carries on (the scheduler's own timer notices).
+    row.pop("id", None)
+    await sessions.submit_changes(tid, _external({"op": "insert", "table": "engine_params", "row": row}))
+    resumed = await until_state(app_client, tid, "running", timeout=30)
+    assert resumed["stalled_reason"] is None and resumed["last_event"].startswith("resumed")
+    await app_client.post(f"/api/training-mode/sessions/{tid}/cancel")
 
 
 @pytest.mark.asyncio
@@ -576,7 +564,7 @@ async def test_listing_filtering_and_the_executor_report(app_client, sessions):
     bid = made["session"]["id"]
     await until_state(app_client, bid, "finished")
     top = (await app_client.get("/api/training-mode/sessions")).json()
-    assert top["training_mode_sessions"][0]["id"] == bid
+    assert top["sessions"][0]["id"] == bid
     assert top["executor"]["kind"] in ("swarm", "serial") and top["executor"]["workers"] >= 1
     assert top["limits"] == {"max_problems_per_request": 10000, "max_seeds_per_problem": 100000, "max_codelets": 200000}
     q = (await app_client.get(f"/api/training-mode/sessions/{bid}/problems", params={"q": "efg"})).json()
@@ -912,11 +900,11 @@ async def test_no_route_clears_a_sessions_memory_and_memory_is_refused(app_clien
     after = (await app_client.get(f"/api/training-mode/sessions/{tid}/memory")).json()
     assert after == before
     # A request that sends memory is refused (422) and creates nothing.
-    count = len((await app_client.get("/api/training-mode/sessions")).json()["training_mode_sessions"])
+    count = len((await app_client.get("/api/training-mode/sessions")).json()["sessions"])
     for body in ({"name": "m", "memory": "independent"}, {"name": "m", "settings": {"memory": "independent"}}):
         resp = await app_client.post("/api/training-mode/sessions", json=body)
         assert resp.status_code == 422 and isinstance(resp.json()["detail"], str)
-    assert len((await app_client.get("/api/training-mode/sessions")).json()["training_mode_sessions"]) == count
+    assert len((await app_client.get("/api/training-mode/sessions")).json()["sessions"]) == count
     # Only deleting the whole Training Mode Session removes its memory.
     assert (await app_client.delete(f"/api/training-mode/sessions/{tid}")).status_code == 204
     assert (await app_client.get(f"/api/training-mode/sessions/{tid}/memory")).status_code == 404
@@ -1065,44 +1053,32 @@ async def test_a_killed_serial_child_is_retried(app_client, sessions, test_engin
 
 @pytest.mark.asyncio
 async def test_on_config_change_is_gone_and_a_run_records_the_configuration_it_ran_under(
-        app_client, sessions, test_engine):
+        app_client, sessions):
     """No policy field decides what a configuration change does (config plan 3.9).  Nothing pauses
-    or adopts: the next run simply starts under the current configuration and records its hash."""
-    original = sessions.test_meta
-    changed = original.with_overrides({"update_cycle_length": 16})
-    from server.engine.hashing import config_hash
-
-    assert config_hash(changed) != config_hash(original)
+    or adopts: the next run simply starts under the session's configuration as it then stands and
+    records its hash, its configuration revision and its episode version."""
     for body in ({"on_config_change": "adopt"}, {"on_config_change": "pause"}):
         resp = await app_client.post("/api/training-mode/sessions", json={"name": "x", "policy": body})
         assert resp.status_code == 400 and "on_config_change" in resp.json()["detail"]
-    current = {"meta": original}
-    svc = bs.TrainingModeSessionService(
-        async_sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False),
-        lambda: current["meta"], executor=create_executor())
-    await svc.start()
-    bs.set_training_mode_session_service(svc)
-    try:
-        made = await create(app_client, 1, seeds_per_problem=60000)
-        tid, pid = made["session"]["id"], made["problem_ids"][0]
-        assert "on_config_change" not in made["session"]["policy"]
-        await app_client.post(f"/api/training-mode/sessions/{tid}/pause")
-        await asyncio.sleep(0.5)
-        current["meta"] = changed
-        await app_client.post(f"/api/training-mode/sessions/{tid}/resume")
+    made = await create(app_client, 1, seeds_per_problem=60000)
+    tid, pid = made["session"]["id"], made["problem_ids"][0]
+    assert "on_config_change" not in made["session"]["policy"]
+    first_hash = made["session"]["configuration"]["hash"]
+    await app_client.post(f"/api/training-mode/sessions/{tid}/pause")
+    await asyncio.sleep(0.5)
+    await sessions.submit_changes(tid, _external({"op": "set_param", "name": "update_cycle_length", "to": 16}))
+    await app_client.post(f"/api/training-mode/sessions/{tid}/resume")
 
-        async def _both():
-            hashes = {r["config_hash"] for r in await runs_of(app_client, tid, pid)}
-            return hashes if len(hashes) == 2 else None
+    async def _both():
+        seen = {(r["config_hash"], r["configuration_revision"]) for r in await runs_of(app_client, tid, pid)}
+        return seen if len({h for h, _ in seen}) == 2 else None
 
-        hashes = await wait_for(_both)
-        assert hashes == {config_hash(original), config_hash(changed)}
-        now = await session_state(app_client, tid)
-        assert now["state"] == "running" and now["activity"] is None  # it never paused or stalled
-        await app_client.post(f"/api/training-mode/sessions/{tid}/cancel")
-    finally:
-        bs.set_training_mode_session_service(sessions)
-        await svc.stop()
+    seen = await wait_for(_both)
+    now = await session_state(app_client, tid)
+    assert {h for h, _ in seen} == {first_hash, now["configuration"]["hash"]}
+    assert {rev for _, rev in seen} == {0, 1}
+    assert now["state"] == "running" and now["activity"] is None  # it never paused or stalled
+    await app_client.post(f"/api/training-mode/sessions/{tid}/cancel")
 
 
 # ---------------------------------------------------------------------------
@@ -1362,7 +1338,7 @@ async def test_live_summaries_carry_persisted_saved_through_and_unsaved(app_clie
     bid = made["session"]["id"]
     s0 = made["session"]
     assert s0["persisted"] is True and s0["unsaved"] is None
-    assert s0["saved_through"] == {"stopped_at": None, "configuration_revision": None, "episode_version": 0}
+    assert s0["saved_through"] == {"stopped_at": None, "configuration_revision": 0, "episode_version": 0}
     started = (await app_client.post(_api(bid, "/start"))).json()
     assert started["source"] == "live" and started["persisted"] is False
     assert started["unsaved"] == {"runs": 0, "merges": 0, "problems": 0, "outcomes": 0, "edits": 0,
@@ -1379,7 +1355,7 @@ async def test_live_summaries_carry_persisted_saved_through_and_unsaved(app_clie
     again = (await app_client.post(_api(bid, "/start"))).json()
     assert again["saved_through"]["episode_version"] == 6 and again["saved_through"]["stopped_at"]
     assert again["unsaved"]["runs"] == 0
-    listing = (await app_client.get("/api/training-mode/sessions")).json()["training_mode_sessions"]
+    listing = (await app_client.get("/api/training-mode/sessions")).json()["sessions"]
     row = next(t for t in listing if t["id"] == bid)
     assert row["source"] == "live" and row["persisted"] is False
     await stop(app_client, bid)
@@ -1426,7 +1402,7 @@ async def test_starting_refuses_every_mutation_with_busy_and_ends_running(app_cl
     await asyncio.wait_for(entered.wait(), 30)
     state = await session_state(app_client, bid)
     assert state["state"] == "starting" and state["activity"] is None
-    listed = (await app_client.get("/api/training-mode/sessions")).json()["training_mode_sessions"]
+    listed = (await app_client.get("/api/training-mode/sessions")).json()["sessions"]
     assert next(t for t in listed if t["id"] == bid)["state"] == "starting"
     await assert_busy(app_client, bid, also=("start", "stop"))
     assert bid not in sessions._live

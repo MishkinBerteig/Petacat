@@ -158,21 +158,28 @@ async def service():
     from sqlalchemy import delete
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
     from sqlalchemy.pool import NullPool
-    from server.models.metadata import Base
-    from server.models import training_mode_session as tr
     from server.services.training_mode_session_service import TrainingModeSessionService
 
     engine = create_async_engine(url, poolclass=NullPool)
+    # A session has its own configuration, created from the global one, so the service needs the
+    # whole schema and the Metacat Standard Configuration loaded: prepare the test database as
+    # the e2e fixtures do (the database outlives schema changes, and they drop it when done).
+    from sqlalchemy import text
+    from server.models.metadata import Base
+    import server.models.run  # noqa: F401
+    from server.models import training_mode_session as tr
+    from server.services.standard_configuration import seed_metadata_from_json, sync_help_topics
+
     async with engine.begin() as conn:
-        # ``create_all`` never alters a table, and the test database outlives schema changes:
-        # start these tables from the current models.
-        from sqlalchemy import text
-        await conn.execute(text(
-            "DROP TABLE IF EXISTS training_memory_merges, training_mode_session_runs, "
-            "training_mode_session_problems, training_mode_sessions CASCADE"))
-        await conn.run_sync(lambda c: Base.metadata.create_all(c, tables=[
-            tr.TrainingModeSession.__table__, tr.TrainingModeSessionProblem.__table__, tr.TrainingModeSessionRun.__table__,
-            tr.SessionMemoryMerge.__table__]))
+        await conn.run_sync(Base.metadata.drop_all)
+        await conn.run_sync(Base.metadata.create_all)
+    prep = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    async with prep() as s:
+        seed_dir = os.path.join(os.getcwd(), "seed_data")
+        await seed_metadata_from_json(s, seed_dir)
+        await s.flush()
+        await sync_help_topics(s, seed_dir)
+        await s.commit()
     factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     svc = TrainingModeSessionService(factory, lambda: meta, executor=create_executor())
     await svc.start()

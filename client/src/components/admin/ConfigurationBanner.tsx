@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getConfigurationStatus } from '@/api/client'
+import { getConfigurationStatus, GLOBAL_CONFIGURATION_ID } from '@/api/client'
 import type { ConfigurationStatus } from '@/types/configuration'
 
 /**
@@ -10,16 +10,22 @@ import type { ConfigurationStatus } from '@/types/configuration'
  * `refreshKey` changes whenever the person moves to another tab or acts on the
  * configuration, which is when the count may have changed.
  */
-export function ConfigurationBanner({ refreshKey }: { refreshKey?: unknown }) {
+export function ConfigurationBanner({
+  refreshKey,
+  configuration = GLOBAL_CONFIGURATION_ID,
+}: {
+  refreshKey?: unknown
+  configuration?: number
+}) {
   const [status, setStatus] = useState<ConfigurationStatus | null>(null)
 
   useEffect(() => {
     let live = true
-    getConfigurationStatus()
+    getConfigurationStatus(configuration)
       .then(s => { if (live) setStatus(s) })
       .catch(() => { if (live) setStatus(null) })
     return () => { live = false }
-  }, [refreshKey])
+  }, [refreshKey, configuration])
 
   if (!status || typeof status.differs_rows !== 'number' || status.differs_rows === 0) return null
 
