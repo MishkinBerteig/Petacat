@@ -304,3 +304,12 @@ describe('values and errors', () => {
     expect(describeDbError(err, 'save')).toBe('Could not save (episodic_memory_protected): never edited')
   })
 })
+
+describe('DatabasePanel help (C11b)', () => {
+  it('has a ? for the Database tab', async () => {
+    serve()
+    render(<DatabasePanel />)
+    await screen.findByRole('navigation', { name: 'Tables' })
+    expect(screen.getByRole('button', { name: 'Show help for the Database tab' }).textContent).toBe('?')
+  })
+})

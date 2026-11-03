@@ -472,30 +472,51 @@ describe('the requester for a session configuration', () => {
   })
 })
 
-describe('the deep link #/admin?configuration=<id>', () => {
+describe('the deep link #/config?configuration=<id>', () => {
   afterEach(() => { window.location.hash = '' })
 
   it('opens that configuration in the editors on mount', async () => {
     serve()
-    window.location.hash = '#/admin?configuration=5'
+    window.location.hash = '#/config?configuration=5'
     render(<AdminLayout />)
     await waitFor(() => expect(screen.getByTestId('configuration-chip').textContent).toContain("Training Mode Session 'Alpha'"))
   })
 
-  it('opens it on a hashchange while the Admin view is shown', async () => {
+  it('opens it on a hashchange while the Configurations view is shown', async () => {
     serve()
-    window.location.hash = '#/admin'
+    window.location.hash = '#/config'
     render(<AdminLayout />)
     await waitFor(() => expect(screen.getByTestId('configuration-chip').textContent).toContain(GLOBAL_CHIP))
-    window.location.hash = '#/admin?configuration=6'
+    window.location.hash = '#/config?configuration=6'
     window.dispatchEvent(new HashChangeEvent('hashchange'))
     await waitFor(() => expect(screen.getByTestId('configuration-chip').textContent).toContain("Training Mode Session 'Beta'"))
   })
 
   it('keeps the global configuration for a missing or invalid id', async () => {
     serve()
-    window.location.hash = '#/admin?configuration=abc'
+    window.location.hash = '#/config?configuration=abc'
     render(<AdminLayout />)
     await waitFor(() => expect(screen.getByTestId('configuration-chip').textContent).toContain(GLOBAL_CHIP))
+  })
+})
+
+describe('help buttons (C11b)', () => {
+  it('the manager list has a ? for the configuration manager', async () => {
+    serve()
+    render(<ConfigurationsTab openId={1} onOpen={() => {}} onHistory={() => {}} />)
+    await screen.findByTestId('badge-1')
+    expect(screen.getByRole('button', { name: 'Show help for the configuration manager' }).textContent).toBe('?')
+  })
+
+  it('the header chip has a ? for the scope picker', async () => {
+    serve()
+    render(<AdminLayout />)
+    await screen.findByLabelText('Apply to')
+    expect(screen.getByRole('button', { name: 'Show help for the scope picker (Apply to)' }).textContent).toBe('?')
+  })
+
+  it('the new-session form has a ? for the Starting Conceptual State', () => {
+    render(<NewSessionForm limits={null} defaults={null} onCreated={() => {}} onCancel={() => {}} />)
+    expect(screen.getByRole('button', { name: 'Show help for the Starting Conceptual State' }).textContent).toBe('?')
   })
 })

@@ -84,7 +84,7 @@ export function HamburgerMenu({ activeView, onSelect, disabled }: Props) {
             onClick={() => select('training-mode')}
           />
           <MenuItem
-            label="Configuration (Metacat Mode)"
+            label="Configurations (Metacat Mode and Training Mode)"
             active={activeView === 'config'}
             onClick={() => select('config')}
           />

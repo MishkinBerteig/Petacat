@@ -18,7 +18,7 @@
         "strength",
         "salience"
       ],
-      "dissertation_ref": "\u00a71.5.4, p.21-26; \u00a72.4, p.51-52; \u00a73.1-3.5, p.72-125"
+      "dissertation_ref": "§1.5.4, p.21-26; §2.4, p.51-52; §3.1-3.5, p.72-125"
     }
   },
   {
@@ -39,7 +39,7 @@
         "lateral_sliplink",
         "fully_active"
       ],
-      "dissertation_ref": "\u00a71.5.3, p.20-21; \u00a72.4, p.51-52; \u00a73.4, p.113-121"
+      "dissertation_ref": "§1.5.3, p.20-21; §2.4, p.51-52; §3.4, p.113-121"
     }
   },
   {
@@ -60,7 +60,7 @@
         "builder",
         "bin"
       ],
-      "dissertation_ref": "\u00a71.5.5, p.26-28; \u00a74.2.3, p.150-152"
+      "dissertation_ref": "§1.5.5, p.26-28; §4.2.3, p.150-152"
     }
   },
   {
@@ -82,7 +82,7 @@
         "excitation",
         "inhibition"
       ],
-      "dissertation_ref": "\u00a72.3.2, p.46-47; \u00a72.4.2, p.53-54; \u00a74.1, p.127-144; \u00a74.2, p.145-152"
+      "dissertation_ref": "§2.3.2, p.46-47; §2.4.2, p.53-54; §4.1, p.127-144; §4.2, p.145-152"
     }
   },
   {
@@ -102,7 +102,7 @@
         "processing_history",
         "clamp_period"
       ],
-      "dissertation_ref": "\u00a72.4.3, p.54-57; \u00a74.4, p.161-167"
+      "dissertation_ref": "§2.4.3, p.54-57; §4.4, p.161-167"
     }
   },
   {
@@ -123,7 +123,7 @@
         "cross_run",
         "episodic_runs"
       ],
-      "dissertation_ref": "\u00a72.3.3-2.3.4, p.47-49; \u00a72.4.1, p.52-53; \u00a74.7, p.184-200"
+      "dissertation_ref": "§2.3.3-2.3.4, p.47-49; §2.4.1, p.52-53; §4.7, p.184-200"
     }
   },
   {
@@ -143,7 +143,7 @@
         "unhappiness",
         "rule_factor"
       ],
-      "dissertation_ref": "\u00a71.5.6, p.28-32"
+      "dissertation_ref": "§1.5.6, p.28-32"
     }
   },
   {
@@ -199,7 +199,7 @@
     "topic_key": "snag",
     "title": "Snag",
     "short_desc": "A failure to apply a translated rule to the target string, recorded in the Trace with the rule and the failure, and stored in Episodic Memory.",
-    "full_desc": "A snag is a failure to apply a translated rule to the target string. Metacat translates the rule it found for the top string pair into the target's terms and then applies it; a snag is the moment that application cannot be carried out. The canonical case is 'abc -> abd; xyz -> ?', where the rule asks for the successor of the rightmost letter and z has none. Three kinds arise: a swap, where objects exchange attributes in a way the target cannot hold; a conflict, where two demands on the string disagree; and a change, where an object is asked to become something it cannot be. Each snag is explained in one sentence written from the failure itself -- for example 'changing the letter-category of the letter z to its successor is not possible in xyz' -- which the commentary reports (\"Hit a snag: ...\"), Episodic Memory keeps with the English of the translated rule that failed, the Memory panel shows, and an answer's explanation quotes when it avoids the snag.\n\nA snag names the rule that ran aground, the translated rule, the bridges supporting the translation and the slippages taken along the way, so it is a specific account of an impasse rather than a report that progress has stopped. That account is what a snag description in Episodic Memory is built from (\u00a74.7.2), and what lets a later answer be recognised as one that avoids the impasse.\n\nWhen a snag is recorded, the system discards every proposed bond, group and bridge, sets temperature to 100 and clamps it there, clamps the theme-pattern of the interpretation that ran aground, empties the Coderack, and posts the initial codelets afresh. The run restarts its perceptual work from the strings while holding on to what it has built and to the themes that characterise the failure. Repeated snags with overlapping themes trigger the jootsing mechanism. For example, if the system repeatedly tries and fails to translate a rule because the target string lacks a required letter, a snag records this pattern so jootsing can inhibit the stuck interpretation.",
+    "full_desc": "A snag is a failure to apply a translated rule to the target string. Metacat translates the rule it found for the top string pair into the target's terms and then applies it; a snag is the moment that application cannot be carried out. The canonical case is 'abc -> abd; xyz -> ?', where the rule asks for the successor of the rightmost letter and z has none. Three kinds arise: a swap, where objects exchange attributes in a way the target cannot hold; a conflict, where two demands on the string disagree; and a change, where an object is asked to become something it cannot be. Each snag is explained in one sentence written from the failure itself -- for example 'changing the letter-category of the letter z to its successor is not possible in xyz' -- which the commentary reports (\"Hit a snag: ...\"), Episodic Memory keeps with the English of the translated rule that failed, the Memory panel shows, and an answer's explanation quotes when it avoids the snag.\n\nA snag names the rule that ran aground, the translated rule, the bridges supporting the translation and the slippages taken along the way, so it is a specific account of an impasse rather than a report that progress has stopped. That account is what a snag description in Episodic Memory is built from (§4.7.2), and what lets a later answer be recognised as one that avoids the impasse.\n\nWhen a snag is recorded, the system discards every proposed bond, group and bridge, sets temperature to 100 and clamps it there, clamps the theme-pattern of the interpretation that ran aground, empties the Coderack, and posts the initial codelets afresh. The run restarts its perceptual work from the strings while holding on to what it has built and to the themes that characterise the failure. Repeated snags with overlapping themes trigger the jootsing mechanism. For example, if the system repeatedly tries and fails to translate a rule because the target string lacks a required letter, a snag records this pattern so jootsing can inhibit the stuck interpretation.",
     "metadata": {}
   },
   {
@@ -375,7 +375,7 @@
     "topic_key": "admin",
     "title": "Admin",
     "short_desc": "Destructive administrative operations: clear episodic memory, or fully reset all run data.",
-    "full_desc": "The Admin view is accessed from the hamburger menu and houses destructive operations that would be dangerous to place alongside everyday controls.\n\nClear Episodic Memory removes all stored answer and snag descriptions that Metacat has accumulated from past runs. After clearing, the engine can no longer 'remember' previous answers or get reminded of similar problems -- each subsequent run starts fresh. This does not affect the current run, run history, or any engine configuration. Useful when you want the system to approach a problem without bias from prior solutions.\n\nFull Reset (delete everything) completely resets Petacat to its initial state. It stops any running engine, deletes every run and its history, clears episodic memory, and resets all UI panels. Database seed data (slipnet nodes, codelet types, engine parameters, demo problems, and other configuration) is preserved -- only user-created run data is destroyed.\n\nBoth actions require confirmation and cannot be undone. See the Admin panel itself for the exact API endpoints called and the detailed technical notes for each operation.",
+    "full_desc": "The Admin view is accessed from the hamburger menu (the entry Admin (Metacat Mode)) and houses destructive operations that would be dangerous to place alongside everyday controls.\n\nClear Episodic Memory removes all stored answer and snag descriptions that Metacat has accumulated from past runs. After clearing, the engine can no longer 'remember' previous answers or get reminded of similar problems -- each subsequent run starts fresh. This does not affect the current run, run history, or any engine configuration. Useful when you want the system to approach a problem without bias from prior solutions.\n\nFull Reset (delete everything) completely resets Petacat to its initial state. It stops any running engine, deletes every run and its history, clears episodic memory, and resets all UI panels. Database seed data (slipnet nodes, codelet types, engine parameters, demo problems, and other configuration) is preserved -- only user-created run data is destroyed.\n\nBoth actions require confirmation and cannot be undone. They act on Metacat Mode's runs and Episodic Memory only; a Training Mode Session, with its Episodic Memory and its configuration, is removed only by deleting that Training Mode Session. The Admin view has two menu entries: Admin (Metacat Mode), described here, and Configurations (Metacat Mode and Training Mode), which holds the configuration tools (the configuration manager, History, and the Database tab); see Configuration. See the Admin panel itself for the exact API endpoints called and the detailed technical notes for each operation.",
     "metadata": {
       "key_concepts": [
         "memory",
@@ -475,7 +475,7 @@
     "topic_key": "session",
     "title": "Training Mode Session",
     "short_desc": "Training Mode: a named Training episode of many problems, each run over many seeds on every core, with its own Episodic Memory, kept in the database.",
-    "full_desc": "A Training Mode Session is a named, long-lived Training episode, and it belongs to Training Mode. You give it a list of letter-string analogy problems and a number of seeds per problem; it runs every problem over every seed on all the cores of the machine and keeps, for each problem, the distribution of answers Petacat reached. Where the Swarm group answers that question for one problem on the dashboard, a Training Mode Session answers it for dozens or thousands of problems and remembers the result. A Training Mode Session is also what Training-Mode learning will drive. Nothing in a Training Mode Session affects Metacat Mode.\n\nThis is not the episodic runs of the Review view. Those are Metacat Mode's recordings of runs made on the dashboard, each inheriting Metacat Mode's Episodic Memory. A Training Mode Session is a job that Petacat runs by itself, and it is stored in its own tables.\n\nA Training Mode Session is created Stopped. Start it to run it; Pause and Resume hold and release it; Stop saves it to the database and returns it to Stopped, and Start runs it again from where it was. Starting and Stopping take a moment, and in them the Training Mode Session takes no changes. You can add problems in any state but those two: start with 25, then add five more each time some finish. When nothing is left to run, a running Training Mode Session is idle and waits for more.\n\nEvery Training Mode Session has an Episodic Memory of its own, the same kind of structure as Metacat's but never shared with Metacat Mode. It is never cleared: it goes only when you delete the whole Training Mode Session.\n\nEvery run is exact: it is the same run that the Run button would make with that seed, started from the Training Mode Session's Episodic Memory as of the run's memory version, whether or not the parallel plugin is installed (without it the Training Mode Session runs one run at a time). That is run mode: a Training Mode Session uses the swarm across runs when the plugin is present and a serial child process otherwise, and each run is single-threaded inside its worker; using more than one core within a Training Mode Session's run is not yet available. The order in which problems are processed is not guaranteed: they are started roughly in the order they arrived so that they finish steadily, but do not depend on any order.\n\nA Training Mode Session writes to the database only when it is Stopped. A Stopped one is a record: creating it, renaming it, adding problems and deleting it are saved at once. A live one (Running or Paused) holds its runs, Episodic Memory merges, new problems, finished problems and edits in memory, and everything you see of it comes from memory; the view says 'Live', what the database holds (as of the last Stop) and what is not yet saved. Stop is the save point: it lets runs in flight finish for a short time, then writes everything in one step (its problems, runs, Episodic Memory and a snapshot of it, and its configuration's changes and current state), and if that fails the Training Mode Session goes back to Paused with nothing lost, so you can try again. If the server dies, everything since the last Stop is lost. After a server restart every Training Mode Session is Stopped; when you start it, the Episodic Memory and the configuration are loaded as the Stop saved them (nothing is replayed, and the configuration is checked against its stored hash) and problems resume at the seeds not yet stored. Because runs are deterministic the result is the same. A problem's number is its place in its Training Mode Session (1, 2, 3 ...), and it is the same whether the Training Mode Session is live or stored.\n\nThe left column lists the Training Mode Sessions, newest first, with a line about the cores. The right side shows the selected Training Mode Session: its settings, its error policy, its totals and controls, a box to add problems, the table of problems and a tab for the Training Mode Session's Episodic Memory.",
+    "full_desc": "A Training Mode Session is a named, long-lived Training episode, and it belongs to Training Mode. You give it a list of letter-string analogy problems and a number of seeds per problem; it runs every problem over every seed on all the cores of the machine and keeps, for each problem, the distribution of answers Petacat reached. Where the Swarm group answers that question for one problem on the dashboard, a Training Mode Session answers it for dozens or thousands of problems and remembers the result. A Training Mode Session is also what Training-Mode learning will drive. Nothing in a Training Mode Session affects Metacat Mode.\n\nThis is not the episodic runs of the Review view. Those are Metacat Mode's recordings of runs made on the dashboard, each inheriting Metacat Mode's Episodic Memory. A Training Mode Session is a job that Petacat runs by itself, and it is stored in its own tables.\n\nA Training Mode Session is created Stopped. Start it to run it; Pause and Resume hold and release it; Stop saves it to the database and returns it to Stopped, and Start runs it again from where it was. Starting and Stopping take a moment, and in them the Training Mode Session takes no changes. You can add problems in any state but those two: start with 25, then add five more each time some finish. When nothing is left to run, a running Training Mode Session is idle and waits for more.\n\nEvery Training Mode Session has an Episodic Memory of its own, the same kind of structure as Metacat's but never shared with Metacat Mode. It is never cleared: it goes only when you delete the whole Training Mode Session.\n\nEvery run is exact: it is the same run that the Run button would make with that seed, started from the Training Mode Session's Episodic Memory as of the run's memory version, whether or not the parallel plugin is installed (without it the Training Mode Session runs one run at a time). That is run mode: a Training Mode Session uses the swarm across runs when the plugin is present and a serial child process otherwise, and each run is single-threaded inside its worker; using more than one core within a Training Mode Session's run is not yet available. The order in which problems are processed is not guaranteed: they are started roughly in the order they arrived so that they finish steadily, but do not depend on any order.\n\nA Training Mode Session writes to the database only when it is Stopped. A Stopped one is a record: creating it, renaming it, adding problems and deleting it are saved at once. A live one (Running or Paused) holds its runs, Episodic Memory merges, new problems, finished problems and edits in memory, and everything you see of it comes from memory; the view says 'Live', what the database holds (as of the last Stop) and what is not yet saved. Stop is the save point: it lets runs in flight finish for a short time, then writes everything in one step (its problems, runs, Episodic Memory and a snapshot of it, and its configuration's changes and current state), and if that fails the Training Mode Session goes back to Paused with nothing lost, so you can try again. If the server dies, everything since the last Stop is lost. After a server restart every Training Mode Session is Stopped; when you start it, the Episodic Memory and the configuration are loaded as the Stop saved them (nothing is replayed, and the configuration is checked against its stored hash) and problems resume at the seeds not yet stored. Because runs are deterministic the result is the same. A problem's number is its place in its Training Mode Session (1, 2, 3 ...), and it is the same whether the Training Mode Session is live or stored.\n\nThe left column lists the Training Mode Sessions, newest first, with a line about the cores. The right side shows the selected Training Mode Session: its settings, its error policy, its totals and controls, and three tabs. Problems has a box to add problems and the table of problems. Memory shows the Training Mode Session's Episodic Memory. Configuration shows its own evolving configuration, from its Starting Conceptual State to now. Delete asks you to type the Training Mode Session's name exactly, because deleting it removes its Episodic Memory and its configuration with it.",
     "metadata": {}
   },
   {
@@ -483,7 +483,7 @@
     "topic_key": "session_new",
     "title": "Training Mode Session: New session",
     "short_desc": "Creates a Training Mode Session from a name, its settings, an error policy and a list of problems.",
-    "full_desc": "Name is required. The settings (seeds per problem, first seed, max codelets per run, parameter overrides and backend) are fixed once the Training Mode Session is created, because they decide what a run is; the error policy can be changed later. Every Training Mode Session has its own Episodic Memory; there is no setting for it. A new Training Mode Session is Stopped: press Start in its view to run it.\n\nMax codelets per run is the most codelets any one run may execute; a run that reaches it gives up and is counted as 'gave up at max codelets'.\n\n'Use the dashboard's parameter overrides' applies the engine-parameter changes you have made in Run Controls to every run. They are recorded with the Training Mode Session, so it keeps running with them even if you later change the dashboard.\n\nBackend is the numeric backend every run uses. Leave it on the default unless you are comparing backends.\n\nThe problems come from the text box, from a file you upload (.txt, .md, .csv or .json, read in your browser), or from the demo problems. The preview says how many problems were found, how many lines were rejected (open the list to see which and why) and how many exact duplicates were dropped, and the total number of runs. Nothing is sent until you press Create. A very long list is sent in several requests to stay within the server's limit.",
+    "full_desc": "Name is required. The settings (seeds per problem, first seed, max codelets per run, parameter overrides and backend) are fixed once the Training Mode Session is created, because they decide what a run is; the error policy can be changed later. Every Training Mode Session has its own Episodic Memory; there is no setting for it. A new Training Mode Session is Stopped: press Start in its view to run it. Its Starting Conceptual State is a copy of the global configuration, unless you opened this form from the configuration manager's 'New session from this configuration', which names the configuration it copies. From then on the Training Mode Session's configuration is its own.\n\nMax codelets per run is the most codelets any one run may execute; a run that reaches it gives up and is counted as 'gave up at max codelets'.\n\n'Use the dashboard's parameter overrides' applies the engine-parameter changes you have made in Run Controls to every run. They are recorded with the Training Mode Session, so it keeps running with them even if you later change the dashboard.\n\nBackend is the numeric backend every run uses. Leave it on the default unless you are comparing backends.\n\nThe problems come from the text box, from a file you upload (.txt, .md, .csv or .json, read in your browser), or from the demo problems. The preview says how many problems were found, how many lines were rejected (open the list to see which and why) and how many exact duplicates were dropped, and the total number of runs. Nothing is sent until you press Create. A very long list is sent in several requests to stay within the server's limit.",
     "metadata": {}
   },
   {
@@ -555,7 +555,7 @@
     "topic_key": "session_external_route",
     "title": "Training Mode Session: The external route",
     "short_desc": "Changes a Training Mode Session's configuration from outside Petacat, with one batch of ops.",
-    "full_desc": "The external route is the change API scoped to one Training Mode Session: POST /api/training-mode/sessions/{id}/changes takes the same batch as POST /api/configurations/{id}/changes (source, actor, note, base_version, base_mode, on_op_failure, dry_run and a list of ops) with the source set to 'external' unless the batch names another. It is how a program outside Petacat does Training-Mode learning: it reads the Training Mode Session's results and Episodic Memory, works out what the configuration should become, and sends the change. Nothing limits what it may change: any node, link, parameter, codelet body or other aspect of the Training Mode Session's configuration is open to it, exactly as it is to the in-worker learner and the Admin view. Advisories on the report say when a change looks unusual, and never refuse it.\n\nWhat the route does depends on the Training Mode Session's state. Running or Paused: the batch is accepted into memory, takes the next version, reaches every run started afterward (never one already running), and the report says 'persisted: false'; it is written to the database at the next Stop. Stopped: the batch is written at once ('persisted: true') and Start loads it. Starting or Stopping: the answer is 409 'busy'; try again in a moment. Other refusals are a malformed or unparseable batch (400 or 422), a stale base version when base_mode is 'strict' (409 'stale'), and an insert whose key exists (409 'key_exists'). A dry run reports what would change and writes nothing. Metacat Mode's configuration is never reached by this route.\n\nThe Training Mode Session's journal (GET .../journal) records every batch with its source, actor and the run that caused it, entries held in memory are labelled 'not yet saved', and the configuration at any version can be read (GET .../configuration?version=) or compared with another (GET .../configuration/diff?from=&to=).",
+    "full_desc": "The external route is the change API scoped to one Training Mode Session: POST /api/training-mode/sessions/{id}/changes takes the same batch as POST /api/configurations/{id}/changes (source, actor, note, base_version, base_mode, on_op_failure, dry_run and a list of ops) with the source set to 'external' unless the batch names another. Unlike the general route, base_version is required here: an integer revision, or 'head' for the Training Mode Session's current version; a batch without it is refused with 400. It is how a program outside Petacat does Training-Mode learning: it reads the Training Mode Session's results and Episodic Memory, works out what the configuration should become, and sends the change. Nothing limits what it may change: any node, link, parameter, codelet body or other aspect of the Training Mode Session's configuration is open to it, exactly as it is to the in-worker learner and the Admin view. Advisories on the report say when a change looks unusual, and never refuse it.\n\nWhat the route does depends on the Training Mode Session's state. Running or Paused: the batch is accepted into memory, takes the next version, reaches every run started afterward (never one already running), and the report says 'persisted: false'; it is written to the database at the next Stop. Stopped: the batch is written at once ('persisted: true') and Start loads it. Starting or Stopping: the answer is 409 'busy'; try again in a moment. Other refusals are a malformed or unparseable batch (400 or 422), a stale base version when base_mode is 'strict' (409 'stale'), and an insert whose key exists (409 'key_exists'). A dry run reports what would change and writes nothing. Metacat Mode's configuration is never reached by this route.\n\nThe Training Mode Session's journal (GET .../journal) records every batch with its source, actor and the run that caused it, entries held in memory are labelled 'not yet saved', and the configuration at any version can be read (GET .../configuration?version=) or compared with another (GET .../configuration/diff?from=&to=).",
     "metadata": {}
   },
   {
@@ -563,8 +563,13 @@
     "topic_key": "session_learning_sources",
     "title": "Training Mode Session: Training-Mode learning sources",
     "short_desc": "The three ways a Training Mode Session's configuration changes: the in-worker learner, the external route and the Admin view.",
-    "full_desc": "A Training Mode Session's configuration starts as its Starting Conceptual State and is changed by Training-Mode learning, which has three sources. The in-worker learner is code that runs inside Petacat after each run and sends a batch to the change API (Petacat provides the seam; an in-worker learner itself is a separate piece of work). The external route is the same API reached over HTTP from a program outside Petacat. The Admin view is a person editing the Training Mode Session's configuration by hand in the configuration manager. All three use the one change API, so they may change exactly the same things, with no caps, no protected nodes and no drift limits, and each batch is recorded in the Training Mode Session's journal with its source ('learner', 'external' or 'admin').\n\nThe only protection is the Training Mode Session's Episodic Memory: no source can edit or clear it, and it goes only when the whole Training Mode Session is deleted. Episodic Memory is also used by Metacat Mode, where it is Metacat-Mode learning and belongs to a different, global configuration that no Training Mode source can reach.\n\nWhen a change lands, a batch applied to a live Training Mode Session reaches the runs started after it and none already running. Each run records the configuration version and Training episode version it used, so a run can always be read under the configuration it ran with.",
-    "metadata": {}
+    "full_desc": "A Training Mode Session's configuration starts as its Starting Conceptual State and is changed by Training-Mode learning, which has three sources. The in-worker learner is code that runs inside Petacat after each run and sends a batch to the change API (Petacat provides the seam; an in-worker learner itself is a separate piece of work). The external route is the same API reached over HTTP from a program outside Petacat. The Admin view is a person editing the Training Mode Session's configuration by hand in the configuration manager, the editors, the Database tab or Edit all. All three use the one change API, so they may change exactly the same things, with no caps, no protected nodes and no drift limits, and each batch is recorded in the Training Mode Session's journal with its source ('learner', 'external' or 'admin').\n\nThe only protection is the Training Mode Session's Episodic Memory: no source can edit or clear it, and it goes only when the whole Training Mode Session is deleted. Episodic Memory is also used by Metacat Mode, where it is Metacat-Mode learning and belongs to a different, global configuration that no Training-Mode source can reach: the global configuration refuses the sources 'learner' and 'external', and is changed only by the Admin view, Import, Reset and Restore.\n\nWhen a change lands, a batch applied to a live Training Mode Session reaches the runs started after it and none already running. Each run records the configuration version and Training episode version it used, so a run can always be read under the configuration it ran with. The Configuration tab of the Training Mode Session shows the whole sequence.",
+    "metadata": {
+      "key_concepts": [
+        "change_api",
+        "starting_conceptual_state"
+      ]
+    }
   },
   {
     "topic_type": "component",
@@ -629,15 +634,14 @@
     "topic_type": "component",
     "topic_key": "configuration",
     "title": "Configuration",
-    "short_desc": "The thirteen collections that make up Petacat's domain knowledge, each on its own tab, each editable: create, update and delete rows and the next run created uses them.",
-    "full_desc": "The Configuration view is reached from the hamburger menu. Petacat keeps its domain knowledge in the database rather than in code -- the Slipnet's concepts and links, the codelet types and their Python bodies, the engine's parameters and formula coefficients, the theme dimensions, the posting rules, the codelet patterns, the commentary templates, the demo problems, the Slipnet grid layout and the help topics -- and this screen is where that knowledge is edited.\n\nThirteen collections, and every tab writes. Codelet patterns is the one without a tab of its own -- it is configured through the API and the seed file. The table-shaped ones -- slipnet nodes, slipnet links, urgency levels, formula coefficients, engine parameters, theme dimensions, posting rules, slipnet layout, demo problems and the enum tables -- edit in place: double-click a cell to change it, '+ Add' to create a row, and the cross at the end of a row to delete it, with a confirmation. A column holding a list or an object takes JSON, and a value that is not valid JSON is reported rather than sent. The two collections made of long text -- codelet types and help topics -- and the commentary templates each get a list beside an editor, so a codelet's execute_body, a topic's full description and a template's JSON have room to be worked on.\n\nA refusal is reported where it happened and says what kind of problem it is: a name already taken, a value out of range, a row that is gone. A collection that fails to load says so and offers to try again, which reads differently from a collection that is empty.\\n\\nA saved change is picked up by the next run created. The run in progress keeps the configuration it started with, so an edit made mid-run takes effect on the run after it.\n\nTwo collection-wide operations sit alongside the tabs. The Export and Import buttons carry the same thirteen collections as one JSON object, in the configuration's own order, which makes a configuration backup diffable and restorable in a single transaction. Nothing the application does writes the seed files; they change only by a committed development change.",
+    "short_desc": "Petacat's domain knowledge lives in the database: every collection is editable, every edit is journaled, and the next run uses it.",
+    "full_desc": "The Admin view, whose configuration editors are reached from the hamburger menu entry Configurations (Metacat Mode and Training Mode) (#/config), is where Petacat's domain knowledge is examined and changed. That knowledge lives in the database, not in code: the Slipnet's concepts and links, the codelet types and their Python bodies, the engine's parameters and formula coefficients, the theme dimensions, the posting rules, the codelet patterns, the commentary templates, the demo problems, the Slipnet grid layout and the help topics. The database is the source of truth. The seed files, the Metacat Standard Configuration, are loaded into an empty database once and never again.\n\nTabs: Configurations (the manager: every configuration, compared and opened), Status and reset, one tab for each collection (Slipnet Nodes, Slipnet Links, Codelet Types, Engine Params, Urgency Levels, Formula Coefficients, Demo Problems, Enum Tables, Theme Dimensions, Posting Rules, Commentary Templates, Slipnet Layout, Help Topics), History, and Database (all modes). The chip above the tabs says which configuration is open: the global one, which Metacat Mode uses, or a Training Mode Session's. An information banner says how many rows the open configuration differs from the Metacat Standard Configuration; it never blocks anything.\n\nThe table-shaped collections edit in place: double-click a cell to change it, '+ Add' to create a row, and the cross at the end of a row to delete it, with a confirmation. A column holding a list or an object takes JSON. The two collections made of long text, codelet types and help topics, and the commentary templates each get a list beside an editor. Every save is a batch through the change API and one entry of the journal, so it is validated whole before anything is written: a refusal says what kind of problem it is and where (a name already taken, a reference to nothing, code that does not compile). Parameter ranges are advisory.\n\nAn edit to the global configuration takes effect at the next run, in either mode; a run already started keeps the configuration it began with. Nothing the application does writes the seed files; they change only through a committed development change. Export and Import carry the collections as one JSON object, and Import is one journal entry that can be undone.",
     "metadata": {
       "key_concepts": [
-        "slipnet",
-        "coderack",
-        "themespace",
-        "commentary",
-        "problem_input"
+        "metacat_standard_configuration",
+        "configuration_manager",
+        "configuration_journal",
+        "change_api"
       ]
     }
   },
@@ -725,7 +729,7 @@
     "topic_key": "run_parameters",
     "title": "Run Parameters",
     "short_desc": "The engine settings that are fixed before a run starts and cannot change while it thinks.",
-    "full_desc": "Most entries in the engine's parameter set are read while it thinks: thresholds that decide what reaches the Temporal Trace, the periods governing clamps and settling, the Coderack's capacity and urgency resolution, the Themespace's boost, decay and spread, and the update cadence.\n\nEach can be set for one run. Omitted parameters keep the global default, and an unknown name or an out-of-range value is refused rather than ignored \u2014 ignoring a typo would give you a run at the default while the record said otherwise. Because they are fixed at creation, changing one starts a new run rather than altering the loaded one.\n\nThe whole resolved set is stored with a Normal or Audit run, not just what you changed. That is deliberate: if only your overrides were kept, reading them later would mean reading them against whatever the defaults had become, and the run's record would quietly change meaning.\n\nNot every engine setting is offered. Display timings and a handful the port reads nowhere are excluded, because a control that changes nothing is worse than no control. Three parameters that name Slipnet nodes are shown read-only: a wrong node name is not a typo a run recovers from.\n\nDistinct from the derived values shown beside them, which are outputs rather than settings \u2014 which numeric backend ran, how the Coderack sharded, the config and memory hashes.",
+    "full_desc": "Most entries in the engine's parameter set are read while it thinks: thresholds that decide what reaches the Temporal Trace, the periods governing clamps and settling, the Coderack's capacity and urgency resolution, the Themespace's boost, decay and spread, and the update cadence.\n\nEach can be set for one run. Omitted parameters keep the global default, and an unknown name or an out-of-range value is refused rather than ignored — ignoring a typo would give you a run at the default while the record said otherwise. Because they are fixed at creation, changing one starts a new run rather than altering the loaded one.\n\nThe whole resolved set is stored with a Normal or Audit run, not just what you changed. That is deliberate: if only your overrides were kept, reading them later would mean reading them against whatever the defaults had become, and the run's record would quietly change meaning.\n\nNot every engine setting is offered. Display timings and a handful the port reads nowhere are excluded, because a control that changes nothing is worse than no control. Three parameters that name Slipnet nodes are shown read-only: a wrong node name is not a typo a run recovers from.\n\nDistinct from the derived values shown beside them, which are outputs rather than settings — which numeric backend ran, how the Coderack sharded, the config and memory hashes.",
     "metadata": {
       "related": [
         "persistence_mode",
@@ -760,6 +764,111 @@
         "coderack"
       ],
       "dissertation_ref": ""
+    }
+  },
+  {
+    "topic_type": "component",
+    "topic_key": "metacat_standard_configuration",
+    "title": "The Metacat Standard Configuration",
+    "short_desc": "The seed files, loaded once into an empty database; after that the database is the source of truth.",
+    "full_desc": "The Metacat Standard Configuration is the set of files in seed_data/: the Slipnet's nodes and links, the codelet types and their bodies, the engine parameters, the urgency levels, the formula coefficients, the theme dimensions, the posting rules, the commentary templates, the demo problems, the Slipnet layout and the enum tables. It is Metacat's own domain knowledge as Petacat ports it.\n\nThe files are read once, when the server starts against an empty database, and written into the database in one step recorded as the first entry of the journal. From then on the database is the one source of truth: the engine is handed whatever the database holds, and nothing reads the files again. Editing a file does not change a running installation, and clearing the database is a development move that makes the next start load the files again.\n\nNothing the application does writes the seed files: not the Admin view, not Import, not a reset, and not any Training-Mode learning source. They change only through a committed development change, made to fix a fidelity bug in Petacat and naming the rows it affects.\n\nThe Admin view can still show how a configuration differs from the Metacat Standard Configuration (the banner and the Status and reset tab count the differing rows) and can put rows, or everything, back to it with Reset to the Metacat Standard Configuration or Restore selected. A reset is an ordinary journal entry and can be undone.",
+    "metadata": {
+      "key_concepts": [
+        "configuration_manager",
+        "configuration_journal"
+      ]
+    }
+  },
+  {
+    "topic_type": "component",
+    "topic_key": "starting_conceptual_state",
+    "title": "The Starting Conceptual State",
+    "short_desc": "The whole configuration a Training Mode Session starts with: its base plus any creation overrides.",
+    "full_desc": "The Starting Conceptual State is the whole configuration a Training Mode Session starts with: the base it was copied from, plus any overrides given when it was created. The base is the global configuration (the one Metacat Mode uses), the Metacat Standard Configuration, or another Training Mode Session's configuration, and in testing it is often a replica of the Metacat Standard Configuration. The overrides are ordinary change API operations, recorded in the session's journal as one entry with source 'creation'.\n\nThe Starting Conceptual State is version 0 of the session's configuration. Every later version is a change made by one of the Training-Mode learning sources, and Training-Mode learning may change any aspect of it: nodes, links, parameters, codelet bodies, formula coefficients, posting rules, templates and the rest. The session keeps its base as a stored snapshot, so version 0 can always be read back, compared with a later version, and restored.\n\nThe copy is made once, at creation. After that the session's configuration and the global configuration are unrelated: changing the global configuration in the Admin view never changes a session, and nothing in a session ever changes the global configuration or Metacat Mode's Episodic Memory.\n\nIn the Admin view, 'New session from this configuration' on the Configurations tab opens the creation form with the base chosen.",
+    "metadata": {
+      "key_concepts": [
+        "session",
+        "change_api"
+      ]
+    }
+  },
+  {
+    "topic_type": "component",
+    "topic_key": "change_api",
+    "title": "The change API",
+    "short_desc": "The one door to a configuration: a batch of operations, validated whole and recorded as one journal entry.",
+    "full_desc": "Every change to a configuration, from any source, goes through the change API: POST /api/configurations/{id}/changes for any configuration, and POST /api/training-mode/sessions/{id}/changes for a Training Mode Session's (the external route). The Admin view's editors, Import, Reset, the Database tab and Edit all are all clients of it, so they all follow the same rules.\n\nA batch has a source ('admin', 'external', 'learner', 'import', 'restore', 'reset' or 'creation'), an actor, a note, and a list of operations. The operations are either generic (insert, update or delete a row of a table, addressed by its natural key) or convenience operations that expand into generic ones: for example add_node, remove_node with its splice option, rename_node, merge_nodes, add_link, set_param, adjust_param, set_coefficient, set_codelet_body, move_layout and rebind_role. GET /api/configurations/{id}/schema lists every table, column and operation.\n\nThe whole batch is checked before anything is written. A batch that would leave a name pointing at nothing, a value the engine cannot read, or code that does not compile is refused with an error that names the operation, the table, the key and the line and column of a code error. Parameter ranges and similar oddities come back as advisories on the report and never refuse a batch. An 'expect' on an update says what the row must hold now; base_version and base_mode ('strict' or 'rebase') decide what happens when the configuration has changed since you read it; on_op_failure ('abort' or 'skip') decides whether one failing operation cancels the batch; dry_run reports what would change and writes nothing.\n\nThe report lists what was applied, skipped, cascaded to dependent rows, left dangling or affected, any effect on the run-start check, and the new version. The batch is written as one entry of the journal.\n\nThere are no caps, no protected nodes and no drift limits: every aspect of a configuration can be changed by every Training-Mode learning source. The one rule about sources is that the global configuration, which belongs to Metacat Mode, refuses the Training-Mode sources 'learner' and 'external'. A Training Mode Session's Episodic Memory is not part of any configuration and cannot be reached by a batch.\n\nWhere a change lands: a global change takes effect at the next run, in either mode; a run already started keeps the configuration it began with. A change to a live Training Mode Session is held in memory and reaches the runs started afterwards.",
+    "metadata": {
+      "key_concepts": [
+        "configuration_journal",
+        "session_learning_sources"
+      ]
+    }
+  },
+  {
+    "topic_type": "component",
+    "topic_key": "configuration_journal",
+    "title": "History: the journal",
+    "short_desc": "The one record of every configuration change, with undo, restore and the story of a name.",
+    "full_desc": "The journal is the single record of changes to configurations. Every accepted batch, from every source, is one entry holding the batch as proposed, the operations as resolved, the previous values of the rows it touched, the source, the actor, the channel, the note, the new version, and a hash of the resulting configuration. Entries are only appended: nothing edits or deletes one. The journal is kept apart from the Audit persistence mode, which records Metacat Mode runs.\n\nThe History tab of the Admin view lists a configuration's entries, newest first, with filters for source, actor, table and group. Open an entry to see what it proposed, what it resolved to and what it replaced. For a live Training Mode Session the entries it holds only in memory are listed too, marked 'not yet saved'; they are written at the next Stop.\n\nUndo is a new entry, never a rewrite: it applies the inverse of a batch, or of a whole group (for example one Edit all), as a new batch with source 'restore'. A node's History, in the Slipnet Nodes editor, shows every entry that touched it and can restore a deleted node with the rows that depended on it. Deleting a node first shows what would be cascaded, left dangling or affected.\n\nAny past version can be read back: GET /api/configurations/{id}/as-of reads a configuration at a version or a time. 'Verify journal' replays the journal and checks that it reproduces the stored configuration and its hash.\n\nThe 'names that no longer resolve' panel, in a Training Mode Session's Memory tab and in Metacat Mode's Episodic Memory view, lists names an Episodic Memory refers to that the current configuration lacks, each with its story from the journal (GET /api/journal/where-did-name-go). Episodic Memory keeps the name; the journal says what became of the node.",
+    "metadata": {
+      "key_concepts": [
+        "configuration_manager",
+        "change_api"
+      ]
+    }
+  },
+  {
+    "topic_type": "component",
+    "topic_key": "configuration_manager",
+    "title": "The configuration manager",
+    "short_desc": "The Admin view's Configurations tab: every configuration, compared, opened, frozen and used to start sessions.",
+    "full_desc": "The Admin view works on one configuration at a time. The Configurations tab, its first tab, lists them all: the global configuration, which Metacat Mode uses, and one configuration for each Training Mode Session. Each row shows the name, a mode badge, the version, whether it is frozen, how many rows it differs from the Metacat Standard Configuration, its last change, and whether a session's configuration is Live (in memory) or Stored (as of last stop).\n\nOpen makes that configuration the one every other tab shows and edits; a chip above the tabs always says which one is open, its mode and whether it is live. Compare picks any two configurations, or one and the Metacat Standard Configuration, and lists the differing rows; selected rows can be applied to the other side, with a dry-run preview and a reason. History opens the journal. Freeze stops accidental changes: edits that name a frozen configuration are skipped by 'all'. 'New session from this configuration' starts a Training Mode Session whose Starting Conceptual State is a copy of it. A Training Mode Session's own Configuration tab links here ('#/admin?configuration=<id>').\n\nEdits take effect at the next run in either mode. For a Training Mode Session that is Starting or Stopping the tabs are read-only for a moment. Enum tables and Help topics belong to the engine's shared vocabulary and exist only for the global configuration.\n\nThe scope picker in the chip chooses where an edit goes: This configuration, Chosen configurations or All configurations (see Edit all). The Status and reset tab shows how the open configuration differs from the Metacat Standard Configuration, compares, verifies the journal and resets after a typed confirmation.",
+    "metadata": {
+      "key_concepts": [
+        "metacat_standard_configuration",
+        "configuration_journal",
+        "edit_scope"
+      ]
+    }
+  },
+  {
+    "topic_type": "component",
+    "topic_key": "edit_scope",
+    "title": "Edit all: the scope picker",
+    "short_desc": "Send one edit to this configuration, a chosen few, or all of them, with a preview of what each would do.",
+    "full_desc": "The scope picker in the configuration chip decides where an edit in any editor goes. 'This configuration' writes to the open one and nothing else. 'Chosen configurations' shows a checklist; 'All configurations' sends the edit to every configuration that is not frozen. When the scope is wider than one, saving an edit opens a preview instead of writing.\n\nThe preview gives each target a result: it applies; there is nothing to change; the row differs from what you edited (tick Overwrite to apply anyway); the row or a node it needs is missing (Apply the rest runs the operations that can run); the configuration changed since the preview (Preview again); or it was skipped, because it is frozen or is Starting or Stopping. 'All or nothing' holds back every target if any would fail. Commit takes a reason, and writes one entry to each target's journal, all sharing one group. A live Training Mode Session takes the edit into memory, shown as Live (in memory), and saves it at its next Stop. Undo this group, on the result, reverses it in each stored target, and in a live one after it is stopped.\n\nEdit all is how a person edits the global configuration and some sessions in one step. It uses source 'admin' on every target; the global configuration is changed only by that source, and Metacat Mode's results are unaffected until its next run.",
+    "metadata": {
+      "key_concepts": [
+        "configuration_manager",
+        "change_api"
+      ]
+    }
+  },
+  {
+    "topic_type": "component",
+    "topic_key": "database_tab",
+    "title": "Database (all modes)",
+    "short_desc": "The Admin view's tab for browsing any table and editing the ones that are safe to edit, with a read-only SQL box.",
+    "full_desc": "The Database tab shows every table in the database, in both modes, each marked with its class. Configuration tables are edited through the change API, so each edit is a journal entry (channel 'admin_database'); the edit is checked like any other batch and has a dry run. Content tables (the help topics) are edited directly. Runtime tables (runs and what they recorded) can be edited only in expert mode, after typing the table's name, and never for a run that is initialised, running or paused. The journal tables are read-only: nothing edits the record of changes. Training Mode Session tables are managed by the session service and are shown but not edited, and a session's Episodic Memory, its merges and snapshot, and the Episodic Memory columns of its runs cannot be edited at all; a session's Episodic Memory goes only when the whole Training Mode Session is deleted, and a session row is deleted only through the session's own Delete.\n\nA session's tables show what the database holds, as of that session's last Stop; a session that is running is not shown as it is now. The SQL box runs one SELECT or WITH statement at a time and nothing else.",
+    "metadata": {
+      "key_concepts": [
+        "configuration_journal",
+        "change_api"
+      ]
+    }
+  },
+  {
+    "topic_type": "component",
+    "topic_key": "session_configuration_tab",
+    "title": "Training Mode Session: Configuration tab",
+    "short_desc": "A Training Mode Session's configuration over its life: the Slipnet at any version, the timeline, comparisons and rows.",
+    "full_desc": "The Configuration tab is a Training Mode Session's window onto its own evolving configuration, read-only. The Configuration version slider moves from version 0, the Starting Conceptual State, to the current version, and everything below follows it. The label says whether the read is Live (in memory), with the version the database holds and how many changes are unsaved, or Stored (as of last stop).\n\nSlipnet graph draws the Slipnet as it was at that version, so you can watch Training-Mode learning change it. Timeline lists the journal entries with their source ('learner', 'external' or 'admin'), actor, time, the counts of rows changed and a note, and Show moves the slider to a version. Compare versions lists the rows added, removed and changed between two versions. Table rows reads any table at the chosen version. A non-current version of a live session that has not been saved cannot be rebuilt and is refused.\n\nTo change the configuration, follow the link to the configuration manager, which opens the Admin view's configuration editors (menu entry Configurations (Metacat Mode and Training Mode)) on this session's configuration, or use the external route.",
+    "metadata": {
+      "key_concepts": [
+        "configuration_manager",
+        "session_learning_sources"
+      ]
     }
   }
 ]

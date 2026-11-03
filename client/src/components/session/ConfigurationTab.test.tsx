@@ -165,7 +165,7 @@ describe('ConfigurationTab: the version slider and the graph', () => {
   it('links to the configuration manager and offers no editing here', async () => {
     render(<ConfigurationTab session={session()} />)
     const link = await screen.findByTestId('edit-configuration-link')
-    await waitFor(() => expect(link).toHaveAttribute('href', '#/admin?configuration=9'))
+    await waitFor(() => expect(link).toHaveAttribute('href', '#/config?configuration=9'))
     expect(screen.queryByRole('button', { name: /^(Save|Add|Delete|Edit)/ })).not.toBeInTheDocument()
   })
 
@@ -240,5 +240,17 @@ describe('ConfigurationTab: the table rows', () => {
     expect(calls.some((c) => c.includes('/configuration?version=1&table=slipnet_node_defs'))).toBe(true)
     fireEvent.click(screen.getByRole('button', { name: 'Show current version' }))
     await waitFor(() => expect(screen.getAllByTestId('config-row')).toHaveLength(2))
+  })
+})
+
+describe('ConfigurationTab help (C11b)', () => {
+  it('has a ? for the tab, and the timeline has ?s for the learning sources and the external route', async () => {
+    render(<ConfigurationTab session={session()} />)
+    await screen.findByTestId('config-version-readout')
+    expect(screen.getByRole('button', { name: 'Show help for the Configuration tab' }).textContent).toBe('?')
+    fireEvent.click(screen.getByRole('tab', { name: 'Timeline' }))
+    await screen.findByTestId('configuration-timeline')
+    expect(screen.getByRole('button', { name: 'Show help for the Training-Mode learning sources' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Show help for the external route' })).toBeTruthy()
   })
 })

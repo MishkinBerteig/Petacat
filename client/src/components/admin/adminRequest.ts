@@ -263,5 +263,14 @@ export function makeAdminRequest(
 /** The requester an editor uses; it changes only when the configuration does. */
 export function useAdminRequest(configuration: number = GLOBAL_CONFIGURATION_ID): AdminRequest {
   const scope = useScopeRef()
-  return useMemo(() => makeAdminRequest(configuration, () => scope.current), [configuration, scope])
+  return useMemo(() => {
+    const inner = makeAdminRequest(configuration, () => scope.current)
+    // One place covers every editor and every scope: a write that succeeded tells the layout, which
+    // refreshes the difference banner and the header chip.
+    return (async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+      const result = await inner<T>(path, options)
+      if ((options.method ?? 'GET').toUpperCase() !== 'GET') scope.current?.written()
+      return result
+    }) as AdminRequest
+  }, [configuration, scope])
 }

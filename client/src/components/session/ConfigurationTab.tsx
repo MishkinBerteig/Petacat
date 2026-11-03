@@ -31,7 +31,7 @@ import type {
   SessionSlipnet,
 } from '@/types/sessionConfiguration';
 import { SlipnetGraphView, type SlipnetGraphData } from '../SlipnetGraphView';
-import { cardStyle, errorStyle, fmtInt, fmtTime, tableStyle, tdStyle, thStyle } from './shared';
+import { cardStyle, ControlHelp, errorStyle, fmtInt, fmtTime, tableStyle, tdStyle, thStyle } from './shared';
 
 export const LIVE_LABEL = 'Live (in memory)';
 export const STORED_LABEL = 'Stored (as of last stop)';
@@ -108,15 +108,16 @@ export function ConfigurationTab({ session }: { session: SessionSummary }) {
   return (
     <div data-testid="configuration-tab">
       <div className="text-xs text-muted" style={{ marginBottom: 6 }}>
+        <ControlHelp topic="session_configuration_tab" label="the Configuration tab" />
         This Training Mode Session&apos;s own configuration, which began as its Starting Conceptual State and changes through
         Training-Mode learning. It never affects Metacat Mode&apos;s global configuration. This tab is read-only; edit it in the{' '}
         <a
-          href={counts ? `#/admin?configuration=${counts.configuration_id}` : '#/admin'}
+          href={counts ? `#/config?configuration=${counts.configuration_id}` : '#/config'}
           data-testid="edit-configuration-link"
         >
           configuration manager
         </a>{' '}
-        (Admin view, opened on this session&apos;s configuration).
+        in the Admin view (menu entry Configurations (Metacat Mode and Training Mode)), opened on this session&apos;s configuration.
       </div>
       {error && (
         <div role="alert" style={errorStyle}>
@@ -322,6 +323,8 @@ function Timeline({
             </option>
           ))}
         </select>
+        <ControlHelp topic="session_learning_sources" label="the Training-Mode learning sources" />
+        <ControlHelp topic="session_external_route" label="the external route" />
         {journal && (
           <span className="text-xs text-muted" data-testid="timeline-count">
             {fmtInt(journal.total)} {journal.total === 1 ? 'entry' : 'entries'}, newest first

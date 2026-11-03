@@ -87,3 +87,20 @@ describe('ModeSwitch', () => {
     expect(screen.getByTestId('mode-switch')).toHaveAttribute('data-mode', 'training-mode')
   })
 })
+
+describe('ModeSwitch on the Configurations view', () => {
+  it('marks neither mode current, and either button still leaves for its mode', () => {
+    const onSelectView = vi.fn()
+    render(<ModeSwitch view="config" onSelectView={onSelectView} />)
+    for (const id of ['mode-metacat', 'mode-training-mode']) {
+      const b = screen.getByTestId(id)
+      expect(b).toHaveAttribute('aria-pressed', 'false')
+      expect(b).not.toHaveAttribute('aria-current')
+    }
+    expect(screen.getByTestId('mode-switch')).toHaveAttribute('data-mode', 'none')
+    fireEvent.click(screen.getByTestId('mode-metacat'))
+    expect(onSelectView).toHaveBeenLastCalledWith('dashboard')
+    fireEvent.click(screen.getByTestId('mode-training-mode'))
+    expect(onSelectView).toHaveBeenLastCalledWith('training-mode')
+  })
+})

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { describeApiError, listConfigurations, patchConfiguration } from '@/api/client'
 import type { ConfigurationSummary } from '@/types/configuration'
+import { ControlHelp } from '../session/shared'
 import { ConfigurationCompare } from './ConfigurationCompare'
 import { BADGE_COLORS, badgeMode, badgeText, METACAT_MODE, TRAINING_MODE } from './configurationLabels'
 
@@ -118,6 +119,7 @@ export function ConfigurationsTab({
             <option value={TRAINING_MODE}>{TRAINING_MODE}</option>
           </select>
         </label>
+        <ControlHelp topic="configuration_manager" label="the configuration manager" />
         <span className="text-xs text-muted">
           {items ? `${shown.length} of ${items.length} configurations` : 'Loading…'}
           {' '}A change to a configuration takes effect at the start of its next run.

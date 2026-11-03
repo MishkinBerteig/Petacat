@@ -267,10 +267,10 @@ export default function App() {
       {/* ---- Header ---- */}
       <div
         className="app-header"
-        data-mode={modeOfView(view)}
+        data-mode={view === 'config' ? 'configurations' : modeOfView(view)}
         // The mode's accent runs along the header's lower edge, so the mode can be
         // read without reading the switch.
-        style={{ borderBottom: `3px solid ${MODE_ACCENTS[modeOfView(view)]}` }}
+        style={{ borderBottom: `3px solid ${view === 'config' ? 'var(--border)' : MODE_ACCENTS[modeOfView(view)]}` }}
       >
         <HamburgerMenu activeView={view} onSelect={handleViewChange} disabled={isProcessing} />
         {view === 'dashboard' && <WindowsMenu />}
@@ -278,7 +278,7 @@ export default function App() {
         <ModeSwitch view={view} onSelectView={handleViewChange} disabled={isProcessing} />
         <span className="text-muted text-sm">
           {view === 'config' ? (
-            "Configuration — the global configuration Metacat Mode uses"
+            "Configurations — Metacat Mode's global configuration and each Training Mode Session's own. The chip below names the one open."
           ) : view === 'admin' ? (
             'Admin — the global configuration Metacat Mode uses'
           ) : view === 'review' ? (

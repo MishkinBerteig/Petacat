@@ -165,6 +165,7 @@ export function NewSessionForm({ configurationBase = null, limits, defaults, onC
       <div className="text-xs text-muted" style={{ marginTop: 4 }}>
         A Training Mode Session is a named episode: many problems, each over many seeds. The settings below are fixed once it
         is created. {configurationBase ? 'It never changes Metacat Mode.' : 'It copies the global configuration that Metacat Mode uses and never changes it.'}
+        <ControlHelp topic="starting_conceptual_state" label="the Starting Conceptual State" />
       </div>
 
       {configurationBase && (

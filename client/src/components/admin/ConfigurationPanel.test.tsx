@@ -157,3 +157,12 @@ describe('AdminLayout', () => {
     expect(screen.queryByText(/seed data/i)).toBeNull()
   })
 })
+
+describe('ConfigurationPanel help (C11b)', () => {
+  it('has a ? for the Metacat Standard Configuration beside the status heading', async () => {
+    serve()
+    render(<ConfigurationPanel />)
+    await screen.findByText('7')
+    expect(screen.getByRole('button', { name: 'Show help for the Metacat Standard Configuration' }).textContent).toBe('?')
+  })
+})

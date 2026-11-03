@@ -97,11 +97,11 @@ async function importConfiguration(file: File): Promise<Flash> {
 }
 
 /**
- * The configuration a link asks the Admin view to open: `#/admin?configuration=<id>` (the
+ * The configuration a link asks the Admin view to open: `#/config?configuration=<id>` (the
  * Training Mode Session's Configuration tab links here). Anything else is no request.
  */
 export function configurationFromHash(): number | null {
-  const match = window.location.hash.match(/^#\/admin\?(.*)$/)
+  const match = window.location.hash.match(/^#\/config\?(.*)$/)
   if (!match) return null
   const raw = new URLSearchParams(match[1]).get('configuration')
   if (raw === null || !/^\d+$/.test(raw)) return null
@@ -149,7 +149,7 @@ export function AdminLayout({ editNodeName, onClearEditNode }: AdminLayoutProps)
     setActiveTab(tab)
   }, [])
 
-  // A link to `#/admin?configuration=<id>` opens that configuration, also while this view is shown.
+  // A link to `#/config?configuration=<id>` opens that configuration, also while this view is shown.
   useEffect(() => {
     const onHash = () => {
       const id = configurationFromHash()
@@ -200,7 +200,7 @@ export function AdminLayout({ editNodeName, onClearEditNode }: AdminLayoutProps)
   }, [])
 
   return (
-    <ScopeProvider openId={openId}>
+    <ScopeProvider openId={openId} onWritten={bump}>
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {flash && (
         <div

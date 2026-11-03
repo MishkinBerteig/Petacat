@@ -249,8 +249,10 @@ async def post_changes(session_id: int, body: dict[str, Any]):
 
     The change API scoped to this one session (``POST /api/configurations/{id}/changes`` is the
     same function): the body is ``{source, actor, note, base_version, base_mode, on_op_failure,
-    dry_run, ops}`` and ``source`` defaults to ``external``.  Every learning source (the
-    in-worker learner, this route and the Admin view) may change anything, and no rule refuses
+    dry_run, ops}`` and ``source`` defaults to ``external``.  ``base_version`` is REQUIRED on this
+    route: an integer revision, or ``"head"`` for the session's current version; without it the
+    answer is 400 (``base_version must be an integer revision or "head"``).  Every learning source
+    (the in-worker learner, this route and the Admin view) may change anything, and no rule refuses
     a change.  By state: Running or Paused, the batch is accepted into memory and the report
     says ``persisted: false`` (written at Stop); Stopped, it is written at once
     (``persisted: true``); Starting or Stopping, 409 ``busy``.  A refusal is ``{ok: false,

@@ -1,5 +1,6 @@
 import type { ConfigurationSummary } from '@/types/configuration'
 import { useScope } from './editScope'
+import { ControlHelp } from '../session/shared'
 import { BADGE_COLORS, badgeMode, chipText, fallbackChipText, sourceLabel } from './configurationLabels'
 
 /**
@@ -59,6 +60,7 @@ export function ConfigurationChip({
           {sc && <option value="all">All configurations</option>}
         </select>
       </label>
+      <ControlHelp topic="edit_scope" label="the scope picker (Apply to)" />
       {sc && pick === 'all' && (
         <span data-testid="scope-all-note" style={{ fontSize: 10 }}>
           Every configuration that is not frozen; frozen ones are skipped and listed in the preview.

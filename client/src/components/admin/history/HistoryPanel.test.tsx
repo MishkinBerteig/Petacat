@@ -125,3 +125,13 @@ describe('HistoryPanel', () => {
     expect((await screen.findAllByRole('alert'))[0].textContent).toContain('Could not load the History')
   })
 })
+
+describe('HistoryPanel help (C11b)', () => {
+  it('has a ? for the journal and one for the change API', async () => {
+    serve({ 'GET /journal': () => PAGE([entry(1)]) })
+    render(<HistoryPanel configurationId={1} />)
+    await screen.findAllByTestId('history-entry')
+    expect(screen.getByRole('button', { name: 'Show help for the configuration journal' }).textContent).toBe('?')
+    expect(screen.getByRole('button', { name: 'Show help for the change API' }).textContent).toBe('?')
+  })
+})

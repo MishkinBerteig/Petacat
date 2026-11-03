@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { describeApiError, listConfigurations } from '@/api/client'
 import type { ConfigurationSummary } from '@/types/configuration'
+import { ControlHelp } from '../../session/shared'
 import { EntryDetail } from './EntryDetail'
 import { getJournal, undoBatch, undoGroup } from './historyApi'
 import { PendingBadge, boxStyle, countsText, errorStyle, smallButton, whenText } from './shared'
@@ -84,8 +85,10 @@ export function HistoryPanel({ configurationId, onChanged }: Props) {
 
   return (
     <div data-testid="history-panel" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <div className="text-xs text-muted">
+      <div className="text-xs text-muted" style={{ display: 'flex', alignItems: 'center' }}>
         The journal is the one record of changes: every edit, restore and undo is an entry, and nothing is rewritten.
+        <ControlHelp topic="configuration_journal" label="the configuration journal" />
+        <ControlHelp topic="change_api" label="the change API" />
       </div>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', fontSize: 11 }}>
         {configurationId === undefined && (

@@ -19,7 +19,7 @@ describe('HamburgerMenu', () => {
       .getAllByRole('button')
       .map((b) => b.textContent?.replace('✓', '').trim())
       .filter((t) => t && t !== '☰')
-    expect(labels).toEqual(['Run Dashboard (Metacat Mode)', 'Review (Metacat Mode)', 'Training Mode', 'Configuration (Metacat Mode)', 'Admin (Metacat Mode)'])
+    expect(labels).toEqual(['Run Dashboard (Metacat Mode)', 'Review (Metacat Mode)', 'Training Mode', 'Configurations (Metacat Mode and Training Mode)', 'Admin (Metacat Mode)'])
   })
 
   it('selects the Training Mode view', () => {
@@ -33,6 +33,6 @@ describe('HamburgerMenu', () => {
   it('marks the active view', () => {
     render(<HamburgerMenu activeView="training-mode" onSelect={() => {}} />)
     fireEvent.click(screen.getByRole('button', { name: 'Navigation menu' }))
-    expect(screen.getByRole('button', { name: /Training Mode/ })).toHaveTextContent('✓')
+    expect(screen.getAllByRole('button').find((b) => b.textContent?.replace('✓', '').trim() === 'Training Mode')).toHaveTextContent('✓')
   })
 })

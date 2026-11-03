@@ -69,16 +69,20 @@ Episodic Memory is a very minimal kind of learning: **Metacat-Mode learning**.
 **Training Mode** is every extension since v1.2 that makes Petacat a novel
 machine-learning platform:
 
-- **Training Mode Sessions** (today): named, database-backed Training episodes of
+- **Training Mode Sessions**: named, database-backed Training episodes of
   many problems, each run over many seeds, extendable while they run, each with its own
-  Episodic Memory that is never cleared. A Training Mode Session is created Stopped, then started, paused,
-  resumed, stopped, started again and deleted.
+  Episodic Memory that is never cleared and its own evolving configuration. A Training Mode Session
+  is created Stopped, then started, paused, resumed, stopped, started again and deleted.
   See [Training Mode Session](#training-mode-session-many-problems-on-every-core) and `/api/training-mode/sessions`.
-- **Planned, not yet built:** a Training Mode Session's own evolving Slipnet, learners, and an
-  external delta route.
+- **A configuration of its own.** Each Training Mode Session starts from its
+  **Starting Conceptual State**, a copy of a base configuration taken once at creation, and
+  Training-Mode learning changes it through three learning sources (the in-worker learner seam, the
+  external route and the Admin view). See
+  [The configuration, the journal and the change API](#the-configuration-the-journal-and-the-change-api).
+- **Not built:** the in-worker learner itself. Petacat provides the seam it will use, a call to the
+  change API after each run; the in-worker learner is a separate piece of work.
 
-A Training Mode Session copies the global configuration when it is created and never reads or
-writes Metacat Mode's Episodic Memory, Slipnet or configuration.
+A Training Mode Session never reads or writes Metacat Mode's Episodic Memory, Slipnet or configuration.
 
 ### The word "learning"
 
@@ -108,7 +112,9 @@ What is available today:
 
 **v2.0** is the first major milestone: Petacat recognizing new concepts and
 incorporating them into the Slipnet, by modelling a learning feedback loop and
-perceptual processes. That is **Training-Mode learning**, and it is not built yet.
+perceptual processes. That is **Training-Mode learning**. What exists is its ground:
+the configuration in the database, the one change API and journal, and a Training Mode Session
+that runs its own evolving configuration. The in-worker learner itself is not built yet.
 
 [metacat]: http://science.slc.edu/~jmarshall/metacat/
 [marshall]: http://science.slc.edu/~jmarshall/
@@ -393,33 +399,28 @@ Three different intentions, and the control for each:
 
 ### 5. Explore and edit configuration
 
-Open the **Configuration** view via the hamburger menu (top-left) or navigate
-to `#/config`. This view provides editable tables for all domain knowledge that
-drives the engine:
+Open the Admin view's configuration editors with the hamburger menu entry **Configurations (Metacat Mode and Training Mode)** (top-left) or navigate to `#/config`. The
+database holds Petacat's domain knowledge, and the Admin view works on one configuration at a
+time (the global one, which Metacat Mode uses, unless you open a Training Mode Session's; the chip below the header names the one open). Its tabs:
 
-- **Slipnet Nodes** -- 59 concept nodes with conceptual depths
-- **Slipnet Links** -- 202 links between nodes (category, instance, property, lateral, sliplink)
-- **Slipnet Layout** -- Grid positions for the graph visualization
-- **Codelet Types** -- 27 codelet types with Python `execute_body` source
-- **Engine Params** -- Runtime thresholds and parameters
-- **Urgency Levels** -- 7 codelet urgency bin values
-- **Formula Coefficients** -- 79 formula weights and constants
-- **Demo Problems** -- 34 pre-configured analogy problems
-- **Theme Dimensions** -- 9 conceptual dimensions for theme clusters
-- **Posting Rules** -- Codelet posting patterns
-- **Commentary Templates** -- Natural-language output templates
-- **Enums** -- The enum tables (bond categories, proposal levels, and the rest)
-- **Help Topics** -- The in-app help text, editable in place and backed by
-  `seed_data/help_topics.en.json`
+- **Configurations**: every configuration, compared, opened, frozen, and used to start a Training Mode Session
+- **Status and reset**: how the open configuration differs from the Metacat Standard Configuration, with Verify journal and Reset
+- **Slipnet Nodes**, **Slipnet Links**, **Codelet Types** (Python `execute_body` source), **Engine Params**,
+  **Urgency Levels**, **Formula Coefficients**, **Demo Problems**, **Enum Tables**, **Theme Dimensions**,
+  **Posting Rules**, **Commentary Templates**, **Slipnet Layout** and **Help Topics** (the in-app help
+  text, backed by `seed_data/help_topics.en.json`): editable tables over the seed data's 59 nodes, 202
+  links, 27 codelet types, 79 formula coefficients and the rest
+- **History**: the journal, with undo
+- **Database (all modes)**: browse any table, edit the safe ones
 
-All tables support inline editing (double-click a cell to edit). Changes are
-saved to the database immediately and apply to the next run created; a run keeps
-the configuration it started with for its whole life. Use the **Export** /
-**Import** buttons to move the full configuration as a JSON file.
+Double-click a cell to edit it. Every save is a batch through the change API, checked whole before
+anything is written, and it applies to the next run created in either mode; a run keeps the
+configuration it started with for its whole life. **Export** / **Import** move the full
+configuration as a JSON file. Double-click a node in the Slipnet graph to open its focus view and
+click **Edit** when no run is active.
 
-You can also navigate directly to a node's configuration by double-clicking it
-in the Slipnet graph (to open the node focus view) and clicking **Edit** when
-no run is active.
+[The configuration, the journal and the change API](#the-configuration-the-journal-and-the-change-api)
+explains the rest.
 
 ### 6. Run the tests
 
@@ -1015,6 +1016,125 @@ making the serial loop read state as it stood N codelets ago:
 - by N = 15, runs start failing to converge inside the codelet cap;
 - by N = 50, a genuinely new answer appears.
 
+## The configuration, the journal and the change API
+
+Petacat's domain knowledge (the Slipnet's nodes and links, the codelet types and their Python
+bodies, the engine parameters, the formula coefficients, the theme dimensions, the posting
+rules, the commentary templates, the demo problems, the layout and the enum tables) lives in the
+database. It is not in code and the engine assumes none of it.
+
+### The Metacat Standard Configuration
+
+The files in `seed_data/` are the **Metacat Standard Configuration**. The server loads them into an
+**empty** database at start-up, in one transaction, as the first entry of the journal, and never
+again. After that the database is the source of truth: editing a file changes nothing for a
+database that already has data, and clearing the database (a development move, not an upgrade) makes
+the next start load the files again. Petacat has no database migrations.
+
+Nothing at run time writes the files: not the Admin view, not Import, not a reset, and not any
+Training-Mode learning source. They change only through a committed development change that fixes
+a fidelity bug and names the rows it touches. See [`seed_data/README.md`](seed_data/README.md).
+
+From the command line, `.venv/bin/python -m server.config status | diff | reset-to-standard --yes |
+restore-selected --row TABLE KEY_JSON | verify-journal` (each with `--configuration ID` and `--json`)
+reports on and repairs a configuration without the UI.
+
+### Which configuration a run uses
+
+- **Metacat Mode** uses the **global configuration**. An edit to it takes effect at the next run (the
+  server swaps in the new configuration as soon as the write commits); a run already started keeps
+  the configuration it began with, and records its `config_hash`.
+- **A Training Mode Session** has a configuration of its own, a row beside the global one. It starts
+  as the session's **Starting Conceptual State**: a copy, taken once at creation, of the global
+  configuration (the default), of the Metacat Standard Configuration, or of another session's
+  configuration (`settings.configuration_base` of `"global"`, `"standard"` or `{"session_id": n}`), plus
+  any creation overrides (`settings.parameters`, applied as one creation entry). From then on it is the session's
+  alone. The global configuration and a session's never read each other, and a session's configuration
+  never touches Metacat Mode.
+- Each configuration is **frozen** or not; a frozen one is skipped by edits that choose "all".
+
+### The change API and the journal
+
+Every change to a configuration, from any source, is a **batch** of operations sent to the **change
+API**: `POST /api/configurations/{id}/changes` (and `POST /api/training-mode/sessions/{id}/changes`
+for a session's, the external route). `GET /api/configurations/{id}/schema` lists every table and
+operation.
+
+- **Operations.** Generic operations (`insert`, `update`, `delete` on a row, addressed by its natural
+  key) and 29 convenience operations that expand into them (`add_node`, `remove_node`, `rename_node`,
+  `merge_nodes`, `add_link`, `set_param`, `adjust_param`, `set_coefficient`, `set_codelet_body`,
+  `move_layout`, `rebind_role` and others).
+- **Checked whole, first.** A batch that leaves a name pointing at nothing, a value the engine cannot read or code that does
+  not compile is refused with the operation, table, key and (for code) line and column, and nothing is written.
+  `expect` guards an update; `base_version` (required, an integer revision or `"head"`, on the external route `POST /api/training-mode/sessions/{id}/changes`, which answers 400 without it) with `base_mode` `strict` or `rebase` handles a configuration that moved on;
+  `on_op_failure` is `abort` or `skip`; `dry_run` reports and writes nothing. Parameter ranges
+  and oddities come back as advisories, never refusals.
+- **The report** lists what was applied, skipped, cascaded to dependent rows, left dangling or affected,
+  any run-start effect, and the new version.
+- **Everything is open to Training-Mode learning.** There are no caps, drift limits or protected nodes. The one protection is a
+  Training Mode Session's Episodic Memory, which no batch can edit or clear.
+- **The sources** are `admin`, `external`, `learner`, `import`, `restore`, `reset` and `creation`. The global configuration
+  refuses `learner` and `external`, because they are Training-Mode learning sources.
+
+The **journal** (`configuration_journal`) is the one record of changes. Each accepted batch is one
+append-only entry: the batch as proposed, the operations as resolved, the previous values of the rows, the
+source, actor, channel, note, version and a hash of the result. It is a different thing from the Audit persistence mode.
+Undo, restore and "the configuration at version N" are views of it: an undo is a new entry (source `restore`), never a rewrite.
+`GET /api/journal` filters entries; `GET /api/configurations/{id}/as-of` reads a past version;
+`GET /api/journal/where-did-name-go?name=` tells what became of a name that an Episodic Memory still
+mentions; `POST /api/configurations/{id}/restore` undoes a batch or group or restores one row;
+`GET /api/configurations/{id}/verify-journal` replays the journal and checks it against the stored
+configuration and hash.
+
+### The three Training-Mode learning sources
+
+A Training Mode Session's configuration changes by **Training-Mode learning**, which has three sources. All use
+the change API, so all may change exactly the same things:
+
+| Source | What it is | Journal source |
+|---|---|---|
+| The in-worker learner | Code inside Petacat that, after each run, sends a batch. Petacat provides the seam (`set_after_run` on the session service); the learner itself is not built. | `learner` |
+| The external route | `POST /api/training-mode/sessions/{id}/changes`: a program outside Petacat reads results and sends a batch. | `external` |
+| The Admin view | A person editing a session's configuration in the configuration manager, the editors, the Database tab or Edit all. | `admin` |
+
+### Editing from the Admin view
+
+- **Configurations tab (the manager).** Lists the global configuration and one per session, with mode badge, version, frozen state,
+  how many rows differ from the Metacat Standard Configuration, and Live (in memory) or Stored (as of last stop) for a
+  session. Open, Compare (any two, or one and the standard, applying selected rows to the other side),
+  History, Freeze and "New session from this configuration". `#/config?configuration=<id>` opens one.
+- **Edit all.** A scope picker in the configuration chip sends an editor's save to this configuration, chosen ones, or all
+  that are not frozen. A preview gives each target a result (applies, no change, differs, missing, stale, skipped) with
+  Overwrite, Apply the rest, Preview again, "all or nothing" and a reason; a commit shares one group, and "Undo this group" reverses it
+  (`POST /api/configurations/edits/preview` and `/edits`).
+- **History.** The journal for the open configuration, with filters, entry detail, undo of a batch or group, a node's History in the Slipnet
+  Nodes editor, restore of a deleted node with its dependents, and a deletion preview. A "names that no longer resolve" panel in a
+  Training Mode Session's Memory tab and in Metacat Mode's Episodic Memory view tells the story of each missing name.
+- **Database (all modes).** Every table, classed: configuration tables edit through the change API (channel `admin_database`),
+  content tables directly, runtime tables only in expert mode after typing the table's name and never for an active run; the journal
+  and a Training Mode Session's Episodic Memory are read-only; one `SELECT` or `WITH` at a time in the SQL box
+  (`/api/admin/db/...`).
+
+### Configuration routes
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/configurations`, `/api/configurations/{id}` | The configurations with their summaries / one |
+| PATCH | `/api/configurations/{id}` | Name, note, frozen |
+| GET | `/api/configurations/{id}/rows`, `/export` | A table's rows / the whole configuration |
+| POST | `/api/configurations/{id}/changes` | The change API |
+| GET | `/api/configurations/{id}/schema` | Tables and operations the change API knows |
+| GET | `/api/configurations/{id}/status`, `/diff`, `/verify-journal` | Difference from the Metacat Standard Configuration / row diff / journal check |
+| POST | `/api/configurations/{id}/reset-to-standard`, `/restore-selected` | Put everything, or chosen rows, back to the Metacat Standard Configuration (`{"confirm": "reset"}` for a reset) |
+| GET | `/api/configurations/compare?a=&b=` | Rows differing between two configurations (`standard` is allowed) |
+| POST | `/api/configurations/{id}/apply-from` | Apply chosen rows from another configuration, with `dry_run` |
+| POST | `/api/configurations/edits/preview`, `/edits` | Edit all |
+| GET | `/api/journal`, `/api/journal/{entry_id}`, `/api/journal/where-did-name-go`, `/api/configurations/{id}/as-of` | The journal and its views |
+| POST | `/api/configurations/{id}/restore`, `/api/journal/check-names` | Undo or restore / check names against a configuration |
+| GET/POST | `/api/admin/db/tables`, `/tables/{name}/rows`, `/changes`, `/edit`, `/sql` | The Database tab |
+
+[API.md](API.md) has the full list with each route's purpose.
+
 ## Training Mode Session: many problems on every core
 
 A **Training Mode Session** is a named, long-lived **Training episode**: many different letter-string
@@ -1036,12 +1156,13 @@ A Training Mode Session is **Stopped**, **Starting**, **Running**, **Paused** or
 - **Created Stopped.** `POST /api/training-mode/sessions` stores it and its first problems and runs nothing.
   `POST /api/training-mode/sessions/{id}/start` loads it and runs it (`{"paused": true}` starts it Paused).
 - **Stopped is a record in the database.** Only the other four states are live in the server process, and
-  **after a server restart every Training Mode Session is Stopped**. Starting (the load) rebuilds the
-  Episodic Memory from the stored merges and resumes each unfinished problem at the seeds not yet stored.
+  **after a server restart every Training Mode Session is Stopped**. Starting (the load) reads the Episodic Memory snapshot and the configuration's stored current state
+  (checking its hash), replays no journal, and resumes each unfinished problem at the seeds not yet stored.
   It only reads: a failed Start leaves the session Stopped exactly as it was (500).
 - **Stop** (`POST /api/training-mode/sessions/{id}/stop`) is the save point. The session is Stopping while
   the runs in flight are allowed a short drain time to finish and merge (the rest are discarded and their
-  seeds run again after the next start); then everything the session produced is written in **one
+  seeds run again after the next start); then everything the session produced (its problems, runs,
+  Episodic Memory and a snapshot of it, and its configuration's journal entries and current state) is written in **one
   transaction** and the live part is dropped. If that write fails nothing is written, the session returns
   to **Paused** with its memory intact, `last_event` says why, and Stop may be retried (500).
   The row records `stopped_at`, `stopped_from` (`running` or `paused`) and `stop_reason` (`user`,
@@ -1087,6 +1208,27 @@ Training Mode Session is deleted.
     merged. That is a reference for tests, not a link to Metacat Mode. With many workers it is
     the same idea with runs overlapping.
 
+### Its configuration
+
+Every Training Mode Session has its own configuration, from its Starting Conceptual State (see
+[above](#which-configuration-a-run-uses)). It is version 0; each batch that changes it takes the next version.
+
+- **A batch reaches the next run, never one in flight.** A run takes its Episodic Memory and its
+  configuration together when it is handed to a worker, and records `memory_version` (the Training episode
+  version) and `configuration_revision`. The configuration goes to a worker once per version, as a
+  finished configuration, not as operations to replay. Workers import no journal code.
+- **A live session holds its configuration changes in memory** and writes them at the Stop, with the memory and
+  everything else (see the Stopped rule below). A Start reads the stored current state and checks it against its hash.
+  It replays nothing.
+- **The three Training-Mode learning sources** all send batches: `POST .../changes` is the external route (and works in
+  every state but Starting and Stopping: a live session takes it in memory, `persisted: false`; a Stopped one writes it at
+  once), the in-worker learner seam is `set_after_run`, and the Admin view edits through the configuration manager.
+- **Reading it back.** `GET .../journal` (entries, with those held in memory marked `pending`),
+  `GET .../configuration?version=&table=`, `GET .../configuration/diff?from=&to=` and
+  `GET .../slipnet?version=`. `GET .../export?what=configuration` and `what=journal` download them as JSON.
+  The Configuration tab of the view shows all of this.
+- **Deleting the session deletes its configuration** and its journal, with its Episodic Memory.
+
 ### Settings and error policy
 
 **Settings are fixed at creation,** because they shape what a run is:
@@ -1096,10 +1238,11 @@ Training Mode Session is deleted.
 | `seeds_per_problem` | 100 (1 to 100,000) | Seeds each problem runs; a problem may override |
 | `seed_start` | 1 | First seed |
 | `max_codelets` | 20,000 (1 to 200,000) | A run that reaches it gives up (`*CAP*`) |
-| `parameters` | none | Engine parameter overrides, validated like `POST /api/runs` |
+| `parameters` | none | Engine parameter overrides, validated like `POST /api/runs`; folded once into the Starting Conceptual State as a creation entry |
+| `configuration_base` | `"global"` | The base the Starting Conceptual State is copied from: `"global"`, `"standard"` (the Metacat Standard Configuration) or `{"session_id": n}` |
 | `backend` | resolved at creation | The numeric backend |
 
-**The error policy can be edited at any time but Starting and Stopping** (`PATCH /api/training-mode/sessions/{id}`). There is no policy for an engine-configuration change (`on_config_change` is removed, and a field of that name is a 400): nothing pauses, adopts or rebases, and the next run starts under the configuration current then and records its `config_hash`:
+**The error policy can be edited at any time but Starting and Stopping** (`PATCH /api/training-mode/sessions/{id}`). There is no policy for a configuration change (`on_config_change` is removed, and a field of that name is a 400): nothing pauses, adopts or rebases, and the next run starts under the session's configuration current then and records its `config_hash`:
 
 | Field | Default | Meaning |
 |---|---|---|
@@ -1163,7 +1306,9 @@ worker, and the speculative executor is not yet available to Training Mode Sessi
 | GET | `/api/training-mode/sessions/{id}/finished` | Problems finished after a cursor; `wait` (up to 60 s) long-polls |
 | GET | `/api/training-mode/sessions/{id}/memory` | The Training Mode Session's Episodic Memory (read-only), in the shape `GET /api/memory` uses |
 | POST | `/api/training-mode/sessions/{id}/start`, `/pause`, `/resume`, `/stop`, `/cancel` | The states, and the cancel action |
-| GET | `/api/training-mode/sessions/{id}/export` | Download `problems`, `distribution` or `runs` as CSV or JSON |
+| POST | `/api/training-mode/sessions/{id}/changes` | The external route: a change API batch for its configuration |
+| GET | `/api/training-mode/sessions/{id}/journal`, `/configuration`, `/configuration/diff`, `/slipnet` | Its journal, and its configuration at a version, compared, or as a Slipnet |
+| GET | `/api/training-mode/sessions/{id}/export` | Download `problems`, `distribution` or `runs` as CSV or JSON, or the `configuration` or `journal` as JSON |
 
 ### The Training Mode Session view
 
@@ -1171,7 +1316,10 @@ The hamburger menu's **Training Mode** entry (`#/training-mode`, or `#/training-
 the view. The left column lists the Training Mode Sessions with a line about the cores. The right
 shows the selected one: settings, error policy, totals and controls, a box to paste or
 upload problems with a preview, the table of problems (searched and sorted by the
-server) and a Memory tab. Help topics start at
+server) and, in three tabs, Problems, Memory and Configuration. The Configuration tab has a
+**Configuration version** slider (version 0 is the Starting Conceptual State) and the inner tabs **Slipnet graph**,
+**Timeline**, **Compare versions** and **Table rows**; it says **Live (in memory)** or **Stored (as of last stop)**, and links to the
+configuration manager. **Delete** asks for the session's name, typed exactly. Help topics start at
 [HELP.md](HELP.md)'s "Training Mode Session".
 
 ### `scripts/session_client.py`: driving it from an ML layer
@@ -1296,9 +1444,17 @@ Training Mode. The full list, with request and response shapes, is in
 | GET | `/api/training-mode/sessions/{id}/problems/{pid}`, `.../runs` | One problem's distribution / its runs, with `seq` and `memory_version` |
 | POST | `/api/training-mode/sessions/{id}/problems/{pid}/cancel` | Cancel one problem |
 | GET | `/api/training-mode/sessions/{id}/finished` | Problems finished after a cursor; long-polls with `wait` |
-| GET | `/api/training-mode/sessions/{id}/memory` | The Training episode's memory (shared only) |
-| POST | `/api/training-mode/sessions/{id}/pause`, `/resume`, `/close`, `/cancel` | Lifecycle |
-| GET | `/api/training-mode/sessions/{id}/export` | CSV or JSON of problems, distribution or runs |
+| GET | `/api/training-mode/sessions/{id}/memory` | The Training Mode Session's own Episodic Memory (read-only) |
+| POST | `/api/training-mode/sessions/{id}/start`, `/pause`, `/resume`, `/stop`, `/cancel` | The states, and the cancel action |
+| POST | `/api/training-mode/sessions/{id}/changes` | The external route: a change API batch for its configuration |
+| GET | `/api/training-mode/sessions/{id}/journal`, `/configuration`, `/configuration/diff`, `/slipnet` | Its journal, and its configuration at a version, compared, or as a Slipnet |
+| GET | `/api/training-mode/sessions/{id}/export` | CSV or JSON of problems, distribution or runs; the configuration or journal as JSON |
+
+### Configuration
+
+The configuration routes (the change API, the journal, the configuration manager, edit-all and the
+Database tab) are tabulated under
+[Configuration routes](#configuration-routes).
 
 ### Interactive controls
 
@@ -1456,7 +1612,10 @@ compared against the dissertation's.
 
 ## Seed Data
 
-All domain knowledge lives in `seed_data/*.json`:
+All domain knowledge starts in `seed_data/*.json`, the **Metacat Standard Configuration**. The server
+loads these files into an empty database once; after that the database is the source of truth and the
+files are not read again (see [`seed_data/README.md`](seed_data/README.md) and
+[The configuration](#the-configuration-the-journal-and-the-change-api)):
 
 | File | Contents |
 |------|----------|
@@ -1490,6 +1649,10 @@ the static [`HELP.md`](HELP.md) reference and matching TypeScript constants.
   `client/src/constants/helpTopics.ts`. The Admin view's **Regenerate Help
   Documentation** button does the same from the running server, and `--check`
   reports when the derived files are behind.
+- **v2.0 topics**: HELP.md has topics for the Metacat Standard Configuration, the
+  Starting Conceptual State, the change API, the journal (History), the configuration manager,
+  Edit all, the Database tab, a Training Mode Session's Configuration tab, its states and its
+  Training-Mode learning sources.
 
 ## Key Differences from Scheme Original
 

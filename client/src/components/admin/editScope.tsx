@@ -23,6 +23,8 @@ export interface ScopeValue {
   reload: () => Promise<void>
   /** Send `ops` to the scope's targets through the preview; rejects when nothing was written. */
   commit: (ops: Ops) => Promise<EditCommit>
+  /** Called after any successful editor save, so the banner and chip refresh (see adminRequest). */
+  written: () => void
 }
 
 const ScopeContext = createContext<ScopeValue | null>(null)
@@ -46,12 +48,15 @@ interface Pending {
   reject: (e: Error) => void
 }
 
-export function ScopeProvider({ openId, children }: { openId: number; children: ReactNode }) {
+export function ScopeProvider({ openId, onWritten, children }: { openId: number; onWritten?: () => void; children: ReactNode }) {
   const [scope, setScope] = useState<EditScope>({ mode: 'this', ids: [] })
   const [configurations, setConfigurations] = useState<ConfigurationSummary[] | null>(null)
   const [pending, setPending] = useState<Pending | null>(null)
   const scopeRef = useRef(scope)
   scopeRef.current = scope
+  const onWrittenRef = useRef(onWritten)
+  onWrittenRef.current = onWritten
+  const written = useCallback(() => onWrittenRef.current?.(), [])
 
   const reload = useCallback(async () => {
     try { setConfigurations(await listConfigurations()) } catch { setConfigurations(null) }
@@ -74,8 +79,8 @@ export function ScopeProvider({ openId, children }: { openId: number; children: 
   }, [])
 
   const value = useMemo<ScopeValue>(
-    () => ({ scope, setScope: choose, configurations, reload, commit }),
-    [scope, choose, configurations, reload, commit],
+    () => ({ scope, setScope: choose, configurations, reload, commit: async ops => { const c = await commit(ops); written(); return c }, written }),
+    [scope, choose, configurations, reload, commit, written],
   )
 
   return (

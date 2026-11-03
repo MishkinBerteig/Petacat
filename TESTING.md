@@ -542,7 +542,7 @@ changing what it records.
 | `test_journal_only_writer.py` | 10 | C6: only the journal layer writes a configuration or journal table (an AST check over the table list from model introspection), the checker on planted snippets, the two doors `write_immediate` and `write_deferred`, and nothing in `engine/` or `parallel/` imports the journal |
 | `test_no_node_literals_in_engine.py` | 5 | The EN0 lint: no line of `server/engine/**` names a node or codelet type of the Metacat Standard Configuration (`plato-` literals and compositions, `name[6:]`, node names, codelet types), and none reads the seed files outside the one door (`MetadataProvider.from_standard_configuration`); a read anywhere else, even in `metadata.py`, is caught. The allow-list `no_node_literals_allowlist.txt` is empty and may only shrink: an entry that no longer matches fails, and a new violation cannot be added to it |
 | `test_parallel_detachable.py` | 4 | Nothing under `server/engine/**` imports the parallel plugin, and a serial run and the service layer work in an interpreter where `server.parallel` cannot be imported; a Training Mode Session run there chooses the serial executor and produces the plugin's runs, run for run |
-| `test_v2_guards.py` | 8 | C10: the engine tree is the baseline commit's, touched after EN11 only by the allowed packages; nothing is called "innate" or "core names", and "protected" means only a session's Episodic Memory (with the checker seen catching planted words); no table named for the old session entity and no `session_id` column on `runs`; the worker-side code never imports the journal layer |
+| `test_v2_guards.py` | 8 | C10: the engine tree is the baseline commit's, touched after EN11 only by the allowed packages; the retired term for the Starting Conceptual State is used nowhere, and the word for a session's Episodic Memory class means nothing else (with the checker seen catching planted words); no table named for the old session entity and no `session_id` column on `runs`; the worker-side code never imports the journal layer |
 
 **`tests/integration/` — the repository's artifacts agree**
 
@@ -755,7 +755,7 @@ nothing consults them now.
 
 `client/` carries a Vitest suite covering the store, the panels, the admin
 editors and the review surfaces. Run it with `cd client && npx vitest run`, and
-`npx tsc --noEmit` alongside it. **545 cases across 38 files**, all passing, in
+`npx tsc --noEmit` alongside it. **698 cases across 50 files**, all passing, in
 3.1 s on an Apple M-series machine.
 
 | File (`client/src/`) | Cases | Covers |
@@ -765,25 +765,27 @@ editors and the review surfaces. Run it with `cd client && npx vitest run`, and
 | `store/displayStore.test.ts` | 7 | Panel visibility (an entry for every panel including the EEG, Verbose hidden by default, toggling, show or hide all, remembered in localStorage, and surviving storage that throws) and the graphics switches that stop and resume the Slipnet and Coderack polls independently |
 | `store/runStore.test.ts` | 44 | The spreading threshold outliving a page reload, and the store's run lifecycle |
 | `hooks/useWorkspaceClick.test.ts` | 3 | Clicking the Workspace steps when idle, stops a running run and resumes it on the next click, and ignores other buttons and a missing run |
+| `App.test.tsx` | 4 | App's routing: `#/config?configuration=<id>` opens the configuration editors on that configuration (on load and on a hashchange), `#/config/slipnet/<node>` and `#/admin` still route, and the Configurations view's header and menu entry are neutral between the modes |
 | `components/AdminPanel.test.tsx` | 6 | The Admin panel's operations report what became of them, and it says it edits the global configuration Metacat Mode uses |
 | `components/CoderackBars.test.tsx` | 9 | The Coderack window as Metacat draws it: a slot per codelet type in engine order, bars at the engine's selection probability and never derived from a type's name, counts and total, the last-run marker, a recorded coderack without probabilities, and the Options-menu switches for the count column and the last-type marker |
 | `components/CoderackView.test.tsx` | 6 | The Coderack panel's codelet-pattern clamps |
 | `components/ClampControls.test.tsx` | 5 | Clamp theme pattern, Undo last clamp and the mid-run Self-watching toggle, as Metacat's Options menu has them |
+| `components/CollapsibleGroup.test.tsx` | 8 | A collapsible group opens and closes from its header button, stays mounted when closed, remembers its state across a remount, and works when storage throws; the Run Controls panel's six groups start with Run and Episodic Memory open |
 | `components/CommentaryPanel.test.tsx` | 7 | An empty commentary panel has two different causes |
 | `components/EegView.test.tsx` | 4 | The EEG window: the two curves titled in Metacat's colours, each starting at 100 with one point per cycle, the message when a run has no EEG, and the live run read from the store |
-| `components/HamburgerMenu.test.tsx` | 3 | Training Mode is a view of its own, between Review and Configuration, and choosing it reports the view to the app |
+| `components/HamburgerMenu.test.tsx` | 3 | Training Mode is a view of its own, between Review and Configurations (Metacat Mode and Training Mode), and choosing it reports the view to the app |
 | `components/HelpPopover.test.tsx` | 3 | The popover shows a glossary term, and says when it cannot |
 | `components/LastErrorBanner.test.tsx` | 3 | The error channel is rendered where it can be seen |
 | `components/MemoryView.test.tsx` | 19 | The Memory panel shows the memory the run is thinking against, labelled as Metacat Mode's Episodic Memory |
-| `components/ModeSwitch.test.tsx` | 15 | The header's switch between Metacat Mode and Training Mode: which mode each view belongs to, moving between them, the help link, and staying put while a run is processing |
+| `components/ModeSwitch.test.tsx` | 16 | The header's switch between Metacat Mode and Training Mode: which mode each view belongs to, moving between them, the help link, and staying put while a run is processing |
 | `components/MomentDisplay.test.tsx` | 21 | Clicking a Trace event, answer or snag redisplays the moment: the Workspace header and highlights, the Slipnet pattern, the Coderack, the Temperature, the Trace window's print-name labels |
-| `components/ProblemInputPanel.test.tsx` | 7 | The problem panel owns the problem's identity |
+| `components/ProblemInputPanel.test.tsx` | 10 | The problem panel owns the problem's identity |
 | `components/RunControlsPanel.test.tsx` | 56 | A run starts on the problem the form actually shows, and the Workers control is labelled as the run mode |
 | `components/RunHistory.test.tsx` | 34 | Run History stays current as runs finish |
 | `components/RunParametersPanel.test.tsx` | 14 | The twenty-six run parameters, settable before a run |
 | `components/SearchPalette.test.tsx` | 7 | Cmd+K search reaches every kind of help topic |
 | `components/SelfWatchingWarning.test.tsx` | 4 | The red warning shown whenever self-watching is off: absent while it is on, and separate warnings for the next run and the loaded run, following a catalogue default of off |
-| `components/SlipnetGraphView.test.tsx` | 7 | The Slipnet graph says what it could not do |
+| `components/SlipnetGraphView.test.tsx` | 10 | The Slipnet graph says what it could not do |
 | `components/SlipnetView.test.tsx` | 8 | The node-focus Edit button's visibility |
 | `components/SubstrateBadge.test.tsx` | 5 | The header says which processor the arithmetic runs on |
 | `components/SwarmPanel.test.tsx` | 6 | The Swarm group: it sends the form's problem with the chosen seeds, shows the distribution and telemetry returned, uses justification mode when there is an answer, disables itself with a reason when the plugin is detached or the seed count is over the limit or there is no problem, and shows a server error without losing the form |
@@ -792,12 +794,22 @@ editors and the review surfaces. Run it with `cd client && npx vitest run`, and
 | `components/VerbosePanel.test.tsx` | 11 | The Verbose panel and the store's narration: polled from where the last reply ended, bounded on both sides, the Step button sent as step mode, the mode remembered with no run loaded |
 | `components/WindowsMenu.test.tsx` | 3 | The Windows menu lists Hide/Show for each panel including EEG, hides and shows all windows, and carries the Slipnet and Coderack graphics switches |
 | `components/WorkspaceView.test.tsx` | 12 | Workspace labels do not print on top of each other |
-| `components/admin/AdminEditors.test.tsx` | 42 | Every Configuration tab edits the collection it shows |
+| `components/admin/AdminEditors.test.tsx` | 44 | Every Configuration tab edits the collection it shows |
 | `components/admin/AdminHttpFailures.test.tsx` | 10 | The Configuration screen reports what the server refused |
+| `components/admin/ConfigurationManager.test.tsx` | 44 | The configuration manager: the chip's exact wording on every tab for global, Stopped, live and changing-state configurations, the list's badges, columns, filter and sort, Open, Freeze and Unfreeze, History, New session from this configuration (and the form's `configuration_base`), Compare and Apply from, and the deep link `#/admin?configuration=<id>` |
+| `components/admin/ConfigurationPanel.test.tsx` | 11 | The Status and reset tab and the information banner: differing rows from the Metacat Standard Configuration, Compare, Verify journal, Reset after a typed confirmation, Restore selected |
+| `components/admin/database/DatabasePanel.test.tsx` | 17 | The Database tab: class badges and banners, no edit control on read-only classes, the change batch built from the row editor, expert mode and its typed confirmation, refusals named by code, the SQL box |
+| `components/admin/EditorSaveRefresh.test.tsx` | 1 | A successful Engine Params save refreshes the difference banner and the header chip without a tab change |
+| `components/admin/EditAll.test.tsx` | 17 | Edit all: the scope picker (This, Chosen, All), the preview request, each per-target result, Overwrite, Apply the rest, Preview again, all-or-nothing and the reason, cancel, and Undo this group |
+| `components/admin/history/HistoryPanel.test.tsx` | 9 | History: entries with source, actor, channel, note, version and counts, a live session's pending entries marked "not yet saved" and not undoable, entry detail, undo of a batch or group as a new entry, filters, and a refusal explained |
+| `components/admin/history/mounting.test.tsx` | 2 | The names panel is mounted on a Training Mode Session's Memory tab (checked against that session's configuration) and on Metacat Mode's Episodic Memory view (checked against the global configuration) |
+| `components/admin/history/NamesPanel.test.tsx` | 4 | Names that no longer resolve: the names of an Episodic Memory's theme patterns, each missing name with its story from the journal, finding a session's configuration, and showing nothing when all resolve |
+| `components/admin/history/NodeHistory.test.tsx` | 5 | A node's History and restoring a deleted node with its dependents as a new entry, undoing the batch that removed it, and the deletion preview listing what cascades, dangles or is affected |
 | `components/review/EpisodicRunTimeline.test.tsx` | 3 | A note being typed on an Episodic Memory clear survives a late refresh, and an untouched note follows the server |
 | `components/review/ReviewPanel.test.tsx` | 34 | The review surfaces read the record back, and the episodic-run timeline shows each Episodic Memory clear between the runs with an editable note |
+| `components/session/ConfigurationTab.test.tsx` | 12 | A Training Mode Session's Configuration tab: the version slider and the Live (in memory) or Stored (as of last stop) label, the Slipnet graph redrawn per version, the timeline and its source filter, Compare versions, Table rows, the link to the configuration manager, and no edit controls |
 | `components/session/problemText.test.ts` | 37 | Parsing pasted or uploaded problems (letters only, 1 to 64 characters, case-sensitive; JSON entries with their own seeds, answer and tag) and the preview the Training Mode Session view shows before adding them |
-| `components/session/SessionPanel.test.tsx` | 59 | The Training Mode Session view: the list and the selected Training Mode Session, creating one, adding problems, the error-policy fields, the problems table searched and sorted through the server, the Memory tab, and the controls (pause, resume, close, cancel, export) |
+| `components/session/SessionPanel.test.tsx` | 69 | The Training Mode Session view: the list and the selected Training Mode Session, creating one, adding problems, the error-policy fields, the problems table searched and sorted through the server, the Memory and Configuration tabs, the controls (start, pause, resume, stop, cancel, export), and Delete behind the session's name typed exactly |
 
 ### Running under the free-threaded interpreter
 

@@ -6,6 +6,7 @@ import { SqlBox } from './SqlBox'
 import type { DbRow, DbRowPage, DbTable, TableClass } from './types'
 import { showValue } from './values'
 import { useScope } from '../editScope'
+import { ControlHelp } from '../../session/shared'
 
 const PAGE = 25
 
@@ -149,6 +150,10 @@ export function DatabasePanel() {
   return (
     <div style={{ display: 'flex', gap: 12, height: '100%' }}>
       <nav aria-label="Tables" style={{ width: 250, flexShrink: 0, overflow: 'auto', fontSize: 11 }}>
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4, fontWeight: 600 }}>
+          Database
+          <ControlHelp topic="database_tab" label="the Database tab" />
+        </div>
         <label style={{ display: 'block', marginBottom: 6 }}>
           Configuration{' '}
           <input

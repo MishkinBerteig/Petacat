@@ -70,7 +70,8 @@ const groupStyle: CSSProperties = {
 
 export function ModeSwitch({ view, onSelectView, disabled = false }: Props) {
   const { showHelp } = useHelp();
-  const current = modeOfView(view);
+  // On the Configurations view (both modes' configurations) neither mode is current.
+  const current = view === 'config' ? null : modeOfView(view);
 
   const choose = (mode: AppMode) => {
     if (disabled || mode === current) return;
@@ -82,7 +83,7 @@ export function ModeSwitch({ view, onSelectView, disabled = false }: Props) {
       role="group"
       aria-label="Mode"
       data-testid="mode-switch"
-      data-mode={current}
+      data-mode={current ?? 'none'}
       style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
     >
       <div style={groupStyle}>

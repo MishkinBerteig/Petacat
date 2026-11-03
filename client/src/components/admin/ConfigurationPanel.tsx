@@ -13,6 +13,7 @@ import type {
   ConfigurationDiffRow,
   ConfigurationStatus,
 } from '@/types/configuration'
+import { ControlHelp } from '../session/shared'
 
 /** The word the server needs typed before it resets. */
 const RESET_WORD = 'reset'
@@ -91,7 +92,7 @@ export function ConfigurationPanel({
       setTyped('')
       await afterChange(
         res.wrote
-          ? `Reset to the Metacat Standard Configuration (revision ${res.revision}, ${res.ops} changes).`
+          ? `Reset to the Metacat Standard Configuration (revision ${res.revision}, ${res.ops} ${res.ops === 1 ? 'change' : 'changes'}).`
           : 'Nothing to reset: the configuration already equals the Metacat Standard Configuration.',
       )
     } catch (err) {
@@ -156,7 +157,10 @@ export function ConfigurationPanel({
       )}
 
       <section aria-label="Configuration status" style={{ border: '1px solid var(--border)', borderRadius: 4, padding: 8 }}>
-        <h3 style={{ margin: '0 0 6px', fontSize: 12 }}>Configuration status ({modeLabel})</h3>
+        <h3 style={{ margin: '0 0 6px', fontSize: 12, display: 'flex', alignItems: 'center' }}>
+          Configuration status ({modeLabel})
+          <ControlHelp topic="metacat_standard_configuration" label="the Metacat Standard Configuration" />
+        </h3>
         {status ? (
           <dl style={{ display: 'grid', gridTemplateColumns: 'max-content 1fr', gap: '2px 12px', margin: 0 }}>
             <dt>Revision</dt><dd style={{ margin: 0 }}>{status.revision}</dd>
