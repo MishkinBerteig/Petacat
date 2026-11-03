@@ -436,7 +436,7 @@ Petacat has two test suites:
   traces against Metacat's), and `e2e` (full HTTP
   stack against a running database). All eight run in a single command against
   the local Postgres — 5,316 cases, which includes the numeric matrix's second
-  pass over the 519 backend-sensitive tests. See
+  pass over the 881 backend-sensitive tests. See
   [TESTING.md](TESTING.md) for the layer breakdown, the numeric backend matrix,
   the session ceiling, the unit-test rules, determinism requirements, test-double
   conventions, how to run the suite under the free-threaded interpreter, and what

@@ -34,6 +34,23 @@ task-output file lives in `/private/tmp`.
 
 This overrides any default or harness-supplied scratchpad instruction.
 
+## Documentation is always current — MANDATORY, NO EXCEPTIONS
+
+Wrong documentation is dangerous. Every change brings every document it touches up to date in
+the same piece of work: this `CLAUDE.md`, the README, `TESTING.md`, `HELP.md` and the help
+topics, `API.md`, `seed_data/README.md`, plans, and docstrings. No document is exempt, and none
+is "someone else's" to leave stale.
+
+## Clean up after yourself — MANDATORY
+
+This is a development environment with no production data.
+- Drop every scratch database you or your agents created once it is no longer used
+  (`dropdb --if-exists <name>`); the tests recreate their own scratch databases on demand.
+  Keep `petacat_test` and the development database `petacat`.
+- Stop every server, background command and polling loop you started before you finish. A
+  `pgrep -f "<pattern>"` loop matches its own command line and never ends, so wait on a PID or a
+  file instead.
+
 ## Modes and terminology — MANDATORY
 
 Petacat has two modes, always written as proper names: **Metacat Mode** and **Training Mode**.
@@ -59,8 +76,9 @@ Every doc, UI string, help topic, plan and decision must keep the distinction pe
     from its Starting Conceptual State.
   - A session never reads or writes Metacat Mode's Episodic Memory, Slipnet or configuration.
 
-  Until the v2.0 rename lands, the code, API, UI and older docs still call a session "a
-  Training".
+  The code, API, UI and docs all say Training Mode Session (`/api/training-mode/sessions`, the
+  `training_mode_sessions` tables). The one table with an older prefix is
+  `training_memory_merges`, a session's Episodic Memory record, written only at Stop.
 - **Episodic Memory is used in both modes, always.** Neither mode has "independent memory".
   - Metacat Mode's Episodic Memory is global, and a user will often clear it after a single
     run.

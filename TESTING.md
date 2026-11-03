@@ -214,7 +214,7 @@ that allowance.
 | **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 529 |
 
 Those counts are cases, so they include the second pass the numeric matrix makes
-over the 519 backend-sensitive tests.
+over the 881 backend-sensitive tests.
 
 One line decides each layer. Read them as a question about what a new test's
 subject is, and write the test where the answer lands:
