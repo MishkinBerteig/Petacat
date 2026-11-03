@@ -129,7 +129,7 @@ async def setup_db(test_engine, schema_lock):
     # Import all models so Base.metadata knows about them
     from server.models.metadata import Base  # noqa
     import server.models.run  # noqa — registers Run, CycleSnapshot, etc. on Base.metadata
-    import server.models.training  # noqa — registers trainings, training_problems, ...
+    import server.models.training_mode_session  # noqa — registers training_mode_sessions, training_mode_session_problems, ...
 
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
@@ -226,6 +226,11 @@ async def app_client(setup_db, test_engine):
     from server.main import app
     from server.db import get_session
     from server.engine.metadata import MetadataProvider
+    from server.services.configuration_store import (
+        ConfigurationStore,
+        read_revision,
+        set_configuration_store,
+    )
     from server.services.run_service import RunService
     from server.api import runs as runs_module
 
@@ -234,10 +239,12 @@ async def app_client(setup_db, test_engine):
         os.path.join(os.path.dirname(__file__), "..", "..", "seed_data"),
     )
     meta = MetadataProvider.from_standard_configuration(seed_dir)
-    run_service = RunService(meta)
-    runs_module._run_service = run_service
-
     factory = async_sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
+    async with factory() as _session:
+        store = ConfigurationStore(meta, await read_revision(_session))
+    set_configuration_store(store)
+    run_service = RunService(store)
+    runs_module._run_service = run_service
 
     async def _test_session():
         session = factory()
@@ -255,3 +262,4 @@ async def app_client(setup_db, test_engine):
         yield client
 
     app.dependency_overrides.clear()
+    set_configuration_store(None)

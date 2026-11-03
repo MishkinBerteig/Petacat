@@ -50,7 +50,7 @@ def test_the_two_strategies_produce_the_same_stopping_states(meta):
     population measured one way could not be compared with one measured the other, and the
     oracle's baseline (built process-parallel) would not apply to a batched population.
     """
-    by_process = run_population(PROBLEM, 8, seed_offset=500, workers=2, max_steps=3000)
+    by_process = run_population(PROBLEM, 8, meta, seed_offset=500, workers=2, max_steps=3000)
     batched = run_population_batched(PROBLEM, 8, seed_offset=500, max_steps=3000, meta=meta)
     assert by_process.states == batched.states
 
@@ -146,7 +146,7 @@ def test_the_batching_seam_sees_every_live_runner(meta):
 
 
 def test_process_parallel_returns_one_state_per_run(meta):
-    result = run_population(PROBLEM, 6, seed_offset=1200, workers=2, max_steps=2000)
+    result = run_population(PROBLEM, 6, meta, seed_offset=1200, workers=2, max_steps=2000)
     assert result.runs == 6
     assert len(result.states) == 6
     assert all(":" in state for state in result.states)

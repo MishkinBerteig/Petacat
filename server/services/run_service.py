@@ -17,6 +17,7 @@ from server.engine.coderack import coderack_display
 from server.engine.ids import KIND_ANSWER, KIND_SNAG
 from server.engine.memory import AnswerDescription, EpisodicMemory, SnagDescription
 from server.engine.metadata import MetadataProvider
+from server.services.configuration_store import ConfigurationStore
 from server.engine.runner import EngineContext, EngineRunner, STATUS_ANSWER_FOUND, STATUS_HALTED, STATUS_PAUSED, STATUS_RUNNING, StepResult
 from server.engine.serialization import (
     describe_structure,
@@ -213,8 +214,8 @@ def _stored_snag_explanation(row: Any, templates: dict | None = None) -> str:
 class RunService:
     """Orchestrates engine + DB persistence."""
 
-    def __init__(self, meta: MetadataProvider) -> None:
-        self.meta = meta
+    def __init__(self, store: ConfigurationStore) -> None:
+        self._store = store
         self._runners: dict[int, EngineRunner] = {}
         #: The sink attached to each live run.  Persistence mode is a property of a
         #: run, not a global setting, so this is per-run rather than per-service.
@@ -243,18 +244,14 @@ class RunService:
         #: ``trace.ss:411-413``).
         self._displaying: dict[int, tuple[str, int]] = {}
 
-    async def reload_metadata(self, session: AsyncSession) -> None:
-        """Rebuild the ``MetadataProvider`` from the database for the Runs created from here on.
+    @property
+    def meta(self) -> MetadataProvider:
+        """What a Run created now would execute under: the configuration store's provider.
 
-        A Run holds the provider it was created with (``EngineRunner`` takes it at
-        creation), so a Run already under way keeps its configuration and an edit made
-        while something is running takes effect on the next one. The provider is
-        replaced only once the new one has been built: if the database holds a
-        configuration it cannot build from, this raises and the previous provider stays.
+        A Run reads it once, when it is created, and holds it for life, so an edit reaches
+        the next Run and never one already under way.
         """
-        from server.services.metadata_service import load_metadata_from_db
-
-        self.meta = await load_metadata_from_db(session)
+        return self._store.current()
 
     # ------------------------------------------------------------------
     # Existing methods
@@ -297,7 +294,8 @@ class RunService:
         # Validated before anything is created, so a bad override cannot leave a
         # half-built Run behind. Raises ValueError, which the API turns into a 400.
         overrides = validate_overrides(parameters)
-        run_meta = self.meta.with_overrides(overrides)
+        base_meta = self.meta  # read once: this Run holds it for life
+        run_meta = base_meta.with_overrides(overrides)
         # The run-start check comes first, before any parameter is read below: a
         # configuration that lacks a name gives the check's one message, not a KeyError.
         require_run_start(run_meta)
@@ -326,10 +324,11 @@ class RunService:
         # The explicit argument and the parameter are the same setting reached two ways,
         # so the stored parameter set has to agree with what the Run actually used.
         overrides["spreading_activation_threshold"] = threshold
-        run_meta = self.meta.with_overrides(overrides)
+        run_meta = base_meta.with_overrides(overrides)
         if mode == MODE_FAST:
             return self._create_fast_run(
                 initial, modified, target, answer, seed, threshold, workers, overrides,
+                base_meta,
             )
 
         run = Run(
@@ -367,7 +366,7 @@ class RunService:
         memory = _global_memory
         commentary = CommentaryLog()
 
-        runner = EngineRunner(self.meta)
+        runner = EngineRunner(base_meta)
         runner.init_mcat(initial, modified, target, answer=answer, seed=seed,
                          memory=memory, sink=sink, commentary=commentary,
                          parameters=overrides)
@@ -405,6 +404,7 @@ class RunService:
         threshold: int,
         workers: int = 1,
         parameters: dict[str, Any] | None = None,
+        meta: MetadataProvider | None = None,
     ) -> RunInfo:
         """A Fast Run, created without touching the database.
 
@@ -423,7 +423,7 @@ class RunService:
         self._next_fast_id -= 1
 
         sink = sink_for_mode(MODE_FAST)
-        runner = EngineRunner(self.meta)
+        runner = EngineRunner(meta or self.meta)
         runner.init_mcat(
             initial, modified, target, answer=answer, seed=seed,
             memory=_global_memory, sink=sink,

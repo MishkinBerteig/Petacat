@@ -13,7 +13,7 @@
 // ---------------------------------------------------------------------------
 
 import { useCallback, useState, type ReactNode } from 'react';
-import { ControlHelp } from '@/components/training/shared';
+import { ControlHelp } from '@/components/session/shared';
 import type { ComponentHelpKey } from '@/constants/helpTopics';
 
 const STORAGE_PREFIX = 'petacat.runControls.open.';

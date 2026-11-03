@@ -70,7 +70,7 @@ afterEach(() => {
 })
 
 describe('AdminPanel — clearing Episodic Memory', () => {
-  it("says it edits the global configuration Metacat Mode uses, which a Training copies", async () => {
+  it("says it edits the global configuration Metacat Mode uses, which a Training Mode Session copies", async () => {
     render(<AdminPanel />)
     const note = await screen.findByTestId('admin-mode-note')
     expect(note).toHaveTextContent('Metacat Mode')

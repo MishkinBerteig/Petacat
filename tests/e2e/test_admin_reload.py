@@ -3,8 +3,8 @@
 The Admin view can change anything in the database, and the requirement is that a change
 works for every run started after it (Metacat Mode: a single run, an episodic run, the
 one-problem Swarm). These tests make the edit through the Admin API only and then start a
-run, never calling ``/api/admin/reload``, so they fail if the server keeps serving the
-configuration it loaded at start-up.
+run, with no reload route to call (there is none), so they fail if the server keeps serving
+the configuration it loaded at start-up.
 
 ``abc -> abd; xyz -> ?`` at seed 2006188493 (fig. 5.11) finishes in 923 codelets on the
 shipped ``expiration_period`` of 500 and in 1475 with 80, so the count says which value the
@@ -81,10 +81,13 @@ async def test_slipnet_edit_reaches_the_next_run(app_client):
 
 
 @pytest.mark.asyncio
-async def test_swarm_runs_under_the_edited_configuration(app_client):
+async def test_swarm_runs_under_the_edited_configuration(app_client, db_session):
+    from server.services.configuration_store import get_configuration_store
+
+    # The fixture's store starts from the seed files; the baseline is the database's.
+    await get_configuration_store().refresh(db_session)
     body = {"initial": "abc", "modified": "abd", "target": "ijk", "seeds": [1],
             "max_steps": 200, "backend": "numpy"}
-    await app_client.post("/api/admin/reload")  # the baseline is the database's configuration
     first = (await app_client.post("/api/swarm", json=body)).json()
     await _set_param(app_client, "expiration_period", "80")
     try:

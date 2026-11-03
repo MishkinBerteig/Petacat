@@ -132,4 +132,4 @@ def _refuse_bulk_change(state):
 
 
 # The tables register on the shared ``Base`` when this module is imported;
-# ``server/models/configuration_state.py`` imports it, as ``training.py`` imports that.
+# ``server/models/configuration_state.py`` imports it, as ``training_mode_session.py`` imports that.

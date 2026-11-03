@@ -189,6 +189,11 @@ Compounding: admin **import** handles 4 collections while **export** writes 12
 `adopt_configuration_edits` middleware marks `RunService.meta` stale after any successful
 `/api/admin` write, and `create_run` rebuilds it, so an admin edit reaches the next Run.
 
+*Superseded by C3:* the middleware, `POST /api/admin/reload` and `RunService.reload_metadata`
+are gone. The journal layer refreshes the `ConfigurationStore` (`server/services/configuration_store.py`)
+after every committed change to the global configuration, and every service reads
+`store.current()` when it creates or dispatches a run.
+
 The second half is fixed now. `_IMPORTABLE` (`admin.py`) lists all twelve collections with
 their model, primary key and payload-key aliases; `_import_collection` upserts by that key
 and `_resync_identity_sequence` advances the sequence for the integer-keyed tables. Import

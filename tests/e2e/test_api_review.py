@@ -37,9 +37,10 @@ async def review_client(app_client):
     """
     from server.api import review as review_module
     from server.api.runs import get_run_service
+    from server.services.configuration_store import get_configuration_store
     from server.services.review_service import ReviewService
 
-    review_module._review_service = ReviewService(get_run_service().meta)
+    review_module._review_service = ReviewService(get_configuration_store())
     yield app_client
     review_module._review_service = None
 

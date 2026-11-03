@@ -78,6 +78,19 @@ logger = logging.getLogger("petacat")
 _CONFIGURATIONS = Configuration.__table__
 _JOURNAL = JournalEntry.__table__
 
+#: The post-commit hook for the global configuration: ``await hook(session)``, called by
+#: ``write_immediate`` only after a change to the global configuration has committed (never
+#: for a write that changed nothing, a ``commit=False`` write, or a failed one).  The
+#: ``ConfigurationStore`` installs its ``refresh`` here (``set_configuration_store``), so an
+#: edit reaches the next run before the write returns.
+_global_commit_hook = None
+
+
+def set_global_commit_hook(hook) -> None:
+    """Install (or, with ``None``, remove) the post-commit hook for global changes."""
+    global _global_commit_hook
+    _global_commit_hook = hook
+
 
 # ──────────────────────────────────────────────────────────────────
 # Errors and results
@@ -96,8 +109,20 @@ class MissingKey(JournalError):
     """An update or delete names a natural key the table does not hold."""
 
 
+class StaleRevision(JournalError):
+    """The caller's ``expected_revision`` is not the configuration's revision (compare-and-set)."""
+
+
 class SourceRefused(JournalError):
     """The global configuration (Metacat Mode) refuses a Training Mode source (M2)."""
+
+
+class ConfigurationNotAdopted(JournalError):
+    """A global change committed, but the post-commit hook failed.
+
+    The change is in the database and in the journal; the configuration the runs use is
+    still the previous one, until the database holds a configuration it can be built from.
+    """
 
 
 @dataclass
@@ -401,6 +426,7 @@ async def write_immediate(
     episode_version: int | None = None,
     compute_hash: bool = True,
     commit: bool = True,
+    expected_revision: int | None = None,
 ) -> WriteResult:
     """Apply ``ops`` to the configuration's tables and append the entry, in one transaction.
 
@@ -409,8 +435,11 @@ async def write_immediate(
     Configuration's first load writes ``configuration_state`` in the same one); the batch
     is still all-or-nothing, inside a savepoint.
 
-    Raises :class:`KeyExists`, :class:`MissingKey`, :class:`SourceRefused` or
-    :class:`JournalError`; a database error (a foreign key, for one) propagates.  Either
+    ``expected_revision`` is an optional compare-and-set: once the configuration's row is
+    locked, a revision other than this raises :class:`StaleRevision` and nothing is written.
+
+    Raises :class:`KeyExists`, :class:`MissingKey`, :class:`SourceRefused`,
+    :class:`StaleRevision` or :class:`JournalError`; a database error (a foreign key, for one) propagates.  Either
     way nothing was written.
     """
     ops = list(ops)
@@ -419,6 +448,7 @@ async def write_immediate(
             result = await _write(
                 session, ops, source, actor, configuration_id, channel, note, proposed,
                 group_id, causing_run_id, episode_version, compute_hash,
+                expected_revision,
             )
             await session.commit()
         else:
@@ -426,21 +456,44 @@ async def write_immediate(
                 result = await _write(
                     session, ops, source, actor, configuration_id, channel, note, proposed,
                     group_id, causing_run_id, episode_version, compute_hash,
+                    expected_revision,
                 )
             await session.flush()
-        return result
     except BaseException:
         if commit:
             await session.rollback()
         raise
+    if commit and result.changed and configuration_id == GLOBAL_CONFIGURATION_ID:
+        await _run_global_commit_hook(session)
+    return result
+
+
+async def _run_global_commit_hook(session: AsyncSession) -> None:
+    """Call the post-commit hook.  The change is already committed, so a failure here is
+    reported as :class:`ConfigurationNotAdopted` and rolls nothing back."""
+    if _global_commit_hook is None:
+        return
+    try:
+        await _global_commit_hook(session)
+    except Exception as exc:
+        logger.exception("The configuration was saved but could not be loaded")
+        raise ConfigurationNotAdopted(
+            "The edit was saved, but the configuration it leaves could not be loaded "
+            f"({exc}); the previous configuration stays in force until this is fixed."
+        ) from exc
 
 
 async def _write(
     session, ops, source, actor, configuration_id, channel, note, proposed, group_id,
-    causing_run_id, episode_version, compute_hash,
+    causing_run_id, episode_version, compute_hash, expected_revision=None,
 ) -> WriteResult:
     configuration = await _lock_configuration(session, configuration_id)
     _check_source(configuration["kind"], source)
+    if expected_revision is not None and configuration["revision"] != expected_revision:
+        raise StaleRevision(
+            f"configuration {configuration_id} is at revision {configuration['revision']}, "
+            f"not the expected {expected_revision}"
+        )
     if configuration["kind"] != KIND_GLOBAL:
         raise NotImplementedError(
             "write_immediate writes the global configuration; a session's configuration "

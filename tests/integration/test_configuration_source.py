@@ -60,7 +60,7 @@ LOCK_KEY = 0x7E7ACC2
 async def scratch():
     """An empty scratch database, held under an advisory lock for the test."""
     import server.models.run  # noqa: F401
-    import server.models.training  # noqa: F401
+    import server.models.training_mode_session  # noqa: F401
     from server.models.metadata import Base
 
     url = scratch_url()

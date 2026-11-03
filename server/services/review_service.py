@@ -152,7 +152,7 @@ def clear_summary(clear: EpisodicMemoryClear) -> dict:
 class ReviewService:
     """Reads the record; never mutates a Run.
 
-    Given the ``MetadataProvider`` rather than the ``RunService`` on purpose: review
+    Given the ``ConfigurationStore`` rather than the ``RunService`` on purpose: review
     must work for Runs whose runner is long gone, which is nearly all of them, so it
     has no business consulting the live-run registry.  What it needs the metadata for
     is the short names and conceptual depths a capture references by name, and the
@@ -163,9 +163,14 @@ class ReviewService:
     #: this is a memory bound; the least recently used is dropped when it is exceeded.
     MAX_OPEN_INSPECTORS = 3
 
-    def __init__(self, meta: Any) -> None:
-        self.meta = meta
+    def __init__(self, store: Any) -> None:
+        self._store = store
         self._inspectors: dict[int, _Inspector] = {}
+
+    @property
+    def meta(self) -> Any:
+        """The configuration store's current provider (read when an inspection opens)."""
+        return self._store.current()
 
     # ------------------------------------------------------------------
     # The episodic-run timeline

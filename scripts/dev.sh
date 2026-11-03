@@ -48,7 +48,7 @@ ensure_db() {
 
     # The role and both databases are created if absent, so a fresh clone needs no
     # manual setup step.  petacat_test is separate from petacat precisely so that an
-    # e2e run cannot touch the Training Session in the development database.
+    # e2e run cannot touch the Training Mode Session in the development database.
     psql -d postgres -tAc "SELECT 1 FROM pg_roles WHERE rolname='petacat'" | grep -q 1 \
         || psql -d postgres -qc "CREATE ROLE petacat LOGIN PASSWORD 'dev' CREATEDB"
     for db in petacat petacat_test; do

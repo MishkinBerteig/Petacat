@@ -299,7 +299,7 @@ export function MemoryView() {
         </div>
       )}
 
-      {/* Which mode's memory this is: Training Mode's Trainings keep their own. */}
+      {/* Which mode's memory this is: Training Mode's Training Mode Sessions keep their own. */}
       <div
         className="text-xs text-muted"
         data-testid="memory-mode-note"
@@ -338,7 +338,7 @@ export function MemoryView() {
           {!isEmpty && (
             <button
               onClick={handleClear}
-              title="Clear Metacat Mode's Episodic Memory (not a Training's episode memory)"
+              title="Clear Metacat Mode's Episodic Memory (not a Training Mode Session's episode memory)"
               style={{ fontSize: 10, color: 'var(--error)' }}
             >
               Clear Memory

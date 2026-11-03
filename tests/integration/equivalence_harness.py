@@ -155,7 +155,7 @@ async def load_fresh_database(engine: Any, seed_dir: str = SEED_DIR) -> None:
     seeder, once, into empty tables.
     """
     import server.models.run  # noqa: F401 -- registers the runtime tables
-    import server.models.training  # noqa: F401
+    import server.models.training_mode_session  # noqa: F401
     from server.models.metadata import Base
     from server.services.standard_configuration import seed_metadata_from_json
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker

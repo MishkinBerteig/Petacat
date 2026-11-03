@@ -117,11 +117,11 @@ print("OK")
     assert "OK" in completed.stdout
 
 
-def test_trainings_run_serially_in_one_child_when_the_plugin_is_detached() -> None:
-    """The Training service is core: with ``server.parallel`` unimportable it chooses the
+def test_sessions_run_serially_in_one_child_when_the_plugin_is_detached() -> None:
+    """The Training Mode Session service is core: with ``server.parallel`` unimportable it chooses the
     serial executor, and the runs it produces equal the plugin's in-process reference.
 
-    This needs the test Postgres (the Training is database-backed); without it only the
+    This needs the test Postgres (the Training Mode Session is database-backed); without it only the
     executor itself is checked.
     """
     import json
@@ -130,7 +130,7 @@ def test_trainings_run_serially_in_one_child_when_the_plugin_is_detached() -> No
         r"""
 import asyncio, json, os, sys
 from server.engine.metadata import MetadataProvider
-from server.services.training_executor import SerialExecutor, TrainingTask, create_executor
+from server.services.training_mode_session_executor import SerialExecutor, SessionTask, create_executor
 
 meta = MetadataProvider.from_standard_configuration(os.path.join(os.getcwd(), "seed_data"))
 executor = create_executor()
@@ -139,7 +139,7 @@ problems = [("abc", "abd", "ijk"), ("abc", "abd", "xyz")]
 out = {}
 
 # The executor alone.
-tasks = [TrainingTask(i, m, t, None, seed, 300, None, "off") for (i, m, t) in problems for seed in (1, 2)]
+tasks = [SessionTask(i, m, t, None, seed, 300, None, "off") for (i, m, t) in problems for seed in (1, 2)]
 for task in tasks:
     o = executor.submit([task], meta).result(timeout=300)[0]
     out[f"exec/{task.target}/{task.seed}"] = [o.status, o.answer, o.codelets]
@@ -159,23 +159,23 @@ async def service():
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
     from sqlalchemy.pool import NullPool
     from server.models.metadata import Base
-    from server.models import training as tr
-    from server.services.training_service import TrainingService
+    from server.models import training_mode_session as tr
+    from server.services.training_mode_session_service import TrainingModeSessionService
 
     engine = create_async_engine(url, poolclass=NullPool)
     async with engine.begin() as conn:
         await conn.run_sync(lambda c: Base.metadata.create_all(c, tables=[
-            tr.Training.__table__, tr.TrainingProblem.__table__, tr.TrainingRun.__table__,
-            tr.TrainingMemoryMerge.__table__]))
+            tr.TrainingModeSession.__table__, tr.TrainingModeSessionProblem.__table__, tr.TrainingModeSessionRun.__table__,
+            tr.SessionMemoryMerge.__table__]))
     factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    svc = TrainingService(factory, lambda: meta, executor=create_executor())
+    svc = TrainingModeSessionService(factory, lambda: meta, executor=create_executor())
     await svc.start()
     try:
-        made = await svc.create_training(
+        made = await svc.create_session(
             name="detached", settings={"seeds_per_problem": 2, "max_codelets": 300, "backend": "off"},
             problems=[{"initial": i, "modified": m, "target": t} for (i, m, t) in problems])
-        tid = made["training"]["id"]
-        await svc.start_training(tid)
+        tid = made["session"]["id"]
+        await svc.start_session(tid)
         for _ in range(600):
             if (await svc.summary(tid))["activity"] == "idle":
                 break
@@ -188,7 +188,7 @@ async def service():
     finally:
         await svc.stop()
         async with factory() as s:
-            await s.execute(delete(tr.Training).where(tr.Training.name == "detached"))
+            await s.execute(delete(tr.TrainingModeSession).where(tr.TrainingModeSession.name == "detached"))
             await s.commit()
         await engine.dispose()
 
@@ -200,7 +200,7 @@ print("RESULT", json.dumps(out))
     assert completed.returncode == 0, completed.stderr[-3000:]
     out = json.loads(completed.stdout.split("RESULT ", 1)[1])
     assert any(k.startswith("exec/") for k in out)
-    # The Training's runs share one Episodic Memory (a run after the first starts from what the
+    # The Training Mode Session's runs share one Episodic Memory (a run after the first starts from what the
     # earlier ones left), so only the executor's memory-free runs have a plugin reference.
     assert any(k.startswith("svc/") for k in out)
     out = {k: v for k, v in out.items() if k.startswith("exec/")}

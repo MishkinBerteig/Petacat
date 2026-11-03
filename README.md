@@ -28,7 +28,7 @@ license change was authorised by Dr. Marshall directly (see
 > end-to-end. Episodic Memory (Metacat-Mode learning) shapes the runs that inherit it: a run
 > declines an answer already held for the same problem and rules, so repeating a
 > problem across Metacat Mode's [episodic runs](#persistence-modes-and-episodic-runs)
-> (which are Metacat Mode and not Training Mode) explores a different answer each time. It ships with 4,660 test cases covering the engine, the API, and the
+> (which are Metacat Mode and not Training Mode) explores a different answer each time. It ships with 5,003 test cases covering the engine, the API, and the
 > help/config system, run on both the CPU and the GPU numeric backends. Underneath the seven components sits an execution
 > substrate — three [persistence modes](#persistence-modes-and-episodic-runs),
 > a [GPU numeric substrate](#the-numeric-substrate), and
@@ -59,8 +59,7 @@ affects it in any way**. It comprises:
   share, with reminding, snags and answer and snag descriptions. Metacat Mode's runs
   are **episodic runs**: each inherits the Episodic Memory that the runs before it
   left, until that memory is cleared. This is *Metacat Mode's* Episodic Memory and it
-  has nothing to do with Training Mode. (v1.2 called the sequence of runs a "Training
-  Session". That was a Petacat misnomer, not Metacat's term, and v2.0 removed it:
+  has nothing to do with Training Mode. (v1.2 called the span between two clears a "session". That was a Petacat misnomer, not Metacat's term, and v2.0 removed it:
   Metacat Mode has no sessions of any kind.)
 
 Episodic Memory is a very minimal kind of learning: **Metacat-Mode learning**.
@@ -70,24 +69,23 @@ Episodic Memory is a very minimal kind of learning: **Metacat-Mode learning**.
 **Training Mode** is every extension since v1.2 that makes Petacat a novel
 machine-learning platform:
 
-- **Trainings** (today; Training Mode Sessions): named, database-backed Training episodes of
+- **Training Mode Sessions** (today): named, database-backed Training episodes of
   many problems, each run over many seeds, extendable while they run, each with its own
-  Episodic Memory that is never cleared. A Training is created Stopped, then started, paused,
+  Episodic Memory that is never cleared. A Training Mode Session is created Stopped, then started, paused,
   resumed, stopped, started again and deleted.
-  See [Training](#training-many-problems-on-every-core) and `/api/trainings`.
-- **Planned, not yet built:** a Training's own evolving Slipnet, learners, and an
+  See [Training Mode Session](#training-mode-session-many-problems-on-every-core) and `/api/training-mode/sessions`.
+- **Planned, not yet built:** a Training Mode Session's own evolving Slipnet, learners, and an
   external delta route.
 
-A Training copies the global configuration when it is created and never reads or
+A Training Mode Session copies the global configuration when it is created and never reads or
 writes Metacat Mode's Episodic Memory, Slipnet or configuration.
 
 ### The word "learning"
 
 "Learning" (learn, learned, learner) is ambiguous now, so this README always qualifies it:
 **Metacat-Mode learning** is Episodic Memory; **Training-Mode learning** is everything
-new. "Episode" is qualified the same way: a **Training episode** belongs to Training
-Mode, and **Metacat's** episodic memory belongs to Metacat Mode. "Training" on its own
-means Training Mode, and "Workspace" always means the engine's perceptual system.
+new. "Episode" is qualified the same way: a **Training episode** belongs to Training Mode, and **Metacat's** episodic memory belongs to Metacat Mode. A bare
+"session" means a Training Mode Session, and "Workspace" always means the engine's perceptual system.
 
 ### Run mode is separate from both modes
 
@@ -102,9 +100,9 @@ What is available today:
 
 | Run mode | Metacat Mode | Training Mode |
 |---|---|---|
-| Single-threaded | Yes: the default run (`workers` 1) | Partly: the serial executor, one run at a time in a child process, chosen for the whole server rather than per Training (when the plugin is absent, or by `PETACAT_TRAINING_EXECUTOR=serial`) |
-| Multi-core across runs (swarm) | Yes: the one-problem Swarm, `POST /api/swarm` | Yes: a Training's own swarm pool, process-wide (chosen when the plugin is present, or by `PETACAT_TRAINING_EXECUTOR=swarm`). Each run is single-threaded inside its worker |
-| Multi-core within one run (speculative executor) | Yes: `workers` > 1 on `POST /api/runs`, Run to answer only. Bit-for-bit the [stream-serial reference](#exact-parallelism-inside-one-run), which has the serial run's probability law but is not the same run for a given seed; not yet faster than serial | Not yet: a Training's runs are single-threaded; a plan to extend it is under review |
+| Single-threaded | Yes: the default run (`workers` 1) | Partly: the serial executor, one run at a time in a child process, chosen for the whole server rather than per Training Mode Session (when the plugin is absent, or by `PETACAT_SESSION_EXECUTOR=serial`) |
+| Multi-core across runs (swarm) | Yes: the one-problem Swarm, `POST /api/swarm` | Yes: a Training Mode Session's own swarm pool, process-wide (chosen when the plugin is present, or by `PETACAT_SESSION_EXECUTOR=swarm`). Each run is single-threaded inside its worker |
+| Multi-core within one run (speculative executor) | Yes: `workers` > 1 on `POST /api/runs`, Run to answer only. Bit-for-bit the [stream-serial reference](#exact-parallelism-inside-one-run), which has the serial run's probability law but is not the same run for a given seed; not yet faster than serial | Not yet: a Training Mode Session's runs are single-threaded; a plan to extend it is under review |
 
 ### The v2.0 milestone
 
@@ -436,7 +434,7 @@ Petacat has two test suites:
   plugin against the serial runs it claims to equal), `lockstep` (Petacat's decision
   traces against Metacat's), and `e2e` (full HTTP
   stack against a running database). All eight run in a single command against
-  the local Postgres — 4,660 cases, which includes the numeric matrix's second
+  the local Postgres — 5,003 cases, which includes the numeric matrix's second
   pass over the 519 backend-sensitive tests. See
   [TESTING.md](TESTING.md) for the layer breakdown, the numeric backend matrix,
   the session ceiling, the unit-test rules, determinism requirements, test-double
@@ -1017,57 +1015,57 @@ making the serial loop read state as it stood N codelets ago:
 - by N = 15, runs start failing to converge inside the codelet cap;
 - by N = 50, a genuinely new answer appears.
 
-## Training: many problems on every core
+## Training Mode Session: many problems on every core
 
-A **Training** is a named, long-lived **Training episode**: many different letter-string
+A **Training Mode Session** is a named, long-lived **Training episode**: many different letter-string
 problems, each run over a number of seeds, spread across every core. It belongs to
 **Training Mode**, which the machine-learning layer drives. It is not the episodic runs of Review, which are Metacat Mode's recordings of dashboard
-runs and share Metacat Mode's Episodic Memory; a Training is a job Petacat runs by itself, with its own
-Episodic Memory, and it lives in its own tables (`server/models/training.py`).
+runs and share Metacat Mode's Episodic Memory; a Training Mode Session is a job Petacat runs by itself, with its own
+Episodic Memory, and it lives in its own tables (`server/models/training_mode_session.py`).
 
-**Problems can be added in any state.** Create a Training with 25 problems and start it;
+**Problems can be added in any state.** Create a Training Mode Session with 25 problems and start it;
 whenever five have finished, add five more. Problems start roughly in
 the order they arrive, so they finish steadily, but the order is not guaranteed and a
 client must not depend on it. Each run is the run the Run button would make with that
-seed, started from the Training's Episodic Memory as of the run's `memory_version`.
+seed, started from the Training Mode Session's Episodic Memory as of the run's `memory_version`.
 
 ### The states
 
-A Training is **Stopped**, **Running** or **Paused**.
+A Training Mode Session is **Stopped**, **Running** or **Paused**.
 
-- **Created Stopped.** `POST /api/trainings` stores it and its first problems and runs nothing.
-  `POST /api/trainings/{id}/start` loads it and runs it (`{"paused": true}` starts it Paused).
-- **Stopped is a record in the database.** Only Running and Paused Trainings are live in
-  the server process, and **after a server restart every Training is Stopped**. Starting
+- **Created Stopped.** `POST /api/training-mode/sessions` stores it and its first problems and runs nothing.
+  `POST /api/training-mode/sessions/{id}/start` loads it and runs it (`{"paused": true}` starts it Paused).
+- **Stopped is a record in the database.** Only Running and Paused Training Mode Sessions are live in
+  the server process, and **after a server restart every Training Mode Session is Stopped**. Starting
   rebuilds the Episodic Memory from the stored merges and resumes each unfinished problem at
   the seeds not yet stored.
-- **Stop** (`POST /api/trainings/{id}/stop`) writes every run and merge still held in memory and
+- **Stop** (`POST /api/training-mode/sessions/{id}/stop`) writes every run and merge still held in memory and
   drops the live part. Runs in flight are dropped and their seeds run again after the next
   start. The row records `stopped_at`, `stopped_from` (`running` or `paused`) and
   `stop_reason` (`user`, `shutdown` or `error`; a server shutdown records `shutdown`).
-- **Pause and resume** act on a live Training and answer 409 for a Stopped one.
-- **Cancel** (`POST /api/trainings/{id}/cancel`) is an action, not a state. It cancels every
+- **Pause and resume** act on a live Training Mode Session and answer 409 for a Stopped one.
+- **Cancel** (`POST /api/training-mode/sessions/{id}/cancel`) is an action, not a state. It cancels every
   queued and in-flight problem, keeps the finished runs and changes no state; problems can be
-  added afterwards. There are no `closed` or `cancelled` Trainings, and no `close` route.
+  added afterwards. There are no `closed` or `cancelled` Training Mode Sessions, and no `close` route.
 - **Inside Running** the summary's `activity` is `idle` (nothing left to run) or `stalled`
   (it cannot run; `stalled_reason` says why) and is `null` while there is work. Problems are
   accepted in every state.
 - **Delete** removes everything: the Episodic Memory, the problems and runs and, for a live
-  Training, its live state (settled first, with no Stop write). It leaves no tombstone.
+  Training Mode Session, its live state (settled first, with no Stop write). It leaves no tombstone.
 
 ### The Episodic Memory
 
-Every Training has one; there is no setting for it. A request that sends `memory` (at the top
+Every Training Mode Session has one; there is no setting for it. A request that sends `memory` (at the top
 level or in `settings`) is answered with 422. **No route clears it**: it goes only when the whole
-Training is deleted.
+Training Mode Session is deleted.
 
-- The Training is one Training episode with one Episodic Memory
-  (the same kind of structure as Metacat's Episodic Memory, but the Training's own).
+- The Training Mode Session is one Training episode with one Episodic Memory
+  (the same kind of structure as Metacat's Episodic Memory, but the Training Mode Session's own).
   - A run takes a **copy of the episode memory as it is when the run starts** and
     holds it static for its whole duration. What other runs add to the episode memory never reaches a run
     in flight. The run's own additions go into its own copy, as in any run.
   - **When the copy is taken.** The copy is made when the run is handed to a worker.
-    The Training has its own process pool and never has more runs in flight than it
+    The Training Mode Session has its own process pool and never has more runs in flight than it
     has workers, so a run starts the moment it is handed over. Every result that has
     come back is merged before the next run is handed out.
   - When the run finishes, its additions are **merged** into the episode memory. They
@@ -1076,7 +1074,7 @@ Training is deleted.
     same description twice.
   - The episode memory has a **version**, the number of merges so far. Each run records
     `memory_version` (the version it started with) and `seq` (its merge order). That
-    record makes a Training reproducible: the stored merges rebuild the memory exactly.
+    record makes a Training Mode Session reproducible: the stored merges rebuild the memory exactly.
   - **One worker reproduces Metacat's serial episode:** each run starts after the previous one
     merged. That is a reference for tests, not a link to Metacat Mode. With many workers it is
     the same idea with runs overlapping.
@@ -1093,16 +1091,16 @@ Training is deleted.
 | `parameters` | none | Engine parameter overrides, validated like `POST /api/runs` |
 | `backend` | resolved at creation | The numeric backend |
 
-**The error policy can be edited at any time** (`PATCH /api/trainings/{id}`):
+**The error policy can be edited at any time** (`PATCH /api/training-mode/sessions/{id}`):
 
 | Field | Default | Meaning |
 |---|---|---|
-| `on_run_error` | `record` | A run raised. `record` keeps the error as that run's outcome and carries on; `skip_problem` cancels the rest of that problem's seeds; `pause` pauses the Training; `cancel` cancels every queued and in-flight problem (the state does not change) |
+| `on_run_error` | `record` | A run raised. `record` keeps the error as that run's outcome and carries on; `skip_problem` cancels the rest of that problem's seeds; `pause` pauses the Training Mode Session; `cancel` cancels every queued and in-flight problem (the state does not change) |
 | `max_errors_per_problem` | none | Reaching it cancels that problem |
-| `max_errors_total` | none | Reaching it pauses the Training |
+| `max_errors_total` | none | Reaching it pauses the Training Mode Session |
 | `on_worker_failure` | `retry` | A worker process died (killed, out of memory). Its runs are resubmitted, which is exact because runs are deterministic. A broken pool takes every run in flight with it, so the affected runs are re-run one at a time, and only a run that breaks the pool on its own is charged a retry. `pause` pauses at once |
-| `max_retries` | 3 | Per run; when exhausted, the Training pauses |
-| `on_config_change` | `pause` | The engine configuration differs from the one the Training was created under. `pause` stalls it until the configuration returns, which is checked every 1.5 s; `adopt` continues under the new one, and each run records its `config_hash` |
+| `max_retries` | 3 | Per run; when exhausted, the Training Mode Session pauses |
+| `on_config_change` | `pause` | The engine configuration differs from the one the Training Mode Session was created under. `pause` stalls it until the configuration returns, which is checked every 1.5 s; `adopt` continues under the new one, and each run records its `config_hash` |
 
 **Outcome keys.** A run's key is its answer when it found one, and otherwise
 `*CAP*` (it reached `max_codelets` without an answer), `*ERROR*` (it raised) or
@@ -1111,7 +1109,7 @@ these keys alongside the answers.
 
 ### The database is written only at milestones
 
-The database is written when a Training is created or renamed, when problems are
+The database is written when a Training Mode Session is created or renamed, when problems are
 added, when its policy changes, when it is stopped, and **when a problem finishes all its
 seeds**. That last write is one transaction holding the problem's summary, every run
 committed since the last write (from any problem) and the memory merges since the last
@@ -1124,52 +1122,52 @@ deterministic, so the redone work gives the identical result.
 
 ### With and without the plugin
 
-The Training service is core: it does not import `server/parallel/`. With the plugin it
+The Training Mode Session service is core: it does not import `server/parallel/`. With the plugin it
 submits runs to a swarm pool of its own, separate from the one `POST /api/swarm` uses; without it, a serial executor runs them one at a time
 in a child process. The API is the same and the results are identical, run for run
 (`tests/architecture/test_parallel_detachable.py` checks this in an interpreter that
-cannot import the plugin). `GET /api/trainings` reports which executor is in use.
+cannot import the plugin). `GET /api/training-mode/sessions` reports which executor is in use.
 
-The executor is chosen once per process: `PETACAT_TRAINING_EXECUTOR` (`serial` or `swarm`) forces
+The executor is chosen once per process: `PETACAT_SESSION_EXECUTOR` (`serial` or `swarm`) forces
 it, otherwise the swarm is used when the plugin imports and the serial child process when it does
 not. This is run mode (see [Two modes](#two-modes)); each run is single-threaded inside its
-worker, and the speculative executor is not yet available to Trainings.
+worker, and the speculative executor is not yet available to Training Mode Sessions.
 
 ### Routes
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| GET | `/api/trainings` | Trainings newest first, with the executor, limits and defaults |
-| POST | `/api/trainings` | Create one: `name`, optional `note`, `settings`, `policy` and `problems` |
-| GET / PATCH / DELETE | `/api/trainings/{id}` | Read, rename or change the policy (settings cannot change), delete |
-| POST | `/api/trainings/{id}/problems` | Add problems, in any state |
-| GET | `/api/trainings/{id}/problems` | Search, sort and page the problems |
-| GET | `/api/trainings/{id}/problems/{pid}` | One problem with its full answer distribution |
-| GET | `/api/trainings/{id}/problems/{pid}/runs` | Its runs in seed order, with `seq` and `memory_version` |
-| POST | `/api/trainings/{id}/problems/{pid}/cancel` | Cancel one problem, keeping its finished runs |
-| GET | `/api/trainings/{id}/finished` | Problems finished after a cursor; `wait` (up to 60 s) long-polls |
-| GET | `/api/trainings/{id}/memory` | The Training's Episodic Memory (read-only), in the shape `GET /api/memory` uses |
-| POST | `/api/trainings/{id}/start`, `/pause`, `/resume`, `/stop`, `/cancel` | The states, and the cancel action |
-| GET | `/api/trainings/{id}/export` | Download `problems`, `distribution` or `runs` as CSV or JSON |
+| GET | `/api/training-mode/sessions` | Training Mode Sessions newest first, with the executor, limits and defaults |
+| POST | `/api/training-mode/sessions` | Create one: `name`, optional `note`, `settings`, `policy` and `problems` |
+| GET / PATCH / DELETE | `/api/training-mode/sessions/{id}` | Read, rename or change the policy (settings cannot change), delete |
+| POST | `/api/training-mode/sessions/{id}/problems` | Add problems, in any state |
+| GET | `/api/training-mode/sessions/{id}/problems` | Search, sort and page the problems |
+| GET | `/api/training-mode/sessions/{id}/problems/{pid}` | One problem with its full answer distribution |
+| GET | `/api/training-mode/sessions/{id}/problems/{pid}/runs` | Its runs in seed order, with `seq` and `memory_version` |
+| POST | `/api/training-mode/sessions/{id}/problems/{pid}/cancel` | Cancel one problem, keeping its finished runs |
+| GET | `/api/training-mode/sessions/{id}/finished` | Problems finished after a cursor; `wait` (up to 60 s) long-polls |
+| GET | `/api/training-mode/sessions/{id}/memory` | The Training Mode Session's Episodic Memory (read-only), in the shape `GET /api/memory` uses |
+| POST | `/api/training-mode/sessions/{id}/start`, `/pause`, `/resume`, `/stop`, `/cancel` | The states, and the cancel action |
+| GET | `/api/training-mode/sessions/{id}/export` | Download `problems`, `distribution` or `runs` as CSV or JSON |
 
-### The Training view
+### The Training Mode Session view
 
-The hamburger menu's **Training** entry (`#/training`, or `#/training/7` for one) opens
-the view. The left column lists the Trainings with a line about the cores. The right
+The hamburger menu's **Training Mode** entry (`#/training-mode`, or `#/training-mode/7` for one) opens
+the view. The left column lists the Training Mode Sessions with a line about the cores. The right
 shows the selected one: settings, error policy, totals and controls, a box to paste or
 upload problems with a preview, the table of problems (searched and sorted by the
 server) and a Memory tab. Help topics start at
-[HELP.md](HELP.md)'s "Training".
+[HELP.md](HELP.md)'s "Training Mode Session".
 
-### `scripts/training_client.py`: driving it from an ML layer
+### `scripts/session_client.py`: driving it from an ML layer
 
-`scripts/training_client.py` is the reference for how an ML layer uses the engine, and
-uses only the standard library. It creates a Training with 25 problems, follows the
+`scripts/session_client.py` is the reference for how an ML layer uses the engine, and
+uses only the standard library. It creates a Training Mode Session with 25 problems, follows the
 `finished` long-poll cursor, and each time five have finished it adds five more, until
 a total is reached:
 
 ```bash
-.venv/bin/python scripts/training_client.py --url http://127.0.0.1:8765 \
+.venv/bin/python scripts/session_client.py --url http://127.0.0.1:8765 \
     --initial 25 --add 5 --total 60 --seeds 10 --max-codelets 2000
 ```
 
@@ -1179,7 +1177,7 @@ and the episode memory ended at 154 answers and 5 snags.
 
 ### A pool can no longer outlive its owner
 
-Running the Training suite exposed a leak: when the process that owned a swarm's pool
+Running the Training Mode Session suite exposed a leak: when the process that owned a swarm's pool
 was killed outright (SIGKILL, or out of memory), `atexit` never ran, the pool's pipes
 did not reliably reach end-of-file, and the forkserver and 17 idle workers sat on for
 hours. Each worker now watches its owner once a second; when the owner is gone it exits
@@ -1270,22 +1268,22 @@ The tables below cover the routes a user drives.
 | POST | `/api/swarm` | Run one problem (an `answer` makes it justification mode) over many seeds — `seeds`, or `count` and `seed_start` — on every core; returns the answer distribution, status counts, per-run outcomes and throughput. Persists nothing |
 | GET | `/api/swarm` | The pool: whether the plugin is installed, worker count, core tiers, backends and executors, limits |
 
-### Trainings
+### Training Mode Sessions
 
 Training Mode. The full list, with request and response shapes, is in
-[API.md](API.md) and the [Training section](#training-many-problems-on-every-core).
+[API.md](API.md) and the [Training Mode Session section](#training-mode-session-many-problems-on-every-core).
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| GET/POST | `/api/trainings` | List Trainings with the executor, limits and defaults / create one |
-| GET/PATCH/DELETE | `/api/trainings/{id}` | Read, rename or change the error policy, delete |
-| POST/GET | `/api/trainings/{id}/problems` | Add problems while it runs / search, sort and page them |
-| GET | `/api/trainings/{id}/problems/{pid}`, `.../runs` | One problem's distribution / its runs, with `seq` and `memory_version` |
-| POST | `/api/trainings/{id}/problems/{pid}/cancel` | Cancel one problem |
-| GET | `/api/trainings/{id}/finished` | Problems finished after a cursor; long-polls with `wait` |
-| GET | `/api/trainings/{id}/memory` | The Training episode's memory (shared only) |
-| POST | `/api/trainings/{id}/pause`, `/resume`, `/close`, `/cancel` | Lifecycle |
-| GET | `/api/trainings/{id}/export` | CSV or JSON of problems, distribution or runs |
+| GET/POST | `/api/training-mode/sessions` | List Training Mode Sessions with the executor, limits and defaults / create one |
+| GET/PATCH/DELETE | `/api/training-mode/sessions/{id}` | Read, rename or change the error policy, delete |
+| POST/GET | `/api/training-mode/sessions/{id}/problems` | Add problems while it runs / search, sort and page them |
+| GET | `/api/training-mode/sessions/{id}/problems/{pid}`, `.../runs` | One problem's distribution / its runs, with `seq` and `memory_version` |
+| POST | `/api/training-mode/sessions/{id}/problems/{pid}/cancel` | Cancel one problem |
+| GET | `/api/training-mode/sessions/{id}/finished` | Problems finished after a cursor; long-polls with `wait` |
+| GET | `/api/training-mode/sessions/{id}/memory` | The Training episode's memory (shared only) |
+| POST | `/api/training-mode/sessions/{id}/pause`, `/resume`, `/close`, `/cancel` | Lifecycle |
+| GET | `/api/training-mode/sessions/{id}/export` | CSV or JSON of problems, distribution or runs |
 
 ### Interactive controls
 

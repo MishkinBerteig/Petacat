@@ -96,7 +96,7 @@ A healthy run shows the temperature falling as activity falls: the program build
 **Topic key:** `memory`  
 **Summary:** A cross-run memory store that saves rich answer and snag descriptions, supporting reminding, comparison, and commentary across runs. It is Metacat Mode's Episodic Memory.
 
-Episodic Memory is Metacat's persistent store of past problem-solving experiences, preserving rich descriptions of answers and snags across multiple runs. While the Workspace and Temporal Trace are reset at the beginning of each run, Episodic Memory accumulates over the system's lifetime, giving Metacat the ability to remember, compare, and be reminded of its previous analogies. This is a very minimal kind of learning, which this help calls Metacat-Mode learning; a Training in Training Mode has its own episode memory and never reads or writes this one. This addresses one of the major weaknesses of Copycat, which treats every run as an isolated event with no memory of past results.
+Episodic Memory is Metacat's persistent store of past problem-solving experiences, preserving rich descriptions of answers and snags across multiple runs. While the Workspace and Temporal Trace are reset at the beginning of each run, Episodic Memory accumulates over the system's lifetime, giving Metacat the ability to remember, compare, and be reminded of its previous analogies. This is a very minimal kind of learning, which this help calls Metacat-Mode learning; a Training Mode Session in Training Mode has its own episode memory and never reads or writes this one. This addresses one of the major weaknesses of Copycat, which treats every run as an isolated event with no memory of past results.
 
 The primary unit stored in Episodic Memory is the answer description -- a structured characterization of a discovered answer that includes the problem strings, the answer string itself, the rules used to derive it (with abstractness ratings), the supporting bridges and concept-mappings, the three distilled theme-patterns at the time of discovery -- the dominant themes of the top, bottom and vertical bridges rather than the whole activation field, the temperature at which the answer was found, a quality score from 0 to 100, and any unjustified slippages (concept substitutions that were not supported by the built structures). Episodic Memory also stores snag descriptions that record failures, capturing the themes and structures involved when the system got stuck. Each snag description keeps the rule, the translated rule that failed and Metacat's one-sentence explanation of what went wrong, all of which the Memory panel shows.
 
@@ -115,19 +115,19 @@ Episodic Memory is the only thing that survives a run boundary. The Slipnet, the
 ### Metacat Mode and Training Mode
 
 **Topic key:** `modes`  
-**Summary:** Petacat's two modes: Metacat Mode (v1.2 features, including Episodic Memory) and Training Mode (Trainings and what follows), and how run mode and 'learning' fit.
+**Summary:** Petacat's two modes: Metacat Mode (v1.2 features, including Episodic Memory) and Training Mode (Training Mode Sessions and what follows), and how run mode and 'learning' fit.
 
 Petacat has two modes, and every feature belongs to exactly one of them.
 
-Metacat Mode is Petacat as a functional equivalent of Metacat, exactly as in v1.2: ordinary runs (Fast, Normal and Audit; Run to answer and Live updates), Run History and Review, the one-problem Swarm, and the Admin view, which edits the global configuration. It also holds Metacat's own episodic features: the Episodic Memory that successive runs share, with reminding, snags and answer and snag descriptions. Metacat Mode's runs are episodic runs: each inherits the Episodic Memory that the runs before it left, until that memory is cleared. Metacat Mode has no sessions of any kind; v1.2's 'Training Session' was a Petacat misnomer that v2.0 removed. Episodic Memory is a very minimal kind of learning, which this help calls Metacat-Mode learning. Metacat Mode stays permanently faithful to Metacat.
+Metacat Mode is Petacat as a functional equivalent of Metacat, exactly as in v1.2: ordinary runs (Fast, Normal and Audit; Run to answer and Live updates), Run History and Review, the one-problem Swarm, and the Admin view, which edits the global configuration. It also holds Metacat's own episodic features: the Episodic Memory that successive runs share, with reminding, snags and answer and snag descriptions. Metacat Mode's runs are episodic runs: each inherits the Episodic Memory that the runs before it left, until that memory is cleared. Metacat Mode has no sessions of any kind; v1.2's 'session' label for the span between clears was a Petacat misnomer that v2.0 removed. Episodic Memory is a very minimal kind of learning, which this help calls Metacat-Mode learning. Metacat Mode stays permanently faithful to Metacat.
 
-Training Mode is every extension added since v1.2 that makes Petacat a machine-learning platform. Today that is Trainings (Training Mode Sessions): named, database-backed Training episodes of many problems, extendable while they run, each with its own Episodic Memory that is never cleared. A Training is created, edited, started, paused, resumed, stopped, started again and deleted, and there can be any number of them. Planned for Training Mode are a Training's own evolving Slipnet, learners, and an external delta route; the first major milestone, v2.0, is Petacat recognizing new concepts and incorporating them into the Slipnet by modelling a learning feedback loop and perceptual processes. All of that is Training-Mode learning. A Training copies the global configuration when it is created and never reads or writes Metacat Mode's Episodic Memory, Slipnet or configuration.
+Training Mode is every extension added since v1.2 that makes Petacat a machine-learning platform. Today that is Training Mode Sessions: named, database-backed Training episodes of many problems, extendable while they run, each with its own Episodic Memory that is never cleared. A Training Mode Session is created, edited, started, paused, resumed, stopped, started again and deleted, and there can be any number of them. Planned for Training Mode are a Training Mode Session's own evolving Slipnet, learners, and an external delta route; the first major milestone, v2.0, is Petacat recognizing new concepts and incorporating them into the Slipnet by modelling a learning feedback loop and perceptual processes. All of that is Training-Mode learning. A Training Mode Session copies the global configuration when it is created and never reads or writes Metacat Mode's Episodic Memory, Slipnet or configuration.
 
 Nothing in Training Mode affects Metacat Mode in any way.
 
 The word 'learning' is ambiguous, so this help always qualifies it: Metacat-Mode learning means Episodic Memory, and Training-Mode learning means everything new. 'Episode' is likewise always qualified: a Training episode belongs to Training Mode, and Metacat's episodic memory belongs to Metacat Mode.
 
-Run mode is a separate matter: it is how runs execute, single-threaded or multi-core. Multi-core within one run is the exact speculative executor (workers above 1); multi-core across runs is the swarm. Run mode is independent of the two modes and is meant to be usable in both. It is not the persistence mode (Fast, Normal or Audit), which only decides how a Metacat Mode run is recorded. Episodic Memory is used in both modes and is not a run mode either: Metacat Mode's is global and a user can clear it, and every Training has its own, which is never cleared.
+Run mode is a separate matter: it is how runs execute, single-threaded or multi-core. Multi-core within one run is the exact speculative executor (workers above 1); multi-core across runs is the swarm. Run mode is independent of the two modes and is meant to be usable in both. It is not the persistence mode (Fast, Normal or Audit), which only decides how a Metacat Mode run is recorded. Episodic Memory is used in both modes and is not a run mode either: Metacat Mode's is global and a user can clear it, and every Training Mode Session has its own, which is never cleared.
 
 The word 'Workspace' always means the engine's perceptual system.
 
@@ -231,6 +231,118 @@ Run History is distinct from Episodic Memory: runs are database rows recording a
 To look at what a Normal or Audit run recorded -- its start and end states, what changed between them, or a step-by-step walk through an audited run -- use the Review view in the hamburger menu rather than this panel. Clicking a run here reloads it into the live dashboard; Review reads the record instead.
 
 **Related concepts:** `run`, `deterministic_replay`, `memory`, `persistence_mode`, `episodic_runs`
+
+### Training Mode Session
+
+**Topic key:** `session`  
+**Summary:** Training Mode: a named Training episode of many problems, each run over many seeds on every core, with its own Episodic Memory, kept in the database.
+
+A Training Mode Session is a named, long-lived Training episode, and it belongs to Training Mode. You give it a list of letter-string analogy problems and a number of seeds per problem; it runs every problem over every seed on all the cores of the machine and keeps, for each problem, the distribution of answers Petacat reached. Where the Swarm group answers that question for one problem on the dashboard, a Training Mode Session answers it for dozens or thousands of problems and remembers the result. A Training Mode Session is also what Training-Mode learning will drive. Nothing in a Training Mode Session affects Metacat Mode.
+
+This is not the episodic runs of the Review view. Those are Metacat Mode's recordings of runs made on the dashboard, each inheriting Metacat Mode's Episodic Memory. A Training Mode Session is a job that Petacat runs by itself, and it is stored in its own tables.
+
+A Training Mode Session is created Stopped. Start it to run it; Pause and Resume hold and release it; Stop returns it to Stopped, and Start runs it again from where it was. You can add problems in any state: start with 25, then add five more each time some finish. When nothing is left to run, a running Training Mode Session is idle and waits for more.
+
+Every Training Mode Session has an Episodic Memory of its own, the same kind of structure as Metacat's but never shared with Metacat Mode. It is never cleared: it goes only when you delete the whole Training Mode Session.
+
+Every run is exact: it is the same run that the Run button would make with that seed, started from the Training Mode Session's Episodic Memory as of the run's memory version, whether or not the parallel plugin is installed (without it the Training Mode Session runs one run at a time). That is run mode: a Training Mode Session uses the swarm across runs when the plugin is present and a serial child process otherwise, and each run is single-threaded inside its worker; using more than one core within a Training Mode Session's run is not yet available. The order in which problems are processed is not guaranteed: they are started roughly in the order they arrived so that they finish steadily, but do not depend on any order.
+
+The database is written only at milestones: when a Training Mode Session is created or renamed, when problems are added, when you stop or cancel or change the policy, and when a problem finishes all its seeds (its summary, the runs committed since the last write and the memory merges are written together). Progress inside a problem lives in memory and is shown from there. After a server restart every Training Mode Session is Stopped; when you start it, the Episodic Memory is rebuilt from the stored merges, problems resume at the seeds not yet stored, and anything after the last milestone is redone. Because runs are deterministic the result is the same.
+
+The left column lists the Training Mode Sessions, newest first, with a line about the cores. The right side shows the selected Training Mode Session: its settings, its error policy, its totals and controls, a box to add problems, the table of problems and a tab for the Training Mode Session's Episodic Memory.
+
+### Training Mode Session: Add problems
+
+**Topic key:** `session_add_problems`  
+**Summary:** Adds more problems to a Training Mode Session in any state.
+
+Paste or upload problems exactly as when creating a Training Mode Session; the preview shows what will be added. They join the end of the queue and are started in roughly the order they arrive, though the order is not guaranteed. Each new problem gets the Training Mode Session's seeds per problem and first seed (unless a JSON entry gives its own seeds).
+
+A problem already in the Training Mode Session is not recognised specially: adding it again makes a second row with its own runs. A Stopped Training Mode Session stores them and runs them when it is started; a Paused one holds them until it is resumed. No state refuses problems.
+
+### Training Mode Session: When things go wrong
+
+**Topic key:** `session_error_policy`  
+**Summary:** What a Training Mode Session does when a run raises an error, a worker dies or the engine configuration changes.
+
+When a run raises an error: 'record and carry on' keeps the error as that run's outcome ('error') and continues; 'skip the rest of that problem' cancels that problem's remaining seeds; 'pause the Training Mode Session' pauses it and 'cancel the Training Mode Session' cancels every queued and running problem (the state does not change). Max errors per problem cancels a problem once it has had that many errors; max errors total pauses the Training Mode Session. Leave either blank for no limit.
+
+When a worker process dies (killed, out of memory): 'retry' resubmits its runs, up to the given number of times per run, and pauses the Training Mode Session when that is exhausted. Retrying is exact because runs are deterministic. 'Pause' pauses at once.
+
+When the engine configuration changes (the engine code or its parameters differ from when the Training Mode Session was created): 'pause' stops the Training Mode Session, shown as stalled, until the configuration returns; 'continue under the new configuration' carries on, and each run records the configuration it ran under.
+
+The policy can be edited while the Training Mode Session exists. The reason for a pause is shown as the last event.
+
+### Training Mode Session: Export
+
+**Topic key:** `session_export`  
+**Summary:** Downloads a Training Mode Session's results as CSV (or JSON).
+
+Problems: one row per problem with its strings, status, tallies and top answers. Distribution: one row per problem and outcome, with the count, share and mean quality. Runs: one row per run (seed, outcome, codelets, memory version, seq and so on), for analysis outside Petacat; its JSON form is one JSON object per line. The files hold what has been written to the database, which includes every problem that has finished.
+
+### Training Mode Session: New session
+
+**Topic key:** `session_new`  
+**Summary:** Creates a Training Mode Session from a name, its settings, an error policy and a list of problems.
+
+Name is required. The settings (seeds per problem, first seed, max codelets per run, parameter overrides and backend) are fixed once the Training Mode Session is created, because they decide what a run is; the error policy can be changed later. Every Training Mode Session has its own Episodic Memory; there is no setting for it. A new Training Mode Session is Stopped: press Start in its view to run it.
+
+Max codelets per run is the most codelets any one run may execute; a run that reaches it gives up and is counted as 'gave up at max codelets'.
+
+'Use the dashboard's parameter overrides' applies the engine-parameter changes you have made in Run Controls to every run. They are recorded with the Training Mode Session, so it keeps running with them even if you later change the dashboard.
+
+Backend is the numeric backend every run uses. Leave it on the default unless you are comparing backends.
+
+The problems come from the text box, from a file you upload (.txt, .md, .csv or .json, read in your browser), or from the demo problems. The preview says how many problems were found, how many lines were rejected (open the list to see which and why) and how many exact duplicates were dropped, and the total number of runs. Nothing is sent until you press Create. A very long list is sent in several requests to stay within the server's limit.
+
+### Training Mode Session: Problem text formats
+
+**Topic key:** `session_problem_text`  
+**Summary:** The ways of writing problems that the Training Mode Session view understands.
+
+Strings are letters only (a-z, A-Z), 1 to 64 of them, and case matters: abC is a different problem from abc. Blank lines and lines starting with # or // are ignored. Accepted forms, one problem per line:
+
+- abc -> abd; xyz -> ?   (the arrow may be -> or the character →). A trailing '-> ?', or nothing after the target, means discovery mode.
+- abc -> abd; xyz -> wyz   justification mode: the answer to explain is wyz.
+- abc abd xyz   or   abc abd xyz wyz   (separated by spaces or tabs)
+- abc,abd,xyz   or   abc,abd,xyz,wyz   CSV, with an optional header row 'initial,modified,target,answer'.
+- Markdown table rows: the first problem in `backticks` on the line is taken, so a table such as the one in list-of-letter-string-analogy-problems.md can be pasted whole.
+- A JSON array of objects {"initial", "modified", "target", "answer"} (answer optional; seeds and tag too), when the whole text is JSON.
+
+Exact duplicates within what you paste are dropped and counted. Lines that cannot be read are listed with the reason, never silently skipped. Ordinary prose that mentions a problem may be picked up as one; the preview shows what was found before anything is sent.
+
+### Training Mode Session: Problems table
+
+**Topic key:** `session_problems_table`  
+**Summary:** One row per problem, with the shape of its answer distribution.
+
+Each row is one problem. 'Runs' is finished runs over the seeds it will get. 'Top' and '2nd' are the most and second most frequent answers with their share of the finished runs, 'No answer' is the share of runs that found none, 'Distinct' counts the different outcomes (including no answer, error and gave up), 'Codelets' is the mean number of codelets per run, and 'Errors' counts runs that raised an error. 'Gave up' counts runs that reached max codelets.
+
+The tabs filter by status and the search box matches the problem's strings. Click a column heading to sort; sorting and paging are done by the server, so they work on very large Training Mode Sessions. The figures of a running problem are partial and keep moving; the order of rows is not the order of processing.
+
+Click a row to open its full distribution: every outcome, how many runs, the share and the mean answer quality (0-100). Outcomes other than an answer are labelled 'no answer' (the engine gave up or halted without one), 'gave up at max codelets' and 'error'. Below it the Runs table lists each run: seed, outcome, codelets, quality, the memory version it started with, its merge order (seq), attempts (more than 1 means it was retried after a worker died) and any error.
+
+'Open in dashboard' loads the problem into Problem Input so you can run one of its seeds and watch it. 'Cancel problem' stops a queued or running problem; runs already finished are kept.
+
+### Training Mode Session: Start, Pause, Resume, Stop, Cancel
+
+**Topic key:** `session_run_state`  
+**Summary:** Controls for a Training Mode Session's life.
+
+A Training Mode Session is Stopped, Running or Paused. Start runs a Stopped Training Mode Session (or, with the option, starts it Paused); Pause stops new runs from starting, runs already on a core finish and are kept; Resume lets the Training Mode Session carry on; Stop returns it to Stopped: runs in flight are dropped, their seeds run again after the next Start, and everything else is kept, including the Episodic Memory. Start then continues from there, any number of times. After a server restart every Training Mode Session is Stopped, and the view shows whether it was running or paused at its last Stop and why it stopped (you, a shutdown or an error).
+
+Cancel is an action, not a state: queued and running problems become cancelled (finished runs are kept) and the Training Mode Session stays in the state it was in; you can add problems afterwards. Delete removes the Training Mode Session, its problems, runs and Episodic Memory from the database; a running one is settled first. That cannot be undone, and it is the only thing that removes a Training Mode Session's Episodic Memory.
+
+While Running, the Training Mode Session is 'idle' when nothing is left to run (add problems) and 'stalled' when it cannot run, with the reason, for example because the engine configuration changed since the Training Mode Session was created. The policy may also pause a Training Mode Session or cancel its problems by itself; the last event says why.
+
+### Training Mode Session: Seeds per problem
+
+**Topic key:** `session_seeds`  
+**Summary:** How many runs each problem gets, one per seed.
+
+One run of Petacat gives one answer, but Petacat's behaviour on a problem is the distribution of answers over random seeds. Each seed gives an independent, exactly reproducible run. More seeds give a better estimate of how often each answer is reached: with 100 seeds an answer seen 30% of the time is known to within roughly 9 percentage points, with 1,000 seeds to within roughly 3. The default is 100.
+
+The Training Mode Session uses the seeds first, first+1, ... first+N-1 for every problem. Running again with the same first seed and count gives the same distribution (provided the runs see the same Episodic Memory versions; each run records the version it started with); a different first seed draws an independent sample.
 
 ### Slipnet (Semantic Network)
 
@@ -351,124 +463,12 @@ The Trace is reset at the beginning of each run, so it captures the processing h
 
 **Related concepts:** `event`, `event_type`, `snag`, `progress_watcher`, `jootser`, `temporal_pattern`, `processing_history`, `clamp_period`
 
-### Training
+### Training Mode Session: Memory tab
 
-**Topic key:** `training`  
-**Summary:** Training Mode: a named Training episode of many problems, each run over many seeds on every core, with its own Episodic Memory, kept in the database.
+**Topic key:** `training_mode_session_memory`  
+**Summary:** The Episodic Memory of a Training Mode Session.
 
-A Training (a Training Mode Session) is a named, long-lived Training episode, and it belongs to Training Mode. You give it a list of letter-string analogy problems and a number of seeds per problem; it runs every problem over every seed on all the cores of the machine and keeps, for each problem, the distribution of answers Petacat reached. Where the Swarm group answers that question for one problem on the dashboard, a Training answers it for dozens or thousands of problems and remembers the result. A Training is also what Training-Mode learning will drive. Nothing in a Training affects Metacat Mode.
-
-This is not the episodic runs of the Review view. Those are Metacat Mode's recordings of runs made on the dashboard, each inheriting Metacat Mode's Episodic Memory. A Training is a job that Petacat runs by itself, and it is stored in its own tables.
-
-A Training is created Stopped. Start it to run it; Pause and Resume hold and release it; Stop returns it to Stopped, and Start runs it again from where it was. You can add problems in any state: start with 25, then add five more each time some finish. When nothing is left to run, a running Training is idle and waits for more.
-
-Every Training has an Episodic Memory of its own, the same kind of structure as Metacat's but never shared with Metacat Mode. It is never cleared: it goes only when you delete the whole Training.
-
-Every run is exact: it is the same run that the Run button would make with that seed, started from the Training's Episodic Memory as of the run's memory version, whether or not the parallel plugin is installed (without it the Training runs one run at a time). That is run mode: a Training uses the swarm across runs when the plugin is present and a serial child process otherwise, and each run is single-threaded inside its worker; using more than one core within a Training's run is not yet available. The order in which problems are processed is not guaranteed: they are started roughly in the order they arrived so that they finish steadily, but do not depend on any order.
-
-The database is written only at milestones: when a Training is created or renamed, when problems are added, when you stop or cancel or change the policy, and when a problem finishes all its seeds (its summary, the runs committed since the last write and the memory merges are written together). Progress inside a problem lives in memory and is shown from there. After a server restart every Training is Stopped; when you start it, the Episodic Memory is rebuilt from the stored merges, problems resume at the seeds not yet stored, and anything after the last milestone is redone. Because runs are deterministic the result is the same.
-
-The left column lists the Trainings, newest first, with a line about the cores. The right side shows the selected Training: its settings, its error policy, its totals and controls, a box to add problems, the table of problems and a tab for the Training's Episodic Memory.
-
-### Training: Add problems
-
-**Topic key:** `training_add_problems`  
-**Summary:** Adds more problems to a Training in any state.
-
-Paste or upload problems exactly as when creating a Training; the preview shows what will be added. They join the end of the queue and are started in roughly the order they arrive, though the order is not guaranteed. Each new problem gets the Training's seeds per problem and first seed (unless a JSON entry gives its own seeds).
-
-A problem already in the Training is not recognised specially: adding it again makes a second row with its own runs. A Stopped Training stores them and runs them when it is started; a Paused one holds them until it is resumed. No state refuses problems.
-
-### Training: When things go wrong
-
-**Topic key:** `training_error_policy`  
-**Summary:** What a Training does when a run raises an error, a worker dies or the engine configuration changes.
-
-When a run raises an error: 'record and carry on' keeps the error as that run's outcome ('error') and continues; 'skip the rest of that problem' cancels that problem's remaining seeds; 'pause the Training' pauses it and 'cancel the Training' cancels every queued and running problem (the state does not change). Max errors per problem cancels a problem once it has had that many errors; max errors total pauses the Training. Leave either blank for no limit.
-
-When a worker process dies (killed, out of memory): 'retry' resubmits its runs, up to the given number of times per run, and pauses the Training when that is exhausted. Retrying is exact because runs are deterministic. 'Pause' pauses at once.
-
-When the engine configuration changes (the engine code or its parameters differ from when the Training was created): 'pause' stops the Training, shown as stalled, until the configuration returns; 'continue under the new configuration' carries on, and each run records the configuration it ran under.
-
-The policy can be edited while the Training exists. The reason for a pause is shown as the last event.
-
-### Training: Export
-
-**Topic key:** `training_export`  
-**Summary:** Downloads a Training's results as CSV (or JSON).
-
-Problems: one row per problem with its strings, status, tallies and top answers. Distribution: one row per problem and outcome, with the count, share and mean quality. Runs: one row per run (seed, outcome, codelets, memory version, seq and so on), for analysis outside Petacat; its JSON form is one JSON object per line. The files hold what has been written to the database, which includes every problem that has finished.
-
-### Training: Memory tab
-
-**Topic key:** `training_memory`  
-**Summary:** The Episodic Memory of a Training.
-
-Lists the answers and snags stored in the Training's Episodic Memory, newest first. It is the Training's own, never Metacat Mode's, and it is never cleared: only deleting the whole Training removes it. The memory version is the number of merges applied so far; a run's additions reach the list when it finishes. The counts in the header are the same numbers. A Stopped Training shows the memory it had at its last Stop.
-
-### Training: New training
-
-**Topic key:** `training_new`  
-**Summary:** Creates a Training from a name, its settings, an error policy and a list of problems.
-
-Name is required. The settings (seeds per problem, first seed, max codelets per run, parameter overrides and backend) are fixed once the Training is created, because they decide what a run is; the error policy can be changed later. Every Training has its own Episodic Memory; there is no setting for it. A new Training is Stopped: press Start in its view to run it.
-
-Max codelets per run is the most codelets any one run may execute; a run that reaches it gives up and is counted as 'gave up at max codelets'.
-
-'Use the dashboard's parameter overrides' applies the engine-parameter changes you have made in Run Controls to every run. They are recorded with the Training, so it keeps running with them even if you later change the dashboard.
-
-Backend is the numeric backend every run uses. Leave it on the default unless you are comparing backends.
-
-The problems come from the text box, from a file you upload (.txt, .md, .csv or .json, read in your browser), or from the demo problems. The preview says how many problems were found, how many lines were rejected (open the list to see which and why) and how many exact duplicates were dropped, and the total number of runs. Nothing is sent until you press Create. A very long list is sent in several requests to stay within the server's limit.
-
-### Training: Problem text formats
-
-**Topic key:** `training_problem_text`  
-**Summary:** The ways of writing problems that the Training view understands.
-
-Strings are letters only (a-z, A-Z), 1 to 64 of them, and case matters: abC is a different problem from abc. Blank lines and lines starting with # or // are ignored. Accepted forms, one problem per line:
-
-- abc -> abd; xyz -> ?   (the arrow may be -> or the character →). A trailing '-> ?', or nothing after the target, means discovery mode.
-- abc -> abd; xyz -> wyz   justification mode: the answer to explain is wyz.
-- abc abd xyz   or   abc abd xyz wyz   (separated by spaces or tabs)
-- abc,abd,xyz   or   abc,abd,xyz,wyz   CSV, with an optional header row 'initial,modified,target,answer'.
-- Markdown table rows: the first problem in `backticks` on the line is taken, so a table such as the one in list-of-letter-string-analogy-problems.md can be pasted whole.
-- A JSON array of objects {"initial", "modified", "target", "answer"} (answer optional; seeds and tag too), when the whole text is JSON.
-
-Exact duplicates within what you paste are dropped and counted. Lines that cannot be read are listed with the reason, never silently skipped. Ordinary prose that mentions a problem may be picked up as one; the preview shows what was found before anything is sent.
-
-### Training: Problems table
-
-**Topic key:** `training_problems_table`  
-**Summary:** One row per problem, with the shape of its answer distribution.
-
-Each row is one problem. 'Runs' is finished runs over the seeds it will get. 'Top' and '2nd' are the most and second most frequent answers with their share of the finished runs, 'No answer' is the share of runs that found none, 'Distinct' counts the different outcomes (including no answer, error and gave up), 'Codelets' is the mean number of codelets per run, and 'Errors' counts runs that raised an error. 'Gave up' counts runs that reached max codelets.
-
-The tabs filter by status and the search box matches the problem's strings. Click a column heading to sort; sorting and paging are done by the server, so they work on very large Trainings. The figures of a running problem are partial and keep moving; the order of rows is not the order of processing.
-
-Click a row to open its full distribution: every outcome, how many runs, the share and the mean answer quality (0-100). Outcomes other than an answer are labelled 'no answer' (the engine gave up or halted without one), 'gave up at max codelets' and 'error'. Below it the Runs table lists each run: seed, outcome, codelets, quality, the memory version it started with, its merge order (seq), attempts (more than 1 means it was retried after a worker died) and any error.
-
-'Open in dashboard' loads the problem into Problem Input so you can run one of its seeds and watch it. 'Cancel problem' stops a queued or running problem; runs already finished are kept.
-
-### Training: Start, Pause, Resume, Stop, Cancel
-
-**Topic key:** `training_run_state`  
-**Summary:** Controls for a Training's life.
-
-A Training is Stopped, Running or Paused. Start runs a Stopped Training (or, with the option, starts it Paused); Pause stops new runs from starting, runs already on a core finish and are kept; Resume lets the Training carry on; Stop returns it to Stopped: runs in flight are dropped, their seeds run again after the next Start, and everything else is kept, including the Episodic Memory. Start then continues from there, any number of times. After a server restart every Training is Stopped, and the view shows whether it was running or paused at its last Stop and why it stopped (you, a shutdown or an error).
-
-Cancel is an action, not a state: queued and running problems become cancelled (finished runs are kept) and the Training stays in the state it was in; you can add problems afterwards. Delete removes the Training, its problems, runs and Episodic Memory from the database; a running one is settled first. That cannot be undone, and it is the only thing that removes a Training's Episodic Memory.
-
-While Running, the Training is 'idle' when nothing is left to run (add problems) and 'stalled' when it cannot run, with the reason, for example because the engine configuration changed since the Training was created. The policy may also pause a Training or cancel its problems by itself; the last event says why.
-
-### Training: Seeds per problem
-
-**Topic key:** `training_seeds`  
-**Summary:** How many runs each problem gets, one per seed.
-
-One run of Petacat gives one answer, but Petacat's behaviour on a problem is the distribution of answers over random seeds. Each seed gives an independent, exactly reproducible run. More seeds give a better estimate of how often each answer is reached: with 100 seeds an answer seen 30% of the time is known to within roughly 9 percentage points, with 1,000 seeds to within roughly 3. The default is 100.
-
-The Training uses the seeds first, first+1, ... first+N-1 for every problem. Running again with the same first seed and count gives the same distribution (provided the runs see the same Episodic Memory versions; each run records the version it started with); a different first seed draws an independent sample.
+Lists the answers and snags stored in the Training Mode Session's Episodic Memory, newest first. It is the Training Mode Session's own, never Metacat Mode's, and it is never cleared: only deleting the whole Training Mode Session removes it. The memory version is the number of merges applied so far; a run's additions reach the list when it finishes. The counts in the header are the same numbers. A Stopped Training Mode Session shows the memory it had at its last Stop.
 
 ### Verbose
 
@@ -680,7 +680,7 @@ Direction indicates the orientation of a group or sequence of bonds within a str
 
 A run is one letter-analogy problem plus Petacat's response. Metacat Mode's runs are episodic runs: each inherits the Episodic Memory (Metacat-Mode learning) that the runs before it left, and that memory is the only thing that carries from one run to the next. The Slipnet, the Themespace, the Workspace, the Coderack, the Temporal Trace, the temperature and the random stream are all rebuilt for every run, exactly as in the original Metacat.
 
-This is a Metacat Mode feature. It shares Metacat Mode's Episodic Memory and has nothing to do with Training Mode or with a Training (the Training Mode feature). Metacat Mode has no sessions of any kind: v1.2 showed a 'Training Session', which was a Petacat misnomer and was removed in v2.0.
+This is a Metacat Mode feature. It shares Metacat Mode's Episodic Memory and has nothing to do with Training Mode or with a Training Mode Session (the Training Mode feature). Metacat Mode has no sessions of any kind: v1.2 showed a span between clears as a 'session', which was a Petacat misnomer and was removed in v2.0.
 
 Clearing Episodic Memory is an event. After a clear no run inherits anything from the runs before it, so the next episodic run starts with none. Two controls do it, and they are the same action: the 'Clear Episodic Memory' button in the Episodic Memory group of the Run Controls panel, and 'Clear Episodic Memory' in the Admin view. Each clear is recorded and marked in the Review view's episodic-run timeline, with an editable note. Recorded runs are never deleted by a clear.
 

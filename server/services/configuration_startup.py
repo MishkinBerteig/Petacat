@@ -189,7 +189,7 @@ async def prepare_database(database_url: str, seed_dir: str) -> Any:
     """
     from server.models.metadata import Base
     import server.models.run  # noqa: F401 — registers the runtime tables
-    import server.models.training  # noqa: F401 — and configuration_state
+    import server.models.training_mode_session  # noqa: F401 — and configuration_state
     from server.services.metadata_service import load_metadata_from_db
     from server.services.standard_configuration import sync_help_topics
 

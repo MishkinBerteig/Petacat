@@ -1,8 +1,8 @@
 """The configuration stamp (plan 3.8), before the configuration entity exists.
 
 Every stored artefact reaches the ``config_hash`` of the configuration that made it through its
-run row (``answer_descriptions``, ``snag_descriptions``, ``run_state_captures``) or its Training
-row (``training_runs``, and ``training_memory_merges`` through ``(training_id, problem_id, seed)``).
+run row (``answer_descriptions``, ``snag_descriptions``, ``run_state_captures``) or its Training Mode Session
+row (``training_mode_session_runs``, and ``training_memory_merges`` through ``(session_id, problem_id, seed)``).
 So no column is added: the link is the stamp.  This test runs a Normal Run and an Audit Run, and
 checks that every row the sinks wrote has a ``run_id`` whose run carries a ``config_hash``.
 
@@ -15,15 +15,16 @@ import pytest
 from sqlalchemy import func, select
 
 from server.models.run import AnswerDescriptionRow, Run, RunStateCapture, SnagDescriptionRow
-from server.models.training import Training, TrainingRun
+from server.models.training_mode_session import TrainingModeSession, TrainingModeSessionRun
 
 
 def _service():
     from server.engine.metadata import MetadataProvider
+    from server.services.configuration_store import ConfigurationStore
     from server.services.run_service import RunService
 
     seed_dir = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
-    return RunService(MetadataProvider.from_standard_configuration(seed_dir))
+    return RunService(ConfigurationStore(MetadataProvider.from_standard_configuration(seed_dir)))
 
 
 @pytest.mark.asyncio
@@ -54,12 +55,12 @@ async def test_every_artefact_a_run_stores_reaches_the_runs_config_hash(db_sessi
         assert hashes and all(h == run.config_hash for h in hashes), model.__tablename__
 
 
-def test_the_training_tables_carry_the_link_by_construction():
-    """A Training and each of its runs record a config_hash that cannot be null; a memory merge
-    names its run by (training_id, problem_id, seed), the unique key of ``training_runs``."""
-    assert not Training.__table__.c.config_hash.nullable
-    assert not TrainingRun.__table__.c.config_hash.nullable
-    from server.models.training import TrainingMemoryMerge
+def test_the_session_tables_carry_the_link_by_construction():
+    """A Training Mode Session and each of its runs record a config_hash that cannot be null; a memory merge
+    names its run by (session_id, problem_id, seed), the unique key of ``training_mode_session_runs``."""
+    assert not TrainingModeSession.__table__.c.config_hash.nullable
+    assert not TrainingModeSessionRun.__table__.c.config_hash.nullable
+    from server.models.training_mode_session import SessionMemoryMerge
 
-    merge = TrainingMemoryMerge.__table__.c
-    assert {"training_id", "problem_id", "seed"} <= set(merge.keys())
+    merge = SessionMemoryMerge.__table__.c
+    assert {"session_id", "problem_id", "seed"} <= set(merge.keys())

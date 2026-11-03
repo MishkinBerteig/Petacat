@@ -18,7 +18,7 @@ def test_configuration_tables_exclude_runtime_tables_and_help_topics():
     names = configuration_table_names()
     runtime = {
         "runs", "trace_events", "cycle_snapshots", "answer_descriptions",
-        "snag_descriptions", "trainings", "training_problems", "training_runs",
+        "snag_descriptions", "training_mode_sessions", "training_mode_session_problems", "training_mode_session_runs",
         "training_memory_merges", "configuration_state",
     }
     assert not (names & runtime), f"runtime tables counted as configuration: {names & runtime}"

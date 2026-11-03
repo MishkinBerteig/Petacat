@@ -133,7 +133,7 @@ describe('MemoryView — how the Episodic Memory was read', () => {
     expect(screen.getByText(/shares this memory and is reminded from it/)).toBeTruthy()
   })
 
-  it("says this is Metacat Mode's Episodic Memory, not a Training's", () => {
+  it("says this is Metacat Mode's Episodic Memory, not a Training Mode Session's", () => {
     useRunStore.setState({
       memory: memory({ scope: 'live', mode: 'fast', answers: [answer()] }),
     })

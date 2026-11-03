@@ -277,29 +277,27 @@ def test_default_status_does_not_start_a_pool():
     assert status["workers"] >= 1 and status["start_method"] == "forkserver"
 
 
-def test_a_fresh_swarm_given_no_metadata_runs_on_the_seed_data(meta):
-    """The first call on a pool constructed without metadata binds the seed data.
+def test_a_swarm_with_no_metadata_refuses_rather_than_read_the_seed_files() -> None:
+    """A swarm that was given no configuration has none to run: it raises
+    ``ConfigurationRequired`` and starts no pool.  Nothing falls back to the Metacat
+    Standard Configuration files."""
+    from server.engine.metadata import ConfigurationRequired
 
-    The tasks of that call must name the configuration the workers were started with.
-    They once carried the empty hash read before ``_start`` bound it, and every worker
-    refused them ("no metadata for config ''"); the other tests never saw it because
-    each passes ``meta`` explicitly.
-    """
     swarm = Swarm(workers=2)
     try:
-        outcome = swarm.map([RunTask("abc", "abd", "xyz", seed=7, max_steps=3000)])[0]
+        with pytest.raises(ConfigurationRequired):
+            swarm.map([RunTask("abc", "abd", "xyz", seed=7, max_steps=3000)])
+        with pytest.raises(ConfigurationRequired):
+            swarm.start()
+        assert swarm._executor is None
     finally:
         swarm.shutdown()
-    assert outcome.error is None, outcome.error
-    expected = run_inprocess(
-        RunTask("abc", "abd", "xyz", seed=7, max_steps=3000, backend=default_backend(meta)),
-        meta,
-    )
-    assert outcome.fingerprint() == expected.fingerprint()
+    with pytest.raises(ConfigurationRequired):
+        run_inprocess(RunTask("abc", "abd", "xyz", seed=7, max_steps=10), None)
 
 
 # ---------------------------------------------------------------------------
-# Swarm.submit and the Training executors
+# Swarm.submit and the Training Mode Session executors
 # ---------------------------------------------------------------------------
 
 
@@ -330,14 +328,14 @@ def test_submit_resolves_the_default_backend_like_map(swarm, meta):
 
 def test_the_serial_executor_equals_the_swarm_for_the_same_tasks(swarm, meta):
     """The detached-plugin path gives the swarm's results run for run."""
-    from server.services.training_executor import SerialExecutor, TrainingTask, outcome_fingerprint
+    from server.services.training_mode_session_executor import SerialExecutor, SessionTask, outcome_fingerprint
 
     tasks = _submit_tasks()
     ex = SerialExecutor()
     try:
         via_swarm = [swarm.submit([t], meta).result(timeout=120)[0] for t in tasks]
         via_serial = [
-            ex.submit([TrainingTask(t.initial, t.modified, t.target, t.answer, t.seed, t.max_steps,
+            ex.submit([SessionTask(t.initial, t.modified, t.target, t.answer, t.seed, t.max_steps,
                                     None, "off")], meta).result(timeout=300)[0]
             for t in tasks
         ]
@@ -353,8 +351,8 @@ def test_memory_tasks_agree_across_executors_and_with_a_serial_episode(swarm, me
     import pickle
 
     from server.engine.memory import EpisodicMemory
-    from server.services import training_memory as tm
-    from server.services.training_executor import SerialExecutor, TrainingTask
+    from server.services import training_mode_session_memory as tm
+    from server.services.training_mode_session_executor import SerialExecutor, SessionTask
 
     master = EpisodicMemory()
     refs, expected = [], []
@@ -364,7 +362,7 @@ def test_memory_tasks_agree_across_executors_and_with_a_serial_episode(swarm, me
             ref = tm.MemoryRef(99, "epoch-a", version, 0, [blob for blob in tail_blobs(expected)])
             task = RunTask("abc", "abd", "xyz", None, seed, 2500, backend="off", memory=ref)
             got = swarm.submit([task], meta).result(timeout=120)[0]
-            twin = ex.submit([TrainingTask("abc", "abd", "xyz", None, seed, 2500, None, "off",
+            twin = ex.submit([SessionTask("abc", "abd", "xyz", None, seed, 2500, None, "off",
                                            memory=ref)], meta).result(timeout=300)[0]
             # The reference: a copy of the master as of this version, run in process.
             copy = tm.copy_for_run(master)
@@ -407,13 +405,14 @@ _OWNER = r"""
 import os, sys, time
 mode = sys.argv[1]
 if mode == "swarm":
+    from server.engine.metadata import MetadataProvider
     from server.parallel.swarm import Swarm
-    Swarm(workers=2).start()
+    Swarm(workers=2, meta=MetadataProvider.from_standard_configuration(os.path.join(os.getcwd(), "seed_data"))).start()
 else:
     from server.engine.metadata import MetadataProvider
-    from server.services.training_executor import SerialExecutor, TrainingTask
+    from server.services.training_mode_session_executor import SerialExecutor, SessionTask
     meta = MetadataProvider.from_standard_configuration(os.path.join(os.getcwd(), "seed_data"))
-    SerialExecutor().submit([TrainingTask("abc", "abd", "ijk", None, 1, 50, None, "off")], meta).result(timeout=300)
+    SerialExecutor().submit([SessionTask("abc", "abd", "ijk", None, 1, 50, None, "off")], meta).result(timeout=300)
 print("READY", os.getpid(), flush=True)
 time.sleep(600)
 """

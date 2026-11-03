@@ -6,7 +6,7 @@
 //   Metacat Mode  -- the v1.2 features exactly as they are: the dashboard's runs, Run
 //                    History, Review, the one-problem Swarm, the Admin view and
 //                    Configuration, and Metacat's own Episodic Memory.
-//   Training Mode -- every extension since v1.2: Trainings, each with its own episode
+//   Training Mode -- every extension since v1.2: Training Mode Sessions, each with its own episode
 //                    memory.
 //
 // Run mode (single-threaded or multi-core) is orthogonal to both and is not a third
@@ -23,34 +23,34 @@ import { useHelp } from '@/hooks/useHelp';
 import type { ComponentHelpKey } from '@/constants/helpTopics';
 import type { AppView } from '@/components/HamburgerMenu';
 
-export type AppMode = 'metacat' | 'training';
+export type AppMode = 'metacat' | 'training-mode';
 
 export const MODE_LABELS: Record<AppMode, string> = {
   metacat: 'Metacat Mode',
-  training: 'Training Mode',
+  'training-mode': 'Training Mode',
 };
 
 export const MODE_TOOLTIPS: Record<AppMode, string> = {
   metacat:
     'Metacat Mode: Petacat exactly as v1.2 — runs, Run History, Review, the Swarm, Admin and '
     + "Configuration, and Metacat's own Episodic Memory (Metacat-Mode learning).",
-  training:
-    'Training Mode: Trainings — named episodes of many problems, each with its own episode '
+  'training-mode':
+    'Training Mode: Training Mode Sessions — named episodes of many problems, each with its own episode '
     + 'memory. Nothing here reads or changes Metacat Mode.',
 };
 
 /** The accent each mode wears: a theme token, so light and dark themes both work. */
 export const MODE_ACCENTS: Record<AppMode, string> = {
   metacat: 'var(--text-accent)',
-  training: 'var(--accent)',
+  'training-mode': 'var(--accent)',
 };
 
 /** The help topic that explains the two modes. */
 export const MODES_HELP_KEY: ComponentHelpKey = 'modes';
 
-/** Which mode a view belongs to. Everything but the Training view is Metacat Mode's. */
+/** Which mode a view belongs to. Everything but the Training Mode view is Metacat Mode's. */
 export function modeOfView(view: AppView): AppMode {
-  return view === 'training' ? 'training' : 'metacat';
+  return view === 'training-mode' ? 'training-mode' : 'metacat';
 }
 
 interface Props {
@@ -74,7 +74,7 @@ export function ModeSwitch({ view, onSelectView, disabled = false }: Props) {
 
   const choose = (mode: AppMode) => {
     if (disabled || mode === current) return;
-    onSelectView(mode === 'training' ? 'training' : 'dashboard');
+    onSelectView(mode === 'training-mode' ? 'training-mode' : 'dashboard');
   };
 
   return (
@@ -86,7 +86,7 @@ export function ModeSwitch({ view, onSelectView, disabled = false }: Props) {
       style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
     >
       <div style={groupStyle}>
-        {(['metacat', 'training'] as const).map((mode) => {
+        {(['metacat', 'training-mode'] as const).map((mode) => {
           const active = mode === current;
           return (
             <button

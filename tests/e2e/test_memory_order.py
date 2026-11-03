@@ -17,10 +17,11 @@ import pytest
 
 def _service():
     from server.engine.metadata import MetadataProvider
+    from server.services.configuration_store import ConfigurationStore
     from server.services.run_service import RunService
 
     seed_dir = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
-    return RunService(MetadataProvider.from_standard_configuration(seed_dir))
+    return RunService(ConfigurationStore(MetadataProvider.from_standard_configuration(seed_dir)))
 
 
 def _answer_row(answer_id, text):

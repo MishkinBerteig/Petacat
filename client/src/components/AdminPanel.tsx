@@ -213,8 +213,8 @@ export function AdminPanel() {
         }}
       >
         <strong>Metacat Mode.</strong> This view edits the global configuration that Metacat Mode
-        uses, and clears Metacat Mode&apos;s Episodic Memory. A new Training in Training Mode
-        copies the global configuration when it is created; a Training never changes it.
+        uses, and clears Metacat Mode&apos;s Episodic Memory. A new Training Mode Session in Training Mode
+        copies the global configuration when it is created; a Training Mode Session never changes it.
       </div>
 
       {/* ---- Row 1: Regenerate Help Documentation (utility, non-destructive) ---- */}

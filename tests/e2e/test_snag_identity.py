@@ -136,6 +136,7 @@ async def test_rehydrating_the_memory_keeps_one_row_per_snag(db_session):
 
     from server.engine.metadata import MetadataProvider
     from server.models.run import SnagDescriptionRow
+    from server.services.configuration_store import ConfigurationStore
     from server.services.run_service import RunService, _global_memory
 
     def row(run_id: int, snag_id: int | None, codelet_count: int) -> SnagDescriptionRow:
@@ -157,7 +158,7 @@ async def test_rehydrating_the_memory_keeps_one_row_per_snag(db_session):
     await db_session.commit()
 
     seed_dir = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
-    await RunService(MetadataProvider.from_standard_configuration(seed_dir)).rehydrate_memory(db_session)
+    await RunService(ConfigurationStore(MetadataProvider.from_standard_configuration(seed_dir))).rehydrate_memory(db_session)
 
     assert sorted(
         (s.snag_id, s.run_id) for s in _global_memory.snags if s.run_id != 3
@@ -180,6 +181,7 @@ async def test_rehydrating_keeps_the_explanation_and_falls_back_for_old_rows(db_
     from server.engine.metadata import MetadataProvider
     from server.engine.snag_explanation import snag_explanation_text
     from server.models.run import SnagDescriptionRow
+    from server.services.configuration_store import ConfigurationStore
     from server.services.run_service import RunService, _global_memory
 
     explanation = (
@@ -201,7 +203,7 @@ async def test_rehydrating_keeps_the_explanation_and_falls_back_for_old_rows(db_
     await db_session.commit()
 
     seed_dir = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
-    service = RunService(MetadataProvider.from_standard_configuration(seed_dir))
+    service = RunService(ConfigurationStore(MetadataProvider.from_standard_configuration(seed_dir)))
     await service.rehydrate_memory(db_session)
 
     new, old = sorted(_global_memory.snags, key=lambda s: s.snag_id)[:2]

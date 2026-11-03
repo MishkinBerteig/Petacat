@@ -34,7 +34,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Sequence
 
 from server.engine import hardware
-from server.engine.metadata import MetadataProvider
+from server.engine.metadata import MetadataProvider, require_meta
 from server.engine.runner import EngineRunner
 from server.engine.start_check import require_run_start
 
@@ -102,9 +102,9 @@ def stopping_state(runner: EngineRunner) -> str:
 _META: MetadataProvider | None = None
 
 
-def _init_worker(seed_dir: str) -> None:
+def _init_worker(meta: MetadataProvider) -> None:
     global _META
-    _META = MetadataProvider.from_standard_configuration(seed_dir)
+    _META = meta
     require_run_start(_META)
 
 
@@ -119,10 +119,10 @@ def _run_one(task: tuple) -> str:
 def run_population(
     problem: Sequence[str],
     count: int,
+    meta: MetadataProvider,
     seed_offset: int = 0,
     workers: int | None = None,
     max_steps: int = 6000,
-    seed_dir: str | None = None,
 ) -> PopulationResult:
     """K independent runs across a process pool.
 
@@ -134,14 +134,13 @@ def run_population(
 
     ``workers=None`` takes this machine's pool size — every logical core but one, from
     :func:`server.engine.hardware.population_worker_count`.
+
+    *meta* is required: the caller loads a configuration (the database's, or the Metacat
+    Standard Configuration explicitly) and passes it; nothing here reads the seed files.
     """
     import time
     from multiprocessing import Pool
 
-    seed_dir = seed_dir or os.path.join(
-        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-        "seed_data",
-    )
     workers = workers or hardware.population_worker_count()
     tasks = [
         (tuple(problem), seed_offset + i, max_steps) for i in range(count)
@@ -149,11 +148,11 @@ def run_population(
 
     started = time.perf_counter()
     if workers == 1:
-        _init_worker(seed_dir)
+        _init_worker(meta)
         states = [_run_one(t) for t in tasks]
     else:
         chunk = max(1, count // (workers * 4))
-        with Pool(workers, initializer=_init_worker, initargs=(seed_dir,)) as pool:
+        with Pool(workers, initializer=_init_worker, initargs=(meta,)) as pool:
             states = list(pool.map(_run_one, tasks, chunksize=chunk))
     elapsed = time.perf_counter() - started
 
@@ -200,12 +199,7 @@ def run_population_batched(
     """
     import time
 
-    meta = meta or MetadataProvider.from_standard_configuration(
-        os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-            "seed_data",
-        )
-    )
+    meta = require_meta(meta, "run_population_batched")
     # The run-start check comes first: the read below is the run's, before any runner.
     require_run_start(meta)
     update_cycle = meta.get_param("update_cycle_length")

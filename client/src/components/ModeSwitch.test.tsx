@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------------------
 // Petacat -- the mode switch names the mode and moves between the two
 // ---------------------------------------------------------------------------
-// Metacat Mode is the v1.2 views; Training Mode is the Training view. Run mode is
+// Metacat Mode is the v1.2 views; Training Mode is the Training Mode view. Run mode is
 // orthogonal and is not a third choice here.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -17,7 +17,7 @@ describe('modeOfView', () => {
     ['review', 'metacat'],
     ['config', 'metacat'],
     ['admin', 'metacat'],
-    ['training', 'training'],
+    ['training-mode', 'training-mode'],
   ])('puts %s in %s', (view, mode) => {
     expect(modeOfView(view)).toBe(mode)
   })
@@ -32,14 +32,14 @@ describe('ModeSwitch', () => {
     render(<ModeSwitch view="dashboard" onSelectView={vi.fn()} />)
     expect(screen.getByRole('button', { name: 'Metacat Mode' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Training Mode' })).toBeTruthy()
-    expect(MODE_LABELS).toEqual({ metacat: 'Metacat Mode', training: 'Training Mode' })
+    expect(MODE_LABELS).toEqual({ metacat: 'Metacat Mode', 'training-mode': 'Training Mode' })
   })
 
   it.each<[AppView, string, string]>([
     ['dashboard', 'Metacat Mode', 'Training Mode'],
     ['admin', 'Metacat Mode', 'Training Mode'],
     ['review', 'Metacat Mode', 'Training Mode'],
-    ['training', 'Training Mode', 'Metacat Mode'],
+    ['training-mode', 'Training Mode', 'Metacat Mode'],
   ])('in the %s view marks %s as current', (view, current, other) => {
     render(<ModeSwitch view={view} onSelectView={vi.fn()} />)
     expect(screen.getByRole('button', { name: current })).toHaveAttribute('aria-pressed', 'true')
@@ -47,14 +47,14 @@ describe('ModeSwitch', () => {
     expect(screen.getByRole('button', { name: other })).toHaveAttribute('aria-pressed', 'false')
   })
 
-  it('goes to the dashboard for Metacat Mode and the Training view for Training Mode', () => {
+  it('goes to the dashboard for Metacat Mode and the Training Mode view for Training Mode', () => {
     const onSelect = vi.fn()
     const { rerender } = render(<ModeSwitch view="dashboard" onSelectView={onSelect} />)
     fireEvent.click(screen.getByRole('button', { name: 'Training Mode' }))
-    expect(onSelect).toHaveBeenCalledWith('training')
+    expect(onSelect).toHaveBeenCalledWith('training-mode')
 
     onSelect.mockClear()
-    rerender(<ModeSwitch view="training" onSelectView={onSelect} />)
+    rerender(<ModeSwitch view="training-mode" onSelectView={onSelect} />)
     fireEvent.click(screen.getByRole('button', { name: 'Metacat Mode' }))
     expect(onSelect).toHaveBeenCalledWith('dashboard')
   })
@@ -83,7 +83,7 @@ describe('ModeSwitch', () => {
   })
 
   it('exposes the current mode on its group for styling and tests', () => {
-    render(<ModeSwitch view="training" onSelectView={vi.fn()} />)
-    expect(screen.getByTestId('mode-switch')).toHaveAttribute('data-mode', 'training')
+    render(<ModeSwitch view="training-mode" onSelectView={vi.fn()} />)
+    expect(screen.getByTestId('mode-switch')).toHaveAttribute('data-mode', 'training-mode')
   })
 })

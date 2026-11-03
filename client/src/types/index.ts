@@ -1002,20 +1002,20 @@ export interface SwarmResult {
 }
 
 // ---------------------------------------------------------------------------
-// Training (/api/trainings): a named episode of many problems over many seeds
+// Training Mode Session (/api/training-mode/sessions): a named episode of many problems over many seeds
 // ---------------------------------------------------------------------------
 //
 // Not the episodic runs of Metacat Mode's Review view, which are recordings of
-// dashboard runs. A Training (a Training Mode Session) is a long-lived, database-backed Training
+// dashboard runs. A Training Mode Session is a long-lived, database-backed Training Mode Session
 // episode with one Episodic Memory of its own, never cleared.
 
 /** Stopped, or live and either Running or Paused. */
-export type TrainingState = 'stopped' | 'running' | 'paused';
+export type SessionState = 'stopped' | 'running' | 'paused';
 /** Inside Running only: nothing left to run (`idle`) or unable to run (`stalled`). */
-export type TrainingActivity = 'idle' | 'stalled' | null;
-export type TrainingProblemStatus = 'queued' | 'running' | 'finished' | 'cancelled';
+export type SessionActivity = 'idle' | 'stalled' | null;
+export type SessionProblemStatus = 'queued' | 'running' | 'finished' | 'cancelled';
 
-export interface TrainingErrorPolicy {
+export interface SessionErrorPolicy {
   on_run_error: 'record' | 'skip_problem' | 'pause' | 'cancel';
   max_errors_per_problem: number | null;
   max_errors_total: number | null;
@@ -1025,7 +1025,7 @@ export interface TrainingErrorPolicy {
 }
 
 /** Fixed at creation: they shape what a run is. */
-export interface TrainingSettings {
+export interface SessionSettings {
   seeds_per_problem: number;
   seed_start: number;
   max_codelets: number;
@@ -1040,25 +1040,25 @@ export interface ProblemInput {
   target: string;
   /** Set for justification mode. */
   answer?: string | null;
-  /** This problem's seed count; defaults to the Training's `seeds_per_problem`. */
+  /** This problem's seed count; defaults to the Training Mode Session's `seeds_per_problem`. */
   seeds?: number | null;
   /** Any JSON, returned untouched. */
   tag?: unknown;
 }
 
-export interface TrainingSummary {
+export interface SessionSummary {
   id: number;
   name: string;
   note: string;
-  state: TrainingState;
-  activity: TrainingActivity;
+  state: SessionState;
+  activity: SessionActivity;
   stalled_reason: string | null;
-  settings: TrainingSettings;
-  policy: TrainingErrorPolicy;
+  settings: SessionSettings;
+  policy: SessionErrorPolicy;
   config_hash: string;
   created_at: string;
   updated_at: string;
-  /** The last Stop: when, from which live state, and why. Null for a Training never stopped. */
+  /** The last Stop: when, from which live state, and why. Null for a Training Mode Session never stopped. */
   stopped_at: string | null;
   stopped_from: 'running' | 'paused' | null;
   stop_reason: 'user' | 'shutdown' | 'error' | null;
@@ -1074,16 +1074,16 @@ export interface TrainingSummary {
   last_event: string | null;
 }
 
-export interface TrainingAnswerShare {
+export interface SessionAnswerShare {
   answer: string;
   count: number;
   fraction: number;
   mean_quality: number | null;
 }
 
-export interface TrainingProblemRow {
+export interface SessionProblemRow {
   id: number;
-  training_id: number;
+  session_id: number;
   initial: string;
   modified: string;
   target: string;
@@ -1091,13 +1091,13 @@ export interface TrainingProblemRow {
   seeds: number;
   seed_start: number;
   tag: unknown | null;
-  status: TrainingProblemStatus;
+  status: SessionProblemStatus;
   runs_done: number;
   errors: number;
   capped: number;
   mean_codelets: number | null;
   /** At most 3, most frequent first; `fraction` is of `runs_done`. */
-  top: TrainingAnswerShare[];
+  top: SessionAnswerShare[];
   none_fraction: number | null;
   distinct: number;
   statuses: Record<string, number>;
@@ -1107,12 +1107,12 @@ export interface TrainingProblemRow {
   finished_at: string | null;
 }
 
-export interface TrainingProblemDetail extends TrainingProblemRow {
-  distribution: TrainingAnswerShare[];
+export interface SessionProblemDetail extends SessionProblemRow {
+  distribution: SessionAnswerShare[];
   first_error: string | null;
 }
 
-export interface TrainingRun {
+export interface SessionRun {
   seq: number;
   memory_version: number;
   seed: number;
@@ -1130,47 +1130,47 @@ export interface TrainingRun {
   memory_added: { answers: number; snags: number };
 }
 
-export interface TrainingExecutorInfo {
+export interface SessionExecutorInfo {
   kind: 'swarm' | 'serial';
   workers: number;
   in_flight: number;
   queued_runs: number;
 }
 
-export interface TrainingLimits {
+export interface SessionLimits {
   max_problems_per_request: number;
   max_seeds_per_problem: number;
   max_codelets: number;
 }
 
-export interface TrainingListResponse {
-  trainings: TrainingSummary[];
-  executor: TrainingExecutorInfo;
-  limits: TrainingLimits;
-  defaults: { settings: TrainingSettings; policy: TrainingErrorPolicy };
+export interface SessionListResponse {
+  sessions: SessionSummary[];
+  executor: SessionExecutorInfo;
+  limits: SessionLimits;
+  defaults: { settings: SessionSettings; policy: SessionErrorPolicy };
 }
 
-export interface CreateTrainingRequest {
+export interface CreateSessionRequest {
   name: string;
   note?: string;
-  settings?: Partial<TrainingSettings>;
-  policy?: Partial<TrainingErrorPolicy>;
+  settings?: Partial<SessionSettings>;
+  policy?: Partial<SessionErrorPolicy>;
   problems?: ProblemInput[];
 }
 
-export interface UpdateTrainingRequest {
+export interface UpdateSessionRequest {
   name?: string;
   note?: string;
-  policy?: Partial<TrainingErrorPolicy>;
+  policy?: Partial<SessionErrorPolicy>;
 }
 
-export interface TrainingAddResponse {
-  training: TrainingSummary;
+export interface SessionAddResponse {
+  session: SessionSummary;
   added: number;
   problem_ids: number[];
 }
 
-export type TrainingProblemSort =
+export type SessionProblemSort =
   | 'id'
   | 'runs_done'
   | 'top_fraction'
@@ -1180,30 +1180,30 @@ export type TrainingProblemSort =
   | 'mean_codelets'
   | 'finished_seq';
 
-export interface TrainingProblemQuery {
-  status?: TrainingProblemStatus;
+export interface SessionProblemQuery {
+  status?: SessionProblemStatus;
   q?: string;
-  sort?: TrainingProblemSort;
+  sort?: SessionProblemSort;
   order?: 'asc' | 'desc';
   offset?: number;
   limit?: number;
 }
 
-export interface TrainingProblemPage {
+export interface SessionProblemPage {
   total: number;
-  problems: TrainingProblemRow[];
+  problems: SessionProblemRow[];
 }
 
-export interface TrainingFinishedResponse {
+export interface SessionFinishedResponse {
   cursor: number;
-  problems: TrainingProblemRow[];
+  problems: SessionProblemRow[];
 }
 
 /** The episode's memory, newest first, in the shape `GET /api/memory` uses. */
-export interface TrainingMemory {
+export interface SessionMemory {
   answers: AnswerDescription[];
   snags: SnagDescription[];
 }
 
-export type TrainingExportWhat = 'problems' | 'distribution' | 'runs';
-export type TrainingExportFormat = 'csv' | 'json';
+export type SessionExportWhat = 'problems' | 'distribution' | 'runs';
+export type SessionExportFormat = 'csv' | 'json';

@@ -13,8 +13,11 @@ import { SlipnetLinkEditor } from './SlipnetLinkEditor'
 import { HelpTopicEditor } from './HelpTopicEditor'
 import { UrgencyLevelEditor } from './UrgencyLevelEditor'
 import { FormulaCoefficientEditor } from './FormulaCoefficientEditor'
+import { ConfigurationPanel } from './ConfigurationPanel'
+import { ConfigurationBanner } from './ConfigurationBanner'
 
 const TABS = [
+  { key: 'configuration', label: 'Configuration' },
   { key: 'slipnet', label: 'Slipnet Nodes' },
   { key: 'links', label: 'Slipnet Links' },
   { key: 'codelets', label: 'Codelet Types' },
@@ -85,6 +88,7 @@ interface AdminLayoutProps {
 export function AdminLayout({ editNodeName, onClearEditNode }: AdminLayoutProps) {
   const [activeTab, setActiveTab] = useState<TabKey>('slipnet')
   const [flash, setFlash] = useState<Flash | null>(null)
+  const [configurationChanges, setConfigurationChanges] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // A success announces itself and goes; a failure stays until it is read and dismissed.
@@ -154,6 +158,7 @@ export function AdminLayout({ editNodeName, onClearEditNode }: AdminLayoutProps)
           )}
         </div>
       )}
+      <ConfigurationBanner refreshKey={`${activeTab}:${configurationChanges}`} />
       <div style={{
         display: 'flex',
         gap: 2,
@@ -182,6 +187,9 @@ export function AdminLayout({ editNodeName, onClearEditNode }: AdminLayoutProps)
         <input ref={fileInputRef} type="file" accept=".json" onChange={handleImport} style={{ display: 'none' }} />
       </div>
       <div style={{ flex: 1, overflow: 'auto', padding: 8 }}>
+        {activeTab === 'configuration' && (
+          <ConfigurationPanel onChanged={() => setConfigurationChanges(n => n + 1)} />
+        )}
         {activeTab === 'slipnet' && <SlipnetEditor editNodeName={editNodeName} onClearEditNode={onClearEditNode} />}
         {activeTab === 'links' && <SlipnetLinkEditor />}
         {activeTab === 'codelets' && <CodeletEditor />}

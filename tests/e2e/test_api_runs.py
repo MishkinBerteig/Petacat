@@ -496,7 +496,7 @@ async def test_a_fast_run_contributes_its_answer_to_episodic_memory(app_client):
 
     Those are different promises and only the first belongs to the mode.  A Fast Run
     whose answer vanished from Episodic Memory would be a different program from a
-    Normal one rather than the same program recorded differently, and a Fast training
+    Normal one rather than the same program recorded differently, and a Fast session
     population would then teach the memory nothing.
     """
     shared_before = len((await app_client.get("/api/memory")).json()["answers"])

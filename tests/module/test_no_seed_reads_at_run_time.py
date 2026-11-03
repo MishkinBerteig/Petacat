@@ -6,7 +6,7 @@ of guard:
 
 * **The audit hook.**  A ``sys.addaudithook`` hook fails any ``open`` of a file under the
   seed directory while it is armed.  It is armed across an ordinary run (Verbose mode on,
-  so the message catalogue is read too), a swarm call and a Training-style episode with
+  so the message catalogue is read too), a swarm call and a Training Mode Session-style episode with
   Episodic Memory carried (so reminding and comparison run), and a comparison and
   explanation of the answers it left.  The hook is installed by a local fixture, so no
   ``conftest.py`` is involved; it cannot be removed once installed, so it is disarmed with

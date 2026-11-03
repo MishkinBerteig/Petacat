@@ -72,6 +72,8 @@ async def _admin_write(
         return await journal.write_immediate(
             session, ops=ops, source="admin", actor="admin", channel=channel, note=note
         )
+    except journal.ConfigurationNotAdopted as exc:
+        raise HTTPException(500, str(exc)) from exc
     except journal.KeyExists as exc:
         raise HTTPException(409, str(exc)) from exc
     except journal.MissingKey as exc:
@@ -1252,21 +1254,8 @@ async def delete_help_topic(topic_id: int, session: AsyncSession = Depends(get_s
 
 
 # ------------------------------------------------------------------
-# Reload & Export
+# Export
 # ------------------------------------------------------------------
-
-
-@router.post("/reload")
-async def reload_metadata(session: AsyncSession = Depends(get_session)):
-    """Reload metadata cache from the database.
-
-    Re-reads all metadata tables and rebuilds the MetadataProvider
-    used by the RunService for new runs.
-    """
-    from server.api.runs import get_run_service
-
-    await get_run_service().reload_metadata(session)
-    return {"reloaded": True}
 
 
 #: Slipnet node columns an export carries only when a node has a value.

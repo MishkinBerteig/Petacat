@@ -85,7 +85,21 @@ async def lifespan(app: FastAPI):
     from server.services.run_service import RunService
     from server.api import runs as runs_module
 
-    run_service = RunService(meta)
+    # The configuration store holds the global configuration's provider.  Every Admin edit,
+    # reset and restore commits through the journal layer, which refreshes the store after
+    # the commit, so the next run in either mode starts under the edit.
+    from server.db import async_session_factory as _factory
+    from server.services.configuration_store import (
+        ConfigurationStore,
+        read_revision,
+        set_configuration_store,
+    )
+
+    async with _factory() as _session:
+        store = ConfigurationStore(meta, await read_revision(_session))
+    set_configuration_store(store)
+
+    run_service = RunService(store)
     runs_module._run_service = run_service
 
     # The review surfaces read the record rather than a live runner, so they get their
@@ -93,7 +107,7 @@ async def lifespan(app: FastAPI):
     from server.services.review_service import ReviewService
     from server.api import review as review_module
 
-    review_module._review_service = ReviewService(meta)
+    review_module._review_service = ReviewService(store)
 
     # Rehydrate episodic memory from DB (if DB is available)
     try:
@@ -109,18 +123,18 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.debug("Memory rehydration skipped (DB may not be available): %s", e)
 
-    # Trainings: the scheduler that feeds every core from the problems of all active Trainings.
+    # Training Mode Sessions: the scheduler that feeds every core from the problems of all active Training Mode Sessions.
     try:
-        from server.services.training_service import start_default_service
+        from server.services.training_mode_session_service import start_default_service
 
-        await start_default_service(lambda: run_service.meta)
+        await start_default_service(store.current)
     except Exception as e:
-        logger.warning("Training service not started (database may not be available): %s", e)
+        logger.warning("Training Mode Session service not started (database may not be available): %s", e)
 
     logger.info("Petacat started — %d codelet types loaded", len(meta.codelet_specs))
     yield
 
-    from server.services.training_service import stop_default_service
+    from server.services.training_mode_session_service import stop_default_service
 
     await stop_default_service()
 
@@ -162,20 +176,21 @@ from server.api.runs import router as runs_router
 from server.api.controls import router as controls_router
 from server.api.memory import router as memory_router
 from server.api.admin import router as admin_router
+from server.api.configurations import router as configurations_router
 from server.api.docs import router as docs_router
 from server.api.ws import router as ws_router
 from server.api.review import router as review_router
 from server.api.system import router as system_router
 from server.api.swarm import router as swarm_router
-from server.api.trainings import router as trainings_router
+from server.api.training_mode_sessions import router as training_mode_sessions_router
 
 
 
 @app.exception_handler(RequestValidationError)
 async def validation_error_handler(request: Request, exc: RequestValidationError):
-    """FastAPI's list-of-errors body, except under /api/trainings, whose contract is a
+    """FastAPI's list-of-errors body, except under /api/training-mode/sessions, whose contract is a
     ``{"detail": string}`` for every error."""
-    if request.url.path.startswith("/api/trainings"):
+    if request.url.path.startswith("/api/training-mode/sessions"):
         parts = []
         for err in exc.errors():
             where = ".".join(str(x) for x in err.get("loc", ()) if x != "body")
@@ -184,68 +199,17 @@ async def validation_error_handler(request: Request, exc: RequestValidationError
     return await request_validation_exception_handler(request, exc)
 
 
-_CONFIG_WRITE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
-
-#: Admin writes that are not configuration, or that reload the provider themselves.
-_NOT_CONFIGURATION_PREFIXES = ("/api/admin/help", "/api/admin/reload")
-
-
-@app.middleware("http")
-async def adopt_configuration_edits(request: Request, call_next):
-    """Carry an admin edit through to the Runs created after it.
-
-    A write under ``/api/admin`` changes the configuration in the database. The
-    ``RunService`` holds the ``MetadataProvider`` built from that configuration (the
-    Swarm, the Training scheduler and the parameter listings all read it from there), so
-    once the write has committed the provider is rebuilt from the database, and the next
-    Run, in either run mode, starts under the edit with no reload and no restart.
-
-    A Run already under way keeps the provider it was created with. If the rebuild
-    fails the previous provider stays in place and the caller gets a 500 saying so: the
-    edit is in the database but not yet in force.
-    """
-    response = await call_next(request)
-    path = request.url.path
-    if (
-        request.method in _CONFIG_WRITE_METHODS
-        and path.startswith("/api/admin")
-        and not path.startswith(_NOT_CONFIGURATION_PREFIXES)
-        and 200 <= response.status_code < 300
-    ):
-        from server.api.runs import _run_service
-
-        if _run_service is not None:
-            # The session the routes use, so a test that overrides it is reloaded from
-            # the database it wrote to.
-            source = app.dependency_overrides.get(get_session, get_session)
-            sessions = source()
-            try:
-                await _run_service.reload_metadata(await anext(sessions))
-            except Exception as exc:
-                logger.exception("Configuration reload after an admin edit failed")
-                return JSONResponse(
-                    status_code=500,
-                    content={
-                        "detail": "The edit was saved, but the configuration it leaves "
-                        f"could not be loaded ({exc}); the previous configuration "
-                        "stays in force until this is fixed."
-                    },
-                )
-            finally:
-                await sessions.aclose()
-    return response
-
-
 app.include_router(runs_router)
 app.include_router(controls_router)
 app.include_router(memory_router)
 app.include_router(admin_router)
+app.include_router(configurations_router)
 app.include_router(docs_router)
 app.include_router(ws_router)
 app.include_router(review_router)
 app.include_router(system_router)
 app.include_router(swarm_router)
-app.include_router(trainings_router)
+app.include_router(training_mode_sessions_router)
 
 
 @app.get("/healthz")

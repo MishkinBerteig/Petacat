@@ -12,3 +12,11 @@ SEED_DATA_DIR = os.environ.get(
     "SEED_DATA_DIR",
     os.path.join(os.path.dirname(os.path.dirname(__file__)), "seed_data"),
 )
+
+
+if __name__ == "__main__":  # python -m server.config status | diff | reset-to-standard | ...
+    import sys
+
+    from server.configuration_cli import main
+
+    sys.exit(main())

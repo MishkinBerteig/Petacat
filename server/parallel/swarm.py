@@ -59,11 +59,12 @@ from typing import Any, Iterable, Iterator, Sequence
 
 from server.engine import hardware
 from server.engine.hashing import config_hash
-from server.engine.metadata import MetadataProvider
+from server.engine.metadata import MetadataProvider, require_meta
 from server.engine.start_check import require_run_start
 from server.parallel import qos as _qos
 
-#: Repository seed data: the default configuration of a swarm.
+#: The Metacat Standard Configuration files, for scripts and tests that load them explicitly
+#: and pass the provider in.  The swarm itself never reads them: it takes a provider.
 SEED_DIR = str(Path(__file__).resolve().parents[2] / "seed_data")
 
 #: Modules the forkserver imports once, so every worker is forked warm.  ``mlx`` is
@@ -108,11 +109,11 @@ class RunTask:
     executor_options: dict[str, Any] | None = None
     #: Caller's label, returned untouched on the outcome.
     tag: Any = None
-    #: A Training's episode memory (``server.services.training_memory.MemoryRef``): the run
+    #: A Training Mode Session's episode memory (``server.services.training_mode_session_memory.MemoryRef``): the run
     #: starts from a copy of it and reports its additions.  ``None`` is a fresh memory.
     memory: Any = None
     #: Test hook (``"error"`` raises inside the run, ``"kill"`` kills this worker process);
-    #: only the Training service's in-process fault hook ever sets it.
+    #: only the Training Mode Session service's in-process fault hook ever sets it.
     fault: str | None = None
 
 
@@ -164,7 +165,7 @@ class RunOutcome:
     #: A traceback summary when the run raised; the other fields are then empty.
     error: str | None = None
     worker_pid: int = 0
-    #: With a ``RunTask.memory``: the pickled ``training_memory.Additions`` of the run.
+    #: With a ``RunTask.memory``: the pickled ``training_mode_session_memory.Additions`` of the run.
     additions: bytes | None = None
     #: The worker could not reach the task's memory version; resubmit with a snapshot.
     need_snapshot: bool = False
@@ -295,7 +296,7 @@ def run_one(task: RunTask, meta: MetadataProvider) -> RunOutcome:
             os._exit(137)  # test hook: this worker dies mid-task
         memory = None
         if task.memory is not None:
-            from server.services import training_memory as tm
+            from server.services import training_mode_session_memory as tm
 
             try:
                 memory, base_a, base_s = tm.begin(task.memory)
@@ -368,16 +369,17 @@ def _execute(task: RunTask | EpisodeTask, meta: MetadataProvider):
 
 
 def run_inprocess(
-    task: RunTask | EpisodeTask, meta: MetadataProvider | None = None, backend: str | None = None
+    task: RunTask | EpisodeTask, meta: MetadataProvider, backend: str | None = None
 ):
     """The serial reference: *task* executed in this process, on *task*'s backend.
 
     The backend is scoped (restored afterwards), so a test or script can call this
-    between swarm calls without disturbing its own numeric policy.
+    between swarm calls without disturbing its own numeric policy.  *meta* is required:
+    nothing here reads the Metacat Standard Configuration files.
     """
     from server.engine.numeric.backend import use_backend
 
-    meta = meta or MetadataProvider.from_standard_configuration(SEED_DIR)
+    meta = require_meta(meta, "run_inprocess")
     # The run-start check comes first: a configuration that lacks a name the engine reads
     # gives the check's one message, not a failed run (``run_one`` reports any exception
     # as a failed outcome).
@@ -567,14 +569,12 @@ class Swarm:
         self,
         workers: int | None = None,
         meta: MetadataProvider | None = None,
-        seed_dir: str | None = None,
         backend: str | None = None,
         qos: bool = True,
     ) -> None:
         self.workers = max(1, workers or hardware.population_worker_count())
         self._backend = backend
         self._qos_on = qos
-        self._seed_dir = seed_dir or SEED_DIR
         self._bound_meta: MetadataProvider | None = meta
         self._bound_hash: str = ""
         self._blob: bytes = b""
@@ -608,9 +608,12 @@ class Swarm:
         return ctx
 
     def _bind(self, meta: MetadataProvider | None) -> None:
-        """Make *meta* (or the seed data) this pool's configuration.  Lock held."""
+        """Make *meta* (or the one already bound) this pool's configuration.  Lock held.
+
+        With neither, :class:`ConfigurationRequired`: the pool never reads the files.
+        """
         if meta is None:
-            meta = self._bound_meta or MetadataProvider.from_standard_configuration(self._seed_dir)
+            meta = require_meta(self._bound_meta, "a Swarm with no configuration bound")
         self._bound_meta = meta
         self._bound_hash = config_hash(meta)
         self._blob = pickle.dumps(meta, protocol=pickle.HIGHEST_PROTOCOL)
@@ -722,8 +725,8 @@ class Swarm:
                     self._executor = None
                 self._start()
             if meta is None:
-                # A fresh pool binds the seed data in ``_start``; the tasks must name
-                # that configuration, not the empty hash read before it existed.
+                # The pool was started on the configuration already bound; the tasks must
+                # name that one, not the empty hash read before it existed.
                 cfg = self._bound_hash
             with self._count_lock:
                 self._inflight += 1

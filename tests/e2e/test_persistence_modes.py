@@ -835,6 +835,7 @@ async def test_a_run_records_how_many_workers_executed_it(app_client, db_session
     lost it and the listing never had it.
     """
     from server.api import runs as runs_module
+    from server.services.configuration_store import get_configuration_store
     from server.services.run_service import RunService
 
     free = await _create(app_client, MODE_NORMAL, workers=4)
@@ -855,7 +856,7 @@ async def test_a_run_records_how_many_workers_executed_it(app_client, db_session
         Run.__table__.update().where(Run.id == serial["run_id"]).values(workers=None)
     )
     await db_session.commit()
-    runs_module._run_service = RunService(runs_module._run_service.meta)
+    runs_module._run_service = RunService(get_configuration_store())
     restarted = (await app_client.get(f"/api/runs/{free['run_id']}")).json()
     assert restarted["workers"] == 4
     unknown = (await app_client.get(f"/api/runs/{serial['run_id']}/parameters")).json()

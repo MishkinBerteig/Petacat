@@ -2,11 +2,11 @@
 
 > **Auto-generated.** Run `python scripts/generate_api_docs.py` to regenerate from the FastAPI application.
 
-154 HTTP routes, plus `WS /ws/runs/{run_id}` for live state push.
+158 HTTP routes, plus `WS /ws/runs/{run_id}` for live state push.
 
 Interactive documentation is served at `/docs` while the API is running.
 
-Petacat has two modes: **Metacat Mode** (the v1.2 features, including Metacat's own Episodic Memory) and **Training Mode** (Trainings and what follows). Nothing in Training Mode affects Metacat Mode. Run mode (single-threaded or multi-core) is independent of both and is not the persistence mode (Fast, Normal or Audit).
+Petacat has two modes: **Metacat Mode** (the v1.2 features, including Metacat's own Episodic Memory) and **Training Mode** (Training Mode Sessions and what follows). Nothing in Training Mode affects Metacat Mode. Run mode (single-threaded or multi-core) is independent of both and is not the persistence mode (Fast, Normal or Audit).
 
 ## Runs
 
@@ -72,34 +72,34 @@ Metacat Mode, multi-core across runs: one problem over many seeds on every core,
 | `GET` | `/api/swarm` | Swarm Status |
 | `POST` | `/api/swarm` | Run Swarm |
 
-## Trainings
+## Training Mode Sessions
 
-Training Mode: named, long-lived Training episodes of many problems over many seeds (Training Mode Sessions), each with its own Episodic Memory that no route clears (never Metacat Mode's). A Training is created Stopped and is started, paused, resumed, stopped and started again; problems can be added in any state; the database is written only at milestones (works with or without the parallel plugin).
+Training Mode: named, long-lived Training episodes of many problems over many seeds (Training Mode Sessions), each with its own Episodic Memory that no route clears (never Metacat Mode's). A Training Mode Session is created Stopped and is started, paused, resumed, stopped and started again; problems can be added in any state; the database is written only at milestones (works with or without the parallel plugin).
 
 | Method | Path | Purpose |
 |---|---|---|
-| `GET` | `/api/trainings` | List Trainings |
-| `POST` | `/api/trainings` | Create Training |
-| `GET` | `/api/trainings/{training_id}` | Get Training |
-| `PATCH` | `/api/trainings/{training_id}` | Update Training |
-| `DELETE` | `/api/trainings/{training_id}` | Delete Training |
-| `POST` | `/api/trainings/{training_id}/cancel` | Cancel |
-| `GET` | `/api/trainings/{training_id}/export` | Export |
-| `GET` | `/api/trainings/{training_id}/finished` | Finished |
-| `GET` | `/api/trainings/{training_id}/memory` | Training Memory |
-| `POST` | `/api/trainings/{training_id}/pause` | Pause |
-| `GET` | `/api/trainings/{training_id}/problems` | List Problems |
-| `POST` | `/api/trainings/{training_id}/problems` | Add Problems |
-| `GET` | `/api/trainings/{training_id}/problems/{problem_id}` | Get Problem |
-| `POST` | `/api/trainings/{training_id}/problems/{problem_id}/cancel` | Cancel Problem |
-| `GET` | `/api/trainings/{training_id}/problems/{problem_id}/runs` | Problem Runs |
-| `POST` | `/api/trainings/{training_id}/resume` | Resume |
-| `POST` | `/api/trainings/{training_id}/start` | Start |
-| `POST` | `/api/trainings/{training_id}/stop` | Stop |
+| `GET` | `/api/training-mode/sessions` | List Sessions |
+| `POST` | `/api/training-mode/sessions` | Create Session |
+| `GET` | `/api/training-mode/sessions/{session_id}` | Get Session |
+| `PATCH` | `/api/training-mode/sessions/{session_id}` | Update Session |
+| `DELETE` | `/api/training-mode/sessions/{session_id}` | Delete Session |
+| `POST` | `/api/training-mode/sessions/{session_id}/cancel` | Cancel |
+| `GET` | `/api/training-mode/sessions/{session_id}/export` | Export |
+| `GET` | `/api/training-mode/sessions/{session_id}/finished` | Finished |
+| `GET` | `/api/training-mode/sessions/{session_id}/memory` | Training Mode Session Memory |
+| `POST` | `/api/training-mode/sessions/{session_id}/pause` | Pause |
+| `GET` | `/api/training-mode/sessions/{session_id}/problems` | List Problems |
+| `POST` | `/api/training-mode/sessions/{session_id}/problems` | Add Problems |
+| `GET` | `/api/training-mode/sessions/{session_id}/problems/{problem_id}` | Get Problem |
+| `POST` | `/api/training-mode/sessions/{session_id}/problems/{problem_id}/cancel` | Cancel Problem |
+| `GET` | `/api/training-mode/sessions/{session_id}/problems/{problem_id}/runs` | Problem Runs |
+| `POST` | `/api/training-mode/sessions/{session_id}/resume` | Resume |
+| `POST` | `/api/training-mode/sessions/{session_id}/start` | Start |
+| `POST` | `/api/training-mode/sessions/{session_id}/stop` | Stop |
 
 ## Episodic Memory
 
-Metacat Mode: the Episodic Memory (Metacat-Mode learning) that each episodic run inherits from the runs before it, until it is cleared. Clearing is an event, recorded with an editable note. It is not Training Mode and is untouched by Trainings.
+Metacat Mode: the Episodic Memory (Metacat-Mode learning) that each episodic run inherits from the runs before it, until it is cleared. Clearing is an event, recorded with an editable note. It is not Training Mode and is untouched by Training Mode Sessions.
 
 | Method | Path | Purpose |
 |---|---|---|
@@ -134,7 +134,7 @@ Metacat Mode: reading back what a Normal or Audit run recorded, and the episodic
 
 ## Configuration
 
-Metacat Mode: the editable copy of the seed data (the global configuration). A Training copies it when created and never changes it.
+Metacat Mode: the editable copy of the seed data (the global configuration). A Training Mode Session copies it when created and never changes it.
 
 | Method | Path | Purpose |
 |---|---|---|
@@ -174,7 +174,6 @@ Metacat Mode: the editable copy of the seed data (the global configuration). A T
 | `POST` | `/api/admin/posting-rules` | Create Posting Rule |
 | `PUT` | `/api/admin/posting-rules/{rule_id}` | Update Posting Rule |
 | `DELETE` | `/api/admin/posting-rules/{rule_id}` | Delete Posting Rule |
-| `POST` | `/api/admin/reload` | Reload Metadata |
 | `GET` | `/api/admin/slipnet-layout` | List Slipnet Layout |
 | `POST` | `/api/admin/slipnet-layout` | Create Slipnet Layout |
 | `PUT` | `/api/admin/slipnet-layout/{node_name}` | Update Slipnet Layout |
@@ -221,4 +220,9 @@ What the process resolved at startup.
 
 | Method | Path | Purpose |
 |---|---|---|
+| `GET` | `/api/configurations/{configuration_id}/diff` | Get Diff |
+| `POST` | `/api/configurations/{configuration_id}/reset-to-standard` | Post Reset |
+| `POST` | `/api/configurations/{configuration_id}/restore-selected` | Post Restore Selected |
+| `GET` | `/api/configurations/{configuration_id}/status` | Get Status |
+| `GET` | `/api/configurations/{configuration_id}/verify-journal` | Get Verify Journal |
 | `GET` | `/healthz` | Healthz |

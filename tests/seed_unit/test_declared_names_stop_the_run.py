@@ -103,17 +103,19 @@ def test_the_engine_stops_before_the_first_codelet(meta, kind, name) -> None:
 def test_a_metacat_mode_run_stops_before_it_reads_a_parameter(meta, kind, name) -> None:
     """``RunService.create_run`` reads ``spreading_activation_threshold`` before the engine
     exists; the check comes first, so no session is touched and no ``KeyError`` is raised."""
+    from server.services.configuration_store import ConfigurationStore
     from server.services.run_service import RunService
 
-    service = RunService(_without(meta, kind, name))
+    service = RunService(ConfigurationStore(_without(meta, kind, name)))
     with pytest.raises(RunStartError, match=name):
         asyncio.run(service.create_run(None, "abc", "abd", "xyz", seed=1))  # type: ignore[arg-type]
 
 
 def test_a_metacat_mode_run_lacking_the_spreading_threshold_gives_the_check_message(meta) -> None:
+    from server.services.configuration_store import ConfigurationStore
     from server.services.run_service import RunService
 
-    service = RunService(_without(meta, "parameter", "spreading_activation_threshold"))
+    service = RunService(ConfigurationStore(_without(meta, "parameter", "spreading_activation_threshold")))
     with pytest.raises(RunStartError, match="spreading_activation_threshold"):
         asyncio.run(service.create_run(None, "abc", "abd", "xyz", seed=1))  # type: ignore[arg-type]
 
@@ -145,9 +147,9 @@ def test_the_in_process_swarm_reference_gives_the_check_message_not_a_failed_out
 
 
 def test_a_training_mode_dispatch_stops_at_the_executor(meta) -> None:
-    from server.services.training_executor import SerialExecutor, TrainingTask
+    from server.services.training_mode_session_executor import SerialExecutor, SessionTask
 
-    task = TrainingTask("abc", "abd", "xyz", None, 1, 50, None, "off")
+    task = SessionTask("abc", "abd", "xyz", None, 1, 50, None, "off")
     executor = SerialExecutor()
     try:
         with pytest.raises(RunStartError, match="update_cycle_length"):

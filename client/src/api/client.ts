@@ -3,6 +3,13 @@
 // ---------------------------------------------------------------------------
 
 import type {
+  ConfigurationDiff,
+  ConfigurationRowRef,
+  ConfigurationStatus,
+  ConfigurationWriteResult,
+  JournalVerifyReport,
+} from '@/types/configuration';
+import type {
   RunParams,
   RunInfo,
   StepResult,
@@ -36,21 +43,21 @@ import type {
   SwarmStatus,
   SwarmRequest,
   SwarmResult,
-  TrainingListResponse,
-  TrainingSummary,
-  CreateTrainingRequest,
-  UpdateTrainingRequest,
-  TrainingAddResponse,
+  SessionListResponse,
+  SessionSummary,
+  CreateSessionRequest,
+  UpdateSessionRequest,
+  SessionAddResponse,
   ProblemInput,
-  TrainingProblemQuery,
-  TrainingProblemPage,
-  TrainingProblemDetail,
-  TrainingProblemRow,
-  TrainingRun,
-  TrainingFinishedResponse,
-  TrainingMemory,
-  TrainingExportWhat,
-  TrainingExportFormat,
+  SessionProblemQuery,
+  SessionProblemPage,
+  SessionProblemDetail,
+  SessionProblemRow,
+  SessionRun,
+  SessionFinishedResponse,
+  SessionMemory,
+  SessionExportWhat,
+  SessionExportFormat,
 } from '../types';
 
 const API_BASE = '/api';
@@ -843,128 +850,128 @@ export async function closeInspector(runId: number): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// Training — a named episode of many problems over many seeds, kept in the database
+// Training Mode Session — a named episode of many problems over many seeds, kept in the database
 // ---------------------------------------------------------------------------
 
-/** Every Training (newest first), the executor's state, the limits and the defaults. */
-export async function listTrainings(): Promise<TrainingListResponse> {
-  return request<TrainingListResponse>('/trainings');
+/** Every Training Mode Session (newest first), the executor's state, the limits and the defaults. */
+export async function listSessions(): Promise<SessionListResponse> {
+  return request<SessionListResponse>('/training-mode/sessions');
 }
 
-export async function createTraining(req: CreateTrainingRequest): Promise<TrainingAddResponse> {
-  return request<TrainingAddResponse>('/trainings', { method: 'POST', body: JSON.stringify(req) });
+export async function createSession(req: CreateSessionRequest): Promise<SessionAddResponse> {
+  return request<SessionAddResponse>('/training-mode/sessions', { method: 'POST', body: JSON.stringify(req) });
 }
 
-export async function getTraining(trainingId: number): Promise<TrainingSummary> {
-  return request<TrainingSummary>(`/trainings/${trainingId}`);
+export async function getSession(sessionId: number): Promise<SessionSummary> {
+  return request<SessionSummary>(`/training-mode/sessions/${sessionId}`);
 }
 
 /** Rename, change the note or change the error policy; settings cannot change. */
-export async function updateTraining(
-  trainingId: number,
-  req: UpdateTrainingRequest,
-): Promise<TrainingSummary> {
-  return request<TrainingSummary>(`/trainings/${trainingId}`, {
+export async function updateSession(
+  sessionId: number,
+  req: UpdateSessionRequest,
+): Promise<SessionSummary> {
+  return request<SessionSummary>(`/training-mode/sessions/${sessionId}`, {
     method: 'PATCH',
     body: JSON.stringify(req),
   });
 }
 
-/** Insert problems into a Training that is open or paused (409 otherwise). */
-export async function addTrainingProblems(
-  trainingId: number,
+/** Insert problems into a Training Mode Session that is open or paused (409 otherwise). */
+export async function addSessionProblems(
+  sessionId: number,
   problems: ProblemInput[],
-): Promise<TrainingAddResponse> {
-  return request<TrainingAddResponse>(`/trainings/${trainingId}/problems`, {
+): Promise<SessionAddResponse> {
+  return request<SessionAddResponse>(`/training-mode/sessions/${sessionId}/problems`, {
     method: 'POST',
     body: JSON.stringify({ problems }),
   });
 }
 
-export async function listTrainingProblems(
-  trainingId: number,
-  query: TrainingProblemQuery = {},
-): Promise<TrainingProblemPage> {
-  return request<TrainingProblemPage>(`/trainings/${trainingId}/problems${qs({ ...query })}`);
+export async function listSessionProblems(
+  sessionId: number,
+  query: SessionProblemQuery = {},
+): Promise<SessionProblemPage> {
+  return request<SessionProblemPage>(`/training-mode/sessions/${sessionId}/problems${qs({ ...query })}`);
 }
 
-export async function getTrainingProblem(
-  trainingId: number,
+export async function getSessionProblem(
+  sessionId: number,
   problemId: number,
-): Promise<TrainingProblemDetail> {
-  return request<TrainingProblemDetail>(`/trainings/${trainingId}/problems/${problemId}`);
+): Promise<SessionProblemDetail> {
+  return request<SessionProblemDetail>(`/training-mode/sessions/${sessionId}/problems/${problemId}`);
 }
 
-export async function getTrainingProblemRuns(
-  trainingId: number,
+export async function getSessionProblemRuns(
+  sessionId: number,
   problemId: number,
-): Promise<{ runs: TrainingRun[] }> {
-  return request<{ runs: TrainingRun[] }>(`/trainings/${trainingId}/problems/${problemId}/runs`);
+): Promise<{ runs: SessionRun[] }> {
+  return request<{ runs: SessionRun[] }>(`/training-mode/sessions/${sessionId}/problems/${problemId}/runs`);
 }
 
-export async function cancelTrainingProblem(
-  trainingId: number,
+export async function cancelSessionProblem(
+  sessionId: number,
   problemId: number,
-): Promise<TrainingProblemRow> {
-  return request<TrainingProblemRow>(`/trainings/${trainingId}/problems/${problemId}/cancel`, {
+): Promise<SessionProblemRow> {
+  return request<SessionProblemRow>(`/training-mode/sessions/${sessionId}/problems/${problemId}/cancel`, {
     method: 'POST',
   });
 }
 
 /** Problems finished after `after`; with `wait` (seconds, at most 60) it long-polls. */
-export async function getTrainingFinished(
-  trainingId: number,
+export async function getSessionFinished(
+  sessionId: number,
   after = 0,
   limit = 100,
   wait = 0,
-): Promise<TrainingFinishedResponse> {
-  return request<TrainingFinishedResponse>(
-    `/trainings/${trainingId}/finished${qs({ after, limit, wait })}`,
+): Promise<SessionFinishedResponse> {
+  return request<SessionFinishedResponse>(
+    `/training-mode/sessions/${sessionId}/finished${qs({ after, limit, wait })}`,
   );
 }
 
-/** The Training's Episodic Memory (live, or rebuilt from the stored merges when Stopped). */
-export async function getTrainingMemory(trainingId: number): Promise<TrainingMemory> {
-  return request<TrainingMemory>(`/trainings/${trainingId}/memory`);
+/** The Training Mode Session's Episodic Memory (live, or rebuilt from the stored merges when Stopped). */
+export async function getSessionMemory(sessionId: number): Promise<SessionMemory> {
+  return request<SessionMemory>(`/training-mode/sessions/${sessionId}/memory`);
 }
 
-export async function pauseTraining(trainingId: number): Promise<TrainingSummary> {
-  return request<TrainingSummary>(`/trainings/${trainingId}/pause`, { method: 'POST' });
+export async function pauseSession(sessionId: number): Promise<SessionSummary> {
+  return request<SessionSummary>(`/training-mode/sessions/${sessionId}/pause`, { method: 'POST' });
 }
 
-export async function resumeTraining(trainingId: number): Promise<TrainingSummary> {
-  return request<TrainingSummary>(`/trainings/${trainingId}/resume`, { method: 'POST' });
+export async function resumeSession(sessionId: number): Promise<SessionSummary> {
+  return request<SessionSummary>(`/training-mode/sessions/${sessionId}/resume`, { method: 'POST' });
 }
 
-/** Stopped to Running (or Paused). A live Training is unchanged. */
-export async function startTraining(trainingId: number, paused = false): Promise<TrainingSummary> {
-  return request<TrainingSummary>(`/trainings/${trainingId}/start`, {
+/** Stopped to Running (or Paused). A live Training Mode Session is unchanged. */
+export async function startSession(sessionId: number, paused = false): Promise<SessionSummary> {
+  return request<SessionSummary>(`/training-mode/sessions/${sessionId}/start`, {
     method: 'POST',
     body: JSON.stringify({ paused }),
   });
 }
 
-/** Running or Paused to Stopped; the Training can be started again. */
-export async function stopTraining(trainingId: number): Promise<TrainingSummary> {
-  return request<TrainingSummary>(`/trainings/${trainingId}/stop`, { method: 'POST' });
+/** Running or Paused to Stopped; the Training Mode Session can be started again. */
+export async function stopSession(sessionId: number): Promise<SessionSummary> {
+  return request<SessionSummary>(`/training-mode/sessions/${sessionId}/stop`, { method: 'POST' });
 }
 
 /** An action, not a state: cancel every queued and in-flight problem. */
-export async function cancelTraining(trainingId: number): Promise<TrainingSummary> {
-  return request<TrainingSummary>(`/trainings/${trainingId}/cancel`, { method: 'POST' });
+export async function cancelSession(sessionId: number): Promise<SessionSummary> {
+  return request<SessionSummary>(`/training-mode/sessions/${sessionId}/cancel`, { method: 'POST' });
 }
 
-export async function deleteTraining(trainingId: number): Promise<void> {
-  return request<void>(`/trainings/${trainingId}`, { method: 'DELETE' });
+export async function deleteSession(sessionId: number): Promise<void> {
+  return request<void>(`/training-mode/sessions/${sessionId}`, { method: 'DELETE' });
 }
 
 /** The URL of an export download; a plain link, not a fetch. */
-export function trainingExportUrl(
-  trainingId: number,
-  what: TrainingExportWhat,
-  format: TrainingExportFormat = 'csv',
+export function sessionExportUrl(
+  sessionId: number,
+  what: SessionExportWhat,
+  format: SessionExportFormat = 'csv',
 ): string {
-  return `${API_BASE}/trainings/${trainingId}/export${qs({ what, format })}`;
+  return `${API_BASE}/training-mode/sessions/${sessionId}/export${qs({ what, format })}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -1052,4 +1059,52 @@ export async function getSwarmStatus(): Promise<SwarmStatus> {
 /** Run a problem over `count` seeds. Persists nothing (Fast-mode semantics). */
 export async function runSwarm(req: SwarmRequest): Promise<SwarmResult> {
   return request<SwarmResult>('/swarm', { method: 'POST', body: JSON.stringify(req) });
+}
+
+// ---------------------------------------------------------------------------
+// Configuration — status, comparison with the Metacat Standard Configuration, reset
+// ---------------------------------------------------------------------------
+
+/** The global configuration (Metacat Mode) is configuration 1. */
+export const GLOBAL_CONFIGURATION_ID = 1;
+
+export async function getConfigurationStatus(
+  id: number = GLOBAL_CONFIGURATION_ID,
+): Promise<ConfigurationStatus> {
+  return request<ConfigurationStatus>(`/configurations/${id}/status`);
+}
+
+/** Rows added, removed or changed against the Metacat Standard Configuration. */
+export async function getConfigurationDiff(
+  id: number = GLOBAL_CONFIGURATION_ID,
+): Promise<ConfigurationDiff> {
+  return request<ConfigurationDiff>(`/configurations/${id}/diff`);
+}
+
+/** A journaled change (`source = reset`). The server needs `confirm` to be the word `reset`. */
+export async function resetConfigurationToStandard(
+  confirm: string,
+  id: number = GLOBAL_CONFIGURATION_ID,
+): Promise<ConfigurationWriteResult> {
+  return request<ConfigurationWriteResult>(`/configurations/${id}/reset-to-standard`, {
+    method: 'POST',
+    body: JSON.stringify({ confirm }),
+  });
+}
+
+/** A journaled change (`source = restore`) of only the chosen rows. */
+export async function restoreConfigurationRows(
+  rows: ConfigurationRowRef[],
+  id: number = GLOBAL_CONFIGURATION_ID,
+): Promise<ConfigurationWriteResult> {
+  return request<ConfigurationWriteResult>(`/configurations/${id}/restore-selected`, {
+    method: 'POST',
+    body: JSON.stringify({ rows }),
+  });
+}
+
+export async function verifyConfigurationJournal(
+  id: number = GLOBAL_CONFIGURATION_ID,
+): Promise<JournalVerifyReport> {
+  return request<JournalVerifyReport>(`/configurations/${id}/verify-journal`);
 }

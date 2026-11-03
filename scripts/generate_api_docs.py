@@ -38,11 +38,11 @@ GROUPS: list[tuple[str, str, str]] = [
         "answer distribution, plus pool status (a detachable plugin; 503 when absent).",
     ),
     (
-        "/api/trainings",
-        "Trainings",
+        "/api/training-mode/sessions",
+        "Training Mode Sessions",
         "Training Mode: named, long-lived Training episodes of many problems over many seeds "
         "(Training Mode Sessions), each with its own Episodic Memory that no route clears (never "
-        "Metacat Mode's). A Training is created Stopped and is started, paused, resumed, stopped "
+        "Metacat Mode's). A Training Mode Session is created Stopped and is started, paused, resumed, stopped "
         "and started again; problems can be added in any state; the database is written only at "
         "milestones (works with or without the parallel plugin).",
     ),
@@ -51,10 +51,10 @@ GROUPS: list[tuple[str, str, str]] = [
         "Episodic Memory",
         "Metacat Mode: the Episodic Memory (Metacat-Mode learning) that each episodic run inherits "
         "from the runs before it, until it is cleared. Clearing is an event, recorded with an "
-        "editable note. It is not Training Mode and is untouched by Trainings.",
+        "editable note. It is not Training Mode and is untouched by Training Mode Sessions.",
     ),
     ("/api/review", "Review", "Metacat Mode: reading back what a Normal or Audit run recorded, and the episodic-run timeline: recorded runs with the Episodic Memory clears between them (Metacat Mode, not Training Mode)."),
-    ("/api/admin", "Configuration", "Metacat Mode: the editable copy of the seed data (the global configuration). A Training copies it when created and never changes it."),
+    ("/api/admin", "Configuration", "Metacat Mode: the editable copy of the seed data (the global configuration). A Training Mode Session copies it when created and never changes it."),
     ("/api/docs", "Help", "In-app help topics, the glossary and search."),
     ("/api/system", "System", "What the process resolved at startup."),
 ]
@@ -103,7 +103,7 @@ def render() -> str:
         "Interactive documentation is served at `/docs` while the API is running.",
         "",
         "Petacat has two modes: **Metacat Mode** (the v1.2 features, including Metacat's own "
-        "Episodic Memory) and **Training Mode** (Trainings and what follows). Nothing in "
+        "Episodic Memory) and **Training Mode** (Training Mode Sessions and what follows). Nothing in "
         "Training Mode affects Metacat Mode. Run mode (single-threaded or multi-core) is "
         "independent of both and is not the persistence mode (Fast, Normal or Audit).",
         "",

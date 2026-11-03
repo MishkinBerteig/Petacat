@@ -2,7 +2,7 @@
 // Petacat -- Tests for the navigation menu
 // ---------------------------------------------------------------------------
 //
-// What these defend: Training is a view of its own, between Review and
+// What these defend: Training Mode is a view of its own, between Review and
 // Configuration, and choosing it reports the view to the app.
 // ---------------------------------------------------------------------------
 
@@ -12,7 +12,7 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { HamburgerMenu } from './HamburgerMenu'
 
 describe('HamburgerMenu', () => {
-  it('lists Training between Review and Configuration', () => {
+  it('lists Training Mode between Review and Configuration', () => {
     render(<HamburgerMenu activeView="dashboard" onSelect={() => {}} />)
     fireEvent.click(screen.getByRole('button', { name: 'Navigation menu' }))
     const labels = screen
@@ -22,17 +22,17 @@ describe('HamburgerMenu', () => {
     expect(labels).toEqual(['Run Dashboard (Metacat Mode)', 'Review (Metacat Mode)', 'Training Mode', 'Configuration (Metacat Mode)', 'Admin (Metacat Mode)'])
   })
 
-  it('selects the training view', () => {
+  it('selects the Training Mode view', () => {
     const onSelect = vi.fn()
     render(<HamburgerMenu activeView="dashboard" onSelect={onSelect} />)
     fireEvent.click(screen.getByRole('button', { name: 'Navigation menu' }))
     fireEvent.click(screen.getByRole('button', { name: 'Training Mode' }))
-    expect(onSelect).toHaveBeenCalledWith('training')
+    expect(onSelect).toHaveBeenCalledWith('training-mode')
   })
 
   it('marks the active view', () => {
-    render(<HamburgerMenu activeView="training" onSelect={() => {}} />)
+    render(<HamburgerMenu activeView="training-mode" onSelect={() => {}} />)
     fireEvent.click(screen.getByRole('button', { name: 'Navigation menu' }))
-    expect(screen.getByRole('button', { name: /Training/ })).toHaveTextContent('✓')
+    expect(screen.getByRole('button', { name: /Training Mode/ })).toHaveTextContent('✓')
   })
 })
