@@ -29,6 +29,7 @@ empirically on real runs.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from dataclasses import dataclass
@@ -46,6 +47,16 @@ BIT = {name: 1 << i for i, name in enumerate(COMPONENTS)}
 ALL = (1 << NCOMP) - 1
 
 _ALIASES = {"ctx_scalars": "ctx", "proposals": None}
+
+
+def body_digest(source: str) -> str:
+    """The digest of a codelet body's source, as stored in ``effects_data.json``.
+
+    The audit of a type's masks is an audit of one body.  Training-Mode learning can edit a
+    body under an audited name, so the table is trusted for a type only while the body that is
+    about to run has the digest the audit saw (:meth:`Effects.info`).
+    """
+    return hashlib.sha256(source.encode("utf-8")).hexdigest()
 
 
 def mask(names) -> int:
@@ -88,6 +99,8 @@ class TypeInfo:
     #: choice, not a safety classification, so the exactness tests still treat the type
     #: as speculable.
     profitable: bool = True
+    #: Digest of the audited body (:func:`body_digest`); ``""`` for the barrier fallback.
+    body_digest: str = ""
 
 
 class Effects:
@@ -96,8 +109,17 @@ class Effects:
         self.types = types
         self._unknown = TypeInfo("?", True, ALL, ALL, True, "unclassified: barrier")
 
-    def info(self, codelet_type: str) -> TypeInfo:
-        return self.types.get(codelet_type, self._unknown)
+    def info(self, codelet_type: str, body_digest: str) -> TypeInfo:
+        """The audited entry for *codelet_type*, only if *body_digest* is the audited body's.
+
+        A body that is not the audited one (edited under an audited name, or a name the audit
+        never saw) is a barrier: it runs on the coordinator, in order, as a writer of
+        everything, which is slower and exact.
+        """
+        got = self.types.get(codelet_type)
+        if got is None or not got.body_digest or got.body_digest != body_digest:
+            return self._unknown
+        return got
 
 
 _DATA = os.path.join(os.path.dirname(__file__), "effects_data.json")
@@ -119,7 +141,8 @@ def load(path: str | None = None) -> Effects:
     types = {
         n: TypeInfo(n, bool(e["barrier"]), mask(e["reads"]), mask(e["writes"]),
                     bool(e["uses_cc"]), e.get("why", ""),
-                    bool(e.get("speculate", True)), bool(e.get("profitable", True)))
+                    bool(e.get("speculate", True)), bool(e.get("profitable", True)),
+                    e.get("body_digest", ""))
         for n, e in raw["types"].items()
     }
     eff = Effects(builtins, types)

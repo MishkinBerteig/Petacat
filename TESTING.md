@@ -125,14 +125,14 @@ outside the matrix take it too and the run is entirely what it says it is.
   gpu  mlx      float32    873 tests
   whole suite requested: the full matrix is required of this run
 
-  unit          1738 collected   1738 run   1738 passed      0 failed      0 skipped  complete
+  unit          1749 collected   1749 run   1749 passed      0 failed      0 skipped  complete
   seed_unit     1041 collected   1041 run   1041 passed      0 failed      0 skipped  complete
   module        1041 collected   1041 run   1041 passed      0 failed      0 skipped  complete
   architecture    73 collected     73 run     73 passed      0 failed      0 skipped  complete
   integration    346 collected    346 run    346 passed      0 failed      0 skipped  complete
-  parallel       248 collected    248 run    248 passed      0 failed      0 skipped  complete
+  parallel       273 collected    273 run    273 passed      0 failed      0 skipped  complete
   lockstep       228 collected    228 run    228 passed      0 failed      0 skipped  complete
-  e2e            483 collected    483 run    483 passed      0 failed      0 skipped  complete
+  e2e            499 collected    499 run    499 passed      0 failed      0 skipped  complete
 
   run complete in 13.9 min against a 60 min ceiling
 ```
@@ -204,14 +204,14 @@ that allowance.
 
 | Layer | Directory | Scope | May depend on | Cases |
 |-------|-----------|-------|---------------|-------|
-| **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 1738 |
+| **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 1749 |
 | **seed unit** | `tests/seed_unit/` | One class or function, measured against the values Petacat ships with | Real `seed_data/*.json`, and the machine the process is running on | 1041 |
 | **module** | `tests/module/` | Several real components assembled and driven | Real engine objects and `seed_data/*.json`; no DB, no HTTP | 1041 |
 | **architecture** | `tests/architecture/` | How the source tree is allowed to depend on itself | The repository's source, `seed_data/*.json`, child interpreters | 73 |
 | **integration** | `tests/integration/` | Agreement between the repository's artifacts, and the harness's own rules | Real `seed_data/*.json`, the ORM declarations, the generated client files, the documentation, a real pytest session | 346 |
-| **parallel** | `tests/parallel/` | The detachable multi-core plugin (`server/parallel/`): each executor against the serial run it claims to equal | Real engine objects and `seed_data/*.json`, worker processes and threads; each test pins the backend it compares on | 248 |
+| **parallel** | `tests/parallel/` | The detachable multi-core plugin (`server/parallel/`): each executor against the serial run it claims to equal | Real engine objects and `seed_data/*.json`, worker processes and threads; each test pins the backend it compares on | 273 |
 | **lockstep** | `tests/lockstep/` | Petacat's decision traces against Metacat's: naming, helper conformance, tracing/replay RNGs, determinism guards, the comparer | Real engine in faithful mode (numeric backend off, or a named backend); recorded Metacat traces | 228 |
-| **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 483 |
+| **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 499 |
 
 Those counts are cases, so they include the second pass the numeric matrix makes
 over the 519 backend-sensitive tests.
@@ -246,7 +246,7 @@ first**, then move up toward the API and GUI.
 
 All eight layers run in one command — the
 [required command](#the-required-command) — and, since Petacat runs natively, all
-eight actually run: **5,198 cases**, every one of them executed. A layer that is
+eight actually run: **5,250 cases**, every one of them executed. A layer that is
 normally skipped is not a layer that is normally green, and none of these is.
 
 Wall-clock time depends heavily on the machine and on what else it is doing. The
@@ -401,6 +401,7 @@ changing what it records.
 | `test_session_episode.py` | 34 | S1: the pure `EpisodeLog` (`server/services/session_episode.py`): one version counter over memory and configuration, the run-finish entry (memory, then batch, then one version), external and Admin entries, relative ops commuting, `expect` first-wins with the loser recorded, abort and skip, targets removed since the snapshot, `config_at` at every version, all interleavings of three runs, removing, renaming or merging a memory-named node, exact reduction to serial, a fuzz test; against a fake and the real `resolve` |
 | `test_database_sql_check.py` | 3 | C7: the Database tab's SQL box accepts one `SELECT` or `WITH` statement only (quoted semicolons and comments handled) |
 | `test_session_live_config.py` | 20 | S3: `LiveConfiguration` (`server/services/session_live_config.py`): a live session's configuration in memory over the `EpisodeLog`; the configuration revision as the compare-and-set token, distinct from the episode version; run-finish entries; live batches held as pending journal entries in revision order |
+| `test_configuration_edits.py` | 8 | C12: edit-all's service: the preview token round trip, the Admin batch each target gets, overwrite and apply-the-rest, and how each report or refusal becomes one of the six per-target results |
 | `test_change_resolve.py` | 32 | C14a: `resolve` (`server/services/change_resolve/`): generic ops, `expect`, `ok_if_missing`, JSON Patch; G6 (each malformed, unknown-reference, code, stale and key-exists case refused with the op named and its status); the changes that must not be refused (a role's node, a letter, the chain, every node, a coefficient, a required parameter, an urgency level, a codelet type, every posting rule); advisories; `skip` with rollback; purity, determinism and the report's shape |
 | `test_change_resolve_convenience.py` | 31 | C14a: every convenience op equals its expansion into generic ops; cascades, rename, merge, relative ops without clamping, role and trigger ops |
 | `test_change_resolve_property.py` | 6 | C14a: random op sequences keep the document well-formed (no dangling reference, no duplicate key, deterministic, replays); single ops equal one batch; memory-named nodes can be removed, renamed and merged from every source |
@@ -604,6 +605,8 @@ changing what it records.
 | `test_configuration_compare_api.py` | 6 | C9a: compare any two configurations or one with the Metacat Standard Configuration (diff by table and natural key), and apply-from (a dry-run preview, then add, remove and update rows through the change API as a `restore`), with their refusals |
 | `test_journal_api.py` | 6 | C13: `/api/journal` (list, filters, one entry, errors), as-of by revision and time, where-did-name-go and check-names, the restore and undo round trip, bad restore requests, and a session configuration's history with a live source |
 | `test_session_configuration.py` | 20 | S3: a Training Mode Session runs its own configuration: creation from each base with parameters folded, the WP-S3 equivalence, one worker equal to the serial episode with a learner, a live batch reaching the next dispatched run and not one in flight, a Stopped session's edit written at once, Starting and Stopping busy, M1, and the hand-off of held entries to the Stop write |
+| `test_session_stop_start.py` | 8 | S5: Stop then Start round-trips a session exactly with zero journal or merge statements at Start; many Stop/Start cycles; a failed Stop writes nothing and a retry writes everything; a tampered stored state refuses the Start while a Stopped edit does not; graceful shutdown stores every live configuration; a never-stopped session writes nothing while live |
+| `test_configuration_edits_api.py` | 8 | C12: edit-all over HTTP: the matrix of global, running, paused, Stopped, frozen and differing targets with M3 and undo by group; a missing row and a removed node with apply-the-rest; no_change, overwrite and a frozen target chosen by id; a session changing state; a stale preview re-previewed; all-or-nothing across stored and live targets |
 | `test_configuration_stamp_link.py` | 2 | The configuration stamp (plan 3.8): every answer description, snag description and state capture a Normal or Audit run stores carries its run's id, and so the run's `config_hash`; the Training Mode tables carry theirs by construction |
 | `test_api_controls.py` | 29 | Breakpoints, clamping, Clamp theme pattern, Undo last clamp, the mid-run self-watching toggle, and the threshold endpoints |
 | `test_api_displays.py` | 5 | The coderack, EEG and Themespace-name data the Metacat windows need |
@@ -632,8 +635,9 @@ changing what it records.
 | `test_placement.py` | 13 | The measured backend policy: the CPU by default, never the GPU on its own, the environment overrides |
 | `test_update_cycle.py` | 9 | The plugin's update cycle: faithful is bit-identical to the engine's, stream is identical at every thread count |
 | `test_clock_rack.py` | 12 | The exponential-race coderack draws each codelet with the faithful two-stage draw's probability, and a later post never disturbs an earlier choice it does not beat; the prediction cached for an epoch stays exact until a post passes it |
-| `test_effects.py` | 8 | The builtin effects table is complete, and no speculated read prefix writes shared state (the hidden-write detector) |
-| `test_speculative_exact.py` | 17 | The speculative executor is bit-identical to the stream-serial reference at every worker count, with forced aborts too; which codelets run ahead, and how far, never changes a result; one worker is the reference itself; the slow sweep (`PETACAT_SPECULATIVE_SWEEP_SEEDS`) widens it |
+| `test_effects.py` | 11 | The builtin effects table is complete, and no speculated read prefix writes shared state (the hidden-write detector) |
+| `test_speculative_exact.py` | 19 | The speculative executor is bit-identical to the stream-serial reference at every worker count, with forced aborts too; which codelets run ahead, and how far, never changes a result; one worker is the reference itself; the slow sweep (`PETACAT_SPECULATIVE_SWEEP_SEEDS`) widens it |
+| `test_session_transport.py` | 17 | S4: transport to workers: swarm equals serial equals in-process on evolved configurations (parameters changed, a body edited); the configuration shipped per task equals the plain run; no rebind across many configuration versions of two alternating sessions, and one serial child; worker death on the swarm and the serial child; the shipper and the worker cache bounded and exact; Metacat Mode's Swarm calls unchanged |
 | `test_training_mode_session_memory.py` | 10 | The Training episode memory without a database: descriptions survive the JSON storage encoding and pickle transport, a merge skips what the episode already holds and restamps ids in the master's numbering, a run's copy is independent of the master, a serial episode equals copy-and-merge one run at a time, and a worker reaches a version from its cache plus the tail (or asks for a snapshot) |
 
 **Collected by no layer**

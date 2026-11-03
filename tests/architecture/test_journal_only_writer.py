@@ -45,9 +45,11 @@ LAYER = "services/journal.py"
 #: The model definitions (they declare the tables and the append-only refusal; no writes).
 MODEL_FILES = {"models/journal.py", "models/metadata.py"}
 
-#: Where ``write_deferred`` may be called: a session's Stop write.  Empty until S5 (the Stop
-#: write); each entry is ``(file relative to server/, enclosing function)``.
-WRITE_DEFERRED_CALLERS: set[tuple[str, str]] = set()
+#: Where ``write_deferred`` may be called: a session's Stop write (S5).  Each entry is
+#: ``(file relative to server/, enclosing function)``.
+WRITE_DEFERRED_CALLERS: set[tuple[str, str]] = {
+    ("services/training_mode_session_service.py", "_write_stop"),
+}
 
 #: Directories that never write the journal: not a run, a worker, the swarm or the
 #: speculative executor (3.11).
@@ -311,6 +313,8 @@ def test_write_deferred_is_called_only_from_the_stop_write():
     assert callers <= WRITE_DEFERRED_CALLERS, (
         f"write_deferred may be called only from a session's Stop write: {sorted(callers - WRITE_DEFERRED_CALLERS)}"
     )
+    # and the Stop write really is a caller (the allow-list names it, not an empty promise)
+    assert callers == WRITE_DEFERRED_CALLERS, sorted(WRITE_DEFERRED_CALLERS - callers)
 
 
 def test_no_run_worker_swarm_or_speculative_executor_writes_the_journal():

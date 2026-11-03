@@ -275,3 +275,50 @@ def test_full_length_runs(meta, pi):
     """Runs to their natural end (an answer, or the generous step cap), 8 workers."""
     ssr, spec = check(meta, PROBLEMS[pi], 21, 8, 12000)
     assert ssr.codelet_count == spec.codelet_count
+
+
+# -- code-bearing changes: an edited body is a barrier, and the run stays exact ----------
+
+
+def _with_body(meta, name, edit):
+    import dataclasses
+
+    specs = dict(meta.codelet_specs)
+    specs[name] = dataclasses.replace(specs[name], execute_body=edit(specs[name].execute_body))
+    return dataclasses.replace(meta, codelet_specs=specs)
+
+
+EDITS = {
+    # Same behaviour, different source: the audit no longer applies, so it is a barrier.
+    "comment": lambda body: body + "\n# edited by Training-Mode learning\n",
+    # A different behaviour (the builder never builds): still exact.
+    "behaviour": lambda body: "fizzle()\n" + body,
+}
+
+
+@pytest.mark.parametrize("edit", sorted(EDITS))
+@pytest.mark.parametrize("name", ["bond-builder", "group-evaluator"])
+def test_an_edited_body_runs_as_a_barrier_and_stays_exact(meta, name, edit):
+    """The effects masks were audited against the Metacat Standard Configuration's bodies. A
+    body edited under an audited name has not been audited: the executor runs it as a barrier
+    (inline, in order, writing everything), and the speculative run equals the stream-serial
+    reference on the same edited configuration."""
+    from server.parallel.speculative.engine import SpeculativeEngine
+
+    edited = _with_body(meta, name, EDITS[edit])
+    for pi in (0, 1, 12):
+        ssr, spec = check(edited, PROBLEMS[pi], 1, 4, 450)
+    runner = EngineRunner(edited)
+    runner.init_mcat(*PROBLEMS[0], seed=1)
+    with SpeculativeEngine(runner, 4, use_qos=False) as engine:
+        info, may_run_ahead, blocks = engine._type_plan(name)
+        assert info.barrier and blocks and not may_run_ahead
+        assert engine._uses_cc(name)  # the audited uses_cc is not trusted for an edited body
+        other = "bond-builder" if name != "bond-builder" else "group-evaluator"
+        assert not engine._type_plan(other)[0].barrier  # the other audited types are unaffected
+
+
+def test_an_unedited_configuration_still_speculates(meta):
+    """The digest check does not demote the audited bodies: ahead-of-time work still happens."""
+    ssr, spec = check(meta, PROBLEMS[0], 1, 4, 450)
+    assert spec.telemetry["speculated"] > 0

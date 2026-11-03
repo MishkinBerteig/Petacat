@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from server.db import get_session
 from server.services import configuration_admin as admin
 from server.services import configuration_compare as compare_service
+from server.services import configuration_edits as edits
 from server.services import configurations, journal
 from server.services.configuration_writer import ChangeError, ChangeService, error_response
 
@@ -298,3 +299,74 @@ async def get_schema(configuration_id: int, session: AsyncSession = Depends(get_
             },
         },
     }
+
+
+# ---------------------------------------------------------------------------
+# Edit-all (C12): one edit sent to chosen or all configurations, with a preview
+# ---------------------------------------------------------------------------
+
+
+class EditTargets(BaseModel):
+    ids: list[int] | None = None
+    all: bool = False
+
+
+class EditPreviewRequest(BaseModel):
+    ops: list[dict[str, Any]]
+    targets: EditTargets
+    #: The revision the editor read, per configuration id; a target not named is previewed at head.
+    base_revisions: dict[int, int] = Field(default_factory=dict)
+    note: str = ""
+
+
+class EditCommitRequest(BaseModel):
+    preview_token: str
+    #: Configuration ids to re-send without ``expect`` (their result was ``differs``).
+    overwrite: list[int] = Field(default_factory=list)
+    #: Configuration ids to re-send with only the ops that do apply (``not_applicable``).
+    apply_rest: list[int] = Field(default_factory=list)
+    all_or_nothing: bool = False
+    reason: str = ""
+
+
+def _edit_http(exc: edits.EditError) -> HTTPException:
+    return HTTPException(exc.status, exc.message)
+
+
+@router.post("/edits/preview")
+async def post_edits_preview(body: EditPreviewRequest, session: AsyncSession = Depends(get_session)):
+    """Preview one edit on chosen or all configurations: ``dry_run`` on each target.
+
+    ``targets`` is ``{ids: [...]}`` (chosen, sent even when frozen) or ``{all: true}`` (every
+    configuration; a ``frozen`` one is ``skipped_by_selection``).  The answer has one result per
+    target (``apply``, ``no_change``, ``differs``, ``not_applicable``, ``stale`` or
+    ``skipped_by_selection``) and the ``preview_token`` the commit needs.  Nothing is written.
+    Editing every configuration is a human Admin action: each batch has ``actor = admin``.
+    """
+    try:
+        return await edits.preview(
+            session, body.ops, ids=body.targets.ids, all_=body.targets.all,
+            base_revisions=body.base_revisions, note=body.note)
+    except edits.EditError as exc:
+        raise _edit_http(exc)
+    except ChangeError as exc:
+        return error_response(exc)
+
+
+@router.post("/edits")
+async def post_edits(body: EditCommitRequest, session: AsyncSession = Depends(get_session)):
+    """Commit a previewed edit.  Each reached configuration takes its own batch (own journal
+    entry and revision bump, a live session's in memory with ``persisted: false``); all share
+    ``group_id``.  A skipped target never blocks another.  ``all_or_nothing`` writes nothing
+    unless every reached target applies (3.16.3).  A target whose revision moved since the
+    preview is ``stale`` with a fresh ``re_preview`` and is not written."""
+    try:
+        return await edits.commit(
+            session, body.preview_token, overwrite=body.overwrite, apply_rest=body.apply_rest,
+            all_or_nothing=body.all_or_nothing, reason=body.reason)
+    except edits.EditError as exc:
+        raise _edit_http(exc)
+    except ChangeError as exc:
+        return error_response(exc)
+    except journal.ConfigurationNotAdopted as exc:
+        raise HTTPException(500, str(exc))

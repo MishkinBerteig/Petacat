@@ -27,10 +27,13 @@ States
 A Training Mode Session is **Stopped**, **Starting**, **Running**, **Paused** or **Stopping**.
 Only the last four are live (held in ``TrainingModeSessionService._live``, Starting being
 the load that precedes it); a Stopped one is a record in the database, and every session
-is Stopped after a server restart.  ``start`` loads a Stopped session (its
-memory rebuilt from the stored merges, its unfinished problems resumed at the seeds not
-stored); ``stop`` drains the runs in flight (up to ``drain_timeout``), writes everything
-the session produced since it started in one transaction and drops the live part,
+is Stopped after a server restart.  ``start`` loads a Stopped session: its Episodic Memory
+snapshot, its configuration's stored current state (checked against the stored
+``config_hash``, so a mismatch refuses the Start) and its unfinished problems, resumed at
+the seeds not stored; it reads no journal row and no merge.  ``stop`` drains the runs in
+flight (up to ``drain_timeout``), writes everything the session produced since it started
+(including its configuration's journal entries and current state, and the memory snapshot)
+in one transaction and drops the live part,
 recording ``stopped_from`` (``running`` or ``paused``) and ``stop_reason`` (``user``,
 ``shutdown`` or ``error``).  A failed Start leaves the session Stopped; a failed Stop
 returns it to Paused with its memory intact.  ``cancel`` is an action, not a state: it
@@ -119,6 +122,7 @@ from typing import Any, AsyncIterator, Callable
 
 from sqlalchemy import case, cast, delete, false, func, insert, select, update
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from server.engine.memory import EpisodicMemory
@@ -128,10 +132,13 @@ from server.engine.start_check import RunStartError, require_run_start
 from server.models.journal import (
     Configuration, ConfigurationSnapshot, JournalEntry, KIND_SESSION,
 )
-from server.models.training_mode_session import TrainingModeSession, SessionMemoryMerge, TrainingModeSessionProblem, TrainingModeSessionRun
+from server.models.training_mode_session import (
+    SessionMemoryMerge, SessionMemorySnapshot, TrainingModeSession, TrainingModeSessionProblem,
+    TrainingModeSessionRun,
+)
 from server.services import config_document as cd
 from server.services import configuration_store as store
-from server.services import configurations
+from server.services import configurations, journal
 from server.services import training_mode_session_memory as tm
 from server.services.session_live_config import ConfigRef, LiveConfiguration
 from server.services.training_mode_session_executor import (
@@ -506,6 +513,11 @@ class LiveSession:
             ref.snapshot = self.snapshot[1]
             return ref
         ref.tail_from = max(0, self.version - tail_depth)
+        # A session that was just Started holds no merge blob for the versions before its Start
+        # (the Start read loads the memory snapshot and replays nothing): the tail begins at the
+        # first version held, and a worker that cannot reach it asks for a snapshot.
+        while ref.tail_from < self.version and (ref.tail_from + 1) not in self.merge_blobs:
+            ref.tail_from += 1
         ref.tail = [self.merge_blobs[v] for v in range(ref.tail_from + 1, self.version + 1)]
         return ref
 
@@ -685,27 +697,23 @@ class TrainingModeSessionService:
     async def _load_one(self, s: AsyncSession, t: TrainingModeSession) -> LiveSession:
         """The Start read: build the live part of a Stopped session from the database.
 
-        Reads only.  The Episodic Memory is rebuilt from the stored merges and the unfinished
-        problems come back with the runs stored for them, so they resume at the seeds not stored.
-        The session's own configuration is read here too: its stored current state, at its
-        revision, becomes the live ``LiveConfiguration``.  (S5 replaces the merge replay with the
-        memory snapshot the Stop write stores and checks the configuration's ``config_hash``;
-        until then the Stop write stores no configuration state.)"""
+        Reads only, and reads back what the Stop write stored, replaying nothing:
+
+        * the session row (settings, policy, counters, ``last_change_version``);
+        * the Episodic Memory snapshot (no merge row is read);
+        * the unfinished problems with the runs stored for them, so they resume at the seeds not
+          yet run;
+        * the configuration's stored current state, checked against its stored ``config_hash``
+          (no journal row is read; a mismatch refuses the Start).
+        """
         lt = self._new_live(t)
-        merges = (await s.execute(
-            select(SessionMemoryMerge).where(SessionMemoryMerge.session_id == t.id)
-            .order_by(SessionMemoryMerge.seq)
-        )).scalars().all()
-        for m in merges:
-            adds = tm.decode_additions(m.answers, m.snags)
-            tm.apply_merge(lt.memory, adds)
-            lt.version = m.seq
-            lt.merge_blobs[m.seq] = tm.dump_additions(adds)
-        if lt.version != len(merges):
-            logger.warning("session %d: merge log has gaps (%d merges, version %d)",
-                           t.id, len(merges), lt.version)
-        for k in sorted(lt.merge_blobs)[:-MERGE_KEEP]:
-            del lt.merge_blobs[k]
+        snap = (await s.execute(
+            select(SessionMemorySnapshot).where(SessionMemorySnapshot.session_id == t.id)
+        )).scalar_one_or_none()
+        if snap is not None:
+            lt.memory = tm.memory_from_snapshot(snap.data)
+            lt.version = snap.version
+            lt.snapshot = (snap.version, snap.data)
         lt.saved_version = lt.version
         P = TrainingModeSessionProblem
         problems = (await s.execute(
@@ -739,20 +747,23 @@ class TrainingModeSessionService:
         The configuration's row is locked first, so a stored write to a Stopped session's
         configuration that began just before this Start is complete before the document is read,
         and one that begins after it finds the session live and goes to memory."""
-        C, J = Configuration.__table__, JournalEntry.__table__
+        C = Configuration.__table__
         row = (await s.execute(
             select(C).where(C.c.session_id == t.id, C.c.kind == KIND_SESSION).with_for_update()
         )).mappings().first()
         if row is None:
             raise SessionError(500, f"session {t.id} has no configuration; clear the database and recreate it")
         document = await configurations.current_document(s, row["id"])
-        last = (await s.execute(
-            select(func.max(J.c.episode_version)).where(J.c.configuration_id == row["id"])
-        )).scalar_one()
+        stored, found = row["config_hash"], cd.config_hash(document)
+        if stored != found:
+            raise SessionError(
+                409, f"the config_hash check failed: session {t.id}'s stored configuration state "
+                     f"hashes to {found} but its configuration row records {stored}; the session "
+                     "stays Stopped (verify-journal on its configuration shows where they differ)")
         lt.config = LiveConfiguration(
             document, configuration_id=row["id"], revision=row["revision"],
             episode_version=lt.version, base_hash=row["base_snapshot_hash"], frozen=row["frozen"],
-            last_change_version=last, saved_at=t.stopped_at,
+            last_change_version=t.last_change_version, saved_at=t.stopped_at,
         )
 
     @staticmethod
@@ -1594,13 +1605,16 @@ class TrainingModeSessionService:
     # -- the Episodic Memory --------------------------------------------------
 
     async def memory_of(self, session_id: int) -> EpisodicMemory:
-        """The Episodic Memory (live if started, else rebuilt from the stored merges)."""
+        """The Episodic Memory (live if started, else the snapshot the last Stop stored)."""
         lt = self._live.get(session_id)
         if lt is not None:
             return tm.copy_for_run(lt.memory)
         async with self._factory() as s:
             await self._get_session(s, session_id)
-            return await self.rebuild_memory(s, session_id)
+            snap = (await s.execute(
+                select(SessionMemorySnapshot).where(SessionMemorySnapshot.session_id == session_id)
+            )).scalar_one_or_none()
+            return tm.memory_from_snapshot(snap.data) if snap is not None else EpisodicMemory()
 
     @staticmethod
     async def stored_replay_source(s: AsyncSession, session_id: int) -> tm.ListReplaySource:
@@ -2090,13 +2104,16 @@ class TrainingModeSessionService:
     async def _write_stop(self, lt: LiveSession, *, stopped_from: str, reason: str) -> None:
         """The Stop write: the one database write of a live session, in one transaction.
 
-        It writes what exists today: the session row, new problems, outcomes (finished and
-        cancelled problems), runs and Episodic Memory merges.  Nothing is removed from the live
-        part until it commits, so a failure leaves the session exactly as it was.
+        It writes, together:
 
-        Seam for S5, in this same transaction: the journal entries (``journal.write_deferred``),
-        the configuration's stored current state and revision and the memory snapshot.  The
-        Start read (``_load_one``) is its counterpart."""
+        * the session row, new problems, outcomes (finished and cancelled problems) and runs;
+        * the Episodic Memory merges, and the memory snapshot at the last of them;
+        * the configuration's held journal entries (``journal.write_deferred``) and its stored
+          current state, revision and hash (``journal.store_current_state``), so the Start read
+          loads them back and replays nothing.
+
+        Nothing is removed from the live part until it commits, so a failure leaves the session
+        exactly as it was, and the database as the previous Stop left it."""
         P, R = TrainingModeSessionProblem, TrainingModeSessionRun
         now = _utcnow()
         problems = sorted(lt.problems.values(), key=lambda lp: lp.id)
@@ -2104,6 +2121,10 @@ class TrainingModeSessionService:
         settled = [lp for lp in problems if lp.stored and lp.settled]
         run_rows = [self._run_row(lt, r) for r in lt.pending_runs]
         merge_rows = await asyncio.to_thread(self._merge_rows, lt, list(lt.pending_merges))
+        config = lt.config
+        entries = config.pending_entries()
+        snapshot = (await asyncio.to_thread(tm.snapshot_blob, lt.memory)
+                    if lt.version != lt.saved_version else None)
         async with self._factory() as s:
             async with s.begin():
                 for i in range(0, len(new_rows), INSERT_CHUNK):
@@ -2123,9 +2144,20 @@ class TrainingModeSessionService:
                     name=lt.name, note=lt.note, policy=lt.policy, config_hash=lt.config_hash,
                     last_event=lt.last_event, finished_count=lt.finished_count,
                     next_problem_id=lt.next_problem_id, updated_at=now, stopped_at=now,
-                    stopped_from=stopped_from, stop_reason=reason))
+                    stopped_from=stopped_from, stop_reason=reason,
+                    last_change_version=config.last_change_version))
                 if res.rowcount == 0:
                     raise SessionError(404, f"session {lt.id} was deleted")
+                if snapshot is not None:
+                    values = {"version": lt.version, "data": snapshot, "saved_at": now}
+                    await s.execute(pg_insert(SessionMemorySnapshot).values(session_id=lt.id, **values)
+                                    .on_conflict_do_update(index_elements=["session_id"], set_=values))
+                if entries:
+                    await journal.write_deferred(
+                        s, configuration_id=config.configuration_id, entries=entries, commit=False)
+                    await journal.store_current_state(
+                        s, config.configuration_id, config.document, revision=config.revision,
+                        config_hash=config.config_hash)
 
     @staticmethod
     def _run_row(lt: LiveSession, r: RunRec) -> dict[str, Any]:

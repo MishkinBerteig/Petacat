@@ -34,7 +34,7 @@ from __future__ import annotations
 
 from sqlalchemy import (
     BigInteger, CheckConstraint, Column, DateTime, Float, ForeignKey, ForeignKeyConstraint, Index, Integer,
-    String, Text, UniqueConstraint,
+    LargeBinary, String, Text, UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 
@@ -74,6 +74,9 @@ class TrainingModeSession(Base):
     #: ``hashing.config_hash`` of the session's own configuration, as of the last Stop (or its
     #: creation).  A live session's current hash is in memory.
     config_hash = Column(String(64), nullable=False, default="")
+    #: The Training episode version of the configuration's last change, as of the last Stop
+    #: (``None`` if it has never changed); the Start read takes it from here, not from the journal.
+    last_change_version = Column(Integer, nullable=True)
     #: The last ``finished_seq`` handed out, as of the last Stop.
     finished_count = Column(Integer, nullable=False, default=0)
     #: The next per-session problem ordinal, as of the last Stop.
@@ -200,6 +203,27 @@ class SessionMemoryMerge(Base):
     #: The run's new descriptions, oldest first, as ``state_graph`` records.
     answers = Column(JSONB, nullable=True)
     snags = Column(JSONB, nullable=True)
+
+
+class SessionMemorySnapshot(Base):
+    """The session's Episodic Memory as of its last Stop: what the Start read loads.
+
+    The Stop write replaces it in the same transaction that appends the merges it covers, so
+    ``version`` is the last stored merge's ``seq``.  Start loads this row and replays no merge
+    (the merges stay as the record, and ``rebuild_memory`` can replay them to check it).
+    """
+
+    __tablename__ = "training_mode_session_memory_snapshots"
+
+    session_id = Column(
+        Integer, ForeignKey("training_mode_sessions.id", ondelete="CASCADE"), primary_key=True
+    )
+    #: The Training episode version the snapshot is at.
+    version = Column(Integer, nullable=False)
+    #: ``training_mode_session_memory.snapshot_blob``.
+    data = Column(LargeBinary, nullable=False)
+    saved_at = Column(DateTime, nullable=False, default=_utcnow)
+
 
 # Registered here so every drop_all/create_all that imports the runtime models also covers
 # ``configuration_state`` (the start-up load marker; see server/services/configuration_startup.py).

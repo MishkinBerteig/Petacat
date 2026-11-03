@@ -2,7 +2,7 @@
 
 > **Auto-generated.** Run `python scripts/generate_api_docs.py` to regenerate from the FastAPI application.
 
-178 HTTP routes, plus `WS /ws/runs/{run_id}` for live state push.
+180 HTTP routes, plus `WS /ws/runs/{run_id}` for live state push.
 
 Interactive documentation is served at `/docs` while the API is running.
 
@@ -227,6 +227,8 @@ What the process resolved at startup.
 |---|---|---|
 | `GET` | `/api/configurations` | List Configurations |
 | `GET` | `/api/configurations/compare` | Get Compare |
+| `POST` | `/api/configurations/edits` | Post Edits |
+| `POST` | `/api/configurations/edits/preview` | Post Edits Preview |
 | `GET` | `/api/configurations/{configuration_id}` | Get Configuration |
 | `PATCH` | `/api/configurations/{configuration_id}` | Patch Configuration |
 | `POST` | `/api/configurations/{configuration_id}/apply-from` | Post Apply From |

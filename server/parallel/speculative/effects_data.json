@@ -605,7 +605,8 @@
    ],
    "uses_cc": false,
    "why": "Pure read prefix of 17 builtin calls then a single write builtin. Reads obj.left_string_pos (immutable). ~64.5k of 1.14M observed executions; fizzles ~55% of the time before propose_bond. ['verbose' a",
-   "profit_note": "WP10: speculating only this type changed a run's time by x0.987 (median of 3 cases, 4 workers, M5 Max): its hand-off and cross-thread costs exceed the work it hides"
+   "profit_note": "WP10: speculating only this type changed a run's time by x0.987 (median of 3 cases, 4 workers, M5 Max): its hand-off and cross-thread costs exceed the work it hides",
+   "body_digest": "e2ba52755e2689e50b180b77cca1005fae7d22835b27ca733f64f0e4c560cf3e"
   },
   "top-down-bond-scout:category": {
    "barrier": false,
@@ -622,7 +623,8 @@
     "verbose"
    ],
    "uses_cc": false,
-   "why": "args['slipnode'] / args['scope'] are codelet arguments (shared Slipnet node / WorkspaceString; read-only). choose_string_for reads live bond pointers (relevance), not just stored values. ['verbose' ap"
+   "why": "args['slipnode'] / args['scope'] are codelet arguments (shared Slipnet node / WorkspaceString; read-only). choose_string_for reads live bond pointers (relevance), not just stored values. ['verbose' ap",
+   "body_digest": "0684078ec11733de3cb388a65a6a0df12844551c2c88100f13536562ca880aed"
   },
   "top-down-bond-scout:direction": {
    "barrier": false,
@@ -639,7 +641,8 @@
     "verbose"
    ],
    "uses_cc": false,
-   "why": "Same shape as :category. ['verbose' appears in writes only when ctx.verbose is on.]"
+   "why": "Same shape as :category. ['verbose' appears in writes only when ctx.verbose is on.]",
+   "body_digest": "02fb5894159ac7caf5d78273f90c97b65f3e4c0f8a2a7697ff3b2503e8c54000"
   },
   "bond-evaluator": {
    "barrier": false,
@@ -658,7 +661,8 @@
    ],
    "uses_cc": false,
    "why": "evaluate_structure (line 6) is a READ whose only mutation is to the argument bond (strength, proposal_level); the first shared write is the activate at line 10, then post_codelet('bond-builder', round",
-   "profit_note": "WP10: speculating only this type changed a run's time by x0.969 (median of 3 cases, 4 workers, M5 Max): its hand-off and cross-thread costs exceed the work it hides"
+   "profit_note": "WP10: speculating only this type changed a run's time by x0.969 (median of 3 cases, 4 workers, M5 Max): its hand-off and cross-thread costs exceed the work it hides",
+   "body_digest": "cb527edbddaef551a65a37c7acce2eab81fa8960af4a3e956a972790dc9f98b5"
   },
   "bond-builder": {
    "barrier": false,
@@ -680,7 +684,8 @@
     "workspace"
    ],
    "uses_cc": false,
-   "why": "One builtin, entirely a write. The whole body should be treated as live-after-token."
+   "why": "One builtin, entirely a write. The whole body should be treated as live-after-token.",
+   "body_digest": "be2d3a9a8a333d31e7b0707ae7b85609cd8d94758ffffa6814b035fdbd9ae7c9"
   },
   "top-down-group-scout:category": {
    "barrier": false,
@@ -699,7 +704,8 @@
    ],
    "uses_cc": false,
    "why": "The most id-hungry body: allocates ids in the prefix of ~47% of its executions, BEFORE any builtin write and before the fizzle decision. Serial id order must be preserved even for singletons that are ",
-   "profit_note": "WP10: speculating only this type changed a run's time by x0.966 (median of 3 cases, 4 workers, M5 Max): its hand-off and cross-thread costs exceed the work it hides"
+   "profit_note": "WP10: speculating only this type changed a run's time by x0.966 (median of 3 cases, 4 workers, M5 Max): its hand-off and cross-thread costs exceed the work it hides",
+   "body_digest": "9a2df80ed2aa0028ef63ff71765e9677a8c20f5a4ec577a9da34545404aa2545"
   },
   "top-down-group-scout:direction": {
    "barrier": false,
@@ -716,7 +722,8 @@
     "verbose"
    ],
    "uses_cc": false,
-   "why": " ['verbose' appears in writes only when ctx.verbose is on.]"
+   "why": " ['verbose' appears in writes only when ctx.verbose is on.]",
+   "body_digest": "265633c7ca8cc69463916e72e2f3f6f05917b3bd38de30432d86fd137557376e"
   },
   "group-scout:whole-string": {
    "barrier": false,
@@ -733,7 +740,8 @@
     "verbose"
    ],
    "uses_cc": false,
-   "why": "Reads string.bonds (live list) at line 4. Note the body binds `rng = ctx.rng` ONCE at exec start: it must be the step's stream at that moment. ['verbose' appears in writes only when ctx.verbose is on."
+   "why": "Reads string.bonds (live list) at line 4. Note the body binds `rng = ctx.rng` ONCE at exec start: it must be the step's stream at that moment. ['verbose' appears in writes only when ctx.verbose is on.",
+   "body_digest": "8ae3606d26641ba3fb4fe40e868107d7b844edc23bf7504e13f3e217f98cd0c6"
   },
   "group-evaluator": {
    "barrier": false,
@@ -749,7 +757,8 @@
     "slipnet_buf"
    ],
    "uses_cc": false,
-   "why": "Reads group.strength (private, recomputed) for the post urgency."
+   "why": "Reads group.strength (private, recomputed) for the post urgency.",
+   "body_digest": "5dd8e2165dc7d21fcef818f6b10d3f17556ec7ec716f8232b1a707f5ef9017c2"
   },
   "group-builder": {
    "barrier": false,
@@ -771,7 +780,8 @@
     "workspace"
    ],
    "uses_cc": false,
-   "why": "Prefix is two reads then the write builtin. ['verbose' appears in writes only when ctx.verbose is on.]"
+   "why": "Prefix is two reads then the write builtin. ['verbose' appears in writes only when ctx.verbose is on.]",
+   "body_digest": "a9672885b955fac98b6b36a764d95674b67da6c0dcb70167deb02e50a06ff3f6"
   },
   "bottom-up-bridge-scout": {
    "barrier": false,
@@ -788,7 +798,8 @@
     "verbose"
    ],
    "uses_cc": true,
-   "why": "Reads workspace.answer_string (set only by report_answer = barrier). `justify_mode` and `codelet_count` are namespace locals captured at exec start. Everything up to line 80 (the whole admissibility g"
+   "why": "Reads workspace.answer_string (set only by report_answer = barrier). `justify_mode` and `codelet_count` are namespace locals captured at exec start. Everything up to line 80 (the whole admissibility g",
+   "body_digest": "ea4e8cabaa2225ef2f0d66e006d029009cda515a13f105e8d647ce2511d9694e"
   },
   "important-object-bridge-scout": {
    "barrier": false,
@@ -807,7 +818,8 @@
    ],
    "uses_cc": true,
    "why": "Only prefix body with a hidden SHARED write before its first builtin write. Scans string2.objects and every object's relevant descriptions. ['verbose' appears in writes only when ctx.verbose is on.]",
-   "profit_note": "WP10: speculating only this type changed a run's time by x0.986 (median of 3 cases, 4 workers, M5 Max): its hand-off and cross-thread costs exceed the work it hides"
+   "profit_note": "WP10: speculating only this type changed a run's time by x0.986 (median of 3 cases, 4 workers, M5 Max): its hand-off and cross-thread costs exceed the work it hides",
+   "body_digest": "d806dcae97bd3d0d5a6e869f511fd09e1b330c3aa89ebf3a68b307e65330b7d3"
   },
   "bridge-evaluator": {
    "barrier": false,
@@ -824,7 +836,8 @@
     "slipnet_buf"
    ],
    "uses_cc": false,
-   "why": "The slipnet_buf writes are NOT builtins, so a builtin-level classifier misses them. Observed 111,275 cm.activate_descriptions calls in 51,235 executions."
+   "why": "The slipnet_buf writes are NOT builtins, so a builtin-level classifier misses them. Observed 111,275 cm.activate_descriptions calls in 51,235 executions.",
+   "body_digest": "30a67c78d4025e77464d88e0d566233bfefd4f24f24391fdfad513390c6fdf35"
   },
   "bridge-builder": {
    "barrier": false,
@@ -846,7 +859,8 @@
     "workspace"
    ],
    "uses_cc": false,
-   "why": "vprint at line 8 only when verbose. Heavy builder: fights, flips, concept-mapping augmentation, Themespace boost, Trace events. ['verbose' appears in writes only when ctx.verbose is on.]"
+   "why": "vprint at line 8 only when verbose. Heavy builder: fights, flips, concept-mapping augmentation, Themespace boost, Trace events. ['verbose' appears in writes only when ctx.verbose is on.]",
+   "body_digest": "7c987ec825d3f166812408cfef463782178ed9729c9bb088aef19208f8fc3c69"
   },
   "bottom-up-description-scout": {
    "barrier": false,
@@ -863,7 +877,8 @@
     "verbose"
    ],
    "uses_cc": false,
-   "why": " ['verbose' appears in writes only when ctx.verbose is on.]"
+   "why": " ['verbose' appears in writes only when ctx.verbose is on.]",
+   "body_digest": "ab7be41f56521e2b4d8e28ffb7f2266cb467e0aa4c6e54f15c9d40eb36648be0"
   },
   "top-down-description-scout": {
    "barrier": false,
@@ -882,7 +897,8 @@
    ],
    "uses_cc": false,
    "why": "possible_descriptor evals the node's descriptor_predicate over live objects. ['verbose' appears in writes only when ctx.verbose is on.]",
-   "profit_note": "WP10: speculating only this type changed a run's time by x0.985 (median of 3 cases, 4 workers, M5 Max): its hand-off and cross-thread costs exceed the work it hides"
+   "profit_note": "WP10: speculating only this type changed a run's time by x0.985 (median of 3 cases, 4 workers, M5 Max): its hand-off and cross-thread costs exceed the work it hides",
+   "body_digest": "f801a9d43aaa08ee1c9b2cc515c10cb3a33f40bdeaed291fe3a21a76ad0f339f"
   },
   "description-evaluator": {
    "barrier": false,
@@ -901,7 +917,8 @@
    ],
    "uses_cc": false,
    "why": "Writes before it evaluates anything: no read-only prefix. 73k executions: treat as live-after-token from line 7.",
-   "profit_note": "WP10: speculating only this type changed a run's time by x0.967 (median of 3 cases, 4 workers, M5 Max): its hand-off and cross-thread costs exceed the work it hides"
+   "profit_note": "WP10: speculating only this type changed a run's time by x0.967 (median of 3 cases, 4 workers, M5 Max): its hand-off and cross-thread costs exceed the work it hides",
+   "body_digest": "bf2903a786521b1b4e73299dae6bd8940544766ea9d92f7c9aa35dacf6b8e2d7"
   },
   "description-builder": {
    "barrier": false,
@@ -923,7 +940,8 @@
     "workspace"
    ],
    "uses_cc": false,
-   "why": "Lines 8-17 are a pure read prefix (object-exists + duplicate scan). Line 26 writes again after the build. ['verbose' appears in writes only when ctx.verbose is on.]"
+   "why": "Lines 8-17 are a pure read prefix (object-exists + duplicate scan). Line 26 writes again after the build. ['verbose' appears in writes only when ctx.verbose is on.]",
+   "body_digest": "db7e5c411915626e8ed722580462464058101de7a9c9ab6cbbc236fe8a11dc1f"
   },
   "rule-scout": {
    "barrier": false,
@@ -942,7 +960,8 @@
     "workspace"
    ],
    "uses_cc": true,
-   "why": "build_rule_from_bridges/currently_works: image caches and id/description writes on shared objects"
+   "why": "build_rule_from_bridges/currently_works: image caches and id/description writes on shared objects",
+   "body_digest": "0f7efed0e405d7a64c8c5330d6078447e45e4d4d86845b5ffb53386ccd1d69ea"
   },
   "rule-evaluator": {
    "barrier": false,
@@ -960,7 +979,8 @@
     "workspace"
    ],
    "uses_cc": false,
-   "why": "Rule.currently_works rewrites obj.image on every workspace object (hidden shared write)"
+   "why": "Rule.currently_works rewrites obj.image on every workspace object (hidden shared write)",
+   "body_digest": "7d7bf056e3f0c9b3f1c4b3b24f58c5db5b965801e8c1a6d5016c33097cc6ddf1"
   },
   "rule-builder": {
    "barrier": false,
@@ -983,7 +1003,8 @@
     "workspace"
    ],
    "uses_cc": false,
-   "why": "mutates a BUILT incumbent rule (revise_abstracted_rule_information) before build_structure"
+   "why": "mutates a BUILT incumbent rule (revise_abstracted_rule_information) before build_structure",
+   "body_digest": "ac06c274debde5032c9d4f6149a7cc1f9a9aa99328d0fac213948fc7a60ea91e"
   },
   "answer-finder": {
    "barrier": true,
@@ -1010,7 +1031,8 @@
     "workspace"
    ],
    "uses_cc": false,
-   "why": "BARRIER: can call record_snag (update cycle + coderack flush) and report_answer (update cycle, memory). Most executions fizzle at the first probability gate (4,238 executions, 187 answers) but cannot "
+   "why": "BARRIER: can call record_snag (update cycle + coderack flush) and report_answer (update cycle, memory). Most executions fizzle at the first probability gate (4,238 executions, 187 answers) but cannot ",
+   "body_digest": "a11f9e4d0c83bc898a3aadbbe5ae49ed54d6f088e00fcbdf79b73a6855a09706"
   },
   "answer-justifier": {
    "barrier": true,
@@ -1037,7 +1059,8 @@
     "workspace"
    ],
    "uses_cc": true,
-   "why": "BARRIER (clamp state). Passes trace/themespace/slipnet/memory/coderack/temperature objects directly into the engine function."
+   "why": "BARRIER (clamp state). Passes trace/themespace/slipnet/memory/coderack/temperature objects directly into the engine function.",
+   "body_digest": "8175e0f9fa8089d7e6abb628f509c56658ec543c3cd05bee28af2305f1c14ed8"
   },
   "thematic-bridge-scout": {
    "barrier": false,
@@ -1060,7 +1083,8 @@
     "workspace"
    ],
    "uses_cc": true,
-   "why": "interleaves id-allocating writes with reads; 0.03% of codelets"
+   "why": "interleaves id-allocating writes with reads; 0.03% of codelets",
+   "body_digest": "afbc7cc50235b006a4a4ff92211ab68807518ddf811c506ae315e891aa98014c"
   },
   "progress-watcher": {
    "barrier": true,
@@ -1081,7 +1105,8 @@
     "verbose"
    ],
    "uses_cc": true,
-   "why": "BARRIER (touches trace clamp state). 15,885 executions but only 180 Trace events written: most are read-only 'activity>0' checks - a conditional-barrier refinement could be a later optimisation, at th"
+   "why": "BARRIER (touches trace clamp state). 15,885 executions but only 180 Trace events written: most are read-only 'activity>0' checks - a conditional-barrier refinement could be a later optimisation, at th",
+   "body_digest": "6bfe1424afec0f799cbff8ff64dca1a6afb68f771ef645befae77f774212e33d"
   },
   "jootser": {
    "barrier": true,
@@ -1108,7 +1133,8 @@
     "workspace"
    ],
    "uses_cc": true,
-   "why": "BARRIER: can call give_up (update_everything) and report_answer. ['verbose' appears in writes only when ctx.verbose is on.]"
+   "why": "BARRIER: can call give_up (update_everything) and report_answer. ['verbose' appears in writes only when ctx.verbose is on.]",
+   "body_digest": "cf9645168f110265f2e014d8af839b0a507162dcad16e3e74334d3dd444a7703"
   },
   "breaker": {
    "barrier": false,
@@ -1123,7 +1149,8 @@
     "workspace"
    ],
    "uses_cc": false,
-   "why": "Reads EVERY built structure's strength and the list order of all structure lists - a very wide read set, but a pure one until the break. Family 'breaker' is not barrier per the brief (observed 2,332 e"
+   "why": "Reads EVERY built structure's strength and the list order of all structure lists - a very wide read set, but a pure one until the break. Family 'breaker' is not barrier per the brief (observed 2,332 e",
+   "body_digest": "2a5e9d2ff3419268e237cc7a85b15065716c65c40920427a1d8dbde3bdabf9d8"
   }
  }
 }

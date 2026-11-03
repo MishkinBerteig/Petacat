@@ -13,8 +13,8 @@ Every table is introspected from ``Base.metadata`` and put in one **class**:
 * ``journal``: ``configurations``, ``configuration_journal`` and the other layer-owned tables.
   Read-only (409 ``journal_read_only``).
 * ``session_managed``: a Training Mode Session's tables.  Read-only (409 ``session_managed``).
-* ``episodic_memory``: a session's Episodic Memory: ``training_memory_merges``, a session's
-  journal table, and the run columns ``seq``, ``memory_version``, ``added_answers`` and
+* ``episodic_memory``: a session's Episodic Memory: ``training_memory_merges``, its
+  snapshot ``training_mode_session_memory_snapshots``, a session's journal table, and the run columns ``seq``, ``memory_version``, ``added_answers`` and
   ``added_snags``.  Read-only, and expert mode does not lift it (409
   ``episodic_memory_protected``).
 
@@ -86,7 +86,7 @@ EPISODIC_MEMORY_PROTECTED = "episodic_memory_protected"
 JOURNAL_READ_ONLY = "journal_read_only"
 
 #: Tables, and run columns, that are a Training Mode Session's Episodic Memory (3.15).
-_EPISODIC_TABLES = frozenset({"training_memory_merges"})
+_EPISODIC_TABLES = frozenset({"training_memory_merges", "training_mode_session_memory_snapshots"})
 EPISODIC_RUN_COLUMNS = frozenset({"seq", "memory_version", "added_answers", "added_snags"})
 _SESSION_RUNS_TABLE = "training_mode_session_runs"
 _SESSIONS_TABLE = "training_mode_sessions"

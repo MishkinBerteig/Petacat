@@ -605,8 +605,8 @@ class SpeculativeEngine:
     # -- namespace template ------------------------------------------------
 
     def _uses_cc(self, name: str) -> bool:
-        info = self.effects.types.get(name)
-        return True if info is None else info.uses_cc
+        # Through the plan, so the audited ``uses_cc`` is trusted only for the audited body.
+        return self._type_plan(name)[0].uses_cc
 
     def _make_template(self, ctx: Any) -> dict[str, Any]:
         """Bound builtins and the safe Python builtins, built once per thread.
@@ -1214,7 +1214,8 @@ class SpeculativeEngine:
         """
         got = self._plans.get(codelet_type)
         if got is None:
-            info = self.effects.info(codelet_type)
+            # The audit holds for the audited body only: an edited one is a barrier.
+            info = self.effects.info(codelet_type, fx.body_digest(self._registry_get(codelet_type).source))
             ok = (info.speculate and info.profitable and not info.barrier
                   and (self._only is None or codelet_type in self._only))
             blocks = bool(info.barrier or info.writes & _CONFLICT_MASK)

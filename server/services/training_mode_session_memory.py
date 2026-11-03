@@ -28,6 +28,18 @@ worker applies the merges it has not seen, which gives the same master as the sc
 because the merge is deterministic.  A worker too far behind (or ahead, after a retry)
 returns ``need_snapshot`` and the scheduler resubmits that task with a full snapshot.
 
+Shipping the configuration to workers
+-------------------------------------
+A session's configuration is shipped the other way: a task carries a :class:`ConfigShip`, the
+pickled provider (about 135 KB) its run starts under, with a *key* the sender gives each
+distinct provider.  The sender pickles a provider once, when it first sees it; a worker
+unpickles a key once and keeps the provider (:func:`worker_provider`).  Measured
+(``agents-workspace/v2-S4/spike_transport.out``), carrying the 135 KB with every task adds
+about 0.03 ms to a task's round trip and nothing measurable to a pipelined task, against
+runs of tens of milliseconds, so there is no tail, no snapshot request and no rebinding of
+any pool when a configuration changes.  A task for another configuration is just a task
+with another key, so sessions with different configurations share one pool.
+
 Storage uses :mod:`server.engine.state_graph`'s record encoding (JSON); transport uses
 pickle of the same objects, which is smaller and faster.  Tuples come back from JSON as
 lists, so :func:`decode_additions` restores ``problem`` to a tuple, the one tuple field.
@@ -36,16 +48,20 @@ lists, so :func:`decode_additions` restores ``problem`` to a tuple, the one tupl
 from __future__ import annotations
 
 import pickle
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Any, Iterable, Iterator, Protocol
 
 from server.engine.ids import KIND_ANSWER, KIND_SNAG, IdAllocator
 from server.engine.memory import AnswerDescription, EpisodicMemory, SnagDescription
+from server.engine.metadata import MetadataProvider
 
 #: Merges kept in a worker task's tail, at least; the service raises it with the workers.
 MIN_TAIL = 16
 #: Episodes a worker keeps cached.
 CACHE_LIMIT = 8
+#: Configurations (providers) a worker keeps cached: a few sessions' current versions.
+PROVIDER_CACHE_LIMIT = 8
 
 
 @dataclass
@@ -73,6 +89,15 @@ class MemoryRef:
     tail: list[bytes] = field(default_factory=list)
     #: A full snapshot of the master at ``version``; replaces the tail when set.
     snapshot: bytes | None = None
+
+
+@dataclass(frozen=True)
+class ConfigShip:
+    """The configuration a task's run starts under: ``blob`` is ``pickle.dumps(provider)``,
+    ``key`` names that provider (unique per provider object among those one sender ships)."""
+
+    key: int
+    blob: bytes
 
 
 class NeedSnapshot(Exception):
@@ -242,12 +267,44 @@ def begin(ref: MemoryRef) -> tuple[EpisodicMemory, int, int]:
     return copy, len(copy.answers), len(copy.snags)
 
 
+_PROVIDERS: OrderedDict[int, MetadataProvider] = OrderedDict()
+
+
+def worker_provider(ship: ConfigShip) -> MetadataProvider:
+    """The provider for *ship*: unpickled once per key in this process, then cached (LRU)."""
+    got = _PROVIDERS.get(ship.key)
+    if got is not None:
+        _PROVIDERS.move_to_end(ship.key)
+        return got
+    got = pickle.loads(ship.blob)
+    _PROVIDERS[ship.key] = got
+    while len(_PROVIDERS) > PROVIDER_CACHE_LIMIT:
+        _PROVIDERS.popitem(last=False)
+    return got
+
+
+def begin_run(
+    ref: MemoryRef | None, ship: ConfigShip | None, fallback: MetadataProvider | None
+) -> tuple[EpisodicMemory | None, int, int, MetadataProvider | None]:
+    """Everything a run starts from: ``(memory copy, base answers, base snags, provider)``.
+
+    The one compose step, used by ``swarm.run_one`` and the session executor's ``run_task``
+    so the swarm, the serial child and an in-process run start identically.  The provider
+    is the shipped one, else *fallback* (a caller that passes the provider directly); the
+    memory is ``None`` for a task with no ``MemoryRef``.  Raises :class:`NeedSnapshot`.
+    """
+    memory, base_a, base_s = (None, 0, 0) if ref is None else begin(ref)
+    provider = worker_provider(ship) if ship is not None else fallback
+    return memory, base_a, base_s, provider
+
+
 def end(copy: EpisodicMemory, base_answers: int, base_snags: int) -> bytes:
     return dump_additions(additions_of(copy, base_answers, base_snags))
 
 
 def forget_worker_cache() -> None:
     _CACHE.clear()
+    _PROVIDERS.clear()
 
 
 # ---------------------------------------------------------------------------

@@ -17,6 +17,10 @@ Design
   run.  A forkserver is a clean single-threaded process that imports the engine *once*
   (``set_forkserver_preload``) and forks a worker from that warm image, so a worker
   starts in tens of milliseconds and a task never starts a process.
+* **A Training Mode Session's configuration travels with its tasks.**  A task that carries
+  a ``config`` (``RunTask.config``) runs on that pickled provider, cached in the worker by
+  key; the pool is bound once and such tasks never hash, rebind or restart it.  The rest of
+  this paragraph is the Metacat-Mode path, which passes the provider with the call.
 * **Metadata is sent once.**  The pool is *bound* to one ``MetadataProvider`` (pickled
   and shipped through the worker initializer, keyed by ``hashing.config_hash``).  A call
   that brings a different configuration re-initialises the workers when the pool is idle;
@@ -112,6 +116,11 @@ class RunTask:
     #: A Training Mode Session's episode memory (``server.services.training_mode_session_memory.MemoryRef``): the run
     #: starts from a copy of it and reports its additions.  ``None`` is a fresh memory.
     memory: Any = None
+    #: The configuration a Training Mode Session's run starts under
+    #: (``training_mode_session_memory.ConfigShip``): the worker runs on it instead of the
+    #: pool's bound provider, so one pool serves every session and never rebinds.  ``None``
+    #: (Metacat Mode, every ordinary caller) runs on the provider the call names.
+    config: Any = None
     #: Test hook (``"error"`` raises inside the run, ``"kill"`` kills this worker process);
     #: only the Training Mode Session service's in-process fault hook ever sets it.
     fault: str | None = None
@@ -295,11 +304,11 @@ def run_one(task: RunTask, meta: MetadataProvider) -> RunOutcome:
         if task.fault == "kill":
             os._exit(137)  # test hook: this worker dies mid-task
         memory = None
-        if task.memory is not None:
+        if task.memory is not None or task.config is not None:
             from server.services import training_mode_session_memory as tm
 
             try:
-                memory, base_a, base_s = tm.begin(task.memory)
+                memory, base_a, base_s, meta = tm.begin_run(task.memory, task.config, meta)
             except tm.NeedSnapshot:
                 return RunOutcome(
                     seed=task.seed, status="need_snapshot", answer="", answers=[], codelets=0,
@@ -684,12 +693,18 @@ class Swarm:
             if meta is None or (self._bound_hash and config_hash(meta) == self._bound_hash):
                 return False
             old, self._executor = self._executor, None
+            if self._bound_hash:
+                self.rebinds += 1  # binding a pool that has no configuration yet is not a rebind
             self._bind(meta)
-            self.rebinds += 1
         if old is not None:
             old.shutdown(wait=True)
         self.start()
         return True
+
+    @property
+    def bound(self) -> bool:
+        """Whether the pool has a configuration (a constructor's ``meta`` or a ``configure``)."""
+        return self._bound_meta is not None
 
     def config_hash(self) -> str:
         return self._bound_hash

@@ -195,3 +195,35 @@ def test_detect_mode_is_the_ssr(meta, pi):
     ssr = run_record(meta, problem, 3, "ssr", max_steps=300)
     detect = run_record(meta, problem, 3, "spec", workers=0, max_steps=300, detect=True)
     assert diff(ssr, detect) == []
+
+
+# -- the audit belongs to the audited body (body digests) -------------------------------
+
+
+def test_every_type_stores_the_digest_of_its_audited_body(bodies):
+    """``effects_data.json`` holds a digest for each of the 27 bodies, equal to the digest of
+    the Metacat Standard Configuration's body: a changed seed body must be re-audited and its
+    digest updated on purpose."""
+    table = fx.load()
+    for name, body in bodies.items():
+        assert table.types[name].body_digest == fx.body_digest(body["execute_body"]), (
+            f"{name}: the body changed since it was audited; re-audit it and update its digest"
+        )
+
+
+def test_info_returns_the_audited_entry_only_for_the_audited_body(bodies):
+    table = fx.load()
+    for name, body in bodies.items():
+        audited = table.info(name, fx.body_digest(body["execute_body"]))
+        assert audited is table.types[name]
+        edited = table.info(name, fx.body_digest(body["execute_body"] + "\n# edited\n"))
+        assert edited.barrier and edited.reads == fx.ALL and edited.writes == fx.ALL
+        assert edited.uses_cc
+    assert table.info("a-type-nobody-audited", fx.body_digest("fizzle()")).barrier
+    assert table.info("bond-builder", "").barrier  # no body (an empty one) is not the audited one
+
+
+def test_a_digest_is_a_sha256_of_the_source():
+    import hashlib
+
+    assert fx.body_digest("fizzle()") == hashlib.sha256(b"fizzle()").hexdigest()

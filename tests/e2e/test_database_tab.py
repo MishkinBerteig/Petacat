@@ -59,6 +59,7 @@ async def test_every_table_is_listed_with_its_class(app_client):
         "training_mode_session_problems": "session_managed",
         "training_mode_session_runs": "session_managed",
         "training_memory_merges": "episodic_memory",
+        "training_mode_session_memory_snapshots": "episodic_memory",
     }
     for name, cls in expected.items():
         assert tables[name]["class"] == cls, name
