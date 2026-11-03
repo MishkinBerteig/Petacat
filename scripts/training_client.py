@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Drive a Training over the REST API: the reference for how an ML layer would use Petacat.
 
-The workflow (the user's own): create a Training with N problems (default 25), then,
+The workflow (the user's own): create a Training with N problems (default 25) and start it, then,
 whenever at least K of them have finished (default 5), add K new ones, until a total is
 reached.  It follows the ``finished`` long-poll cursor, so it learns of each finished
 problem the moment it finishes, and it prints a line for each.
@@ -85,7 +85,6 @@ def main() -> int:
     ap.add_argument("--total", type=int, default=60, help="stop adding at this many problems")
     ap.add_argument("--seeds", type=int, default=10, help="seeds per problem")
     ap.add_argument("--max-codelets", type=int, default=2000)
-    ap.add_argument("--memory", choices=["shared", "independent"], default="shared")
     ap.add_argument("--problems", help="JSON file of problems instead of the built-in supply")
     ap.add_argument("--timeout", type=float, default=3600.0)
     args = ap.parse_args()
@@ -94,13 +93,13 @@ def main() -> int:
     started = time.monotonic()
     made = call(args.url, "POST", "/api/trainings", {
         "name": args.name,
-        "settings": {"memory": args.memory, "seeds_per_problem": args.seeds,
-                     "max_codelets": args.max_codelets},
+        "settings": {"seeds_per_problem": args.seeds, "max_codelets": args.max_codelets},
         "problems": [next(supply) for _ in range(args.initial)],
     })
     tid = made["training"]["id"]
+    call(args.url, "POST", f"/api/trainings/{tid}/start")  # a new Training is Stopped
     ex = call(args.url, "GET", "/api/trainings")["executor"]
-    print(f"training {tid}: {args.initial} problems x {args.seeds} seeds, memory={args.memory}, "
+    print(f"training {tid}: {args.initial} problems x {args.seeds} seeds, "
           f"executor={ex['kind']} x{ex['workers']}, backend={made['training']['settings']['backend']}")
 
     total, cursor, unreplaced, finished = args.initial, 0, 0, 0
@@ -127,7 +126,7 @@ def main() -> int:
         if total >= args.total and finished >= total:
             break
 
-    call(args.url, "POST", f"/api/trainings/{tid}/close")
+    call(args.url, "POST", f"/api/trainings/{tid}/stop")
     summary = call(args.url, "GET", f"/api/trainings/{tid}")
     wall = time.monotonic() - started
     runs = summary["runs"]["done"]
@@ -135,7 +134,7 @@ def main() -> int:
     print(f"done: {summary['problems']['finished']} problems, {runs} runs in {wall:.1f}s "
           f"= {runs / wall:.1f} runs/s, {summary['codelets'] / wall:,.0f} codelets/s, "
           f"errors {summary['runs']['errors']}, capped {summary['runs']['capped']}"
-          + (f", memory v{summary['memory_version']}: {mem['answers']} answers, {mem['snags']} snags" if mem else ""))
+          + f", Episodic Memory v{summary['memory_version']}: {mem['answers']} answers, {mem['snags']} snags")
     return 0
 
 

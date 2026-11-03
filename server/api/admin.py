@@ -6,15 +6,18 @@ urgency levels, formula coefficients, and demo problems.
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import delete, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.db import get_session
 from server.engine.rational import canonical_rational
+from server.services import journal
+from server.services.config_registry import LAYER_REGISTRY
 from server.services.configuration_input import check_param_value
 from server.models.metadata import (
     BridgeOrientationDef,
@@ -50,6 +53,56 @@ from server.models.metadata import (
 )
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
+
+
+# ------------------------------------------------------------------
+# Writing configuration: every write goes through the journal layer
+# ------------------------------------------------------------------
+#
+# The editors below read with ordinary queries and write only by building resolved ops
+# (by natural key) and calling ``journal.write_immediate``: one journal entry and one
+# revision per request, ``source = admin``.  ``help_topics`` is content, not configuration,
+# and keeps its own writes.
+
+
+async def _admin_write(
+    session: AsyncSession, ops: list[dict], *, channel: str = "admin_editor", note: str = ""
+) -> journal.WriteResult:
+    try:
+        return await journal.write_immediate(
+            session, ops=ops, source="admin", actor="admin", channel=channel, note=note
+        )
+    except journal.KeyExists as exc:
+        raise HTTPException(409, str(exc)) from exc
+    except journal.MissingKey as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except journal.JournalError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+async def _insert(session: AsyncSession, model: type, values: dict) -> SimpleNamespace:
+    """Insert one row; returns the stored row (with its ``id`` and defaults)."""
+    result = await _admin_write(
+        session, [{"op": "insert", "table": model.__tablename__, "key": {}, "row": values}]
+    )
+    return SimpleNamespace(**result.rows[0])
+
+
+async def _update(session: AsyncSession, model: type, current: Any, values: dict) -> SimpleNamespace:
+    """Change columns of the row ``current`` (an ORM row read for this request)."""
+    table = model.__tablename__
+    key = LAYER_REGISTRY[table].key_of(current)
+    result = await _admin_write(
+        session, [{"op": "update", "table": table, "key": key, "set": values}]
+    )
+    return SimpleNamespace(**result.rows[0])
+
+
+async def _delete(session: AsyncSession, model: type, current: Any) -> None:
+    table = model.__tablename__
+    await _admin_write(
+        session, [{"op": "delete", "table": table, "key": LAYER_REGISTRY[table].key_of(current)}]
+    )
 
 
 # ------------------------------------------------------------------
@@ -213,15 +266,13 @@ async def create_slipnet_node(
     if existing is not None:
         raise HTTPException(409, f"Node '{req.name}' already exists")
 
-    node = SlipnetNodeDef(
+    node = await _insert(session, SlipnetNodeDef, dict(
         name=req.name,
         short_name=req.short_name,
         conceptual_depth=req.conceptual_depth,
         description=req.description,
         descriptor_predicate=req.descriptor_predicate,
-    )
-    session.add(node)
-    await session.commit()
+    ))
     return SlipnetNodeResponse(
         name=node.name,
         short_name=node.short_name,
@@ -241,11 +292,12 @@ async def update_slipnet_node(
     node = await session.get(SlipnetNodeDef, name)
     if node is None:
         raise HTTPException(404, f"Node '{name}' not found")
-    node.short_name = req.short_name
-    node.conceptual_depth = req.conceptual_depth
-    node.description = req.description
-    node.descriptor_predicate = req.descriptor_predicate
-    await session.commit()
+    node = await _update(session, SlipnetNodeDef, node, dict(
+        short_name=req.short_name,
+        conceptual_depth=req.conceptual_depth,
+        description=req.description,
+        descriptor_predicate=req.descriptor_predicate,
+    ))
     return SlipnetNodeResponse(
         name=node.name,
         short_name=node.short_name,
@@ -264,8 +316,7 @@ async def delete_slipnet_node(
     node = await session.get(SlipnetNodeDef, name)
     if node is None:
         raise HTTPException(404, f"Node '{name}' not found")
-    await session.delete(node)
-    await session.commit()
+    await _delete(session, SlipnetNodeDef, node)
     return {"deleted": name}
 
 
@@ -301,17 +352,14 @@ async def create_slipnet_link(
     session: AsyncSession = Depends(get_session),
 ):
     """Create a new slipnet link definition."""
-    link = SlipnetLinkDef(
+    link = await _insert(session, SlipnetLinkDef, dict(
         from_node=req.from_node,
         to_node=req.to_node,
         link_type=req.link_type,
         label_node=req.label_node,
         link_length=req.link_length,
         fixed_length=req.fixed_length,
-    )
-    session.add(link)
-    await session.flush()
-    await session.commit()
+    ))
     return SlipnetLinkResponse(
         id=link.id,
         from_node=link.from_node,
@@ -333,13 +381,14 @@ async def update_slipnet_link(
     link = await session.get(SlipnetLinkDef, link_id)
     if link is None:
         raise HTTPException(404, f"Link {link_id} not found")
-    link.from_node = req.from_node
-    link.to_node = req.to_node
-    link.link_type = req.link_type
-    link.label_node = req.label_node
-    link.link_length = req.link_length
-    link.fixed_length = req.fixed_length
-    await session.commit()
+    link = await _update(session, SlipnetLinkDef, link, dict(
+        from_node=req.from_node,
+        to_node=req.to_node,
+        link_type=req.link_type,
+        label_node=req.label_node,
+        link_length=req.link_length,
+        fixed_length=req.fixed_length,
+    ))
     return SlipnetLinkResponse(
         id=link.id,
         from_node=link.from_node,
@@ -360,8 +409,7 @@ async def delete_slipnet_link(
     link = await session.get(SlipnetLinkDef, link_id)
     if link is None:
         raise HTTPException(404, f"Link {link_id} not found")
-    await session.delete(link)
-    await session.commit()
+    await _delete(session, SlipnetLinkDef, link)
     return {"deleted": link_id}
 
 
@@ -428,7 +476,7 @@ async def create_codelet_type(
 
     await _check_codelet_family_and_phase(session, req.family, req.phase)
 
-    codelet = CodeletTypeDef(
+    codelet = await _insert(session, CodeletTypeDef, dict(
         name=req.name,
         family=req.family,
         phase=req.phase,
@@ -437,9 +485,7 @@ async def create_codelet_type(
         source_file=req.source_file,
         source_line=req.source_line,
         execute_body=req.execute_body,
-    )
-    session.add(codelet)
-    await session.commit()
+    ))
     return CodeletTypeResponse(
         name=codelet.name,
         family=codelet.family,
@@ -462,14 +508,15 @@ async def update_codelet_type(
     codelet = await session.get(CodeletTypeDef, name)
     if codelet is None:
         raise HTTPException(404, f"Codelet type '{name}' not found")
-    codelet.family = req.family
-    codelet.phase = req.phase
-    codelet.default_urgency = req.default_urgency
-    codelet.description = req.description
-    codelet.source_file = req.source_file
-    codelet.source_line = req.source_line
-    codelet.execute_body = req.execute_body
-    await session.commit()
+    codelet = await _update(session, CodeletTypeDef, codelet, dict(
+        family=req.family,
+        phase=req.phase,
+        default_urgency=req.default_urgency,
+        description=req.description,
+        source_file=req.source_file,
+        source_line=req.source_line,
+        execute_body=req.execute_body,
+    ))
     return CodeletTypeResponse(
         name=codelet.name,
         family=codelet.family,
@@ -491,8 +538,7 @@ async def delete_codelet_type(
     codelet = await session.get(CodeletTypeDef, name)
     if codelet is None:
         raise HTTPException(404, f"Codelet type '{name}' not found")
-    await session.delete(codelet)
-    await session.commit()
+    await _delete(session, CodeletTypeDef, codelet)
     return {"deleted": name}
 
 
@@ -526,9 +572,9 @@ async def create_param(
     value = req.value
     if req.value_type == "rational":
         value = _checked_number(value, "rational", kinds=("rational",))
-    param = EngineParam(name=req.name, value=value, value_type=req.value_type)
-    session.add(param)
-    await session.commit()
+    param = await _insert(
+        session, EngineParam, dict(name=req.name, value=value, value_type=req.value_type)
+    )
     return ParamResponse(name=param.name, value=param.value, value_type=param.value_type or "string")
 
 
@@ -543,12 +589,12 @@ async def update_param(
     if param is None:
         raise HTTPException(404, f"Parameter '{name}' not found")
     value_type = req.value_type if req.value_type is not None else param.value_type
-    param.value = req.value
+    changes: dict[str, Any] = {"value": req.value}
     if value_type == "rational":
-        param.value = _checked_number(req.value, "rational", kinds=("rational",))
+        changes["value"] = _checked_number(req.value, "rational", kinds=("rational",))
     if req.value_type is not None:
-        param.value_type = req.value_type
-    await session.commit()
+        changes["value_type"] = req.value_type
+    param = await _update(session, EngineParam, param, changes)
     return ParamResponse(
         name=param.name,
         value=param.value,
@@ -565,8 +611,7 @@ async def delete_param(
     param = await session.get(EngineParam, name)
     if param is None:
         raise HTTPException(404, f"Parameter '{name}' not found")
-    await session.delete(param)
-    await session.commit()
+    await _delete(session, EngineParam, param)
     return {"deleted": name}
 
 
@@ -594,9 +639,7 @@ async def create_urgency_level(
     existing = await session.get(UrgencyLevel, req.name)
     if existing is not None:
         raise HTTPException(409, f"Urgency level '{req.name}' already exists")
-    level = UrgencyLevel(name=req.name, value=req.value)
-    session.add(level)
-    await session.commit()
+    level = await _insert(session, UrgencyLevel, dict(name=req.name, value=req.value))
     return UrgencyLevelResponse(name=level.name, value=level.value)
 
 
@@ -610,8 +653,7 @@ async def update_urgency_level(
     level = await session.get(UrgencyLevel, name)
     if level is None:
         raise HTTPException(404, f"Urgency level '{name}' not found")
-    level.value = req.value
-    await session.commit()
+    level = await _update(session, UrgencyLevel, level, dict(value=req.value))
     return UrgencyLevelResponse(name=level.name, value=level.value)
 
 
@@ -624,8 +666,7 @@ async def delete_urgency_level(
     level = await session.get(UrgencyLevel, name)
     if level is None:
         raise HTTPException(404, f"Urgency level '{name}' not found")
-    await session.delete(level)
-    await session.commit()
+    await _delete(session, UrgencyLevel, level)
     return {"deleted": name}
 
 
@@ -674,9 +715,9 @@ async def create_formula_coefficient(
     if existing is not None:
         raise HTTPException(409, f"Formula coefficient '{req.name}' already exists")
     value = _checked_number(req.value, req.value_type, kinds=COEFFICIENT_VALUE_TYPES)
-    coeff = FormulaCoefficient(name=req.name, value=value, value_type=req.value_type)
-    session.add(coeff)
-    await session.commit()
+    coeff = await _insert(
+        session, FormulaCoefficient, dict(name=req.name, value=value, value_type=req.value_type)
+    )
     return FormulaCoefficientResponse(
         name=coeff.name, value=coeff.value, value_type=coeff.value_type
     )
@@ -695,9 +736,10 @@ async def update_formula_coefficient(
     if coeff is None:
         raise HTTPException(404, f"Formula coefficient '{name}' not found")
     value_type = req.value_type if req.value_type is not None else coeff.value_type
-    coeff.value = _checked_number(req.value, value_type, kinds=COEFFICIENT_VALUE_TYPES)
-    coeff.value_type = value_type
-    await session.commit()
+    coeff = await _update(session, FormulaCoefficient, coeff, dict(
+        value=_checked_number(req.value, value_type, kinds=COEFFICIENT_VALUE_TYPES),
+        value_type=value_type,
+    ))
     return FormulaCoefficientResponse(
         name=coeff.name, value=coeff.value, value_type=coeff.value_type
     )
@@ -712,8 +754,7 @@ async def delete_formula_coefficient(
     coeff = await session.get(FormulaCoefficient, name)
     if coeff is None:
         raise HTTPException(404, f"Formula coefficient '{name}' not found")
-    await session.delete(coeff)
-    await session.commit()
+    await _delete(session, FormulaCoefficient, coeff)
     return {"deleted": name}
 
 
@@ -752,7 +793,7 @@ async def create_demo(
     session: AsyncSession = Depends(get_session),
 ):
     """Create a new demo problem."""
-    demo = DemoProblem(
+    demo = await _insert(session, DemoProblem, dict(
         name=req.name,
         section=req.section,
         initial=req.initial,
@@ -762,10 +803,7 @@ async def create_demo(
         seed=req.seed,
         mode=req.mode,
         description=req.description,
-    )
-    session.add(demo)
-    await session.flush()
-    await session.commit()
+    ))
     return DemoProblemResponse(
         id=demo.id,
         name=demo.name,
@@ -790,16 +828,17 @@ async def update_demo(
     demo = await session.get(DemoProblem, demo_id)
     if demo is None:
         raise HTTPException(404, f"Demo {demo_id} not found")
-    demo.name = req.name
-    demo.section = req.section
-    demo.initial = req.initial
-    demo.modified = req.modified
-    demo.target = req.target
-    demo.answer = req.answer
-    demo.seed = req.seed
-    demo.mode = req.mode
-    demo.description = req.description
-    await session.commit()
+    demo = await _update(session, DemoProblem, demo, dict(
+        name=req.name,
+        section=req.section,
+        initial=req.initial,
+        modified=req.modified,
+        target=req.target,
+        answer=req.answer,
+        seed=req.seed,
+        mode=req.mode,
+        description=req.description,
+    ))
     return DemoProblemResponse(
         id=demo.id,
         name=demo.name,
@@ -823,8 +862,7 @@ async def delete_demo(
     demo = await session.get(DemoProblem, demo_id)
     if demo is None:
         raise HTTPException(404, f"Demo {demo_id} not found")
-    await session.delete(demo)
-    await session.commit()
+    await _delete(session, DemoProblem, demo)
     return {"deleted": demo_id}
 
 
@@ -857,10 +895,10 @@ async def list_theme_dimensions(session: AsyncSession = Depends(get_session)):
 async def create_theme_dimension(
     req: ThemeDimensionRequest, session: AsyncSession = Depends(get_session),
 ):
-    row = ThemeDimensionDef(slipnet_node=req.slipnet_node, valid_relations=req.valid_relations)
-    session.add(row)
-    await session.flush()
-    await session.commit()
+    row = await _insert(
+        session, ThemeDimensionDef,
+        dict(slipnet_node=req.slipnet_node, valid_relations=req.valid_relations),
+    )
     return ThemeDimensionResponse(id=row.id, slipnet_node=row.slipnet_node, valid_relations=row.valid_relations)
 
 
@@ -871,9 +909,10 @@ async def update_theme_dimension(
     row = await session.get(ThemeDimensionDef, dim_id)
     if row is None:
         raise HTTPException(404, f"Theme dimension {dim_id} not found")
-    row.slipnet_node = req.slipnet_node
-    row.valid_relations = req.valid_relations
-    await session.commit()
+    row = await _update(
+        session, ThemeDimensionDef, row,
+        dict(slipnet_node=req.slipnet_node, valid_relations=req.valid_relations),
+    )
     return ThemeDimensionResponse(id=row.id, slipnet_node=row.slipnet_node, valid_relations=row.valid_relations)
 
 
@@ -882,8 +921,7 @@ async def delete_theme_dimension(dim_id: int, session: AsyncSession = Depends(ge
     row = await session.get(ThemeDimensionDef, dim_id)
     if row is None:
         raise HTTPException(404, f"Theme dimension {dim_id} not found")
-    await session.delete(row)
-    await session.commit()
+    await _delete(session, ThemeDimensionDef, row)
     return {"deleted": dim_id}
 
 
@@ -953,17 +991,14 @@ async def create_posting_rule(
         while rule_key in taken:
             n += 1
             rule_key = f"{req.codelet_type}-{n}"
-    row = PostingRule(
+    row = await _insert(session, PostingRule, dict(
         rule_key=rule_key,
         codelet_type=req.codelet_type, direction=req.direction,
         urgency_when_posted=req.urgency_when_posted, urgency_formula=req.urgency_formula,
         posting_formula=req.posting_formula, count_formula=req.count_formula,
         count_values=req.count_values, condition=req.condition,
         triggering_slipnodes=req.triggering_slipnodes,
-    )
-    session.add(row)
-    await session.flush()
-    await session.commit()
+    ))
     return PostingRuleResponse(
         id=row.id, rule_key=row.rule_key, codelet_type=row.codelet_type, direction=row.direction,
         urgency_when_posted=row.urgency_when_posted, urgency_formula=row.urgency_formula,
@@ -980,16 +1015,17 @@ async def update_posting_rule(
     row = await session.get(PostingRule, rule_id)
     if row is None:
         raise HTTPException(404, f"Posting rule {rule_id} not found")
-    row.codelet_type = req.codelet_type
-    row.direction = req.direction
-    row.urgency_when_posted = req.urgency_when_posted
-    row.urgency_formula = req.urgency_formula
-    row.posting_formula = req.posting_formula
-    row.count_formula = req.count_formula
-    row.count_values = req.count_values
-    row.condition = req.condition
-    row.triggering_slipnodes = req.triggering_slipnodes
-    await session.commit()
+    row = await _update(session, PostingRule, row, dict(
+        codelet_type=req.codelet_type,
+        direction=req.direction,
+        urgency_when_posted=req.urgency_when_posted,
+        urgency_formula=req.urgency_formula,
+        posting_formula=req.posting_formula,
+        count_formula=req.count_formula,
+        count_values=req.count_values,
+        condition=req.condition,
+        triggering_slipnodes=req.triggering_slipnodes,
+    ))
     return PostingRuleResponse(
         id=row.id, rule_key=row.rule_key, codelet_type=row.codelet_type, direction=row.direction,
         urgency_when_posted=row.urgency_when_posted, urgency_formula=row.urgency_formula,
@@ -1004,8 +1040,7 @@ async def delete_posting_rule(rule_id: int, session: AsyncSession = Depends(get_
     row = await session.get(PostingRule, rule_id)
     if row is None:
         raise HTTPException(404, f"Posting rule {rule_id} not found")
-    await session.delete(row)
-    await session.commit()
+    await _delete(session, PostingRule, row)
     return {"deleted": rule_id}
 
 
@@ -1038,10 +1073,10 @@ async def list_commentary_templates(session: AsyncSession = Depends(get_session)
 async def create_commentary_template(
     req: CommentaryTemplateRequest, session: AsyncSession = Depends(get_session),
 ):
-    row = CommentaryTemplate(template_key=req.template_key, template_data=req.template_data)
-    session.add(row)
-    await session.flush()
-    await session.commit()
+    row = await _insert(
+        session, CommentaryTemplate,
+        dict(template_key=req.template_key, template_data=req.template_data),
+    )
     return CommentaryTemplateResponse(id=row.id, template_key=row.template_key, template_data=row.template_data)
 
 
@@ -1052,9 +1087,10 @@ async def update_commentary_template(
     row = await session.get(CommentaryTemplate, template_id)
     if row is None:
         raise HTTPException(404, f"Commentary template {template_id} not found")
-    row.template_key = req.template_key
-    row.template_data = req.template_data
-    await session.commit()
+    row = await _update(
+        session, CommentaryTemplate, row,
+        dict(template_key=req.template_key, template_data=req.template_data),
+    )
     return CommentaryTemplateResponse(id=row.id, template_key=row.template_key, template_data=row.template_data)
 
 
@@ -1063,8 +1099,7 @@ async def delete_commentary_template(template_id: int, session: AsyncSession = D
     row = await session.get(CommentaryTemplate, template_id)
     if row is None:
         raise HTTPException(404, f"Commentary template {template_id} not found")
-    await session.delete(row)
-    await session.commit()
+    await _delete(session, CommentaryTemplate, row)
     return {"deleted": template_id}
 
 
@@ -1101,9 +1136,10 @@ async def create_slipnet_layout(
     existing = await session.get(SlipnetLayoutPos, req.node_name)
     if existing is not None:
         raise HTTPException(409, f"Layout for node '{req.node_name}' already exists")
-    row = SlipnetLayoutPos(node_name=req.node_name, grid_row=req.grid_row, grid_col=req.grid_col)
-    session.add(row)
-    await session.commit()
+    row = await _insert(
+        session, SlipnetLayoutPos,
+        dict(node_name=req.node_name, grid_row=req.grid_row, grid_col=req.grid_col),
+    )
     return SlipnetLayoutResponse(node_name=row.node_name, grid_row=row.grid_row, grid_col=row.grid_col)
 
 
@@ -1114,9 +1150,9 @@ async def update_slipnet_layout(
     row = await session.get(SlipnetLayoutPos, node_name)
     if row is None:
         raise HTTPException(404, f"Layout for node '{node_name}' not found")
-    row.grid_row = req.grid_row
-    row.grid_col = req.grid_col
-    await session.commit()
+    row = await _update(
+        session, SlipnetLayoutPos, row, dict(grid_row=req.grid_row, grid_col=req.grid_col)
+    )
     return SlipnetLayoutResponse(node_name=row.node_name, grid_row=row.grid_row, grid_col=row.grid_col)
 
 
@@ -1125,8 +1161,7 @@ async def delete_slipnet_layout(node_name: str, session: AsyncSession = Depends(
     row = await session.get(SlipnetLayoutPos, node_name)
     if row is None:
         raise HTTPException(404, f"Layout for node '{node_name}' not found")
-    await session.delete(row)
-    await session.commit()
+    await _delete(session, SlipnetLayoutPos, row)
     return {"deleted": node_name}
 
 
@@ -1462,52 +1497,58 @@ async def _import_collection(
     key_field: str,
     rows: list[dict],
     aliases: dict[str, str],
-) -> int:
-    """Write one collection's rows, matching each on *key_field*.
+) -> tuple[int, list[dict]]:
+    """One collection's rows as ops, each matched on its natural key.
 
-    A row already present is updated in place; a row that is not is added. Payload keys
-    the model does not carry are left alone, so a payload from a newer export loads into
-    an older schema for the columns the two share.
+    A configuration row already present becomes an update of the columns the payload
+    carries; one that is not becomes an insert.  The surrogate ``id`` a payload carries is
+    dropped: ids are not stable across configurations, and the key is the natural key.
+    Payload keys the model does not carry are left alone, so a payload from a newer
+    export loads into an older schema for the columns the two share.  Returns the row
+    count and the ops (none for ``help_topics``, which is content and is written
+    directly, unflushed).
     """
     attributes = _model_attributes(model)
+    if model is HelpTopic:
+        for raw in rows:
+            row = {aliases.get(key, key): value for key, value in raw.items()}
+            row = {key: value for key, value in row.items() if key in attributes}
+            if key_field not in row:
+                raise ValueError(f"{model.__tablename__}: a row arrived without its {key_field}")
+            existing = await session.get(model, row[key_field])
+            if existing is None:
+                session.add(model(**row))
+            else:
+                for field, value in row.items():
+                    if field != key_field:
+                        setattr(existing, field, value)
+        return len(rows), []
+
+    spec = LAYER_REGISTRY[model.__tablename__]
+    present = {
+        spec.key_tuple(spec.key_of(r)) for r in (await session.execute(select(model))).scalars()
+    }
+    ops: list[dict] = []
     for raw in rows:
         row = {aliases.get(key, key): value for key, value in raw.items()}
-        row = {key: value for key, value in row.items() if key in attributes}
-        if key_field not in row:
-            raise ValueError(
-                f"{model.__tablename__}: a row arrived without its {key_field}"
-            )
-        existing = await session.get(model, row[key_field])
-        if existing is None:
-            session.add(model(**row))
+        row = {
+            key: value for key, value in row.items()
+            if key in attributes and key != spec.surrogate
+        }
+        missing = [c for c in spec.key if c not in row and not spec.table.c[c].nullable]
+        if missing:
+            raise ValueError(f"{model.__tablename__}: a row arrived without its {missing[0]}")
+        key = spec.key_of(row)
+        kt = spec.key_tuple(key)
+        if kt in present:
+            ops.append({
+                "op": "update", "table": spec.name, "key": key,
+                "set": {c: v for c, v in row.items() if c not in spec.key},
+            })
         else:
-            for field, value in row.items():
-                if field != key_field:
-                    setattr(existing, field, value)
-    return len(rows)
-
-
-async def _resync_identity_sequence(session: AsyncSession, model: type) -> None:
-    """Put an integer primary key's sequence past the largest id now present.
-
-    Rows arrive carrying their own ids, and the sequence a later ``POST`` draws from
-    counts independently of them, so it is advanced to match.
-    """
-    from sqlalchemy import func as sa_func, text
-
-    table = model.__tablename__
-    column = next(iter(model.__table__.primary_key)).name
-    highest = (
-        await session.execute(sa_func.max(getattr(model, column)))
-    ).scalar()
-    if highest is None:
-        return
-    await session.execute(
-        text(
-            "SELECT setval(pg_get_serial_sequence(:table, :column), :value, true)"
-        ),
-        {"table": table, "column": column, "value": int(highest)},
-    )
+            ops.append({"op": "insert", "table": spec.name, "key": key, "row": row})
+            present.add(kt)
+    return len(rows), ops
 
 
 @router.post("/import")
@@ -1518,26 +1559,27 @@ async def import_metadata(
     """Import metadata from a JSON object — the same thirteen collections ``/export`` writes.
 
     Every collection present in the payload is applied; the response names each one and
-    how many rows it carried, so what was written is legible from the reply. Rows are
-    matched on their primary key, and the whole import is one transaction.
+    how many rows it carried, so what was written is legible from the reply. Configuration
+    rows are matched on their natural key and written as one journal entry
+    (``source = import``); the whole import is one transaction.
     """
     imported: dict[str, int] = {}
+    ops: list[dict] = []
     try:
         for name, model, key_field, aliases in _IMPORTABLE:
             rows = data.get(name)
             if rows is None:
                 continue
-            imported[name] = await _import_collection(
+            imported[name], collection_ops = await _import_collection(
                 session, model, key_field, rows, aliases
             )
+            ops.extend(collection_ops)
 
+        # Help topics are flushed above and committed with the configuration entry below.
         await session.flush()
-
-        for name, model, key_field, _aliases in _IMPORTABLE:
-            if name in imported and key_field == "id":
-                await _resync_identity_sequence(session, model)
-
-        await session.commit()
+        await journal.write_immediate(
+            session, ops=ops, source="import", actor="admin", channel="admin_import"
+        )
 
     except Exception as e:
         await session.rollback()
@@ -1632,14 +1674,12 @@ async def create_enum_value(
     existing = await session.get(model, req.name)
     if existing is not None:
         raise HTTPException(409, f"Value '{req.name}' already exists in {table}")
-    row = model(
+    row = await _insert(session, model, dict(
         name=req.name,
         display_label=req.display_label,
         sort_order=req.sort_order,
         description=req.description,
-    )
-    session.add(row)
-    await session.commit()
+    ))
     return EnumValueResponse(
         name=row.name,
         display_label=row.display_label,
@@ -1660,10 +1700,11 @@ async def update_enum_value(
     row = await session.get(model, name)
     if row is None:
         raise HTTPException(404, f"Value '{name}' not found in {table}")
-    row.display_label = req.display_label
-    row.sort_order = req.sort_order
-    row.description = req.description
-    await session.commit()
+    row = await _update(session, model, row, dict(
+        display_label=req.display_label,
+        sort_order=req.sort_order,
+        description=req.description,
+    ))
     return EnumValueResponse(
         name=row.name,
         display_label=row.display_label,
@@ -1684,9 +1725,9 @@ async def delete_enum_value(
     if row is None:
         raise HTTPException(404, f"Value '{name}' not found in {table}")
     try:
-        await session.delete(row)
-        await session.flush()
-        await session.commit()
+        await _delete(session, model, row)
+    except HTTPException:
+        raise
     except Exception:
         await session.rollback()
         raise HTTPException(

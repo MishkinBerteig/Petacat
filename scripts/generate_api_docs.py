@@ -40,10 +40,11 @@ GROUPS: list[tuple[str, str, str]] = [
     (
         "/api/trainings",
         "Trainings",
-        "Training Mode: named, long-lived Training episodes of many problems over many seeds, "
-        "extendable while they run, each with its own episode memory (never Metacat Mode's "
-        "Episodic Memory); the database is written only when a problem finishes (works with or "
-        "without the parallel plugin).",
+        "Training Mode: named, long-lived Training episodes of many problems over many seeds "
+        "(Training Mode Sessions), each with its own Episodic Memory that no route clears (never "
+        "Metacat Mode's). A Training is created Stopped and is started, paused, resumed, stopped "
+        "and started again; problems can be added in any state; the database is written only at "
+        "milestones (works with or without the parallel plugin).",
     ),
     (
         "/api/memory",

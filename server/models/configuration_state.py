@@ -32,3 +32,6 @@ class ConfigurationState(Base):
     standard_hash = Column(String(64), nullable=False)
     loaded_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     load_state = Column(String(16), nullable=False)
+
+
+import server.models.journal  # noqa: E402,F401 — registers configurations and the journal

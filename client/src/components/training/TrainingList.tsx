@@ -60,7 +60,7 @@ export function TrainingList({ trainings, selectedId, onSelect }: Props) {
                 <span style={{ fontWeight: 600, fontSize: 12, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {b.name || `Training ${b.id}`}
                 </span>
-                <StateBadge state={b.state} />
+                <StateBadge state={b.state} activity={b.activity} />
               </div>
               <div className="text-xs text-muted" style={{ margin: '2px 0 3px' }}>
                 {fmtInt(b.problems.finished)}/{fmtInt(b.problems.total)} problems ·{' '}

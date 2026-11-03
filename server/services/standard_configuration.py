@@ -9,7 +9,9 @@ truth for one concept — and requires it to be resolved rather than re-homed.
 
 Start-up (``server/services/configuration_startup.py``) decides whether to load: the
 database is the source of truth, and the files are loaded into it only when it is empty.
-What lives here is the writing, and the help-topic upsert.
+What lives here is the load's ops (the journal layer, ``server/services/journal.py``,
+writes them as the global journal's first entry, ``source = standard_load``), and the
+help-topic upsert.
 """
 
 from __future__ import annotations
@@ -68,15 +70,6 @@ ENUM_MODELS: dict[str, str] = {
     "demo_modes": "DemoModeDef",
 }
 
-#: Tables whose seed rows are written with explicit integer ids.
-ID_SEQUENCE_TABLES = (
-    "slipnet_link_defs",
-    "demo_problems",
-    "posting_rules",
-    "codelet_pattern_defs",
-    "theme_dimension_defs",
-)
-
 #: The help topics ship in one file, which the `en` suffix names.
 HELP_TOPICS_FILENAME = "help_topics.en.json"
 
@@ -99,238 +92,235 @@ def standard_configuration_hash(seed_dir: str) -> str:
 
 def configuration_table_names() -> frozenset[str]:
     """Every table the Metacat Standard Configuration loads into (by model introspection)."""
-    return frozenset(_derived_names())
+    from server.services.config_registry import configuration_table_names as names
+
+    return names()
 
 
 def _derived_names() -> set[str]:
     """Every metadata table the bulk seed files are responsible for."""
-    import inspect
-
-    from server.models import metadata as metadata_models
-
-    return {
-        cls.__tablename__
-        for _, cls in inspect.getmembers(metadata_models, inspect.isclass)
-        if getattr(cls, "__module__", "") == metadata_models.__name__
-        and hasattr(cls, "__tablename__")
-        and cls.__tablename__ not in NON_DERIVED_TABLES
-    }
+    return set(configuration_table_names())
 
 
 async def seed_metadata_from_json(session: AsyncSession, seed_dir: str) -> None:
-    """Write every bulk seed file into its metadata table.
+    """Write every bulk seed file into its metadata table, as the global journal's first entry.
 
-    Plain inserts into **empty** tables: the database is loaded from the files only when
-    it is empty (the first load, or a test database).  The caller owns the transaction.
-
-    C6 will route this load through the journal layer as the global journal's first entry
-    (``source = standard_load``); until then the rows are written directly.
+    The rows go through the journal layer (``server/services/journal.py``) as one
+    ``standard_load`` entry: plain inserts into **empty** tables, because the database is
+    loaded from the files only when it is empty (the first load, or a test database).  The
+    caller owns the transaction (the layer is told not to commit), so the configuration
+    rows, this entry and ``configuration_state`` end up in one.
     """
-    from server.models import metadata as models
+    from server.services.journal import write_immediate
+
+    await write_immediate(
+        session,
+        ops=standard_load_ops(seed_dir),
+        source="standard_load",
+        actor="system",
+        channel="first_load",
+        note="the Metacat Standard Configuration",
+        proposed={
+            "standard_configuration_hash": standard_configuration_hash(seed_dir),
+            "files": list(BULK_SEED_FILES),
+        },
+        commit=False,
+    )
+
+
+def standard_load_ops(seed_dir: str) -> list[dict]:
+    """The Metacat Standard Configuration as resolved insert ops, in load order.
+
+    The enum lookup tables come first (the foreign keys below require them).  Every
+    order column (``sort_order``, ``ordinal``) is written explicitly, because the order of
+    the nodes, links, codelet types, parameters and posting rules is behaviour: it fixes
+    the float accumulation order of the spread and which node each ``rng.prob`` draw is
+    spent on.  The integer ``id`` of the tables that have one comes from the table's
+    sequence, in insertion order.
+    """
+    from server.services.config_registry import LAYER_REGISTRY
+
+    ops: list[dict] = []
 
     def _load(filename: str) -> Any:
         with open(os.path.join(seed_dir, filename)) as f:
             return json.load(f)
 
-    # Enum lookup tables first — the FK constraints below require them.
+    def add(table: str, row: dict) -> None:
+        ops.append(
+            {"op": "insert", "table": table, "key": LAYER_REGISTRY[table].key_of(row), "row": row}
+        )
+
     enums_data = _load("enums.json")
-    for table_name, model_name in ENUM_MODELS.items():
-        model_cls = getattr(models, model_name)
-        rows = enums_data.get(table_name, [])
-        for row in rows:
-            session.add(
-                model_cls(
-                    name=row["name"],
-                    display_label=row["display_label"],
-                    sort_order=row["sort_order"],
-                    description=row.get("description", ""),
-                )
+    for table_name in ENUM_MODELS:
+        for row in enums_data.get(table_name, []):
+            add(
+                table_name,
+                {
+                    "name": row["name"],
+                    "display_label": row["display_label"],
+                    "sort_order": row["sort_order"],
+                    "description": row.get("description", ""),
+                },
             )
-    await session.flush()
 
     # ``sort_order`` carries the Scheme's node order, which the file reproduces.
     for position, n in enumerate(_load("slipnet_nodes.json")):
-        session.add(
-            models.SlipnetNodeDef(
-                sort_order=position,
-                name=n["name"],
-                short_name=n["short_name"],
-                conceptual_depth=n["conceptual_depth"],
-                description=n.get("description", ""),
-                descriptor_predicate=n.get("descriptor_predicate"),
-                plain_name=n.get("plain_name"),
-                glyph=n.get("glyph"),
-                numeric_value=n.get("numeric_value"),
-                full_name=n.get("full_name"),
-                cm_short_name=n.get("cm_short_name"),
-                article_an=n.get("article_an"),
-            )
+        add(
+            "slipnet_node_defs",
+            {
+                "sort_order": position,
+                "name": n["name"],
+                "short_name": n["short_name"],
+                "conceptual_depth": n["conceptual_depth"],
+                "description": n.get("description", ""),
+                "descriptor_predicate": n.get("descriptor_predicate"),
+                "plain_name": n.get("plain_name"),
+                "glyph": n.get("glyph"),
+                "numeric_value": n.get("numeric_value"),
+                "full_name": n.get("full_name"),
+                "cm_short_name": n.get("cm_short_name"),
+                "article_an": n.get("article_an"),
+            },
         )
 
-    for position, lk in enumerate(_load("slipnet_links.json"), start=1):
-        session.add(
-            models.SlipnetLinkDef(
-                id=position,
-                sort_order=position - 1,
-                from_node=lk["from_node"],
-                to_node=lk["to_node"],
-                link_type=lk["link_type"],
-                label_node=lk.get("label_node"),
-                link_length=lk.get("link_length"),
-                fixed_length=lk["fixed_length"]
+    for position, lk in enumerate(_load("slipnet_links.json")):
+        add(
+            "slipnet_link_defs",
+            {
+                "sort_order": position,
+                "from_node": lk["from_node"],
+                "to_node": lk["to_node"],
+                "link_type": lk["link_type"],
+                "label_node": lk.get("label_node"),
+                "link_length": lk.get("link_length"),
+                "fixed_length": lk["fixed_length"]
                 if "fixed_length" in lk
                 else lk.get("link_length") is not None,
-            )
+            },
         )
 
     for position, c in enumerate(_load("codelet_types.json")):
-        session.add(
-            models.CodeletTypeDef(
-                sort_order=position,
-                name=c["name"],
-                family=c["family"],
-                phase=c["phase"],
-                default_urgency=c.get("default_urgency"),
-                description=c.get("description", ""),
-                source_file=c.get("source_file", ""),
-                source_line=c.get("source_line", 0),
-                execute_body=c.get("execute_body", ""),
-            )
+        add(
+            "codelet_type_defs",
+            {
+                "sort_order": position,
+                "name": c["name"],
+                "family": c["family"],
+                "phase": c["phase"],
+                "default_urgency": c.get("default_urgency"),
+                "description": c.get("description", ""),
+                "source_file": c.get("source_file", ""),
+                "source_line": c.get("source_line", 0),
+                "execute_body": c.get("execute_body", ""),
+            },
         )
 
     # ``sort_order`` keeps each file's key order, which a table keyed by name would lose.
     for position, (k, v) in enumerate(_load("engine_params.json").items()):
-        session.add(models.EngineParam(name=k, sort_order=position, **_param_columns(v)))
+        add("engine_params", {"name": k, "sort_order": position, **_param_columns(v)})
 
     for position, (k, v) in enumerate(_load("urgency_levels.json").items()):
-        session.add(models.UrgencyLevel(name=k, value=v, sort_order=position))
+        add("urgency_levels", {"name": k, "value": v, "sort_order": position})
 
     # ``value_type`` keeps the JSON kind of the value (``5`` against ``5.0`` against ``"2/3"``).
     for position, (k, v) in enumerate(_load("formula_coefficients.json").items()):
-        session.add(
-            models.FormulaCoefficient(name=k, sort_order=position, **_coefficient_columns(v))
+        add("formula_coefficients", {"name": k, "sort_order": position, **_coefficient_columns(v)})
+
+    for d in _load("demo_problems.json"):
+        add(
+            "demo_problems",
+            {
+                "name": d["name"],
+                "section": d.get("section", ""),
+                "initial": d["initial"],
+                "modified": d["modified"],
+                "target": d["target"],
+                "answer": d.get("answer"),
+                "seed": d["seed"],
+                "mode": d["mode"],
+                "description": d.get("description", ""),
+            },
         )
 
-    for position, d in enumerate(_load("demo_problems.json"), start=1):
-        session.add(
-            models.DemoProblem(
-                id=position,
-                name=d["name"],
-                section=d.get("section", ""),
-                initial=d["initial"],
-                modified=d["modified"],
-                target=d["target"],
-                answer=d.get("answer"),
-                seed=d["seed"],
-                mode=d["mode"],
-                description=d.get("description", ""),
-            )
-        )
-
-    # Posting rules.  `id` is assigned explicitly rather than left to the sequence,
-    # because the order the engine consults these rules in decides how many draws it
-    # takes from the run's random stream — so the file's order is part of the value,
-    # and `load_metadata_from_db` sorts on this column to recover it.
+    # Posting rules.  The order the engine consults these rules in decides how many draws
+    # it takes from the run's random stream, so the file's order is part of the value.
     posting_data = _load("posting_rules.json")
-    for position, pr in enumerate(posting_data.get("posting_rules", []), start=1):
-        session.add(
-            models.PostingRule(
-                id=position,
-                rule_key=pr.get("rule_key", pr["codelet_type"]),
-                sort_order=position - 1,
-                codelet_type=pr["codelet_type"],
-                direction=pr["direction"],
-                urgency_when_posted=pr.get("urgency_when_posted"),
-                urgency_formula=pr.get("urgency_formula"),
-                posting_formula=pr.get("posting_formula", ""),
-                count_formula=pr.get("count_formula", ""),
-                count_values=pr.get("count_values"),
-                condition=pr.get("condition", "always"),
-                triggering_slipnodes=pr.get("triggering_slipnodes"),
-            )
+    for position, pr in enumerate(posting_data.get("posting_rules", [])):
+        add(
+            "posting_rules",
+            {
+                "rule_key": pr.get("rule_key", pr["codelet_type"]),
+                "sort_order": position,
+                "codelet_type": pr["codelet_type"],
+                "direction": pr["direction"],
+                "urgency_when_posted": pr.get("urgency_when_posted"),
+                "urgency_formula": pr.get("urgency_formula"),
+                "posting_formula": pr.get("posting_formula", ""),
+                "count_formula": pr.get("count_formula", ""),
+                "count_values": pr.get("count_values"),
+                "condition": pr.get("condition", "always"),
+                "triggering_slipnodes": pr.get("triggering_slipnodes"),
+            },
         )
 
-    # The nine named codelet patterns, which live in the same file as the rules.
-    # `id` is assigned across all patterns so both the order of the patterns and the
-    # order within each one survive the round trip.
-    entry_id = 0
+    # The nine named codelet patterns, which live in the same file as the rules.  The
+    # ordinal runs across all patterns, so both the order of the patterns and the order
+    # within each one survive the round trip.
+    ordinal = 0
     for pattern_name, entries in posting_data.get("codelet_patterns", {}).items():
         for codelet_type, urgency_level in entries:
-            entry_id += 1
-            session.add(
-                models.CodeletPatternDef(
-                    id=entry_id,
-                    ordinal=entry_id - 1,
-                    pattern_name=pattern_name,
-                    codelet_type=codelet_type,
-                    urgency_level=urgency_level,
-                )
+            add(
+                "codelet_pattern_defs",
+                {
+                    "ordinal": ordinal,
+                    "pattern_name": pattern_name,
+                    "codelet_type": codelet_type,
+                    "urgency_level": urgency_level,
+                },
             )
+            ordinal += 1
 
-    for position, td in enumerate(
-        _load("theme_dimensions.json").get("dimensions", []), start=1
-    ):
-        session.add(
-            models.ThemeDimensionDef(
-                id=position,
-                slipnet_node=td["slipnet_node"],
-                valid_relations=td["valid_relations"],
-            )
+    for td in _load("theme_dimensions.json").get("dimensions", []):
+        add(
+            "theme_dimension_defs",
+            {"slipnet_node": td["slipnet_node"], "valid_relations": td["valid_relations"]},
         )
 
     for position, (name, pos) in enumerate(
         _load("slipnet_layout.json").get("node_positions", {}).items()
     ):
-        session.add(
-            models.SlipnetLayoutPos(
-                node_name=name, grid_row=pos[0], grid_col=pos[1], sort_order=position
-            )
+        add(
+            "slipnet_layout",
+            {"node_name": name, "grid_row": pos[0], "grid_col": pos[1], "sort_order": position},
         )
 
-    # Role bindings and theme relations reference nodes and codelet types by name; the
-    # rows they reference are flushed first.
-    await session.flush()
+    # Role bindings and theme relations reference nodes and codelet types by name.
     roles = _load("roles.json")
     for r in roles.get("node_roles", []):
-        session.add(
-            models.SlipnetNodeRole(role=r["role"], ordinal=r["ordinal"], node_name=r["node_name"])
+        add(
+            "slipnet_node_roles",
+            {"role": r["role"], "ordinal": r["ordinal"], "node_name": r["node_name"]},
         )
     for r in roles.get("codelet_roles", []):
-        session.add(
-            models.CodeletTypeRole(
-                role=r["role"], ordinal=r["ordinal"], codelet_type=r["codelet_type"]
-            )
+        add(
+            "codelet_type_roles",
+            {"role": r["role"], "ordinal": r["ordinal"], "codelet_type": r["codelet_type"]},
         )
     for r in _load("theme_relations.json"):
-        session.add(
-            models.ThemeRelation(
-                name=r["name"],
-                ordinal=r["ordinal"],
-                node_name=r.get("node_name"),
-                abstractness=r.get("abstractness"),
-                description=r.get("description", ""),
-            )
+        add(
+            "theme_relations",
+            {
+                "name": r["name"],
+                "ordinal": r["ordinal"],
+                "node_name": r.get("node_name"),
+                "abstractness": r.get("abstractness"),
+                "description": r.get("description", ""),
+            },
         )
 
-    session.add(
-        models.CommentaryTemplate(
-            template_key="all", template_data=_load("commentary_templates.json")
-        )
-    )
-
-    # The rows above carry explicit ids, which leave each table's id sequence at its start;
-    # an Admin create that draws from it would collide.  Put every such sequence past the
-    # largest id written, inside the same transaction.
-    await session.flush()
-    from sqlalchemy import text
-
-    for table in ID_SEQUENCE_TABLES:
-        await session.execute(
-            text(
-                f"SELECT setval(pg_get_serial_sequence('{table}', 'id'), "
-                f"(SELECT COALESCE(MAX(id), 1) FROM {table}), true)"
-            )
-        )
+    add("commentary_templates", {"template_key": "all", "template_data": _load("commentary_templates.json")})
+    return ops
 
 
 def _coefficient_columns(value: Any) -> dict[str, str]:

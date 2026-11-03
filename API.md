@@ -2,7 +2,7 @@
 
 > **Auto-generated.** Run `python scripts/generate_api_docs.py` to regenerate from the FastAPI application.
 
-153 HTTP routes, plus `WS /ws/runs/{run_id}` for live state push.
+154 HTTP routes, plus `WS /ws/runs/{run_id}` for live state push.
 
 Interactive documentation is served at `/docs` while the API is running.
 
@@ -74,7 +74,7 @@ Metacat Mode, multi-core across runs: one problem over many seeds on every core,
 
 ## Trainings
 
-Training Mode: named, long-lived Training episodes of many problems over many seeds, extendable while they run, each with its own episode memory (never Metacat Mode's Episodic Memory); the database is written only when a problem finishes (works with or without the parallel plugin).
+Training Mode: named, long-lived Training episodes of many problems over many seeds (Training Mode Sessions), each with its own Episodic Memory that no route clears (never Metacat Mode's). A Training is created Stopped and is started, paused, resumed, stopped and started again; problems can be added in any state; the database is written only at milestones (works with or without the parallel plugin).
 
 | Method | Path | Purpose |
 |---|---|---|
@@ -84,7 +84,6 @@ Training Mode: named, long-lived Training episodes of many problems over many se
 | `PATCH` | `/api/trainings/{training_id}` | Update Training |
 | `DELETE` | `/api/trainings/{training_id}` | Delete Training |
 | `POST` | `/api/trainings/{training_id}/cancel` | Cancel |
-| `POST` | `/api/trainings/{training_id}/close` | Close |
 | `GET` | `/api/trainings/{training_id}/export` | Export |
 | `GET` | `/api/trainings/{training_id}/finished` | Finished |
 | `GET` | `/api/trainings/{training_id}/memory` | Training Memory |
@@ -95,6 +94,8 @@ Training Mode: named, long-lived Training episodes of many problems over many se
 | `POST` | `/api/trainings/{training_id}/problems/{problem_id}/cancel` | Cancel Problem |
 | `GET` | `/api/trainings/{training_id}/problems/{problem_id}/runs` | Problem Runs |
 | `POST` | `/api/trainings/{training_id}/resume` | Resume |
+| `POST` | `/api/trainings/{training_id}/start` | Start |
+| `POST` | `/api/trainings/{training_id}/stop` | Stop |
 
 ## Episodic Memory
 

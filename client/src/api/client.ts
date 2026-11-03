@@ -923,7 +923,7 @@ export async function getTrainingFinished(
   );
 }
 
-/** The episode's Episodic Memory (shared memory only). */
+/** The Training's Episodic Memory (live, or rebuilt from the stored merges when Stopped). */
 export async function getTrainingMemory(trainingId: number): Promise<TrainingMemory> {
   return request<TrainingMemory>(`/trainings/${trainingId}/memory`);
 }
@@ -936,11 +936,20 @@ export async function resumeTraining(trainingId: number): Promise<TrainingSummar
   return request<TrainingSummary>(`/trainings/${trainingId}/resume`, { method: 'POST' });
 }
 
-/** Accept no more problems; the Training is finished once the last one finishes. */
-export async function closeTraining(trainingId: number): Promise<TrainingSummary> {
-  return request<TrainingSummary>(`/trainings/${trainingId}/close`, { method: 'POST' });
+/** Stopped to Running (or Paused). A live Training is unchanged. */
+export async function startTraining(trainingId: number, paused = false): Promise<TrainingSummary> {
+  return request<TrainingSummary>(`/trainings/${trainingId}/start`, {
+    method: 'POST',
+    body: JSON.stringify({ paused }),
+  });
 }
 
+/** Running or Paused to Stopped; the Training can be started again. */
+export async function stopTraining(trainingId: number): Promise<TrainingSummary> {
+  return request<TrainingSummary>(`/trainings/${trainingId}/stop`, { method: 'POST' });
+}
+
+/** An action, not a state: cancel every queued and in-flight problem. */
 export async function cancelTraining(trainingId: number): Promise<TrainingSummary> {
   return request<TrainingSummary>(`/trainings/${trainingId}/cancel`, { method: 'POST' });
 }

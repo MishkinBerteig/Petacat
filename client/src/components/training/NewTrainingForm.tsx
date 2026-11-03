@@ -8,7 +8,6 @@ import { addTrainingProblems, createTraining, describeApiError, getSwarmStatus }
 import type {
   TrainingErrorPolicy,
   TrainingLimits,
-  TrainingMemoryMode,
   TrainingSettings,
   TrainingSummary,
 } from '@/types';
@@ -42,7 +41,6 @@ export function NewTrainingForm({ limits, defaults, onCreated, onCancel }: Props
   const overrideCount = Object.keys(overrides).length;
 
   const [name, setName] = useState('');
-  const [memory, setMemory] = useState<TrainingMemoryMode>(defaults?.settings.memory ?? 'shared');
   const [seeds, setSeeds] = useState(String(defaults?.settings.seeds_per_problem ?? DEFAULT_SEEDS));
   const [seedStart, setSeedStart] = useState(String(defaults?.settings.seed_start ?? 1));
   const [maxCodelets, setMaxCodelets] = useState(
@@ -60,7 +58,6 @@ export function NewTrainingForm({ limits, defaults, onCreated, onCancel }: Props
   const [touched, setTouched] = useState(false);
   useEffect(() => {
     if (!defaults || touched) return;
-    setMemory(defaults.settings.memory);
     setSeeds(String(defaults.settings.seeds_per_problem));
     setSeedStart(String(defaults.settings.seed_start));
     setMaxCodelets(String(defaults.settings.max_codelets));
@@ -116,7 +113,6 @@ export function NewTrainingForm({ limits, defaults, onCreated, onCancel }: Props
       const first = await createTraining({
         name: name.trim(),
         settings: {
-          memory,
           seeds_per_problem: seedsN,
           seed_start: startN,
           max_codelets: codeletsN,
@@ -177,25 +173,12 @@ export function NewTrainingForm({ limits, defaults, onCreated, onCancel }: Props
 
       <div style={fieldGroupStyle}>
         <span style={{ display: 'flex', alignItems: 'center' }}>
-          <label style={labelStyle} htmlFor="training-memory">
-            Memory
-          </label>
-          <ControlHelp topic="training_memory_mode" label="Memory" />
+          <span style={labelStyle}>Episodic Memory</span>
+          <ControlHelp topic="training_memory" label="Episodic Memory" />
         </span>
-        <select
-          id="training-memory"
-          value={memory}
-          disabled={busy}
-          onChange={(e) => touch(setMemory)(e.target.value as TrainingMemoryMode)}
-          style={{ maxWidth: 260 }}
-        >
-          <option value="shared">Shared (one episode)</option>
-          <option value="independent">Independent runs</option>
-        </select>
         <div className="text-xs text-muted" data-testid="memory-help-line">
-          {memory === 'shared'
-            ? 'Each run copies the Training\'s episode memory when it starts and holds it static. What a run adds reaches only the runs that start after it finishes.'
-            : 'Every run starts with an empty memory and nothing is shared: a plain answer distribution.'}
+          Every Training has its own Episodic Memory, never cleared and never shared with Metacat Mode. Each run copies it when it starts and holds it static; what a run adds
+          reaches only the runs that start after it finishes. A new Training is stopped: press Start to run it.
         </div>
       </div>
 

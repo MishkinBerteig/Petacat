@@ -8,9 +8,10 @@ from __future__ import annotations
 
 import json
 from fractions import Fraction
+from collections.abc import Iterable, Mapping
 from typing import Any
 
-from sqlalchemy import select, text
+from sqlalchemy import inspect as sa_inspect, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.engine.posting import validate_posting_formulas
@@ -60,264 +61,313 @@ from server.models.metadata import (
 )
 
 
-async def load_metadata_from_db(session: AsyncSession) -> MetadataProvider:
-    """Load all metadata from Postgres into an immutable MetadataProvider."""
+#: The enum lookup tables the provider's ``enum_values`` mirrors, and the model of each.
+ENUM_TABLE_MODELS: dict[str, Any] = {
+    "run_statuses": RunStatusDef,
+    "event_types": EventTypeDef,
+    "bridge_types": BridgeTypeDef,
+    "bridge_orientations": BridgeOrientationDef,
+    "clause_types": ClauseTypeDef,
+    "rule_types": RuleTypeDef,
+    "theme_types": ThemeTypeDef,
+    "proposal_levels": ProposalLevelDef,
+    "link_types": LinkTypeDef,
+    "codelet_families": CodeletFamilyDef,
+    "codelet_phases": CodeletPhaseDef,
+    "posting_directions": PostingDirectionDef,
+    "param_value_types": ParamValueTypeDef,
+    "demo_modes": DemoModeDef,
+}
 
-    # Slipnet nodes.
-    #
-    # `descriptor_predicate` is read back here.  It had the column, the startup
-    # reconciliation that adds it to older databases, and the seeder that writes it —
-    # and this loader built the spec from three columns and left the fourth behind, so
-    # every configuration the application loaded from the database had all fourteen
-    # predicates missing.  A node whose predicate is `None` falls back to being read
-    # off the object (`slipnet.py:146`), which is a valid state for the fifty-odd nodes
-    # that ship that way and silently wrong for the fourteen that do not.
-    # Ordered explicitly.  ``select()`` promises nothing, and the node order is
-    # load-bearing: ``Slipnet.update_activations`` walks the nodes for the activation
-    # spread and for the probabilistic jump, so the order fixes both the float
-    # accumulation order and which node each ``rng.prob`` draw is spent on.  Left
-    # unordered this was Postgres heap order, which drifts with every re-seed — the
-    # development database returned ``plato-y, plato-z, plato-one, …`` and ran a
-    # measurably different engine from the seed data.
-    result = await session.execute(
-        select(SlipnetNodeDef).order_by(SlipnetNodeDef.sort_order)
-    )
-    node_specs = {
-        row.name: SlipnodeSpec(
-            name=row.name,
-            short_name=row.short_name,
-            conceptual_depth=row.conceptual_depth,
-            descriptor_predicate=row.descriptor_predicate,
-            plain_name=row.plain_name,
-            glyph=row.glyph,
-            numeric_value=row.numeric_value,
-            full_name=row.full_name,
-            cm_short_name=row.cm_short_name,
-            article_an=row.article_an,
+#: Each provider field, and the configuration tables it is built from.  A change to a table
+#: rebuilds only the fields that name it (``ConfigDocument``'s per-field rebuild).
+PROVIDER_FIELD_TABLES: dict[str, tuple[str, ...]] = {
+    "slipnet_node_specs": ("slipnet_node_defs",),
+    "slipnet_link_specs": ("slipnet_link_defs",),
+    "codelet_specs": ("codelet_type_defs",),
+    "posting_rules": ("posting_rules",),
+    "params": ("engine_params",),
+    "urgency_levels": ("urgency_levels",),
+    "formula_coefficients": ("formula_coefficients",),
+    "commentary_templates": ("commentary_templates",),
+    "demo_problems": ("demo_problems",),
+    "theme_dimensions": ("theme_dimension_defs",),
+    "slipnet_layout": ("slipnet_layout",),
+    "codelet_patterns": ("codelet_pattern_defs",),
+    "node_roles": ("slipnet_node_roles",),
+    "codelet_roles": ("codelet_type_roles",),
+    "theme_relations": ("theme_relations",),
+    "enum_values": tuple(ENUM_TABLE_MODELS),
+}
+
+
+def _rows(table: Any) -> Iterable[Mapping[str, Any]]:
+    """The rows of a table given either as a sequence of rows or as ``{key: row}``."""
+    return table.values() if isinstance(table, Mapping) else table
+
+
+# ---------------------------------------------------------------------------
+# Rows to provider fields.  This is the one implementation: the database path
+# (``load_metadata_from_db``) and ``ConfigDocument.provider`` both call it.  A row is a
+# plain mapping of column name to value, in the table's order (the order is behaviour for
+# the nodes, links, codelet types, posting rules and parameters: it fixes the float
+# accumulation order and which node each ``rng.prob`` draw is spent on).
+# ---------------------------------------------------------------------------
+
+
+def _field_slipnet_node_specs(tables: Mapping[str, Any]) -> dict[str, SlipnodeSpec]:
+    return {
+        r["name"]: SlipnodeSpec(
+            name=r["name"],
+            short_name=r["short_name"],
+            conceptual_depth=r["conceptual_depth"],
+            descriptor_predicate=r.get("descriptor_predicate"),
+            plain_name=r.get("plain_name"),
+            glyph=r.get("glyph"),
+            numeric_value=r.get("numeric_value"),
+            full_name=r.get("full_name"),
+            cm_short_name=r.get("cm_short_name"),
+            article_an=r.get("article_an"),
         )
-        for row in result.scalars()
+        for r in _rows(tables["slipnet_node_defs"])
     }
 
-    # Slipnet links
-    result = await session.execute(select(SlipnetLinkDef).order_by(SlipnetLinkDef.sort_order, SlipnetLinkDef.id))
-    link_specs = [
+
+def _field_slipnet_link_specs(tables: Mapping[str, Any]) -> list[SlipnetLinkSpec]:
+    return [
         SlipnetLinkSpec(
-            from_node=row.from_node,
-            to_node=row.to_node,
-            link_type=row.link_type,
-            label_node=row.label_node,
-            link_length=row.link_length,
-            fixed_length=row.fixed_length if row.fixed_length is not None else (row.link_length is not None),
+            from_node=r["from_node"],
+            to_node=r["to_node"],
+            link_type=r["link_type"],
+            label_node=r.get("label_node"),
+            link_length=r.get("link_length"),
+            fixed_length=r["fixed_length"]
+            if r.get("fixed_length") is not None
+            else (r.get("link_length") is not None),
         )
-        for row in result.scalars()
+        for r in _rows(tables["slipnet_link_defs"])
     ]
 
-    # Codelet types
-    result = await session.execute(
-        select(CodeletTypeDef).order_by(CodeletTypeDef.sort_order)
-    )
-    codelet_specs = {
-        row.name: CodeletSpec(
-            name=row.name,
-            family=row.family,
-            phase=row.phase,
-            default_urgency=row.default_urgency,
-            description=row.description or "",
-            source_file=row.source_file or "",
-            source_line=row.source_line or 0,
-            execute_body=row.execute_body or "",
+
+def _field_codelet_specs(tables: Mapping[str, Any]) -> dict[str, CodeletSpec]:
+    return {
+        r["name"]: CodeletSpec(
+            name=r["name"],
+            family=r["family"],
+            phase=r["phase"],
+            default_urgency=r.get("default_urgency"),
+            description=r.get("description") or "",
+            source_file=r.get("source_file") or "",
+            source_line=r.get("source_line") or 0,
+            execute_body=r.get("execute_body") or "",
         )
-        for row in result.scalars()
+        for r in _rows(tables["codelet_type_defs"])
     }
 
-    # Engine params, in the seed file's key order (``sort_order``; the name breaks a tie).
-    result = await session.execute(
-        select(EngineParam).order_by(EngineParam.sort_order, EngineParam.name)
-    )
-    params: dict[str, Any] = {}
-    for row in result.scalars():
-        params[row.name] = _parse_param(row.value, row.value_type)
 
-    # Urgency levels, in the seed file's key order.
-    result = await session.execute(
-        select(UrgencyLevel).order_by(UrgencyLevel.sort_order, UrgencyLevel.name)
-    )
-    urgency_levels = {row.name: row.value for row in result.scalars()}
-
-    # Formula coefficients, in the seed file's key order; ``value_type`` restores the
-    # int, float or exact rational the text holds.
-    result = await session.execute(
-        select(FormulaCoefficient).order_by(
-            FormulaCoefficient.sort_order, FormulaCoefficient.name
-        )
-    )
-    formula_coefficients = {
-        row.name: _parse_coefficient(row.value, row.value_type) for row in result.scalars()
-    }
-
-    # Posting rules.  Ordered explicitly: the engine consults these in sequence and
-    # every consultation costs a draw from the run's random stream, so the order is
-    # part of the configuration rather than an incidental of the query.  `id` carries
-    # it, assigned from the seed file's order when the row is written.
-    result = await session.execute(select(PostingRule).order_by(PostingRule.sort_order, PostingRule.id)
-    )
+def _field_posting_rules(tables: Mapping[str, Any]) -> list[PostingRuleSpec]:
     posting_rules = [
         PostingRuleSpec(
-            codelet_type=row.codelet_type,
-            direction=row.direction,
-            urgency_when_posted=row.urgency_when_posted,
-            urgency_formula=row.urgency_formula,
-            posting_formula=row.posting_formula or "",
-            count_formula=row.count_formula or "",
-            count_values=row.count_values,
-            condition=row.condition or "always",
-            triggering_slipnodes=row.triggering_slipnodes,
-            rule_key=row.rule_key,
+            codelet_type=r["codelet_type"],
+            direction=r["direction"],
+            urgency_when_posted=r.get("urgency_when_posted"),
+            urgency_formula=r.get("urgency_formula"),
+            posting_formula=r.get("posting_formula") or "",
+            count_formula=r.get("count_formula") or "",
+            count_values=r.get("count_values"),
+            condition=r.get("condition") or "always",
+            triggering_slipnodes=r.get("triggering_slipnodes"),
+            rule_key=r["rule_key"],
         )
-        for row in result.scalars()
+        for r in _rows(tables["posting_rules"])
     ]
-
-    # A bad posting formula fails here, at load, rather than mid-run — where it would
+    # A bad posting formula fails here, at load, rather than mid-run -- where it would
     # look like one codelet type exploring differently rather than like a broken
     # configuration.  The same contract the descriptor predicates get.
     validate_posting_formulas(posting_rules)
+    return posting_rules
 
-    # Commentary templates.  Ordered by `id`, the order the rows were written in.
-    result = await session.execute(
-        select(CommentaryTemplate).order_by(CommentaryTemplate.id)
-    )
+
+def _field_params(tables: Mapping[str, Any]) -> dict[str, Any]:
+    return {r["name"]: _parse_param(r["value"], r["value_type"]) for r in _rows(tables["engine_params"])}
+
+
+def _field_urgency_levels(tables: Mapping[str, Any]) -> dict[str, int]:
+    return {r["name"]: r["value"] for r in _rows(tables["urgency_levels"])}
+
+
+def _field_formula_coefficients(tables: Mapping[str, Any]) -> dict[str, Any]:
+    # ``value_type`` restores the int, float or exact rational the text holds.
+    return {
+        r["name"]: _parse_coefficient(r["value"], r["value_type"])
+        for r in _rows(tables["formula_coefficients"])
+    }
+
+
+def _field_commentary_templates(tables: Mapping[str, Any]) -> dict[str, Any]:
     commentary_templates: dict[str, Any] = {}
-    for row in result.scalars():
-        if row.template_key == "all":
-            commentary_templates = row.template_data
+    for r in _rows(tables["commentary_templates"]):
+        if r["template_key"] == "all":
+            commentary_templates = r["template_data"]
         else:
-            commentary_templates[row.template_key] = row.template_data
+            commentary_templates[r["template_key"]] = r["template_data"]
+    return commentary_templates
 
-    # Demo problems
-    result = await session.execute(select(DemoProblemRow).order_by(DemoProblemRow.id))
-    demo_problems = [
+
+def _field_demo_problems(tables: Mapping[str, Any]) -> list[DemoProblem]:
+    return [
         DemoProblem(
-            name=row.name,
-            section=row.section or "",
-            initial=row.initial,
-            modified=row.modified,
-            target=row.target,
-            answer=row.answer,
-            seed=row.seed,
-            mode=row.mode,
-            description=row.description or "",
+            name=r["name"],
+            section=r.get("section") or "",
+            initial=r["initial"],
+            modified=r["modified"],
+            target=r["target"],
+            answer=r.get("answer"),
+            seed=r["seed"],
+            mode=r["mode"],
+            description=r.get("description") or "",
         )
-        for row in result.scalars()
+        for r in _rows(tables["demo_problems"])
     ]
 
-    # Theme dimensions
-    result = await session.execute(
-        select(ThemeDimensionDef).order_by(ThemeDimensionDef.id)
-    )
-    theme_dimensions = [
-        ThemeDimensionSpec(
-            slipnet_node=row.slipnet_node,
-            valid_relations=row.valid_relations,
-        )
-        for row in result.scalars()
+
+def _field_theme_dimensions(tables: Mapping[str, Any]) -> list[ThemeDimensionSpec]:
+    return [
+        ThemeDimensionSpec(slipnet_node=r["slipnet_node"], valid_relations=r["valid_relations"])
+        for r in _rows(tables["theme_dimension_defs"])
     ]
 
-    # Slipnet layout.  Display only; in the seed file's key order.
-    result = await session.execute(
-        select(SlipnetLayoutPos).order_by(
-            SlipnetLayoutPos.sort_order, SlipnetLayoutPos.node_name
-        )
-    )
-    slipnet_layout = {
-        row.node_name: (row.grid_row, row.grid_col) for row in result.scalars()
-    }
 
-    # Codelet patterns.  Ordered by `ordinal`, which the seeder assigns across every
-    # pattern, so both the order of the patterns and the order within each one come
-    # back as the seed file wrote them.
-    result = await session.execute(
-        select(CodeletPatternDef).order_by(CodeletPatternDef.ordinal, CodeletPatternDef.id)
-    )
-    codelet_patterns: dict[str, list[tuple[str, int]]] = {}
-    for row in result.scalars():
-        codelet_patterns.setdefault(row.pattern_name, []).append(
-            (row.codelet_type, row.urgency_level)
-        )
+def _field_slipnet_layout(tables: Mapping[str, Any]) -> dict[str, tuple[int, int]]:
+    # Display only.
+    return {r["node_name"]: (r["grid_row"], r["grid_col"]) for r in _rows(tables["slipnet_layout"])}
 
-    # Role bindings and theme relations.  ``role`` is ordered by byte value
-    # (``COLLATE "C"``) so the order does not depend on the database's locale.
-    result = await session.execute(
-        select(SlipnetNodeRole).order_by(
-            SlipnetNodeRole.role.collate("C"), SlipnetNodeRole.ordinal
-        )
+
+def _field_codelet_patterns(tables: Mapping[str, Any]) -> dict[str, list[tuple[str, str]]]:
+    codelet_patterns: dict[str, list[tuple[str, str]]] = {}
+    for r in _rows(tables["codelet_pattern_defs"]):
+        codelet_patterns.setdefault(r["pattern_name"], []).append((r["codelet_type"], r["urgency_level"]))
+    return codelet_patterns
+
+
+def _field_node_roles(tables: Mapping[str, Any]) -> tuple[NodeRoleSpec, ...]:
+    return tuple(
+        NodeRoleSpec(role=r["role"], ordinal=r["ordinal"], node_name=r["node_name"])
+        for r in _rows(tables["slipnet_node_roles"])
     )
-    node_roles = tuple(
-        NodeRoleSpec(role=r.role, ordinal=r.ordinal, node_name=r.node_name)
-        for r in result.scalars()
+
+
+def _field_codelet_roles(tables: Mapping[str, Any]) -> tuple[CodeletRoleSpec, ...]:
+    return tuple(
+        CodeletRoleSpec(role=r["role"], ordinal=r["ordinal"], codelet_type=r["codelet_type"])
+        for r in _rows(tables["codelet_type_roles"])
     )
-    result = await session.execute(
-        select(CodeletTypeRole).order_by(
-            CodeletTypeRole.role.collate("C"), CodeletTypeRole.ordinal
-        )
-    )
-    codelet_roles = tuple(
-        CodeletRoleSpec(role=r.role, ordinal=r.ordinal, codelet_type=r.codelet_type)
-        for r in result.scalars()
-    )
-    result = await session.execute(
-        select(ThemeRelation).order_by(ThemeRelation.ordinal, ThemeRelation.name)
-    )
-    theme_relations = tuple(
+
+
+def _field_theme_relations(tables: Mapping[str, Any]) -> tuple[ThemeRelationSpec, ...]:
+    return tuple(
         ThemeRelationSpec(
-            name=r.name,
-            ordinal=r.ordinal,
-            node_name=r.node_name,
-            abstractness=r.abstractness,
-            description=r.description or "",
+            name=r["name"],
+            ordinal=r["ordinal"],
+            node_name=r.get("node_name"),
+            abstractness=r.get("abstractness"),
+            description=r.get("description") or "",
         )
-        for r in result.scalars()
+        for r in _rows(tables["theme_relations"])
     )
 
-    # Enum values from lookup tables
-    enum_table_models = {
-        "run_statuses": RunStatusDef,
-        "event_types": EventTypeDef,
-        "bridge_types": BridgeTypeDef,
-        "bridge_orientations": BridgeOrientationDef,
-        "clause_types": ClauseTypeDef,
-        "rule_types": RuleTypeDef,
-        "theme_types": ThemeTypeDef,
-        "proposal_levels": ProposalLevelDef,
-        "link_types": LinkTypeDef,
-        "codelet_families": CodeletFamilyDef,
-        "codelet_phases": CodeletPhaseDef,
-        "posting_directions": PostingDirectionDef,
-        "param_value_types": ParamValueTypeDef,
-        "demo_modes": DemoModeDef,
+
+def _field_enum_values(tables: Mapping[str, Any]) -> dict[str, set[str]]:
+    return {name: {r["name"] for r in _rows(tables[name])} for name in ENUM_TABLE_MODELS}
+
+
+_FIELD_BUILDERS = {
+    "slipnet_node_specs": _field_slipnet_node_specs,
+    "slipnet_link_specs": _field_slipnet_link_specs,
+    "codelet_specs": _field_codelet_specs,
+    "posting_rules": _field_posting_rules,
+    "params": _field_params,
+    "urgency_levels": _field_urgency_levels,
+    "formula_coefficients": _field_formula_coefficients,
+    "commentary_templates": _field_commentary_templates,
+    "demo_problems": _field_demo_problems,
+    "theme_dimensions": _field_theme_dimensions,
+    "slipnet_layout": _field_slipnet_layout,
+    "codelet_patterns": _field_codelet_patterns,
+    "node_roles": _field_node_roles,
+    "codelet_roles": _field_codelet_roles,
+    "theme_relations": _field_theme_relations,
+    "enum_values": _field_enum_values,
+}
+
+
+def build_provider_field(name: str, tables: Mapping[str, Any]) -> Any:
+    """One provider field built from the rows of the tables it depends on."""
+    return _FIELD_BUILDERS[name](tables)
+
+
+def provider_from_tables(tables: Mapping[str, Any]) -> MetadataProvider:
+    """The whole provider from configuration rows (``{table name: rows in order}``)."""
+    return MetadataProvider(**{name: build(tables) for name, build in _FIELD_BUILDERS.items()})
+
+
+def _row_dict(row: Any) -> dict[str, Any]:
+    """An ORM row as a column mapping, without the surrogate ``id`` (not stable across configurations)."""
+    d = {a.key: getattr(row, a.key) for a in sa_inspect(type(row)).mapper.column_attrs}
+    d.pop("id", None)
+    return d
+
+
+async def load_rows_from_db(session: AsyncSession) -> dict[str, list[dict[str, Any]]]:
+    """Every configuration table's rows, each in the order the engine depends on.
+
+    Ordered explicitly.  ``select()`` promises nothing, and the order of the nodes, links,
+    codelet types, parameters and posting rules is load-bearing: ``Slipnet.update_activations``
+    walks the nodes for the activation spread and for the probabilistic jump, so the order
+    fixes both the float accumulation order and which node each ``rng.prob`` draw is spent
+    on.  Left unordered this was Postgres heap order, which drifts with every re-seed.
+    ``role`` is ordered by byte value (``COLLATE "C"``) so the order does not depend on the
+    database's locale.
+    """
+    queries = {
+        "slipnet_node_defs": select(SlipnetNodeDef).order_by(SlipnetNodeDef.sort_order),
+        "slipnet_link_defs": select(SlipnetLinkDef).order_by(SlipnetLinkDef.sort_order, SlipnetLinkDef.id),
+        "codelet_type_defs": select(CodeletTypeDef).order_by(CodeletTypeDef.sort_order),
+        "engine_params": select(EngineParam).order_by(EngineParam.sort_order, EngineParam.name),
+        "urgency_levels": select(UrgencyLevel).order_by(UrgencyLevel.sort_order, UrgencyLevel.name),
+        "formula_coefficients": select(FormulaCoefficient).order_by(
+            FormulaCoefficient.sort_order, FormulaCoefficient.name
+        ),
+        "posting_rules": select(PostingRule).order_by(PostingRule.sort_order, PostingRule.id),
+        "commentary_templates": select(CommentaryTemplate).order_by(CommentaryTemplate.id),
+        "demo_problems": select(DemoProblemRow).order_by(DemoProblemRow.id),
+        "theme_dimension_defs": select(ThemeDimensionDef).order_by(ThemeDimensionDef.id),
+        "slipnet_layout": select(SlipnetLayoutPos).order_by(
+            SlipnetLayoutPos.sort_order, SlipnetLayoutPos.node_name
+        ),
+        "codelet_pattern_defs": select(CodeletPatternDef).order_by(
+            CodeletPatternDef.ordinal, CodeletPatternDef.id
+        ),
+        "slipnet_node_roles": select(SlipnetNodeRole).order_by(
+            SlipnetNodeRole.role.collate("C"), SlipnetNodeRole.ordinal
+        ),
+        "codelet_type_roles": select(CodeletTypeRole).order_by(
+            CodeletTypeRole.role.collate("C"), CodeletTypeRole.ordinal
+        ),
+        "theme_relations": select(ThemeRelation).order_by(ThemeRelation.ordinal, ThemeRelation.name),
     }
-    enum_values: dict[str, set[str]] = {}
-    for table_name, model in enum_table_models.items():
-        result = await session.execute(select(model).order_by(model.name))
-        enum_values[table_name] = {row.name for row in result.scalars()}
+    for table_name, model in ENUM_TABLE_MODELS.items():
+        queries[table_name] = select(model).order_by(model.sort_order, model.name)
+    tables: dict[str, list[dict[str, Any]]] = {}
+    for table_name, query in queries.items():
+        result = await session.execute(query)
+        tables[table_name] = [_row_dict(r) for r in result.scalars()]
+    return tables
 
-    return MetadataProvider(
-        slipnet_node_specs=node_specs,
-        slipnet_link_specs=link_specs,
-        codelet_specs=codelet_specs,
-        posting_rules=posting_rules,
-        params=params,
-        urgency_levels=urgency_levels,
-        formula_coefficients=formula_coefficients,
-        commentary_templates=commentary_templates,
-        demo_problems=demo_problems,
-        theme_dimensions=theme_dimensions,
-        slipnet_layout=slipnet_layout,
-        codelet_patterns=codelet_patterns,
-        node_roles=node_roles,
-        codelet_roles=codelet_roles,
-        theme_relations=theme_relations,
-        enum_values=enum_values,
-    )
+
+async def load_metadata_from_db(session: AsyncSession) -> MetadataProvider:
+    """Load all metadata from Postgres into an immutable MetadataProvider."""
+    return provider_from_tables(await load_rows_from_db(session))
 
 
 def _parse_coefficient(value: str, value_type: str) -> int | float | Fraction:

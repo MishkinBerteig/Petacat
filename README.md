@@ -28,7 +28,7 @@ license change was authorised by Dr. Marshall directly (see
 > end-to-end. Episodic Memory (Metacat-Mode learning) shapes the runs that inherit it: a run
 > declines an answer already held for the same problem and rules, so repeating a
 > problem across Metacat Mode's [episodic runs](#persistence-modes-and-episodic-runs)
-> (which are Metacat Mode and not Training Mode) explores a different answer each time. It ships with 4,514 test cases covering the engine, the API, and the
+> (which are Metacat Mode and not Training Mode) explores a different answer each time. It ships with 4,660 test cases covering the engine, the API, and the
 > help/config system, run on both the CPU and the GPU numeric backends. Underneath the seven components sits an execution
 > substrate — three [persistence modes](#persistence-modes-and-episodic-runs),
 > a [GPU numeric substrate](#the-numeric-substrate), and
@@ -70,8 +70,10 @@ Episodic Memory is a very minimal kind of learning: **Metacat-Mode learning**.
 **Training Mode** is every extension since v1.2 that makes Petacat a novel
 machine-learning platform:
 
-- **Trainings** (today): named, database-backed Training episodes of many problems,
-  each run over many seeds, extendable while they run, each with its own episode memory.
+- **Trainings** (today; Training Mode Sessions): named, database-backed Training episodes of
+  many problems, each run over many seeds, extendable while they run, each with its own
+  Episodic Memory that is never cleared. A Training is created Stopped, then started, paused,
+  resumed, stopped, started again and deleted.
   See [Training](#training-many-problems-on-every-core) and `/api/trainings`.
 - **Planned, not yet built:** a Training's own evolving Slipnet, learners, and an
   external delta route.
@@ -94,7 +96,7 @@ one run is the exact speculative executor (`workers` > 1); multi-core *across* r
 the swarm. Run mode is independent of the two modes and is meant to be viable in both.
 It is not the **persistence mode** (Fast, Normal or Audit), which decides how a
 Metacat Mode run is recorded and is the `mode` field of `POST /api/runs`, a v1.2 name
-that stays as it is. Nor is it a Training's `memory` setting (`shared` or `independent`).
+that stays as it is. Nor is it Episodic Memory, which both modes use.
 
 What is available today:
 
@@ -434,7 +436,7 @@ Petacat has two test suites:
   plugin against the serial runs it claims to equal), `lockstep` (Petacat's decision
   traces against Metacat's), and `e2e` (full HTTP
   stack against a running database). All eight run in a single command against
-  the local Postgres — 4,514 cases, which includes the numeric matrix's second
+  the local Postgres — 4,660 cases, which includes the numeric matrix's second
   pass over the 519 backend-sensitive tests. See
   [TESTING.md](TESTING.md) for the layer breakdown, the numeric backend matrix,
   the session ceiling, the unit-test rules, determinism requirements, test-double
@@ -1021,18 +1023,45 @@ A **Training** is a named, long-lived **Training episode**: many different lette
 problems, each run over a number of seeds, spread across every core. It belongs to
 **Training Mode**, which the machine-learning layer drives. It is not the episodic runs of Review, which are Metacat Mode's recordings of dashboard
 runs and share Metacat Mode's Episodic Memory; a Training is a job Petacat runs by itself, with its own
-episode memory, and it lives in its own tables (`alembic/versions/017_trainings.py`, `server/models/training.py`).
+Episodic Memory, and it lives in its own tables (`server/models/training.py`).
 
-**Problems can be added while it runs.** Create a Training with 25 problems; whenever
-five have finished, add five more. A Training stays `open` until it is closed, and is
-finished once it is closed and its last problem finishes. Problems start roughly in
+**Problems can be added in any state.** Create a Training with 25 problems and start it;
+whenever five have finished, add five more. Problems start roughly in
 the order they arrive, so they finish steadily, but the order is not guaranteed and a
 client must not depend on it. Each run is the run the Run button would make with that
-seed: the same answer, the same codelet count.
+seed, started from the Training's Episodic Memory as of the run's `memory_version`.
 
-### Shared versus independent memory
+### The states
 
-- **`shared` (the default).** The Training is one Training episode with one episode memory
+A Training is **Stopped**, **Running** or **Paused**.
+
+- **Created Stopped.** `POST /api/trainings` stores it and its first problems and runs nothing.
+  `POST /api/trainings/{id}/start` loads it and runs it (`{"paused": true}` starts it Paused).
+- **Stopped is a record in the database.** Only Running and Paused Trainings are live in
+  the server process, and **after a server restart every Training is Stopped**. Starting
+  rebuilds the Episodic Memory from the stored merges and resumes each unfinished problem at
+  the seeds not yet stored.
+- **Stop** (`POST /api/trainings/{id}/stop`) writes every run and merge still held in memory and
+  drops the live part. Runs in flight are dropped and their seeds run again after the next
+  start. The row records `stopped_at`, `stopped_from` (`running` or `paused`) and
+  `stop_reason` (`user`, `shutdown` or `error`; a server shutdown records `shutdown`).
+- **Pause and resume** act on a live Training and answer 409 for a Stopped one.
+- **Cancel** (`POST /api/trainings/{id}/cancel`) is an action, not a state. It cancels every
+  queued and in-flight problem, keeps the finished runs and changes no state; problems can be
+  added afterwards. There are no `closed` or `cancelled` Trainings, and no `close` route.
+- **Inside Running** the summary's `activity` is `idle` (nothing left to run) or `stalled`
+  (it cannot run; `stalled_reason` says why) and is `null` while there is work. Problems are
+  accepted in every state.
+- **Delete** removes everything: the Episodic Memory, the problems and runs and, for a live
+  Training, its live state (settled first, with no Stop write). It leaves no tombstone.
+
+### The Episodic Memory
+
+Every Training has one; there is no setting for it. A request that sends `memory` (at the top
+level or in `settings`) is answered with 422. **No route clears it**: it goes only when the whole
+Training is deleted.
+
+- The Training is one Training episode with one Episodic Memory
   (the same kind of structure as Metacat's Episodic Memory, but the Training's own).
   - A run takes a **copy of the episode memory as it is when the run starts** and
     holds it static for its whole duration. What other runs add to the episode memory never reaches a run
@@ -1051,8 +1080,6 @@ seed: the same answer, the same codelet count.
   - **One worker reproduces Metacat's serial episode:** each run starts after the previous one
     merged. That is a reference for tests, not a link to Metacat Mode. With many workers it is
     the same idea with runs overlapping.
-- **`independent`.** Every run gets a fresh memory: the answer-distribution mode, with
-  no cross-run state.
 
 ### Settings and error policy
 
@@ -1060,7 +1087,6 @@ seed: the same answer, the same codelet count.
 
 | Setting | Default | Meaning |
 |---|---|---|
-| `memory` | `shared` | `shared` or `independent`, as above |
 | `seeds_per_problem` | 100 (1 to 100,000) | Seeds each problem runs; a problem may override |
 | `seed_start` | 1 | First seed |
 | `max_codelets` | 20,000 (1 to 200,000) | A run that reaches it gives up (`*CAP*`) |
@@ -1071,7 +1097,7 @@ seed: the same answer, the same codelet count.
 
 | Field | Default | Meaning |
 |---|---|---|
-| `on_run_error` | `record` | A run raised. `record` keeps the error as that run's outcome and carries on; `skip_problem` cancels the rest of that problem's seeds; `pause` pauses the Training; `cancel` cancels it |
+| `on_run_error` | `record` | A run raised. `record` keeps the error as that run's outcome and carries on; `skip_problem` cancels the rest of that problem's seeds; `pause` pauses the Training; `cancel` cancels every queued and in-flight problem (the state does not change) |
 | `max_errors_per_problem` | none | Reaching it cancels that problem |
 | `max_errors_total` | none | Reaching it pauses the Training |
 | `on_worker_failure` | `retry` | A worker process died (killed, out of memory). Its runs are resubmitted, which is exact because runs are deterministic. A broken pool takes every run in flight with it, so the affected runs are re-run one at a time, and only a run that breaks the pool on its own is charged a retry. `pause` pauses at once |
@@ -1086,13 +1112,13 @@ these keys alongside the answers.
 ### The database is written only at milestones
 
 The database is written when a Training is created or renamed, when problems are
-added, when its status or policy changes, and **when a problem finishes all its
+added, when its policy changes, when it is stopped, and **when a problem finishes all its
 seeds**. That last write is one transaction holding the problem's summary, every run
 committed since the last write (from any problem) and the memory merges since the last
 write, in `seq` order. Progress inside a problem lives in memory and is served from
-there; `running` is a live state that is never stored.
+there; Running and Paused are live states that are never stored.
 
-On restart the memory is rebuilt from the stored merges, problems resume at the seeds
+On start the memory is rebuilt from the stored merges, problems resume at the seeds
 they have not stored, and anything after the last milestone is redone. Runs are
 deterministic, so the redone work gives the identical result.
 
@@ -1116,14 +1142,14 @@ worker, and the speculative executor is not yet available to Trainings.
 | GET | `/api/trainings` | Trainings newest first, with the executor, limits and defaults |
 | POST | `/api/trainings` | Create one: `name`, optional `note`, `settings`, `policy` and `problems` |
 | GET / PATCH / DELETE | `/api/trainings/{id}` | Read, rename or change the policy (settings cannot change), delete |
-| POST | `/api/trainings/{id}/problems` | Add problems (409 once closed or cancelled) |
+| POST | `/api/trainings/{id}/problems` | Add problems, in any state |
 | GET | `/api/trainings/{id}/problems` | Search, sort and page the problems |
 | GET | `/api/trainings/{id}/problems/{pid}` | One problem with its full answer distribution |
 | GET | `/api/trainings/{id}/problems/{pid}/runs` | Its runs in seed order, with `seq` and `memory_version` |
 | POST | `/api/trainings/{id}/problems/{pid}/cancel` | Cancel one problem, keeping its finished runs |
 | GET | `/api/trainings/{id}/finished` | Problems finished after a cursor; `wait` (up to 60 s) long-polls |
-| GET | `/api/trainings/{id}/memory` | The episode memory (shared only), in the shape `GET /api/memory` uses |
-| POST | `/api/trainings/{id}/pause`, `/resume`, `/close`, `/cancel` | Lifecycle |
+| GET | `/api/trainings/{id}/memory` | The Training's Episodic Memory (read-only), in the shape `GET /api/memory` uses |
+| POST | `/api/trainings/{id}/start`, `/pause`, `/resume`, `/stop`, `/cancel` | The states, and the cancel action |
 | GET | `/api/trainings/{id}/export` | Download `problems`, `distribution` or `runs` as CSV or JSON |
 
 ### The Training view
@@ -1132,7 +1158,7 @@ The hamburger menu's **Training** entry (`#/training`, or `#/training/7` for one
 the view. The left column lists the Trainings with a line about the cores. The right
 shows the selected one: settings, error policy, totals and controls, a box to paste or
 upload problems with a preview, the table of problems (searched and sorted by the
-server) and, for shared memory, a Memory tab. Help topics start at
+server) and a Memory tab. Help topics start at
 [HELP.md](HELP.md)'s "Training".
 
 ### `scripts/training_client.py`: driving it from an ML layer
@@ -1147,7 +1173,7 @@ a total is reached:
     --initial 25 --add 5 --total 60 --seeds 10 --max-codelets 2000
 ```
 
-A live run of that workflow: **60 problems, 600 runs, shared memory, 17 workers, 5.5 s,
+A live run of that workflow: **60 problems, 600 runs, one Episodic Memory, 17 workers, 5.5 s,
 about 110 runs/s (167,000 codelets/s), 0 errors**; 154 runs hit the 2,000-codelet cap,
 and the episode memory ended at 154 answers and 5 snags.
 

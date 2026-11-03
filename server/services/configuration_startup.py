@@ -103,10 +103,10 @@ async def classify_database(session: AsyncSession) -> str:
     """``EMPTY`` or ``COMPLETE``; raises :class:`ConfigurationStartupError` otherwise."""
     from server.models import metadata as models
     from server.models.configuration_state import ConfigurationState, LOAD_STATE_READY
-    from server.services.standard_configuration import _derived_names
+    from server.services.config_registry import configuration_table_names
 
     populated: list[str] = []
-    for cls in _configuration_classes(models, _derived_names()):
+    for cls in _configuration_classes(models, set(configuration_table_names())):
         count = (await session.execute(select(func.count()).select_from(cls))).scalar_one()
         if count:
             populated.append(cls.__tablename__)
@@ -163,8 +163,8 @@ async def first_load(session: AsyncSession, seed_dir: str) -> None:
     )
     from server.services.standard_configuration import seed_metadata_from_json, standard_configuration_hash
 
-    # C6: route this load through the journal layer, as the global journal's first entry
-    # (source = standard_load), instead of writing the rows directly.
+    # The load goes through the journal layer as the global journal's first entry
+    # (source = standard_load), uncommitted, so it shares this transaction.
     await seed_metadata_from_json(session, seed_dir)
     session.add(
         ConfigurationState(

@@ -65,34 +65,6 @@ def test_every_trace_event_type_the_engine_emits_is_declared():
     assert not missing, f"event types missing from enums.json: {sorted(missing)}"
 
 
-class _RecordingSession:
-    """Enough of an ``AsyncSession`` to record what the seeder writes.
-
-    No database: the question is which tables the seeder *addresses*, and running it
-    against a recorder answers that without a Postgres and without the answer
-    depending on one being seeded a particular way.
-    """
-
-    def __init__(self):
-        self.written: set[str] = set()
-
-    def add(self, row) -> None:
-        self.written.add(type(row).__tablename__)
-
-    async def flush(self) -> None:
-        pass
-
-    async def execute(self, _statement):
-        class _Result:
-            def scalars(self):
-                return self
-
-            def all(self):
-                return []
-
-        return _Result()
-
-
 async def test_the_seeder_writes_every_configuration_table():
     """A configuration table that is never written is how a whole seed file goes missing.
 
@@ -105,16 +77,17 @@ async def test_the_seeder_writes_every_configuration_table():
 
     from server.services.standard_configuration import (
         configuration_table_names,
-        seed_metadata_from_json,
+        standard_load_ops,
     )
 
+    # The seeder hands its rows to the journal layer as ops (C6); the ops name the tables
+    # it addresses, so no database is needed to answer which ones.
     seed_dir = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
-    session = _RecordingSession()
-    await seed_metadata_from_json(session, seed_dir)
+    written = {op["table"] for op in standard_load_ops(seed_dir)}
 
     expected = set(configuration_table_names())
 
-    missing = expected - session.written
+    missing = expected - written
     assert not missing, (
         "the seeder owns these configuration tables but writes no row into them: "
         f"{sorted(missing)}"

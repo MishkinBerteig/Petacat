@@ -1,7 +1,9 @@
-"""SQLAlchemy models for Trainings: named, long-lived episodes of many problems over many seeds.
+"""SQLAlchemy models for Trainings (Training Mode Sessions): named, long-lived episodes of
+many problems over many seeds.
 
-A **Training** owns one episode: with ``memory = 'shared'`` a single Episodic Memory that
-each run copies when it starts and merges its additions into when it finishes.  It holds
+A **Training** owns one Training episode and so one Episodic Memory, which each run copies
+when it starts and merges its additions into when it finishes.  Every Training has one; it
+is never cleared and goes only when the whole Training is deleted.  A Training holds
 problems; a problem holds its per-seed runs; the memory merges are logged in order so the
 memory can be rebuilt exactly.
 
@@ -13,6 +15,11 @@ The database is written only at milestones (see ``server/services/training_servi
 a Training or its problems are created or changed, and **once when a problem finishes** --
 that problem's summary, every run committed since the last write from any problem, and the
 memory merges since the last write, in one transaction.  ``running`` is live-only.
+
+A Training row carries no live state.  Its state (Stopped, Running or Paused) is held by the
+service: a Training that is not live is **Stopped**, which is every Training after a server
+restart.  The row records only the last Stop (``stopped_at``, ``stopped_from``,
+``stop_reason``).
 
 The status columns are plain strings with CHECK constraints rather than foreign keys to
 enum tables: the enum tables are derived metadata that a re-seed rewrites, and these are
@@ -30,25 +37,23 @@ from sqlalchemy.dialects.postgresql import JSONB
 from server.models.metadata import Base
 from server.models.run import _utcnow
 
-TRAINING_STATUSES = ("open", "paused", "closed", "cancelled")
+STOPPED_FROM = ("running", "paused")
+STOP_REASONS = ("user", "shutdown", "error")
 PROBLEM_STATUSES = ("queued", "finished", "cancelled")
-MEMORY_MODES = ("shared", "independent")
 
 
 class Training(Base):
     __tablename__ = "trainings"
     __table_args__ = (
-        CheckConstraint("status IN ('open','paused','closed','cancelled')", name="ck_trainings_status"),
-        CheckConstraint("memory IN ('shared','independent')", name="ck_trainings_memory"),
+        CheckConstraint("stopped_from IN ('running','paused')", name="ck_trainings_stopped_from"),
+        CheckConstraint("stop_reason IN ('user','shutdown','error')", name="ck_trainings_stop_reason"),
     )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String(200), nullable=False)
     note = Column(Text, nullable=False, default="")
-    status = Column(String(16), nullable=False, default="open")
 
     # Settings: fixed at creation, because they shape what a run is.
-    memory = Column(String(16), nullable=False, default="shared")
     seeds_per_problem = Column(Integer, nullable=False, default=100)
     seed_start = Column(Integer, nullable=False, default=1)
     max_codelets = Column(Integer, nullable=False, default=20000)
@@ -65,7 +70,10 @@ class Training(Base):
     last_event = Column(Text, nullable=True)
     created_at = Column(DateTime, nullable=False, default=_utcnow)
     updated_at = Column(DateTime, nullable=False, default=_utcnow, onupdate=_utcnow)
-    closed_at = Column(DateTime, nullable=True)
+    #: The last Stop: when, from which live state, and why.  Null for a Training never stopped.
+    stopped_at = Column(DateTime, nullable=True)
+    stopped_from = Column(String(16), nullable=True)
+    stop_reason = Column(String(16), nullable=True)
 
 
 class TrainingProblem(Base):
@@ -141,13 +149,13 @@ class TrainingRun(Base):
     error = Column(Text, nullable=True)
     config_hash = Column(String(64), nullable=False, default="")
     attempts = Column(Integer, nullable=False, default=1)
-    #: Merge order in the episode (shared memory); null for independent runs.
-    seq = Column(Integer, nullable=True)
-    #: The memory version the run started with (shared memory).
-    memory_version = Column(Integer, nullable=True)
+    #: Merge order in the Training episode.
+    seq = Column(Integer, nullable=False)
+    #: The Episodic Memory version the run started with.
+    memory_version = Column(Integer, nullable=False)
     #: What the merge actually added to the episode after the presence checks.
-    added_answers = Column(Integer, nullable=True)
-    added_snags = Column(Integer, nullable=True)
+    added_answers = Column(Integer, nullable=False)
+    added_snags = Column(Integer, nullable=False)
 
 
 class TrainingMemoryMerge(Base):

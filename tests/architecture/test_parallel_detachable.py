@@ -172,16 +172,15 @@ async def service():
     await svc.start()
     try:
         made = await svc.create_training(
-            name="detached", settings={"memory": "independent", "seeds_per_problem": 2,
-                                       "max_codelets": 300, "backend": "off"},
+            name="detached", settings={"seeds_per_problem": 2, "max_codelets": 300, "backend": "off"},
             problems=[{"initial": i, "modified": m, "target": t} for (i, m, t) in problems])
         tid = made["training"]["id"]
-        await svc.close(tid)
+        await svc.start_training(tid)
         for _ in range(600):
-            if (await svc.summary(tid))["state"] == "finished":
+            if (await svc.summary(tid))["activity"] == "idle":
                 break
             await asyncio.sleep(0.2)
-        assert (await svc.summary(tid))["state"] == "finished"
+        assert (await svc.summary(tid))["activity"] == "idle"
         assert svc.executor_info()["kind"] == "serial"
         for pid, (_, _, t) in zip(made["problem_ids"], problems):
             for r in await svc.problem_runs(tid, pid):
@@ -201,6 +200,10 @@ print("RESULT", json.dumps(out))
     assert completed.returncode == 0, completed.stderr[-3000:]
     out = json.loads(completed.stdout.split("RESULT ", 1)[1])
     assert any(k.startswith("exec/") for k in out)
+    # The Training's runs share one Episodic Memory (a run after the first starts from what the
+    # earlier ones left), so only the executor's memory-free runs have a plugin reference.
+    assert any(k.startswith("svc/") for k in out)
+    out = {k: v for k, v in out.items() if k.startswith("exec/")}
 
     # The plugin's in-process reference (a fresh interpreter, plugin present) gives the
     # same runs, run for run.

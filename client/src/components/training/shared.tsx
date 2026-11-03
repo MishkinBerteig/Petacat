@@ -5,7 +5,7 @@
 import { useEffect, useRef } from 'react';
 import { useHelp } from '@/hooks/useHelp';
 import type { ComponentHelpKey } from '@/constants/helpTopics';
-import type { TrainingState } from '@/types';
+import type { TrainingActivity, TrainingState } from '@/types';
 
 /** A small "?" that opens the control's own help topic. */
 export function ControlHelp({ topic, label }: { topic: ComponentHelpKey; label: string }) {
@@ -130,16 +130,17 @@ export function outcomeLabel(key: string): string {
 // Badge and progress bar
 // ---------------------------------------------------------------------------
 
-const STATE_COLOUR: Record<TrainingState, string> = {
+const STATE_COLOUR: Record<string, string> = {
+  stopped: 'var(--text-secondary)',
   running: 'var(--text-accent)',
   idle: 'var(--text-secondary)',
   paused: 'var(--warning)',
-  finished: 'var(--success)',
-  cancelled: 'var(--error)',
   stalled: 'var(--error)',
 };
 
-export function StateBadge({ state }: { state: TrainingState }) {
+/** The Training's state (stopped, running, paused); inside Running its activity (idle or stalled) when it has one. */
+export function StateBadge({ state, activity }: { state: TrainingState; activity: TrainingActivity }) {
+  const label = state === 'running' && activity ? activity : state;
   return (
     <span
       data-testid="state-badge"
@@ -150,11 +151,11 @@ export function StateBadge({ state }: { state: TrainingState }) {
         letterSpacing: 0.5,
         padding: '1px 6px',
         borderRadius: 3,
-        border: `1px solid ${STATE_COLOUR[state]}`,
-        color: STATE_COLOUR[state],
+        border: `1px solid ${STATE_COLOUR[label]}`,
+        color: STATE_COLOUR[label],
       }}
     >
-      {state}
+      {label}
     </span>
   );
 }

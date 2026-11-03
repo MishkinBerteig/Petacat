@@ -4,10 +4,11 @@
 //
 // What these defend: the list shows each training's progress and the executor line; a
 // new training is created from the parsed problems and a long list is split to the
-// server's per-request limit; problems can be added only while the training accepts
-// them; the table filters by status and expands a row into its distribution; the
-// controls call the right routes and show the server's complaint; polling stops when
-// the view goes away.
+// server's per-request limit; problems can be added in every state; every Training has
+// an Episodic Memory and no control for its mode; the table filters by status and expands
+// a row into its distribution; the controls (start, pause, resume, stop, cancel, delete)
+// call the right routes and show the server's complaint; polling stops when the view
+// goes away.
 // ---------------------------------------------------------------------------
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
@@ -21,7 +22,6 @@ import {
   trainingExportUrl,
   cancelTraining,
   cancelTrainingProblem,
-  closeTraining,
   createTraining,
   deleteTraining,
   getTraining,
@@ -35,6 +35,8 @@ import {
   listTrainings,
   pauseTraining,
   resumeTraining,
+  startTraining,
+  stopTraining,
 } from '@/api/client'
 import type {
   TrainingErrorPolicy,
@@ -55,7 +57,8 @@ vi.mock('@/api/client', async (importOriginal) => ({
   cancelTrainingProblem: vi.fn(),
   pauseTraining: vi.fn(),
   resumeTraining: vi.fn(),
-  closeTraining: vi.fn(),
+  startTraining: vi.fn(),
+  stopTraining: vi.fn(),
   cancelTraining: vi.fn(),
   deleteTraining: vi.fn(),
   getDemos: vi.fn(),
@@ -83,11 +86,10 @@ function training(over: Partial<TrainingSummary> = {}): TrainingSummary {
     id: 1,
     name: 'Pilot',
     note: '',
-    status: 'open',
     state: 'running',
+    activity: null,
     stalled_reason: null,
     settings: {
-      memory: 'shared',
       seeds_per_problem: 100,
       seed_start: 1,
       max_codelets: 20000,
@@ -101,7 +103,9 @@ function training(over: Partial<TrainingSummary> = {}): TrainingSummary {
     config_hash: 'abcdef012345',
     created_at: '2026-10-30T10:00:00',
     updated_at: '2026-10-30T10:05:00',
-    closed_at: null,
+    stopped_at: null,
+    stopped_from: null,
+    stop_reason: null,
     problems: { total: 4, queued: 1, running: 1, finished: 2, cancelled: 0 },
     runs: { total: 400, done: 250, errors: 2, capped: 5, retries: 1 },
     codelets: 1_234_567,
@@ -162,8 +166,8 @@ const LIST: TrainingListResponse = {
     training({
       id: 2,
       name: 'Done one',
-      status: 'closed',
-      state: 'finished',
+      state: 'running',
+      activity: 'idle',
       problems: { total: 2, queued: 0, running: 0, finished: 2, cancelled: 0 },
       runs: { total: 200, done: 200, errors: 0, capped: 0, retries: 0 },
     }),
@@ -171,7 +175,7 @@ const LIST: TrainingListResponse = {
   executor: { kind: 'swarm', workers: 17, in_flight: 34, queued_runs: 12000 },
   limits: { max_problems_per_request: 1000, max_seeds_per_problem: 10000, max_codelets: 200000 },
   defaults: {
-    settings: { memory: 'shared', seeds_per_problem: 100, seed_start: 1, max_codelets: 20000, parameters: null, backend: 'off' },
+    settings: { seeds_per_problem: 100, seed_start: 1, max_codelets: 20000, parameters: null, backend: 'off' },
     policy: POLICY,
   },
 }
@@ -186,7 +190,8 @@ const m = {
   cancelTrainingProblem: vi.mocked(cancelTrainingProblem),
   pauseTraining: vi.mocked(pauseTraining),
   resumeTraining: vi.mocked(resumeTraining),
-  closeTraining: vi.mocked(closeTraining),
+  startTraining: vi.mocked(startTraining),
+  stopTraining: vi.mocked(stopTraining),
   cancelTraining: vi.mocked(cancelTraining),
   deleteTraining: vi.mocked(deleteTraining),
   getDemos: vi.mocked(getDemos),
@@ -235,7 +240,7 @@ describe('TrainingPanel: the list', () => {
     expect(within(items[0]).getByText('running')).toBeInTheDocument()
     expect(items[0]).toHaveTextContent('2/4 problems')
     expect(items[0]).toHaveTextContent('250/400 runs')
-    expect(within(items[1]).getByText('finished')).toBeInTheDocument()
+    expect(within(items[1]).getByText('idle')).toBeInTheDocument()
     expect(within(items[0]).getByRole('progressbar')).toHaveAttribute('aria-valuenow', '250')
   })
 
@@ -312,7 +317,7 @@ describe('TrainingPanel: creating a training', () => {
     await waitFor(() => expect(m.createTraining).toHaveBeenCalledTimes(1))
     expect(m.createTraining).toHaveBeenCalledWith({
       name: 'Fresh',
-      settings: { memory: 'shared', seeds_per_problem: 50, seed_start: 1, max_codelets: 20000 },
+      settings: { seeds_per_problem: 50, seed_start: 1, max_codelets: 20000 },
       policy: POLICY,
       problems: [
         { initial: 'abc', modified: 'abd', target: 'xyz', answer: null },
@@ -436,8 +441,8 @@ describe('TrainingPanel: the training detail', () => {
     )
   })
 
-  it('pauses an open training and resumes a paused one', async () => {
-    m.pauseTraining.mockResolvedValue(training({ status: 'paused', state: 'paused' }))
+  it('pauses a running training and resumes a paused one', async () => {
+    m.pauseTraining.mockResolvedValue(training({ state: 'paused' }))
     m.resumeTraining.mockResolvedValue(training())
     await open()
     fireEvent.click(screen.getByRole('button', { name: 'Pause' }))
@@ -448,25 +453,33 @@ describe('TrainingPanel: the training detail', () => {
     expect(await screen.findByRole('button', { name: 'Pause' })).toBeInTheDocument()
   })
 
-  it('closes with a tooltip that says what it means', async () => {
-    m.closeTraining.mockResolvedValue(training({ status: 'closed' }))
-    await open()
-    const close = screen.getByRole('button', { name: 'Close' })
-    expect(close).toHaveAttribute('title', 'Accept no more problems')
-    fireEvent.click(close)
-    await waitFor(() => expect(m.closeTraining).toHaveBeenCalledWith(1))
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Close' })).toBeDisabled())
+  it('starts a stopped training and stops a live one, with no Close control', async () => {
+    m.startTraining.mockResolvedValue(training())
+    m.stopTraining.mockResolvedValue(
+      training({ state: 'stopped', stopped_at: '2026-10-30T11:00:00', stopped_from: 'running', stop_reason: 'user' }),
+    )
+    await open({ state: 'stopped' })
+    expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Stop' })).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: 'Start' }))
+    await waitFor(() => expect(m.startTraining).toHaveBeenCalledWith(1))
+    const stop = await screen.findByRole('button', { name: 'Stop' })
+    await waitFor(() => expect(stop).toBeEnabled())
+    fireEvent.click(stop)
+    await waitFor(() => expect(m.stopTraining).toHaveBeenCalledWith(1))
+    expect(await screen.findByTestId('stopped-line')).toHaveTextContent('from running (user)')
+    expect(await screen.findByRole('button', { name: 'Start' })).toBeInTheDocument()
   })
 
   it('shows the server complaint when a control fails', async () => {
-    m.pauseTraining.mockRejectedValue(apiError(409, 'training is cancelled'))
+    m.pauseTraining.mockRejectedValue(apiError(409, 'training 1 is stopped; start it before you pause it'))
     await open()
     fireEvent.click(screen.getByRole('button', { name: 'Pause' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent('training is cancelled')
+    expect(await screen.findByRole('alert')).toHaveTextContent('start it before you pause it')
   })
 
-  it('cancels only after confirmation', async () => {
-    m.cancelTraining.mockResolvedValue(training({ status: 'cancelled', state: 'cancelled' }))
+  it('cancels only after confirmation, and cancel leaves the state alone', async () => {
+    m.cancelTraining.mockResolvedValue(training())
     const confirm = vi.spyOn(window, 'confirm')
     await open()
     confirm.mockReturnValueOnce(false)
@@ -488,7 +501,8 @@ describe('TrainingPanel: the training detail', () => {
   })
 
   it('shows why a training is stalled', async () => {
-    await open({ state: 'stalled', stalled_reason: 'the engine configuration changed' })
+    await open({ activity: 'stalled', stalled_reason: 'the engine configuration changed' })
+    expect(screen.getAllByText('stalled').length).toBeGreaterThan(0)
     expect(screen.getByText(/Stalled: the engine configuration changed/)).toBeInTheDocument()
   })
 })
@@ -510,29 +524,25 @@ describe('TrainingPanel: adding problems', () => {
     expect(await within(box).findByText('Added 2 problems.')).toBeInTheDocument()
   })
 
-  it('is disabled when the training is closed', async () => {
-    m.getTraining.mockResolvedValue(training({ status: 'closed' }))
-    render(<TrainingPanel initialTrainingId={1} />)
-    const box = await screen.findByTestId('add-problems')
-    expect(within(box).getByText(/accepts no more problems/)).toBeInTheDocument()
-    expect(within(box).getByLabelText('Problems')).toBeDisabled()
-    expect(within(box).getByRole('button', { name: /^Add \d/ })).toBeDisabled()
+  it('is enabled in every state: stopped, running and paused', async () => {
+    for (const over of [{ state: 'stopped' as const }, { state: 'paused' as const }, {}]) {
+      m.getTraining.mockResolvedValue(training(over))
+      const { unmount } = render(<TrainingPanel initialTrainingId={1} />)
+      const box = await screen.findByTestId('add-problems')
+      expect(within(box).getByLabelText('Problems')).toBeEnabled()
+      if (over.state === 'stopped') expect(within(box).getByText(/stored now and run when it is started/)).toBeInTheDocument()
+      else expect(within(box).queryByText(/stored now and run when it is started/)).not.toBeInTheDocument()
+      unmount()
+    }
   })
 
-  it('is enabled while paused', async () => {
-    m.getTraining.mockResolvedValue(training({ status: 'paused', state: 'paused' }))
-    render(<TrainingPanel initialTrainingId={1} />)
-    const box = await screen.findByTestId('add-problems')
-    expect(within(box).getByLabelText('Problems')).toBeEnabled()
-  })
-
-  it('shows the server complaint, such as a 409 from a closed training', async () => {
-    m.addTrainingProblems.mockRejectedValue(apiError(409, 'training is closed'))
+  it('shows the server complaint, such as a 422 from the server', async () => {
+    m.addTrainingProblems.mockRejectedValue(apiError(422, 'seeds must be 1..100000'))
     render(<TrainingPanel initialTrainingId={1} />)
     const box = await screen.findByTestId('add-problems')
     user.type(within(box).getByLabelText('Problems'), 'abc abd xyz')
     fireEvent.click(within(box).getByRole('button', { name: 'Add 1 problems' }))
-    expect(await within(box).findByRole('alert')).toHaveTextContent('training is closed')
+    expect(await within(box).findByRole('alert')).toHaveTextContent('seeds must be 1..100000')
   })
 })
 
@@ -561,7 +571,7 @@ describe('TrainingPanel: the problems table', () => {
   })
 
   it('shows "Add problems to start" for an empty training', async () => {
-    await open({ problems: { total: 0, queued: 0, running: 0, finished: 0, cancelled: 0 }, state: 'idle' })
+    await open({ problems: { total: 0, queued: 0, running: 0, finished: 0, cancelled: 0 }, activity: 'idle' })
     expect(screen.getByText('Add problems to start.')).toBeInTheDocument()
   })
 
@@ -695,7 +705,7 @@ describe('TrainingPanel: polling', () => {
 
   it('slows to 5 s when the training is not running', async () => {
     vi.useFakeTimers()
-    m.getTraining.mockResolvedValue(training({ status: 'closed', state: 'finished' }))
+    m.getTraining.mockResolvedValue(training({ activity: 'idle' }))
     render(<TrainingPanel initialTrainingId={1} />)
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0)
@@ -743,9 +753,10 @@ describe('TrainingPanel: v2 features', () => {
   it('shows the settings read-only, the memory counts and the extra run counts', async () => {
     await open()
     expect(screen.getByTestId('training-settings-line')).toHaveTextContent(
-      'shared memory · backend off · 100 seeds per problem from 1 · max codelets per run 20,000',
+      'backend off · 100 seeds per problem from 1 · max codelets per run 20,000',
     )
     expect(screen.getByTestId('training-memory-line')).toHaveTextContent('12 answers, 3 snags, version 9')
+    expect(screen.getByTestId('training-memory-line')).toHaveTextContent('never cleared')
     const runs = screen.getByTestId('training-runs-line')
     expect(runs).toHaveTextContent('2 errors')
     expect(runs).toHaveTextContent('5 gave up at max codelets')
@@ -829,14 +840,11 @@ describe('TrainingPanel: v2 features', () => {
     expect(screen.getByTestId('memory-tab')).toHaveTextContent('Version 9')
   })
 
-  it('has no Memory tab for independent runs', async () => {
-    await open({
-      settings: { ...training().settings, memory: 'independent' },
-      memory: null,
-      memory_version: null,
-    })
-    expect(screen.queryByRole('tab', { name: 'Memory' })).not.toBeInTheDocument()
-    expect(screen.getByTestId('training-memory-line')).toHaveTextContent('independent')
+  it('always has a Memory tab, even for a stopped training', async () => {
+    await open({ state: 'stopped', memory: { answers: 0, snags: 0 }, memory_version: 0 })
+    expect(screen.getByRole('tab', { name: 'Memory' })).toBeInTheDocument()
+    expect(screen.getByTestId('training-memory-line')).toHaveTextContent('0 answers, 0 snags, version 0')
+    expect(screen.getByTestId('training-settings-line')).not.toHaveTextContent(/independent|shared/)
   })
 
   it('labels the non-answer outcomes in plain words', async () => {
@@ -910,7 +918,7 @@ describe('TrainingPanel: v2 features', () => {
           error: 'ValueError: boom',
           config_hash: 'h',
           attempts: 2,
-          memory_added: null,
+          memory_added: { answers: 0, snags: 0 },
         },
       ],
     })
@@ -932,7 +940,7 @@ describe('TrainingPanel: v2 features', () => {
   it('pages a long runs list', async () => {
     const mk = (seed: number) => ({
       seq: seed, memory_version: seed, seed, status: 'answer_found', key: 'a', answer: 'a', answers: ['a'],
-      codelets: 10, seconds: 0.1, temperature: 1, answer_quality: 1, error: null, config_hash: 'h', attempts: 1, memory_added: null,
+      codelets: 10, seconds: 0.1, temperature: 1, answer_quality: 1, error: null, config_hash: 'h', attempts: 1, memory_added: { answers: 0, snags: 0 },
     })
     m.getTrainingProblemRuns.mockResolvedValue({ runs: Array.from({ length: 60 }, (_, i) => mk(i + 1)) })
     await open()
@@ -959,14 +967,12 @@ describe('TrainingPanel: the new-training form (v2)', () => {
     expect(screen.getByRole('button', { name: 'Create training' })).toBeEnabled()
   })
 
-  it('offers shared memory by default, with a help line for each mode', async () => {
+  it('has no memory control: every Training has an Episodic Memory', async () => {
     await openForm()
-    const select = screen.getByLabelText('Memory') as HTMLSelectElement
-    expect(select.value).toBe('shared')
-    expect(screen.getByRole('option', { name: 'Shared (one episode)' })).toBeInTheDocument()
-    expect(screen.getByTestId('memory-help-line')).toHaveTextContent(/copies the Training's episode memory when it starts/)
-    fireEvent.change(select, { target: { value: 'independent' } })
-    expect(screen.getByTestId('memory-help-line')).toHaveTextContent(/empty memory/)
+    expect(screen.queryByLabelText('Memory')).not.toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: /Independent/ })).not.toBeInTheDocument()
+    expect(screen.getByTestId('memory-help-line')).toHaveTextContent(/own Episodic Memory, never cleared/)
+    expect(screen.getByTestId('memory-help-line')).toHaveTextContent(/A new Training is stopped/)
   })
 
   it('takes the error policy defaults from the server', async () => {
@@ -981,11 +987,10 @@ describe('TrainingPanel: the new-training form (v2)', () => {
     expect((screen.getByLabelText('When a run raises an error') as HTMLSelectElement).value).toBe('record')
   })
 
-  it('sends the chosen memory, max codelets, backend and policy', async () => {
+  it('sends the max codelets, backend and policy, and no memory setting', async () => {
     m.createTraining.mockResolvedValue({ training: training({ id: 8 }), added: 1, problem_ids: [1] })
     await openForm()
     user.type(screen.getByLabelText('Name (required)'), 'Ep')
-    fireEvent.change(screen.getByLabelText('Memory'), { target: { value: 'independent' } })
     user.type(screen.getByLabelText('Max codelets per run'), '5000')
     await screen.findByRole('option', { name: 'numpy' })
     fireEvent.change(screen.getByLabelText('Backend (advanced)'), { target: { value: 'numpy' } })
@@ -997,7 +1002,6 @@ describe('TrainingPanel: the new-training form (v2)', () => {
     await waitFor(() => expect(m.createTraining).toHaveBeenCalled())
     const req = m.createTraining.mock.calls[0][0]
     expect(req.settings).toEqual({
-      memory: 'independent',
       seeds_per_problem: 100,
       seed_start: 1,
       max_codelets: 5000,

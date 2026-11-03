@@ -12,32 +12,43 @@ parallel plugin's process pool, or the single child process used when the plugin
 detached) cannot change its outcome.  The engine is untouched; each run builds its own
 Workspace as any run does.
 
-The episode memory
-------------------
-With ``memory = 'shared'`` a Training owns one :class:`EpisodicMemory`
-(``training_memory.py``).  A run starts from a copy of it at the version current when the
+The Episodic Memory
+-------------------
+Every Training owns one :class:`EpisodicMemory` (``training_memory.py``), never cleared and
+gone only when the Training is deleted.  A run starts from a copy of it at the version current when the
 run is dispatched and keeps that copy static; when the run finishes, its additions are
 merged into the master (presence-checked), bumping the version.  A run records the
 ``memory_version`` it started with and its merge order ``seq``.  Only runs dispatched after
-a merge see it.  Dispatch keeps at most one run per worker in flight in shared mode, so
+a merge see it.  Dispatch keeps at most one run per worker in flight, so
 with one worker each run starts after the previous one merged: Metacat's serial episode.
-``memory = 'independent'`` gives every run a fresh memory.
+
+States
+------
+A Training is **Stopped**, **Running** or **Paused**.  Only Running and Paused Trainings are
+live (held in ``TrainingService._live``); a Stopped one is a record in the database, and every
+Training is Stopped after a server restart.  ``start`` loads a Stopped Training (its memory
+rebuilt from the stored merges, its unfinished problems resumed at the seeds not stored);
+``stop`` writes what is still pending and drops the live part, recording ``stopped_from``
+(``running`` or ``paused``) and ``stop_reason`` (``user``, ``shutdown`` or ``error``).
+``cancel`` is an action, not a state: it cancels every queued and in-flight problem and
+changes no state.  Inside Running the activity is derived: ``idle`` (nothing unfinished) or
+``stalled`` (it cannot run: ``stalled_reason``).
 
 The database is written only at milestones
 ------------------------------------------
-* a Training is created or renamed, problems are added, its status or policy changes;
+* a Training is created or renamed, problems are added, its policy changes, it is stopped;
 * **a problem finishes all its seeds (or is cancelled)**: in one transaction, that problem's
   summary, *every run committed since the last write from any problem*, and the memory
   merges since the last write.
 
 Progress inside a problem lives in memory and the API reports it from there.  The stored
-problem status is ``queued | finished | cancelled``; ``running`` is live-only.  On startup
+problem status is ``queued | finished | cancelled``; ``running`` is live-only.  On start
 the memory is rebuilt from the stored merges, each queued problem resumes at the seeds it
 has not stored, and anything after the last milestone is redone.
 
 The scheduler
 -------------
-One asyncio task keeps the executor fed from the problems of every active Training: seeds
+One asyncio task keeps the executor fed from the problems of every live Training: seeds
 of problems already started first (so they finish steadily), then the oldest queued
 problem, round-robin across Trainings so a huge one cannot starve a small one.  Inserting
 a problem wakes it.
@@ -66,7 +77,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, AsyncIterator, Callable
 
-from sqlalchemy import delete, func, insert, select, update
+from sqlalchemy import case, delete, func, insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from server.engine.hashing import config_hash
@@ -112,7 +123,7 @@ _POLICY_CHOICES = {
     "on_worker_failure": ("retry", "pause"),
     "on_config_change": ("pause", "adopt"),
 }
-_SETTINGS_KEYS = ("memory", "seeds_per_problem", "seed_start", "max_codelets", "parameters", "backend")
+_SETTINGS_KEYS = ("seeds_per_problem", "seed_start", "max_codelets", "parameters", "backend")
 
 
 class _Skip(Exception):
@@ -182,10 +193,10 @@ class RunRec:
     error: str | None
     config_hash: str
     attempts: int = 1
-    seq: int | None = None
-    memory_version: int | None = None
-    added_answers: int | None = None
-    added_snags: int | None = None
+    seq: int = 0
+    memory_version: int = 0
+    added_answers: int = 0
+    added_snags: int = 0
     problem_id: int = 0
 
 
@@ -281,7 +292,7 @@ class Sub:
     lt: "LiveTraining"
     lp: LiveProblem
     seed: int
-    version: int | None
+    version: int
     config_hash: str
     failures: int
     #: Re-run alone after a pool break (see ``_worker_failed``).
@@ -291,8 +302,8 @@ class Sub:
 @dataclass
 class LiveTraining:
     id: int
+    #: ``running`` or ``paused``; a Training that is not live is Stopped.
     status: str
-    memory_mode: str
     seeds_per_problem: int
     seed_start: int
     max_codelets: int
@@ -301,7 +312,6 @@ class LiveTraining:
     policy: dict
     config_hash: str
     meta: MetadataProvider | None
-    closed: bool = False
     stalled_reason: str | None = None
     last_event: str | None = None
     queue: deque = field(default_factory=deque)        # LiveProblem not yet started
@@ -311,8 +321,8 @@ class LiveTraining:
     completions: deque = field(default_factory=deque)
     cancelled: bool = False
     errors_total: int = 0
-    # -- the episode memory (shared mode) --
-    memory: EpisodicMemory | None = None
+    # -- the Episodic Memory --
+    memory: EpisodicMemory = field(default_factory=EpisodicMemory)
     version: int = 0
     epoch: str = field(default_factory=lambda: uuid.uuid4().hex)
     merge_blobs: dict = field(default_factory=dict)    # seq -> pickled Additions
@@ -322,14 +332,10 @@ class LiveTraining:
     want_snapshot: set = field(default_factory=set)    # (pid, seed) whose worker needs one
 
     @property
-    def shared(self) -> bool:
-        return self.memory_mode == "shared"
-
-    @property
     def schedulable(self) -> bool:
         return (
             self.meta is not None and not self.cancelled and self.stalled_reason is None
-            and self.status in ("open", "closed")
+            and self.status == "running"
         )
 
     def next_problem(self) -> LiveProblem | None:
@@ -420,20 +426,20 @@ class TrainingService:
         return self._executor
 
     async def start(self) -> None:
-        """Load the live Trainings and start the scheduler."""
+        """Start the scheduler.  Every Training is Stopped: nothing is loaded until it is started."""
         self._loop = asyncio.get_running_loop()
         self._wake = asyncio.Event()
         self._write_lock = asyncio.Lock()
         if self._executor is None:
             self._executor = create_executor()
         self._stopped = False
-        await self._load()
         self._task = asyncio.create_task(self._run(), name="training-scheduler")
         self._wake.set()
 
     async def stop(self) -> None:
         """Stop scheduling.  Progress after the last milestone is dropped; unfinished
-        problems resume from their stored seeds on the next start."""
+        problems resume from their stored seeds when the Training is next started.  Each live
+        Training is recorded as stopped by the shutdown, from its state."""
         self._stopped = True
         tasks = [t for t in [self._task, *self._tasks] if t is not None]
         for t in tasks:
@@ -445,6 +451,9 @@ class TrainingService:
                 pass
         self._task = None
         self._tasks.clear()
+        for lt in list(self._live.values()):
+            await self._persist(lt, stopped_at=_utcnow(), stopped_from=lt.status,
+                                stop_reason="shutdown")
         self._live.clear()
         if self._executor is not None:
             self._executor.close()
@@ -456,16 +465,13 @@ class TrainingService:
         return cached[1]
 
     def _new_live(self, t: Training, meta: MetadataProvider | None) -> LiveTraining:
-        lt = LiveTraining(
-            id=t.id, status=t.status, memory_mode=t.memory,
+        return LiveTraining(
+            id=t.id, status="running",
             seeds_per_problem=t.seeds_per_problem, seed_start=t.seed_start,
             max_codelets=t.max_codelets, parameters=t.parameters, backend=t.backend,
             policy=normalize_policy(t.policy), config_hash=t.config_hash, meta=meta,
-            closed=t.closed_at is not None, last_event=t.last_event,
+            last_event=t.last_event,
         )
-        if lt.shared:
-            lt.memory = EpisodicMemory()
-        return lt
 
     def _enqueue(self, lt: LiveTraining, p: Any, stored: dict[int, RunRec] | None = None) -> LiveProblem:
         lp = LiveProblem(
@@ -482,57 +488,49 @@ class TrainingService:
         lt.unsubmitted += len(lp.todo)
         return lp
 
-    async def _load(self) -> None:
-        resumed: list[tuple[LiveTraining, LiveProblem]] = []
-        async with self._factory() as s:
-            trainings = (await s.execute(
-                select(Training).where(Training.status != "cancelled").order_by(Training.id)
+    async def _load_one(self, s: AsyncSession, t: Training) -> tuple[LiveTraining, list[LiveProblem]]:
+        """Build the live part of a Stopped Training from the database: its Episodic Memory
+        rebuilt from the stored merges and its unfinished problems at the seeds not stored.
+        Returns it with the problems whose every seed was stored but whose own write was not."""
+        resumed: list[LiveProblem] = []
+        lt = self._new_live(t, None)
+        merges = (await s.execute(
+            select(TrainingMemoryMerge).where(TrainingMemoryMerge.training_id == t.id)
+            .order_by(TrainingMemoryMerge.seq)
+        )).scalars().all()
+        for m in merges:
+            adds = tm.decode_additions(m.answers, m.snags)
+            tm.apply_merge(lt.memory, adds)
+            lt.version = m.seq
+            lt.merge_blobs[m.seq] = tm.dump_additions(adds)
+        if lt.version != len(merges):
+            logger.warning("training %d: merge log has gaps (%d merges, version %d)",
+                           t.id, len(merges), lt.version)
+        for k in sorted(lt.merge_blobs)[:-MERGE_KEEP]:
+            del lt.merge_blobs[k]
+        problems = (await s.execute(
+            select(TrainingProblem).where(
+                TrainingProblem.training_id == t.id, TrainingProblem.status == "queued"
+            ).order_by(TrainingProblem.id)
+        )).scalars().all()
+        stored: dict[int, dict[int, RunRec]] = {}
+        if problems:
+            runs = (await s.execute(
+                select(TrainingRun).join(TrainingProblem, TrainingProblem.id == TrainingRun.problem_id)
+                .where(TrainingRun.training_id == t.id, TrainingProblem.status == "queued")
             )).scalars().all()
-            for t in trainings:
-                lt = self._new_live(t, None)
-                if lt.shared:
-                    merges = (await s.execute(
-                        select(TrainingMemoryMerge).where(TrainingMemoryMerge.training_id == t.id)
-                        .order_by(TrainingMemoryMerge.seq)
-                    )).scalars().all()
-                    for m in merges:
-                        adds = tm.decode_additions(m.answers, m.snags)
-                        tm.apply_merge(lt.memory, adds)
-                        lt.version = m.seq
-                        lt.merge_blobs[m.seq] = tm.dump_additions(adds)
-                    if lt.version != len(merges):
-                        logger.warning("training %d: merge log has gaps (%d merges, version %d)",
-                                       t.id, len(merges), lt.version)
-                    for k in sorted(lt.merge_blobs)[:-MERGE_KEEP]:
-                        del lt.merge_blobs[k]
-                problems = (await s.execute(
-                    select(TrainingProblem).where(
-                        TrainingProblem.training_id == t.id, TrainingProblem.status == "queued"
-                    ).order_by(TrainingProblem.id)
-                )).scalars().all()
-                stored: dict[int, dict[int, RunRec]] = {}
-                if problems:
-                    runs = (await s.execute(
-                        select(TrainingRun).join(TrainingProblem, TrainingProblem.id == TrainingRun.problem_id)
-                        .where(TrainingRun.training_id == t.id, TrainingProblem.status == "queued")
-                    )).scalars().all()
-                    for r in runs:
-                        stored.setdefault(r.problem_id, {})[r.seed] = self._rec_from_row(r)
-                for p in problems:
-                    lp = self._enqueue(lt, p, stored.get(p.id))
-                    lt.errors_total += sum(1 for r in lp.outcomes.values() if r.error)
-                    if not lp.todo and lp.inflight == 0:
-                        resumed.append((lt, lp))
-                lt.errors_total += int((await s.execute(
-                    select(func.coalesce(func.sum(TrainingProblem.errors), 0)).where(
-                        TrainingProblem.training_id == t.id, TrainingProblem.status != "queued")
-                )).scalar_one())
-                self._live[t.id] = lt
-        self._check_configs(initial=True)
-        for lt, lp in resumed:  # every seed was stored but the problem's own write was not
-            lt.active[lp.id] = lp
-            lp.started_at = lp.started_at or _utcnow()
-            self._begin_finish(lt, lp)
+            for r in runs:
+                stored.setdefault(r.problem_id, {})[r.seed] = self._rec_from_row(r)
+        for p in problems:
+            lp = self._enqueue(lt, p, stored.get(p.id))
+            lt.errors_total += sum(1 for r in lp.outcomes.values() if r.error)
+            if not lp.todo and lp.inflight == 0:
+                resumed.append(lp)
+        lt.errors_total += int((await s.execute(
+            select(func.coalesce(func.sum(TrainingProblem.errors), 0)).where(
+                TrainingProblem.training_id == t.id, TrainingProblem.status != "queued")
+        )).scalar_one())
+        return lt, resumed
 
     @staticmethod
     def _rec_from_row(r: Any) -> RunRec:
@@ -594,11 +592,11 @@ class TrainingService:
         return lock
 
     async def _sync_live(self, lt: LiveTraining) -> None:
-        """Write the live status and event to the row.  The live state is authoritative:
-        this writes what it is *now*, under the Training's status lock, so a pause made
-        by a policy cannot be overwritten by (or overwrite) a user's close/resume/PATCH."""
+        """Write the live event to the row (the state itself is live-only).  It writes what
+        the event is *now*, under the Training's status lock, so a pause made by a policy
+        cannot be overwritten by (or overwrite) a user's change."""
         async with self._status_lock(lt.id):
-            await self._persist(lt, status=lt.status, last_event=lt.last_event)
+            await self._persist(lt, last_event=lt.last_event)
 
     # -- the scheduler ------------------------------------------------------
 
@@ -622,12 +620,9 @@ class TrainingService:
                 self._wake.set()
 
     def _window(self) -> int:
-        w = self._executor.workers
-        # Shared memory: a run starts as soon as it is dispatched, so a worker is never
-        # handed a run before the previous one has merged.
-        if any(lt.shared and lt.schedulable for lt in self._live.values()):
-            return max(1, w)
-        return max(2, w * 2)
+        # A run starts as soon as it is dispatched, so a worker is never handed a run
+        # before the previous one has merged.
+        return max(1, self._executor.workers)
 
     def _pick(self) -> tuple[LiveTraining, LiveProblem] | None:
         trainings = [lt for lt in self._live.values() if lt.schedulable]
@@ -683,7 +678,7 @@ class TrainingService:
                       isolated: bool = False) -> None:
         """Hand one run to the executor.
 
-        **When a run's memory copy is taken.**  A shared-memory run starts from the master
+        **When a run's memory copy is taken.**  A run starts from the master
         as it is *at the moment this method builds the run's* ``MemoryRef`` (below): every
         outcome that had completed has been merged first (``_fill`` drains them), and the
         version is recorded as the run's ``memory_version``.  The Training owns its pool
@@ -693,22 +688,19 @@ class TrainingService:
         later reaches only runs dispatched after it.
         """
         failures = lp.failures.get(seed, 0)
-        ref = None
-        if lt.shared:
-            snapshot = (lp.id, seed) in lt.want_snapshot
-            lt.want_snapshot.discard((lp.id, seed))
-            depth = max(tm.MIN_TAIL, 4 * self._executor.workers)
-            ref = lt.memory_ref(depth, snapshot)
-            blob = len(ref.snapshot) if ref.snapshot is not None else sum(len(b) for b in ref.tail)
-            self.task_memory_bytes[0] += blob
-            self.task_memory_bytes[1] += 1
+        snapshot = (lp.id, seed) in lt.want_snapshot
+        lt.want_snapshot.discard((lp.id, seed))
+        depth = max(tm.MIN_TAIL, 4 * self._executor.workers)
+        ref = lt.memory_ref(depth, snapshot)
+        blob = len(ref.snapshot) if ref.snapshot is not None else sum(len(b) for b in ref.tail)
+        self.task_memory_bytes[0] += blob
+        self.task_memory_bytes[1] += 1
         fault = self.fault_hook(lp, seed, failures) if self.fault_hook else None
         task = TrainingTask(
             lp.initial, lp.modified, lp.target, lp.answer, seed, lt.max_codelets,
             lt.parameters, lt.backend, memory=ref, fault=fault,
         )
-        sub = Sub(lt, lp, seed, ref.version if ref is not None else None, lt.config_hash, failures,
-                  isolated)
+        sub = Sub(lt, lp, seed, ref.version, lt.config_hash, failures, isolated)
         self._inflight_runs += 1
         if isolated:
             self._isolated_inflight += 1
@@ -769,7 +761,7 @@ class TrainingService:
         alone is the culprit and only it is charged -- its ``attempts``, the ``max_retries``
         budget and ``on_worker_failure``.  Innocent runs are re-run normally and their
         ``attempts`` count only their own failures.  Results are exact either way: runs
-        are deterministic (a shared-memory run is re-dispatched at the then-current version).
+        are deterministic (a run is re-dispatched at the then-current version).
         """
         lt, lp, seed = sub.lt, sub.lp, sub.seed
         lp.inflight -= 1
@@ -810,15 +802,14 @@ class TrainingService:
             config_hash=sub.config_hash, attempts=sub.failures + 1, problem_id=lp.id,
             memory_version=sub.version,
         )
-        if lt.shared:
-            blob = o.additions
-            adds = pickle.loads(blob) if blob else tm.Additions()
-            n_a, n_s = tm.apply_merge(lt.memory, adds)
-            lt.version += 1
-            rec.seq, rec.added_answers, rec.added_snags = lt.version, n_a, n_s
-            lt.merge_blobs[lt.version] = blob or tm.dump_additions(adds)
-            lt.merge_blobs.pop(lt.version - MERGE_KEEP, None)
-            lt.pending_merges.append((lt.version, lp.id, o.seed, adds))
+        blob = o.additions
+        adds = pickle.loads(blob) if blob else tm.Additions()
+        n_a, n_s = tm.apply_merge(lt.memory, adds)
+        lt.version += 1
+        rec.seq, rec.added_answers, rec.added_snags = lt.version, n_a, n_s
+        lt.merge_blobs[lt.version] = blob or tm.dump_additions(adds)
+        lt.merge_blobs.pop(lt.version - MERGE_KEEP, None)
+        lt.pending_merges.append((lt.version, lp.id, o.seed, adds))
         lp.outcomes[o.seed] = rec
         lp.failures.pop(o.seed, None)
         lt.pending_runs.append(rec)
@@ -854,8 +845,8 @@ class TrainingService:
             self._trigger_pause(lt, f"paused: {lt.errors_total} errors reached max_errors_total")
 
     def _trigger_pause(self, lt: LiveTraining, event: str) -> None:
-        """Pause from inside the scheduler: effective at once, persisted right after."""
-        if lt.status in ("paused", "cancelled"):
+        """Pause from inside the scheduler: effective at once, its event persisted right after."""
+        if lt.status == "paused":
             return
         lt.status = "paused"
         lt.last_event = event
@@ -1013,7 +1004,7 @@ class TrainingService:
         meta = self._meta_provider()
         return {
             "settings": {
-                "memory": "shared", "seeds_per_problem": 100, "seed_start": 1,
+                "seeds_per_problem": 100, "seed_start": 1,
                 "max_codelets": 20_000, "parameters": None,
                 "backend": default_training_backend(meta),
             },
@@ -1043,14 +1034,14 @@ class TrainingService:
             if lt is None:
                 continue
             live[t.id] = {}
-            for lp in lt.active.values():
-                if lp.cancelled:
+            for lp in lt.problems.values():
+                if lp.cancelled or not (lp.started or lp.outcomes):
                     continue
                 recs = list(lp.outcomes.values())
                 live[t.id][lp.id] = (
                     len(recs), sum(1 for r in recs if r.error), sum(r.codelets for r in recs),
                     sum(1 for r in recs if r.key == CAP_KEY),
-                    sum(max(r.attempts - 1, 0) for r in recs),
+                    sum(max(r.attempts - 1, 0) for r in recs), lp.started,
                 )
         s = self._factory()
         await s.connection(execution_options={"isolation_level": "REPEATABLE READ"})
@@ -1075,6 +1066,34 @@ class TrainingService:
         # its finished_seq is still beyond finished_cursor.
         cursors = dict((await s.execute(
             select(Training.id, Training.finished_count).where(Training.id.in_(ids)))).all())
+        # A Stopped Training holds no memory in the process: its size is what its stored
+        # runs added, and its version the last stored merge.
+        stored_mem = {
+            tid: (int(a), int(sn)) for tid, a, sn in (await s.execute(
+                select(TrainingRun.training_id, func.coalesce(func.sum(TrainingRun.added_answers), 0),
+                       func.coalesce(func.sum(TrainingRun.added_snags), 0))
+                .where(TrainingRun.training_id.in_(ids)).group_by(TrainingRun.training_id)
+            )).all()
+        }
+        # A Stopped Training's unfinished problems keep the runs the Stop wrote; count them.
+        R = TrainingRun
+        partial = {
+            tid: tuple(int(v) for v in vals) for tid, *vals in (await s.execute(
+                select(
+                    R.training_id, func.count(),
+                    func.coalesce(func.sum(case((R.error.is_not(None), 1), else_=0)), 0),
+                    func.coalesce(func.sum(R.codelets), 0),
+                    func.coalesce(func.sum(case((R.key == CAP_KEY, 1), else_=0)), 0),
+                    func.coalesce(func.sum(R.attempts - 1), 0),
+                ).join(P, P.id == R.problem_id)
+                .where(R.training_id.in_(ids), P.status == "queued")
+                .group_by(R.training_id)
+            )).all()
+        }
+        stored_version = dict((await s.execute(
+            select(TrainingMemoryMerge.training_id, func.max(TrainingMemoryMerge.seq))
+            .where(TrainingMemoryMerge.training_id.in_(ids)).group_by(TrainingMemoryMerge.training_id)
+        )).all())
         await s.close()
         zero = (0,) * 7
         out = []
@@ -1085,66 +1104,63 @@ class TrainingService:
             total = q[1] + f[1]
             done, errors, codelets, capped, retries = f[2], f[3], f[4], f[5], f[6]
             lt = self._live.get(t.id)
-            for pid, (n, e, cl, cap, rt) in live.get(t.id, {}).items():
+            if t.id not in live:
+                n, e, cl, cap, rt = partial.get(t.id, (0,) * 5)
+                done, errors, codelets, capped, retries = done + n, errors + e, codelets + cl, capped + cap, retries + rt
+            for pid, (n, e, cl, cap, rt, started) in live.get(t.id, {}).items():
                 if pid in written:
                     continue
-                running += 1
-                queued -= 1
+                if started:
+                    running += 1
+                    queued -= 1
                 done += n
                 errors += e
                 codelets += cl
                 capped += cap
                 retries += rt
             unfinished = queued + running
-            closed = t.closed_at is not None
-            stalled = lt.stalled_reason if lt is not None else None
-            if lt is None and t.status != "cancelled":
-                stalled = "the Training is not loaded by this server"
-            status = lt.status if lt is not None and not lt.cancelled else t.status
-            if status == "cancelled":
-                state = "cancelled"
-            elif stalled and (not closed or unfinished > 0):
-                state = "stalled"
-            elif status == "paused":
-                state = "paused"
-            elif closed and unfinished == 0:
-                state = "finished"
-            elif unfinished > 0:
-                state = "running"
+            if lt is None:
+                state, activity, stalled = "stopped", None, None
             else:
-                state = "idle"
+                state, stalled = lt.status, lt.stalled_reason
+                activity = None
+                if state == "running":
+                    activity = "stalled" if stalled else ("idle" if unfinished == 0 else None)
             rate = lt.rate() if lt is not None else None
-            if state != "running":
+            if state != "running" or activity is not None:
                 rate = None
             remaining = max(total - done, 0)
-            shared = t.memory == "shared"
+            if lt is not None:
+                memory = {"answers": len(lt.memory.answers), "snags": len(lt.memory.snags)}
+                memory_version = lt.version
+            else:
+                a_n, s_n = stored_mem.get(t.id, (0, 0))
+                memory = {"answers": a_n, "snags": s_n}
+                memory_version = stored_version.get(t.id) or 0
             out.append({
-                "id": t.id, "name": t.name, "note": t.note, "status": status, "state": state,
-                "stalled_reason": stalled if state == "stalled" else None,
+                "id": t.id, "name": t.name, "note": t.note, "state": state, "activity": activity,
+                "stalled_reason": stalled if activity == "stalled" else None,
                 "settings": {
-                    "memory": t.memory, "seeds_per_problem": t.seeds_per_problem,
+                    "seeds_per_problem": t.seeds_per_problem,
                     "seed_start": t.seed_start, "max_codelets": t.max_codelets,
                     "parameters": t.parameters, "backend": t.backend,
                 },
                 "policy": normalize_policy(lt.policy if lt is not None else t.policy),
                 "config_hash": lt.config_hash if lt is not None else t.config_hash,
                 "created_at": _iso(t.created_at), "updated_at": _iso(t.updated_at),
-                "closed_at": _iso(t.closed_at),
+                "stopped_at": _iso(t.stopped_at), "stopped_from": t.stopped_from,
+                "stop_reason": t.stop_reason,
                 "problems": {
                     "total": queued + running + f[0] + x[0], "queued": queued,
                     "running": running, "finished": f[0], "cancelled": x[0],
                 },
                 "runs": {"total": total, "done": done, "errors": errors, "capped": capped,
                          "retries": retries},
-                "memory": (
-                    {"answers": len(lt.memory.answers), "snags": len(lt.memory.snags)}
-                    if shared and lt is not None and lt.memory is not None else
-                    ({"answers": 0, "snags": 0} if shared else None)
-                ),
+                "memory": memory,
                 "codelets": codelets,
                 "runs_per_second": round(rate, 3) if rate else None,
                 "eta_seconds": round(remaining / rate, 1) if rate and remaining else None,
-                "memory_version": (lt.version if lt is not None else 0) if shared else None,
+                "memory_version": memory_version,
                 "finished_cursor": cursors.get(t.id, t.finished_count),
                 "last_event": (lt.last_event if lt is not None else None) or t.last_event,
             })
@@ -1171,8 +1187,8 @@ class TrainingService:
         lt = self._live.get(p.training_id)
         lp = lt.problems.get(p.id) if lt is not None and p.status == "queued" else None
         status = p.status
-        if lp is not None and lp.started and not lp.cancelled:
-            status = "running"
+        if lp is not None and (lp.started or lp.outcomes) and not lp.cancelled:
+            status = "running" if lp.started else "queued"
             t = summarize(list(lp.outcomes.values()))
             finished_seq = None
         else:
@@ -1313,17 +1329,14 @@ class TrainingService:
                     except asyncio.TimeoutError:
                         pass
 
-    # -- the episode memory --------------------------------------------------
+    # -- the Episodic Memory --------------------------------------------------
 
     async def memory_of(self, training_id: int) -> EpisodicMemory:
-        """The episode memory (live if loaded, else rebuilt from the stored merges)."""
+        """The Episodic Memory (live if started, else rebuilt from the stored merges)."""
         async with self._factory() as s:
-            t = await self._get_training(s, training_id)
-            if t.memory != "shared":
-                raise TrainingError(409, f"training {training_id} uses independent memory: "
-                                         "it has no episode memory")
+            await self._get_training(s, training_id)
             lt = self._live.get(training_id)
-            if lt is not None and lt.memory is not None:
+            if lt is not None:
                 return tm.copy_for_run(lt.memory)
             return await self.rebuild_memory(s, training_id)
 
@@ -1339,6 +1352,7 @@ class TrainingService:
         return mem
 
     def live_memory(self, training_id: int) -> EpisodicMemory | None:
+        """The live Episodic Memory, or ``None`` for a Stopped Training."""
         lt = self._live.get(training_id)
         return lt.memory if lt is not None else None
 
@@ -1410,9 +1424,6 @@ class TrainingService:
         for key in settings:
             if key not in _SETTINGS_KEYS:
                 raise TrainingError(422, f"unknown setting {key!r}; known: {list(_SETTINGS_KEYS)}")
-        memory = settings.get("memory") or "shared"
-        if memory not in ("shared", "independent"):
-            raise TrainingError(422, "settings.memory must be 'shared' or 'independent'")
         spp = settings.get("seeds_per_problem", 100)
         if not isinstance(spp, int) or isinstance(spp, bool) or not 1 <= spp <= MAX_SEEDS_PER_PROBLEM:
             raise TrainingError(422, f"settings.seeds_per_problem must be 1..{MAX_SEEDS_PER_PROBLEM}")
@@ -1441,7 +1452,7 @@ class TrainingService:
         async with self._factory() as s:
             async with s.begin():
                 t = Training(
-                    name=name, note=note or "", status="open", memory=memory,
+                    name=name, note=note or "",
                     seeds_per_problem=spp, seed_start=seed_start, max_codelets=max_codelets,
                     parameters=overrides or None, backend=backend_name, policy=full_policy,
                     config_hash=cfg, finished_count=0,
@@ -1449,12 +1460,7 @@ class TrainingService:
                 s.add(t)
                 await s.flush()
                 created = await self._insert_problems(s, t, problems)
-            lt = self._new_live(t, meta)
-            for p in created:
-                self._enqueue(lt, p)
-            self._live[t.id] = lt
-            summary = (await self._summaries(s, [t]))[0]
-        self.wake()
+            summary = (await self._summaries(s, [t]))[0]  # a new Training is Stopped
         return {"training": summary, "added": len(created), "problem_ids": [p.id for p in created]}
 
     async def add_problems(self, training_id: int, problems: list[dict]) -> dict[str, Any]:
@@ -1466,8 +1472,6 @@ class TrainingService:
                 )).scalar_one_or_none()
                 if t is None:
                     raise TrainingError(404, f"training {training_id} not found")
-                if t.status == "cancelled" or t.closed_at is not None or t.status == "closed":
-                    raise TrainingError(409, f"training {training_id} is {t.status}; it accepts no more problems")
                 self._check_seed_range(
                     t.seed_start, [t.seeds_per_problem] + [p.get("seeds") or 0 for p in problems])
                 created = await self._insert_problems(s, t, problems)
@@ -1481,11 +1485,9 @@ class TrainingService:
 
     # -- control -----------------------------------------------------------------
 
-    async def _set_status(self, training_id: int, fn) -> dict[str, Any]:
-        """Apply a status/policy change.  The live state is authoritative: the row is
-        brought up to the live status first, *then* the change is applied, and the result
-        goes back to the live state -- a stale row never overwrites a policy's pause.
-        Serialised per Training."""
+    async def _change_row(self, training_id: int, fn) -> dict[str, Any]:
+        """Apply a change to the Training's row (name, note, policy) and, if it is live, to
+        its live part.  Serialised per Training."""
         async with self._status_lock(training_id):
             async with self._factory() as s:
                 async with s.begin():
@@ -1494,18 +1496,11 @@ class TrainingService:
                     )).scalar_one_or_none()
                     if t is None:
                         raise TrainingError(404, f"training {training_id} not found")
-                    lt = self._live.get(training_id)
-                    if lt is not None and t.status != "cancelled":
-                        t.status = lt.status
-                        t.last_event = lt.last_event
                     fn(t)
                     t.updated_at = _utcnow()
                 lt = self._live.get(training_id)
                 if lt is not None:
-                    lt.status = t.status
-                    lt.closed = t.closed_at is not None
                     lt.policy = normalize_policy(t.policy)
-                    lt.last_event = t.last_event
                 summary = (await self._summaries(s, [t]))[0]
         await self._announce(training_id)
         self.wake()
@@ -1529,34 +1524,70 @@ class TrainingService:
             if new_policy is not None:
                 t.policy = new_policy
 
-        return await self._set_status(training_id, fn)
+        return await self._change_row(training_id, fn)
+
+    async def start_training(self, training_id: int, paused: bool = False) -> dict[str, Any]:
+        """Stopped -> Running (or Paused).  Starting a live Training changes nothing."""
+        async with self._status_lock(training_id):
+            if training_id not in self._live:
+                async with self._factory() as s:
+                    t = await self._get_training(s, training_id)
+                    lt, resumed = await self._load_one(s, t)
+                lt.status = "paused" if paused else "running"
+                self._live[training_id] = lt
+                self._check_configs()
+                for lp in resumed:  # every seed was stored but the problem's own write was not
+                    lt.active[lp.id] = lp
+                    lp.started_at = lp.started_at or _utcnow()
+                    self._begin_finish(lt, lp)
+        await self._announce(training_id)
+        self.wake()
+        return await self.summary(training_id)
+
+    def _live_or_409(self, training_id: int, action: str) -> LiveTraining:
+        lt = self._live.get(training_id)
+        if lt is None:
+            raise TrainingError(409, f"training {training_id} is stopped; start it before you {action} it")
+        return lt
 
     async def pause(self, training_id: int) -> dict[str, Any]:
-        def fn(t: Training) -> None:
-            if t.status in ("open", "closed"):
-                t.status = "paused"
-        return await self._set_status(training_id, fn)
+        async with self._factory() as s:
+            await self._get_training(s, training_id)
+        self._live_or_409(training_id, "pause").status = "paused"
+        await self._announce(training_id)
+        return await self.summary(training_id)
 
     async def resume(self, training_id: int) -> dict[str, Any]:
-        lt = self._live.get(training_id)
-        if lt is not None:
+        async with self._factory() as s:
+            await self._get_training(s, training_id)
+        lt = self._live_or_409(training_id, "resume")
+        if lt.status == "paused":
             for lp in lt.active.values():
                 lp.failures.clear()  # a resume is a fresh start for the retry budget
+            lt.status = "running"
+        await self._announce(training_id)
+        self.wake()
+        return await self.summary(training_id)
 
-        def fn(t: Training) -> None:
-            if t.status == "paused":
-                t.status = "closed" if t.closed_at is not None else "open"
-        return await self._set_status(training_id, fn)
-
-    async def close(self, training_id: int) -> dict[str, Any]:
-        def fn(t: Training) -> None:
-            if t.status == "cancelled":
-                return
-            if t.closed_at is None:
-                t.closed_at = _utcnow()
-            if t.status == "open":
-                t.status = "closed"
-        return await self._set_status(training_id, fn)
+    async def stop_training(self, training_id: int, reason: str = "user") -> dict[str, Any]:
+        """Running or Paused -> Stopped.  Runs in flight are dropped (their seeds run again
+        after the next start); every run and merge committed in memory is written, and the
+        row records ``stopped_at``, ``stopped_from`` and ``stop_reason``.  A Stopped
+        Training is left as it is."""
+        async with self._factory() as s:
+            await self._get_training(s, training_id)
+        async with self._status_lock(training_id):
+            lt = self._live.pop(training_id, None)
+            if lt is not None:
+                lt.cancelled = True
+                await self._quiesce(lt)
+                async with self._factory() as s:
+                    async with s.begin():
+                        await s.execute(update(Training).where(Training.id == training_id).values(
+                            updated_at=_utcnow(), stopped_at=_utcnow(), stopped_from=lt.status,
+                            stop_reason=reason, last_event=lt.last_event))
+        await self._announce(training_id)
+        return await self.summary(training_id)
 
     async def cancel_problem(self, training_id: int, pid: int) -> dict[str, Any]:
         async with self._factory() as s:
@@ -1597,27 +1628,32 @@ class TrainingService:
             self._forget(lt, lp)
 
     async def cancel_training(self, training_id: int, event: str | None = None) -> dict[str, Any]:
-        def fn(t: Training) -> None:
-            t.status = "cancelled"
-            if event is not None:
-                t.last_event = event
-            if t.closed_at is None:
-                t.closed_at = _utcnow()
-        await self._set_status(training_id, fn)
-        lt = self._live.pop(training_id, None)
+        """Cancel every queued and in-flight problem.  An action, not a state: the Training
+        keeps its state and accepts new problems afterwards."""
+        async with self._factory() as s:
+            await self._get_training(s, training_id)
+        lt = self._live.get(training_id)
         if lt is not None:
-            lt.cancelled = True
+            if event is not None:
+                lt.last_event = event
             await self._settle(lt, keep_results=True)
         async with self._factory() as s:
             async with s.begin():
                 await s.execute(update(TrainingProblem).where(
                     TrainingProblem.training_id == training_id, TrainingProblem.status == "queued"
                 ).values(status="cancelled", finished_at=_utcnow()))
+                if event is not None:
+                    await s.execute(update(Training).where(Training.id == training_id)
+                                    .values(last_event=event))
         await self._announce(training_id)
         return await self.summary(training_id)
 
+    def _after_settle(self, lt: LiveTraining) -> None:
+        """Nothing of the live problems is left; only runs queued for isolation remain counted."""
+        lt.unsubmitted = sum(1 for (l, _, _) in self._isolation if l is lt)
+
     async def _settle(self, lt: LiveTraining, keep_results: bool) -> None:
-        """Stop a Training's live problems: wait for those being written, write the started
+        """Cancel a Training's live problems: wait for those being written, write the started
         ones as cancelled (or drop them), and forget the rest."""
         waiting = []
         for lp in list(lt.problems.values()):
@@ -1635,7 +1671,24 @@ class TrainingService:
                 self._forget(lt, lp)
         if keep_results and lt.pending_runs:
             await self._flush_pending(lt)
-        lt.unsubmitted = 0
+        self._after_settle(lt)
+
+    async def _quiesce(self, lt: LiveTraining) -> None:
+        """Drop a Training's live part for a Stop: wait for the problems being written, then
+        write every run and merge still pending and forget the problems, which stay queued in
+        the database with their stored runs.  Runs in flight are dropped."""
+        waiting = []
+        for lp in list(lt.problems.values()):
+            lp.cancelled = lp.cancelled or not lp.finishing  # later outcomes are dropped
+            if lp.finishing and lp.written is not None:
+                waiting.append(lp)
+        for lp in waiting:
+            await lp.written.wait()
+        for lp in list(lt.problems.values()):
+            self._forget(lt, lp)
+        if lt.pending_runs or lt.pending_merges:
+            await self._flush_pending(lt)
+        self._after_settle(lt)
 
     async def _flush_pending(self, lt: LiveTraining) -> None:
         """Write runs that are still pending (their problem is already settled)."""
@@ -1660,6 +1713,9 @@ class TrainingService:
         del lt.pending_merges[:n_merges]
 
     async def delete_training(self, training_id: int) -> None:
+        """Delete a Training and everything it owns: its Episodic Memory, problems and runs
+        (the foreign keys cascade) and its live part, which is settled first with no Stop
+        write.  Nothing is left behind.  This is the only act that removes its memory."""
         async with self._factory() as s:
             await self._get_training(s, training_id)
         lt = self._live.pop(training_id, None)
@@ -1672,6 +1728,7 @@ class TrainingService:
         self._versions.pop(training_id, None)
         await self._announce(training_id)
         self._conds.pop(training_id, None)
+        self._status_locks.pop(training_id, None)
 
     # -- export streams ---------------------------------------------------------
 

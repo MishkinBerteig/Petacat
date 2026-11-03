@@ -40,7 +40,6 @@ export const COMPONENT_HELP_KEYS = [
   'training_error_policy',
   'training_export',
   'training_memory',
-  'training_memory_mode',
   'training_new',
   'training_problem_text',
   'training_problems_table',

@@ -1006,13 +1006,14 @@ export interface SwarmResult {
 // ---------------------------------------------------------------------------
 //
 // Not the episodic runs of Metacat Mode's Review view, which are recordings of
-// dashboard runs. A Training is a long-lived, database-backed episode with one
-// Episodic Memory (when its memory is shared).
+// dashboard runs. A Training (a Training Mode Session) is a long-lived, database-backed Training
+// episode with one Episodic Memory of its own, never cleared.
 
-export type TrainingStatus = 'open' | 'paused' | 'closed' | 'cancelled';
-export type TrainingState = 'running' | 'idle' | 'paused' | 'finished' | 'cancelled' | 'stalled';
+/** Stopped, or live and either Running or Paused. */
+export type TrainingState = 'stopped' | 'running' | 'paused';
+/** Inside Running only: nothing left to run (`idle`) or unable to run (`stalled`). */
+export type TrainingActivity = 'idle' | 'stalled' | null;
 export type TrainingProblemStatus = 'queued' | 'running' | 'finished' | 'cancelled';
-export type TrainingMemoryMode = 'shared' | 'independent';
 
 export interface TrainingErrorPolicy {
   on_run_error: 'record' | 'skip_problem' | 'pause' | 'cancel';
@@ -1025,7 +1026,6 @@ export interface TrainingErrorPolicy {
 
 /** Fixed at creation: they shape what a run is. */
 export interface TrainingSettings {
-  memory: TrainingMemoryMode;
   seeds_per_problem: number;
   seed_start: number;
   max_codelets: number;
@@ -1050,24 +1050,26 @@ export interface TrainingSummary {
   id: number;
   name: string;
   note: string;
-  status: TrainingStatus;
   state: TrainingState;
+  activity: TrainingActivity;
   stalled_reason: string | null;
   settings: TrainingSettings;
   policy: TrainingErrorPolicy;
   config_hash: string;
   created_at: string;
   updated_at: string;
-  closed_at: string | null;
+  /** The last Stop: when, from which live state, and why. Null for a Training never stopped. */
+  stopped_at: string | null;
+  stopped_from: 'running' | 'paused' | null;
+  stop_reason: 'user' | 'shutdown' | 'error' | null;
   problems: { total: number; queued: number; running: number; finished: number; cancelled: number };
   runs: { total: number; done: number; errors: number; capped: number; retries: number };
-  /** Null for independent memory. */
-  memory: { answers: number; snags: number } | null;
+  memory: { answers: number; snags: number };
   codelets: number;
   runs_per_second: number | null;
   eta_seconds: number | null;
-  /** Merges applied so far (shared memory only). */
-  memory_version: number | null;
+  /** Merges applied so far. */
+  memory_version: number;
   finished_cursor: number;
   last_event: string | null;
 }
@@ -1111,8 +1113,8 @@ export interface TrainingProblemDetail extends TrainingProblemRow {
 }
 
 export interface TrainingRun {
-  seq: number | null;
-  memory_version: number | null;
+  seq: number;
+  memory_version: number;
   seed: number;
   status: string;
   key: string;
@@ -1125,7 +1127,7 @@ export interface TrainingRun {
   error: string | null;
   config_hash: string;
   attempts: number;
-  memory_added: { answers: number; snags: number } | null;
+  memory_added: { answers: number; snags: number };
 }
 
 export interface TrainingExecutorInfo {

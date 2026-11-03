@@ -68,7 +68,8 @@ export function TrainingPanel({ initialTrainingId = null }: TrainingPanelProps) 
   };
   usePolling(refreshList, LIST_POLL_MS);
 
-  const state = selected?.id === selectedId ? selected.state : null;
+  // Working: running with something to do (no idle or stalled activity).
+  const working = selected?.id === selectedId && selected.state === 'running' && selected.activity === null;
   usePolling(
     async () => {
       if (selectedId === null) return;
@@ -80,7 +81,7 @@ export function TrainingPanel({ initialTrainingId = null }: TrainingPanelProps) 
         setSelectedError(describeApiError(err, 'load the training'));
       }
     },
-    selectedId === null ? null : state === 'running' ? RUNNING_POLL_MS : IDLE_POLL_MS,
+    selectedId === null ? null : working ? RUNNING_POLL_MS : IDLE_POLL_MS,
     selectedId,
   );
 

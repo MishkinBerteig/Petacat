@@ -7,11 +7,12 @@ import {
   addTrainingProblems,
   trainingExportUrl,
   cancelTraining,
-  closeTraining,
   deleteTraining,
   describeApiError,
   pauseTraining,
   resumeTraining,
+  startTraining,
+  stopTraining,
   updateTraining,
 } from '@/api/client';
 import type { TrainingErrorPolicy, TrainingLimits, TrainingSummary } from '@/types';
@@ -54,9 +55,8 @@ export function TrainingDetail({ training, limits, notice, onTrainingChanged, on
   const [renaming, setRenaming] = useState(false);
   const [newName, setNewName] = useState('');
 
-  const acceptsProblems = training.status === 'open' || training.status === 'paused';
+  const live = training.state !== 'stopped';
   const label = training.name || `Training ${training.id}`;
-  const shared = training.settings.memory === 'shared';
 
   const act = async (what: string, fn: () => Promise<TrainingSummary>) => {
     setBusy(true);
@@ -92,7 +92,7 @@ export function TrainingDetail({ training, limits, notice, onTrainingChanged, on
   const handleCancel = () => {
     if (
       !window.confirm(
-        `Cancel "${label}"? Queued and running problems become cancelled; finished runs are kept.`,
+        `Cancel the queued and running problems of "${label}"? Finished runs are kept and the Training stays ${training.state}.`,
       )
     )
       return;
@@ -102,7 +102,7 @@ export function TrainingDetail({ training, limits, notice, onTrainingChanged, on
   const handleDelete = async () => {
     if (
       !window.confirm(
-        `Delete "${label}"? Its problems, runs and memory are removed from the database. This cannot be undone.`,
+        `Delete "${label}"? Its problems, runs and Episodic Memory are removed from the database${live ? ', and its live state is discarded' : ''}. This cannot be undone.`,
       )
     )
       return;
@@ -165,7 +165,7 @@ export function TrainingDetail({ training, limits, notice, onTrainingChanged, on
               </button>
             </>
           )}
-          <StateBadge state={training.state} />
+          <StateBadge state={training.state} activity={training.activity} />
           <ControlHelp topic="training" label="Training" />
           <span className="text-xs text-muted">created {fmtTime(training.created_at)}</span>
         </div>
@@ -183,6 +183,13 @@ export function TrainingDetail({ training, limits, notice, onTrainingChanged, on
             }}
           >
             {training.last_event}
+          </div>
+        )}
+        {training.state === 'stopped' && training.stopped_at && (
+          <div className="text-xs text-muted" data-testid="stopped-line">
+            Stopped {fmtTime(training.stopped_at)}
+            {training.stopped_from ? ` from ${training.stopped_from}` : ''}
+            {training.stop_reason ? ` (${training.stop_reason})` : ''}.
           </div>
         )}
         {training.stalled_reason && (
@@ -208,25 +215,31 @@ export function TrainingDetail({ training, limits, notice, onTrainingChanged, on
         <ProgressBar done={training.runs.done} total={training.runs.total} label="Runs done" />
 
         <div className="text-xs mono" style={{ marginTop: 4 }} data-testid="training-memory-line">
-          {shared && training.memory
-            ? `Training episode memory: ${fmtInt(training.memory.answers)} answers, ${fmtInt(training.memory.snags)} snags, version ${fmtInt(training.memory_version ?? 0)}`
-            : 'Training episode memory: independent runs (nothing shared)'}
+          {`Episodic Memory (this Training's own, never cleared): ${fmtInt(training.memory.answers)} answers, ${fmtInt(training.memory.snags)} snags, version ${fmtInt(training.memory_version)}`}
         </div>
         <div className="text-xs text-muted" style={{ marginTop: 4 }} data-testid="training-settings-line">
-          Settings (fixed): {shared ? 'shared memory' : 'independent runs'} · backend {s.backend} ·{' '}
+          Settings (fixed): backend {s.backend} ·{' '}
           {fmtInt(s.seeds_per_problem)} seeds per problem from {s.seed_start} · max codelets per run{' '}
           {fmtInt(s.max_codelets)}
           {overrideCount > 0 ? ` · ${overrideCount} parameter overrides` : ''}
         </div>
 
         <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          {training.status === 'paused' ? (
+          {training.state === 'stopped' ? (
+            <button
+              disabled={busy}
+              onClick={() => void act('start the Training', () => startTraining(training.id))}
+              title="Run the Training from where it stopped"
+            >
+              Start
+            </button>
+          ) : training.state === 'paused' ? (
             <button disabled={busy} onClick={() => void act('resume the Training', () => resumeTraining(training.id))}>
               Resume
             </button>
           ) : (
             <button
-              disabled={busy || training.status !== 'open'}
+              disabled={busy}
               onClick={() => void act('pause the Training', () => pauseTraining(training.id))}
               title="Stop starting new runs; runs already on a core finish"
             >
@@ -234,22 +247,19 @@ export function TrainingDetail({ training, limits, notice, onTrainingChanged, on
             </button>
           )}
           <button
-            disabled={busy || !acceptsProblems}
-            onClick={() => void act('close the Training', () => closeTraining(training.id))}
-            title="Accept no more problems"
+            disabled={busy || !live}
+            onClick={() => void act('stop the Training', () => stopTraining(training.id))}
+            title="Return to Stopped: runs in flight are dropped, everything else is kept, and Start continues from there"
           >
-            Close
+            Stop
           </button>
-          <button
-            disabled={busy || training.status === 'cancelled' || training.state === 'finished'}
-            onClick={handleCancel}
-          >
+          <button disabled={busy} onClick={handleCancel} title="Cancel every queued and running problem; the state does not change">
             Cancel
           </button>
           <button disabled={busy} onClick={() => void handleDelete()}>
             Delete
           </button>
-          <ControlHelp topic="training_run_state" label="pause, close and cancel" />
+          <ControlHelp topic="training_run_state" label="start, pause, resume, stop and cancel" />
           <span style={{ flex: 1 }} />
           <span className="text-xs text-muted">Export:</span>
           {(['problems', 'distribution', 'runs'] as const).map((what) => (
@@ -274,17 +284,17 @@ export function TrainingDetail({ training, limits, notice, onTrainingChanged, on
         <PolicyEditor training={training} onTrainingChanged={onTrainingChanged} />
       </div>
 
-      <AddProblems training={training} limits={limits} enabled={acceptsProblems} onTrainingChanged={onTrainingChanged} />
+      <AddProblems training={training} limits={limits} onTrainingChanged={onTrainingChanged} />
 
       <div style={cardStyle}>
         <div role="tablist" aria-label="Training views" style={{ display: 'flex', gap: 2, marginBottom: 8 }}>
-          {(['problems', ...(shared ? (['memory'] as const) : [])] as const).map((t) => (
+          {(['problems', 'memory'] as const).map((t) => (
             <button
               key={t}
               role="tab"
               aria-selected={tab === t}
               onClick={() => setTab(t)}
-              title={t === 'memory' ? "This Training's own episode memory (Training Mode), not Metacat Mode's Episodic Memory" : undefined}
+              title={t === 'memory' ? "This Training's own Episodic Memory (Training Mode), not Metacat Mode's" : undefined}
               style={{
                 fontSize: 11,
                 padding: '2px 10px',
@@ -301,7 +311,7 @@ export function TrainingDetail({ training, limits, notice, onTrainingChanged, on
           ))}
           {tab === 'memory' && <ControlHelp topic="training_memory" label="the Memory tab" />}
         </div>
-        {tab === 'memory' && shared ? <MemoryTab training={training} /> : <ProblemsTable training={training} />}
+        {tab === 'memory' ? <MemoryTab training={training} /> : <ProblemsTable training={training} />}
       </div>
     </div>
   );
@@ -380,18 +390,16 @@ function PolicyEditor({
 }
 
 // ---------------------------------------------------------------------------
-// Add problems to a training that is open or paused
+// Add problems to a Training in any state
 // ---------------------------------------------------------------------------
 
 function AddProblems({
   training,
   limits,
-  enabled,
   onTrainingChanged,
 }: {
   training: TrainingSummary;
   limits: TrainingLimits | null;
-  enabled: boolean;
   onTrainingChanged: (b: TrainingSummary) => void;
 }) {
   const [text, setText] = useState('');
@@ -433,13 +441,13 @@ function AddProblems({
         <div style={sectionLabelStyle}>Add problems</div>
         <ControlHelp topic="training_add_problems" label="Add problems" />
       </div>
-      {!enabled && (
+      {training.state === 'stopped' && (
         <div className="text-xs text-muted" style={{ margin: '4px 0' }}>
-          This training is {training.status} and accepts no more problems.
+          This Training is stopped: problems are stored now and run when it is started.
         </div>
       )}
       <div style={{ marginTop: 6 }}>
-        <ProblemTextInput id="add-problems-text" value={text} onChange={setText} disabled={!enabled || busy} demos rows={3} />
+        <ProblemTextInput id="add-problems-text" value={text} onChange={setText} disabled={busy} demos rows={3} />
         <ProblemPreview parsed={parsed} seedsPerProblem={training.settings.seeds_per_problem} />
       </div>
       {error && (
@@ -453,7 +461,7 @@ function AddProblems({
         </div>
       )}
       <div style={{ marginTop: 8 }}>
-        <button disabled={!enabled || busy || parsed.problems.length === 0} onClick={() => void add()}>
+        <button disabled={busy || parsed.problems.length === 0} onClick={() => void add()}>
           {busy ? 'Adding…' : `Add ${parsed.problems.length.toLocaleString()} problems`}
         </button>
       </div>

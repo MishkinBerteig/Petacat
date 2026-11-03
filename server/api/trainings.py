@@ -1,11 +1,15 @@
-"""FastAPI router for Trainings: named, long-lived episodes of many problems over many seeds.
+"""FastAPI router for Trainings (Training Mode Sessions): named, long-lived episodes of many
+problems over many seeds.
 
-See ``server/services/training_service.py`` for the design.  A Training can be extended
-while it runs (``POST /{id}/problems``), paused, resumed, closed and cancelled; problems
-report their answer distribution as they finish, and ``GET /{id}/finished`` is a long-poll
-cursor over the order in which they finished -- the surface an ML layer drives.  With
-``memory = 'shared'`` the runs share one episode memory (a run copies it at its start and
-merges its additions when it finishes); ``GET /{id}/memory`` serves it.
+See ``server/services/training_service.py`` for the design.  A Training is created Stopped
+and is started, paused, resumed and stopped any number of times (``POST /{id}/start``,
+``/pause``, ``/resume``, ``/stop``); ``POST /{id}/cancel`` is an action that cancels every
+queued and in-flight problem and changes no state.  Problems can be added in any state
+(``POST /{id}/problems``); they report their answer distribution as they finish, and
+``GET /{id}/finished`` is a long-poll cursor over the order in which they finished -- the
+surface an ML layer drives.  Every Training has one Episodic Memory that its runs share (a
+run copies it at its start and merges its additions when it finishes); ``GET /{id}/memory``
+serves it.  No route clears it: deleting the whole Training removes it.
 
 The routes work with or without the parallel plugin: without it the runs execute serially
 in one child process, with identical results.
@@ -48,15 +52,22 @@ class AddProblemsRequest(BaseModel):
 
 
 class CreateTrainingRequest(BaseModel):
+    model_config = {"extra": "forbid"}  # e.g. a ``memory`` field is refused (422)
     name: str = Field(min_length=1, max_length=200)
     note: str = Field(default="", max_length=10_000)
-    #: Partial ``TrainingSettings``: memory, seeds_per_problem, seed_start, max_codelets,
+    #: Partial ``TrainingSettings``: seeds_per_problem, seed_start, max_codelets,
     #: parameters, backend.  Each is validated by the service (422, or 400 for parameters
     #: and backend); omitted ones take the defaults.
     settings: dict[str, Any] | None = None
     #: Partial ``ErrorPolicy``; a bad value is a 400.
     policy: dict[str, Any] | None = None
     problems: list[ProblemInput] = Field(default_factory=list, max_length=MAX_PROBLEMS_PER_REQUEST)
+
+
+class StartRequest(BaseModel):
+    model_config = {"extra": "forbid"}
+    #: Start in the Paused state instead of Running.
+    paused: bool = False
 
 
 class UpdateTrainingRequest(BaseModel):
@@ -122,7 +133,7 @@ async def update_training(training_id: int, req: UpdateTrainingRequest) -> dict[
 
 @router.get("/{training_id}/memory")
 async def training_memory(training_id: int) -> dict[str, Any]:
-    """The episode memory, newest first, in the shape ``GET /api/memory`` uses (shared only)."""
+    """The Training's Episodic Memory, newest first, in the shape ``GET /api/memory`` uses."""
     from server.api.runs import get_run_service
 
     memory = await _call(_service().memory_of(training_id))
@@ -132,7 +143,7 @@ async def training_memory(training_id: int) -> dict[str, Any]:
 
 @router.post("/{training_id}/problems", status_code=201)
 async def add_problems(training_id: int, req: AddProblemsRequest) -> dict[str, Any]:
-    """Insert problems into a training, whether or not it is running (409 once closed)."""
+    """Insert problems into a training in any state: a Stopped one stores them, a live one queues them."""
     return await _call(_service().add_problems(training_id, _dump(req.problems)))
 
 
@@ -182,33 +193,41 @@ async def finished(
     return await _call(_service().finished(training_id, after, limit, wait))
 
 
+@router.post("/{training_id}/start")
+async def start(training_id: int, req: StartRequest | None = None) -> dict[str, Any]:
+    """Stopped to Running (or Paused when ``paused`` is true); a live Training is unchanged."""
+    return await _call(_service().start_training(training_id, paused=bool(req and req.paused)))
+
+
 @router.post("/{training_id}/pause")
 async def pause(training_id: int) -> dict[str, Any]:
-    """Start nothing new; runs in flight finish and are kept."""
+    """Start nothing new; runs in flight finish and are kept (409 when Stopped)."""
     return await _call(_service().pause(training_id))
 
 
 @router.post("/{training_id}/resume")
 async def resume(training_id: int) -> dict[str, Any]:
-    """Continue a paused training."""
+    """Continue a paused training (409 when Stopped)."""
     return await _call(_service().resume(training_id))
 
 
-@router.post("/{training_id}/close")
-async def close(training_id: int) -> dict[str, Any]:
-    """Accept no more problems; the training is finished once the last one finishes."""
-    return await _call(_service().close(training_id))
+@router.post("/{training_id}/stop")
+async def stop(training_id: int) -> dict[str, Any]:
+    """Running or Paused to Stopped: runs in flight are dropped, the rest is written, and the
+    Training can be started again. A Stopped Training is unchanged."""
+    return await _call(_service().stop_training(training_id))
 
 
 @router.post("/{training_id}/cancel")
 async def cancel(training_id: int) -> dict[str, Any]:
-    """Cancel every queued and running problem."""
+    """Cancel every queued and in-flight problem. An action, not a state: the state is unchanged."""
     return await _call(_service().cancel_training(training_id))
 
 
 @router.delete("/{training_id}", status_code=204)
 async def delete_training(training_id: int) -> None:
-    """Cancel, then delete the training with its problems and runs."""
+    """Delete the training with its Episodic Memory, problems and runs. A live one is settled
+    first, with no Stop write; nothing is left behind."""
     await _call(_service().delete_training(training_id))
 
 

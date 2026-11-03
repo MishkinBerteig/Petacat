@@ -1,10 +1,10 @@
 // ---------------------------------------------------------------------------
-// Petacat -- Training: the episode's Episodic Memory (read-only)
+// Petacat -- Training: the Training's Episodic Memory (read-only)
 // ---------------------------------------------------------------------------
 //
 // Follows MemoryView's presentation (answer cards with the quality colour, snag
 // cards with the explanation) without its actions: those act on a dashboard run, and a
-// Training's memory belongs to the episode.
+// Training's memory belongs to its Training episode. Every Training has one and no control clears it.
 // ---------------------------------------------------------------------------
 
 import { useState } from 'react';
@@ -39,19 +39,18 @@ export function MemoryTab({ training }: { training: TrainingSummary }) {
         setMemory(await getTrainingMemory(training.id));
         setError(null);
       } catch (err) {
-        setError(describeApiError(err, "load this Training's episode memory"));
+        setError(describeApiError(err, "load this Training's Episodic Memory"));
       }
     },
-    training.state === 'running' ? POLL_RUNNING_MS : POLL_IDLE_MS,
+    training.state === 'running' && training.activity === null ? POLL_RUNNING_MS : POLL_IDLE_MS,
     `${training.id}|${training.memory_version}`,
   );
 
   return (
     <div data-testid="memory-tab">
       <div className="text-xs text-muted" style={{ marginBottom: 6 }}>
-        This Training&apos;s own episode memory (Training Mode, not Metacat Mode&apos;s Episodic Memory), newest first. A run's additions reach it when the run finishes, and only
-        runs that start afterwards can use them.
-        {training.memory_version !== null && <> Version {fmtInt(training.memory_version)}.</>}
+        This Training Mode Session&apos;s own Episodic Memory (never Metacat Mode&apos;s), newest first. It is never cleared; only deleting the whole Training removes it. A run&apos;s
+        additions reach it when the run finishes, and only runs that start afterwards can use them. Version {fmtInt(training.memory_version)}.
       </div>
       {error && (
         <div role="alert" style={errorStyle}>
