@@ -145,3 +145,60 @@ export interface ApplyFromReport {
   effects?: unknown[]
   skipped_rows?: ConfigurationRowRef[]
 }
+
+// ---------------------------------------------------------------------------
+// Edit-all (C12 routes, C9b UI): one change sent to chosen or all configurations
+// ---------------------------------------------------------------------------
+
+export type EditResult =
+  | 'apply' | 'no_change' | 'differs' | 'not_applicable' | 'stale' | 'skipped_by_selection'
+
+/** Which configurations a change goes to. `this` is the open one and never uses the edits routes. */
+export interface EditScope {
+  mode: 'this' | 'chosen' | 'all'
+  /** The checklist of `chosen`. */
+  ids: number[]
+}
+
+export interface EditPreviewTarget {
+  configuration_id: number
+  name: string
+  mode: string
+  mode_label: string
+  session_id: number | null
+  session_state: string | null
+  frozen: boolean
+  result: EditResult
+  reason: string | null
+  revision: number | null
+  current_revision?: number
+  report?: Record<string, unknown> | null
+  /** False for a live session: the change is held in memory and saved at Stop. */
+  persisted: boolean
+}
+
+export interface EditPreview {
+  preview_token: string
+  targets: EditPreviewTarget[]
+  counts: Record<string, number>
+}
+
+export interface EditCommitTarget extends EditPreviewTarget {
+  batch_id?: number | null
+  version_before?: number | null
+  version_after?: number | null
+  /** Present for all-or-nothing; otherwise a target with result `apply` was written. */
+  committed?: boolean
+  /** What a stale target would do now. */
+  re_preview?: { result: EditResult; reason: string | null; revision: number | null }
+}
+
+export interface EditCommit {
+  group_id: string
+  committed: boolean
+  all_or_nothing: boolean
+  blocked_by?: number[]
+  persisted_false?: number[]
+  targets: EditCommitTarget[]
+  counts: Record<string, number>
+}

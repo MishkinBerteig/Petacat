@@ -2,7 +2,7 @@
 
 > **Auto-generated.** Run `python scripts/generate_api_docs.py` to regenerate from the FastAPI application.
 
-180 HTTP routes, plus `WS /ws/runs/{run_id}` for live state push.
+185 HTTP routes, plus `WS /ws/runs/{run_id}` for live state push.
 
 Interactive documentation is served at `/docs` while the API is running.
 
@@ -84,8 +84,12 @@ Training Mode: named, long-lived Training episodes of many problems over many se
 | `PATCH` | `/api/training-mode/sessions/{session_id}` | Update Session |
 | `DELETE` | `/api/training-mode/sessions/{session_id}` | Delete Session |
 | `POST` | `/api/training-mode/sessions/{session_id}/cancel` | Cancel |
+| `POST` | `/api/training-mode/sessions/{session_id}/changes` | Post Changes |
+| `GET` | `/api/training-mode/sessions/{session_id}/configuration` | Session Configuration |
+| `GET` | `/api/training-mode/sessions/{session_id}/configuration/diff` | Session Configuration Diff |
 | `GET` | `/api/training-mode/sessions/{session_id}/export` | Export |
 | `GET` | `/api/training-mode/sessions/{session_id}/finished` | Finished |
+| `GET` | `/api/training-mode/sessions/{session_id}/journal` | Session Journal |
 | `GET` | `/api/training-mode/sessions/{session_id}/memory` | Training Mode Session Memory |
 | `POST` | `/api/training-mode/sessions/{session_id}/pause` | Pause |
 | `GET` | `/api/training-mode/sessions/{session_id}/problems` | List Problems |
@@ -94,6 +98,7 @@ Training Mode: named, long-lived Training episodes of many problems over many se
 | `POST` | `/api/training-mode/sessions/{session_id}/problems/{problem_id}/cancel` | Cancel Problem |
 | `GET` | `/api/training-mode/sessions/{session_id}/problems/{problem_id}/runs` | Problem Runs |
 | `POST` | `/api/training-mode/sessions/{session_id}/resume` | Resume |
+| `GET` | `/api/training-mode/sessions/{session_id}/slipnet` | Session Slipnet |
 | `POST` | `/api/training-mode/sessions/{session_id}/start` | Start |
 | `POST` | `/api/training-mode/sessions/{session_id}/stop` | Stop |
 

@@ -66,6 +66,10 @@ markers = [
     # Metacat's.  Its runs pin the numeric backend off themselves (faithful mode) and
     # stay outside the backend matrix.
     "lockstep: the Petacat/Metacat decision-trace harness (tests/lockstep/)",
+    # Performance budgets of the Training Mode Session configuration machinery
+    # (tests/parallel/test_session_budgets.py, tests/e2e/test_session_long_journal.py).
+    # Their timings run only with PETACAT_BUDGETS=1; their size checks run by default.
+    "budget: performance budget; the timing checks run only with PETACAT_BUDGETS=1",
 ]
 
 # The e2e database URL is not set here.  A `[tool.pytest.ini_options.env]` table used

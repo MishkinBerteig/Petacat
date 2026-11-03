@@ -147,11 +147,13 @@ describe('the header chip', () => {
     expect(screen.queryByText(/slipnet nodes \(double-click/)).toBeNull()
   })
 
-  it('shows the scope picker with only "this configuration"', async () => {
+  it('shows the scope picker, defaulting to "this configuration"', async () => {
     serve()
     render(<AdminLayout />)
     const picker = await screen.findByLabelText('Apply to')
-    expect(within(picker).getAllByRole('option').map(o => o.textContent)).toEqual(['This configuration'])
+    expect(within(picker).getAllByRole('option').map(o => o.textContent))
+      .toEqual(['This configuration', 'Chosen configurations', 'All configurations'])
+    expect((picker as HTMLSelectElement).value).toBe('this')
   })
 
   it('says why the enum and help tabs have no session configuration to edit', async () => {
@@ -467,5 +469,33 @@ describe('the requester for a session configuration', () => {
     serve(rowsReply('commentary_templates', ['template_key'], []))
     await expect(makeAdminRequest(5)('/admin/commentary-templates/4', { method: 'DELETE' }))
       .rejects.toMatchObject({ status: 404 })
+  })
+})
+
+describe('the deep link #/admin?configuration=<id>', () => {
+  afterEach(() => { window.location.hash = '' })
+
+  it('opens that configuration in the editors on mount', async () => {
+    serve()
+    window.location.hash = '#/admin?configuration=5'
+    render(<AdminLayout />)
+    await waitFor(() => expect(screen.getByTestId('configuration-chip').textContent).toContain("Training Mode Session 'Alpha'"))
+  })
+
+  it('opens it on a hashchange while the Admin view is shown', async () => {
+    serve()
+    window.location.hash = '#/admin'
+    render(<AdminLayout />)
+    await waitFor(() => expect(screen.getByTestId('configuration-chip').textContent).toContain(GLOBAL_CHIP))
+    window.location.hash = '#/admin?configuration=6'
+    window.dispatchEvent(new HashChangeEvent('hashchange'))
+    await waitFor(() => expect(screen.getByTestId('configuration-chip').textContent).toContain("Training Mode Session 'Beta'"))
+  })
+
+  it('keeps the global configuration for a missing or invalid id', async () => {
+    serve()
+    window.location.hash = '#/admin?configuration=abc'
+    render(<AdminLayout />)
+    await waitFor(() => expect(screen.getByTestId('configuration-chip').textContent).toContain(GLOBAL_CHIP))
   })
 })

@@ -247,6 +247,20 @@ describe('SessionPanel: the list', () => {
     expect(within(items[0]).getByRole('progressbar')).toHaveAttribute('aria-valuenow', '250')
   })
 
+  it('shows whether each session is live or stored, and its saved_through version', async () => {
+    m.listSessions.mockResolvedValue({
+      ...LIST,
+      sessions: [
+        session({ saved_through: { stopped_at: null, configuration_revision: 4, episode_version: 0 } }),
+        session({ id: 2, name: 'Done one', state: 'stopped', source: 'stored', unsaved: null }),
+      ],
+    })
+    render(<SessionPanel />)
+    const saved = await screen.findAllByTestId('session-item-saved')
+    expect(saved[0]).toHaveTextContent('Live (in memory) · 502 unsaved · saved through configuration version 4')
+    expect(saved[1]).toHaveTextContent('Stored (as of last stop)')
+  })
+
   it('says the executor is serial when the parallel plugin is absent', async () => {
     m.listSessions.mockResolvedValue({ ...LIST, executor: { kind: 'serial', workers: 1, in_flight: 0, queued_runs: 0 } })
     render(<SessionPanel />)
@@ -493,14 +507,29 @@ describe('SessionPanel: the session detail', () => {
     await waitFor(() => expect(m.cancelSession).toHaveBeenCalledWith(1))
   })
 
-  it('deletes after confirmation and returns to the list', async () => {
+  it('deletes only after the session name is typed, and returns to the list', async () => {
     m.deleteSession.mockResolvedValue(undefined)
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
     await open()
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
+    const confirm = screen.getByRole('button', { name: 'Delete this Training Mode Session' })
+    expect(confirm).toBeDisabled()
+    fireEvent.change(screen.getByLabelText(/Type the name/), { target: { value: 'pilot' } })
+    expect(confirm).toBeDisabled()
+    fireEvent.change(screen.getByLabelText(/Type the name/), { target: { value: 'Pilot' } })
+    expect(confirm).toBeEnabled()
+    expect(m.deleteSession).not.toHaveBeenCalled()
+    fireEvent.click(confirm)
     await waitFor(() => expect(m.deleteSession).toHaveBeenCalledWith(1))
     await waitFor(() => expect(screen.queryByTestId('session-detail')).not.toBeInTheDocument())
     expect(window.location.hash).toBe('#/training-mode')
+  })
+
+  it('Keep it closes the delete confirmation without deleting', async () => {
+    await open()
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Keep it' }))
+    expect(screen.queryByTestId('delete-confirmation')).not.toBeInTheDocument()
+    expect(m.deleteSession).not.toHaveBeenCalled()
   })
 
   it('shows why a session is stalled', async () => {
@@ -1105,9 +1134,8 @@ describe('SessionPanel: the Stopped rule (live and stored, saved_through, unsave
   })
 
   it('says a live delete discards the unsaved state', async () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
     await open()
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
-    expect(confirm).toHaveBeenCalledWith(expect.stringContaining('discarded without being saved'))
+    expect(screen.getByTestId('delete-confirmation')).toHaveTextContent('discarded without being saved')
   })
 })

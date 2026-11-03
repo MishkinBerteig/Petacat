@@ -3,6 +3,13 @@
 // ---------------------------------------------------------------------------
 
 import type {
+  SessionConfigurationCounts,
+  SessionConfigurationDiff,
+  SessionConfigurationRows,
+  SessionJournal,
+  SessionSlipnet,
+} from '@/types/sessionConfiguration';
+import type {
   ApplyFromReport,
   ConfigurationCompare,
   ConfigurationDiff,
@@ -10,6 +17,8 @@ import type {
   ConfigurationSummary,
   ConfigurationStatus,
   ConfigurationWriteResult,
+  EditCommit,
+  EditPreview,
   JournalVerifyReport,
 } from '@/types/configuration';
 import type {
@@ -1155,4 +1164,75 @@ export async function applyConfigurationFrom(
     method: 'POST',
     body: JSON.stringify({ source, rows, note: options.note ?? '', dry_run: options.dryRun ?? false }),
   });
+}
+
+// ---------------------------------------------------------------------------
+// Edit-all: preview and commit one change to chosen or all configurations (C12 routes)
+// ---------------------------------------------------------------------------
+
+/** `targets` is `{ids}` (chosen) or `{all: true}`; `baseRevisions` maps a configuration id to its revision. */
+export async function previewConfigurationEdits(
+  ops: Array<Record<string, unknown>>,
+  targets: { ids: number[] } | { all: true },
+  baseRevisions: Record<string, number>,
+  note = '',
+): Promise<EditPreview> {
+  return request<EditPreview>('/configurations/edits/preview', {
+    method: 'POST',
+    body: JSON.stringify({ ops, targets, base_revisions: baseRevisions, note }),
+  });
+}
+
+export async function commitConfigurationEdits(body: {
+  preview_token: string
+  overwrite: number[]
+  apply_rest: number[]
+  all_or_nothing: boolean
+  reason: string
+}): Promise<EditCommit> {
+  return request<EditCommit>('/configurations/edits', { method: 'POST', body: JSON.stringify(body) });
+}
+
+// ---------------------------------------------------------------------------
+// A Training Mode Session's own configuration: journal, versions, diff, Slipnet (S6 routes)
+// ---------------------------------------------------------------------------
+
+export async function getSessionJournal(
+  sessionId: number,
+  options: { source?: string; limit?: number; offset?: number } = {},
+): Promise<SessionJournal> {
+  const q = new URLSearchParams();
+  if (options.source) q.set('source', options.source);
+  q.set('limit', String(options.limit ?? 200));
+  if (options.offset) q.set('offset', String(options.offset));
+  return request<SessionJournal>(`/training-mode/sessions/${sessionId}/journal?${q.toString()}`);
+}
+
+/** Row counts per table, or with `table` that table's rows, at a version (the current one when omitted). */
+export async function getSessionConfiguration(
+  sessionId: number,
+  options: { version?: number; table?: string } = {},
+): Promise<SessionConfigurationCounts | SessionConfigurationRows> {
+  const q = new URLSearchParams();
+  if (options.version !== undefined) q.set('version', String(options.version));
+  if (options.table) q.set('table', options.table);
+  const qs = q.toString();
+  return request(`/training-mode/sessions/${sessionId}/configuration${qs ? `?${qs}` : ''}`);
+}
+
+export async function getSessionConfigurationDiff(
+  sessionId: number,
+  from: number,
+  to?: number,
+): Promise<SessionConfigurationDiff> {
+  const q = new URLSearchParams({ from: String(from) });
+  if (to !== undefined) q.set('to', String(to));
+  return request<SessionConfigurationDiff>(
+    `/training-mode/sessions/${sessionId}/configuration/diff?${q.toString()}`,
+  );
+}
+
+export async function getSessionSlipnet(sessionId: number, version?: number): Promise<SessionSlipnet> {
+  const qs = version !== undefined ? `?version=${version}` : '';
+  return request<SessionSlipnet>(`/training-mode/sessions/${sessionId}/slipnet${qs}`);
 }

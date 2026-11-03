@@ -1385,6 +1385,10 @@ class TrainingModeSessionService:
             raise SessionError(404, f"session {session_id} not found")
         return t
 
+    def database(self):
+        """A database session from the service's factory (the API's read views use it)."""
+        return self._factory()
+
     async def list_sessions(self) -> list[dict[str, Any]]:
         async with self._factory() as s:
             ts = (await s.execute(select(TrainingModeSession).order_by(TrainingModeSession.id.desc()))).scalars().all()

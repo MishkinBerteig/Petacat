@@ -21,6 +21,7 @@ import { HistoryPanel } from './history/HistoryPanel'
 import { ConfigurationChip } from './ConfigurationChip'
 import { ConfigurationsTab } from './ConfigurationsTab'
 import { isChangingState } from './configurationLabels'
+import { ScopeProvider } from './editScope'
 
 const TABS = [
   { key: 'configurations', label: 'Configurations' },
@@ -95,6 +96,19 @@ async function importConfiguration(file: File): Promise<Flash> {
   }
 }
 
+/**
+ * The configuration a link asks the Admin view to open: `#/admin?configuration=<id>` (the
+ * Training Mode Session's Configuration tab links here). Anything else is no request.
+ */
+export function configurationFromHash(): number | null {
+  const match = window.location.hash.match(/^#\/admin\?(.*)$/)
+  if (!match) return null
+  const raw = new URLSearchParams(match[1]).get('configuration')
+  if (raw === null || !/^\d+$/.test(raw)) return null
+  const id = Number(raw)
+  return id >= 1 ? id : null
+}
+
 interface AdminLayoutProps {
   editNodeName?: string | null;
   onClearEditNode?: () => void;
@@ -105,7 +119,7 @@ export function AdminLayout({ editNodeName, onClearEditNode }: AdminLayoutProps)
   const [flash, setFlash] = useState<Flash | null>(null)
   const [configurationChanges, setConfigurationChanges] = useState(0)
   // The configuration the editors below are changing; 1 is the global one (Metacat Mode).
-  const [openId, setOpenId] = useState(GLOBAL_CONFIGURATION_ID)
+  const [openId, setOpenId] = useState(() => configurationFromHash() ?? GLOBAL_CONFIGURATION_ID)
   const [summary, setSummary] = useState<ConfigurationSummary | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -134,6 +148,16 @@ export function AdminLayout({ editNodeName, onClearEditNode }: AdminLayoutProps)
     setOpenId(id)
     setActiveTab(tab)
   }, [])
+
+  // A link to `#/admin?configuration=<id>` opens that configuration, also while this view is shown.
+  useEffect(() => {
+    const onHash = () => {
+      const id = configurationFromHash()
+      if (id !== null) open(id)
+    }
+    window.addEventListener('hashchange', onHash)
+    return () => window.removeEventListener('hashchange', onHash)
+  }, [open])
 
   // Auto-switch to slipnet tab when editNodeName arrives
   useEffect(() => {
@@ -176,6 +200,7 @@ export function AdminLayout({ editNodeName, onClearEditNode }: AdminLayoutProps)
   }, [])
 
   return (
+    <ScopeProvider openId={openId}>
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {flash && (
         <div
@@ -279,5 +304,6 @@ export function AdminLayout({ editNodeName, onClearEditNode }: AdminLayoutProps)
         )}
       </div>
     </div>
+    </ScopeProvider>
   )
 }

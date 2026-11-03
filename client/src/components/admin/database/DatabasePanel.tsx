@@ -5,6 +5,7 @@ import { RowEditor, type EditMode } from './RowEditor'
 import { SqlBox } from './SqlBox'
 import type { DbRow, DbRowPage, DbTable, TableClass } from './types'
 import { showValue } from './values'
+import { useScope } from '../editScope'
 
 const PAGE = 25
 
@@ -44,6 +45,7 @@ export function DatabasePanel() {
   const [flash, setFlash] = useState<Flash | null>(null)
   const [busy, setBusy] = useState(false)
 
+  const scope = useScope()
   const table = tables.find(t => t.name === selected) ?? null
 
   const loadTables = useCallback(async () => {
@@ -121,6 +123,15 @@ export function DatabasePanel() {
                 expect: Object.fromEntries(Object.keys(changed).map(k => [k, old[k]])) }
             : { op, table: table.name, key: row!.key },
       ]
+      if (scope && scope.scope.mode !== 'this') {
+        // Chosen or all configurations: through the preview, as an editor's save does.
+        setBusy(true)
+        scope.commit(ops)
+          .then(c => afterWrite(`Committed to ${c.targets.filter(t => t.committed).length} configuration(s) in group ${c.group_id}.`))
+          .catch(err => setFlash({ kind: 'error', text: err instanceof Error && !(err as any).status ? err.message : describeDbError(err, `${op} a row of ${table.name}`) }))
+          .finally(() => setBusy(false))
+        return
+      }
       void send('/admin/db/changes',
         { configuration_id: Number(configurationId), ops, note: 'Database tab' },
         `${op} a row of ${table.name}`,

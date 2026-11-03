@@ -30,6 +30,8 @@ export const COMPONENT_HELP_KEYS = [
   'session_add_problems',
   'session_error_policy',
   'session_export',
+  'session_external_route',
+  'session_learning_sources',
   'session_new',
   'session_problem_text',
   'session_problems_table',

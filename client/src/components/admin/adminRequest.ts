@@ -22,6 +22,7 @@
 
 import { useMemo } from 'react'
 import { ApiError, GLOBAL_CONFIGURATION_ID, request } from '@/api/client'
+import { useScopeRef, type ScopeValue } from './editScope'
 
 export type AdminRequest = <T>(path: string, options?: RequestInit) => Promise<T>
 
@@ -92,7 +93,7 @@ interface Table {
 }
 
 /** The requester for one configuration. `GLOBAL_CONFIGURATION_ID` is `request` itself. */
-export function makeAdminRequest(configuration: number): AdminRequest {
+function makeConfigurationRequest(configuration: number): AdminRequest {
   if (configuration === GLOBAL_CONFIGURATION_ID) return request
 
   const tables = new Map<string, Table>()
@@ -189,7 +190,78 @@ export function makeAdminRequest(configuration: number): AdminRequest {
   }
 }
 
+/**
+ * The requester for one configuration, with the scope picker (3.10.2) applied. While the scope is
+ * "this configuration" (or `getScope` is absent) it is the plain requester. Otherwise a write to
+ * an editor becomes ops for the edits routes, and goes through the preview dialog to the
+ * chosen configurations or to all of them; reads are unchanged.
+ */
+export function makeAdminRequest(
+  configuration: number,
+  getScope?: () => ScopeValue | null,
+): AdminRequest {
+  const plain = makeConfigurationRequest(configuration)
+  if (!getScope) return plain
+
+  let keyColumns: Record<string, string[]> = {}
+  async function keysOf(table: string): Promise<string[]> {
+    if (!keyColumns[table]) {
+      const res = await request<RowsResponse>(`/configurations/${configuration}/rows?table=${table}`)
+      keyColumns = { ...keyColumns, [table]: res.key_columns }
+    }
+    return keyColumns[table]
+  }
+
+  return async function scopedRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
+    const sc = getScope()
+    const method = (options.method ?? 'GET').toUpperCase()
+    const found = locate(path)
+    if (!sc || sc.scope.mode === 'this' || method === 'GET' || !found) return plain<T>(path, options)
+
+    const { spec } = found
+    const cols = await keysOf(spec.table)
+    const list = (await plain<Row[]>(found.base)) as Row[]
+    const body: Row = options.body ? JSON.parse(String(options.body)) : {}
+    const keyOf = (row: Row): Row => Object.fromEntries(cols.map(c => [c, row[c] ?? '']))
+
+    if (method === 'POST') {
+      const row = { ...body }
+      if (spec.table === 'posting_rules' && !row.rule_key) {
+        const taken = new Set(list.map(r => r.rule_key))
+        let key = String(row.codelet_type)
+        for (let n = 2; taken.has(key); n++) key = `${row.codelet_type}_${n}`
+        row.rule_key = key
+      }
+      await sc.commit([{ op: 'insert', table: spec.table, row }])
+      return row as T
+    }
+
+    const idText = decodeURIComponent(found.id ?? '')
+    const current = list.find(r => (spec.surrogate ? String(r.id) === idText : String(r[cols[0]]) === idText))
+    if (!current) {
+      throw new ApiError(404, 'Not Found', JSON.stringify({ detail: `${spec.table} row ${idText} is not in this configuration` }))
+    }
+    const key = keyOf(current)
+    if (method === 'DELETE') {
+      await sc.commit([{ op: 'delete', table: spec.table, key }])
+      return undefined as T
+    }
+    // PUT: only columns the row has; a key column that did not change names the row, not a field.
+    const fields: Row = {}
+    for (const [c, v] of Object.entries(body)) {
+      if (c === 'id' || !(c in current) || (spec.table === 'posting_rules' && c === 'rule_key')) continue
+      if (cols.includes(c) && sameValue(v, key[c])) continue
+      if (sameValue(v, current[c])) continue
+      fields[c] = v
+    }
+    const expect = Object.fromEntries(Object.keys(fields).map(c => [c, current[c]]))
+    await sc.commit([{ op: 'update', table: spec.table, key, fields, expect }])
+    return { ...current, ...body } as T
+  }
+}
+
 /** The requester an editor uses; it changes only when the configuration does. */
 export function useAdminRequest(configuration: number = GLOBAL_CONFIGURATION_ID): AdminRequest {
-  return useMemo(() => makeAdminRequest(configuration), [configuration])
+  const scope = useScopeRef()
+  return useMemo(() => makeAdminRequest(configuration, () => scope.current), [configuration, scope])
 }

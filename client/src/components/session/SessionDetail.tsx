@@ -17,6 +17,7 @@ import {
 } from '@/api/client';
 import type { SessionErrorPolicy, SessionLimits, SessionSummary } from '@/types';
 import { chunk, parseProblemText } from './problemText';
+import { ConfigurationTab } from './ConfigurationTab';
 import { MemoryTab } from './MemoryTab';
 import { PolicyFields } from './PolicyFields';
 import { ProblemPreview, ProblemTextInput } from './ProblemTextInput';
@@ -51,7 +52,9 @@ interface Props {
 export function SessionDetail({ session, limits, notice, onSessionChanged, onDeleted }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<'problems' | 'memory'>('problems');
+  const [tab, setTab] = useState<'problems' | 'memory' | 'configuration'>('problems');
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [typedName, setTypedName] = useState('');
   const [renaming, setRenaming] = useState(false);
   const [newName, setNewName] = useState('');
 
@@ -101,19 +104,20 @@ export function SessionDetail({ session, limits, notice, onSessionChanged, onDel
     void act('cancel the Training Mode Session', () => cancelSession(session.id));
   };
 
+  const askDelete = () => {
+    setTypedName('');
+    setConfirmingDelete(true);
+  };
+
+  /** Runs only from the typed confirmation: the name typed must be the session's name exactly. */
   const handleDelete = async () => {
-    if (
-      !window.confirm(
-        `Delete "${label}"? Its problems, runs and Episodic Memory are removed from the database${live ? ', and its live state is discarded without being saved' : ''}. This cannot be undone.`,
-      )
-    )
-      return;
     setBusy(true);
     setError(null);
     try {
       await deleteSession(session.id);
       onDeleted();
     } catch (err) {
+      setConfirmingDelete(false);
       setError(describeApiError(err, 'delete the Training Mode Session'));
       setBusy(false);
     }
@@ -267,7 +271,7 @@ export function SessionDetail({ session, limits, notice, onSessionChanged, onDel
           >
             Cancel
           </button>
-          <button disabled={busy || transient} onClick={() => void handleDelete()}>
+          <button disabled={busy || transient} onClick={askDelete}>
             Delete
           </button>
           <ControlHelp topic="session_run_state" label="start, pause, resume, stop and cancel" />
@@ -292,6 +296,37 @@ export function SessionDetail({ session, limits, notice, onSessionChanged, onDel
           <ControlHelp topic="session_export" label="export" />
         </div>
 
+        {confirmingDelete && (
+          <div
+            role="alertdialog"
+            aria-label="Confirm deleting this Training Mode Session"
+            data-testid="delete-confirmation"
+            style={{ ...errorStyle, marginTop: 8, marginBottom: 0 }}
+          >
+            <div style={{ marginBottom: 6 }}>
+              Delete &quot;{label}&quot;? Its problems, runs, configuration and Episodic Memory are removed from the database
+              {live ? ', and its live state is discarded without being saved' : ''}. This cannot be undone.
+            </div>
+            <label htmlFor="delete-confirm-name" style={{ fontSize: 11, marginRight: 6 }}>
+              Type the name &quot;{label}&quot; to confirm
+            </label>
+            <input
+              id="delete-confirm-name"
+              value={typedName}
+              autoFocus
+              autoComplete="off"
+              onChange={(e) => setTypedName(e.target.value)}
+              style={{ minWidth: 200 }}
+            />{' '}
+            <button disabled={busy || typedName !== label} onClick={() => void handleDelete()}>
+              Delete this Training Mode Session
+            </button>{' '}
+            <button disabled={busy} onClick={() => setConfirmingDelete(false)}>
+              Keep it
+            </button>
+          </div>
+        )}
+
         <PolicyEditor session={session} onSessionChanged={onSessionChanged} />
       </div>
 
@@ -299,13 +334,19 @@ export function SessionDetail({ session, limits, notice, onSessionChanged, onDel
 
       <div style={cardStyle}>
         <div role="tablist" aria-label="Training Mode Session views" style={{ display: 'flex', gap: 2, marginBottom: 8 }}>
-          {(['problems', 'memory'] as const).map((t) => (
+          {(['problems', 'memory', 'configuration'] as const).map((t) => (
             <button
               key={t}
               role="tab"
               aria-selected={tab === t}
               onClick={() => setTab(t)}
-              title={t === 'memory' ? "This Training Mode Session's own Episodic Memory (Training Mode), not Metacat Mode's" : undefined}
+              title={
+                t === 'memory'
+                  ? "This Training Mode Session's own Episodic Memory (Training Mode), not Metacat Mode's"
+                  : t === 'configuration'
+                    ? "This Training Mode Session's own configuration and how it has changed (Training Mode), not Metacat Mode's"
+                    : undefined
+              }
               style={{
                 fontSize: 11,
                 padding: '2px 10px',
@@ -317,12 +358,18 @@ export function SessionDetail({ session, limits, notice, onSessionChanged, onDel
                 fontWeight: tab === t ? 700 : 400,
               }}
             >
-              {t === 'problems' ? 'Problems' : 'Memory'}
+              {t === 'problems' ? 'Problems' : t === 'memory' ? 'Memory' : 'Configuration'}
             </button>
           ))}
           {tab === 'memory' && <ControlHelp topic="training_mode_session_memory" label="the Memory tab" />}
         </div>
-        {tab === 'memory' ? <MemoryTab session={session} /> : <ProblemsTable session={session} />}
+        {tab === 'memory' ? (
+          <MemoryTab session={session} />
+        ) : tab === 'configuration' ? (
+          <ConfigurationTab session={session} />
+        ) : (
+          <ProblemsTable session={session} />
+        )}
       </div>
     </div>
   );

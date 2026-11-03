@@ -195,3 +195,46 @@ describe('SlipnetGraphView — a clamp the server refuses', () => {
     expect(screen.queryByRole('button', { name: 'Unclamp' })).toBeNull()
   })
 })
+
+describe('SlipnetGraphView — drawing a graph it was handed', () => {
+  const GRAPH = {
+    nodes: [
+      { name: 'a', short_name: 'A', conceptual_depth: 10 },
+      { name: 'b', short_name: 'B', conceptual_depth: 20 },
+      { name: 'c', short_name: 'C', conceptual_depth: 30 },
+    ],
+    links: [
+      { from_node: 'a', to_node: 'b', link_type: 'lateral', label_node: null, link_length: 60, fixed_length: false },
+    ],
+    layout: { a: [0, 0] as [number, number], b: [0, 1] as [number, number] },
+  }
+
+  it('makes no request and draws exactly the nodes and links given', async () => {
+    const fetchMock = vi.fn((url: string, init?: RequestInit) => handler(url, init))
+    vi.stubGlobal('fetch', fetchMock)
+    render(<SlipnetGraphView graph={GRAPH} slipnet={null} readOnly />)
+    await waitFor(() => expect(document.querySelectorAll('.graph-node').length).toBe(3))
+    expect(fetchMock).not.toHaveBeenCalled()
+    // A link row has no id: it still draws (one path for the one link).
+    expect(document.querySelectorAll('svg path').length).toBe(1)
+  })
+
+  it('places a node the layout does not place in rows below the grid, not on top of another', async () => {
+    render(<SlipnetGraphView graph={GRAPH} slipnet={null} readOnly />)
+    await waitFor(() => expect(document.querySelectorAll('.graph-node').length).toBe(3))
+    const centres = Array.from(document.querySelectorAll('.graph-node circle:not([fill="none"])')).map((c) => [
+      Number(c.getAttribute('cx')),
+      Number(c.getAttribute('cy')),
+    ])
+    expect(new Set(centres.map((c) => c.join(','))).size).toBe(3)
+    const ys = centres.map((c) => c[1])
+    expect(Math.max(...ys)).toBeGreaterThan(Math.min(...ys))
+  })
+
+  it('redraws when handed a different graph', async () => {
+    const { rerender } = render(<SlipnetGraphView graph={GRAPH} slipnet={null} readOnly />)
+    await waitFor(() => expect(document.querySelectorAll('.graph-node').length).toBe(3))
+    rerender(<SlipnetGraphView graph={{ ...GRAPH, nodes: GRAPH.nodes.slice(0, 2) }} slipnet={null} readOnly />)
+    await waitFor(() => expect(document.querySelectorAll('.graph-node').length).toBe(2))
+  })
+})

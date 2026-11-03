@@ -15,8 +15,9 @@ interface SlipnetExport {
     | { node_positions?: Record<string, [number, number]> };
 }
 
-interface LinkDef {
-  id: number;
+export interface LinkDef {
+  /** Absent in a configuration's link rows (they are keyed by their four natural-key columns). */
+  id?: number;
   from_node: string;
   to_node: string;
   link_type: string;
@@ -44,6 +45,50 @@ function activationColor(activation: number): string {
   const g = Math.round(101 - t * 78);
   const b = Math.round(192 - t * 142);
   return `rgb(${r},${g},${b})`;
+}
+
+/**
+ * A Slipnet to draw that did not come from the live server: the nodes, the links and where the
+ * layout puts each node as (row, column). A node the layout does not place is drawn in rows below
+ * the grid (see `placeNodes`), so a configuration that has gained a node still shows it.
+ */
+export interface SlipnetGraphData {
+  nodes: SlipnetNodeDef[];
+  links: LinkDef[];
+  layout: Record<string, [number, number]>;
+}
+
+/** Fewest columns an unplaced node's rows may use: the width of the Metacat Standard grid. */
+const UNPLACED_COLS = 13;
+
+/**
+ * Where every node goes: its layout cell, or, for a node the layout does not place, the next free
+ * cell in rows added below the grid (left to right, in node order). Returns the positions and the
+ * names that were unplaced.
+ */
+export function placeNodes(
+  names: string[],
+  layout: Record<string, [number, number]>,
+): { positions: Record<string, [number, number]>; unplaced: string[] } {
+  const positions: Record<string, [number, number]> = {};
+  let maxRow = -1;
+  let maxCol = UNPLACED_COLS - 1;
+  const unplaced: string[] = [];
+  for (const name of names) {
+    const p = layout[name];
+    if (p) {
+      positions[name] = p;
+      maxRow = Math.max(maxRow, p[0]);
+      maxCol = Math.max(maxCol, p[1]);
+    } else {
+      unplaced.push(name);
+    }
+  }
+  const cols = maxCol + 1;
+  unplaced.forEach((name, i) => {
+    positions[name] = [maxRow + 2 + Math.floor(i / cols), i % cols];
+  });
+  return { positions, unplaced };
 }
 
 // Grid layout: 5 rows x 13 cols. Cell spacing for a clear, readable graph.
@@ -78,6 +123,12 @@ interface Props {
   slipnet?: SlipnetState | null;
   /** Suppress the clamp menu: a recorded Slipnet cannot be clamped. */
   readOnly?: boolean;
+  /**
+   * The nodes, links and layout to draw. Omit them and the graph loads the global configuration's
+   * from the server (Metacat Mode); pass them and it draws exactly these and makes no request
+   * (a Training Mode Session's configuration at a version).
+   */
+  graph?: SlipnetGraphData;
 }
 
 export function SlipnetGraphView({
@@ -86,6 +137,7 @@ export function SlipnetGraphView({
   selectedNode,
   slipnet: slipnetOverride,
   readOnly = false,
+  graph,
 }: Props) {
   const liveSlipnet = useRunStore((s) => s.slipnet);
   const liveRunId = useRunStore((s) => s.runId);
@@ -94,10 +146,19 @@ export function SlipnetGraphView({
   const slipnet = slipnetOverride !== undefined ? slipnetOverride : liveSlipnet;
   const runId = readOnly ? null : liveRunId;
 
-  const [nodeDefs, setNodeDefs] = useState<SlipnetNodeDef[]>([]);
-  const [links, setLinks] = useState<LinkDef[]>([]);
-  const [gridPositions, setGridPositions] = useState<Record<string, [number, number]>>({});
-  const [loading, setLoading] = useState(true);
+  const supplied = graph !== undefined;
+  const [fetchedNodes, setNodeDefs] = useState<SlipnetNodeDef[]>([]);
+  const [fetchedLinks, setLinks] = useState<LinkDef[]>([]);
+  const [fetchedGrid, setGridPositions] = useState<Record<string, [number, number]>>({});
+  const [fetchedLoading, setLoading] = useState(true);
+  const loading = supplied ? false : fetchedLoading;
+  const nodeDefs = supplied ? graph.nodes : fetchedNodes;
+  const links = supplied ? graph.links : fetchedLinks;
+  const suppliedLayout = supplied ? graph.layout : null;
+  const gridPositions = useMemo(
+    () => placeNodes(nodeDefs.map((n) => n.name), suppliedLayout ?? fetchedGrid).positions,
+    [nodeDefs, suppliedLayout, fetchedGrid],
+  );
   /** Why the graph is empty: the nodes and links did not arrive. */
   const [loadError, setLoadError] = useState<string | null>(null);
   /** Why the last clamp asked for is not in force. */
@@ -124,6 +185,7 @@ export function SlipnetGraphView({
   } | null>(null);
 
   useEffect(() => {
+    if (supplied) return;
     Promise.all([
       request<SlipnetExport>('/admin/export'),
       api.getSlipnetLinks(),
@@ -151,7 +213,7 @@ export function SlipnetGraphView({
       setLoadError(describeApiError(err, 'load the Slipnet graph'));
       setLoading(false);
     });
-  }, []);
+  }, [supplied]);
 
   useEffect(() => {
     const handler = () => setContextMenu(null);
@@ -399,7 +461,7 @@ export function SlipnetGraphView({
 
           return (
             <path
-              key={link.id}
+              key={link.id ?? `${link.from_node}|${link.to_node}|${link.link_type}|${link.label_node ?? ''}`}
               d={pathD}
               fill="none"
               stroke={labelFrozen ? 'cyan' : LINK_COLORS[link.link_type] ?? '#888'}

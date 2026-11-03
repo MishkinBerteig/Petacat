@@ -128,11 +128,11 @@ outside the matrix take it too and the run is entirely what it says it is.
   unit          1749 collected   1749 run   1749 passed      0 failed      0 skipped  complete
   seed_unit     1041 collected   1041 run   1041 passed      0 failed      0 skipped  complete
   module        1041 collected   1041 run   1041 passed      0 failed      0 skipped  complete
-  architecture    73 collected     73 run     73 passed      0 failed      0 skipped  complete
+  architecture    91 collected     91 run     91 passed      0 failed      0 skipped  complete
   integration    346 collected    346 run    346 passed      0 failed      0 skipped  complete
-  parallel       273 collected    273 run    273 passed      0 failed      0 skipped  complete
+  parallel       291 collected    291 run    291 passed      0 failed      0 skipped  complete
   lockstep       228 collected    228 run    228 passed      0 failed      0 skipped  complete
-  e2e            499 collected    499 run    499 passed      0 failed      0 skipped  complete
+  e2e            529 collected    529 run    529 passed      0 failed      0 skipped  complete
 
   run complete in 13.9 min against a 60 min ceiling
 ```
@@ -207,11 +207,11 @@ that allowance.
 | **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 1749 |
 | **seed unit** | `tests/seed_unit/` | One class or function, measured against the values Petacat ships with | Real `seed_data/*.json`, and the machine the process is running on | 1041 |
 | **module** | `tests/module/` | Several real components assembled and driven | Real engine objects and `seed_data/*.json`; no DB, no HTTP | 1041 |
-| **architecture** | `tests/architecture/` | How the source tree is allowed to depend on itself | The repository's source, `seed_data/*.json`, child interpreters | 73 |
+| **architecture** | `tests/architecture/` | How the source tree is allowed to depend on itself | The repository's source, `seed_data/*.json`, child interpreters | 91 |
 | **integration** | `tests/integration/` | Agreement between the repository's artifacts, and the harness's own rules | Real `seed_data/*.json`, the ORM declarations, the generated client files, the documentation, a real pytest session | 346 |
-| **parallel** | `tests/parallel/` | The detachable multi-core plugin (`server/parallel/`): each executor against the serial run it claims to equal | Real engine objects and `seed_data/*.json`, worker processes and threads; each test pins the backend it compares on | 273 |
+| **parallel** | `tests/parallel/` | The detachable multi-core plugin (`server/parallel/`): each executor against the serial run it claims to equal | Real engine objects and `seed_data/*.json`, worker processes and threads; each test pins the backend it compares on | 291 |
 | **lockstep** | `tests/lockstep/` | Petacat's decision traces against Metacat's: naming, helper conformance, tracing/replay RNGs, determinism guards, the comparer | Real engine in faithful mode (numeric backend off, or a named backend); recorded Metacat traces | 228 |
-| **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 499 |
+| **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 529 |
 
 Those counts are cases, so they include the second pass the numeric matrix makes
 over the 519 backend-sensitive tests.
@@ -246,7 +246,7 @@ first**, then move up toward the API and GUI.
 
 All eight layers run in one command — the
 [required command](#the-required-command) — and, since Petacat runs natively, all
-eight actually run: **5,250 cases**, every one of them executed. A layer that is
+eight actually run: **5,316 cases**, every one of them executed. A layer that is
 normally skipped is not a layer that is normally green, and none of these is.
 
 Wall-clock time depends heavily on the machine and on what else it is doing. The
@@ -539,9 +539,10 @@ changing what it records.
 |------|----:|--------|
 | `test_engine_purity.py` | 18 | Nothing under `server/engine/**` imports `sqlalchemy`, `server.models`, `server.db` or `server.services`, and the serializers run in an interpreter where those cannot be imported |
 | `test_declared_read_list.py` | 7 | EN10: every literal name passed to `get_param`, `get_formula_coeff` or `get_urgency` in `server/` is on the declared read list, and every declared name exists in the Metacat Standard Configuration |
-| `test_journal_only_writer.py` | 8 | C6: only the journal layer writes a configuration or journal table (an AST check over the table list from model introspection), the checker on planted snippets, the two doors `write_immediate` and `write_deferred`, and nothing in `engine/` or `parallel/` imports the journal |
+| `test_journal_only_writer.py` | 10 | C6: only the journal layer writes a configuration or journal table (an AST check over the table list from model introspection), the checker on planted snippets, the two doors `write_immediate` and `write_deferred`, and nothing in `engine/` or `parallel/` imports the journal |
 | `test_no_node_literals_in_engine.py` | 5 | The EN0 lint: no line of `server/engine/**` names a node or codelet type of the Metacat Standard Configuration (`plato-` literals and compositions, `name[6:]`, node names, codelet types), and none reads the seed files outside the one door (`MetadataProvider.from_standard_configuration`); a read anywhere else, even in `metadata.py`, is caught. The allow-list `no_node_literals_allowlist.txt` is empty and may only shrink: an entry that no longer matches fails, and a new violation cannot be added to it |
 | `test_parallel_detachable.py` | 4 | Nothing under `server/engine/**` imports the parallel plugin, and a serial run and the service layer work in an interpreter where `server.parallel` cannot be imported; a Training Mode Session run there chooses the serial executor and produces the plugin's runs, run for run |
+| `test_v2_guards.py` | 8 | C10: the engine tree is the baseline commit's, touched after EN11 only by the allowed packages; nothing is called "innate" or "core names", and "protected" means only a session's Episodic Memory (with the checker seen catching planted words); no table named for the old session entity and no `session_id` column on `runs`; the worker-side code never imports the journal layer |
 
 **`tests/integration/` — the repository's artifacts agree**
 
@@ -607,6 +608,11 @@ changing what it records.
 | `test_session_configuration.py` | 20 | S3: a Training Mode Session runs its own configuration: creation from each base with parameters folded, the WP-S3 equivalence, one worker equal to the serial episode with a learner, a live batch reaching the next dispatched run and not one in flight, a Stopped session's edit written at once, Starting and Stopping busy, M1, and the hand-off of held entries to the Stop write |
 | `test_session_stop_start.py` | 8 | S5: Stop then Start round-trips a session exactly with zero journal or merge statements at Start; many Stop/Start cycles; a failed Stop writes nothing and a retry writes everything; a tampered stored state refuses the Start while a Stopped edit does not; graceful shutdown stores every live configuration; a never-stopped session writes nothing while live |
 | `test_configuration_edits_api.py` | 8 | C12: edit-all over HTTP: the matrix of global, running, paused, Stopped, frozen and differing targets with M3 and undo by group; a missing row and a removed node with apply-the-rest; no_change, overwrite and a frozen target chosen by id; a session changing state; a stale preview re-previewed; all-or-nothing across stored and live targets |
+| `test_session_routes.py` | 13 | S6: the session routes that carry its configuration: the external route (a Stopped session writes at once, a live one holds the batch, 409 while starting or stopping, every learning source recorded, refusals in the change API's shape, dry runs); the journal timeline with live pending entries; the configuration, diff and Slipnet at a version, stored and live; export of the configuration and the journal |
+| `test_session_docs.py` | 4 | S6: `API.md` and the contract list every session route; the help topics for the external route and the learning sources are served; learn, learner and episode are qualified by mode |
+| `test_session_long_journal.py` | 2 | S8: a session with a long journal (30,000 entries by default) starts with no journal or merge statement, the same statements as a one-entry journal, and the stored hash; `verify_journal` still agrees over it; the journal-growth budget per entry (only with `PETACAT_BUDGETS=1`) |
+| `test_mode_isolation.py` | 7 | C10: M1, a Metacat Mode run is identical after a battery of session activity and session edits never change the global provider or hash; M2, the global configuration refuses `learner` and `external`; M3, edit-all end to end, one Admin entry per configuration, and a session-only edit-all leaves the global configuration alone; no journal row from a Metacat Mode run, nor from a live session before its Stop write |
+| `test_configuration_edit_scope_ui_flow.py` | 1 | C9b: the Admin scope picker's request shapes: preview by natural key with `expect`, commit to the global configuration and a Stopped session with a reason, then undo by group |
 | `test_configuration_stamp_link.py` | 2 | The configuration stamp (plan 3.8): every answer description, snag description and state capture a Normal or Audit run stores carries its run's id, and so the run's `config_hash`; the Training Mode tables carry theirs by construction |
 | `test_api_controls.py` | 29 | Breakpoints, clamping, Clamp theme pattern, Undo last clamp, the mid-run self-watching toggle, and the threshold endpoints |
 | `test_api_displays.py` | 5 | The coderack, EEG and Themespace-name data the Metacat windows need |
@@ -638,6 +644,9 @@ changing what it records.
 | `test_effects.py` | 11 | The builtin effects table is complete, and no speculated read prefix writes shared state (the hidden-write detector) |
 | `test_speculative_exact.py` | 19 | The speculative executor is bit-identical to the stream-serial reference at every worker count, with forced aborts too; which codelets run ahead, and how far, never changes a result; one worker is the reference itself; the slow sweep (`PETACAT_SPECULATIVE_SWEEP_SEEDS`) widens it |
 | `test_session_transport.py` | 17 | S4: transport to workers: swarm equals serial equals in-process on evolved configurations (parameters changed, a body edited); the configuration shipped per task equals the plain run; no rebind across many configuration versions of two alternating sessions, and one serial child; worker death on the swarm and the serial child; the shipper and the worker cache bounded and exact; Metacat Mode's Swarm calls unchanged |
+| `test_session_budgets.py` | 9 | S8: performance budgets of the session configuration machinery: a task's configuration is the provider's pickle and under the snapshot budget (always run); resolving and applying a batch, a live submit, hashing a new version, a worker composing one and the per-task overhead (timings, run only with `PETACAT_BUDGETS=1`) |
+| `test_session_evolved_speculative.py` | 4 | S8: the speculative executor on a configuration evolved through the change API: edited bodies stay exact against the stream-serial reference, a restored body speculates again, an earlier version keeps its own decision, and a parameter-only evolution demotes no codelet type |
+| `test_session_worker_isolation.py` | 1 | S8: a worker-side run, in a fresh interpreter, imports neither the journal layer, the database driver nor the ORM, so no worker can write a journal row |
 | `test_training_mode_session_memory.py` | 10 | The Training episode memory without a database: descriptions survive the JSON storage encoding and pickle transport, a merge skips what the episode already holds and restamps ids in the master's numbering, a run's copy is independent of the master, a serial episode equals copy-and-merge one run at a time, and a worker reaches a version from its cache plus the tail (or asks for a snapshot) |
 
 **Collected by no layer**

@@ -66,6 +66,14 @@ export function SessionList({ sessions, selectedId, onSelect }: Props) {
                 {fmtInt(b.problems.finished)}/{fmtInt(b.problems.total)} problems ·{' '}
                 {fmtInt(b.runs.done)}/{fmtInt(b.runs.total)} runs
               </div>
+              <div className="text-xs text-muted" style={{ margin: '0 0 3px' }} data-testid="session-item-saved">
+                {b.source === 'live' && b.unsaved
+                  ? `Live (in memory) · ${fmtInt(Object.values(b.unsaved).reduce((n, v) => n + v, 0))} unsaved`
+                  : 'Stored (as of last stop)'}
+                {b.saved_through.configuration_revision !== null
+                  ? ` · saved through configuration version ${b.saved_through.configuration_revision}`
+                  : ''}
+              </div>
               <ProgressBar done={b.runs.done} total={b.runs.total} label={`Progress of ${b.name || `session ${b.id}`}`} />
             </button>
           </li>

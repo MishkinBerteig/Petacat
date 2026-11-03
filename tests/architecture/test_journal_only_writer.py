@@ -317,6 +317,49 @@ def test_write_deferred_is_called_only_from_the_stop_write():
     assert callers == WRITE_DEFERRED_CALLERS, sorted(WRITE_DEFERRED_CALLERS - callers)
 
 
+#: Who may call each function of the layer that writes an entry or a configuration's stored
+#: state, outside the layer (C10).  ``write_immediate`` is the door every route goes through;
+#: ``write_deferred`` is the Stop write's; the other three are the layer's further writers
+#: (a configuration's meta edit (C8), a session configuration's creation, and the stored
+#: current state saved with the Stop write).  A new caller is a new way into the journal and
+#: must be added here on purpose.
+WRITER_CALLERS: dict[str, set[tuple[str, str]]] = {
+    "write_immediate": {
+        ("api/admin.py", "_journal_write"),
+        ("api/database.py", "_write_enum_ops"),
+        ("services/configuration_admin.py", "reset_to_standard"),
+        ("services/configuration_admin.py", "restore_selected"),
+        ("services/configuration_edits.py", "_write_stored"),
+        ("services/configuration_writer.py", "_apply"),
+        ("services/journal_views.py", "restore_entity"),
+        ("services/journal_views.py", "undo"),
+        ("services/standard_configuration.py", "seed_metadata_from_json"),
+    },
+    "write_deferred": WRITE_DEFERRED_CALLERS,
+    "update_configuration_meta": {("services/configurations.py", "update_meta")},
+    "create_session_configuration_rows": {("services/configurations.py", "create_session_configuration")},
+    "store_current_state": {("services/training_mode_session_service.py", "_write_stop")},
+}
+
+
+@pytest.mark.parametrize("writer", sorted(WRITER_CALLERS))
+def test_each_writer_of_the_layer_has_exactly_its_named_callers(writer):
+    assert set(_calls(writer)) == WRITER_CALLERS[writer], writer
+
+
+def test_the_layer_has_no_public_writer_the_callers_table_does_not_name():
+    """A new public function of the layer that inserts an entry or stores state is a new door."""
+    tree = ast.parse((SERVER / LAYER).read_text())
+    writers = set()
+    for n in tree.body:
+        if not isinstance(n, ast.AsyncFunctionDef) or n.name.startswith("_"):
+            continue
+        for c in ast.walk(n):
+            if isinstance(c, ast.Call) and _call_name(c) in {"insert", "_write", "_save_current"}:
+                writers.add(n.name)
+    assert writers <= set(WRITER_CALLERS), sorted(writers - set(WRITER_CALLERS))
+
+
 def test_no_run_worker_swarm_or_speculative_executor_writes_the_journal():
     offenders = []
     for path, rel in _server_files():

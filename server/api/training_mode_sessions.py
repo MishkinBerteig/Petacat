@@ -31,9 +31,12 @@ import json
 from typing import Any, AsyncIterator, Literal
 
 from fastapi import APIRouter, HTTPException, Query
-from fastapi.responses import StreamingResponse
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
+from server.services import session_configuration_views as views
+from server.services.configuration_writer import ChangeError, error_response
 from server.services.training_mode_session_service import (
     MAX_PROBLEMS_PER_REQUEST,
     MAX_SEEDS_PER_PROBLEM,
@@ -235,6 +238,80 @@ async def cancel(session_id: int) -> dict[str, Any]:
     return await _call(_service().cancel_session(session_id))
 
 
+# ---------------------------------------------------------------------------
+# The session's configuration: changes from every learning source, and its history
+# ---------------------------------------------------------------------------
+
+
+@router.post("/{session_id}/changes")
+async def post_changes(session_id: int, body: dict[str, Any]):
+    """The external route: submit a batch of changes to the session's configuration.
+
+    The change API scoped to this one session (``POST /api/configurations/{id}/changes`` is the
+    same function): the body is ``{source, actor, note, base_version, base_mode, on_op_failure,
+    dry_run, ops}`` and ``source`` defaults to ``external``.  Every learning source (the
+    in-worker learner, this route and the Admin view) may change anything, and no rule refuses
+    a change.  By state: Running or Paused, the batch is accepted into memory and the report
+    says ``persisted: false`` (written at Stop); Stopped, it is written at once
+    (``persisted: true``); Starting or Stopping, 409 ``busy``.  A refusal is ``{ok: false,
+    error, status, message, problems}``: 400 or 422 for a malformed batch, 409 for ``stale``
+    (``base_mode: strict`` only) or ``key_exists``, 404 for an unknown session.
+    """
+    batch = dict(body)
+    batch.setdefault("source", "external")
+    try:
+        return await _service().submit_changes(session_id, batch)
+    except ChangeError as exc:
+        return error_response(exc)
+    except SessionError as exc:
+        raise HTTPException(exc.status, exc.detail) from exc
+
+
+@router.get("/{session_id}/journal")
+async def session_journal(
+    session_id: int,
+    from_: int | None = Query(None, alias="from", ge=0),
+    to: int | None = Query(None, ge=0),
+    source: str | None = None,
+    actor: str | None = None,
+    limit: int = Query(100, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
+    detail: bool = False,
+) -> dict[str, Any]:
+    """The session's journal timeline, newest first: version, source, actor, the causing run,
+    the counts of ops by kind, the hash. ``from`` and ``to`` are versions (inclusive); a live
+    session's entries not yet stored are included with ``pending: true``."""
+    return await _call(views.journal(
+        _service(), session_id, from_version=from_, to_version=to, source=source, actor=actor,
+        limit=limit, offset=offset, detail=detail))
+
+
+@router.get("/{session_id}/configuration")
+async def session_configuration(
+    session_id: int, version: int | None = Query(None, ge=0), table: str | None = None
+) -> dict[str, Any]:
+    """The configuration at a version (the current one by default): the table row counts, or
+    with ``table`` that table's rows. Labelled ``live`` or ``stored`` with ``saved_through``
+    and ``unsaved``."""
+    return await _call(views.configuration(_service(), session_id, version, table))
+
+
+@router.get("/{session_id}/configuration/diff")
+async def session_configuration_diff(
+    session_id: int, from_: int = Query(alias="from", ge=0), to: int | None = Query(None, ge=0)
+) -> dict[str, Any]:
+    """The rows added, removed or changed going from version ``from`` to version ``to`` (the
+    current version by default)."""
+    return await _call(views.diff(_service(), session_id, from_, to))
+
+
+@router.get("/{session_id}/slipnet")
+async def session_slipnet(session_id: int, version: int | None = Query(None, ge=0)) -> dict[str, Any]:
+    """The Slipnet graph at a version: nodes, links and layout, with the nodes that have no
+    layout row."""
+    return await _call(views.slipnet(_service(), session_id, version))
+
+
 @router.delete("/{session_id}", status_code=204)
 async def delete_session(session_id: int) -> None:
     """Delete the session with its Episodic Memory, problems and runs. A live one is settled
@@ -328,14 +405,28 @@ async def _export_stream(
 @router.get("/{session_id}/export")
 async def export(
     session_id: int,
-    what: Literal["problems", "distribution", "runs"] = "problems",
-    format: Literal["csv", "json"] = "csv",
+    what: Literal["problems", "distribution", "runs", "configuration", "journal"] = "problems",
+    format: Literal["csv", "json"] | None = None,
+    version: int | None = Query(None, ge=0),
 ) -> StreamingResponse:
-    """Download a session: its problems, answer distributions, or every run (NDJSON for json).
-    For a live session the stored rows are followed by a tail from memory, and the header
-    ``X-Export-Source: stored+live-tail`` says so."""
+    """Download a session: its problems, answer distributions, or every run (CSV by default;
+    NDJSON for runs as json), or ``what=configuration`` (the configuration at ``version``, the
+    current one by default, as one bundle) or ``what=journal`` (every entry in full), both JSON
+    only. For a live session the stored rows are followed by a tail from memory, and the
+    header ``X-Export-Source: stored+live-tail`` says so."""
     service = _service()
-    await _call(service.summary(session_id))  # 404 before the stream starts
+    summary = await _call(service.summary(session_id))  # 404 before the stream starts
+    if what in ("configuration", "journal"):
+        if format == "csv":
+            raise HTTPException(400, f"what={what} is JSON only")
+        if what == "configuration":
+            body = await _call(views.export_configuration(service, session_id, version))
+        else:
+            body = await _call(views.export_journal(service, session_id))
+        headers = {"Content-Disposition": f'attachment; filename="session-{session_id}-{what}.json"',
+                   "X-Export-Source": "live" if summary["source"] == "live" else "stored"}
+        return JSONResponse(jsonable_encoder(body), headers=headers)
+    format = format or "csv"
     if format == "csv":
         media, ext = "text/csv", "csv"
     elif what == "runs":
