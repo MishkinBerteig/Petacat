@@ -322,13 +322,13 @@ describe('SessionPanel: creating a session', () => {
     user.type(screen.getByLabelText('Seeds per problem'), '50')
     user.type(
       screen.getByLabelText('Problems'),
-      'abc → abd; xyz → ?\nabc abd xyz\nabc -> abd; ijk -> ?\n1bc abd xyz',
+      'abc → abd; xyz → ?\nabc abd xyz\nabc -> abd; ijk -> ?\nabc abd',
     )
     expect(screen.getByTestId('preview-summary')).toHaveTextContent(
       '2 problems parsed, 1 lines rejected, 1 duplicates · 100 runs in total',
     )
     fireEvent.click(screen.getByRole('button', { name: 'Show rejected lines' }))
-    expect(screen.getByTestId('rejected-list')).toHaveTextContent(/line 4.*not letters only/)
+    expect(screen.getByTestId('rejected-list')).toHaveTextContent(/line 4.*3 or 4 fields/)
 
     fireEvent.click(screen.getByRole('button', { name: 'Create session' }))
     await waitFor(() => expect(m.createSession).toHaveBeenCalledTimes(1))

@@ -83,9 +83,7 @@ export function SwarmPanel() {
   const seedOk = Number.isInteger(seedN) && seedStart.trim() !== '';
   const stepsOk = Number.isInteger(stepsN) && stepsN >= 1;
   const hasProblem =
-    formInputs.initial.trim() !== '' &&
-    formInputs.modified.trim() !== '' &&
-    formInputs.target.trim() !== '';
+    formInputs.initial !== '' && formInputs.modified !== '' && formInputs.target !== '';
 
   const unavailable = status !== null && !status.available;
   const reasonDisabled = unavailable
@@ -112,7 +110,7 @@ export function SwarmPanel() {
         initial: formInputs.initial,
         modified: formInputs.modified,
         target: formInputs.target,
-        answer: formInputs.answer.trim() !== '' ? formInputs.answer : null,
+        answer: formInputs.answer !== '' ? formInputs.answer : null,
         count: countN,
         seed_start: seedN,
         max_steps: stepsN,
@@ -127,7 +125,7 @@ export function SwarmPanel() {
     }
   };
 
-  const justification = formInputs.answer.trim() !== '';
+  const justification = formInputs.answer !== '';
   const t = result?.telemetry;
 
   return (

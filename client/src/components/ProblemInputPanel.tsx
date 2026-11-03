@@ -9,10 +9,53 @@
 // any field instead means the next Run starts a new run.
 // ---------------------------------------------------------------------------
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useLayoutEffect, useRef } from 'react';
 import { useRunStore } from '@/store/runStore';
 import type { DemoProblem } from '@/types';
 import { getDemos, describeApiError } from '@/api/client';
+
+// A problem string is any text, line breaks included: an <input> drops the line breaks of a
+// pasted string, so each of the four problem fields is a one-row <textarea> that grows with
+// its content and otherwise looks and behaves like the input it replaces. Enter did nothing
+// in the input (it is not in a form, and the global Enter shortcut stands aside while a field
+// has focus), so plain Enter still does nothing here; Shift+Enter types a line break, and
+// pasting keeps every line break. Enter during an IME composition is left to the IME.
+function ProblemField(props: {
+  id: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  disabled: boolean;
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    if (el.scrollHeight > 0) {
+      const cs = getComputedStyle(el);
+      const pad = parseFloat(cs.paddingTop || '0') + parseFloat(cs.paddingBottom || '0');
+      el.style.height = `${Math.max(el.scrollHeight - pad, 0)}px`;
+    }
+  }, [props.value]);
+  return (
+    <textarea
+      ref={ref}
+      id={props.id}
+      className="problem-field"
+      rows={1}
+      value={props.value}
+      onChange={(e) => props.onChange(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) e.preventDefault();
+      }}
+      placeholder={props.placeholder}
+      spellCheck={false}
+      style={{ width: '100%', resize: 'none', overflow: 'hidden' }}
+      disabled={props.disabled}
+    />
+  );
+}
 
 export function ProblemInputPanel() {
   const workspace = useRunStore((s) => s.workspace);
@@ -113,52 +156,44 @@ export function ProblemInputPanel() {
     <div className="flex-col" style={{ fontSize: 13 }}>
       <div style={fieldGroupStyle}>
         <label style={labelStyle} htmlFor="problem-initial">Initial</label>
-        <input
+        <ProblemField
           id="problem-initial"
-          type="text"
           value={formInputs.initial}
-          onChange={(e) => setFormInput('initial', e.target.value)}
+          onChange={(v) => setFormInput('initial', v)}
           placeholder="abc"
-          style={{ width: '100%' }}
           disabled={isRunning}
         />
       </div>
 
       <div style={fieldGroupStyle}>
         <label style={labelStyle} htmlFor="problem-modified">Modified</label>
-        <input
+        <ProblemField
           id="problem-modified"
-          type="text"
           value={formInputs.modified}
-          onChange={(e) => setFormInput('modified', e.target.value)}
+          onChange={(v) => setFormInput('modified', v)}
           placeholder="abd"
-          style={{ width: '100%' }}
           disabled={isRunning}
         />
       </div>
 
       <div style={fieldGroupStyle}>
         <label style={labelStyle} htmlFor="problem-target">Target</label>
-        <input
+        <ProblemField
           id="problem-target"
-          type="text"
           value={formInputs.target}
-          onChange={(e) => setFormInput('target', e.target.value)}
+          onChange={(v) => setFormInput('target', v)}
           placeholder="xyz"
-          style={{ width: '100%' }}
           disabled={isRunning}
         />
       </div>
 
       <div style={fieldGroupStyle}>
         <label style={labelStyle} htmlFor="problem-answer">Answer (optional)</label>
-        <input
+        <ProblemField
           id="problem-answer"
-          type="text"
           value={formInputs.answer}
-          onChange={(e) => setFormInput('answer', e.target.value)}
+          onChange={(v) => setFormInput('answer', v)}
           placeholder=""
-          style={{ width: '100%' }}
           disabled={isRunning}
         />
       </div>

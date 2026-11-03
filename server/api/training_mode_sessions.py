@@ -33,10 +33,11 @@ from typing import Any, AsyncIterator, Literal
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse, StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from server.services import session_configuration_views as views
 from server.services.configuration_writer import ChangeError, error_response
+from server.services.problem_text import check_problem
 from server.services.training_mode_session_service import (
     MAX_PROBLEMS_PER_REQUEST,
     MAX_SEEDS_PER_PROBLEM,
@@ -45,17 +46,22 @@ from server.services.training_mode_session_service import (
     get_training_mode_session_service,
 )
 
-LETTERS = r"^[A-Za-z]{1,64}$"
-
-
 class ProblemInput(BaseModel):
-    initial: str = Field(pattern=LETTERS)
-    modified: str = Field(pattern=LETTERS)
-    target: str = Field(pattern=LETTERS)
+    #: Any Unicode text, stored exactly; see ``server.services.problem_text``.
+    initial: str
+    modified: str
+    target: str
     #: Set for justification mode.
-    answer: str | None = Field(default=None, pattern=LETTERS)
+    answer: str | None = None
     seeds: int | None = Field(default=None, ge=1, le=MAX_SEEDS_PER_PROBLEM)
     tag: Any = None
+
+    @model_validator(mode="after")
+    def _problem_text(self) -> "ProblemInput":
+        # Refuses only the empty string (initial, modified, target; an answer is null or
+        # non-empty), U+0000 and a lone surrogate; every other string is valid.
+        check_problem(self.initial, self.modified, self.target, self.answer, require_nonempty=True)
+        return self
 
 
 class AddProblemsRequest(BaseModel):

@@ -125,14 +125,14 @@ outside the matrix take it too and the run is entirely what it says it is.
   gpu  mlx      float32    873 tests
   whole suite requested: the full matrix is required of this run
 
-  unit          1749 collected   1749 run   1749 passed      0 failed      0 skipped  complete
+  unit          1798 collected   1798 run   1798 passed      0 failed      0 skipped  complete
   seed_unit     1041 collected   1041 run   1041 passed      0 failed      0 skipped  complete
   module        1041 collected   1041 run   1041 passed      0 failed      0 skipped  complete
   architecture    91 collected     91 run     91 passed      0 failed      0 skipped  complete
   integration    346 collected    346 run    346 passed      0 failed      0 skipped  complete
   parallel       291 collected    291 run    291 passed      0 failed      0 skipped  complete
   lockstep       228 collected    228 run    228 passed      0 failed      0 skipped  complete
-  e2e            529 collected    529 run    529 passed      0 failed      0 skipped  complete
+  e2e            535 collected    535 run    535 passed      0 failed      0 skipped  complete
 
   run complete in 13.9 min against a 60 min ceiling
 ```
@@ -204,14 +204,14 @@ that allowance.
 
 | Layer | Directory | Scope | May depend on | Cases |
 |-------|-----------|-------|---------------|-------|
-| **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 1749 |
+| **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 1798 |
 | **seed unit** | `tests/seed_unit/` | One class or function, measured against the values Petacat ships with | Real `seed_data/*.json`, and the machine the process is running on | 1041 |
 | **module** | `tests/module/` | Several real components assembled and driven | Real engine objects and `seed_data/*.json`; no DB, no HTTP | 1041 |
 | **architecture** | `tests/architecture/` | How the source tree is allowed to depend on itself | The repository's source, `seed_data/*.json`, child interpreters | 91 |
 | **integration** | `tests/integration/` | Agreement between the repository's artifacts, and the harness's own rules | Real `seed_data/*.json`, the ORM declarations, the generated client files, the documentation, a real pytest session | 346 |
 | **parallel** | `tests/parallel/` | The detachable multi-core plugin (`server/parallel/`): each executor against the serial run it claims to equal | Real engine objects and `seed_data/*.json`, worker processes and threads; each test pins the backend it compares on | 291 |
 | **lockstep** | `tests/lockstep/` | Petacat's decision traces against Metacat's: naming, helper conformance, tracing/replay RNGs, determinism guards, the comparer | Real engine in faithful mode (numeric backend off, or a named backend); recorded Metacat traces | 228 |
-| **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 529 |
+| **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 535 |
 
 Those counts are cases, so they include the second pass the numeric matrix makes
 over the 881 backend-sensitive tests.
@@ -246,7 +246,7 @@ first**, then move up toward the API and GUI.
 
 All eight layers run in one command — the
 [required command](#the-required-command) — and, since Petacat runs natively, all
-eight actually run: **5,316 cases**, every one of them executed. A layer that is
+eight actually run: **5,371 cases**, every one of them executed. A layer that is
 normally skipped is not a layer that is normally green, and none of these is.
 
 Wall-clock time depends heavily on the machine and on what else it is doing. The
@@ -397,6 +397,7 @@ changing what it records.
 | `test_journal_replay.py` | 4 | C6: pure journal replay, reconstruction from before-images and inverse ops |
 | `test_session_episodic_memory_always.py` | 4 | S11: a Training Mode Session always has an Episodic Memory: no memory, status or `closed_at` columns and non-null episode columns; no shared or independent branch and no `close`; no route clears the memory; the create request forbids extra fields |
 | `test_no_training_entity_name.py` | 2 | S12: the grep guard: the old entity name is used nowhere outside Training Mode, Training episode and `training_memory_merges`, in code, UI strings and current docs; and the old modules, routes and component folder are gone |
+| `test_problem_text.py` | 10 | Any Unicode text is a valid problem string (`server/services/problem_text.py`): the shared check accepts a broad corpus (scripts, emoji, combining and invisible characters, whitespace, line breaks, 1,000 characters) exactly, keeps NFC and NFD distinct, and refuses only U+0000 and a lone surrogate with clear messages; every request model (session problems, runs, the Swarm, demo problems) uses it, and the session, run and Swarm requests keep the structural rule (non-empty initial, modified and target; an answer absent or non-empty) |
 | `test_session_episode.py` | 34 | S1: the pure `EpisodeLog` (`server/services/session_episode.py`): one version counter over memory and configuration, the run-finish entry (memory, then batch, then one version), external and Admin entries, relative ops commuting, `expect` first-wins with the loser recorded, abort and skip, targets removed since the snapshot, `config_at` at every version, all interleavings of three runs, removing, renaming or merging a memory-named node, exact reduction to serial, a fuzz test; against a fake and the real `resolve` |
 | `test_database_sql_check.py` | 3 | C7: the Database tab's SQL box accepts one `SELECT` or `WITH` statement only (quoted semicolons and comments handled) |
 | `test_session_live_config.py` | 20 | S3: `LiveConfiguration` (`server/services/session_live_config.py`): a live session's configuration in memory over the `EpisodeLog`; the configuration revision as the compare-and-set token, distinct from the episode version; run-finish entries; live batches held as pending journal entries in revision order |
@@ -630,6 +631,7 @@ changing what it records.
 | `test_moment_display.py` | 6 | Event, answer and snag redisplay over the API: print names in the listing, the picture served live and from the stored row, the toggle and the switch, rows with no picture |
 | `test_swarm_api.py` | 5 | `POST /api/swarm` equals the serial runs, persists nothing, and rejects bad requests; `GET /api/swarm` reports the pool |
 | `test_training_mode_sessions_api.py` | 47 | Training Mode Sessions over HTTP: every stored run is the serial run; the 25 + 5 workflow (problems added while it runs); the finished long-poll; pause, resume, close, cancel, delete; the database written only when a problem finishes; a restart redoes what was cut off to the identical result and rebuilds the shared memory exactly; one worker is a serial episode and many replay from the merge log; fair sharing of the cores; every error policy; worker-failure retries, charged only to the run that broke the pool; a policy pause survives a concurrent status change; live counts never step backwards; a summary's finished cursor comes from the same snapshot as its counts; seed ranges fit the database; configuration change stalls or is adopted; validation, export, defaults and fixed settings |
+| `test_unicode_problem_strings.py` | 6 | Any Unicode text end to end: a Training Mode Session of 20 corpus problems runs, is Stopped and reads back exactly from the database and the API; NFC and NFD problems both kept; Metacat Mode runs store and return the corpus exactly (runs row, Review, Run History); demo problems take Unicode names, sections and strings; U+0000 and a lone surrogate are a 422 in sessions, runs and demo problems; empty strings are a 422, not a crash, in runs and the Swarm |
 | `test_step0_config_from_db.py` | 48 | Step 0's guard tests: a shipped value reproduces the run and a changed one moves it |
 
 **`tests/parallel/` — the multi-core plugin against the serial runs it claims to equal**
@@ -754,7 +756,7 @@ nothing consults them now.
 
 `client/` carries a Vitest suite covering the store, the panels, the admin
 editors and the review surfaces. Run it with `cd client && npx vitest run`, and
-`npx tsc --noEmit` alongside it. **699 cases across 50 files**, all passing, in
+`npx tsc --noEmit` alongside it. **717 cases across 50 files**, all passing, in
 3.1 s on an Apple M-series machine.
 
 | File (`client/src/`) | Cases | Covers |
@@ -778,7 +780,7 @@ editors and the review surfaces. Run it with `cd client && npx vitest run`, and
 | `components/MemoryView.test.tsx` | 19 | The Memory panel shows the memory the run is thinking against, labelled as Metacat Mode's Episodic Memory |
 | `components/ModeSwitch.test.tsx` | 16 | The header's switch between Metacat Mode and Training Mode: which mode each view belongs to, moving between them, the help link, and staying put while a run is processing |
 | `components/MomentDisplay.test.tsx` | 21 | Clicking a Trace event, answer or snag redisplays the moment: the Workspace header and highlights, the Slipnet pattern, the Coderack, the Temperature, the Trace window's print-name labels |
-| `components/ProblemInputPanel.test.tsx` | 10 | The problem panel owns the problem's identity |
+| `components/ProblemInputPanel.test.tsx` | 13 | The problem panel owns the problem's identity; its four fields keep any text exactly, line breaks included |
 | `components/RunControlsPanel.test.tsx` | 56 | A run starts on the problem the form actually shows, and the Workers control is labelled as the run mode |
 | `components/RunHistory.test.tsx` | 34 | Run History stays current as runs finish |
 | `components/RunParametersPanel.test.tsx` | 14 | The twenty-six run parameters, settable before a run |
@@ -807,7 +809,7 @@ editors and the review surfaces. Run it with `cd client && npx vitest run`, and
 | `components/review/EpisodicRunTimeline.test.tsx` | 3 | A note being typed on an Episodic Memory clear survives a late refresh, and an untouched note follows the server |
 | `components/review/ReviewPanel.test.tsx` | 34 | The review surfaces read the record back, and the episodic-run timeline shows each Episodic Memory clear between the runs with an editable note |
 | `components/session/ConfigurationTab.test.tsx` | 12 | A Training Mode Session's Configuration tab: the version slider and the Live (in memory) or Stored (as of last stop) label, the Slipnet graph redrawn per version, the timeline and its source filter, Compare versions, Table rows, the link to the configuration manager, and no edit controls |
-| `components/session/problemText.test.ts` | 37 | Parsing pasted or uploaded problems (letters only, 1 to 64 characters, case-sensitive; JSON entries with their own seeds, answer and tag) and the preview the Training Mode Session view shows before adding them |
+| `components/session/problemText.test.ts` | 52 | Parsing pasted or uploaded problems (any Unicode text, kept exactly and case-sensitive; double-quoted fields with JSON escapes in every line form; JSON entries with their own seeds, answer and tag) and the preview the Training Mode Session view shows before adding them |
 | `components/session/SessionPanel.test.tsx` | 69 | The Training Mode Session view: the list and the selected Training Mode Session, creating one, adding problems, the error-policy fields, the problems table searched and sorted through the server, the Memory and Configuration tabs, the controls (start, pause, resume, stop, cancel, export), and Delete behind the session's name typed exactly |
 
 ### Running under the free-threaded interpreter

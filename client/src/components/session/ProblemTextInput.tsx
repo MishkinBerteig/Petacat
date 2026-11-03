@@ -11,7 +11,7 @@ import { useRef, useState } from 'react';
 import { describeApiError, getDemos } from '@/api/client';
 import type { ProblemInput } from '@/types';
 import { ControlHelp, fmtInt, labelStyle, noticeStyle } from './shared';
-import type { ParsedProblems } from './problemText';
+import { fieldText, type ParsedProblems } from './problemText';
 
 interface InputProps {
   id: string;
@@ -48,7 +48,10 @@ export function ProblemTextInput({ id, value, onChange, disabled, demos = false,
       setProblem(null);
       append(
         list
-          .map((d) => `${d.initial} → ${d.modified}; ${d.target} → ${d.answer ? d.answer : '?'}`)
+          .map((d) =>
+            `${fieldText(d.initial)} → ${fieldText(d.modified)}; ${fieldText(d.target)} → ${
+              d.answer ? fieldText(d.answer) : '?'
+            }`)
           .join('\n'),
       );
     } catch (err) {

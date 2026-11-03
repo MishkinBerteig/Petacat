@@ -108,10 +108,10 @@ class Run(Base):
     )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    initial_string = Column(String(64), nullable=False)
-    modified_string = Column(String(64), nullable=False)
-    target_string = Column(String(64), nullable=False)
-    answer_string = Column(String(64), nullable=True)
+    initial_string = Column(Text, nullable=False)
+    modified_string = Column(Text, nullable=False)
+    target_string = Column(Text, nullable=False)
+    answer_string = Column(Text, nullable=True)
     seed = Column(BigInteger, nullable=False)
     status = Column(String(16), ForeignKey("run_statuses.name"), default="initialized")
     justify_mode = Column(Boolean, default=False)
@@ -197,7 +197,7 @@ class TraceEventRow(Base):
     # event redisplays (:mod:`server.engine.trace_display`).  Added after the table
     # existed, so the startup reconcile adds them nullable; NULL means a row written
     # before they were kept, which then shows its description and cannot be redisplayed.
-    print_name = Column(String(255), nullable=True)
+    print_name = Column(Text, nullable=True)
     picture = Column(JSONB, nullable=True)
     created_at = Column(DateTime, default=_utcnow)
 

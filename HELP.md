@@ -222,7 +222,7 @@ The word 'Workspace' always means the engine's perceptual system.
 ### Problem Input
 
 **Topic key:** `problem_input`  
-**Summary:** The four letter strings that define an analogy problem: Initial, Modified, Target, and (optionally) Answer.
+**Summary:** The four strings that define an analogy problem: Initial, Modified, Target, and (optionally) Answer.
 
 The Problem Input panel is where you specify the analogy problem Metacat will attempt to solve. Every problem has the form 'Initial -> Modified; Target -> ?'. For example, 'abc -> abd; xyz -> ?' asks Metacat to find an analogous transformation for xyz given that abc became abd.
 
@@ -232,6 +232,8 @@ The four fields are:
 - Modified: The result of the top-row transformation, e.g. 'abd'. Metacat will discover rules that describe how Initial became Modified.
 - Target: The starting string of the bottom row, e.g. 'xyz'. Metacat will try to apply an analogous transformation to this string.
 - Answer (optional): If you supply this, Metacat enters justification mode and tries to explain why this specific answer is (or isn't) a good analogy, rather than discovering an answer from scratch.
+
+A string can be any text: any script, emoji, spaces, punctuation, line breaks, any case and any length. It is kept exactly as typed or pasted, with no trimming, case change or normalisation. Each field is a one-row box that grows with its content; pasting keeps line breaks, Shift+Enter types one, and plain Enter does nothing, as before. An empty Initial, Modified or Target cannot be run, and an empty Answer means discovery. Only the character U+0000 and a lone surrogate, which a database cannot store as text, are refused.
 
 Seed sets the random seed. With one worker, the same problem, the same seed and the same Episodic Memory reproduce a run exactly; with more than one (parallel, set in Run Controls) the seed still reproduces the run, identically for any worker count of 2 or more, but as a different run from the one-worker loop. Blank or 0 means seed 0. It lives here because it is part of the problem's identity -- changing it gives you a different run of the same strings.
 
@@ -325,7 +327,7 @@ To look at what a Normal or Audit run recorded -- its start and end states, what
 **Topic key:** `session`  
 **Summary:** Training Mode: a named Training episode of many problems, each run over many seeds on every core, with its own Episodic Memory, kept in the database.
 
-A Training Mode Session is a named, long-lived Training episode, and it belongs to Training Mode. You give it a list of letter-string analogy problems and a number of seeds per problem; it runs every problem over every seed on all the cores of the machine and keeps, for each problem, the distribution of answers Petacat reached. Where the Swarm group answers that question for one problem on the dashboard, a Training Mode Session answers it for dozens or thousands of problems and remembers the result. A Training Mode Session is also what Training-Mode learning will drive. Nothing in a Training Mode Session affects Metacat Mode.
+A Training Mode Session is a named, long-lived Training episode, and it belongs to Training Mode. You give it a list of analogy problems (letter strings, or any Unicode text) and a number of seeds per problem; it runs every problem over every seed on all the cores of the machine and keeps, for each problem, the distribution of answers Petacat reached. Where the Swarm group answers that question for one problem on the dashboard, a Training Mode Session answers it for dozens or thousands of problems and remembers the result. A Training Mode Session is also what Training-Mode learning will drive. Nothing in a Training Mode Session affects Metacat Mode.
 
 This is not the episodic runs of the Review view. Those are Metacat Mode's recordings of runs made on the dashboard, each inheriting Metacat Mode's Episodic Memory. A Training Mode Session is a job that Petacat runs by itself, and it is stored in its own tables.
 
@@ -425,14 +427,16 @@ The problems come from the text box, from a file you upload (.txt, .md, .csv or 
 **Topic key:** `session_problem_text`  
 **Summary:** The ways of writing problems that the Training Mode Session view understands.
 
-Strings are letters only (a-z, A-Z), 1 to 64 of them, and case matters: abC is a different problem from abc. Blank lines and lines starting with # or // are ignored. Accepted forms, one problem per line:
+Any text is a valid problem string, in either mode: any script, emoji, spaces, tabs, line breaks, punctuation, any case, any length. A string is kept exactly as written: nothing is trimmed inside it, its case is not changed and it is not normalised (so abC is a different problem from abc, and the two ways of writing an accented letter are two different strings). Initial, modified and target must not be empty (an empty answer means discovery), and only what a database cannot store as text is refused: the character U+0000 and a lone surrogate (which is not Unicode text at all). Blank lines and lines starting with # or // are ignored. Accepted forms, one problem per line:
 
 - abc -> abd; xyz -> ?   (the arrow may be -> or the character →). A trailing '-> ?', or nothing after the target, means discovery mode.
 - abc -> abd; xyz -> wyz   justification mode: the answer to explain is wyz.
 - abc abd xyz   or   abc abd xyz wyz   (separated by spaces or tabs)
 - abc,abd,xyz   or   abc,abd,xyz,wyz   CSV, with an optional header row 'initial,modified,target,answer'.
 - Markdown table rows: the first problem in `backticks` on the line is taken, so a table such as the one in list-of-letter-string-analogy-problems.md can be pasted whole.
-- A JSON array of objects {"initial", "modified", "target", "answer"} (answer optional; seeds and tag too), when the whole text is JSON.
+- A JSON array of objects {"initial", "modified", "target", "answer"} (answer optional; seeds and tag too), when the whole text is JSON. Its strings are kept exactly as the JSON gives them; a null or absent answer is discovery, and an answer of "?" is the string ?.
+
+Quoting. In every line form (not the JSON array) a field may be written in double quotes, with JSON string syntax, and is then kept exactly, with no trimming inside the quotes. Separators inside quotes (; -> → , spaces, backticks) do not split the line. Examples: "a b" -> "a,b"; "x -> y" -> ?   and   "abc" "é" "say \"hi\"".  Inside quotes write a backslash followed by the letter n for a line break, \t for a tab, \" for a quote, \\ for a backslash and \u00e9 for any character by its code; anything else, a real tab included, is kept as typed. A quote opens a quoted field only at the start of a field (after a space, a separator or the start of the line), and nothing may follow the closing quote except a space or a separator. An unquoted ? as the answer means discovery; the quoted answer "?" is the string ?. An unquoted field is trimmed, so to keep leading or trailing spaces, quote it. A problem that starts with # or // must be quoted, or the line is taken for a comment. An unterminated quote is reported as a rejected line.
 
 Exact duplicates within what you paste are dropped and counted. Lines that cannot be read are listed with the reason, never silently skipped. Ordinary prose that mentions a problem may be picked up as one; the preview shows what was found before anything is sent.
 

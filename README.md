@@ -28,7 +28,7 @@ license change was authorised by Dr. Marshall directly (see
 > end-to-end. Episodic Memory (Metacat-Mode learning) shapes the runs that inherit it: a run
 > declines an answer already held for the same problem and rules, so repeating a
 > problem across Metacat Mode's [episodic runs](#persistence-modes-and-episodic-runs)
-> (which are Metacat Mode and not Training Mode) explores a different answer each time. It ships with 5,316 test cases covering the engine, the API, and the
+> (which are Metacat Mode and not Training Mode) explores a different answer each time. It ships with 5,371 test cases covering the engine, the API, and the
 > help/config system, run on both the CPU and the GPU numeric backends. Underneath the seven components sits an execution
 > substrate — three [persistence modes](#persistence-modes-and-episodic-runs),
 > a [GPU numeric substrate](#the-numeric-substrate), and
@@ -328,7 +328,11 @@ view. The two left-hand panels split along *what* versus *how*:
 
 **Problem Input** (top-left) defines the problem: the four strings (Initial,
 Modified, Target, and optionally Answer — supplying an Answer switches the
-engine into justification mode), the **Seed**, and the demo dropdown.
+engine into justification mode), the **Seed**, and the demo dropdown. A string can
+be any Unicode text (any script, emoji, spaces, punctuation, line breaks, any case
+and length) and is kept exactly as typed or pasted; each field is a one-row box that
+grows with its content, pasting keeps line breaks, Shift+Enter types one and plain
+Enter does nothing, as it did in the single-line input it replaced.
 
 **Run Controls** (below it) decides how that problem executes, in eight groups: Run, Episodic Memory, Recording, Engine parameters, What this run is, Manual stepping, Swarm, and Settings.
 
@@ -437,7 +441,7 @@ Petacat has two test suites:
   plugin against the serial runs it claims to equal), `lockstep` (Petacat's decision
   traces against Metacat's), and `e2e` (full HTTP
   stack against a running database). All eight run in a single command against
-  the local Postgres — 5,316 cases, which includes the numeric matrix's second
+  the local Postgres — 5,371 cases, which includes the numeric matrix's second
   pass over the 881 backend-sensitive tests. See
   [TESTING.md](TESTING.md) for the layer breakdown, the numeric backend matrix,
   the session ceiling, the unit-test rules, determinism requirements, test-double
@@ -1139,8 +1143,8 @@ the change API, so all may change exactly the same things:
 
 ## Training Mode Session: many problems on every core
 
-A **Training Mode Session** is a named, long-lived **Training episode**: many different letter-string
-problems, each run over a number of seeds, spread across every core. It belongs to
+A **Training Mode Session** is a named, long-lived **Training episode**: many different
+problems (letter strings, or any Unicode text), each run over a number of seeds, spread across every core. It belongs to
 **Training Mode**, which the machine-learning layer drives. It is not the episodic runs of Review, which are Metacat Mode's recordings of dashboard
 runs and share Metacat Mode's Episodic Memory; a Training Mode Session is a job Petacat runs by itself, with its own
 Episodic Memory, and it lives in its own tables (`server/models/training_mode_session.py`).
@@ -1150,6 +1154,19 @@ whenever five have finished, add five more. Problems start roughly in
 the order they arrive, so they finish steadily, but the order is not guaranteed and a
 client must not depend on it. Each run is the run the Run button would make with that
 seed, started from the Training Mode Session's Episodic Memory as of the run's `memory_version`.
+
+**Any Unicode text is a valid problem string, in both modes.** `initial`, `modified`, `target` and
+`answer` may hold any characters: any script, emoji and combining sequences, spaces, tabs, line breaks,
+punctuation, any case, any length. A string is stored and returned exactly as given (no trimming, no case
+change, no Unicode normalisation: NFC and NFD spellings are two strings, and duplicates are exact string
+matches only). One shared check (`server/services/problem_text.py`) serves the session routes, Metacat Mode's
+`POST /api/runs`, `POST /api/swarm` and the Admin view's Demo Problems, and refuses only what cannot be text in
+the database, each with a 422 that names the field: a string containing U+0000, and a string that is not
+valid Unicode (a lone surrogate such as JSON `"\ud800"`). In both modes `initial`, `modified` and `target`
+must also be non-empty and `answer` is `null` (discovery) or non-empty (an empty string would crash or hang the
+engine); the Run Dashboard and the Swarm already send an empty Answer field as discovery. The problems box of the
+Training Mode Session view reads quoted fields (`"a b" -> "a,b"; "x" -> ?`) so any string can be written on
+one line; its help topic has the syntax. Every column that holds a problem or answer string is `text`.
 
 ### The states
 

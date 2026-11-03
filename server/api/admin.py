@@ -10,11 +10,12 @@ from types import SimpleNamespace
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 from sqlalchemy import func, inspect as sa_inspect, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.db import get_session
+from server.services.problem_text import check_problem
 from server.engine.rational import canonical_rational
 from server.models.journal import GLOBAL_CONFIGURATION_ID
 from server.services import journal
@@ -354,6 +355,14 @@ class DemoProblemRequest(BaseModel):
     seed: int = 0
     mode: str = "discovery"
     description: str = ""
+
+    @model_validator(mode="after")
+    def _problem_text(self) -> "DemoProblemRequest":
+        # Any Unicode text is a valid problem string; only U+0000 and a lone surrogate are
+        # refused, because they cannot be stored.  See ``server.services.problem_text``.
+        check_problem(self.initial, self.modified, self.target, self.answer)
+        return self
+
 
 
 class DemoProblemResponse(BaseModel):

@@ -215,3 +215,43 @@ describe('ProblemInputPanel — the Answer field is the answer the user gives', 
     expect(useRunStore.getState().formInputs.answer).toBe('')
   })
 })
+
+describe('ProblemInputPanel — a problem string is any text, line breaks included', () => {
+  const blank = { initial: '', modified: '', target: '', answer: '', seed: '' }
+
+  it('keeps a pasted line break, spaces and non-Latin text in all four fields', () => {
+    const setFormInput = vi.fn()
+    setup({ runId: null, workspace: null, formInputs: blank, setFormInput })
+    render(<ProblemInputPanel />)
+    const values: Record<string, string> = {
+      Initial: 'a\nb',
+      Modified: ' x  y ',
+      Target: '漢字 😀\n',
+      'Answer (optional)': 'é\tz',
+    }
+    const fields: Record<string, string> = {
+      Initial: 'initial', Modified: 'modified', Target: 'target', 'Answer (optional)': 'answer',
+    }
+    for (const [label, value] of Object.entries(values)) {
+      fireEvent.change(screen.getByLabelText(label), { target: { value } })
+      expect(setFormInput).toHaveBeenLastCalledWith(fields[label], value)
+    }
+  })
+
+  it('shows a stored line break in its field, and the fields are one-row text areas', () => {
+    setup({ runId: null, workspace: null, formInputs: { ...blank, initial: 'a\nb' } })
+    render(<ProblemInputPanel />)
+    const el = screen.getByLabelText('Initial') as HTMLTextAreaElement
+    expect(el.tagName).toBe('TEXTAREA')
+    expect(el.value).toBe('a\nb')
+    expect(el.rows).toBe(1)
+  })
+
+  it('leaves Enter doing nothing, as in the input it replaces, and lets Shift+Enter through', () => {
+    setup({ runId: null, workspace: null, formInputs: blank })
+    render(<ProblemInputPanel />)
+    const el = screen.getByLabelText('Initial')
+    expect(fireEvent.keyDown(el, { key: 'Enter' })).toBe(false) // default prevented
+    expect(fireEvent.keyDown(el, { key: 'Enter', shiftKey: true })).toBe(true)
+  })
+})

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import signal
@@ -11,6 +12,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -198,6 +200,15 @@ async def validation_error_handler(request: Request, exc: RequestValidationError
             where = ".".join(str(x) for x in err.get("loc", ()) if x != "body")
             parts.append(f"{where}: {err.get('msg')}" if where else str(err.get("msg")))
         return JSONResponse({"detail": "; ".join(parts[:5])}, status_code=422)
+    # The default body echoes each error's ``input``.  A lone surrogate in it (JSON "\\ud800") is
+    # not UTF-8 text, so the response could not be encoded and the client would get a 500 instead
+    # of the 422 that says what is wrong; only then are the echoed inputs left out.
+    errors = jsonable_encoder(exc.errors())
+    try:
+        json.dumps(errors, ensure_ascii=False).encode("utf-8")
+    except UnicodeEncodeError:
+        errors = [{k: v for k, v in e.items() if k not in ("input", "ctx")} for e in errors]
+        return JSONResponse({"detail": errors}, status_code=422)
     return await request_validation_exception_handler(request, exc)
 
 

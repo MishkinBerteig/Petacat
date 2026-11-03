@@ -26,9 +26,10 @@ from collections import Counter
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from server.api.runs import get_run_service
+from server.services.problem_text import check_problem
 from server.engine import hardware
 from server.engine.numeric import available_backends
 from server.engine.parameters import UnknownParameter, validate_overrides
@@ -76,6 +77,15 @@ class SwarmRequest(BaseModel):
     backend: str | None = None
     #: Return one entry per run.  Off gives the distribution and telemetry only.
     include_runs: bool = True
+
+    @model_validator(mode="after")
+    def _problem_text(self) -> "SwarmRequest":
+        # Any Unicode text is a valid problem string; only U+0000 and a lone surrogate are
+        # refused, because they cannot be stored; initial, modified and target must be non-empty and
+        # an answer is null or non-empty (an empty one crashes the engine).  See ``server.services.problem_text``.
+        check_problem(self.initial, self.modified, self.target, self.answer, require_nonempty=True)
+        return self
+
 
 
 class SwarmRunOutcome(BaseModel):

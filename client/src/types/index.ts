@@ -1036,7 +1036,7 @@ export interface SessionSettings {
   backend: string;
 }
 
-/** A problem as a client sends it. Strings are letters only, 1 to 64 of them. */
+/** A problem as a client sends it. Any Unicode text is a valid string (any script, emoji, spaces, line breaks; any length), kept exactly. */
 export interface ProblemInput {
   initial: string;
   modified: string;

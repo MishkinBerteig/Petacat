@@ -43,6 +43,7 @@ from server.engine.commentary import CommentaryLog
 from server.engine.hashing import config_hash, memory_hash
 from server.engine.parameters import resolved_parameters, validate_overrides
 from server.services.sinks import MODE_AUDIT, MODE_FAST, MODE_NORMAL, sink_for_mode
+from server.services.problem_text import check_problem
 
 # The multi-core subsystem is a plugin (``server/parallel/``): reached through
 # ``load()`` so that a checkout without it still serves every serial Run.
@@ -291,6 +292,10 @@ class RunService:
         reconstruction replays the faithful loop's action log forward, which a
         stream-mode run is not.
         """
+        # Any Unicode text is a valid problem string; only U+0000 and a lone surrogate are
+        # refused, and initial, modified and target must be non-empty and an answer null or non-empty
+        # (a ProblemTextError, a ValueError the API turns into an error).
+        check_problem(initial, modified, target, answer, require_nonempty=True)
         # Validated before anything is created, so a bad override cannot leave a
         # half-built Run behind. Raises ValueError, which the API turns into a 400.
         overrides = validate_overrides(parameters)

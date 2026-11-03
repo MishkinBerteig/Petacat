@@ -106,10 +106,10 @@ class TrainingModeSessionProblem(Base):
     )
     #: The problem's ordinal within its session (the API's ``problem_id``).
     problem_id = Column(Integer, primary_key=True, autoincrement=False)
-    initial = Column(String(64), nullable=False)
-    modified = Column(String(64), nullable=False)
-    target = Column(String(64), nullable=False)
-    answer = Column(String(64), nullable=True)
+    initial = Column(Text, nullable=False)
+    modified = Column(Text, nullable=False)
+    target = Column(Text, nullable=False)
+    answer = Column(Text, nullable=True)
     seeds = Column(Integer, nullable=False)
     seed_start = Column(Integer, nullable=False)
     #: The client's own label for the problem, returned untouched.

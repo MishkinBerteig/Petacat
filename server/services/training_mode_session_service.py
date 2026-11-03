@@ -111,7 +111,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import pickle
-import re
 import time
 import uuid
 from collections import Counter, deque
@@ -140,6 +139,7 @@ from server.services import config_document as cd
 from server.services import configuration_store as store
 from server.services import configurations, journal
 from server.services import training_mode_session_memory as tm
+from server.services.problem_text import ProblemTextError, check_problem_mapping
 from server.services.session_live_config import ConfigRef, LiveConfiguration
 from server.services.training_mode_session_executor import (
     SessionTask,
@@ -156,7 +156,6 @@ ERROR_KEY = "*ERROR*"
 MAX_PROBLEMS_PER_REQUEST = 10_000
 MAX_SEEDS_PER_PROBLEM = 100_000
 MAX_CODELETS_LIMIT = 200_000
-LETTERS = re.compile(r"^[A-Za-z]{1,64}$")
 RATE_WINDOW = 30.0
 INSERT_CHUNK = 2000
 RUN_ROW_CHUNK = 2000
@@ -1651,11 +1650,10 @@ class TrainingModeSessionService:
         if len(problems) > MAX_PROBLEMS_PER_REQUEST:
             raise SessionError(422, f"at most {MAX_PROBLEMS_PER_REQUEST} problems per request")
         for p in problems:
-            for k in ("initial", "modified", "target"):
-                if not LETTERS.match(p.get(k) or ""):
-                    raise SessionError(422, f"{k} must be 1-64 letters")
-            if p.get("answer") is not None and not LETTERS.match(p["answer"]):
-                raise SessionError(422, "answer must be 1-64 letters")
+            try:
+                check_problem_mapping(p, require_nonempty=True)
+            except ProblemTextError as exc:
+                raise SessionError(422, str(exc)) from None
             n = p.get("seeds")
             if n is not None and not (1 <= n <= MAX_SEEDS_PER_PROBLEM):
                 raise SessionError(422, f"seeds must be 1..{MAX_SEEDS_PER_PROBLEM}")

@@ -598,9 +598,9 @@ async def test_validation_errors(app_client, sessions):
     ok = problem(0)
     for bad in (
         {"problems": [{**ok, "initial": ""}]},
-        {"problems": [{**ok, "initial": "ab1"}]},
-        {"problems": [{**ok, "target": "x" * 65}]},
-        {"problems": [{**ok, "answer": "a b"}]},
+        {"problems": [{**ok, "target": ""}]},
+        {"problems": [{**ok, "answer": ""}]},          # an answer is null (discovery) or non-empty
+        {"problems": [{**ok, "initial": "a\x00b"}]},    # U+0000 cannot be stored as text
         {"problems": [{**ok, "seeds": 0}]},
         {"problems": [{**ok, "seeds": 100001}]},
         {"problems": [ok] * 10001},
@@ -622,6 +622,9 @@ async def test_validation_errors(app_client, sessions):
         resp = await post("/api/training-mode/sessions", json=bad)
         assert resp.status_code == 422, (bad if len(str(bad)) < 200 else "big", resp.text)
         assert isinstance(resp.json()["detail"], str)
+    # A lone surrogate is not UTF-8 text; httpx's own ``json=`` cannot even send one, so it goes as escapes.
+    resp = await post("/api/training-mode/sessions", content='{"name": "v", "problems": [{"initial": "a", "modified": "b", "target": "c", "answer": "\\ud800"}]}', headers={"Content-Type": "application/json"})
+    assert resp.status_code == 422 and "answer" in resp.json()["detail"], resp.text
     for bad in (
         {"settings": {"parameters": {"no_such_parameter": 1}}},
         {"settings": {"backend": "no-such-backend"}},
@@ -634,7 +637,7 @@ async def test_validation_errors(app_client, sessions):
         assert resp.status_code == 400 and isinstance(resp.json()["detail"], str)
     made = await create(app_client, 1)
     bid = made["session"]["id"]
-    assert (await post(f"/api/training-mode/sessions/{bid}/problems", json={"problems": [{**ok, "initial": "1"}]})).status_code == 422
+    assert (await post(f"/api/training-mode/sessions/{bid}/problems", json={"problems": [{**ok, "initial": ""}]})).status_code == 422
     assert (await app_client.get(f"/api/training-mode/sessions/{bid}/problems", params={"limit": 5000})).status_code == 422
     assert (await app_client.get(f"/api/training-mode/sessions/{bid}/problems", params={"sort": "bogus"})).status_code == 422
     assert (await app_client.get(f"/api/training-mode/sessions/{bid}/finished", params={"wait": 61})).status_code == 422

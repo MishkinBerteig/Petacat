@@ -10,7 +10,7 @@ problem the moment it finishes, and it prints a line for each.
         --initial 25 --add 5 --total 60 --seeds 8 --max-codelets 2000
 
 Problems come from ``seed_data/demo_problems.json`` plus generated variants
-(``abc -> abd`` against a window of the alphabet), or from ``--problems FILE`` (a JSON list
+(``abc -> abd`` against a window of the alphabet), or from ``--problems FILE`` (a UTF-8 JSON list
 of ``{initial, modified, target, answer?, seeds?, tag?}``).  Only the standard library is used.
 """
 
@@ -53,12 +53,12 @@ def problem_stream(path: str | None):
         return p
 
     if path:
-        with open(path) as fh:
+        with open(path, encoding="utf-8") as fh:
             for p in json.load(fh):
                 if fresh(p):
                     yield p
     else:
-        with open(os.path.join(REPO, "seed_data", "demo_problems.json")) as fh:
+        with open(os.path.join(REPO, "seed_data", "demo_problems.json"), encoding="utf-8") as fh:
             for d in json.load(fh):
                 p = {"initial": d["initial"], "modified": d["modified"], "target": d["target"],
                      "tag": {"demo": d["name"]}}

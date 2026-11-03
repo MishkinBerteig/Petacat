@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------
 //
 // What these defend: every accepted format yields the same problem, strings are
-// letters only and case-sensitive, duplicates are exact matches only, a line that
+// any Unicode text and case-sensitive, duplicates are exact matches only, a line that
 // cannot be read is reported with its number and a reason rather than dropped, and
 // the repository's own problem list parses whole.
 // ---------------------------------------------------------------------------
@@ -12,7 +12,7 @@ import { describe, it, expect } from 'vitest'
 
 // The repository's own list, read as text at build time (no Node typings needed).
 import problemListMd from '../../../../list-of-letter-string-analogy-problems.md?raw'
-import { parseProblemText, chunk, formatProblem } from './problemText'
+import { parseProblemText, chunk, formatProblem, fieldText, quoteField } from './problemText'
 
 const ABC = { initial: 'abc', modified: 'abd', target: 'xyz', answer: null }
 
@@ -101,13 +101,15 @@ describe('parseProblemText: whitespace and CSV', () => {
   })
 })
 
-describe('parseProblemText: letters, case and limits', () => {
-  it('rejects digits and punctuation, naming the field', () => {
-    const r = parseProblemText('abc → ab1; xyz → ?\nabc → abd; x-z → ?\nabc → abd; xyz → w yz')
-    expect(r.problems).toEqual([])
-    expect(r.rejected[0].reason).toMatch(/modified "ab1" is not letters only/)
-    expect(r.rejected[1].reason).toMatch(/target/)
-    expect(r.rejected).toHaveLength(3)
+describe('parseProblemText: any text, case and limits', () => {
+  it('accepts digits, punctuation and inner spaces in an unquoted arrow problem', () => {
+    const r = parseProblemText('abc → ab1; xyz → ?\nabc → abd; x_z → ?\nabc → abd; xyz → w yz')
+    expect(r.rejected).toEqual([])
+    expect(r.problems.map((p) => [p.modified, p.target, p.answer])).toEqual([
+      ['ab1', 'xyz', null],
+      ['abd', 'x_z', null],
+      ['abd', 'xyz', 'w yz'],
+    ])
   })
 
   it('keeps case: abC is not abc', () => {
@@ -117,13 +119,12 @@ describe('parseProblemText: letters, case and limits', () => {
     expect(r.duplicates).toEqual([])
   })
 
-  it('rejects a string longer than 64 letters but accepts exactly 64', () => {
-    const ok = 'a'.repeat(64)
-    const bad = 'a'.repeat(65)
-    const r = parseProblemText(`${ok} ${ok} ${ok}\n${bad} abd xyz`)
-    expect(r.problems).toHaveLength(1)
-    expect(r.rejected[0].line).toBe(2)
-    expect(r.rejected[0].reason).toMatch(/64/)
+  it('has no length limit', () => {
+    const long = 'a'.repeat(1000)
+    const r = parseProblemText(`${long} ${long} ${long}\n${long}b abd xyz`)
+    expect(r.rejected).toEqual([])
+    expect(r.problems).toHaveLength(2)
+    expect(r.problems[0].initial).toHaveLength(1000)
   })
 
   it('rejects an empty string in an arrow problem', () => {
@@ -131,9 +132,113 @@ describe('parseProblemText: letters, case and limits', () => {
     expect(r.rejected[0].reason).toMatch(/initial is empty/)
   })
 
-  it('rejects a non-letter answer', () => {
-    const r = parseProblemText('abc → abd; xyz → w1z')
-    expect(r.rejected[0].reason).toMatch(/answer/)
+  it('rejects U+0000 and a lone surrogate, which the database cannot store', () => {
+    const r = parseProblemText('"a\\u0000b" abd xyz\n"\\ud800" abd xyz\nabc abd xyz "x\\udc00"')
+    expect(r.problems).toEqual([])
+    expect(r.rejected[0].reason).toMatch(/U\+0000/)
+    expect(r.rejected[1].reason).toMatch(/not valid Unicode/)
+    expect(r.rejected[2].reason).toMatch(/answer is not valid Unicode/)
+  })
+
+  it('does not trim unquoted text that is already trimmed, and does not change NFC to NFD', () => {
+    const nfc = '\u00e9'
+    const nfd = 'e\u0301'
+    const r = parseProblemText(`${nfc} ${nfd} xyz`)
+    expect(r.problems[0].initial).toBe(nfc)
+    expect(r.problems[0].modified).toBe(nfd)
+    expect(r.problems[0].initial).not.toBe(r.problems[0].modified)
+  })
+})
+
+describe('parseProblemText: quoting', () => {
+  const corpus = [
+    'a b', 'a,b;c', 'x->y', 'ABC', '1 2 3', '\u00e9', 'e\u0301', 'αβγ', 'абв', 'אבג', '漢字', 'नमस्ते',
+    '😀', '👨‍👩‍👧', '🇨🇦', '\t', 'a\nb', '\ufeff', '\u202e', 'say "hi"', 'back`tick', '#hash', '//slash',
+    '→', '?', '  padded  ', 'a'.repeat(1000), 'C:\\dir',
+  ]
+  const q = (s: string) => JSON.stringify(s)
+
+  it('keeps every corpus string exactly in the arrow form', () => {
+    for (const s of corpus) {
+      const r = parseProblemText(`${q(s)} → ${q('m')}; ${q(s)} → ${q(s)}`)
+      expect(r.rejected, s).toEqual([])
+      expect(r.problems, s).toEqual([{ initial: s, modified: 'm', target: s, answer: s }])
+    }
+  })
+
+  it('keeps every corpus string exactly with the ASCII arrow, whitespace and CSV forms', () => {
+    for (const s of corpus) {
+      const expected = [{ initial: s, modified: 'm', target: s, answer: null }]
+      expect(parseProblemText(`${q(s)} -> m; ${q(s)}`).problems, s).toEqual(expected)
+      expect(parseProblemText(`${q(s)} m ${q(s)}`).problems, s).toEqual(expected)
+      expect(parseProblemText(`${q(s)},m,${q(s)}`).problems, s).toEqual(expected)
+    }
+  })
+
+  it('keeps a quoted field in a backticked Markdown span, even one holding a backtick or arrow', () => {
+    const r = parseProblemText('| `"a -> b" → "c`d"; "x; y" → ?` | note |')
+    expect(r.rejected).toEqual([])
+    expect(r.problems).toEqual([{ initial: 'a -> b', modified: 'c`d', target: 'x; y', answer: null }])
+  })
+
+  it('does not trim inside the quotes', () => {
+    expect(parseProblemText('" a " → "b "; " c" → ?').problems).toEqual([
+      { initial: ' a ', modified: 'b ', target: ' c', answer: null },
+    ])
+  })
+
+  it('reads JSON escapes and a literal tab inside quotes', () => {
+    const r = parseProblemText('"x\\ny" "\\u00e9\\t" "tab\there"')
+    expect(r.problems).toEqual([{ initial: 'x\ny', modified: 'é\t', target: 'tab\there', answer: null }])
+  })
+
+  it('treats an unquoted ? as discovery and a quoted "?" as the string ?', () => {
+    expect(parseProblemText('abc → abd; xyz → ?').problems[0].answer).toBeNull()
+    expect(parseProblemText('abc abd xyz ?').problems[0].answer).toBeNull()
+    expect(parseProblemText('abc → abd; xyz → "?"').problems[0].answer).toBe('?')
+    expect(parseProblemText('abc abd xyz "?"').problems[0].answer).toBe('?')
+    expect(parseProblemText('abc,abd,xyz,"?"').problems[0].answer).toBe('?')
+  })
+
+  it('rejects an empty quoted answer and an empty quoted field', () => {
+    const r = parseProblemText('abc → abd; xyz → ""\n"" abd xyz')
+    expect(r.rejected[0].reason).toMatch(/answer is empty/)
+    expect(r.rejected[1].reason).toMatch(/initial is empty/)
+  })
+
+  it('reports an unterminated quote, an unknown escape and text glued to a quote', () => {
+    const r = parseProblemText('"abc → abd; xyz → ?\n"a\\qb" abd xyz\n"abc"x abd xyz\nabc "ab"cd xyz')
+    expect(r.problems).toEqual([])
+    expect(r.rejected[0].reason).toMatch(/unterminated quote opened at column 1/)
+    expect(r.rejected[1].reason).toMatch(/unknown escape/)
+    expect(r.rejected[2].reason).toMatch(/directly after the closing quote/)
+    expect(r.rejected[3].reason).toMatch(/directly after the closing quote/)
+  })
+
+  it('treats a quote that does not start a field as ordinary text', () => {
+    expect(parseProblemText('ab"c abd xyz').problems[0].initial).toBe('ab"c')
+    expect(parseProblemText('abc → a"b; xyz → ?').problems[0].modified).toBe('a"b')
+  })
+
+  it('does not drop a quoted problem that starts with # or contains an arrow lookalike', () => {
+    const r = parseProblemText('"#a" "->" "//"')
+    expect(r.problems).toEqual([{ initial: '#a', modified: '->', target: '//', answer: null }])
+  })
+
+  it('keeps the NFC and NFD forms distinct, and exact repeats are the only duplicates', () => {
+    const r = parseProblemText('"é" b c\n"e\u0301" b c\n"é" b c')
+    expect(r.problems).toHaveLength(2)
+    expect(r.duplicates).toHaveLength(1)
+  })
+
+  it('quoteField and fieldText write fields that read back exactly', () => {
+    for (const s of corpus) {
+      const r = parseProblemText(`${fieldText(s)} → ${fieldText(s)}; ${fieldText(s)} → ${fieldText(s)}`)
+      expect(r.problems, s).toEqual([{ initial: s, modified: s, target: s, answer: s }])
+    }
+    expect(fieldText('abC')).toBe('abC')
+    expect(fieldText('?')).toBe('"?"')
+    expect(quoteField('a b')).toBe('"a b"')
   })
 })
 
@@ -179,11 +284,11 @@ describe('parseProblemText: Markdown', () => {
   })
 
   it('reports a backticked problem that cannot be read', () => {
-    const r = parseProblemText('| `1234 → 4321; nopq → ?` | x |\n| `abc → abd; xyz → ?` | x |')
+    const r = parseProblemText('| `1234 → 4321; "nopq → ?` | x |\n| `abc → abd; xyz → ?` | x |')
     expect(r.problems).toHaveLength(1)
     expect(r.rejected).toHaveLength(1)
     expect(r.rejected[0].line).toBe(1)
-    expect(r.rejected[0].reason).toMatch(/not letters only/)
+    expect(r.rejected[0].reason).toMatch(/unterminated quote/)
   })
 
   it('does not reject plain prose in a Markdown text', () => {
@@ -202,13 +307,13 @@ describe('parseProblemText: Markdown', () => {
     const rows = text.split('\n').filter((l: string) => /^\| `[^`]*→[^`]*`/.test(l))
     expect(rows.length).toBeGreaterThan(150)
     const r = parseProblemText(text)
-    // Every table row either gives a problem, is a reported duplicate, or is rejected
-    // for a stated reason (the list holds one non-letter problem on purpose).
+    // Every table row either gives a problem or is a reported duplicate; the list's one
+    // non-letter problem (1234 → 4321) is now an ordinary problem too.
     expect(r.problems.length).toBeGreaterThan(150)
     expect(r.problems.length + r.duplicates.length + r.rejected.length).toBeGreaterThanOrEqual(rows.length)
     expect(r.problems.some((p) => p.initial === 'abc' && p.modified === 'abd' && p.target === 'xyz')).toBe(true)
-    expect(r.rejected.some((x) => /1234/.test(x.text))).toBe(true)
-    for (const p of r.problems) expect(p.initial).toMatch(/^[A-Za-z]+$/)
+    expect(r.rejected).toEqual([])
+    expect(r.problems.some((p) => p.initial === '1234')).toBe(true)
   })
 })
 
@@ -232,7 +337,7 @@ describe('parseProblemText: JSON', () => {
     const r = parseProblemText(
       JSON.stringify([
         { initial: 'abc', modified: 'abd', target: 'xyz', seeds: 5, tag: { job: 7 } },
-        { initial: 'abc', modified: 'ab1', target: 'xyz' },
+        { initial: 'abc', modified: '', target: 'xyz' },
         { initial: 'abc', modified: 'abd' },
         'abc',
         { initial: 'abc', modified: 'abd', target: 'xyz', seeds: 0 },
@@ -240,6 +345,25 @@ describe('parseProblemText: JSON', () => {
     )
     expect(r.problems).toEqual([{ ...ABC, seeds: 5, tag: { job: 7 } }])
     expect(r.rejected.map((x) => x.line)).toEqual([2, 3, 4, 5])
+  })
+
+  it('keeps JSON strings exactly: no trimming, "?" is the string ?, null is discovery', () => {
+    const r = parseProblemText(
+      JSON.stringify([
+        { initial: ' a b ', modified: 'x\ny', target: '😀', answer: '?' },
+        { initial: 'é', modified: 'e\u0301', target: 'x', answer: null },
+        { initial: 'a'.repeat(1000), modified: 'b', target: 'c' },
+      ]),
+    )
+    expect(r.rejected).toEqual([])
+    expect(r.problems[0]).toEqual({ initial: ' a b ', modified: 'x\ny', target: '😀', answer: '?' })
+    expect(r.problems[1].answer).toBeNull()
+    expect(r.problems[2].initial).toHaveLength(1000)
+  })
+
+  it('rejects U+0000 in JSON strings', () => {
+    const r = parseProblemText(JSON.stringify([{ initial: 'a\u0000', modified: 'b', target: 'c' }]))
+    expect(r.rejected[0].reason).toMatch(/U\+0000/)
   })
 
   it('drops duplicates within the array', () => {
