@@ -45,6 +45,7 @@ from server.models.journal import (
 )
 from server.services import config_document as cd
 from server.services import journal, journal_views
+from server.services.problem_text import ProblemTextError, check_string
 
 _CONFIGURATIONS = Configuration.__table__
 _SNAPSHOTS = ConfigurationSnapshot.__table__
@@ -408,6 +409,13 @@ async def export(session: AsyncSession, configuration_id: int) -> dict[str, Any]
     return {"format": "petacat-configuration", "configuration": head, "data": cd.to_data(document)}
 
 
+def _check_text(field: str, value: str) -> None:
+    try:
+        check_string(field, value)
+    except ProblemTextError as exc:
+        raise ConfigurationError(str(exc)) from exc
+
+
 async def update_meta(
     session: AsyncSession,
     configuration_id: int,
@@ -420,12 +428,14 @@ async def update_meta(
     """Change the name, note or ``frozen`` flag: one journaled entry (no ops, next revision)."""
     fields: dict[str, Any] = {}
     if name is not None:
-        if not isinstance(name, str) or not name.strip() or len(name) > 200:
-            raise ConfigurationError("name must be text of 1 to 200 characters")
+        if not isinstance(name, str) or not name.strip():
+            raise ConfigurationError("name must be text with at least one character besides spaces")
+        _check_text("name", name)
         fields["name"] = name.strip()
     if note is not None:
         if not isinstance(note, str):
             raise ConfigurationError("note must be text")
+        _check_text("note", note)
         fields["note"] = note
     if frozen is not None:
         if not isinstance(frozen, bool):

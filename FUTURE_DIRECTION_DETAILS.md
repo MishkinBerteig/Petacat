@@ -23,6 +23,14 @@
 > (Metacat Mode's episodic runs) is removed as a name. v2.0 has built the ground (the configuration
 > in the database, the change API and journal, Training Mode Sessions); the learner is not built.
 > [README.md](README.md) describes what exists.
+>
+> **Update (2026-11-03, later): §8 is current again, as an idea.** The user made the sliding-window
+> re-use of past input and output (§8, the turn recurrence) one of v2.0's two ideas: several
+> **turns** inside a single run of a Training Mode Session. The other idea is perceiving new kinds
+> of input (any UTF-8 text) and making new structures for them in the Slipnet. A turn happens
+> inside a single run; today every run with the fourth spot open is one turn. Only the idea is
+> adopted: §8's details (the `local-llm` partner, the three-word bootstrap) are not decisions, and
+> the rest of this document stays historical. `CLAUDE.md` and the README define both terms.
 
 Living design notes for the "self-knowing Petacat" work sketched in
 `FUTURE_DIRECTION.md`. Where that document poses four open questions, this one

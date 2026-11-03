@@ -19,7 +19,9 @@ from server.api.admin import DemoProblemRequest
 from server.api.runs import CreateRunRequest
 from server.api.swarm import SwarmRequest
 from server.api.training_mode_sessions import ProblemInput
-from server.services.problem_text import ProblemTextError, check_problem, check_problem_mapping, check_string
+from server.services.problem_text import (
+    ProblemTextError, check_deep, check_problem, check_problem_mapping, check_string,
+)
 
 NFC = unicodedata.normalize("NFC", "é")
 NFD = unicodedata.normalize("NFD", "é")
@@ -119,3 +121,16 @@ def test_every_request_model_keeps_the_structural_rule():
         with pytest.raises(ValidationError, match="answer must not be empty"):
             model(initial="a", modified="b", target="c", answer="", **extra)
         assert model(initial="a", modified="b", target="c", answer=None, **extra).answer is None
+
+
+def test_check_deep_accepts_any_nesting_of_text_and_names_the_path_of_a_bad_string():
+    ok = [{"op": "insert", "row": {"glyph": "👨‍👩‍👧", "name": "長" * 5000, "n": 1, "none": None}}]
+    check_deep("ops", ok)
+    for bad, word in (("a\x00b", "U+0000"), ("a\ud800b", "surrogate")):
+        with pytest.raises(ProblemTextError, match=r"ops\[0\]\['row'\]\['glyph'\]") as exc:
+            check_deep("ops", [{"row": {"glyph": bad}}])
+        assert word in str(exc.value) and "\x00" not in str(exc.value)
+        with pytest.raises(ProblemTextError, match="a key of"):
+            check_deep("ops", [{bad: 1}])
+        with pytest.raises(ProblemTextError, match="ops"):
+            check_deep("ops", {"x": ["fine", [bad]]})

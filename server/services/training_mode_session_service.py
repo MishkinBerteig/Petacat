@@ -139,7 +139,7 @@ from server.services import config_document as cd
 from server.services import configuration_store as store
 from server.services import configurations, journal
 from server.services import training_mode_session_memory as tm
-from server.services.problem_text import ProblemTextError, check_problem_mapping
+from server.services.problem_text import ProblemTextError, check_problem_mapping, check_string
 from server.services.session_live_config import ConfigRef, LiveConfiguration
 from server.services.training_mode_session_executor import (
     SessionTask,
@@ -1707,14 +1707,24 @@ class TrainingModeSessionService:
             return requested
         return default_session_backend(meta)
 
+    @staticmethod
+    def _check_text(field: str, value: str) -> None:
+        """Any text is a valid name or note except what the database cannot hold (a 422)."""
+        try:
+            check_string(field, value)
+        except ProblemTextError as exc:
+            raise SessionError(422, str(exc)) from exc
+
     async def create_session(
         self, *, name: str, note: str = "", settings: dict | None = None,
         policy: dict | None = None, problems: list[dict] | None = None,
     ) -> dict[str, Any]:
         """Create a Stopped session: a record, written at once in its own transaction."""
         name = (name or "").strip()
-        if not 1 <= len(name) <= 200:
-            raise SessionError(422, "name is required (1..200 characters)")
+        if not name:
+            raise SessionError(422, "name is required (any text, at least one character)")
+        self._check_text("name", name)
+        self._check_text("note", note)
         problems = problems or []
         self._validate_problems(problems)
         settings = dict(settings or {})
@@ -1826,8 +1836,11 @@ class TrainingModeSessionService:
         """Change name, note or policy: in memory for a live session, at once for a Stopped one."""
         if name is not None:
             name = name.strip()
-            if not 1 <= len(name) <= 200:
-                raise SessionError(422, "name must be 1..200 characters")
+            if not name:
+                raise SessionError(422, "name must not be empty")
+            self._check_text("name", name)
+        if note is not None:
+            self._check_text("note", note)
         lt = self._refuse_if_busy(session_id, "change it")
         if lt is not None:
             if policy is not None:

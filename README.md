@@ -28,7 +28,7 @@ license change was authorised by Dr. Marshall directly (see
 > end-to-end. Episodic Memory (Metacat-Mode learning) shapes the runs that inherit it: a run
 > declines an answer already held for the same problem and rules, so repeating a
 > problem across Metacat Mode's [episodic runs](#persistence-modes-and-episodic-runs)
-> (which are Metacat Mode and not Training Mode) explores a different answer each time. It ships with 5,371 test cases covering the engine, the API, and the
+> (which are Metacat Mode and not Training Mode) explores a different answer each time. It ships with 5,388 test cases covering the engine, the API, and the
 > help/config system, run on both the CPU and the GPU numeric backends. Underneath the seven components sits an execution
 > substrate — three [persistence modes](#persistence-modes-and-episodic-runs),
 > a [GPU numeric substrate](#the-numeric-substrate), and
@@ -79,8 +79,9 @@ machine-learning platform:
   Training-Mode learning changes it through three learning sources (the in-worker learner seam, the
   external route and the Admin view). See
   [The configuration, the journal and the change API](#the-configuration-the-journal-and-the-change-api).
-- **Not built:** the in-worker learner itself. Petacat provides the seam it will use, a call to the
-  change API after each run; the in-worker learner is a separate piece of work.
+- **Not built:** v2.0's two ideas (see [The v2.0 milestone](#the-v20-milestone)): the in-worker
+  learner itself (Petacat provides the seam it will use, a call to the change API after each run),
+  and multi-turn runs.
 
 A Training Mode Session never reads or writes Metacat Mode's Episodic Memory, Slipnet or configuration.
 
@@ -90,6 +91,7 @@ A Training Mode Session never reads or writes Metacat Mode's Episodic Memory, Sl
 **Metacat-Mode learning** is Episodic Memory; **Training-Mode learning** is everything
 new. "Episode" is qualified the same way: a **Training episode** belongs to Training Mode, and **Metacat's** episodic memory belongs to Metacat Mode. A bare
 "session" means a Training Mode Session, and "Workspace" always means the engine's perceptual system.
+A **turn** happens inside a single run (see [The v2.0 milestone](#the-v20-milestone)).
 
 ### Run mode is separate from both modes
 
@@ -110,11 +112,23 @@ What is available today:
 
 ### The v2.0 milestone
 
-**v2.0** is the first major milestone: Petacat recognizing new concepts and
-incorporating them into the Slipnet, by modelling a learning feedback loop and
-perceptual processes. That is **Training-Mode learning**. What exists is its ground:
-the configuration in the database, the one change API and journal, and a Training Mode Session
-that runs its own evolving configuration. The in-worker learner itself is not built yet.
+**v2.0** is the first major milestone. It is two simple ideas, both in Training Mode Sessions:
+
+1. **Perceiving new kinds of input** (any UTF-8 text) and making new structures for them in the
+   Slipnet. That is **Training-Mode learning**.
+2. **Multi-turn runs:** several **turns** inside a single run, re-using past input and output in
+   the sliding-window sense of [FUTURE_DIRECTION_DETAILS.md](FUTURE_DIRECTION_DETAILS.md) §8 (the
+   turn recurrence).
+
+A **turn** is something that happens inside a single run. Today every single run with the fourth
+spot open (`abc -> abd; xyz -> ?`) is one turn; with the sliding window, a single run of a
+Training Mode Session will have many turns. A Training episode holds many runs, and a run holds
+one or more turns. Metacat Mode's runs stay single-turn.
+
+What exists is the ground: any Unicode text as input in both modes, the configuration in the
+database, the one change API and journal, and a Training Mode Session that runs its own evolving
+configuration. Neither idea is built yet: not the in-worker learner (only its seam), and not
+multi-turn runs.
 
 [metacat]: http://science.slc.edu/~jmarshall/metacat/
 [marshall]: http://science.slc.edu/~jmarshall/
@@ -441,7 +455,7 @@ Petacat has two test suites:
   plugin against the serial runs it claims to equal), `lockstep` (Petacat's decision
   traces against Metacat's), and `e2e` (full HTTP
   stack against a running database). All eight run in a single command against
-  the local Postgres — 5,371 cases, which includes the numeric matrix's second
+  the local Postgres — 5,388 cases, which includes the numeric matrix's second
   pass over the 881 backend-sensitive tests. See
   [TESTING.md](TESTING.md) for the layer breakdown, the numeric backend matrix,
   the session ceiling, the unit-test rules, determinism requirements, test-double
@@ -1167,6 +1181,21 @@ must also be non-empty and `answer` is `null` (discovery) or non-empty (an empty
 engine); the Run Dashboard and the Swarm already send an empty Answer field as discovery. The problems box of the
 Training Mode Session view reads quoted fields (`"a b" -> "a,b"; "x" -> ?`) so any string can be written on
 one line; its help topic has the syntax. Every column that holds a problem or answer string is `text`.
+
+**All text a person or a learning source writes is unlimited `text`, too.** A Training Mode Session's name and
+note, a configuration's name and note, the journal's `actor`, `channel`, `group_id` and `note`, and every text
+column of the configuration tables (node, codelet type and parameter names, labels, `glyph`, formulas, `condition`,
+`source_file`, help topics) have no length cap and no character restriction: the columns are `text`. The names stay
+non-empty. The one rule is the one above, applied at each entry point: U+0000 and a lone surrogate are refused with a
+4xx that names the field (422 for session names and notes, 400 for configuration names and notes and for every string
+in a change batch, its provenance fields and its ops, keys included). A `glyph` of several characters (a ZWJ emoji
+sequence, say) can be stored, edited and loaded; the engine still looks a glyph up one character at a time, so
+perceiving a multi-character glyph is later work. The columns that hold a fixed vocabulary (`source`, `mode`,
+`status`, `backend`, `stopped_from`, `stop_reason`, hashes and the like, in the run, journal and session tables) keep
+their short `varchar` types, and every route that takes one checks it against its vocabulary first (the
+configuration tables' vocabulary columns are `text` like the rest). A btree index entry cannot exceed
+about 2,700 bytes, so a primary-key or unique text value (a node name, a `topic_key`) longer than that is
+refused by PostgreSQL.
 
 ### The states
 

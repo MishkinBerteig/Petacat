@@ -346,6 +346,21 @@ describe('SessionPanel: creating a session', () => {
     expect(window.location.hash).toBe('#/training-mode/7')
   })
 
+  it('takes a session name of any length: the input has no maxLength and the name is sent whole', async () => {
+    const long = '名'.repeat(500) + ' 👨‍👩‍👧 ' + 'x'.repeat(300)
+    m.createSession.mockResolvedValue({ session: session({ id: 8, name: long }), added: 1, problem_ids: [1], persisted: true })
+    m.getSession.mockResolvedValue(session({ id: 8, name: long }))
+    await openForm()
+    const input = screen.getByLabelText('Name (required)')
+    expect(input).not.toHaveAttribute('maxlength')
+    user.type(input, long)
+    expect(input).toHaveValue(long)
+    user.type(screen.getByLabelText('Problems'), 'abc abd xyz')
+    fireEvent.click(screen.getByRole('button', { name: 'Create session' }))
+    await waitFor(() => expect(m.createSession).toHaveBeenCalledTimes(1))
+    expect(m.createSession.mock.calls[0][0].name).toBe(long)
+  })
+
   it('sends the dashboard overrides only when the box is ticked', async () => {
     useRunStore.setState({ parameterOverrides: { some_param: 3 } })
     m.createSession.mockResolvedValue({ session: session({ id: 7 }), added: 1, problem_ids: [1], persisted: true })
@@ -821,6 +836,18 @@ describe('SessionPanel: v2 features', () => {
   it('has no last-event box when there is none', async () => {
     await open()
     expect(screen.queryByTestId('last-event')).not.toBeInTheDocument()
+  })
+
+  it('renames inline to a name of any length (no maxLength on the input)', async () => {
+    const long = 'n'.repeat(400) + ' 漢字'
+    m.updateSession.mockResolvedValue(session({ name: long }))
+    await open()
+    fireEvent.click(screen.getByRole('button', { name: 'Rename' }))
+    const input = screen.getByLabelText('New name')
+    expect(input).not.toHaveAttribute('maxlength')
+    user.type(input, long)
+    fireEvent.click(screen.getByRole('button', { name: 'Save name' }))
+    await waitFor(() => expect(m.updateSession).toHaveBeenCalledWith(1, { name: long }))
   })
 
   it('renames inline with PATCH', async () => {

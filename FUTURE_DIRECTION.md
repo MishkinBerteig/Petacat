@@ -8,7 +8,10 @@ cloth. I'd rather start a conversation than ship a spec.
 > stays as written. Its "learning" is Training-Mode learning: a Training Mode Session's
 > configuration changing, never Metacat Mode, which stays faithful to Metacat. v2.0 has built the
 > ground for it (the configuration in the database, the change API and journal, and Training Mode
-> Sessions). Thread 3's learner itself is not built. [README.md](README.md) describes what exists.
+> Sessions). Thread 3's learner itself is not built. v2.0 is now two ideas, both in Training Mode
+> Sessions: perceiving new kinds of input (any UTF-8 text) into new Slipnet structure, and several
+> turns inside a single run, re-using past input and output as in `FUTURE_DIRECTION_DETAILS.md` §8.
+> [README.md](README.md) describes what exists.
 
 The threads are numbered 0 through 3 deliberately. The first of them is the
 ground floor that gives the other three their meaning.

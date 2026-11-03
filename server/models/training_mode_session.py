@@ -54,7 +54,7 @@ class TrainingModeSession(Base):
     )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String(200), nullable=False)
+    name = Column(Text, nullable=False)
     note = Column(Text, nullable=False, default="")
 
     # Settings: fixed at creation, because they shape what a run is.

@@ -101,6 +101,12 @@ Every doc, UI string, help topic, plan and decision must keep the distinction pe
   within a run, the swarm across runs). It is orthogonal to the two modes and must be viable
   in both. It is not the persistence mode (Fast, Normal or Audit).
 - **Workspace** means only the engine's perceptual system.
-- **v2.0** is the first major milestone: recognizing new concepts and incorporating them into
-  the Slipnet by modelling a learning feedback loop and perceptual processes. That is
-  Training-Mode learning.
+- **v2.0** is the first major milestone. It is two simple ideas, both in Training Mode Sessions:
+  1. **Perceiving new kinds of input** (any UTF-8 text) and making new structures for them in
+     the Slipnet. That is Training-Mode learning.
+  2. **Multi-turn runs:** several turns inside a single run, re-using past input and output in
+     the sliding-window sense of `FUTURE_DIRECTION_DETAILS.md` §8 (the turn recurrence).
+- **Turn** is something that happens inside a single run. Today every single run with the fourth
+  spot open (`abc -> abd; xyz -> ?`) is one turn. With the sliding window, a single run of a
+  Training Mode Session will have many turns. A Training episode holds many runs; a run holds one
+  or more turns. Metacat Mode's runs stay single-turn.

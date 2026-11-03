@@ -615,7 +615,7 @@ async def test_validation_errors(app_client, sessions):
         {"memory": "shared"},
         {"settings": {"nonsense": 1}},
         {"name": ""},
-        {"name": "x" * 201},
+        {"name": "a\x00b"},                          # U+0000 cannot be stored as text
         {},
     ):
         bad = {"name": "v", **bad} if "name" not in bad and bad != {} else bad

@@ -147,7 +147,6 @@ export function SessionDetail({ session, limits, notice, onSessionChanged, onDel
               <input
                 aria-label="New name"
                 value={newName}
-                maxLength={200}
                 autoFocus
                 onChange={(e) => setNewName(e.target.value)}
                 onKeyDown={(e) => {

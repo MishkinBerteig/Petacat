@@ -8,7 +8,7 @@ JSON files and can be edited via the admin panel.
 from __future__ import annotations
 
 from sqlalchemy import (
-    BigInteger, Boolean, Column, Float, ForeignKey, Index, Integer, String, Text,
+    BigInteger, Boolean, Column, Float, ForeignKey, Index, Integer, Text,
     UniqueConstraint, column, func, select, table,
 )
 from sqlalchemy.dialects.postgresql import JSON, JSONB
@@ -36,99 +36,99 @@ def _next_after_last(table_name: str, column_name: str = "sort_order"):
 
 class RunStatusDef(Base):
     __tablename__ = "run_statuses"
-    name = Column(String(32), primary_key=True)
-    display_label = Column(String(64), nullable=False)
+    name = Column(Text, primary_key=True)
+    display_label = Column(Text, nullable=False)
     sort_order = Column(Integer, nullable=False, default=0)
     description = Column(Text, default="")
 
 class EventTypeDef(Base):
     __tablename__ = "event_types"
-    name = Column(String(32), primary_key=True)
-    display_label = Column(String(64), nullable=False)
+    name = Column(Text, primary_key=True)
+    display_label = Column(Text, nullable=False)
     sort_order = Column(Integer, nullable=False, default=0)
     description = Column(Text, default="")
 
 class BridgeTypeDef(Base):
     __tablename__ = "bridge_types"
-    name = Column(String(32), primary_key=True)
-    display_label = Column(String(64), nullable=False)
+    name = Column(Text, primary_key=True)
+    display_label = Column(Text, nullable=False)
     sort_order = Column(Integer, nullable=False, default=0)
     description = Column(Text, default="")
 
 class BridgeOrientationDef(Base):
     __tablename__ = "bridge_orientations"
-    name = Column(String(32), primary_key=True)
-    display_label = Column(String(64), nullable=False)
+    name = Column(Text, primary_key=True)
+    display_label = Column(Text, nullable=False)
     sort_order = Column(Integer, nullable=False, default=0)
     description = Column(Text, default="")
 
 class ClauseTypeDef(Base):
     __tablename__ = "clause_types"
-    name = Column(String(32), primary_key=True)
-    display_label = Column(String(64), nullable=False)
+    name = Column(Text, primary_key=True)
+    display_label = Column(Text, nullable=False)
     sort_order = Column(Integer, nullable=False, default=0)
     description = Column(Text, default="")
 
 class RuleTypeDef(Base):
     __tablename__ = "rule_types"
-    name = Column(String(32), primary_key=True)
-    display_label = Column(String(64), nullable=False)
+    name = Column(Text, primary_key=True)
+    display_label = Column(Text, nullable=False)
     sort_order = Column(Integer, nullable=False, default=0)
     description = Column(Text, default="")
 
 class ThemeTypeDef(Base):
     __tablename__ = "theme_types"
-    name = Column(String(32), primary_key=True)
-    display_label = Column(String(64), nullable=False)
+    name = Column(Text, primary_key=True)
+    display_label = Column(Text, nullable=False)
     sort_order = Column(Integer, nullable=False, default=0)
     description = Column(Text, default="")
 
 class ProposalLevelDef(Base):
     __tablename__ = "proposal_levels"
-    name = Column(String(32), primary_key=True)
-    display_label = Column(String(64), nullable=False)
+    name = Column(Text, primary_key=True)
+    display_label = Column(Text, nullable=False)
     sort_order = Column(Integer, nullable=False, default=0)
     description = Column(Text, default="")
 
 class LinkTypeDef(Base):
     __tablename__ = "link_types"
-    name = Column(String(32), primary_key=True)
-    display_label = Column(String(64), nullable=False)
+    name = Column(Text, primary_key=True)
+    display_label = Column(Text, nullable=False)
     sort_order = Column(Integer, nullable=False, default=0)
     description = Column(Text, default="")
 
 class CodeletFamilyDef(Base):
     __tablename__ = "codelet_families"
-    name = Column(String(32), primary_key=True)
-    display_label = Column(String(64), nullable=False)
+    name = Column(Text, primary_key=True)
+    display_label = Column(Text, nullable=False)
     sort_order = Column(Integer, nullable=False, default=0)
     description = Column(Text, default="")
 
 class CodeletPhaseDef(Base):
     __tablename__ = "codelet_phases"
-    name = Column(String(32), primary_key=True)
-    display_label = Column(String(64), nullable=False)
+    name = Column(Text, primary_key=True)
+    display_label = Column(Text, nullable=False)
     sort_order = Column(Integer, nullable=False, default=0)
     description = Column(Text, default="")
 
 class PostingDirectionDef(Base):
     __tablename__ = "posting_directions"
-    name = Column(String(32), primary_key=True)
-    display_label = Column(String(64), nullable=False)
+    name = Column(Text, primary_key=True)
+    display_label = Column(Text, nullable=False)
     sort_order = Column(Integer, nullable=False, default=0)
     description = Column(Text, default="")
 
 class ParamValueTypeDef(Base):
     __tablename__ = "param_value_types"
-    name = Column(String(32), primary_key=True)
-    display_label = Column(String(64), nullable=False)
+    name = Column(Text, primary_key=True)
+    display_label = Column(Text, nullable=False)
     sort_order = Column(Integer, nullable=False, default=0)
     description = Column(Text, default="")
 
 class DemoModeDef(Base):
     __tablename__ = "demo_modes"
-    name = Column(String(32), primary_key=True)
-    display_label = Column(String(64), nullable=False)
+    name = Column(Text, primary_key=True)
+    display_label = Column(Text, nullable=False)
     sort_order = Column(Integer, nullable=False, default=0)
     description = Column(Text, default="")
 
@@ -142,7 +142,7 @@ class SlipnetNodeDef(Base):
 
     __tablename__ = "slipnet_node_defs"
 
-    name = Column(String(64), primary_key=True)
+    name = Column(Text, primary_key=True)
     #: The Scheme's own definition order (``slipnet.ss:407-468``), which
     #: ``seed_data/slipnet_nodes.json`` reproduces element for element.
     #:
@@ -154,7 +154,7 @@ class SlipnetNodeDef(Base):
     #: ``name`` is not a substitute: ``plato-alphabetic-first`` falls between
     #: ``plato-a`` and ``plato-b``.
     sort_order = Column(Integer, nullable=False, default=0, index=True)
-    short_name = Column(String(16), nullable=False)
+    short_name = Column(Text, nullable=False)
     conceptual_depth = Column(Integer, nullable=False)
     description = Column(Text, default="")
     # DSL expression over `obj` deciding whether this node validly describes a
@@ -162,15 +162,15 @@ class SlipnetNodeDef(Base):
     # nodes whose descriptors are read off an object rather than tested.
     descriptor_predicate = Column(Text, nullable=True)
     #: What code used to read off the name (``name[6:]``).  Names are opaque (plan 3.1).
-    plain_name = Column(String(64), nullable=True)
+    plain_name = Column(Text, nullable=True)
     #: The character a letter node stands for.  Case-sensitive; a node with a glyph is a
     #: letter, and the alphabet is the set of such nodes (plan 3.13).
-    glyph = Column(String(1), nullable=True, unique=True)
+    glyph = Column(Text, nullable=True, unique=True)
     #: The value of a number node.  Any integers, contiguous or not (plan 3.13).
     numeric_value = Column(Integer, nullable=True, unique=True)
     #: Display only; NULL falls back to ``plain_name`` or ``short_name`` (plan 3.3).
-    full_name = Column(String(64), nullable=True)
-    cm_short_name = Column(String(16), nullable=True)
+    full_name = Column(Text, nullable=True)
+    cm_short_name = Column(Text, nullable=True)
     article_an = Column(Boolean, nullable=True)
 
 
@@ -190,10 +190,10 @@ class SlipnetLinkDef(Base):
         Integer, nullable=False, index=True,
         default=_next_after_last("slipnet_link_defs"),
     )
-    from_node = Column(String(64), nullable=False, index=True)
-    to_node = Column(String(64), nullable=False, index=True)
-    link_type = Column(String(32), ForeignKey("link_types.name"), nullable=False)
-    label_node = Column(String(64), nullable=True)
+    from_node = Column(Text, nullable=False, index=True)
+    to_node = Column(Text, nullable=False, index=True)
+    link_type = Column(Text, ForeignKey("link_types.name"), nullable=False)
+    label_node = Column(Text, nullable=True)
     link_length = Column(Integer, nullable=True)  # None = dynamic (from label node)
     fixed_length = Column(Boolean, default=True)
 
@@ -213,15 +213,15 @@ class CodeletTypeDef(Base):
 
     __tablename__ = "codelet_type_defs"
 
-    name = Column(String(64), primary_key=True)
+    name = Column(Text, primary_key=True)
     #: Seed-file order.  Same reason as ``SlipnetNodeDef.sort_order`` — the primary key
     #: is a name, so without this the order is the storage layout's.
     sort_order = Column(Integer, nullable=False, default=0, index=True)
-    family = Column(String(32), ForeignKey("codelet_families.name"), nullable=False)
-    phase = Column(String(32), ForeignKey("codelet_phases.name"), nullable=False)
+    family = Column(Text, ForeignKey("codelet_families.name"), nullable=False)
+    phase = Column(Text, ForeignKey("codelet_phases.name"), nullable=False)
     default_urgency = Column(Integer, nullable=True)
     description = Column(Text, default="")
-    source_file = Column(String(64), default="")
+    source_file = Column(Text, default="")
     source_line = Column(Integer, default=0)
     execute_body = Column(Text, default="")  # Python source code
 
@@ -231,9 +231,9 @@ class EngineParam(Base):
 
     __tablename__ = "engine_params"
 
-    name = Column(String(64), primary_key=True)
+    name = Column(Text, primary_key=True)
     value = Column(Text, nullable=False)  # Stored as text, parsed at load
-    value_type = Column(String(16), ForeignKey("param_value_types.name"), default="string")
+    value_type = Column(Text, ForeignKey("param_value_types.name"), default="string")
     #: The seed file's key order (parameters are looked up by name, but the database keeps
     #: the order so that it loses nothing the file says).
     sort_order = Column(Integer, nullable=False, default=_next_after_last("engine_params"))
@@ -244,7 +244,7 @@ class UrgencyLevel(Base):
 
     __tablename__ = "urgency_levels"
 
-    name = Column(String(32), primary_key=True)
+    name = Column(Text, primary_key=True)
     value = Column(Integer, nullable=False)
     sort_order = Column(Integer, nullable=False, default=_next_after_last("urgency_levels"))
 
@@ -254,13 +254,13 @@ class FormulaCoefficient(Base):
 
     __tablename__ = "formula_coefficients"
 
-    name = Column(String(64), primary_key=True)
+    name = Column(Text, primary_key=True)
     #: The number as text, parsed by ``value_type`` at load (as ``engine_params`` does): a
     #: Float column keeps neither ``5`` against ``5.0`` nor an exact rational.
     value = Column(Text, nullable=False)
     #: ``int``, ``float`` or ``rational`` (written ``n/m``, held exactly): the kind the seed
     #: file gives the value.
-    value_type = Column(String(16), ForeignKey("param_value_types.name"), nullable=False, default="float")
+    value_type = Column(Text, ForeignKey("param_value_types.name"), nullable=False, default="float")
     sort_order = Column(Integer, nullable=False, default=_next_after_last("formula_coefficients"))
 
 
@@ -273,21 +273,21 @@ class PostingRule(Base):
     #: The rule's natural key, so a rule can be named without its integer ``id``.  Unique;
     #: when a row is written without one it is the codelet type.
     rule_key = Column(
-        String(64), nullable=False, unique=True,
+        Text, nullable=False, unique=True,
         default=lambda context: context.get_current_parameters()["codelet_type"],
     )
     #: The file's order.  The engine consults the rules in sequence and every consultation
     #: costs a draw from the run's random stream, so the order is behaviour.
     sort_order = Column(Integer, nullable=False, default=_next_after_last("posting_rules"))
-    codelet_type = Column(String(64), nullable=False, index=True)
-    direction = Column(String(16), ForeignKey("posting_directions.name"), nullable=False)
+    codelet_type = Column(Text, nullable=False, index=True)
+    direction = Column(Text, ForeignKey("posting_directions.name"), nullable=False)
     urgency_when_posted = Column(Integer, nullable=True)
-    urgency_formula = Column(String(128), nullable=True)
-    posting_formula = Column(String(256), default="")
-    count_formula = Column(String(128), default="")
+    urgency_formula = Column(Text, nullable=True)
+    posting_formula = Column(Text, default="")
+    count_formula = Column(Text, default="")
     #: ``json``, not ``jsonb``: JSONB reorders object keys, and key order is read back.
     count_values = Column(JSON, nullable=True)
-    condition = Column(String(128), default="always")
+    condition = Column(Text, default="always")
     triggering_slipnodes = Column(JSONB, nullable=True)
 
 
@@ -313,13 +313,13 @@ class CodeletPatternDef(Base):
     #: Position across all patterns, in the file's order: both the order of the patterns
     #: and the order within each one.
     ordinal = Column(Integer, nullable=False, default=_next_after_last("codelet_pattern_defs", "ordinal"))
-    pattern_name = Column(String(64), nullable=False, index=True)
-    codelet_type = Column(String(64), nullable=False)
+    pattern_name = Column(Text, nullable=False, index=True)
+    codelet_type = Column(Text, nullable=False)
     #: A *named* tier from ``urgency_levels``, not a number.  A pattern says which
     #: level and the run resolves it (``Coderack._pattern_entry``), so changing what
     #: ``very_high`` means moves every pattern that names it instead of leaving 77
     #: written down in a second place.
-    urgency_level = Column(String(32), nullable=False)
+    urgency_level = Column(Text, nullable=False)
 
 
 class CommentaryTemplate(Base):
@@ -328,7 +328,7 @@ class CommentaryTemplate(Base):
     __tablename__ = "commentary_templates"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    template_key = Column(String(64), nullable=False, index=True)
+    template_key = Column(Text, nullable=False, index=True)
     #: ``json``, not ``jsonb``: the templates' key order is read back.
     template_data = Column(JSON, nullable=False)
 
@@ -349,7 +349,7 @@ class DemoProblem(Base):
     target = Column(Text, nullable=False)
     answer = Column(Text, nullable=True)
     seed = Column(BigInteger, nullable=False)
-    mode = Column(String(16), ForeignKey("demo_modes.name"), nullable=False)
+    mode = Column(Text, ForeignKey("demo_modes.name"), nullable=False)
     description = Column(Text, default="")
 
 
@@ -359,7 +359,7 @@ class ThemeDimensionDef(Base):
     __tablename__ = "theme_dimension_defs"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    slipnet_node = Column(String(64), nullable=False)
+    slipnet_node = Column(Text, nullable=False)
     valid_relations = Column(JSONB, nullable=False)  # list of strings
 
 
@@ -368,7 +368,7 @@ class SlipnetLayoutPos(Base):
 
     __tablename__ = "slipnet_layout"
 
-    node_name = Column(String(64), primary_key=True)
+    node_name = Column(Text, primary_key=True)
     grid_row = Column(Integer, nullable=False)
     grid_col = Column(Integer, nullable=False)
     sort_order = Column(Integer, nullable=False, default=_next_after_last("slipnet_layout"))
@@ -386,10 +386,10 @@ class SlipnetNodeRole(Base):
     __tablename__ = "slipnet_node_roles"
     __table_args__ = (UniqueConstraint("node_name", "role", name="uq_slipnet_node_role"),)
 
-    role = Column(String(64), primary_key=True)
+    role = Column(Text, primary_key=True)
     ordinal = Column(Integer, primary_key=True, default=0)
     node_name = Column(
-        String(64),
+        Text,
         ForeignKey("slipnet_node_defs.name", onupdate="CASCADE", ondelete="CASCADE"),
         nullable=False,
     )
@@ -401,10 +401,10 @@ class CodeletTypeRole(Base):
     __tablename__ = "codelet_type_roles"
     __table_args__ = (UniqueConstraint("codelet_type", "role", name="uq_codelet_type_role"),)
 
-    role = Column(String(64), primary_key=True)
+    role = Column(Text, primary_key=True)
     ordinal = Column(Integer, primary_key=True, default=0)
     codelet_type = Column(
-        String(64),
+        Text,
         ForeignKey("codelet_type_defs.name", onupdate="CASCADE", ondelete="CASCADE"),
         nullable=False,
     )
@@ -420,10 +420,10 @@ class ThemeRelation(Base):
 
     __tablename__ = "theme_relations"
 
-    name = Column(String(32), primary_key=True)
+    name = Column(Text, primary_key=True)
     ordinal = Column(Integer, nullable=False, default=_next_after_last("theme_relations", "ordinal"))
     node_name = Column(
-        String(64),
+        Text,
         ForeignKey("slipnet_node_defs.name", onupdate="CASCADE", ondelete="CASCADE"),
         nullable=True,
     )
@@ -437,9 +437,9 @@ class HelpTopic(Base):
     __tablename__ = "help_topics"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    topic_type = Column(String(32), nullable=False, index=True)  # component, glossary
-    topic_key = Column(String(64), nullable=False, unique=True, index=True)
-    title = Column(String(128), nullable=False)
+    topic_type = Column(Text, nullable=False, index=True)  # component, glossary
+    topic_key = Column(Text, nullable=False, unique=True, index=True)
+    title = Column(Text, nullable=False)
     short_desc = Column(Text, default="")
     full_desc = Column(Text, default="")
     metadata_json = Column("metadata", JSONB, default=dict)

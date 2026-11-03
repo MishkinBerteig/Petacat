@@ -67,7 +67,7 @@ class Configuration(Base):
     )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String(200), nullable=False, default="", server_default="")
+    name = Column(Text, nullable=False, default="", server_default="")
     note = Column(Text, nullable=False, default="", server_default="")
     kind = Column(String(8), nullable=False)
     #: The Training Mode Session this is the configuration of (``NULL`` for the global one).
@@ -129,11 +129,11 @@ class JournalEntry(Base):
     #: ``(configuration_id, revision)``, never by ``id`` or ``recorded_at``.
     revision = Column(Integer, nullable=False)
     #: Entries of one edit-all, or one undone batch, share a group.
-    group_id = Column(String(64), nullable=True, index=True)
+    group_id = Column(Text, nullable=True, index=True)
     source = Column(String(16), nullable=False)
-    actor = Column(String(80), nullable=False)
+    actor = Column(Text, nullable=False)
     #: The finer route (``admin_editor``, ``admin_database``, ``admin_undo``, ...).
-    channel = Column(String(40), nullable=False, default="")
+    channel = Column(Text, nullable=False, default="")
     note = Column(Text, nullable=False, default="")
     #: The run that caused the change (a learner's), if any.
     causing_run_id = Column(Integer, nullable=True)

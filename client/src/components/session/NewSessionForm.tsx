@@ -184,7 +184,6 @@ export function NewSessionForm({ configurationBase = null, limits, defaults, onC
           value={name}
           onChange={(e) => setName(e.target.value)}
           disabled={busy}
-          maxLength={200}
           style={{ maxWidth: 320 }}
         />
       </div>

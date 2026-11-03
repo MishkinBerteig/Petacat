@@ -85,6 +85,7 @@ from server.models.journal import (
     JournalEntry,
 )
 from server.services.config_registry import LAYER_REGISTRY, TableSpec
+from server.services.problem_text import ProblemTextError, check_deep
 
 logger = logging.getLogger("petacat")
 
@@ -634,10 +635,25 @@ async def _run_global_commit_hook(session: AsyncSession) -> None:
         ) from exc
 
 
+def _check_text(**fields: Any) -> None:
+    """Refuse text the database cannot hold (U+0000, a lone surrogate); any other text is fine.
+
+    The change API checks its batch first (a 400 that names the field); this is the same check
+    for the writers that call the journal directly.
+    """
+    try:
+        for name, value in fields.items():
+            check_deep(name, value)
+    except ProblemTextError as exc:
+        raise JournalError(str(exc)) from exc
+
+
 async def _write(
     session, ops, source, actor, configuration_id, channel, note, proposed, group_id,
     causing_run_id, episode_version, compute_hash, expected_revision=None,
 ) -> WriteResult:
+    _check_text(actor=actor, channel=channel, note=note, group_id=group_id, ops=ops,
+                proposed=proposed)
     configuration = await _lock_configuration(session, configuration_id)
     _check_source(configuration["kind"], source)
     if expected_revision is not None and configuration["revision"] != expected_revision:
@@ -832,6 +848,8 @@ async def update_configuration_meta(
     unknown = set(fields) - set(META_FIELDS)
     if unknown:
         raise JournalError(f"not a meta field: {sorted(unknown)}")
+    _check_text(actor=actor, channel=channel, entry_note=note,
+                **{f"meta {k}": v for k, v in fields.items()})
     try:
         configuration = await _lock_configuration(session, configuration_id)
         _check_source(configuration["kind"], source)

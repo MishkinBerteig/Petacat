@@ -42,6 +42,25 @@ def check_string(field: str, value: str) -> None:
         ) from None
 
 
+def check_deep(field: str, value: Any) -> None:
+    """Run :func:`check_string` over every string in *value*, keys included.
+
+    *value* may be a string or any nesting of mappings and lists (a change batch's ops, a
+    journal ``proposed`` document).  The name in the message is the path to the bad string,
+    such as ``ops[2]['values']['glyph']``.  Non-strings are not looked at.
+    """
+    if isinstance(value, str):
+        check_string(field, value)
+    elif isinstance(value, Mapping):
+        for key, item in value.items():
+            if isinstance(key, str):
+                check_string(f"a key of {field}" if field else "a key", key)
+            check_deep(f"{field}[{key!r}]" if field else repr(key), item)
+    elif isinstance(value, (list, tuple)):
+        for i, item in enumerate(value):
+            check_deep(f"{field}[{i}]", item)
+
+
 def check_problem(
     initial: Any, modified: Any, target: Any, answer: Any = None, *, require_nonempty: bool = False,
 ) -> None:

@@ -48,6 +48,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.models.journal import GLOBAL_CONFIGURATION_ID, KIND_GLOBAL
 from server.services import journal
+from server.services.problem_text import ProblemTextError, check_deep, check_string
 from server.services.configuration_input import (
     BASE_MODES,
     DOES_NOT_COMPILE,
@@ -168,6 +169,17 @@ def check_envelope(batch: Any) -> None:
     for name in ("actor", "note", "channel", "group_id"):
         if name in batch and batch[name] is not None and not isinstance(batch[name], str):
             raise _malformed(f"{name} must be text", name)
+    # Any text is allowed, except what the database cannot hold as text (U+0000, a lone
+    # surrogate): a 400 that names the field, never a database error.
+    try:
+        for name in ("actor", "note", "channel", "group_id"):
+            if isinstance(batch.get(name), str):
+                check_string(name, batch[name])
+        check_deep("ops", ops)
+        if isinstance(batch.get("base_version"), str):
+            check_string("base_version", batch["base_version"])
+    except ProblemTextError as exc:
+        raise _malformed(str(exc), "ops" if str(exc).startswith(("ops", "a key of ops")) else None) from exc
     if "base_version" in batch:
         value = batch["base_version"]
         if value != "head" and (isinstance(value, bool) or not isinstance(value, int)):

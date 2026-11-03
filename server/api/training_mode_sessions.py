@@ -33,11 +33,11 @@ from typing import Any, AsyncIterator, Literal
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse, StreamingResponse
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from server.services import session_configuration_views as views
 from server.services.configuration_writer import ChangeError, error_response
-from server.services.problem_text import check_problem
+from server.services.problem_text import check_problem, check_string
 from server.services.training_mode_session_service import (
     MAX_PROBLEMS_PER_REQUEST,
     MAX_SEEDS_PER_PROBLEM,
@@ -70,8 +70,9 @@ class AddProblemsRequest(BaseModel):
 
 class CreateSessionRequest(BaseModel):
     model_config = {"extra": "forbid"}  # e.g. a ``memory`` field is refused (422)
-    name: str = Field(min_length=1, max_length=200)
-    note: str = Field(default="", max_length=10_000)
+    #: Any text of any length (non-empty); only what the database cannot hold as text is refused.
+    name: str = Field(min_length=1)
+    note: str = ""
     #: Partial ``SessionSettings``: seeds_per_problem, seed_start, max_codelets,
     #: parameters, backend, configuration_base.  Each is validated by the service (422, or 400
     #: for parameters and backend); omitted ones take the defaults.
@@ -79,6 +80,12 @@ class CreateSessionRequest(BaseModel):
     #: Partial ``ErrorPolicy``; a bad value is a 400.
     policy: dict[str, Any] | None = None
     problems: list[ProblemInput] = Field(default_factory=list, max_length=MAX_PROBLEMS_PER_REQUEST)
+
+    @field_validator("name", "note")
+    @classmethod
+    def _text(cls, value: str, info: Any) -> str:
+        check_string(info.field_name, value)
+        return value
 
 
 class StartRequest(BaseModel):
@@ -89,9 +96,16 @@ class StartRequest(BaseModel):
 
 class UpdateSessionRequest(BaseModel):
     model_config = {"extra": "forbid"}  # settings cannot change after creation
-    name: str | None = Field(default=None, min_length=1, max_length=200)
-    note: str | None = Field(default=None, max_length=10_000)
+    name: str | None = Field(default=None, min_length=1)
+    note: str | None = None
     policy: dict[str, Any] | None = None
+
+    @field_validator("name", "note")
+    @classmethod
+    def _text(cls, value: str | None, info: Any) -> str | None:
+        if value is not None:
+            check_string(info.field_name, value)
+        return value
 
 
 router = APIRouter(prefix="/api/training-mode/sessions", tags=["training_mode_sessions"])
