@@ -1,5 +1,11 @@
 # Episodic Best-Answer Discovery: Pilot 02
 
+> **Status note (2026-11-03).** This file reports one measurement or study as it stood then and is
+> kept as written. "Episode" means a Metacat Mode episodic run sequence (runs sharing Metacat's
+> Episodic Memory), not a Training episode, and "learning" means Metacat-Mode learning. Nothing here
+> involves a Training Mode Session. The current description of the system is in
+> [README.md](../../../../README.md) and [TESTING.md](../../../../TESTING.md).
+
 The reference-only pilot completed all **4000 scheduled episodes**: four
 problems, 1000 episodes per problem, and an eight-run horizon. Memory was
 cleared between episodes and retained within each episode. This is a bounded

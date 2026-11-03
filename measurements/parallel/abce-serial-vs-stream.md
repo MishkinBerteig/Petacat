@@ -1,5 +1,9 @@
 # The deep answer `abce`: faithful loop vs stream-serial reference (2026-10-30)
 
+> **Status note (2026-11-03).** This file reports one measurement or study as it stood then and is
+> kept as written. The current description of the system is in [README.md](../../README.md) and
+> [TESTING.md](../../TESTING.md).
+
 `wxyz → vxyz; abcd` is the problem on which the first attempt at codelet parallelism
 showed its damage. Free-running at six workers found the deep answer `abce` in 9.3% of runs,
 against 15.0% serially. The stream-serial reference is the run that every speculative

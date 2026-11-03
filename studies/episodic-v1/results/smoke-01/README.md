@@ -1,5 +1,11 @@
 # Episodic Smoke Test 01
 
+> **Status note (2026-11-03).** This file reports one measurement or study as it stood then and is
+> kept as written. "Episode" means a Metacat Mode episodic run sequence (runs sharing Metacat's
+> Episodic Memory), not a Training episode, and "learning" means Metacat-Mode learning. Nothing here
+> involves a Training Mode Session. The current description of the system is in
+> [README.md](../../../../README.md) and [TESTING.md](../../../../TESTING.md).
+
 Completed 2026-09-06 using the [bounded protocol](protocol.json) and the
 [study design](../../README.md). This is development verification, not the
 full experiment and not publication-strength evidence of equivalence.

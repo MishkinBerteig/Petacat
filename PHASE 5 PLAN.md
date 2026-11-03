@@ -1,5 +1,15 @@
 # Phase 5 Plan — Multi-Modal Learning: Audio and Proprioception
 
+> **Status note (2026-11-03).** This file is a record of its time and is kept as written. Since
+> then: v2.0 removed v1.2's "Training Session" as a name: it was Metacat Mode's episodic runs (runs
+> that inherit Metacat's Episodic Memory until it is cleared), and it is unrelated to a Training
+> Mode Session (`/api/training-mode/sessions`). Learning is always qualified (Metacat-Mode learning
+> is Episodic Memory; Training-Mode learning changes a Training Mode Session's configuration); the
+> database, not `seed_data/*.json`, is the source of truth for configuration (the files are the
+> Metacat Standard Configuration, loaded only into an empty database; Petacat has no migrations).
+> The current description is in [README.md](README.md) ("Two modes", "The configuration, the journal
+> and the change API" and "Training Mode Session"), [TESTING.md](TESTING.md) and [HELP.md](HELP.md).
+
 **Goal.** Extend perception beyond text to **audio** and **proprioception** —
 embodied AI — building directly on the `love`/`not-love` system from Phase 2.
 

@@ -22,7 +22,7 @@ A tight edit-test loop uses:
 .venv/bin/python -m pytest tests/ -q -m "not slow" --numeric-backends=cpu
 ```
 
-which drops the expected-range oracle and puts the whole session on one CPU
+which drops the tests marked `slow` and puts the whole session on one CPU
 backend. Verify with the required command before considering a change done.
 
 ### The numeric backend matrix
@@ -264,15 +264,14 @@ measured on an Apple M2 Max:
 
 The required command is given as three figures because three runs of it on the
 same machine produced them, and that spread is what "depends on what else it is
-doing" looks like in practice. Budget against the largest: the expected-range
-oracle holds each problem to a per-sample deadline (`PETACAT_RANGE_TIMEOUT`,
-600 s), so on a machine loaded enough to reach 24 minutes that deadline is within
-reach, and a problem that hits it reports the stall and names the workers still
-running.
+doing" looks like in practice. Budget against the largest.
 
-What `-m "not slow"` drops is the expected-range check, which is ~1,300 engine runs
-across a process pool. Reach for the tight loop when you want a fast loop rather
-than a number to compare, and for the required command when you want the number.
+What `-m "not slow"` drops is the tests marked `slow`, among them the ones that recompute a
+whole baseline in a fresh interpreter (the golden baseline, the replay of recorded
+traces), run a wide seed sweep of the speculative executor or compare a database-fed
+run with the seed-fed one over many problems. Reach for the tight loop when you want
+a fast loop rather than a number to compare, and for the required command when you
+want the number.
 
 > **If `tests/module/test_free_running.py` fails, read
 > `server/parallel/coderack_shards.py` before reaching for `--numeric-backends`.**
@@ -610,7 +609,7 @@ changing what it records.
 | `test_configuration_edits_api.py` | 8 | C12: edit-all over HTTP: the matrix of global, running, paused, Stopped, frozen and differing targets with M3 and undo by group; a missing row and a removed node with apply-the-rest; no_change, overwrite and a frozen target chosen by id; a session changing state; a stale preview re-previewed; all-or-nothing across stored and live targets |
 | `test_session_routes.py` | 13 | S6: the session routes that carry its configuration: the external route (a Stopped session writes at once, a live one holds the batch, 409 while starting or stopping, every learning source recorded, refusals in the change API's shape, dry runs); the journal timeline with live pending entries; the configuration, diff and Slipnet at a version, stored and live; export of the configuration and the journal |
 | `test_session_docs.py` | 4 | S6: `API.md` and the contract list every session route; the help topics for the external route and the learning sources are served; learn, learner and episode are qualified by mode |
-| `test_session_long_journal.py` | 2 | S8: a session with a long journal (30,000 entries by default) starts with no journal or merge statement, the same statements as a one-entry journal, and the stored hash; `verify_journal` still agrees over it; the journal-growth budget per entry (only with `PETACAT_BUDGETS=1`) |
+| `test_session_long_journal.py` | 2 | S8: a session with a long journal (30,000 entries by default; `PETACAT_LONG_JOURNAL_ENTRIES` sets the length) starts with no journal or merge statement, the same statements as a one-entry journal, and the stored hash; `verify_journal` still agrees over it; the journal-growth budget per entry (only with `PETACAT_BUDGETS=1`) |
 | `test_mode_isolation.py` | 7 | C10: M1, a Metacat Mode run is identical after a battery of session activity and session edits never change the global provider or hash; M2, the global configuration refuses `learner` and `external`; M3, edit-all end to end, one Admin entry per configuration, and a session-only edit-all leaves the global configuration alone; no journal row from a Metacat Mode run, nor from a live session before its Stop write |
 | `test_configuration_edit_scope_ui_flow.py` | 1 | C9b: the Admin scope picker's request shapes: preview by natural key with `expect`, commit to the global configuration and a Stopped session with a reason, then undo by group |
 | `test_configuration_stamp_link.py` | 2 | The configuration stamp (plan 3.8): every answer description, snag description and state capture a Normal or Audit run stores carries its run's id, and so the run's `config_hash`; the Training Mode tables carry theirs by construction |

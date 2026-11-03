@@ -1,5 +1,7 @@
 # Episodic Individual-Answer Discovery Pilot v2
 
+> **Terms.** "Episode" in this document means a Metacat Mode *episodic run sequence*: runs in a row that share Metacat's Episodic Memory. It is not a Training episode, which belongs to Training Mode. "Learning" means Metacat-Mode learning, which is Episodic Memory. Nothing here involves a Training Mode Session.
+
 This reference-only pilot supersedes the v1 smoke test's **whole-winner-set
 population**, not its native definitions of best. No previous study is changed.
 There is no port collection or full-oracle campaign in this protocol.
@@ -92,7 +94,7 @@ The practical hypothesis is that these selected-answer populations concentrate
 quickly enough to make the oracle cheaper to construct. Cost comparisons must
 count the **eight inner runs per episode**, not just episodes. Selection of the
 best of eight opportunities can itself concentrate results, so this pilot alone
-cannot attribute a reduction causally to learning. That does not prevent it from
+cannot attribute a reduction causally to Metacat-Mode learning. That does not prevent it from
 testing the practical oracle-construction cost with episodic memory enabled.
 
 ## Running and Auditing

@@ -1,5 +1,9 @@
 # WP6 findings: GPU, Neural Engine and unified memory (2026-10-29, M5 Max)
 
+> **Status note (2026-11-03).** This file reports one measurement or study as it stood then and is
+> kept as written. The current description of the system is in [README.md](../../README.md) and
+> [TESTING.md](../../TESTING.md).
+
 Host shared with other agents (load average 3-12 during the runs): trust ratios, not absolutes.
 Raw data and scripts are in this folder; WP8 should re-measure on a quiet machine.
 

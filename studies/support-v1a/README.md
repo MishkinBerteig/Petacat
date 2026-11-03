@@ -1,5 +1,7 @@
 # Crash-Aware Continuation of the Support Study
 
+> **Terms.** "Episode" in this document means a Metacat Mode *episodic run sequence*: runs in a row that share Metacat's Episodic Memory. It is not a Training episode, which belongs to Training Mode. "Learning" means Metacat-Mode learning, which is Episodic Memory. Nothing here involves a Training Mode Session.
+
 `support-v1a` is an explicitly post-failure amendment of
 [support-v1](../support-v1/README.md), not a new untouched prospective experiment.
 The original Metacat and Petacat engines, runtime, inputs, assigned seeds,
@@ -77,7 +79,7 @@ do not describe all analyses as prespecified before data collection. Nominal
 binomial limits retain their fixed-law independent-sampling assumptions and
 multiplicity qualifications. Do not estimate a general failure probability by
 pooling this interrupted, heterogeneous collection. No defect-detection power
-or beneficial learning claim follows from this single counterexample.
+or beneficial Metacat-Mode learning claim follows from this single counterexample.
 
 Cost accounting includes inherited completed attempts once, the interrupted
 parent attempt, continuation attempts, and excluded preflight executions.
@@ -155,4 +157,4 @@ For the paper, describe the failure as a reference-qualification case study:
 expensive exploration yielded a reproducible reference defect and a cheap
 targeted regression test. Execution revealed the crash; Good-Turing/p50 did
 not specifically detect it. This does not replace the separate episodic
-learning evaluation needed for the intended submission.
+Metacat-Mode learning evaluation needed for the intended submission.

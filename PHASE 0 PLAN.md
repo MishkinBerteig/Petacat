@@ -1,5 +1,18 @@
 # Phase 0 Plan — Execution Substrate
 
+> **Status note (2026-11-03).** This file is a record of its time and is kept as written. Since
+> then: v2.0 removed v1.2's "Training Session" as a name: it was Metacat Mode's episodic runs (runs
+> that inherit Metacat's Episodic Memory until it is cleared), and it is unrelated to a Training
+> Mode Session (`/api/training-mode/sessions`). The Terminology section below is where that old name
+> is defined. The free-running, coderack-shard and population code the plan describes now lives
+> under `server/parallel/`. The database, not `seed_data/*.json`, is the source of truth for
+> configuration (the files are the Metacat Standard Configuration, loaded only into an empty
+> database; Petacat has no migrations, and the unused `alembic/` folder was removed on 2026-11-03).
+> The as-built figures are checked by
+> `tests/integration/test_documented_code_shape.py` and stay in place. The current description is in
+> [README.md](README.md) ("Two modes", "The configuration, the journal and the change API" and
+> "Training Mode Session"), [TESTING.md](TESTING.md) and [HELP.md](HELP.md).
+
 **Goal.** Database modes and parallelism. **No semantic changes to how Petacat
 works.** This phase introduces no new cognition; it establishes the execution
 structure every later phase runs inside.

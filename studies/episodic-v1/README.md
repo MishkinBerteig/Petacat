@@ -1,5 +1,7 @@
 # Episodic Best-Answer Study v1
 
+> **Terms.** "Episode" in this document means a Metacat Mode *episodic run sequence*: runs in a row that share Metacat's Episodic Memory. It is not a Training episode, which belongs to Training Mode. "Learning" means Metacat-Mode learning, which is Episodic Memory. Nothing here involves a Training Mode Session.
+
 This study compares conceptual results from memory-retaining Metacat and
 Petacat episodes. It does not compare ordered run sequences. The shipped
 configuration is a tightly bounded smoke test, not the full experiment.

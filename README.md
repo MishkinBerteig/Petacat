@@ -132,25 +132,28 @@ that runs its own evolving configuration. The in-worker learner itself is not bu
   speculative executor that spreads one run's codelets across threads
 
 Engine parameters, slipnet topology, codelet definitions and theme dimensions
-live in `seed_data/*.json`, which the API reads at startup and which seeds the
-database. Codelet behaviour is expressed as Python source strings, compiled once
-at startup and executed via `exec()` in a sandboxed namespace.
+live in the database, which is the source of truth for configuration. The files in
+`seed_data/*.json` (the Metacat Standard Configuration) are loaded into an empty database once, at
+start-up. Codelet behaviour is expressed as Python source strings, compiled once per
+configuration and executed via `exec()` in a sandboxed namespace.
 
-Edit that configuration through the Configuration screen: twelve of the thirteen
-collections have a tab that creates, updates and deletes their rows, and a
-change is written to the database and picked up by the next run created. The
-thirteenth, the codelet patterns, is configured through the API and the seed
-file rather than a tab, and travels the export and import routes with the rest. The seed files change only by a committed development change; nothing the application does writes them.
+Edit a configuration through the Admin view (the hamburger menu's **Configurations (Metacat Mode and
+Training Mode)**): thirteen tables have an editor tab that creates, updates and deletes their rows
+(the Slipnet nodes and links, codelet types, engine parameters, urgency levels, formula coefficients,
+demo problems, enum tables, theme dimensions, posting rules, commentary templates, Slipnet layout and
+help topics). Every save goes through the change API and the next run created picks it up. The codelet
+patterns, the roles and the theme relations have no tab and are changed through the change API. The
+seed files change only by a committed development change; nothing the application does writes them.
 
-`GET /api/admin/export` and `POST /api/admin/import` carry the same twelve
-collections as one JSON object — slipnet nodes and links, codelet types, engine
-parameters, urgency levels, formula coefficients, demo problems, theme
-dimensions, posting rules, commentary templates, slipnet layout and help topics.
-Export orders every collection by primary key, so two exports of one
-configuration are the same bytes and a backup diffs against the file it came
-from. Import matches each row on its primary key, applies every collection the
-payload names, reports the row count it wrote for each, and runs as a single
-transaction.
+`GET /api/admin/export` writes sixteen collections as one JSON object, and `POST /api/admin/import`
+reads thirteen of them back: slipnet nodes and links, codelet types, engine parameters, urgency
+levels, formula coefficients, demo problems, theme dimensions, posting rules, codelet patterns,
+commentary templates, slipnet layout and help topics. (The node roles, codelet type roles and theme
+relations are exported so that the download loses nothing, but not imported.) Export orders every
+collection by primary key, so two exports of one configuration are the same bytes and a backup diffs
+against the file it came from. Import matches each row on its natural key, applies every collection
+the payload names, reports the row count it wrote for each, writes one journal entry (source
+`import`), and runs as a single transaction. It imports into the global configuration only.
 
 The engine itself is **database-free**: nothing under `server/engine/` imports
 SQLAlchemy, opens a session, or awaits I/O, and a test
@@ -215,13 +218,12 @@ brew services start postgresql@17
 ```
 
 - **PostgreSQL 17** holds the history of every run — recorded states, traces,
-  audit actions and episodic memory — and the editable copy of the configuration
-  that the Configuration screen writes to. The API requires it to start.
+  audit actions, Metacat Mode's Episodic Memory and every Training Mode Session — and the
+  editable configurations that the Admin view writes to. The API requires it to start.
 
-  The schema lives in `alembic/versions/`. Startup creates any missing tables, so
-  a fresh database is ready as soon as the API comes up. Bring an existing
-  database forward with `.venv/bin/alembic upgrade head`, which is what applies
-  the column additions a newer version expects.
+  Startup creates the tables from the models (`create_all`), so a fresh database is ready as soon
+  as the API comes up. Petacat has no migrations and no upgrade of an existing database: after a schema change,
+  clear the development database and the next start recreates it.
 - **Python 3.14** is the only supported interpreter (`requires-python = ">=3.14"`
   in `pyproject.toml`). Pinning one version matters here: the engine is a
   measurement subject, and results taken on two interpreters are not comparable.
@@ -409,7 +411,7 @@ time (the global one, which Metacat Mode uses, unless you open a Training Mode S
   **Urgency Levels**, **Formula Coefficients**, **Demo Problems**, **Enum Tables**, **Theme Dimensions**,
   **Posting Rules**, **Commentary Templates**, **Slipnet Layout** and **Help Topics** (the in-app help
   text, backed by `seed_data/help_topics.en.json`): editable tables over the seed data's 59 nodes, 202
-  links, 27 codelet types, 79 formula coefficients and the rest
+  links, 27 codelet types, 89 formula coefficients and the rest
 - **History**: the journal, with undo
 - **Database (all modes)**: browse any table, edit the safe ones
 
@@ -457,10 +459,10 @@ Petacat has two test suites:
 # Needs Postgres up: scripts/dev.sh db
 .venv/bin/python -m pytest tests/ -q
 
-# Fast inner loop: one CPU backend, without the slow expected-range oracle
+# Fast inner loop: one CPU backend, without the tests marked slow
 .venv/bin/python -m pytest tests/ -q -m "not slow" --numeric-backends=cpu
 
-# One layer at a time: unit, seed_unit, module, architecture, integration, e2e
+# One layer at a time: unit, seed_unit, module, architecture, integration, parallel, lockstep, e2e
 .venv/bin/python -m pytest tests/unit/ -v
 
 # One backend alone: cpu, gpu, python, numpy, mlx, mlx-cpu, or all
@@ -1336,7 +1338,7 @@ a total is reached:
 
 A live run of that workflow: **60 problems, 600 runs, one Episodic Memory, 17 workers, 5.5 s,
 about 110 runs/s (167,000 codelets/s), 0 errors**; 154 runs hit the 2,000-codelet cap,
-and the episode memory ended at 154 answers and 5 snags.
+and the session's Episodic Memory ended at 154 answers and 5 snags.
 
 ### A pool can no longer outlive its owner
 
@@ -1363,6 +1365,7 @@ and a full set of sizes.
 | Swarm processes | Every logical core but one. The runs share nothing, so every tier of core adds throughput, and the reserved core leaves the parent and the OS somewhere to run. | `PETACAT_POPULATION_WORKERS` |
 | Executor numeric backend | `off` below 512 Slipnet nodes, `numpy` from there, never the GPU on its own (`server/parallel/placement.py`). | `PETACAT_SWARM_BACKEND`, `PETACAT_SPECULATIVE_BACKEND` |
 | GPU dispatch threads | GPU cores × 1,024, rounded up to a power of two. This is the target the Slipnet kernel splits rows against, so a larger GPU splits more widely in the latency-bound regime. | `PETACAT_GPU_CORES`, `PETACAT_GPU_THREADS_PER_CORE` |
+| GPU worthwhile | `PETACAT_GPU_PLACEMENT` `auto` says yes only for a Slipnet of at least 32,768 nodes (a cost model with 200 microseconds per Metal dispatch); `on` and `off` force the answer (`server/parallel/placement.py`). | `PETACAT_GPU_PLACEMENT`, `PETACAT_GPU_MIN_NODES`, `PETACAT_GPU_DISPATCH_US` |
 
 `GET /api/system/numeric` reports the detected machine and everything derived
 from it alongside the chosen backend, and `scripts/bench_*.py` write the same
@@ -1624,12 +1627,14 @@ files are not read again (see [`seed_data/README.md`](seed_data/README.md) and
 | `codelet_types.json` | 27 codelet types with Python execute bodies |
 | `engine_params.json` | Runtime parameters and thresholds |
 | `urgency_levels.json` | 7 urgency bin values |
-| `formula_coefficients.json` | 79 formula weights |
+| `formula_coefficients.json` | 89 formula weights |
 | `theme_dimensions.json` | 9 conceptual dimensions across 3 cluster types |
-| `demo_problems.json` | 34 pre-configured analogy problems |
+| `demo_problems.json` | 41 pre-configured analogy problems |
 | `posting_rules.json` | Codelet posting rules |
 | `commentary_templates.json` | Natural-language output templates, and Verbose mode's 200-odd message texts (`verbose_messages`) |
 | `enums.json` | Enum tables (bond categories, proposal levels, …) |
+| `roles.json` | The roles the engine looks Slipnet nodes and codelet types up by (37 node-role rows, 5 codelet-type-role rows) |
+| `theme_relations.json` | The Themespace's 5 relations |
 | `slipnet_layout.json` | Grid positions for the Slipnet visualisation |
 | `help_topics.en.json` | Help popover text for every dashboard panel + glossary (English) |
 
@@ -1657,7 +1662,7 @@ the static [`HELP.md`](HELP.md) reference and matching TypeScript constants.
 ## Key Differences from Scheme Original
 
 1. **Database-driven configuration**: All constants, codelet definitions, and
-   network topology are in Postgres (loaded from JSON seed files).
+   network topology are in Postgres (first loaded from the JSON seed files, the Metacat Standard Configuration).
 2. **Codelet DSL**: Codelet behaviour is Python source stored in the database,
    compiled once, and `exec()`'d in a sandboxed namespace.
 3. **Web-based UI**: React frontend with real-time WebSocket state push.
@@ -1702,7 +1707,7 @@ Some additional minor differences include:
 - Of course, the name "Petacat".
 - Deterministic runs by setting a "seed".
 - Double-click on a node in the Slipnet to see details about it.
-- An admin page for database and help text management.
+- An Admin view for the configuration (with its journal and change API), the database and the help text.
 
 ## Future Direction
 
@@ -1726,7 +1731,7 @@ out.
 How Petacat is checked against its reference is written up in
 [Support-Set Oracles for Comparing Stochastic Systems](academic/20260828%20oracles-for-stochastic-system-comparison.md):
 the Good–Turing-saturated support sets, the two-sided membership comparison
-that `scripts/compare_to_metacat.py` runs on every change, and the
+that `scripts/compare_to_metacat.py` runs, and the
 discrepancies it located. Its Background section (§0) records the path by
 which the method was reached.
 

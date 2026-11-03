@@ -1,5 +1,15 @@
 # DISCREPANCIES2 — Unintended cognitive divergences between Petacat and the Metacat source
 
+> **Status note (2026-11-03).** This file is a record of its time and is kept as written. Since
+> then: v2.0 removed v1.2's "Training Session" as a name: it was Metacat Mode's episodic runs (runs
+> that inherit Metacat's Episodic Memory until it is cleared), and it is unrelated to a Training
+> Mode Session (`/api/training-mode/sessions`). The code has moved on (the parallel plugin is under
+> `server/parallel/`); the database, not `seed_data/*.json`, is the source of truth for
+> configuration (the files are the Metacat Standard Configuration, loaded only into an empty
+> database; Petacat has no migrations). The current description is in [README.md](README.md) ("Two
+> modes", "The configuration, the journal and the change API" and "Training Mode Session"),
+> [TESTING.md](TESTING.md) and [HELP.md](HELP.md).
+
 > ## STATUS: ALL FINDINGS APPLIED (2026-08-04)
 >
 > Every finding in this document has been fixed, in the five-phase order of

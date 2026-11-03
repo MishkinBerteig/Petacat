@@ -1,5 +1,11 @@
 # Discovery Pilot Results
 
+> **Status note (2026-11-03).** This file reports one measurement or study as it stood then and is
+> kept as written. "Episode" means a Metacat Mode episodic run sequence (runs sharing Metacat's
+> Episodic Memory), not a Training episode, and "learning" means Metacat-Mode learning. Nothing here
+> involves a Training Mode Session. The current description of the system is in
+> [README.md](../../../README.md) and [TESTING.md](../../../TESTING.md).
+
 The completed [pilot-02 summary](pilot-02/SUMMARY.md) and
 [discovery figure](pilot-02/discovery-curves.png) report all 4000 episode assignments.
 The bundle includes the

@@ -1,5 +1,11 @@
 # Petacat vs Metacat support-v1a answer frequencies (post-lockstep)
 
+> **Status note (2026-11-03).** This file reports one measurement or study as it stood then and is
+> kept as written. The database, not `seed_data/*.json`, is now the source of truth for
+> configuration; the files are the Metacat Standard Configuration, loaded only into an empty
+> database. The current description of the system is in [README.md](../README.md) and
+> [TESTING.md](../TESTING.md).
+
 Final confirmation step of the lockstep pass (meta-peta-trace-idea.md section 1): do answer frequencies match now that decision traces match?
 
 ## Method and provenance

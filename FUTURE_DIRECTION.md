@@ -4,6 +4,12 @@ Four open questions about where Petacat might go next — not a roadmap, but
 an invitation to think along with me about four tangled threads in the same
 cloth. I'd rather start a conversation than ship a spec.
 
+> **Note (2026-11-03).** This is an essay in the author's voice, dated April 12, 2026, and it
+> stays as written. Its "learning" is Training-Mode learning: a Training Mode Session's
+> configuration changing, never Metacat Mode, which stays faithful to Metacat. v2.0 has built the
+> ground for it (the configuration in the database, the change API and journal, and Training Mode
+> Sessions). Thread 3's learner itself is not built. [README.md](README.md) describes what exists.
+
 The threads are numbered 0 through 3 deliberately. The first of them is the
 ground floor that gives the other three their meaning.
 

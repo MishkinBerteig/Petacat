@@ -1,5 +1,9 @@
 # WP5 report: parallel update cycle
 
+> **Status note (2026-11-03).** This file reports one measurement or study as it stood then and is
+> kept as written. The current description of the system is in [README.md](../../README.md) and
+> [TESTING.md](../../TESTING.md).
+
 The WP5 agent could not write report files, so the lead saved this copy of its hand-back.
 
 ## What exists

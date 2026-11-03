@@ -1,5 +1,12 @@
 # DISCREPANCIES3 — divergent outcomes between Petacat and Metacat
 
+> **Status note (2026-11-03).** This file is a record of its time and is kept as written. Since
+> then: the expected-range baseline it replaced is gone (see TESTING.md, "Regressions"), and the
+> database, not `seed_data/*.json`, is the source of truth for configuration (the files are the
+> Metacat Standard Configuration, loaded only into an empty database; Petacat has no migrations).
+> The current description is in [README.md](README.md) ("Two modes", "The configuration, the journal
+> and the change API" and "Training Mode Session"), [TESTING.md](TESTING.md) and [HELP.md](HELP.md).
+
 **What this is.** A record of where Petacat's stopping-state distributions differ
 from Metacat's, measured. Nothing else.
 

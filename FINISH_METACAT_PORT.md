@@ -6,6 +6,15 @@
 > runs natively — `scripts/dev.sh` is the dev runner that replaced
 > `docker compose up`, and [README.md](README.md) has the current setup. The Docker
 > section below, and the test counts throughout, describe the state at the time.
+>
+> **Update (2026-11-03).** v2.0 removed v1.2's "Training Session" as a name: it was Metacat Mode's
+> episodic runs (runs that inherit Metacat's Episodic Memory until it is cleared), and it is
+> unrelated to a Training Mode Session. The database, not `seed_data/*.json`, is now the source of
+> truth for configuration (the files are the Metacat Standard Configuration, loaded only into an
+> empty database), `POST /api/admin/reload` is gone, and Petacat has no migrations (the unused
+> `alembic/` folder was removed on 2026-11-03). [README.md](README.md) ("Two modes", "The
+> configuration, the journal and the change API"), [TESTING.md](TESTING.md) and [HELP.md](HELP.md)
+> describe the system as it is.
 
 **Goal:** bring Petacat to functional parity with Marshall's Metacat (PhD dissertation,
 Indiana University, 1999) and the reference Scheme implementation in `../Metacat/`.

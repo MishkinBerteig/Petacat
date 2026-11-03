@@ -1,5 +1,16 @@
 # Self-Watching Parity Audit — Petacat vs. MetaCat
 
+> **Status note (2026-11-03).** This file is a record of its time and is kept as written. Since
+> then: v2.0 removed v1.2's "Training Session" as a name: it was Metacat Mode's episodic runs (runs
+> that inherit Metacat's Episodic Memory until it is cleared), and it is unrelated to a Training
+> Mode Session (`/api/training-mode/sessions`). Its "shared" Training Session memory is Metacat
+> Mode's global Episodic Memory (a Training Mode Session has an Episodic Memory of its own and never
+> touches it); the database, not `seed_data/*.json`, is the source of truth for configuration (the
+> files are the Metacat Standard Configuration, loaded only into an empty database; Petacat has no
+> migrations). The current description is in [README.md](README.md) ("Two modes", "The
+> configuration, the journal and the change API" and "Training Mode Session"),
+> [TESTING.md](TESTING.md) and [HELP.md](HELP.md).
+
 **Scope**: Episodic Memory, Themespace, Temporal Trace — functionality *and* user
 visibility — validated against Marshall's 1999 dissertation and the original Scheme
 in `../Metacat/`, while checking that the Phase 0 execution substrate has not

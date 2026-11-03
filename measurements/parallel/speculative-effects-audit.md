@@ -1,5 +1,13 @@
 # WP3 effects audit - what shared state every codelet builtin, body and read path touches
 
+> **Status note (2026-11-03).** This file reports one measurement or study as it stood then and is
+> kept as written. "Episode" means a Metacat Mode episodic run sequence (runs sharing Metacat's
+> Episodic Memory), not a Training episode, and "learning" means Metacat-Mode learning. Nothing here
+> involves a Training Mode Session. The database, not `seed_data/*.json`, is now the source of truth
+> for configuration; the files are the Metacat Standard Configuration, loaded only into an empty
+> database. The current description of the system is in [README.md](../../README.md) and
+> [TESTING.md](../../TESTING.md).
+
 Scope: the 57 DSL builtins (`server/engine/codelet_dsl/builtins.py::get_builtins`), the 27 codelet bodies (`seed_data/codelet_types.json`) and every engine function they reach, for the purpose of exact (serial-equivalent) speculation.  Read-only on the repo; everything here lives in `agents-workspace/wp3-speculative/audit/`.
 
 Companion file: `effects_table.json` (machine-readable: 57 builtins, 27 bodies, 23 read-path hazards). Regenerate with `build_effects_table.py`; this report with `make_report.py`.

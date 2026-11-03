@@ -1,5 +1,12 @@
 # DISCREPANCIES5 — where Petacat's source and Metacat's source say different things
 
+> **Status note (2026-11-03).** This file is a record of its time and is kept as written. Since
+> then: the engine reads its configuration from the database through a `MetadataProvider`, and the
+> database, not `seed_data/*.json`, is the source of truth for configuration (the files are the
+> Metacat Standard Configuration, loaded only into an empty database; Petacat has no migrations).
+> The current description is in [README.md](README.md) ("Two modes", "The configuration, the journal
+> and the change API" and "Training Mode Session"), [TESTING.md](TESTING.md) and [HELP.md](HELP.md).
+
 **What this is.** A comparison of Petacat's Python against Metacat's Scheme, function by
 function, looking for anything that could make the two compute differently. It is a
 *static* comparison. Every entry names a Petacat site, the Metacat site it corresponds

@@ -1,5 +1,7 @@
 # The Petacat–Metacat lockstep harness
 
+> **Terms.** "Episode" here means Metacat's own episodic runs: a sequence of runs in one Metacat process, each inheriting the Episodic Memory the runs before it left. It is a Metacat Mode idea, and not a Training episode (Training Mode's whole-session notion). The lockstep harness compares engine decisions with Metacat's and never touches a Training Mode Session.
+
 This harness records every random decision headless Metacat 1.2 makes, replays those
 decisions inside Petacat, and checks at each one that Petacat had the same options
 with the same weights or probabilities. Each mismatch is a located bug report. The

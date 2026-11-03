@@ -1,5 +1,7 @@
 # Capped Episodic Frozen-Oracle Study v3
 
+> **Terms.** "Episode" in this document means a Metacat Mode *episodic run sequence*: runs in a row that share Metacat's Episodic Memory. It is not a Training episode, which belongs to Training Mode. "Learning" means Metacat-Mode learning, which is Episodic Memory. Nothing here involves a Training Mode Session.
+
 This is a new, post-pilot protocol for all 19 problems in the single-run study.
 It preserves earlier studies and does not modify either engine. Reference
 collection and port execution belong on the designated experiment host, in a
@@ -143,7 +145,7 @@ remain after reuse, before any reduction from stopping or errors. Independent
 preflight executions and the 48 earlier diagnostic runs are additional overhead,
 not new scientific observations. The preflight is capped at 256 inner runs.
 
-This budget is not directly evidence of learning-induced savings: the validation
+This budget is not directly evidence of savings from Metacat-Mode learning: the validation
 coverage target differs from the original single-run study's target.
 
 ## Running and Verifying

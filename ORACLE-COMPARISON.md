@@ -1,5 +1,13 @@
 # Oracle comparison — Petacat against Metacat's own measured behaviour
 
+> **Status note (2026-11-03).** This file is a record of its time and is kept as written. Since
+> then: `tests/fixtures/expected_range.json` and its test are gone (see TESTING.md, "Regressions"),
+> and the database, not `seed_data/*.json`, is the source of truth for configuration (the files are
+> the Metacat Standard Configuration, loaded only into an empty database; Petacat has no
+> migrations). The current description is in [README.md](README.md) ("Two modes", "The
+> configuration, the journal and the change API" and "Training Mode Session"),
+> [TESTING.md](TESTING.md) and [HELP.md](HELP.md).
+
 Metacat's repository now carries a saturated stopping-state benchmark over all
 nineteen demo problems, produced by the reference implementation running headless
 (`oracle-out/oracle.json`, `oracle-out-copy/oracle.json`; commits `424feb0` and

@@ -1,5 +1,12 @@
 # DISCREPANCIES4 — every variation between Petacat and the Metacat oracle
 
+> **Status note (2026-11-03).** This file is a record of its time and is kept as written. Since
+> then: the engine reads its configuration from the database through a `MetadataProvider`, and the
+> database, not `seed_data/*.json`, is the source of truth for configuration (the files are the
+> Metacat Standard Configuration, loaded only into an empty database; Petacat has no migrations).
+> The current description is in [README.md](README.md) ("Two modes", "The configuration, the journal
+> and the change API" and "Training Mode Session"), [TESTING.md](TESTING.md) and [HELP.md](HELP.md).
+
 **What this is.** One entry per variation found by comparing Petacat against
 Metacat's published reference sets. Each records the problem, the discrepancy
 type, and the run detail needed to reproduce and eventually diagnose it.

@@ -1,5 +1,9 @@
 # The speculative executor: exact within-run parallelism (WP3, 2026-10-29)
 
+> **Status note (2026-11-03).** This file reports one measurement or study as it stood then and is
+> kept as written. The current description of the system is in [README.md](../../README.md) and
+> [TESTING.md](../../TESTING.md).
+
 Code: `server/parallel/speculative/`. Tests: `tests/parallel/test_speculative_exact.py`,
 `test_clock_rack.py` and `test_effects.py`. Benchmark: `scripts/bench_speculative.py`. The
 effects audit is `speculative-effects-audit.md`, next to this file.

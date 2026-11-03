@@ -1,5 +1,9 @@
 # Cognitive equivalence: the stream-serial reference against the faithful loop (2026-10-30)
 
+> **Status note (2026-11-03).** This file reports one measurement or study as it stood then and is
+> kept as written. The current description of the system is in [README.md](../../README.md) and
+> [TESTING.md](../../TESTING.md).
+
 The parallel plugin's within-run executors follow the **stream-serial reference** (`"stream"`),
 which changes two mechanisms of the faithful loop (`run_mcat`):
 - every codelet draws from a counter-based random stream keyed by its id, not from the run's one

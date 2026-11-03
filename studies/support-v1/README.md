@@ -1,5 +1,7 @@
 # Versioned Support Diagnostic Study
 
+> **Terms.** "Episode" in this document means a Metacat Mode *episodic run sequence*: runs in a row that share Metacat's Episodic Memory. It is not a Training episode, which belongs to Training Mode. "Learning" means Metacat-Mode learning, which is Episodic Memory. Nothing here involves a Training Mode Session.
+
 This prospective study replaces uncertain historical build attribution with
 committed code, a fixed protocol, verified reference source, and ordered runs.
 The protocol must be committed before the main collection starts. This is a

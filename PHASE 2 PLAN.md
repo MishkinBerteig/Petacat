@@ -1,5 +1,17 @@
 # Phase 2 Plan — me/not-me and love/not-love
 
+> **Status note (2026-11-03).** This file is a record of its time and is kept as written. Since
+> then: v2.0 removed v1.2's "Training Session" as a name: it was Metacat Mode's episodic runs (runs
+> that inherit Metacat's Episodic Memory until it is cleared), and it is unrelated to a Training
+> Mode Session (`/api/training-mode/sessions`). Its "learned" and "innate" are old terms: learning
+> is always qualified (Metacat-Mode learning is Episodic Memory; Training-Mode learning changes a
+> Training Mode Session's configuration), and the starting configuration is the Starting Conceptual
+> State; the database, not `seed_data/*.json`, is the source of truth for configuration (the files
+> are the Metacat Standard Configuration, loaded only into an empty database; Petacat has no
+> migrations). The current description is in [README.md](README.md) ("Two modes", "The
+> configuration, the journal and the change API" and "Training Mode Session"),
+> [TESTING.md](TESTING.md) and [HELP.md](HELP.md).
+
 **Goal.** Introduce the two axes that make Petacat a *self* that *learns*: the
 **identity axis** (`me` / `not-me`) and the **valence axis** (`love` / `not-love`).
 The first gives the system something to be; the second gives it a reason to change.

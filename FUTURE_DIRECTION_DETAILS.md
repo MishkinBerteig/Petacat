@@ -16,6 +16,13 @@
 > go/no-go), and several measurements re-taken against commit `2c5c086`.
 >
 > Nothing here should be cited as a decision. Read the phase plans.
+>
+> **Update (2026-11-03).** Its terms are old: "learned" and "innate" gave way to learning always
+> qualified (Metacat-Mode learning is Episodic Memory; Training-Mode learning changes a Training
+> Mode Session's configuration) and the Starting Conceptual State, and v1.2's "Training Session"
+> (Metacat Mode's episodic runs) is removed as a name. v2.0 has built the ground (the configuration
+> in the database, the change API and journal, Training Mode Sessions); the learner is not built.
+> [README.md](README.md) describes what exists.
 
 Living design notes for the "self-knowing Petacat" work sketched in
 `FUTURE_DIRECTION.md`. Where that document poses four open questions, this one

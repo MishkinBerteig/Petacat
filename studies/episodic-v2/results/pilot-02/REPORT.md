@@ -1,5 +1,11 @@
 # episodic-v2-answer-discovery-pilot
 
+> **Status note (2026-11-03).** This file reports one measurement or study as it stood then and is
+> kept as written. "Episode" means a Metacat Mode episodic run sequence (runs sharing Metacat's
+> Episodic Memory), not a Training episode, and "learning" means Metacat-Mode learning. Nothing here
+> involves a Training Mode Session. The current description of the system is in
+> [README.md](../../../../README.md) and [TESTING.md](../../../../TESTING.md).
+
 Separate individual-answer populations. N counts answered complete episodes; failures and answerless episodes are reported separately. f1/N is a heuristic conditional missing-mass estimate, not a confidence bound. Pilot collection never stops on a threshold crossing.
 
 Complete: True. Episodes: 4000. Inner runs: 31999.

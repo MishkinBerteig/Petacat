@@ -1,5 +1,11 @@
 # Full Support Study Data
 
+> **Status note (2026-11-03).** This file reports one measurement or study as it stood then and is
+> kept as written. "Episode" means a Metacat Mode episodic run sequence (runs sharing Metacat's
+> Episodic Memory), not a Training episode, and "learning" means Metacat-Mode learning. Nothing here
+> involves a Training Mode Session. The current description of the system is in
+> [README.md](../../../README.md) and [TESTING.md](../../../TESTING.md).
+
 This is the complete scientific-data release for `support-v1a`, plus its
 interrupted parent study, excluded pilot, and unsuccessful initial preflight.
 It contains the actual ordered observations and attempt evidence, not just

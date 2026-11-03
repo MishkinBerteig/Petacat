@@ -5,14 +5,14 @@ strings, help topics and docs.  After the allowed phrases below are removed, the
 must not remain in any scanned file.
 
 Allowed: "Training Mode" (and ``training_mode``, ``training-mode``, ``TRAINING_MODE_SOURCES``,
-``TrainingMode``), "Training episode", the table ``training_memory_merges`` (S5 replaces it
-with the session's journal entries), "corpus training" (Phase 4's corpus-mode training) and
-"training population" (a Fast population of runs).
+``TrainingMode``), "Training episode", the table ``training_memory_merges`` (S5 kept it as
+the session's Episodic Memory record, written at Stop), "corpus training" (Phase 4's
+corpus-mode training) and "training population" (a Fast population of runs).
 
 Not scanned, because they record the past or quote the old names: ``PHASE * PLAN.md``,
 ``DISCREPANCIES*.md``, ``FUTURE_DIRECTION*.md``, ``SELF_WATCHING_AUDIT.md``, ``CLAUDE.md``
 (which quotes the old name when it defines the new one), ``SMOKE-TESTS.md``, ``academic/``,
-``Metacat/``, ``alembic/`` (the stale legacy revisions) and ``agents-workspace/`` (except the
+``Metacat/`` and ``agents-workspace/`` (except the
 API contract), ``node_modules`` and this file.
 """
 

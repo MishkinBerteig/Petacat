@@ -1,5 +1,11 @@
 # episodic-v3-capped-frozen-oracles
 
+> **Status note (2026-11-03).** This file reports one measurement or study as it stood then and is
+> kept as written. "Episode" means a Metacat Mode episodic run sequence (runs sharing Metacat's
+> Episodic Memory), not a Training episode, and "learning" means Metacat-Mode learning. Nothing here
+> involves a Training Mode Session. The current description of the system is in
+> [README.md](../../../../README.md) and [TESTING.md](../../../../TESTING.md).
+
 Per-episode Good-Turing stopping is heuristic. Validation is fixed-size and conditional on answered complete episodes, with 95% simultaneous bounds over the preregistered 38 populations in the main study. Capped problems retain descriptive reference/port frequencies without a coverage guarantee. No port equivalence or defect-detection power is claimed.
 
 | Problem | Construction episodes | Stop | A freeze | B freeze | Validation episodes | Port episodes | Coverage qualified |
