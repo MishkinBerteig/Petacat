@@ -135,7 +135,12 @@ export function EditableTable<T extends Record<string, any>>({
   const deleteAction = actions?.delete ?? GENERIC_ACTIONS.delete;
 
   useEffect(() => {
-    if (editingCell && inputRef.current) inputRef.current.focus();
+    // Focus and select, as every spreadsheet does: typing replaces the value instead of
+    // landing inside it.
+    if (editingCell && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
   }, [editingCell]);
 
   // A success announces itself and gets out of the way; a failure stays on screen until

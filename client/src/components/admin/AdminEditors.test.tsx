@@ -195,6 +195,37 @@ describe('EditableTable — an empty number box', () => {
   })
 })
 
+describe('EditableTable — opening a cell selects its value', () => {
+  it('selects the whole value, so typing replaces it', async () => {
+    // A text column: a number input has no selection range to read back in a browser.
+    serve([{
+      id: 3, name: 'abc-xyz', section: '2.1', initial: 'abc', modified: 'abd',
+      target: 'xyz', answer: null, seed: 7, mode: 'discovery', description: '',
+    }])
+    render(<DemoEditor />)
+
+    const cell = await screen.findByText('abc-xyz')
+    fireEvent.doubleClick(cell)
+    const input = await waitFor(() => {
+      const el = cell.closest('td')?.querySelector('input')
+      if (!el) throw new Error('no edit input appeared')
+      return el as HTMLInputElement
+    })
+
+    expect(document.activeElement).toBe(input)
+    expect(input.selectionStart).toBe(0)
+    expect(input.selectionEnd).toBe(input.value.length)
+
+    // Typing over the selection, as a keyboard does, then Enter.
+    input.setRangeText('renamed', input.selectionStart!, input.selectionEnd!, 'end')
+    fireEvent.input(input)
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    await waitFor(() => expect(calls).toHaveLength(1))
+    expect(calls[0].body.name).toBe('renamed')
+  })
+})
+
 describe('ThemeDimensionEditor — theme dimensions', () => {
   const dim = { id: 5, slipnet_node: 'plato-direction-category', valid_relations: ['identity'] }
 

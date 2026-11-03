@@ -754,7 +754,7 @@ nothing consults them now.
 
 `client/` carries a Vitest suite covering the store, the panels, the admin
 editors and the review surfaces. Run it with `cd client && npx vitest run`, and
-`npx tsc --noEmit` alongside it. **698 cases across 50 files**, all passing, in
+`npx tsc --noEmit` alongside it. **699 cases across 50 files**, all passing, in
 3.1 s on an Apple M-series machine.
 
 | File (`client/src/`) | Cases | Covers |
@@ -793,7 +793,7 @@ editors and the review surfaces. Run it with `cd client && npx vitest run`, and
 | `components/VerbosePanel.test.tsx` | 11 | The Verbose panel and the store's narration: polled from where the last reply ended, bounded on both sides, the Step button sent as step mode, the mode remembered with no run loaded |
 | `components/WindowsMenu.test.tsx` | 3 | The Windows menu lists Hide/Show for each panel including EEG, hides and shows all windows, and carries the Slipnet and Coderack graphics switches |
 | `components/WorkspaceView.test.tsx` | 12 | Workspace labels do not print on top of each other |
-| `components/admin/AdminEditors.test.tsx` | 44 | Every Configuration tab edits the collection it shows |
+| `components/admin/AdminEditors.test.tsx` | 45 | Every Configuration tab edits the collection it shows; opening a cell selects its value |
 | `components/admin/AdminHttpFailures.test.tsx` | 10 | The Configuration screen reports what the server refused |
 | `components/admin/ConfigurationManager.test.tsx` | 44 | The configuration manager: the chip's exact wording on every tab for global, Stopped, live and changing-state configurations, the list's badges, columns, filter and sort, Open, Freeze and Unfreeze, History, New session from this configuration (and the form's `configuration_base`), Compare and Apply from, and the deep link `#/admin?configuration=<id>` |
 | `components/admin/ConfigurationPanel.test.tsx` | 11 | The Status and reset tab and the information banner: differing rows from the Metacat Standard Configuration, Compare, Verify journal, Reset after a typed confirmation, Restore selected |
