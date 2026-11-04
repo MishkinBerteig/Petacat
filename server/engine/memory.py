@@ -191,11 +191,6 @@ class EpisodicMemory:
         self.unresolved_names: set[str] = set()
 
     @property
-    def unresolved_count(self) -> int:
-        """How many distinct stored names this run could not resolve."""
-        return len(self.unresolved_names)
-
-    @property
     def answers_oldest_first(self) -> list[AnswerDescription]:
         """The answers in the order the Memory window lists them: the oldest at the top
         (``(reverse (tell *memory* 'get-all-descriptions))``, ``memory-graphics.ss:145``)."""
@@ -539,23 +534,6 @@ class EpisodicMemory:
             )
             for dimension in answer.unjustified_themes
         }
-
-    def _theme_distance(
-        self,
-        themes1: dict[str, Any],
-        themes2: dict[str, Any],
-    ) -> float:
-        """Compute distance between two theme patterns."""
-        all_dims = set(themes1.keys()) | set(themes2.keys())
-        if not all_dims:
-            return 0.0
-        differences = 0
-        for dim in all_dims:
-            v1 = themes1.get(dim)
-            v2 = themes2.get(dim)
-            if v1 != v2:
-                differences += 1
-        return float(differences)
 
     def clear_activations(self) -> None:
         """Zero every stored answer's reminding activation.

@@ -125,8 +125,8 @@ outside the matrix take it too and the run is entirely what it says it is.
   gpu  mlx      float32    873 tests
   whole suite requested: the full matrix is required of this run
 
-  unit          1799 collected   1799 run   1799 passed      0 failed      0 skipped  complete
-  seed_unit     1041 collected   1041 run   1041 passed      0 failed      0 skipped  complete
+  unit          1756 collected   1756 run   1756 passed      0 failed      0 skipped  complete
+  seed_unit     1039 collected   1039 run   1039 passed      0 failed      0 skipped  complete
   module        1041 collected   1041 run   1041 passed      0 failed      0 skipped  complete
   architecture    91 collected     91 run     91 passed      0 failed      0 skipped  complete
   integration    346 collected    346 run    346 passed      0 failed      0 skipped  complete
@@ -204,8 +204,8 @@ that allowance.
 
 | Layer | Directory | Scope | May depend on | Cases |
 |-------|-----------|-------|---------------|-------|
-| **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 1799 |
-| **seed unit** | `tests/seed_unit/` | One class or function, measured against the values Petacat ships with | Real `seed_data/*.json`, and the machine the process is running on | 1041 |
+| **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 1756 |
+| **seed unit** | `tests/seed_unit/` | One class or function, measured against the values Petacat ships with | Real `seed_data/*.json`, and the machine the process is running on | 1039 |
 | **module** | `tests/module/` | Several real components assembled and driven | Real engine objects and `seed_data/*.json`; no DB, no HTTP | 1041 |
 | **architecture** | `tests/architecture/` | How the source tree is allowed to depend on itself | The repository's source, `seed_data/*.json`, child interpreters | 91 |
 | **integration** | `tests/integration/` | Agreement between the repository's artifacts, and the harness's own rules | Real `seed_data/*.json`, the ORM declarations, the generated client files, the documentation, a real pytest session | 346 |
@@ -246,7 +246,7 @@ first**, then move up toward the API and GUI.
 
 All eight layers run in one command — the
 [required command](#the-required-command) — and, since Petacat runs natively, all
-eight actually run: **5,388 cases**, every one of them executed. A layer that is
+eight actually run: **5,343 cases**, every one of them executed. A layer that is
 normally skipped is not a layer that is normally green, and none of these is.
 
 Wall-clock time depends heavily on the machine and on what else it is doing. The
@@ -407,24 +407,24 @@ changing what it records.
 | `test_change_resolve_property.py` | 6 | C14a: random op sequences keep the document well-formed (no dangling reference, no duplicate key, deterministic, replays); single ops equal one batch; memory-named nodes can be removed, renamed and merged from every source |
 | `test_change_resolve_patch_schema.py` | 9 | C14a: the JSON Patch subset, `schema()`, and the refusal type with its status map |
 | `test_configuration_writer.py` | 7 | C5: `ChangeService`'s envelope check, the `ChangeError` type and its HTTP mapping, and the translation of journal errors |
-| `test_bonds.py` | 25 | `Bond`: direction, facet, strength, flipping |
+| `test_bonds.py` | 23 | `Bond`: direction, facet, strength, flipping |
 | `test_bridge_types.py` | 2 | The bridge-type and orientation constants |
 | `test_codelet_dsl.py` | 3 | Compiling a codelet body: what the interpreter accepts and refuses |
 | `test_clamp_commentary.py` | 12 | A clamp announces itself and its undoing in Metacat's words; remindings newest first with a whole-number strength; the "stumped" answer |
 | `test_commentary.py` | 29 | The `CommentaryLog`, and the emit helpers whose English is written in Python |
 | `test_compare_harness.py` | 18 | The oracle comparison's decision logic: what gets flagged, and how, and its engine-parameter passthrough; the shipped reference sets in `measurements/reference/` |
-| `test_concept_mappings.py` | 37 | `ConceptMapping`: identity, slippage, distinguishing descriptors |
+| `test_concept_mappings.py` | 31 | `ConceptMapping`: identity, slippage, distinguishing descriptors |
 | `test_descriptions.py` | 23 | `Description`: relevance, strength, descriptor predicates |
-| `test_episodic_memory.py` | 16 | `EpisodicMemory`: identifier scoping, theme distance, `answer_present`; the list kept newest first as Metacat conses it, the oldest-first window listing, remindings newest first |
-| `test_formulas.py` | 25 | Averaging, the sigmoid, and the five translation-temperature distributions |
-| `test_groups.py` | 22 | `Group`: length, spanning, membership, internal and external strength |
+| `test_episodic_memory.py` | 12 | `EpisodicMemory`: identifier scoping, `answer_present`; the list kept newest first as Metacat conses it, the oldest-first window listing, remindings newest first |
+| `test_formulas.py` | 13 | The temperature-adjusted probability curve, averaging, the sigmoid, bond degree of association and the group-evaluation probability |
+| `test_groups.py` | 21 | `Group`: length, spanning, membership, internal and external strength |
 | `test_jootsing_outcomes.py` | 7 | The jootser's outcomes: what counts as the same clamp, and when it gives up |
 | `test_object_choice.py` | 8 | Weighted object choice: the temperature exponent, and the absence of floors |
 | `test_config_hash_guard.py` | 11 | The hash guard (plan 3.8, EN2): `config_hash` covers every `MetadataProvider` field by reflection, the exclusion set is pinned, a field added to the provider is hashed without editing the hasher, each hashed field's digest moves with its value and order, the hash is `combine(field_digests)`, and the scheme and a number's type are part of it |
 | `test_en4_relations.py` | 15 | EN4: relations read from `theme_relations` through `slipnet.relation(...)`, the opposite pin, the `diff` abstractness from data, and each relation's row or node removed (a run builds and steps on the demo problems) |
 | `test_en7_codelets_control.py` | 11 | EN7: the initial-description order per string shape, the thematic posted list, `rng.call_count` per codelet against the golden sidecar, each converted role unbound or its node removed, and an absent evaluator role posting nothing |
 | `test_en9_answers_memory_text.py` | 14 | EN9: answers and comparison read roles and relations; an absent template key gives no text and one warning; `comparison_judgment_priority` absent judges no preference; Episodic Memory carried into a run whose configuration lacks a node, a link label or a codelet type it names completes, and the missing name contributes nothing |
-| `test_en5b_alphabet.py` | 15 | EN5b: the alphabet and numbers as data: `slipnet.alphabet` equals the old letter and number lists, a shared glyph or value goes to the first node, a character with no glyph node is unperceived, and the a-d/w-z alphabet and the 1, 2, 4 ladder (cascaded, or with dangling links) build and step on the demo problems |
+| `test_en5b_alphabet.py` | 14 | EN5b: the alphabet and numbers as data: `slipnet.alphabet` equals the old letter and number lists, a shared glyph or value goes to the first node, a character with no glyph node is unperceived, and the a-d/w-z alphabet and the 1, 2, 4 ladder (cascaded, or with dangling links) build and step on the demo problems |
 | `test_en8_rules_language.py` | 14 | EN8: rules, justify and rule English read roles and relations; `rule.dimension_order` and its sort; the abstract-change draws and `rng.get_state()` with a role absent; the justify handlers narrowed (B10); each converted role or relation absent on demo and justify problems |
 | `test_en6_perception.py` | 12 | EN6: bonds, groups, bridges, concept mappings and images read roles, relations and the alphabet; the bridge recruitment post sequence is unchanged; identity absent never raises; every dimension, position, direction, object and recruit role unbound or its node removed, and each relation node removed, on the demo and justify problems; and whole runs (discovery, justify, Episodic Memory carried) on a configuration whose role-bound, relation, letter and number nodes are all renamed give the same answers, codelet counts, RNG draws and English |
 | `test_en10b_scalars.py` | 8 | EN10: the rules, justify and perception scalars read from the configuration with today's values and types (the two rule abstraction probabilities, the justify identity retention, the bridge-recruit urgency level, description local support, concept-mapping and bridge coefficients); a configuration lacking one stops the run at its start naming it |
@@ -447,12 +447,12 @@ changing what it records.
 | `test_temperature.py` | 3 | `Temperature`'s own state: starting value and clamp |
 | `test_thematic_scouting.py` | 20 | The thematic-bridge-scout's decisions (`themes.ss:750-1030`) |
 | `test_theme_types.py` | 6 | `Theme` and `Themespace` type constants |
-| `test_themespace.py` | 31 | Themespace self-watching dynamics: cluster spreading, dominance |
-| `test_trace_event.py` | 6 | `TemporalTrace` event recording |
+| `test_themespace.py` | 24 | Themespace self-watching dynamics: cluster spreading, dominance |
+| `test_trace_event.py` | 3 | `TemporalTrace` event recording |
 | `test_trace_display.py` | 16 | A Trace event's print name and display header against `trace.ss`: every event type, the three group directions, the bridge prefixes, flipped groups, the answer headers; a picture that cannot be taken never stops the trace |
 | `test_verbose.py` | 16 | Scheme's display of values, the bounded narration log (capture and replay, dropped lines), the message-catalogue overlay, and that the narration builtins exist in a codelet's namespace only when Verbose mode is on |
-| `test_workspace_object.py` | 40 | `WorkspaceObject` and `Letter`: geometry, importance, unhappiness |
-| `test_workspace_string.py` | 28 | `WorkspaceString`: bond and group management, spanning, relevance |
+| `test_workspace_object.py` | 36 | `WorkspaceObject` and `Letter`: geometry, importance, unhappiness |
+| `test_workspace_string.py` | 25 | `WorkspaceString`: bond and group management, spanning, relevance |
 | `test_workspace_structure.py` | 10 | The base structure class and its proposal levels |
 
 **`tests/seed_unit/` — one class or function against the shipped values**
@@ -487,7 +487,7 @@ changing what it records.
 | `test_snag_explanation.py` | 20 | A snag's explanation against Metacat 1.2's `get-explanation` (`trace.ss:1097-1125`): every branch of the failure-result, the object phrases, the commentary lines, the template-driven wording, and the fallback for a snag with no stored explanation |
 | `test_rule_quality.py` | 13 | Rule uniformity, abstractness and succinctness against the Scheme's formulas, hand-computed from the seeded depths |
 | `test_slipnet_link_lengths.py` | 6 | The Slipnet's link lengths against the reference Scheme |
-| `test_slipnet_node.py` | 23 | The 59-node Slipnet: its nodes, its links, its clamps and its spreading |
+| `test_slipnet_node.py` | 21 | The 59-node Slipnet: its nodes, its links, its clamps and its spreading |
 | `test_temperature.py` | 2 | Temperature updating against the seeded coefficients |
 
 **`tests/module/` — real components assembled and driven**
@@ -979,10 +979,10 @@ Discovered during the first unit-testing pass. Ordered by priority.
       `tests/module/`.
 
 ### P5 — Testability refactors (source changes, pre-approved)
-- [ ] `concept_mappings._descriptor_is_distinguishing` does an inline
-      `from ...groups import Group` for an `isinstance` check — replace with a
-      polymorphic `obj.is_group()` so the group path is unit-testable without
-      constructing a real `Group`.
+- [x] `concept_mappings._descriptor_is_distinguishing` did an inline
+      `from ...groups import Group` for an `isinstance` check.  **Moot** — the method
+      was dead and is removed; the one live predicate is
+      `workspace_objects.distinguishing_descriptor`.
 - [ ] `themes.ThemeCluster.spread_activation` reads ~8 coefficients from
       `meta` — parameterize so the dynamics can be tested without a full
       `MetadataProvider`.

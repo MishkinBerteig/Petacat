@@ -22,6 +22,7 @@ from server.engine.themes import (
     ThemeCluster,
     Themespace,
 )
+from tests.support.theme_fixtures import populate
 
 
 # --- config test double ----------------------------------------------------
@@ -64,17 +65,6 @@ _SPREAD_PARAMS = {
 
 
 # --- Theme: sign predicates ------------------------------------------------
-
-def test_theme_is_positive_when_activation_above_zero():
-    t = Theme(THEME_TOP_BRIDGE, "direction", "identity")
-    t.activation = 30.0
-    assert t.is_positive is True
-
-
-def test_theme_is_negative_when_activation_below_zero():
-    t = Theme(THEME_TOP_BRIDGE, "direction", "identity")
-    t.activation = -30.0
-    assert t.is_negative is True
 
 
 # --- Theme: boost ----------------------------------------------------------
@@ -129,7 +119,7 @@ def test_clamp_positive_value_sets_a_positive_activation():
 # --- ThemeCluster: dominant theme ------------------------------------------
 
 def _cluster(relations=("identity", "opposite")):
-    return ThemeCluster(THEME_TOP_BRIDGE, "direction", list(relations)).populate()
+    return populate(ThemeCluster(THEME_TOP_BRIDGE, "direction", list(relations)))
 
 
 def test_no_dominant_theme_when_none_positive():
@@ -183,7 +173,7 @@ def test_get_theme_returns_none_for_unknown_relation():
 # --- ThemeCluster: intra-cluster spreading ---------------------------------
 
 def test_spread_activation_skips_frozen_cluster():
-    cluster = ThemeCluster(THEME_TOP_BRIDGE, "direction", ["identity"]).populate()
+    cluster = populate(ThemeCluster(THEME_TOP_BRIDGE, "direction", ["identity"]))
     cluster.themes[0].activation = 40.0
     cluster.frozen = True
     cluster.spread_activation(_FakeMeta([], _SPREAD_PARAMS, _SPREAD_COEFFS))
@@ -191,7 +181,7 @@ def test_spread_activation_skips_frozen_cluster():
 
 
 def test_spread_activation_applies_decay_and_self_excitation():
-    cluster = ThemeCluster(THEME_TOP_BRIDGE, "direction", ["identity"]).populate()
+    cluster = populate(ThemeCluster(THEME_TOP_BRIDGE, "direction", ["identity"]))
     cluster.themes[0].activation = 40.0
     cluster.spread_activation(_FakeMeta([], _SPREAD_PARAMS, _SPREAD_COEFFS))
     # net_input = -25 (decay) + 40*0.5 (self) = -5
@@ -205,7 +195,7 @@ def test_spread_activation_applies_decay_and_self_excitation():
 def _themespace():
     dims = [_FakeDim("direction", ["identity", "opposite"])]
     meta = _FakeMeta(dims, _SPREAD_PARAMS, _SPREAD_COEFFS)
-    return Themespace(meta).populate()
+    return populate(Themespace(meta))
 
 
 def test_justify_mode_makes_all_three_bridge_types_possible():
@@ -248,27 +238,6 @@ def _top_direction_cluster(ts):
     )
 
 
-def test_thematic_pressure_reports_dominant_relation_for_active_type():
-    ts = _themespace()
-    ts.thematic_pressure_on()
-    cluster = _top_direction_cluster(ts)
-    cluster.get_theme("identity").activation = 95.0  # single dominant positive
-    assert ts.get_thematic_pressure("top") == {"direction": "identity"}
-
-
-def test_thematic_pressure_empty_while_pressure_is_off():
-    ts = _themespace()
-    _top_direction_cluster(ts).get_theme("identity").activation = 95.0
-    assert ts.get_thematic_pressure("top") == {}
-
-
-def test_thematic_pressure_empty_for_inactive_bridge_type():
-    ts = _themespace()
-    ts.thematic_pressure_on()
-    # bottom is not among the possible theme types outside justify mode
-    assert ts.get_thematic_pressure("bottom") == {}
-
-
 # --- Themespace: boost / clamp / max ---------------------------------------
 
 def test_boost_theme_raises_the_matching_theme_activation():
@@ -277,26 +246,15 @@ def test_boost_theme_raises_the_matching_theme_activation():
     assert _top_direction_cluster(ts).get_theme("identity").activation == 7.0
 
 
-def test_clamp_negative_pattern_inhibits_matching_theme():
-    ts = _themespace()
-    ts.clamp_negative_pattern({"direction": "opposite"}, THEME_TOP_BRIDGE)
-    theme = _top_direction_cluster(ts).get_theme("opposite")
-    assert theme.frozen is True
-    assert theme.activation == -100.0
-
-
-def test_clamping_a_pattern_turns_thematic_pressure_on():
-    """§4.2: "the clamping of theme activations ... automatically turns on
-    thematic pressure"."""
-    ts = _themespace()
-    assert ts.has_thematic_pressure() is False
-    ts.clamp_negative_pattern({"direction": "opposite"}, THEME_TOP_BRIDGE)
-    assert ts.has_thematic_pressure([THEME_TOP_BRIDGE]) is True
+def _clamp_opposite(ts, theme_type):
+    """Freeze the ``direction: opposite`` theme of *theme_type* at -100 and turn its thematic pressure on."""
+    ts.add_theme(theme_type, "direction", "opposite", False).clamp(-100.0)
+    ts.thematic_pressure_on([theme_type])
 
 
 def test_unclamp_all_turns_thematic_pressure_off():
     ts = _themespace()
-    ts.clamp_negative_pattern({"direction": "opposite"}, THEME_TOP_BRIDGE)
+    _clamp_opposite(ts, THEME_TOP_BRIDGE)
     ts.unclamp_all()
     assert ts.has_thematic_pressure() is False
 
@@ -327,8 +285,8 @@ def test_unclamping_one_theme_type_leaves_the_others_clamped():
     rule unification does by construction.
     """
     ts = _themespace()
-    ts.clamp_negative_pattern({"direction": "opposite"}, THEME_TOP_BRIDGE)
-    ts.clamp_negative_pattern({"direction": "opposite"}, THEME_VERTICAL_BRIDGE)
+    _clamp_opposite(ts, THEME_TOP_BRIDGE)
+    _clamp_opposite(ts, THEME_VERTICAL_BRIDGE)
 
     ts.unclamp_theme_type(THEME_TOP_BRIDGE)
 

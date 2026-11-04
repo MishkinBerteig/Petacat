@@ -209,14 +209,6 @@ def test_incompatible_groups_are_enclosing_groups_of_members():
     assert g.get_incompatible_groups() == [other]
 
 
-def test_subobject_bridges_collects_matching_orientation():
-    member = _PosObj(0, 0)
-    bridge = object()
-    member.horizontal_bridge = bridge
-    g = _group([member, _PosObj(1, 1)])
-    assert g.get_subobject_bridges("horizontal") == [bridge]
-
-
 def test_get_letters_flattens_nested_membership():
     """``letters`` in ``new-group`` (groups.ss:83) — every Letter underneath,
     at any depth.  The builder's flattening branch consolidates over exactly

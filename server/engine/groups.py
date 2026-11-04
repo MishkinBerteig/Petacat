@@ -469,24 +469,6 @@ class Group(WorkspaceObject, WorkspaceStructure):
             object2=other_bond,
         )
 
-    def get_subobject_bridges(self, bridge_orientation: str) -> list[Any]:
-        """Bridges on constituent objects matching the given orientation.
-
-        Scheme: groups.ss:243-244.
-        Returns non-None bridges of the given orientation from constituent objects.
-        """
-        result: list[Any] = []
-        for obj in self.objects:
-            if bridge_orientation == "horizontal":
-                bridge = getattr(obj, "horizontal_bridge", None)
-            elif bridge_orientation == "vertical":
-                bridge = getattr(obj, "vertical_bridge", None)
-            else:
-                continue
-            if bridge is not None:
-                result.append(bridge)
-        return result
-
     def make_flipped_version(self) -> Group:
         """Create a direction-reversed copy of this group.
 
@@ -638,12 +620,7 @@ def _walk_group_neighbors(
     current: Any = group
 
     while True:
-        chooser = getattr(current, method, None)
-        if chooser is None:
-            # A hand-rolled test double rather than a real WorkspaceObject —
-            # the same answer as "at the end of the string".
-            break
-        neighbor = chooser(rng)
+        neighbor = getattr(current, method)(rng)
         if neighbor is None or neighbor is current:
             break
         enclosing = getattr(neighbor, "enclosing_group", None)

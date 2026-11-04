@@ -220,13 +220,6 @@ class AccessRecorder:
             if key is not None:
                 access.record_read(key, self.versions.version(key))
 
-    def read_component(self, name: str) -> None:
-        access = self.current
-        if access is None:
-            return
-        key = (KIND_COMPONENT, name)
-        access.record_read(key, self.versions.version(key))
-
     def write(self, *entities: Any) -> None:
         access = self.current
         for entity in entities:

@@ -136,8 +136,9 @@ same place a human author would. The mechanism exists; what does not exist is th
   shadow mode, and is retained only if it demonstrably helps.
 - **`not-love` can remove a generated codelet; it can never remove a curated one** —
   the same seed-ontology protection Phase 1 established for nodes, extended to code.
-- The DSL validator (`codelet_dsl/validator.py`) becomes load-bearing rather than
-  advisory.
+- A DSL validator becomes load-bearing rather than advisory. (The old advisory
+  `codelet_dsl/validator.py` was never called and was removed in the final Metacat
+  cleanup, so this one is written new.)
 
 **[open — the hard question]** *What is the generative principle?* Options, roughly in
 order of ambition: parameterising existing codelet templates; recombining fragments of

@@ -32,52 +32,6 @@ from typing import Any
 from server.engine.runner import EngineContext
 
 
-def serialize_rng_state(ctx: EngineContext) -> dict:
-    """Serialize RNG state for JSON storage."""
-    state = ctx.rng.get_state()
-    # state is (seed, call_count, rng_internal_state)
-    # rng_internal_state is a tuple from random.getstate() — pickle it
-    return {
-        "seed": state[0],
-        "call_count": state[1],
-        "internal_state": base64.b64encode(pickle.dumps(state[2])).decode("ascii"),
-    }
-
-
-def serialize_slipnet_state(ctx: EngineContext) -> dict:
-    """Serialize slipnet node activations and clamp state."""
-    nodes = {}
-    for name, node in ctx.slipnet.nodes.items():
-        nodes[name] = {
-            "activation": node.activation,
-            "activation_buffer": node.activation_buffer,
-            "frozen": node.frozen,
-            "clamp_cycles_remaining": node.clamp_cycles_remaining,
-        }
-    return nodes
-
-
-def serialize_coderack_state(ctx: EngineContext) -> dict:
-    """Serialize coderack contents."""
-    bins = []
-    for b in ctx.coderack.bins:
-        codelets = [
-            {
-                "codelet_type": c.codelet_type,
-                "urgency": c.urgency,
-                "time_stamp": c.time_stamp,
-                "arguments": {k: str(v) for k, v in c.arguments.items()
-                              if not hasattr(v, '__dict__')},
-            }
-            for c in b.codelets
-        ]
-        bins.append(codelets)
-    return {
-        "bins": bins,
-        "clamped_urgencies": ctx.coderack.clamped_urgencies,
-    }
-
-
 def theme_display_labels(meta: Any) -> dict:
     """Metacat's names for the Themespace's dimensions and relations.
 
@@ -144,32 +98,6 @@ def serialize_themespace_state(ctx: EngineContext) -> dict:
         "active_theme_types": list(ctx.themespace.active_theme_types),
         "thematic_pressure": ctx.themespace.has_thematic_pressure(),
         "dominant_theme_margin": margin,
-    }
-
-
-def serialize_trace_state(ctx: EngineContext) -> dict:
-    """Serialize trace clamp/snag period state (not all events)."""
-    return {
-        "within_clamp_period": ctx.trace.within_clamp_period,
-        "within_snag_period": ctx.trace.within_snag_period,
-        "last_clamp_time": ctx.trace.last_clamp_time,
-        "last_unclamp_time": ctx.trace.last_unclamp_time,
-        "clamp_count": ctx.trace.clamp_count,
-        "snag_count": ctx.trace.snag_count,
-        "event_count": len(ctx.trace.events),
-    }
-
-
-def serialize_runner_state(ctx: EngineContext) -> dict:
-    """Serialize runner control state."""
-    return {
-        "codelet_count": ctx.codelet_count,
-        "temperature": ctx.temperature.value,
-        "temperature_clamped": ctx.temperature.clamped,
-        "temperature_clamp_value": ctx.temperature.clamp_value,
-        "temperature_clamp_cycles": ctx.temperature.clamp_cycles_remaining,
-        "justify_mode": ctx.justify_mode,
-        "self_watching_enabled": ctx.self_watching_enabled,
     }
 
 

@@ -336,18 +336,6 @@ class Bond(WorkspaceStructure):
             object2=other_bond,
         )
 
-    def bonds_equal(self, other: Bond) -> bool:
-        """Structural equality: same from/to objects, same category, same direction.
-
-        Scheme: bonds.ss:436-441.
-        """
-        return (
-            self.from_object is other.from_object
-            and self.to_object is other.to_object
-            and self.bond_category is other.bond_category
-            and self.direction is other.direction
-        )
-
     @property
     def directed(self) -> bool:
         """Whether the bond has a direction (not sameness).
@@ -415,12 +403,7 @@ def _walk_neighbors(obj: Any, direction: str, rng: RNG | None = None) -> list[An
     result: list[Any] = []
     current = obj
     while True:
-        chooser = getattr(current, method, None)
-        if chooser is None:
-            # Not a real WorkspaceObject — a hand-rolled test double.  Nothing to
-            # walk, which is the same answer as "at the end of the string".
-            break
-        neighbor = chooser(rng)
+        neighbor = getattr(current, method)(rng)
         if neighbor is None or neighbor is current:
             break
         result.append(neighbor)

@@ -23,7 +23,7 @@ import threading
 
 import pytest
 
-from server.engine.ids import IdAllocator, current_allocator, use_allocator
+from server.engine.ids import IdAllocator, next_id, use_allocator
 from server.engine.metadata import MetadataProvider
 from server.engine.runner import EngineRunner
 
@@ -147,11 +147,15 @@ def test_allocator_snapshot_and_restore_resume_numbering():
 
 def test_allocator_binding_is_restored_after_use():
     """Nested bindings unwind, so one runner cannot leave its allocator behind."""
-    outer = current_allocator()
-    inner = IdAllocator()
-    with use_allocator(inner):
-        assert current_allocator() is inner
-    assert current_allocator() is outer
+    outer, inner = IdAllocator(), IdAllocator()
+    with use_allocator(outer):
+        with use_allocator(inner):
+            next_id("probe")
+        assert inner.snapshot() == {"probe": 1}
+        assert outer.snapshot() == {}
+        next_id("probe")
+        assert outer.snapshot() == {"probe": 1}
+        assert inner.snapshot() == {"probe": 1}
 
 
 def test_allocator_is_safe_under_concurrent_increment():

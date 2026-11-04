@@ -138,7 +138,7 @@ def test_capture_is_json_serialisable(meta):
 def test_capture_keeps_object_valued_codelet_arguments(meta):
     """The specific thing the old serializer threw away.
 
-    ``serialize_coderack_state`` filtered arguments with
+    The old ``serialize_coderack_state`` (since removed) filtered arguments with
     ``if not hasattr(v, '__dict__')``, which discarded exactly the ones that matter: a
     live rack holds ``Bond``, ``Bridge``, ``Rule`` and ``SlipnetNode`` arguments, and an
     evaluator restored without its structure has nothing to evaluate.

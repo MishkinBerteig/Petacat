@@ -95,18 +95,6 @@ def test_directed_false_when_direction_none():
 
 # --- structural equality ---------------------------------------------------
 
-def test_bonds_equal_true_for_matching_objects_category_direction():
-    a, b = _Obj(0, 0), _Obj(1, 1)
-    cat = _sameness()
-    assert _bond(a, b, cat, _letter_category()).bonds_equal(_bond(a, b, cat, _letter_category()))
-
-
-def test_bonds_equal_false_when_category_differs():
-    a, b = _Obj(0, 0), _Obj(1, 1)
-    b1 = _bond(a, b, _sameness(), _letter_category())
-    b2 = _bond(a, b, _successor(), _letter_category())
-    assert b1.bonds_equal(b2) is False
-
 
 # --- bond degree of association (one path per link-length case) -------------
 

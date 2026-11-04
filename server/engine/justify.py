@@ -663,46 +663,6 @@ def traverse_rule_clauses(
         return None
 
 
-def compare_rule_clause_lists(
-    clauses1: list[RuleClause],
-    clauses2: list[RuleClause],
-) -> list[tuple] | None:
-    """Compare two rule clause lists structurally.
-
-    Scheme: justify.ss ``compare-rule-clause-lists``.
-    Returns a list of (node1, node2) difference pairs, or None if
-    structurally incompatible.  Empty list means identical.
-    """
-    # Check for verbatim rules
-    if _is_verbatim_clause_list(clauses1) and _is_verbatim_clause_list(clauses2):
-        if len(clauses1) == len(clauses2) and all(
-            rules_equal(
-                Rule(RULE_TOP, [c1]),
-                Rule(RULE_TOP, [c2]),
-            )
-            for c1, c2 in zip(clauses1, clauses2)
-        ):
-            return []
-        return None
-
-    def comparison_proc(
-        n1: Any,
-        n2: Any,
-        results: list[dict[str, Any]],
-        *,
-        slipnet: Slipnet | None = None,
-    ) -> list[dict[str, Any]]:
-        if n1 is n2:
-            return results
-        results.append({"node1": n1, "node2": n2})
-        return results
-
-    result = traverse_rule_clauses(clauses1, clauses2, comparison_proc)
-    if result is None:
-        return None
-    return [(d["node1"], d["node2"]) for d in result]
-
-
 # ============================================================================
 #  Vertical theme pattern manipulation
 #  (Scheme: justify.ss get-vertical-theme-pattern-to-clamp)
@@ -1360,11 +1320,6 @@ def _flatten_clauses(clauses: list[RuleClause]) -> list:
     return result
 
 
-def _is_verbatim_clause_list(clauses: list[RuleClause]) -> bool:
-    """Check if a clause list is a single verbatim clause."""
-    return len(clauses) == 1 and clauses[0].is_verbatim
-
-
 def _theme_pattern_to_dict(pattern: Any) -> dict[str, Any] | None:
     """Convert a theme pattern (list or dict) to a dict for clamping."""
     if isinstance(pattern, dict):
@@ -1427,14 +1382,3 @@ def _get_temperature(workspace: Workspace) -> float:
     return getattr(workspace, "temperature", 50.0)
 
 
-def _rules_compatible(rule1: Rule, rule2: Rule) -> bool:
-    """Check if two rules are compatible (same structure after slippage).
-
-    Preserved for backward compatibility.
-    """
-    if len(rule1.clauses) != len(rule2.clauses):
-        return False
-    for c1, c2 in zip(rule1.clauses, rule2.clauses):
-        if c1.clause_type != c2.clause_type:
-            return False
-    return True

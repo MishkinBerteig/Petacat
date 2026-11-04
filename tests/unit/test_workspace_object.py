@@ -39,16 +39,6 @@ def test_initial_unhappiness():
     assert letter.intra_string_unhappiness == 0.0  # workspace-objects.ss:71
 
 
-def test_salience_update():
-    node = SlipnetNode("plato-a", "a", 10)
-    letter = Letter(string=None, position=0, letter_category=node)
-    letter.relative_importance = 50
-    letter.intra_string_unhappiness = 80
-    letter.update_salience()
-    # intra: 0.8*80 + 0.2*50 = 74
-    assert letter.salience["intra"] == 74
-
-
 # ---- test doubles ---------------------------------------------------------
 
 class _FakeBond:
@@ -247,28 +237,6 @@ def test_get_incident_bonds_includes_left_and_right():
     obj.left_bond = left
     obj.right_bond = right
     assert obj.get_incident_bonds() == [left, right]
-
-
-def test_outgoing_sameness_bond_is_mirrored_as_incoming():
-    obj = WorkspaceObject(string=None, left_pos=0, right_pos=0)
-    bond = _FakeBond(50, category_name="plato-sameness")
-    obj.add_outgoing_bond(bond)
-    assert bond in obj.incoming_bonds  # sameness bonds are symmetric
-
-
-def test_outgoing_non_sameness_bond_is_not_mirrored():
-    obj = WorkspaceObject(string=None, left_pos=0, right_pos=0)
-    bond = _FakeBond(50, category_name="plato-successor")
-    obj.add_outgoing_bond(bond)
-    assert bond not in obj.incoming_bonds
-
-
-def test_remove_outgoing_bond_removes_it():
-    obj = WorkspaceObject(string=None, left_pos=0, right_pos=0)
-    bond = _FakeBond(50, category_name="plato-successor")
-    obj.add_outgoing_bond(bond)
-    obj.remove_outgoing_bond(bond)
-    assert bond not in obj.outgoing_bonds
 
 
 # ---- description predicates -----------------------------------------------

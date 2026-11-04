@@ -213,17 +213,6 @@ class CoderackBin:
         """Pick a random codelet from this bin."""
         return rng.pick(self.codelets)
 
-    def get_urgency_sum(self, temperature: float, table: UrgencyValueTable) -> int:
-        """This bin's selection weight — ``coderack.ss:297-299``.
-
-        ``(* current-index (table-ref %urgency-value-table% bin-number
-        *temperature*))``: the count times the **rounded** integer table value, not
-        the raw exponential.  See :class:`UrgencyValueTable`.
-        """
-        if not self.codelets:
-            return 0
-        return len(self.codelets) * table.value(self.bin_number, temperature)
-
     @property
     def count(self) -> int:
         return len(self.codelets)

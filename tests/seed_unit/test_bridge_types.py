@@ -33,7 +33,6 @@ def test_top_bridge_is_horizontal(workspace):
     assert bridge.bridge_type == "top"
     assert bridge.orientation == ORIENTATION_HORIZONTAL
     assert bridge.is_horizontal
-    assert not bridge.is_vertical
 
 
 def test_bottom_bridge_is_horizontal(workspace):
@@ -50,7 +49,6 @@ def test_vertical_bridge_is_vertical(workspace):
     bridge = Bridge(obj1, obj2, BRIDGE_VERTICAL, [])
     assert bridge.bridge_type == "vertical"
     assert bridge.orientation == ORIENTATION_VERTICAL
-    assert bridge.is_vertical
     assert not bridge.is_horizontal
 
 

@@ -541,7 +541,7 @@ async def test_the_bottom_up_rules_the_engine_posts_are_the_database_rows(db_ses
     db_meta = await load_metadata_from_db(db_session)
     runner = EngineRunner(db_meta)
 
-    assert runner.bottom_up_codelet_types() == [
+    assert [rule.codelet_type for rule in runner.bottom_up_posting_rules()] == [
         "bottom-up-bond-scout",
         "group-scout:whole-string",
         "bottom-up-bridge-scout",

@@ -156,11 +156,10 @@ def test_a_missing_commentary_key_is_noted_in_the_runs_log_once(meta) -> None:
     emit_reminding(log, "ijl", "abc -> abd, ijk -> ?", 90, 5, templates)
     emit_reminding(log, "ijl", "abc -> abd, ijk -> ?", 90, 6, templates)
     assert log.warnings == {"answer_reporting.reminding.strongly"}
-    assert log.warning_count == 1
     assert log.count == 2  # the paragraph is still said, without that text
     clean = CommentaryLog()
     emit_answer_discovered(clean, "ijl", 70, "pretty good", 30, 5, 0, meta.commentary_templates)
-    assert clean.warning_count == 0
+    assert not clean.warnings
 
 
 # --- Episodic Memory that names what the configuration no longer has ---------------------
@@ -170,15 +169,14 @@ def test_unresolved_names_add_no_distance_and_are_counted(meta) -> None:
     a, b = _pair()
     memory = EpisodicMemory()
     standard = memory.distance(a, b, meta)
-    assert memory.unresolved_count == 0
+    assert not memory.unresolved_names
     # plato-successor and plato-d are named by the two rules' differing clause
     reduced = rc.provider(rc.node_removed("plato-successor"))
     after = memory.distance(a, b, reduced)
     assert after <= standard
     assert memory.unresolved_names == {"plato-successor"}
-    assert memory.unresolved_count == 1
     memory.clear_activations()  # every run start
-    assert memory.unresolved_count == 0
+    assert not memory.unresolved_names
 
 
 def test_a_removed_dimension_in_a_stored_theme_matches_nothing(meta) -> None:

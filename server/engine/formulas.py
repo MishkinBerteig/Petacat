@@ -9,11 +9,10 @@ Scheme source: formulas.ss
 from __future__ import annotations
 
 import math
-from typing import TYPE_CHECKING, NamedTuple
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from server.engine.metadata import MetadataProvider
-    from server.engine.rng import RNG
 
 
 def temp_adjusted_probability(
@@ -172,79 +171,6 @@ def sigmoid(x: float, beta: float, midpoint: float, divisor: float) -> float:
     Scheme: utilities.ss:488-491.  *divisor* is the coefficient ``sigmoid_divisor``.
     """
     return 1.0 / (1.0 + math.exp(beta * (midpoint - x) / divisor))
-
-
-# ---------------------------------------------------------------------------
-# Probability distributions for translation temperature thresholds
-# Translations from constants.ss:1038-1074 and formulas.ss:38-59
-# ---------------------------------------------------------------------------
-
-
-class ProbabilityDistribution(NamedTuple):
-    """A discrete probability distribution over a set of values.
-
-    Mirrors Scheme ``make-probability-distribution`` in constants.ss:1038-1044.
-    Each value is sampled with probability proportional to its frequency.
-    """
-
-    values: tuple[int, ...]
-    frequencies: tuple[int, ...]
-
-
-def make_probability_distribution(
-    values: list[int], frequencies: list[int]
-) -> ProbabilityDistribution:
-    """Create a probability distribution from values and relative frequencies.
-
-    Scheme: constants.ss:1038-1044.
-    """
-    return ProbabilityDistribution(
-        values=tuple(values),
-        frequencies=tuple(frequencies),
-    )
-
-
-def sample_distribution(dist: ProbabilityDistribution, rng: RNG) -> int:
-    """Sample a value from a probability distribution.
-
-    Uses the RNG's weighted_pick for deterministic, reproducible sampling.
-    Mirrors Scheme ``(tell distribution 'choose-value)``, which calls
-    ``(stochastic-pick values distribution-frequency-values)``.
-    """
-    return rng.weighted_pick(dist.values, dist.frequencies)
-
-
-# The 5 translation temperature threshold distributions.
-# Higher bond density -> lower expected threshold (translation attempted at
-# lower temperatures); lower bond density -> higher expected threshold
-# (translation attempted at higher temperatures).
-#
-# Scheme: constants.ss:1047-1074.
-
-VERY_LOW_TRANSLATION_TEMP_DIST = make_probability_distribution(
-    [10, 20, 30, 40, 50, 60, 70, 80, 90, 100],
-    [5, 150, 5, 2, 1, 1, 1, 1, 1, 1],
-)
-
-LOW_TRANSLATION_TEMP_DIST = make_probability_distribution(
-    [10, 20, 30, 40, 50, 60, 70, 80, 90, 100],
-    [2, 5, 150, 5, 2, 1, 1, 1, 1, 1],
-)
-
-MEDIUM_TRANSLATION_TEMP_DIST = make_probability_distribution(
-    [10, 20, 30, 40, 50, 60, 70, 80, 90, 100],
-    [1, 2, 5, 150, 5, 2, 1, 1, 1, 1],
-)
-
-HIGH_TRANSLATION_TEMP_DIST = make_probability_distribution(
-    [10, 20, 30, 40, 50, 60, 70, 80, 90, 100],
-    [1, 1, 2, 5, 150, 5, 2, 1, 1, 1],
-)
-
-VERY_HIGH_TRANSLATION_TEMP_DIST = make_probability_distribution(
-    [10, 20, 30, 40, 50, 60, 70, 80, 90, 100],
-    [1, 1, 1, 2, 5, 150, 5, 2, 1, 1],
-)
 
 
 # ---------------------------------------------------------------------------

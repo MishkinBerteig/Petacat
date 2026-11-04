@@ -438,10 +438,6 @@ def test_selection_and_eviction_read_the_same_table(meta):
         row = table.row(temperature)
         penalties = table.removal_penalties(temperature)
         assert penalties == tuple(1 + row[-1] - value for value in row)
-        b = coderack.bins[3]
-        _fill(coderack, [(50, 0)])
-        assert b.get_urgency_sum(temperature, table) == len(b.codelets) * row[3]
-        coderack.clear()
 
 
 # --- unchanged behaviour ---------------------------------------------------

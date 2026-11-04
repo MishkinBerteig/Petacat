@@ -87,10 +87,6 @@ class Bridge(WorkspaceStructure):
     def is_horizontal(self) -> bool:
         return self.orientation == ORIENTATION_HORIZONTAL
 
-    @property
-    def is_vertical(self) -> bool:
-        return self.orientation == ORIENTATION_VERTICAL
-
     # ------------------------------------------------------------------
     # The three concept-mapping lists  (Scheme: bridges.ss:150-238)
     # ------------------------------------------------------------------
@@ -123,13 +119,6 @@ class Bridge(WorkspaceStructure):
     def get_non_symmetric_slippages(self) -> list[ConceptMapping]:
         """``get-non-symmetric-slippages`` (bridges.ss:162-163) — over *all* CMs."""
         return [cm for cm in self.get_all_concept_mappings() if cm.is_slippage]
-
-    def get_non_symmetric_non_bond_slippages(self) -> list[ConceptMapping]:
-        """``get-non-symmetric-non-bond-slippages`` (bridges.ss:164-165).
-
-        The main list only — this is what a rule is abstracted from.
-        """
-        return [cm for cm in self.concept_mappings if cm.is_slippage]
 
     def get_slippages(self) -> list[ConceptMapping]:
         """``get-slippages`` (bridges.ss:167-170) — non-symmetric plus symmetric."""
@@ -221,23 +210,12 @@ class Bridge(WorkspaceStructure):
                 self.symmetric_slippages.remove(slippage)
                 break
 
-    def get_relevant_concept_mappings(self) -> list[ConceptMapping]:
-        """Return CMs where both description types are relevant (fully active).
-
-        Scheme: bridges.ss:248 (horizontal), 652 (vertical).
-        """
-        return [cm for cm in self.concept_mappings if cm.relevant()]
-
     def get_distinguishing_concept_mappings(self) -> list[ConceptMapping]:
         """Return CMs where both descriptors are distinguishing.
 
         Scheme: bridges.ss:249-250 (horizontal), 653-654 (vertical).
         """
         return [cm for cm in self.concept_mappings if cm.distinguishing()]
-
-    def distinguishing_concept_mappings(self) -> list[ConceptMapping]:
-        """Alias for get_distinguishing_concept_mappings for backward compat."""
-        return self.get_distinguishing_concept_mappings()
 
     def get_relevant_distinguishing_concept_mappings(self) -> list[ConceptMapping]:
         """CMs that are both relevant and distinguishing.
@@ -457,10 +435,6 @@ class Bridge(WorkspaceStructure):
                 relations.append((dimension, relation))
         return relations
 
-    def get_theme_pattern(self) -> dict[str, Any]:
-        """Dict view of :meth:`get_associated_thematic_relations`."""
-        return dict(self.get_associated_thematic_relations())
-
     # ------------------------------------------------------------------
     # Thematic compatibility  (Scheme: bridges.ss:270-287)
     # ------------------------------------------------------------------
@@ -663,33 +637,6 @@ class Bridge(WorkspaceStructure):
                 return bond2
 
         return None
-
-    def supports_theme_pattern(self, pattern: dict[str, Any]) -> bool:
-        """Check if bridge's theme pattern supports a given pattern.
-
-        Scheme: ``supports-theme-pattern?`` (bridges.ss:239-246, 643-650) — the
-        cross-product of the pattern's entries and the bridge's **all**
-        concept-mappings minus the whole/single ones, matching a CM's type
-        against the entry's dimension and its *label* against the entry's
-        relation.
-
-        The comparison is by theme-relation name, not by node name.  Comparing
-        ``cm.label.name`` ("plato-identity") to a pattern relation ("identity")
-        could never match, so this returned ``False`` unconditionally.
-        """
-        filtered_cms = [
-            cm for cm in self.get_all_concept_mappings()
-            if not _is_whole_or_single_cm(cm)
-        ]
-
-        for dim, rel in pattern.items():
-            for cm in filtered_cms:
-                cm_type_name = getattr(cm.description_type1, "name", "")
-                if cm_type_name != dim:
-                    continue
-                if relation_name_for_label(cm.label) == rel:
-                    return True
-        return False
 
     def _find_workspace(self) -> Any:
         """Try to find the workspace from the bridged objects."""
@@ -1472,7 +1419,6 @@ def _nodes_related(node1: Any, node2: Any) -> bool:
     return False
 
 
-
 def _letter_category_or_length_slippage(cm: ConceptMapping) -> bool:
     """Scheme: ``letter-category/length-slippage?`` (bridges.ss:1487-1492)."""
     return cm.is_slippage and (
@@ -1629,25 +1575,6 @@ def _subobject_bridges(group: Any, orientation: str) -> list[Bridge]:
     return result
 
 
-def _supporting_bridges(b1: Bridge, b2: Bridge, orientation: str) -> bool:
-    """Two bridges support each other if not incompatible and have at least
-    one pair of supporting distinguishing CMs.
-
-    Scheme: bridges.ss:1542-1548 (horizontal), 1632-1638 (vertical).
-    """
-    if _incompatible_bridges(b1, b2, orientation):
-        return False
-
-    b1_dist_cms = b1.get_distinguishing_concept_mappings()
-    b2_dist_cms = b2.get_distinguishing_concept_mappings()
-
-    for cm1 in b1_dist_cms:
-        for cm2 in b2_dist_cms:
-            if _supporting_cms(cm1, cm2):
-                return True
-    return False
-
-
 def _get_bridges_of_type(workspace: Any, bridge_type: str) -> list[Bridge]:
     """Get all bridges of a given type from the workspace.
 
@@ -1720,13 +1647,3 @@ def _get_edge_bond(obj: Any) -> Any:
     return getattr(obj, "left_bond", None)
 
 
-def _is_whole_or_single_cm(cm: ConceptMapping) -> bool:
-    """Check if a CM involves the whole or single position for string-position.
-
-    Scheme: justify.ss:220-229 (remove-whole/single-concept-mappings).
-    """
-    if not holds_role(cm.description_type1, "dimension.string_position"):
-        return False
-    return holds_role(cm.descriptor1, "position.whole") or holds_role(
-        cm.descriptor1, "position.single"
-    )

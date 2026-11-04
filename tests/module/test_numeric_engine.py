@@ -270,6 +270,3 @@ def test_topology_is_built_once_and_reused(meta: MetadataProvider) -> None:
         for _ in range(60):
             runner.step_mcat()
         assert slipnet._numeric_session() is first
-
-        slipnet.invalidate_numeric_layout()
-        assert slipnet._numeric_session() is not first

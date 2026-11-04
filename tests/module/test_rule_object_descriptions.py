@@ -96,16 +96,13 @@ def test_a_descriptor_a_sibling_also_carries_does_not_distinguish(meta):
     assert distinguishing_descriptor(middle, node["plato-q"]) is True
 
 
-def test_one_predicate_answers_for_descriptions_and_concept_mappings(meta):
-    """The three call sites agree because there is only one predicate.
+def test_one_predicate_answers_for_descriptions_and_objects(meta):
+    """The call sites agree because there is only one predicate.
 
-    ``Description.is_distinguishing`` and
-    ``ConceptMapping._descriptor_is_distinguishing`` were independently written
-    copies of ``WorkspaceObject._is_distinguishing_descriptor``, and both had the
-    quantifier the other way round.
+    ``Description.is_distinguishing`` was an independently written copy of
+    ``WorkspaceObject._is_distinguishing_descriptor``, with the quantifier the
+    other way round.
     """
-    from server.engine.concept_mappings import ConceptMapping
-
     ctx = _engine(meta, "eqe", "qeq", "abbba").ctx
     node = ctx.slipnet.nodes
     left = _letters(ctx.workspace.initial_string)[0]
@@ -119,7 +116,6 @@ def test_one_predicate_answers_for_descriptions_and_concept_mappings(meta):
     verdict = distinguishing_descriptor(left, node["plato-e"])
     assert description.is_distinguishing() is verdict
     assert left._is_distinguishing_descriptor(node["plato-e"]) is verdict
-    assert ConceptMapping._descriptor_is_distinguishing(node["plato-e"], left) is verdict
 
 
 # --- get-descriptions-for-rule ---------------------------------------------

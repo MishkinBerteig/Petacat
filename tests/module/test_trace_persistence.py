@@ -86,23 +86,27 @@ def test_running_produces_trace_events(meta):
         assert isinstance(event.event_number, int)
 
 
+_COGNITIVE_EVENT_TYPES = {
+    "concept_activation", "group_built", "concept_mapping_built", "rule_built",
+    "answer_found", "snag", "clamp_start",
+}
+
+
 def test_trace_records_only_cognitive_level_events(meta):
     """§4.4: the Trace is the cognitive level, not a log of every micro-event.
 
     Only the seven listed event types belong there; bonds and descriptions are
     subcognitive and must never appear.
     """
-    from server.engine.trace import COGNITIVE_EVENT_TYPES
-
     runner = EngineRunner(meta)
     runner.init_mcat("abc", "abd", "xyz", seed=42)
     runner.run_mcat(max_steps=500)
 
     event_types = {e.event_type for e in runner.ctx.trace.events}
     assert event_types, "a 500-codelet run should reach some milestone"
-    assert event_types <= set(COGNITIVE_EVENT_TYPES), (
+    assert event_types <= _COGNITIVE_EVENT_TYPES, (
         f"non-cognitive events leaked into the Trace: "
-        f"{event_types - set(COGNITIVE_EVENT_TYPES)}"
+        f"{event_types - _COGNITIVE_EVENT_TYPES}"
     )
     assert "bond_built" not in event_types
     assert "description_built" not in event_types
@@ -114,7 +118,7 @@ def test_snag_events_have_theme_pattern():
     pattern = {"direction": "identity", "category": "sameness"}
     trace.record_snag(100, 70.0, theme_pattern=pattern)
 
-    snags = trace.get_recent_snags()
+    snags = [e for e in trace.events if e.event_type == "snag"]
     assert len(snags) == 1
     assert snags[0].event_type == "snag"
     assert snags[0].theme_pattern == pattern

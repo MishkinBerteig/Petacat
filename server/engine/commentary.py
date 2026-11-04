@@ -120,11 +120,6 @@ class CommentaryLog:
     def count(self) -> int:
         return len(self._paragraphs)
 
-    @property
-    def warning_count(self) -> int:
-        """How many distinct template keys this run found missing."""
-        return len(self.warnings)
-
 
 # ---- Commentary generation helpers ----------------------------------------
 

@@ -13,8 +13,6 @@ def test_proposal_levels_are_strings():
 def test_initial_proposal_level():
     s = WorkspaceStructure()
     assert s.proposal_level == "proposed"
-    assert s.is_proposed
-    assert not s.is_evaluated
     assert not s.is_built
 
 
@@ -22,8 +20,6 @@ def test_evaluate_sets_level():
     s = WorkspaceStructure()
     s.proposal_level = WorkspaceStructure.EVALUATED
     assert s.proposal_level == "evaluated"
-    assert not s.is_proposed
-    assert s.is_evaluated
     assert not s.is_built
 
 
@@ -31,8 +27,6 @@ def test_build_sets_level():
     s = WorkspaceStructure()
     s.proposal_level = WorkspaceStructure.BUILT
     assert s.proposal_level == "built"
-    assert not s.is_proposed
-    assert not s.is_evaluated
     assert s.is_built
 
 

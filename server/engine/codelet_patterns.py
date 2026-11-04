@@ -56,11 +56,6 @@ def pattern_names(meta: Any) -> list[str]:
     return list(clampable_patterns(meta))
 
 
-def pattern_label(meta: Any, name: str) -> str:
-    """What the menu calls *name*."""
-    return clampable_patterns(meta)[name]
-
-
 def pattern_entries(meta: Any, name: str) -> tuple[tuple[str, str], ...]:
     """The ``(codelet type, urgency level)`` pairs *name* clamps.
 

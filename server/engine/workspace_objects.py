@@ -360,19 +360,6 @@ class WorkspaceObject:
     #  Bond tracking  (Scheme: workspace-objects.ss:193-212)
     # ------------------------------------------------------------------
 
-    def add_outgoing_bond(self, bond: Any) -> None:
-        """Scheme: workspace-objects.ss:193-197."""
-        self.outgoing_bonds.append(bond)
-        # Sameness bonds are symmetric
-        if _is_sameness_bond(bond):
-            self.incoming_bonds.append(bond)
-
-    def add_incoming_bond(self, bond: Any) -> None:
-        """Scheme: workspace-objects.ss:198-201."""
-        self.incoming_bonds.append(bond)
-        if _is_sameness_bond(bond):
-            self.outgoing_bonds.append(bond)
-
     def remove_outgoing_bond(self, bond: Any) -> None:
         """Scheme: workspace-objects.ss:202-205."""
         if bond in self.outgoing_bonds:
@@ -485,13 +472,6 @@ class WorkspaceObject:
             return (self.horizontal_bridge is not None
                     and self.vertical_bridge is not None)
         return False
-
-    def in_string(self, string: Any) -> bool:
-        """Is this object in the given string?
-
-        Scheme: workspace-objects.ss:151.
-        """
-        return self.string is string
 
     # ------------------------------------------------------------------
     #  Importance / unhappiness / salience updates
@@ -766,34 +746,6 @@ class WorkspaceObject:
         self.update_inter_string_salience()
         self.update_average_salience()
         self.update_description_strengths()
-
-    # ------------------------------------------------------------------
-    #  Legacy compatibility shim — old update_salience alias
-    # ------------------------------------------------------------------
-
-    def update_salience(
-        self,
-        unhappiness_w_intra: float = 80.0,
-        importance_w_intra: float = 20.0,
-        unhappiness_w_inter: float = 20.0,
-        importance_w_inter: float = 80.0,
-    ) -> None:
-        """Legacy method kept for backward compatibility with existing tests.
-
-        Equivalent to calling update_intra_string_salience +
-        update_inter_string_salience, but without per-string-type logic.
-        """
-        self.salience["intra"] = round(
-            (unhappiness_w_intra / 100) * self.intra_string_unhappiness
-            + (importance_w_intra / 100) * self.relative_importance
-        )
-        for key in ("horizontal_inter", "vertical_inter"):
-            bridge_key = key.replace("_inter", "")
-            unhappiness = self.inter_string_unhappiness.get(bridge_key, 100.0)
-            self.salience[key] = round(
-                (unhappiness_w_inter / 100) * unhappiness
-                + (importance_w_inter / 100) * self.relative_importance
-            )
 
     # ------------------------------------------------------------------
     #  Internal helpers

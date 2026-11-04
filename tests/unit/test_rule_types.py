@@ -52,14 +52,12 @@ def test_verbatim_clause():
 def test_top_rule():
     rule = Rule(rule_type=RULE_TOP, clauses=[])
     assert rule.is_top_rule
-    assert not rule.is_bottom_rule
     assert rule.is_identity_rule  # No clauses = identity
 
 
 def test_bottom_rule():
     clause = RuleClause(clause_type=CLAUSE_INTRINSIC)
     rule = Rule(rule_type=RULE_BOTTOM, clauses=[clause])
-    assert rule.is_bottom_rule
     assert not rule.is_top_rule
     assert not rule.is_identity_rule
 

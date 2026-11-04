@@ -28,8 +28,6 @@ from server.engine.formulas import sigmoid, temp_adjusted_values, weighted_avera
 from server.engine.images import (
     ImageFailure,
     StringImage,
-    is_platonic_letter,
-    is_platonic_number,
     is_platonic_relation,
     get_related_node,
     get_label,
@@ -581,9 +579,6 @@ class IntrinsicChangeDescription:
     def change_subobjects(self) -> bool:
         return self.scope == SCOPE_SUBOBJECTS
 
-    def is_dimension(self, dim: SlipnetNode) -> bool:
-        return self.dimension is dim
-
     def same_dimension(self, other: IntrinsicChangeDescription) -> bool:
         return self.dimension is other.dimension
 
@@ -741,9 +736,6 @@ class ExtrinsicChangeDescription:
 
     def get_enclosing_object(self) -> Any:
         return _get_enclosing_object(self.reference_objects[0])
-
-    def get_left_string_pos(self) -> int:
-        return min(getattr(o, "left_string_pos", 0) for o in self.reference_objects)
 
     # -- implication --------------------------------------------------------
 
@@ -1116,10 +1108,6 @@ class Rule(WorkspaceStructure):
         return self.rule_type == RULE_TOP
 
     @property
-    def is_bottom_rule(self) -> bool:
-        return self.rule_type == RULE_BOTTOM
-
-    @property
     def intrinsic_clauses(self) -> list[RuleClause]:
         return [c for c in self.clauses if c.is_intrinsic]
 
@@ -1136,21 +1124,6 @@ class Rule(WorkspaceStructure):
     def is_verbatim_rule(self) -> bool:
         # rules.ss:206-208: exactly one clause, and that one verbatim.
         return len(self.clauses) == 1 and self.clauses[0].is_verbatim
-
-    @property
-    def is_literal_rule(self) -> bool:
-        """A rule with at least one literal clause (non-abstract, non-verbatim).
-
-        Scheme: rules.ss:210-211.
-        """
-        if self.is_verbatim_rule:
-            return False
-        return any(_literal_clause(c) for c in self.clauses)
-
-    @property
-    def is_abstract_rule(self) -> bool:
-        """Neither verbatim nor literal."""
-        return not self.is_verbatim_rule and not self.is_literal_rule
 
     @property
     def bridge_theme_type(self) -> str:
@@ -1990,60 +1963,6 @@ def _descriptor_key(descriptor: Any, token: str) -> str | None:
 
 
 # ============================================================================
-#  Literal-clause detection
-# ============================================================================
-
-
-def _literal_clause(clause: RuleClause) -> bool:
-    """Scheme: literal-clause? (rules.ss:841-848).
-
-    A clause is literal if any of its object descriptions or changes
-    use literal (non-relational) descriptors.
-    """
-    if clause.is_verbatim:
-        return False
-    if clause.object_description:
-        if _literal_object_description(clause.object_description):
-            return True
-    for change in clause.changes:
-        if _literal_change(change):
-            return True
-    if clause.is_extrinsic and clause.extrinsic_objects:
-        for od in clause.extrinsic_objects:
-            if _literal_object_description(od):
-                return True
-    return False
-
-
-def _literal_object_description(od: tuple) -> bool:
-    """Scheme: literal-object-description? (rules.ss:851-854).
-
-    An OD is literal if its description-type (2nd element) is one of
-    AlphPosCtgy, LettCtgy, or Length.
-    """
-    if len(od) < 2:
-        return False
-    dt = od[1]
-    return (
-        _holds(dt, _DIM_ALPHABETIC_POSITION)
-        or _holds(dt, _DIM_LETTER_CATEGORY)
-        or _holds(dt, _DIM_LENGTH)
-    )
-
-
-def _literal_change(change: RuleChange) -> bool:
-    """Scheme: literal-change? (rules.ss:857-859).
-
-    A change is literal if its descriptor (relation or to_descriptor) is a
-    literal letter/number rather than a relational concept.
-    """
-    desc = change.relation if change.relation else change.to_descriptor
-    if desc is None:
-        return False
-    return is_platonic_letter(desc) or is_platonic_number(desc)
-
-
-# ============================================================================
 #  Rule Describable Bridge Check
 # ============================================================================
 
@@ -2092,16 +2011,6 @@ def rule_describable_bridge(bridge: Bridge) -> bool:
         return any(link.to_node is gc2 for link in gc1.outgoing_links)
 
     return False
-
-
-def _get_slipnet_from_object(obj: Any) -> Any:
-    """Try to get the slipnet reference from a workspace object's string."""
-    string = getattr(obj, "string", None)
-    if string is not None:
-        # WorkspaceString doesn't store slipnet; walk up to workspace if possible
-        # Fallback: use images.py helpers (they need slipnet as explicit arg)
-        pass
-    return None
 
 
 # ============================================================================

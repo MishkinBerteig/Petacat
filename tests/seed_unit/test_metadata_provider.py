@@ -29,7 +29,7 @@ def test_loads_codelet_types(meta):
     assert len(meta.codelet_specs) == 27
     assert "bottom-up-bond-scout" in meta.codelet_specs
     assert "breaker" in meta.codelet_specs
-    spec = meta.get_codelet_spec("bottom-up-bond-scout")
+    spec = meta.codelet_specs["bottom-up-bond-scout"]
     assert spec.family == "bond"
     assert spec.phase == "scout"
     assert spec.default_urgency == 35

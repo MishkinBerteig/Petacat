@@ -256,10 +256,10 @@ def test_the_thematic_scout_can_still_reach_a_slippage_only_bridge(meta):
     from server.engine import themes
 
     for name in ("bottom-up-bridge-scout", "important-object-bridge-scout"):
-        body = meta.get_codelet_spec(name).execute_body
+        body = meta.codelet_specs[name].execute_body
         assert "distinguishing_identity_or_opposite" in body, name
 
-    thematic = meta.get_codelet_spec("thematic-bridge-scout").execute_body
+    thematic = meta.codelet_specs["thematic-bridge-scout"].execute_body
     assert "distinguishing_identity_or_opposite" not in thematic
     assert "slippability" not in thematic
     # ...and nothing it calls applies one on its behalf.
@@ -512,9 +512,6 @@ def test_bond_concept_mappings_stay_out_of_the_main_list(meta):
     assert bridge.bond_concept_mappings
     assert all(cm.bond_concept_mapping for cm in bridge.bond_concept_mappings)
     assert not any(cm.bond_concept_mapping for cm in bridge.concept_mappings)
-    assert not any(
-        cm.bond_concept_mapping for cm in bridge.get_non_symmetric_non_bond_slippages()
-    )
 
 
 # --- BR-8: the incompatibility refinements ---------------------------------

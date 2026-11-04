@@ -91,11 +91,6 @@ class ConceptMapping:
         """Descriptors differ — a conceptual substitution."""
         return not self.is_identity
 
-    @property
-    def english_name(self) -> str:
-        """``a <=> b`` in the nodes' lowercase names (``concept-mappings.ss:41``)."""
-        return slippage_english_name(self)
-
     def strength(self) -> float:
         """Concept mapping strength.
 
@@ -233,26 +228,13 @@ class ConceptMapping:
         # Identity mapping of 'whole' is not distinguishing
         if self.is_identity and holds_role(self.descriptor1, "position.whole"):
             return False
-        # ``_descriptor_is_distinguishing`` is the one predicate (below); called
-        # directly, without the staticmethod hop, on this per-bridge-pair hot path.
+        # ``distinguishing_descriptor`` is the one predicate; called directly on this
+        # per-bridge-pair hot path.
         predicate = _workspace_objects.distinguishing_descriptor
         return (
             predicate(self.object1, self.descriptor1)
             and predicate(self.object2, self.descriptor2)
         )
-
-    @staticmethod
-    def _descriptor_is_distinguishing(descriptor: SlipnetNode, obj: Any) -> bool:
-        """Does *descriptor* tell *obj* apart from the other objects of its string?
-
-        Delegates to the one predicate (``workspace_objects.distinguishing_descriptor``,
-        Scheme ``workspace-objects.ss:223-244``). This used to be a second,
-        independently-written copy that read "not *all* siblings carry it" where the
-        Scheme reads "no sibling carries it" — and it disagreed both with the Scheme
-        and with the copy on ``Description``. One predicate is how they stop
-        disagreeing.
-        """
-        return _workspace_objects.distinguishing_descriptor(obj, descriptor)
 
     def relevant_distinguishing(self) -> bool:
         """True if this CM is both relevant and distinguishing.
@@ -423,15 +405,6 @@ class ConceptMapping:
             pattern.append((self.label, max_activation))
         return pattern
 
-    def is_compatible(self, other: ConceptMapping) -> bool:
-        """Two CMs are compatible if they don't assign conflicting mappings
-        to the same description type."""
-        if self.description_type1 is other.description_type1:
-            return self.descriptor1 is other.descriptor1
-        if self.description_type2 is other.description_type2:
-            return self.descriptor2 is other.descriptor2
-        return True
-
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, ConceptMapping):
             return NotImplemented
@@ -519,9 +492,6 @@ class SlippageLog:
             text += (f"  {concept_mapping_print_name(coattail)} induced by "
                      f"{concept_mapping_print_name(inducing)}\n")
         return text + "\n"
-
-    def get_coattail_slippages(self) -> list[ConceptMapping]:
-        return [entry[0] for entry in self.coattail_slippage_table]
 
     def get_coattail_inducing_slippages(self) -> list[ConceptMapping]:
         return [entry[1] for entry in self.coattail_slippage_table]

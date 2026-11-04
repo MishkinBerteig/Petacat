@@ -4,6 +4,7 @@ import os
 import pytest
 from server.engine.metadata import MetadataProvider
 from server.engine.themes import Themespace, THEME_TOP_BRIDGE, THEME_BOTTOM_BRIDGE, THEME_VERTICAL_BRIDGE
+from tests.support.theme_fixtures import populate
 
 # Every test here executes arithmetic the numeric substrate owns, so each one runs
 # once per backend in the matrix. See tests/conftest.py.
@@ -20,7 +21,7 @@ def meta():
 
 @pytest.fixture
 def themespace(meta):
-    return Themespace(meta).populate()
+    return populate(Themespace(meta))
 
 
 def test_cluster_count(themespace):
@@ -180,7 +181,7 @@ def _clusters_of(themespace, theme_type):
 def test_saving_and_restoring_returns_every_theme_to_where_it_was(meta):
     from server.engine.themes import Themespace
 
-    themespace = Themespace(meta).populate()
+    themespace = populate(Themespace(meta))
     cluster = _clusters_of(themespace, "vertical_bridge")[0]
     live = cluster.themes[0]
     live.activation = 64.0

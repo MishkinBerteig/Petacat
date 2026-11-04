@@ -143,12 +143,6 @@ class WorkspaceString:
     def letters(self) -> list[Letter]:
         return [o for o in self.objects if isinstance(o, Letter)]
 
-    def get_object_at(self, pos: int) -> WorkspaceObject | None:
-        for obj in self.objects:
-            if obj.left_string_pos <= pos <= obj.right_string_pos:
-                return obj
-        return None
-
     def add_bond(self, bond: Bond) -> None:
         # Scheme: ``build-bond`` (bonds.ss:410-422).  The two positional slots must
         # already be free — ``bond-builder`` breaks every bond it displaced
@@ -507,16 +501,6 @@ class WorkspaceString:
         Scheme: ``(unclamp-salience () 'done)`` (``workspace-strings.ss:405``).
         """
 
-    def get_all_descriptors(self) -> list[Any]:
-        """A string contributes no descriptors of its own.
-
-        Scheme: ``(get-all-descriptors () '())``
-        (``workspace-strings.ss:410``).  Descriptions attach to letters and
-        groups, never to strings, and the snag concept pattern asks every snag
-        object for its descriptors.
-        """
-        return []
-
     # -- and the five upstream added afterwards, in ``ca8f7e0`` -------------
     #
     # The first four were found when a snag object reached the *explanation*
@@ -533,16 +517,6 @@ class WorkspaceString:
     # same reason the four above are.  Adding them changes no existing caller:
     # the getattr defaults already were ``None``, and the hasattr branch already
     # contributed nothing.
-
-    @property
-    def which_string(self) -> Any:
-        """A string is in itself, so its own string-type.
-
-        Scheme: ``(which-string () string-type)``.  The same answer
-        ``workspace-objects.ss:150`` computes for a letter or group by asking
-        the string it sits in.
-        """
-        return self.string_type
 
     @property
     def group_category(self) -> None:
@@ -576,10 +550,9 @@ class WorkspaceString:
     def descriptions(self) -> list[Any]:
         """A string carries no descriptions.
 
-        Scheme: ``(get-descriptions () '())``.  Same reason as
-        :meth:`get_all_descriptors`, one level up: the jootser gathers the
+        Scheme: ``(get-descriptions () '())``.  The jootser gathers the
         descriptions of every snag object to choose theme entries
-        (``jootsing.ss:86-88``).
+        (``jootsing.ss:86-88``), and a string contributes none.
         """
         return []
 
@@ -1102,15 +1075,6 @@ class Workspace:
                 "bottom", 100.0 - self.average_bottom_inter_string_unhappiness
             )
 
-    def get_average_inter_string_unhappiness(self, bridge_type_name: str) -> float:
-        """Scheme: ``workspace.ss:505-510`` — a plain accessor over what
-        :meth:`update_average_unhappiness_values` last stored."""
-        return {
-            "top": self.average_top_inter_string_unhappiness,
-            "bottom": self.average_bottom_inter_string_unhappiness,
-            "vertical": self.average_vertical_inter_string_unhappiness,
-        }.get(bridge_type_name, 0.0)
-
     def get_max_inter_string_unhappiness(self) -> float:
         """The worst of the mappings' unhappiness.
 
@@ -1303,16 +1267,6 @@ class Workspace:
                 return True
         return False
 
-    def get_spanning_bridge(self, bridge_type: str) -> Bridge | None:
-        """Get the spanning bridge of the given type, if any.
-
-        Scheme: workspace.ss:316-317.
-        """
-        for b in self.get_bridges(bridge_type):
-            if self._bridge_is_spanning(b):
-                return b
-        return None
-
     def get_all_slippages(self, bridge_type: str) -> list[ConceptMapping]:
         """Collect all slippages from bridges of the given type.
 
@@ -1325,18 +1279,6 @@ class Workspace:
         result: list[ConceptMapping] = []
         for bridge in self.get_bridges(bridge_type):
             result.extend(bridge.get_slippages())
-        return result
-
-    def get_all_non_symmetric_slippages(self, bridge_type: str) -> list[ConceptMapping]:
-        """Non-symmetric slippages only from bridges of the given type.
-
-        Scheme: ``workspace.ss:305-308`` — each bridge's
-        ``get-non-symmetric-slippages`` (bridges.ss:162-163), which reads *all*
-        concept-mappings and so includes the bond ones.
-        """
-        result: list[ConceptMapping] = []
-        for bridge in self.get_bridges(bridge_type):
-            result.extend(bridge.get_non_symmetric_slippages())
         return result
 
     def get_possible_bridge_objects(self, bridge_type: str) -> list[WorkspaceObject]:
@@ -1448,27 +1390,6 @@ class Workspace:
                 return existing
         return None
 
-    def clamp_rule(self, rule: Rule) -> None:
-        """Add rule to clamped rules list.
-
-        Scheme: workspace.ss:412-415.
-        """
-        self.clamped_rules.append(rule)
-
-    def unclamp_rule(self, rule: Rule) -> None:
-        """Remove rule from clamped rules list.
-
-        Scheme: workspace.ss:417-419.
-        """
-        self.clamped_rules = [r for r in self.clamped_rules if r is not rule]
-
-    def unclamp_rules(self) -> None:
-        """Unclamp all rules.
-
-        Scheme: workspace.ss:422-429.
-        """
-        self.clamped_rules = []
-
     def get_clamped_rules(self) -> list[Rule]:
         """Return the clamped rules list.
 
@@ -1535,12 +1456,6 @@ class Workspace:
         if self.bottom_rule_possible:
             types.append("bottom")
         return types
-
-    def rule_possible(self, rule_type: str) -> bool:
-        """Scheme: ``workspace.ss:450-453``."""
-        return (
-            self.top_rule_possible if rule_type == "top" else self.bottom_rule_possible
-        )
 
     def rule_established(self) -> bool:
         """Whether the temperature's rule factor should be 0.

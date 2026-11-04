@@ -222,6 +222,10 @@ class _ZeroTable:
 def test_larger_clock_never_changes_minimum(meta):
     rack = build(meta, 4242)
     temperature = 60.0
+    # ``_clock`` holds firing times under the row the rack last synchronised to; the comparison
+    # below reads it, so put the rack on this temperature's row first (otherwise the outcome
+    # depends on which ids the process happened to have issued).
+    rack.sync_row(temperature)
     for i in range(300):
         top = rack.predict(temperature, 1)[0]
         f_top = rack._clock[top.id][0]

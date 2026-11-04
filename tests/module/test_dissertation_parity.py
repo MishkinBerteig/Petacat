@@ -28,10 +28,17 @@ from server.engine.themes import (
     ThemeCluster,
     relation_name_for_label,
 )
+from tests.support.theme_fixtures import populate
 
 # Every test here executes arithmetic the numeric substrate owns, so each one runs
 # once per backend in the matrix. See tests/conftest.py.
 pytestmark = pytest.mark.numeric_matrix
+
+#: The seven event types the Trace records (the dissertation's §4.4).
+_COGNITIVE_EVENT_TYPES = {
+    "concept_activation", "group_built", "concept_mapping_built", "rule_built",
+    "answer_found", "snag", "clamp_start",
+}
 
 SEED_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
 
@@ -121,7 +128,7 @@ class TestThemespaceActivates:
     def test_dominance_needs_a_margin_over_the_runner_up(self):
         """Scheme: ``update-dominant-theme`` (themes.ss:503-518) — the leader must
         beat the runner-up by strictly more than %dominant-theme-margin% (90)."""
-        cluster = ThemeCluster(THEME_TOP_BRIDGE, "d", ["identity", "opposite"]).populate()
+        cluster = populate(ThemeCluster(THEME_TOP_BRIDGE, "d", ["identity", "opposite"]))
         identity, opposite = cluster.themes
         identity.activation = 95.0
         opposite.activation = 0.0
@@ -134,7 +141,7 @@ class TestThemespaceActivates:
         """Themes are ranked by *absolute* activation, so a negatively clamped
         theme suppresses dominance in its cluster — which is the whole point of
         clamping one in response to a recurring snag (§4.5.2)."""
-        cluster = ThemeCluster(THEME_TOP_BRIDGE, "d", ["identity", "opposite"]).populate()
+        cluster = populate(ThemeCluster(THEME_TOP_BRIDGE, "d", ["identity", "opposite"]))
         identity, opposite = cluster.themes
         identity.activation = 100.0
         opposite.activation = -95.0
@@ -517,14 +524,12 @@ class TestTraceAndSelfWatching:
         ~150 events per run and destroyed the Trace's role as the filtered,
         chunked record that progress-watchers and jootsers reason over.
         """
-        from server.engine.trace import COGNITIVE_EVENT_TYPES
-
         runner = _run(meta, "abc", "abd", "xyz", seed=3, steps=2000)
         events = runner.ctx.trace.events
         types = {e.event_type for e in events}
-        assert types <= set(COGNITIVE_EVENT_TYPES), (
+        assert types <= _COGNITIVE_EVENT_TYPES, (
             f"subcognitive events leaked into the Trace: "
-            f"{types - set(COGNITIVE_EVENT_TYPES)}"
+            f"{types - _COGNITIVE_EVENT_TYPES}"
         )
         assert len(events) < 100, (
             f"{len(events)} Trace events for a 2000-codelet run — the Trace is "
@@ -1199,9 +1204,9 @@ class TestStructuralCapabilities:
         # And they decide correctly.
         runner = _run(meta, "abc", "abd", "xyz", steps=1)
         letters = runner.ctx.workspace.initial_string.letters
-        assert slipnet.nodes["plato-leftmost"].describes(letters[0])
-        assert not slipnet.nodes["plato-leftmost"].describes(letters[2])
-        assert slipnet.nodes["plato-rightmost"].describes(letters[2])
-        assert slipnet.nodes["plato-middle"].describes(letters[1])
-        assert slipnet.nodes["plato-letter"].describes(letters[0])
-        assert not slipnet.nodes["plato-group"].describes(letters[0])
+        assert slipnet.nodes["plato-leftmost"].descriptor_predicate(letters[0])
+        assert not slipnet.nodes["plato-leftmost"].descriptor_predicate(letters[2])
+        assert slipnet.nodes["plato-rightmost"].descriptor_predicate(letters[2])
+        assert slipnet.nodes["plato-middle"].descriptor_predicate(letters[1])
+        assert slipnet.nodes["plato-letter"].descriptor_predicate(letters[0])
+        assert not slipnet.nodes["plato-group"].descriptor_predicate(letters[0])

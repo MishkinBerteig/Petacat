@@ -26,9 +26,6 @@ if TYPE_CHECKING:
 #: has no ``MetadataProvider``, which is a hand-built test object rather than a run.
 DEFAULT_MAX_THEME_ACTIVATION = 100.0
 
-#: Retained under the original name for anything that imports it.
-MAX_THEME_ACTIVATION = DEFAULT_MAX_THEME_ACTIVATION
-
 
 def _clip_positive(value: float, ceiling: float = DEFAULT_MAX_THEME_ACTIVATION) -> float:
     """Scheme: ``clip-positive`` (``themes.ss:34-35``) — clip to [0, +ceiling]."""
@@ -127,14 +124,6 @@ class Theme:
         self.frozen: bool = False
         self._net_input_buffer: float = 0.0
 
-    @property
-    def is_positive(self) -> bool:
-        return self.activation > 0
-
-    @property
-    def is_negative(self) -> bool:
-        return self.activation < 0
-
     def boost(
         self,
         factor: float,
@@ -223,16 +212,6 @@ class ThemeCluster:
         theme = Theme(self.theme_type, self.dimension, relation)
         self.themes.insert(0, theme)
         return theme
-
-    def populate(self) -> ThemeCluster:
-        """Create every possible theme, in ``valid_relations`` order.
-
-        For hand-built fixtures only.  The engine never does this: a run's
-        Themespace holds just the themes something has touched (B-2).
-        """
-        for relation in reversed(self.valid_relations):
-            self.add_theme(relation)
-        return self
 
     def delete_themes(self) -> None:
         """Scheme: cluster ``delete-themes`` (``themes.ss:566-569``)."""
@@ -482,13 +461,6 @@ class Themespace:
             return []
         return self.get_themes(theme_type)
 
-    def populate(self) -> Themespace:
-        """Create every possible theme.  For hand-built fixtures only (see B-2)."""
-        for cluster in self.clusters:
-            for relation in reversed(cluster.valid_relations):
-                self.add_theme(cluster.theme_type, cluster.dimension, relation, False)
-        return self
-
     def get_themes(self, theme_type: str) -> list[Theme]:
         """Existing themes of *theme_type*, in ``all-themes`` order (``themes.ss:176-177``)."""
         return [t for t in self.all_themes if t.theme_type == theme_type]
@@ -548,14 +520,6 @@ class Themespace:
         if theme is not None:
             theme.activation = activation
 
-    def delete_theme(self, theme: Theme) -> None:
-        """Scheme: ``delete-theme`` (``themes.ss:319-325``)."""
-        cluster = self.get_cluster(theme.theme_type, theme.dimension)
-        if cluster is not None and theme in cluster.themes:
-            cluster.themes.remove(theme)
-        if theme in self.all_themes:
-            self.all_themes.remove(theme)
-
     def delete_theme_type(self, theme_type: str) -> None:
         """Scheme: ``delete-theme-type`` (``themes.ss:341-347``); frozen status kept."""
         for cluster in self.get_clusters(theme_type):
@@ -567,15 +531,6 @@ class Themespace:
         for cluster in self.clusters:
             cluster.delete_themes()
         self.all_themes = []
-
-    def get_positive_themes(self, bridge_type: str) -> list[Theme]:
-        """Positively-activated themes of *bridge_type* that exert pressure.
-
-        Thematic-bridge-scouts "pay attention only to positively-activated
-        themes in the Themespace" (§4.1.2, p.144).
-        """
-        tt = theme_type_for_bridge_type(bridge_type)
-        return [t for t in self.get_active_themes(tt) if t.activation > 0]
 
     def _numeric_backend(self) -> Any:
         """The substrate for intra-cluster dynamics, or ``None`` for the loops.
@@ -609,27 +564,6 @@ class Themespace:
         state = ThemeState.from_themespace(self, layout)
         backend.spread_themes(layout, state, self._numeric_params)
         state.apply_to_themespace(self, layout)
-
-    def get_thematic_pressure(self, bridge_type: str) -> dict[str, Any]:
-        """Get dominant themes for a bridge type."""
-        type_map = {
-            "top": THEME_TOP_BRIDGE,
-            "bottom": THEME_BOTTOM_BRIDGE,
-            "vertical": THEME_VERTICAL_BRIDGE,
-        }
-        tt = type_map.get(bridge_type)
-        if tt is None or tt not in self.active_theme_types:
-            return {}
-
-        pressure: dict[str, Any] = {}
-        margin = self.meta.get_param("dominant_theme_margin")
-        for cluster in self.clusters:
-            if cluster.theme_type != tt:
-                continue
-            dom = cluster.get_dominant_theme(margin)
-            if dom is not None:
-                pressure[cluster.dimension] = dom.relation
-        return pressure
 
     def get_dominant_theme_pattern(self, bridge_type: str) -> list:
         """Return the dominant theme pattern for a bridge type as a list.
@@ -802,31 +736,6 @@ class Themespace:
             self.meta.get_param("theme_boost_amount"),
             self.meta.get_param("max_theme_activation"),
         )
-
-    def clamp_negative_pattern(
-        self,
-        pattern: dict[str, str],
-        theme_type: str = THEME_VERTICAL_BRIDGE,
-    ) -> None:
-        """Clamp a negative theme pattern (inhibit a stuck interpretation).
-
-        Clamping a pattern automatically turns thematic pressure on for that
-        theme type (§4.2: "the clamping of theme activations in the Themespace
-        automatically turns on thematic pressure").
-        """
-        clamped = False
-        for cluster in self.clusters:
-            if cluster.theme_type != theme_type:
-                continue
-            if cluster.dimension in pattern:
-                theme = self.add_theme(
-                    theme_type, cluster.dimension, pattern[cluster.dimension], False
-                )
-                if theme:
-                    theme.clamp(-float(self.meta.get_param("max_theme_activation")))
-                    clamped = True
-        if clamped:
-            self.thematic_pressure_on([theme_type])
 
     def spread_activation_to_slipnet(self, slipnet: Any, rng: Any) -> None:
         """Spread activation from active themes to slipnet nodes.

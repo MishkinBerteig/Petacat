@@ -135,11 +135,6 @@ _DEFAULT = IdAllocator()
 _CURRENT: ContextVar[IdAllocator] = ContextVar("petacat_id_allocator", default=_DEFAULT)
 
 
-def current_allocator() -> IdAllocator:
-    """The allocator identifiers should be drawn from right now."""
-    return _CURRENT.get()
-
-
 def next_id(kind: str) -> int:
     """Claim the next identifier of ``kind`` from the current allocator."""
     return _CURRENT.get().next(kind)

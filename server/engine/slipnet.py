@@ -26,8 +26,6 @@ DEFAULT_REFERENCE_UPDATE_CYCLE_LENGTH = 15.0
 
 from server.engine.numeric.layout import (
     DEFAULT_ACTIVATION,
-    FULL_ACTIVATION_THRESHOLD,
-    MAX_ACTIVATION,
     ActivationParams,
     SlipnetState,
     SlipnetTopology,
@@ -80,10 +78,6 @@ def _letter_category_node(obj: Any) -> Any:
         if _holds_role(d.description_type, "dimension.letter_category"):
             return d.descriptor
     return getattr(obj, "letter_category", None)
-
-
-def _letter_category_name(obj: Any) -> str:
-    return getattr(_letter_category_node(obj), "name", "")
 
 
 def _letter_glyph(obj: Any) -> str:
@@ -168,23 +162,6 @@ def compile_descriptor_predicate(
         return bool(eval(code, {**DESCRIPTOR_PREDICATE_NAMESPACE, "obj": obj}))  # noqa: S307
 
     return predicate
-
-
-def _descriptor_read_from_object(descriptor_name: str, obj: Any) -> bool:
-    """Fallback for descriptors that are *read off* an object, not tested.
-
-    Letter-category, direction, bond-category, group-category and bond-facet
-    descriptors are properties the object already carries, so there is nothing to
-    predicate — the node simply describes the object if the object says so.
-    """
-    for d in getattr(obj, "descriptions", []):
-        if getattr(d.descriptor, "name", "") == descriptor_name:
-            return True
-    for attr in ("direction", "group_category", "bond_facet"):
-        node = getattr(obj, attr, None)
-        if node is not None and getattr(node, "name", "") == descriptor_name:
-            return True
-    return _letter_category_name(obj) == descriptor_name
 
 
 _NO_RELATIONS: dict[str, Any] = {}
@@ -473,30 +450,13 @@ class SlipnetNode:
     # Descriptor predicates  (Scheme: slipnet.ss:556-610)
     # ------------------------------------------------------------------
 
-    def describes(self, obj: Any) -> bool:
-        """Does this node validly describe *obj*?
-
-        Scheme: ``define-descriptor-predicate``.  Answers "which descriptors along
-        this dimension actually apply to this object", so codelets don't propose
-        descriptions that are simply false.  The predicate itself comes from the
-        node's seed data; descriptors that are read off the object rather than
-        tested against it fall back to inspecting the object.
-        """
-        if self.descriptor_predicate is not None:
-            return self.descriptor_predicate(obj)
-        return _descriptor_read_from_object(self.name, obj)
-
     def description_possible(self, obj: Any) -> bool:
         """Scheme: ``description-possible?`` (slipnet.ss:200-201).
 
         Defers to ``get_possible_descriptors`` below — the faithful one.  A
-        second, more permissive definition of that method used to sit here,
-        routing through ``describes`` and so through
-        ``_descriptor_read_from_object``, which answers "what *is* this object's
-        value along this dimension" rather than "may this descriptor be applied".
-        It was dead: Python keeps the last definition in a class body, so every
-        caller — including this one — already reached the faithful version.  It
-        is deleted rather than reconciled, because two answers to one question is
+        second, more permissive definition of that method once sat here and was
+        dead, because Python keeps the last definition in a class body; it is
+        deleted rather than reconciled, because two answers to one question is
         the defect whichever one wins.
         """
         return bool(self.get_possible_descriptors(obj))
@@ -1003,12 +963,6 @@ class Alphabet:
         last = marked(roles.alphabet_last_marker)
         return cls(MappingProxyType(glyph_nodes), MappingProxyType(numbers), first, last)
 
-    def is_letter(self, node: Any) -> bool:
-        return getattr(node, "glyph", None) is not None
-
-    def is_number(self, node: Any) -> bool:
-        return getattr(node, "numeric_value", None) is not None
-
     def number_for(self, n: int) -> SlipnetNode | None:
         """The node whose ``numeric_value`` is *n*, or ``None`` (no node names that count)."""
         return self.numbers.get(n)
@@ -1237,15 +1191,6 @@ class Slipnet:
             self._numeric = backend.open_slipnet(SlipnetTopology.from_slipnet(self))
         return self._numeric
 
-    def invalidate_numeric_layout(self) -> None:
-        """Discard the flattened topology, forcing a rebuild on next use.
-
-        Needed only if the graph is edited after construction — the admin surface
-        can rewrite link lengths — because the layout caches the association
-        weights that such an edit changes.
-        """
-        self._numeric = _UNRESOLVED
-
     def update_activations(
         self, rng: RNG, threshold: int = 100, on_flushed: Any = None
     ) -> None:
@@ -1331,14 +1276,6 @@ class Slipnet:
         for node in self.nodes.values():
             node.tick_clamp()
 
-    def reset_activations(self) -> None:
-        """Set all activations to 0 and unclamp everything."""
-        for node in self.nodes.values():
-            node.activation = 0.0
-            node.activation_buffer = 0.0
-            node.frozen = False
-            node.clamp_cycles_remaining = 0
-
     # ------------------------------------------------------------------
     # Query functions (Scheme: slipnet.ss ~287-365)
     # ------------------------------------------------------------------
@@ -1391,22 +1328,6 @@ class Slipnet:
 
         return relations[0]
 
-    def related(self, node1: SlipnetNode, node2: SlipnetNode) -> bool:
-        """True if *node1* and *node2* are the same node or connected by any link.
-
-        Scheme: slipnet.ss:352-354.
-        """
-        if node1 is node2:
-            return True
-        return self.linked(node1, node2)
-
-    def linked(self, node1: SlipnetNode, node2: SlipnetNode) -> bool:
-        """True if *node1* has any outgoing link (any type) to *node2*.
-
-        Scheme: slipnet.ss:357-359.
-        """
-        return any(link.to_node is node2 for link in node1.outgoing_links)
-
     def slip_linked(self, node1: SlipnetNode, node2: SlipnetNode) -> bool:
         """True if *node1* has a lateral-sliplink to *node2*.
 
@@ -1415,36 +1336,6 @@ class Slipnet:
         return any(
             link.to_node is node2 for link in node1.lateral_sliplinks
         )
-
-    @staticmethod
-    def apply_slippages(
-        node: SlipnetNode,
-        slippages: list[object],
-        rng: RNG | None = None,
-    ) -> SlipnetNode:
-        """Apply *slippages* to *node* and return the (possibly slipped) result.
-
-        Convenience wrapper around ``SlipnetNode.apply_slippages``.
-        See ``SlipnetNode.apply_slippages`` for full documentation.
-        """
-        return node.apply_slippages(slippages, rng=rng)
-
-    @staticmethod
-    def get_slipped_node(
-        node: SlipnetNode,
-        slippages: list[object],
-        rng: RNG | None = None,
-    ) -> SlipnetNode:
-        """Return the slipped version of *node* given *slippages*.
-
-        If *node* appears as ``descriptor1`` in any slippage, the corresponding
-        ``descriptor2`` is returned.  Coattail slippages are attempted for
-        non-matching slippages.  If no slippage matches, *node* is returned
-        unchanged.
-
-        This is the primary entry point for rule translation.
-        """
-        return node.apply_slippages(slippages, rng=rng)
 
     def __repr__(self) -> str:
         active = [n for n in self.nodes.values() if n.activation > 0]

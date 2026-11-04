@@ -45,17 +45,6 @@ THEME_ACTIVATED = "theme_activated"
 CONCEPT_MAPPING_BUILT = "concept_mapping_built"
 CONCEPT_ACTIVATION = "concept_activation"
 
-# The seven event types the Trace records (§4.4).  Everything else the Workspace
-# does is below the cognitive level and is deliberately filtered out.
-COGNITIVE_EVENT_TYPES = (
-    CONCEPT_ACTIVATION,
-    GROUP_BUILT,
-    CONCEPT_MAPPING_BUILT,  # slippage events
-    RULE_BUILT,
-    ANSWER_FOUND,
-    SNAG,
-    CLAMP_START,
-)
 
 def _answer_quality_weights(meta: Any) -> list[float]:
     """``answer_quality_rule_weight`` and ``answer_quality_temperature_weight``."""
@@ -1062,32 +1051,6 @@ def _set_theme_activation(
 
 
 # ---------------------------------------------------------------------------
-# Clamp progress commentary helpers
-# ---------------------------------------------------------------------------
-
-def clamp_progress_amount_phrase(progress: float) -> str:
-    """Scheme: trace.ss ``clamp-progress-amount-phrase``."""
-    if progress == 0:
-        return "zero"
-    if progress < 50:
-        return "very little"
-    if progress < 80:
-        return "some"
-    return "a lot of"
-
-
-def clamp_progress_adjective_phrase(progress: float) -> str:
-    """Scheme: trace.ss ``clamp-progress-adjective-phrase``."""
-    if progress == 0:
-        return "a pretty useless"
-    if progress < 50:
-        return "not such a great"
-    if progress < 80:
-        return "an okay"
-    return "a pretty good"
-
-
-# ---------------------------------------------------------------------------
 # TemporalTrace
 # ---------------------------------------------------------------------------
 
@@ -1139,21 +1102,6 @@ class TemporalTrace:
         # down immediately.
         self._last_significant_event_time = event.codelet_count
 
-    def record_clamp_start(self, codelet_count: int, temperature: float) -> None:
-        self.within_clamp_period = True
-        self.last_clamp_time = codelet_count
-        self.clamp_count += 1
-        self.record_event(
-            TraceEvent(CLAMP_START, codelet_count, temperature)
-        )
-
-    def record_clamp_end(self, codelet_count: int, temperature: float) -> None:
-        self.within_clamp_period = False
-        self.last_unclamp_time = codelet_count
-        self.record_event(
-            TraceEvent(CLAMP_END, codelet_count, temperature)
-        )
-
     def record_snag(
         self, codelet_count: int, temperature: float, theme_pattern: Any = None
     ) -> None:
@@ -1193,58 +1141,12 @@ class TemporalTrace:
     # Basic queries (preserved from original)
     # ------------------------------------------------------------------
 
-    def get_recent_snags(self, window: int = 0) -> list[TraceEvent]:
-        """Return recent snag events, optionally within a time window."""
-        snags = [e for e in self.events if e.event_type == SNAG]
-        if window > 0 and snags:
-            cutoff = snags[-1].codelet_count - window
-            snags = [s for s in snags if s.codelet_count >= cutoff]
-        return snags
-
-    def get_answer_events(self) -> list[TraceEvent]:
-        return [e for e in self.events if e.event_type == ANSWER_FOUND]
-
     def time_since_last_event(self, codelet_count: int) -> int:
         """How many codelets since the last significant event."""
         return codelet_count - self._last_significant_event_time
 
     def get_events_by_type(self, event_type: str) -> list[TraceEvent]:
         return [e for e in self.events if e.event_type == event_type]
-
-    def get_theme_overlap(
-        self, events: list[TraceEvent]
-    ) -> float:
-        """Compute theme overlap across a set of events.
-
-        Returns a value 0-1 indicating how similar the theme patterns are.
-        Used by jootsing to detect repetitive failure patterns.
-        """
-        if len(events) < 2:
-            return 0.0
-        patterns = [e.theme_pattern for e in events if e.theme_pattern is not None]
-        if len(patterns) < 2:
-            return 0.0
-        # Compare each pair of patterns
-        total_overlap = 0.0
-        count = 0
-        for i in range(len(patterns)):
-            for j in range(i + 1, len(patterns)):
-                overlap = self._pattern_overlap(patterns[i], patterns[j])
-                total_overlap += overlap
-                count += 1
-        return total_overlap / count if count > 0 else 0.0
-
-    def _pattern_overlap(self, p1: Any, p2: Any) -> float:
-        """Compute overlap between two theme patterns."""
-        if p1 is None or p2 is None:
-            return 0.0
-        if isinstance(p1, dict) and isinstance(p2, dict):
-            shared_keys = set(p1.keys()) & set(p2.keys())
-            if not shared_keys:
-                return 0.0
-            matches = sum(1 for k in shared_keys if p1[k] == p2[k])
-            return matches / max(len(p1), len(p2))
-        return 0.0
 
     # ------------------------------------------------------------------
     # Clamp lifecycle — permission and state queries
@@ -1513,61 +1415,6 @@ class TemporalTrace:
         if idx < 0:
             return list(self.events)
         return self.events[idx + 1:]
-
-    def current_answer(self) -> TraceEvent | None:
-        """Check if the most recent event is an answer and return it.
-
-        Scheme: ``current-answer?`` (line 175).
-        Returns the answer event if the most recent significant event is
-        an answer event, otherwise None.
-        """
-        last_answer = self.get_last_event(ANSWER_FOUND)
-        if last_answer is None:
-            return None
-        # Check that no other significant events happened after it
-        # (Scheme checks (zero? (get-elapsed-time 'answer)), meaning
-        # the answer was the most recently added event)
-        if self.events and self.events[-1] is last_answer:
-            return last_answer
-        return None
-
-    def immediate_snag_condition(self) -> bool:
-        """True if we are in a snag period and the snag just happened.
-
-        Scheme: ``immediate-snag-condition?`` (line 179).
-        """
-        if not self.within_snag_period:
-            return False
-        last_snag = self.get_last_event(SNAG)
-        if last_snag is None:
-            return False
-        # True if the snag is the most recent event
-        return self.events[-1] is last_snag if self.events else False
-
-    def get_num_of_clamps(self, clamp_type: str) -> int:
-        """Count clamp events of a specific type.
-
-        Scheme: ``get-num-of-clamps`` (line 73).
-        """
-        count = 0
-        for event in self.events:
-            if isinstance(event, ClampEvent) and event.clamp_type == clamp_type:
-                count += 1
-            elif event.event_type == CLAMP_START:
-                # Also count plain clamp-start events if they have matching description
-                if hasattr(event, "clamp_type") and event.clamp_type == clamp_type:
-                    count += 1
-        return count
-
-    def get_elapsed_time(self, event_type: str, codelet_count: int) -> int:
-        """Codelets since the last event of a given type.
-
-        Scheme: ``get-elapsed-time`` (line 104).
-        """
-        last_event = self.get_last_event(event_type)
-        if last_event is not None:
-            return codelet_count - last_event.codelet_count
-        return codelet_count
 
     # ------------------------------------------------------------------
     # Housekeeping

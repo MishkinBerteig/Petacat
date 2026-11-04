@@ -1258,24 +1258,6 @@ class EngineRunner:
                     bridge.theme_type, dimension, relation, factor
                 )
 
-    def bottom_up_codelet_types(self) -> list[str]:
-        """The bottom-up codelet types, in posting order (``*bottom-up-codelet-types*``).
-
-        Read from the posting rules rather than held as a list literal, so a new
-        codelet type added as data is actually posted.  `PHASE 1 PLAN.md` §0.6 is
-        explicit that this is what the rest of the phase stands on: today a new type
-        arriving as a row was accepted, hashed and displayed in the admin panel and
-        never posted, because posting walked eleven strings written in Python.
-
-        Order is the seed file's, and it is load-bearing.  Each type reached here draws
-        from the run's random stream — a posting probability, and on success a count —
-        so reordering the rules is not a cosmetic change but a different engine.  The
-        seed file was reordered to match this list rather than the other way round,
-        because the list is what the oracle measured; `breaker` sat ninth in the file
-        and last in the code, and it is last here.
-        """
-        return [rule.codelet_type for rule in self.bottom_up_posting_rules()]
-
     def bottom_up_posting_rules(self) -> list[PostingRuleSpec]:
         """The bottom-up rules themselves, in posting order."""
         return [

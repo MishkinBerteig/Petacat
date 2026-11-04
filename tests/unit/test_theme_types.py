@@ -8,6 +8,7 @@ from server.engine.themes import (
     Theme,
     ThemeCluster,
 )
+from tests.support.theme_fixtures import populate
 
 
 def test_theme_type_constants_are_strings():
@@ -30,7 +31,7 @@ def test_theme_stores_string_type():
 
 
 def test_theme_cluster_stores_string_type():
-    cluster = ThemeCluster(THEME_VERTICAL_BRIDGE, "plato-direction-category", ["identity", "opposite"]).populate()
+    cluster = populate(ThemeCluster(THEME_VERTICAL_BRIDGE, "plato-direction-category", ["identity", "opposite"]))
     assert cluster.theme_type == "vertical_bridge"
     assert len(cluster.themes) == 2
     for theme in cluster.themes:
@@ -43,5 +44,5 @@ def test_theme_repr_contains_string_type():
 
 
 def test_cluster_repr_contains_string_type():
-    cluster = ThemeCluster(THEME_TOP_BRIDGE, "plato-direction-category", ["identity"]).populate()
+    cluster = populate(ThemeCluster(THEME_TOP_BRIDGE, "plato-direction-category", ["identity"]))
     assert "top_bridge" in repr(cluster)

@@ -71,16 +71,6 @@ def test_letters_returns_only_letter_objects():
     assert len(s.letters) == 3
 
 
-def test_get_object_at_returns_object_covering_position():
-    s = _string("abc")
-    assert s.get_object_at(1) is s.objects[1]
-
-
-def test_get_object_at_returns_none_beyond_the_string():
-    s = _string("abc")
-    assert s.get_object_at(9) is None
-
-
 # --- bond management -------------------------------------------------------
 
 def test_add_bond_links_adjacent_letters():
@@ -314,10 +304,3 @@ def test_clamping_a_strings_salience_is_a_no_op():
     assert s.unclamp_salience() is None
 
 
-def test_a_string_contributes_no_descriptors():
-    """``(get-all-descriptors () '())`` — workspace-strings.ss:410.
-
-    Descriptions attach to letters and groups, never to strings, and the snag
-    concept pattern asks every snag object for its descriptors.
-    """
-    assert _string("xy").get_all_descriptors() == []

@@ -331,7 +331,7 @@ class Image:
         # Swapped-image tracking (used by string-position swaps).
         self.swapped_image: Image | None = None
 
-        # Workspace object created by instantiate_as_letter / instantiate_as_group.
+        # Workspace object created by instantiate_as_group.
         self.instantiated_object: Any = None
 
     # -- state snapshot / restore ------------------------------------------
@@ -655,21 +655,6 @@ class Image:
             result.extend(sub.generate())
         return result
 
-    def instantiate_as_letter(
-        self, string: Any, position: int
-    ) -> Any:
-        """Scheme: instantiate-as-letter.
-
-        Creates a new Letter workspace object from this image's start_letter
-        and adds it to *string*.
-        """
-        from server.engine.workspace_objects import Letter
-
-        letter = Letter(string, position, self.start_letter)
-        string.objects.append(letter)
-        self.instantiated_object = letter
-        return letter
-
     def instantiate_as_group(self, string: Any) -> Any:
         """Scheme: instantiate-as-group.
 
@@ -796,24 +781,6 @@ class Image:
                 pass  # identity case
 
     # -- compatibility: old Image.matches() --------------------------------
-
-    def matches(self, other: Image) -> bool:
-        """Structural equivalence check (preserves old stub interface).
-
-        Compares two images recursively: same start_letter, same bond_facet,
-        same direction, same number and structure of sub-images.
-        """
-        if self.start_letter is not other.start_letter:
-            return False
-        if self.bond_facet is not other.bond_facet:
-            return False
-        if self.direction is not other.direction:
-            return False
-        if len(self.sub_images) != len(other.sub_images):
-            return False
-        return all(
-            s.matches(o) for s, o in zip(self.sub_images, other.sub_images)
-        )
 
     def __repr__(self) -> str:
         letter_name = getattr(self.start_letter, "short_name", "?")

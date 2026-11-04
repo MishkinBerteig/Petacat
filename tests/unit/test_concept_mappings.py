@@ -182,39 +182,6 @@ def test_distinguishing_false_for_identity_of_whole():
     assert cm.distinguishing() is False
 
 
-def test_descriptor_not_distinguishing_for_generic_category_node():
-    # plato-letter is a generic category => never distinguishing.
-    obj = FakeObject(string=FakeString())
-    assert ConceptMapping._descriptor_is_distinguishing(FakeNode("plato-letter", roles={"object.letter"}), obj) is False
-
-
-def test_descriptor_distinguishing_true_when_no_string():
-    obj = FakeObject(string=None)
-    assert ConceptMapping._descriptor_is_distinguishing(FakeNode("plato-a"), obj) is True
-
-
-def test_descriptor_not_distinguishing_when_all_siblings_share_it():
-    descriptor = FakeNode("plato-a")
-    string = FakeString()
-    obj = FakeObject(string=string)
-    sib = FakeObject(string=string)
-    from server.engine.descriptions import Description
-    sib.descriptions = [Description(sib, FakeNode("plato-letter-category"), descriptor)]
-    string.letters = [obj, sib]
-    assert ConceptMapping._descriptor_is_distinguishing(descriptor, obj) is False
-
-
-def test_descriptor_distinguishing_when_a_sibling_differs():
-    descriptor = FakeNode("plato-a")
-    string = FakeString()
-    obj = FakeObject(string=string)
-    sib = FakeObject(string=string)
-    from server.engine.descriptions import Description
-    sib.descriptions = [Description(sib, FakeNode("plato-letter-category"), FakeNode("plato-z"))]
-    string.letters = [obj, sib]
-    assert ConceptMapping._descriptor_is_distinguishing(descriptor, obj) is True
-
-
 # --- symmetry --------------------------------------------------------------
 
 def test_symmetric_mapping_of_identity_returns_self():
@@ -324,17 +291,4 @@ def test_concept_pattern_omits_label_when_absent():
 
 # --- compatibility ---------------------------------------------------------
 
-def test_compatible_when_same_type_maps_to_same_descriptor():
-    dt = FakeNode("plato-letter-category")
-    d = FakeNode("plato-a")
-    cm1 = ConceptMapping(dt, d, dt, d)
-    cm2 = ConceptMapping(dt, d, dt, d)
-    assert cm1.is_compatible(cm2) is True
 
-
-def test_incompatible_when_same_type_maps_to_different_descriptor():
-    dt = FakeNode("plato-letter-category")
-    cm1 = ConceptMapping(dt, FakeNode("plato-a"), FakeNode("plato-x"), FakeNode("plato-p"))
-    cm2 = ConceptMapping(dt, FakeNode("plato-b"), FakeNode("plato-y"), FakeNode("plato-q"))
-    # Shared description_type1 (dt) but descriptor1 differs (a vs b) => conflict.
-    assert cm1.is_compatible(cm2) is False

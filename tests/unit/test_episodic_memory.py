@@ -99,28 +99,6 @@ def test_unstored_answer_has_no_id():
 
 # --- theme distance --------------------------------------------------------
 
-def test_theme_distance_is_zero_for_two_empty_patterns():
-    mem = EpisodicMemory()
-    assert mem._theme_distance({}, {}) == 0.0
-
-
-def test_theme_distance_is_zero_for_identical_patterns():
-    mem = EpisodicMemory()
-    themes = {"direction": "opposite", "position": "rightmost"}
-    assert mem._theme_distance(dict(themes), dict(themes)) == 0.0
-
-
-def test_theme_distance_counts_each_differing_dimension():
-    mem = EpisodicMemory()
-    a = {"direction": "opposite", "position": "rightmost"}
-    b = {"direction": "same", "position": "leftmost"}
-    assert mem._theme_distance(a, b) == 2.0
-
-
-def test_theme_distance_counts_dimension_present_on_only_one_side():
-    mem = EpisodicMemory()
-    assert mem._theme_distance({"direction": "opposite"}, {}) == 1.0
-
 
 # --- answer_present: the one place memory reaches back into cognition -------
 

@@ -8,8 +8,8 @@ nothing before this module was.
 What was there instead
 ----------------------
 ``serialize_workspace_state`` is documented "for display": built structures as counts,
-no proposal levels, no descriptions, no object identity.  ``serialize_coderack_state``
-dropped every object-valued codelet argument outright —
+no proposal levels, no descriptions, no object identity.  The old ``serialize_coderack_state``
+(since removed) dropped every object-valued codelet argument outright —
 ``{k: str(v) for k, v in c.arguments.items() if not hasattr(v, '__dict__')}`` — and
 those arguments are not incidental: a live rack carries ``Bond``, ``Bridge``, ``Rule``
 and ``SlipnetNode`` values in them, so a restored rack would have held evaluators and

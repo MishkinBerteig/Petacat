@@ -17,37 +17,6 @@ if TYPE_CHECKING:
     from server.engine.workspace import Workspace
 
 
-class AnswerResult:
-    """Result of an answer-finding attempt."""
-
-    def __init__(
-        self,
-        answer_string: str | None = None,
-        top_rule: Rule | None = None,
-        bottom_rule: Rule | None = None,
-        quality: float = 0.0,
-        temperature: float = 100.0,
-        snag: bool = False,
-        snag_reason: str = "",
-    ) -> None:
-        self.answer_string = answer_string
-        self.top_rule = top_rule
-        self.bottom_rule = bottom_rule
-        self.quality = quality
-        self.temperature = temperature
-        self.snag = snag
-        self.snag_reason = snag_reason
-
-    @property
-    def found(self) -> bool:
-        return self.answer_string is not None
-
-    def __repr__(self) -> str:
-        if self.found:
-            return f"AnswerResult('{self.answer_string}', quality={self.quality:.0f})"
-        return f"AnswerResult(snag={self.snag})"
-
-
 def compute_answer_quality(
     rule_quality: float,
     temperature: float,
@@ -74,22 +43,6 @@ def get_quality_phrase(quality: float, meta: MetadataProvider) -> str:
     from server.engine.answer_comparison import quality_phrase
 
     return quality_phrase(quality, meta.commentary_templates) or "unknown"
-
-
-def get_coherence_phrase(answer: Any, meta: MetadataProvider) -> str:
-    """How coherent this answer looks, as a phrase rather than a boolean.
-
-    Scheme: ``coherence-phrase`` (``answers.ss:919-926``) — a band table the original
-    defines and never calls.  ``answer-incoherent?`` two definitions earlier
-    (``answers.ss:909-916``) is the same judgement collapsed to a boolean, and its
-    threshold tells you what the table's argument is: the signed gap between the
-    answer's rule abstractness and its theme abstractness.  §4.7.3 describes the
-    negative end of that gap for ``dyz`` — abstract themes over "a literal-minded
-    interpretation of abc => abd".
-    """
-    from server.engine.answer_comparison import coherence_phrase, coherence_score
-
-    return coherence_phrase(coherence_score(answer), meta.commentary_templates)
 
 
 # §4.7.1 footnote 18: only these vertical theme categories may appear in an

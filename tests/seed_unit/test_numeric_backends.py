@@ -47,6 +47,7 @@ from server.engine.numeric.layout import (
 from server.engine.numeric.synthetic import synthetic_state, synthetic_topology
 from server.engine.slipnet import Slipnet
 from server.engine.themes import Themespace
+from tests.support.theme_fixtures import populate
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 SEED_DIR = os.path.join(REPO_ROOT, "seed_data")
@@ -465,7 +466,7 @@ def test_theme_spreading_matches_the_cluster_loop(
     import copy
     import random
 
-    themespace = Themespace(meta).populate()
+    themespace = populate(Themespace(meta))
     rng = random.Random(7)
     for cluster in themespace.clusters:
         for theme in cluster.themes:

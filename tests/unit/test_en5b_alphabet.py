@@ -69,14 +69,6 @@ def test_the_numbers_equal_the_old_ladder(slipnet) -> None:
     assert alphabet.unit_length_node is slipnet.nodes["plato-one"]
 
 
-def test_is_letter_and_is_number_equal_the_old_name_tests(slipnet) -> None:
-    alphabet = slipnet.alphabet
-    letters = {n for n in slipnet.nodes if alphabet.is_letter(slipnet.nodes[n])}
-    numbers = {n for n in slipnet.nodes if alphabet.is_number(slipnet.nodes[n])}
-    assert letters == set(LETTER_NODES)
-    assert numbers == set(NUMBER_NODES)
-
-
 def test_the_non_distinguishing_set_equals_the_old_set(slipnet) -> None:
     found = {n for n, node in slipnet.nodes.items() if _is_generic_descriptor(node)}
     assert found == OLD_NON_DISTINGUISHING

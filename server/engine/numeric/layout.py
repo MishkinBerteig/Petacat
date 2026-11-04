@@ -117,11 +117,6 @@ class ActivationParams:
 #: construct directly.
 DEFAULT_ACTIVATION = ActivationParams()
 
-#: The *defaults*, not the values in force.  Retained because they are imported by
-#: name; anything holding a topology or a node reads those instead.
-MAX_ACTIVATION = DEFAULT_ACTIVATION.max_activation
-FULL_ACTIVATION_THRESHOLD = DEFAULT_ACTIVATION.full_activation_threshold
-
 
 # ---------------------------------------------------------------------------
 # Slipnet

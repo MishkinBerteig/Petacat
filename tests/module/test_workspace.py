@@ -238,11 +238,9 @@ def test_check_if_rules_possible_stores_its_verdict(slipnet):
     w.check_if_rules_possible()
     assert w.top_rule_possible is False
     assert w.get_possible_rule_types() == []
-    assert w.rule_possible("top") is False
 
     w.top_rule_possible = True
     assert w.get_possible_rule_types() == ["top"]
-    assert w.rule_possible("top") is True
 
 
 def test_rule_factor_wants_a_rule_both_possible_and_supported(slipnet):

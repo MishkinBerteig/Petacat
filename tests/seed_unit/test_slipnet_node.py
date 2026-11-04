@@ -105,18 +105,6 @@ def test_clamp_initially_relevant(slipnet, meta):
     assert lc.activation == 100.0
 
 
-def test_reset_clears_node_activation(slipnet):
-    slipnet.get_node("plato-a").activation = 50
-    slipnet.reset_activations()
-    assert slipnet.get_node("plato-a").activation == 0
-
-
-def test_reset_releases_clamped_node(slipnet):
-    slipnet.get_node("plato-b").clamp(10)
-    slipnet.reset_activations()
-    assert not slipnet.get_node("plato-b").frozen
-
-
 def test_partially_active_node_does_not_spread_at_high_threshold(slipnet):
     """A node at 50 activation must not spread when the threshold is 100."""
     succ = slipnet.get_node("plato-successor")
@@ -196,9 +184,9 @@ def test_shipped_middle_predicate_is_the_group_aware_one(slipnet):
     rr = _group_over(string, 1, 2)
     jjj = _group_over(string, 3, 5)
 
-    assert middle.describes(rr) is True
-    assert middle.describes(jjj) is False
-    assert middle.describes(string.letters[0]) is False
+    assert middle.descriptor_predicate(rr) is True
+    assert middle.descriptor_predicate(jjj) is False
+    assert middle.descriptor_predicate(string.letters[0]) is False
 
 
 def test_shipped_middle_predicate_says_no_to_the_centre_of_five(slipnet):
@@ -210,13 +198,13 @@ def test_shipped_middle_predicate_says_no_to_the_centre_of_five(slipnet):
     """
     middle = slipnet.get_node("plato-middle")
     string = _string_with_letters(5)
-    assert middle.describes(string.letters[2]) is False
+    assert middle.descriptor_predicate(string.letters[2]) is False
 
 
 def test_shipped_middle_predicate_says_yes_to_the_centre_of_three(slipnet):
     middle = slipnet.get_node("plato-middle")
     string = _string_with_letters(3)
-    assert middle.describes(string.letters[1]) is True
+    assert middle.descriptor_predicate(string.letters[1]) is True
 
 
 def test_shipped_leftmost_and_rightmost_predicates_exclude_a_spanning_group(slipnet):
@@ -230,10 +218,10 @@ def test_shipped_leftmost_and_rightmost_predicates_exclude_a_spanning_group(slip
     string = _string_with_letters(3)
     whole = _group_over(string, 0, 2)
 
-    assert leftmost.describes(whole) is False
-    assert rightmost.describes(whole) is False
-    assert leftmost.describes(string.letters[0]) is True
-    assert rightmost.describes(string.letters[2]) is True
+    assert leftmost.descriptor_predicate(whole) is False
+    assert rightmost.descriptor_predicate(whole) is False
+    assert leftmost.descriptor_predicate(string.letters[0]) is True
+    assert rightmost.descriptor_predicate(string.letters[2]) is True
 
 
 # ---------------------------------------------------------------------------

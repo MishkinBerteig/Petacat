@@ -93,7 +93,7 @@ def test_absent_is_node_shaped() -> None:
     assert a.get_related_node("anything") is None
     assert a.roles == frozenset() and not a.has_role("dimension.length")
     assert a.category is None and a.descriptor_predicate is None
-    assert not a.describes(object()) and not a.description_possible(object())
+    assert not a.description_possible(object())
     a.decay(); a.clamp(); a.unclamp(); a.tick_clamp(); a.activate_from_workspace()
     assert a.activation == 0  # the mutators do nothing
     assert "dimension.length" in a.name and "dimension.length" in repr(a)

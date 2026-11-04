@@ -97,14 +97,6 @@ class WorkspaceStructure:
         return cls._themespace
 
     @property
-    def is_proposed(self) -> bool:
-        return self.proposal_level == self.PROPOSED
-
-    @property
-    def is_evaluated(self) -> bool:
-        return self.proposal_level == self.EVALUATED
-
-    @property
     def is_built(self) -> bool:
         return self.proposal_level == self.BUILT
 

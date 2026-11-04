@@ -564,13 +564,8 @@ for _ in range(400):
 ctx = runner.ctx
 workspace = serialization.serialize_workspace_state(ctx)
 state = {
-    "rng": serialization.serialize_rng_state(ctx),
     "workspace": workspace,
-    "slipnet": serialization.serialize_slipnet_state(ctx),
-    "coderack": serialization.serialize_coderack_state(ctx),
     "themespace": serialization.serialize_themespace_state(ctx),
-    "trace": serialization.serialize_trace_state(ctx),
-    "runner": serialization.serialize_runner_state(ctx),
 }
 blob = json.dumps(state)
 

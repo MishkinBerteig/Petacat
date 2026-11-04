@@ -222,9 +222,6 @@ class MetadataProvider:
     def get_formula_coeff(self, name: str) -> int | float | Fraction:
         return self.formula_coefficients[name]
 
-    def get_codelet_spec(self, name: str) -> CodeletSpec:
-        return self.codelet_specs[name]
-
     @classmethod
     def from_standard_configuration(cls, seed_dir: str) -> MetadataProvider:
         """Load metadata from seed_data/ JSON files (no DB needed)."""

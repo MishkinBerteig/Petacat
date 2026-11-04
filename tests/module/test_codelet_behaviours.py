@@ -1804,7 +1804,7 @@ class TestWorkspaceToThemespace:
         runner._spread_activation_to_themespace()
 
         # Check some theme was boosted (theme pattern has letter-category:identity)
-        pattern = bridge.get_theme_pattern()
+        pattern = dict(bridge.get_associated_thematic_relations())
         assert len(pattern) > 0  # Bridge has a theme pattern
 
 

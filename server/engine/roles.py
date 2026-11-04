@@ -151,9 +151,6 @@ class Absent:
     def get_related_node(self, relation: Any) -> None:
         return None
 
-    def describes(self, obj: Any) -> bool:
-        return False
-
     def description_possible(self, obj: Any) -> bool:
         return False
 
