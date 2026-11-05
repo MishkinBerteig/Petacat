@@ -105,7 +105,7 @@ async function editCell(text: string | RegExp, value: string) {
 describe('DemoEditor — demo problems', () => {
   const demo = {
     id: 3, name: 'abc-xyz', section: '2.1', initial: 'abc', modified: 'abd',
-    target: 'xyz', answer: null, seed: 7, mode: 'discovery', description: '',
+    target: 'xyz', answer: null, seed: 7, description: '',
   }
 
   it('updates a demo, carrying the whole row the API asks for', async () => {
@@ -200,7 +200,7 @@ describe('EditableTable — opening a cell selects its value', () => {
     // A text column: a number input has no selection range to read back in a browser.
     serve([{
       id: 3, name: 'abc-xyz', section: '2.1', initial: 'abc', modified: 'abd',
-      target: 'xyz', answer: null, seed: 7, mode: 'discovery', description: '',
+      target: 'xyz', answer: null, seed: 7, description: '',
     }])
     render(<DemoEditor />)
 
@@ -730,7 +730,7 @@ describe('A refused delete leaves the row where it is', () => {
   it('keeps the demo listed, with the reason it is still there', async () => {
     const demo = {
       id: 3, name: 'abc-xyz', section: '2.1', initial: 'abc', modified: 'abd',
-      target: 'xyz', answer: null, seed: 7, mode: 'discovery', description: '',
+      target: 'xyz', answer: null, seed: 7, description: '',
     }
     stubFetch((_url, init) =>
       method(init) === 'DELETE'

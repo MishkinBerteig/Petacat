@@ -44,7 +44,6 @@ def no_overrides(monkeypatch):
     """Clear every environment variable this module reads."""
     for name in (
         hardware.ENV_WORKERS,
-        hardware.ENV_SHARDS,
         hardware.ENV_POPULATION_WORKERS,
         hardware.ENV_GPU_CORES,
         hardware.ENV_GPU_THREADS_PER_CORE,
@@ -103,11 +102,10 @@ def test_on_macos_it_reads_the_performance_and_efficiency_split(no_overrides):
 
 
 def test_the_derived_sizes_are_all_positive_and_internally_consistent(no_overrides):
-    """Every size follows from the machine, and the shard count follows the workers."""
+    """Every size follows from the machine."""
     derived = hardware.derived_sizes()
 
     assert derived["workers"] == hardware.worker_count()
-    assert derived["coderack_shards"] == hardware.shard_count(derived["workers"])
     assert derived["population_workers"] == hardware.population_worker_count()
     assert all(value >= 1 for value in derived.values())
     assert derived["gpu_target_threads"] >= derived["gpu_cores"]
@@ -174,13 +172,6 @@ def test_a_single_performance_level_is_all_performance_cores(no_overrides, monke
     assert cpu.performance_cores == 16
     assert cpu.efficiency_cores == 0
     assert hardware.worker_count() == 16
-
-
-def test_shards_are_one_per_worker_with_a_floor_of_two(no_overrides):
-    assert hardware.shard_count(24) == 24
-    assert hardware.shard_count(4) == 4
-    assert hardware.shard_count(1) == hardware.MIN_SHARDS
-    assert hardware.shard_count() == max(hardware.MIN_SHARDS, hardware.worker_count())
 
 
 def test_the_gpu_thread_target_scales_with_the_gpu(no_overrides, monkeypatch):
@@ -293,11 +284,6 @@ def test_the_worker_count_can_be_pinned_by_the_environment(no_overrides, monkeyp
 
     monkeypatch.setenv(hardware.ENV_WORKERS, "3")
     assert hardware.worker_count() == 3
-    # The shard count follows the workers it is given, and can be pinned separately.
-    assert hardware.shard_count() == 3
-    monkeypatch.setenv(hardware.ENV_SHARDS, "7")
-    assert hardware.shard_count() == 7
-    assert hardware.shard_count(2) == 7
 
 
 def test_the_population_pool_and_gpu_sizes_can_be_pinned(no_overrides, monkeypatch):
@@ -350,7 +336,7 @@ def test_overrides_in_force_reports_exactly_what_is_set(no_overrides, monkeypatc
 
 
 def test_the_free_running_engine_sizes_itself_from_the_machine(no_overrides):
-    """``workers=None`` is the machine's count, and the shards follow it."""
+    """``workers=None`` is the machine's count."""
     from server.parallel.free_running import FreeRunningEngine
     from server.engine.metadata import MetadataProvider
     from server.engine.runner import EngineRunner
@@ -363,10 +349,8 @@ def test_the_free_running_engine_sizes_itself_from_the_machine(no_overrides):
     runner = EngineRunner(MetadataProvider.from_standard_configuration(seed_dir))
     engine = FreeRunningEngine(runner)
     assert engine.workers == hardware.worker_count()
-    assert engine.shards == hardware.shard_count(engine.workers)
 
-    pinned = FreeRunningEngine(runner, workers=2, shards=3)
-    assert (pinned.workers, pinned.shards) == (2, 3)
+    assert FreeRunningEngine(runner, workers=2).workers == 2
 
 
 def test_the_machine_serialises_to_a_plain_dict(no_overrides):

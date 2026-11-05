@@ -40,8 +40,6 @@ ANSWER_FOUND = "answer_found"
 SNAG = "snag"
 CLAMP_START = "clamp_start"
 CLAMP_END = "clamp_end"
-JOOTSING = "jootsing"
-THEME_ACTIVATED = "theme_activated"
 CONCEPT_MAPPING_BUILT = "concept_mapping_built"
 CONCEPT_ACTIVATION = "concept_activation"
 
@@ -1179,8 +1177,8 @@ class TemporalTrace:
     def permission_to_clamp(
         self,
         self_watching_enabled: bool = True,
-        codelet_count: int = 0,
         *,
+        codelet_count: int,
         grace_period: int,
     ) -> bool:
         """Return True if a new clamp period is permitted.
@@ -1233,7 +1231,7 @@ class TemporalTrace:
         self,
         themespace: Themespace,
         slipnet: Slipnet,
-        codelet_count: int = 0,
+        codelet_count: int,
         coderack: Any = None,
     ) -> float:
         """Deactivate the last clamp event and return progress achieved.

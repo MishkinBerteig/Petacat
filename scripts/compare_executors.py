@@ -50,7 +50,7 @@ def _problems(only: set[str] | None, include_justify: bool) -> list[tuple]:
     demo = json.load(open(os.path.join(ROOT, "seed_data", "demo_problems.json")))
     seen, out = set(), []
     for p in demo:
-        justify = p["mode"] == "justification"
+        justify = p.get("answer") is not None
         if justify and not include_justify:
             continue
         key = (p["initial"], p["modified"], p["target"], p.get("answer") if justify else None)

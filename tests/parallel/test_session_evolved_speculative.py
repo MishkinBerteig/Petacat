@@ -37,7 +37,7 @@ def problems() -> list[tuple]:
         demo = json.load(f)
     seen, out = set(), []
     for p in demo:
-        key = (p["initial"], p["modified"], p["target"], p.get("answer") if p["mode"] == "justification" else None)
+        key = (p["initial"], p["modified"], p["target"], p.get("answer"))
         if key not in seen:
             seen.add(key)
             out.append(key)

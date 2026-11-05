@@ -408,7 +408,6 @@ def capture_run_state(ctx: Any) -> dict:
             "justify_mode": ctx.justify_mode,
             "self_watching_enabled": ctx.self_watching_enabled,
             "spreading_activation_threshold": ctx.spreading_activation_threshold,
-            "staleness_delay": ctx.staleness_delay,
         },
         # The run parameters this Run actually resolved.  A capture that omitted them
         # could only be re-executed against whatever the *global* configuration happened
@@ -659,4 +658,3 @@ def restore_run_state(runner: Any, state: dict) -> None:
     ctx.justify_mode = runner_state["justify_mode"]
     ctx.self_watching_enabled = runner_state["self_watching_enabled"]
     ctx.spreading_activation_threshold = runner_state["spreading_activation_threshold"]
-    ctx.set_staleness_delay(runner_state["staleness_delay"])

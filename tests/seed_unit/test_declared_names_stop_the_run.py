@@ -3,8 +3,8 @@
 ``server/engine/start_check.py`` lists every parameter, formula coefficient and urgency level
 the engine reads.  For each declared name, the Metacat Standard Configuration without it gives a
 ``check_run_start`` problem naming it; and the run-start check comes first on each path that
-starts a run (the engine, a Metacat Mode run, a swarm call, a Training Mode Session dispatch,
-a population), so the message is the check's and never a ``KeyError`` or a failed outcome.
+starts a run (the engine, a Metacat Mode run, a swarm call, a Training Mode Session dispatch),
+so the message is the check's and never a ``KeyError`` or a failed outcome.
 """
 
 from __future__ import annotations
@@ -157,19 +157,3 @@ def test_a_training_mode_dispatch_stops_at_the_executor(meta) -> None:
         assert not executor._pools, "no child process was started"
     finally:
         executor.close()
-
-
-def test_a_population_stops_before_it_reads_the_update_cycle(meta) -> None:
-    from server.parallel.population import run_population_batched
-
-    with pytest.raises(RunStartError, match="update_cycle_length"):
-        run_population_batched(
-            ("abc", "abd", "xyz"), 2, meta=_without(meta, "parameter", "update_cycle_length")
-        )
-
-
-def test_a_sharded_coderack_stops_before_it_reads_the_capacity(meta) -> None:
-    from server.parallel.coderack_shards import FamilyShardedCoderack
-
-    with pytest.raises(RunStartError, match="max_coderack_size"):
-        FamilyShardedCoderack(_without(meta, "parameter", "max_coderack_size"), 2)

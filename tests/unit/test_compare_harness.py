@@ -205,7 +205,7 @@ def test_a_parameter_override_keeps_the_type_the_seed_data_ships(harness):
     else.
     """
     assert harness._parse_param("max_coderack_size=200") == ("max_coderack_size", 200)
-    assert harness._parse_param("min_shard_capacity=50") == ("min_shard_capacity", 50)
+    assert harness._parse_param("num_coderack_bins=8") == ("num_coderack_bins", 8)
 
     name, value = harness._parse_param("verbatim_rule_probability=0.25")
     assert (name, value) == ("verbatim_rule_probability", 0.25)
@@ -249,10 +249,10 @@ def test_overrides_reach_the_provider_the_runs_are_built_from(harness, monkeypat
     # the variable first and puts it back afterwards.
     monkeypatch.setenv("PETACAT_NUMERIC_BACKEND", os.environ.get("PETACAT_NUMERIC_BACKEND", "auto"))
     monkeypatch.setattr("server.engine.numeric.backend._POLICY", None)
-    harness._init("numpy", {"max_coderack_size": 600, "min_shard_capacity": 50})
+    harness._init("numpy", {"max_coderack_size": 600, "num_coderack_bins": 8})
     try:
         assert harness._META.get_param("max_coderack_size") == 600
-        assert harness._META.get_param("min_shard_capacity") == 50
+        assert harness._META.get_param("num_coderack_bins") == 8
         # Everything else is still the shipped configuration.
         assert len(harness._META.posting_rules) == 17
     finally:

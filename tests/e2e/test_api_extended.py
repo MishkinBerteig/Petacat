@@ -622,7 +622,7 @@ _WRITABLE_COLLECTIONS = [
         "demos", "id",
         {
             "name": "e2e demo", "section": "test", "initial": "abc", "modified": "abd",
-            "target": "pqr", "answer": None, "seed": 3, "mode": "discovery",
+            "target": "pqr", "answer": None, "seed": 3,
             "description": "created by a test",
         },
         "name", "e2e demo renamed",
@@ -955,7 +955,7 @@ async def test_admin_list_enum_tables(app_client):
     resp = await app_client.get("/api/admin/enums")
     assert resp.status_code == 200
     data = resp.json()
-    assert len(data["tables"]) == 14
+    assert len(data["tables"]) == 13
     assert "run_statuses" in data["tables"]
     assert "event_types" in data["tables"]
 
@@ -977,10 +977,10 @@ async def test_admin_enum_values_event_types(app_client):
     resp = await app_client.get("/api/admin/enums/event_types")
     assert resp.status_code == 200
     data = resp.json()
-    # 17: the 16 original types plus concept_activation, one of the seven
+    # 15: the 14 types the engine records plus concept_activation, one of the seven
     # Temporal Trace event types of §4.4.  trace_events.event_type is a foreign
     # key onto this table, so every type the engine emits must appear here.
-    assert len(data) == 17
+    assert len(data) == 15
     names = {v["name"] for v in data}
     assert "bond_built" in names
     assert "snag" in names

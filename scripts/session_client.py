@@ -62,7 +62,7 @@ def problem_stream(path: str | None):
             for d in json.load(fh):
                 p = {"initial": d["initial"], "modified": d["modified"], "target": d["target"],
                      "tag": {"demo": d["name"]}}
-                if d["mode"] == "justification":
+                if d.get("answer") is not None:
                     p["answer"] = d["answer"]
                 if fresh(p):
                     yield p

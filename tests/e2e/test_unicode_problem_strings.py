@@ -167,7 +167,7 @@ async def test_metacat_mode_runs_with_unicode_strings_store_and_return_them_exac
 
 @pytest.mark.asyncio
 async def test_demo_problems_take_any_unicode_text(app_client, test_engine):
-    p = {"name": "unicode demo " + "n" * 100, "section": "s" * 50, "initial": "a b\nc", "modified": "x" * 500, "target": "漢字 😀", "answer": "é\t", "mode": "justification"}
+    p = {"name": "unicode demo " + "n" * 100, "section": "s" * 50, "initial": "a b\nc", "modified": "x" * 500, "target": "漢字 😀", "answer": "é\t"}
     resp = await app_client.post("/api/admin/demos", json=p)
     assert resp.status_code == 201, resp.text
     demo_id = resp.json()["id"]

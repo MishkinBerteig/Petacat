@@ -117,7 +117,6 @@ async def test_the_derived_sizes_agree_with_the_engine_that_uses_them(app_client
     derived = data["derived"]
 
     assert derived["workers"] == hardware.worker_count()
-    assert derived["coderack_shards"] == hardware.shard_count(derived["workers"])
     assert derived["population_workers"] == hardware.population_worker_count()
     assert derived["gpu_target_threads"] == hardware.gpu_target_threads()
     assert derived["overrides"] == hardware.overrides_in_force()

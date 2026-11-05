@@ -38,7 +38,6 @@ from server.models.metadata import (
     CodeletTypeDef,
     CodeletTypeRole,
     CommentaryTemplate,
-    DemoModeDef,
     DemoProblem as DemoProblemRow,
     EngineParam,
     EventTypeDef,
@@ -76,7 +75,6 @@ ENUM_TABLE_MODELS: dict[str, Any] = {
     "codelet_phases": CodeletPhaseDef,
     "posting_directions": PostingDirectionDef,
     "param_value_types": ParamValueTypeDef,
-    "demo_modes": DemoModeDef,
 }
 
 #: Each provider field, and the configuration tables it is built from.  A change to a table
@@ -223,7 +221,6 @@ def _field_demo_problems(tables: Mapping[str, Any]) -> list[DemoProblem]:
             target=r["target"],
             answer=r.get("answer"),
             seed=r["seed"],
-            mode=r["mode"],
             description=r.get("description") or "",
         )
         for r in _rows(tables["demo_problems"])
@@ -328,35 +325,37 @@ async def load_rows_from_db(session: AsyncSession) -> dict[str, list[dict[str, A
     ``role`` is ordered by byte value (``COLLATE "C"``) so the order does not depend on the
     database's locale.
     """
-    queries = {
-        "slipnet_node_defs": select(SlipnetNodeDef).order_by(SlipnetNodeDef.sort_order),
-        "slipnet_link_defs": select(SlipnetLinkDef).order_by(SlipnetLinkDef.sort_order, SlipnetLinkDef.id),
-        "codelet_type_defs": select(CodeletTypeDef).order_by(CodeletTypeDef.sort_order),
-        "engine_params": select(EngineParam).order_by(EngineParam.sort_order, EngineParam.name),
-        "urgency_levels": select(UrgencyLevel).order_by(UrgencyLevel.sort_order, UrgencyLevel.name),
-        "formula_coefficients": select(FormulaCoefficient).order_by(
-            FormulaCoefficient.sort_order, FormulaCoefficient.name
-        ),
-        "posting_rules": select(PostingRule).order_by(PostingRule.sort_order, PostingRule.id),
-        "commentary_templates": select(CommentaryTemplate).order_by(CommentaryTemplate.id),
-        "demo_problems": select(DemoProblemRow).order_by(DemoProblemRow.id),
-        "theme_dimension_defs": select(ThemeDimensionDef).order_by(ThemeDimensionDef.id),
-        "slipnet_layout": select(SlipnetLayoutPos).order_by(
-            SlipnetLayoutPos.sort_order, SlipnetLayoutPos.node_name
-        ),
-        "codelet_pattern_defs": select(CodeletPatternDef).order_by(
-            CodeletPatternDef.ordinal, CodeletPatternDef.id
-        ),
-        "slipnet_node_roles": select(SlipnetNodeRole).order_by(
-            SlipnetNodeRole.role.collate("C"), SlipnetNodeRole.ordinal
-        ),
-        "codelet_type_roles": select(CodeletTypeRole).order_by(
-            CodeletTypeRole.role.collate("C"), CodeletTypeRole.ordinal
-        ),
-        "theme_relations": select(ThemeRelation).order_by(ThemeRelation.ordinal, ThemeRelation.name),
+    from server.services.config_registry import LAYER_REGISTRY
+
+    # Every table with order columns is ordered by its total order (``TableSpec.order_by``): the
+    # order columns, then the rest of the natural key, which a ``ConfigDocument`` sorts by too.
+    # A table with no order columns keeps insertion order (``id``), which a document also keeps.
+    insertion_order = {
+        "commentary_templates": CommentaryTemplate,
+        "demo_problems": DemoProblemRow,
+        "theme_dimension_defs": ThemeDimensionDef,
     }
-    for table_name, model in ENUM_TABLE_MODELS.items():
-        queries[table_name] = select(model).order_by(model.sort_order, model.name)
+    models = {
+        "slipnet_node_defs": SlipnetNodeDef,
+        "slipnet_link_defs": SlipnetLinkDef,
+        "codelet_type_defs": CodeletTypeDef,
+        "engine_params": EngineParam,
+        "urgency_levels": UrgencyLevel,
+        "formula_coefficients": FormulaCoefficient,
+        "posting_rules": PostingRule,
+        "slipnet_layout": SlipnetLayoutPos,
+        "codelet_pattern_defs": CodeletPatternDef,
+        "slipnet_node_roles": SlipnetNodeRole,
+        "codelet_type_roles": CodeletTypeRole,
+        "theme_relations": ThemeRelation,
+        **ENUM_TABLE_MODELS,
+    }
+    queries = {
+        name: select(model).order_by(*LAYER_REGISTRY[name].order_by())
+        for name, model in models.items()
+    }
+    for name, model in insertion_order.items():
+        queries[name] = select(model).order_by(model.id)
     tables: dict[str, list[dict[str, Any]]] = {}
     for table_name, query in queries.items():
         result = await session.execute(query)

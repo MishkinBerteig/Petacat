@@ -12,7 +12,7 @@ Two things in the serial loop are barriers by nature, and they are treated diffe
 **The update cycle** — recomputing strengths, saliences, activations and temperature
 every fifteen codelets — is *not* stopped for.  Whichever worker crosses the boundary
 runs it while the others keep executing.  That is deliberately the staleness WP0.5
-measured: during an update, other codelets read values mid-recomputation.  WP0.5 put the
+measured (with a serial read-lag probe, since removed): during an update, other codelets read values mid-recomputation.  WP0.5 put the
 tolerance at **five codelets** of read lag before convergence starts to suffer, and one
 update cycle overlapping a handful of codelets sits inside that budget.
 
@@ -129,15 +129,13 @@ class FreeRunningEngine:
         self,
         runner: EngineRunner,
         workers: int | None = None,
-        shards: int | None = None,
     ) -> None:
         self.runner = runner
-        # ``None`` asks the machine: one worker per performance core, one shard
-        # per worker.  Both are stated in ``server.engine.hardware``, along with
-        # the environment variables that pin them, so a run on a 32-core machine
-        # uses 32 cores and a run on an 8-core machine is not asked to.
+        # ``None`` asks the machine: one worker per performance core.  That is
+        # stated in ``server.engine.hardware``, along with the environment variable
+        # that pins it, so a run on a 32-core machine uses 32 cores and a run on an
+        # 8-core machine is not asked to.
         self.workers = max(1, workers if workers is not None else hardware.worker_count())
-        self.shards = shards if shards is not None else hardware.shard_count(self.workers)
 
         # Reentrant, and it has to be.  ``build_structure`` takes the commit lock and
         # then calls ``break_structure`` for each opponent it defeats, and
@@ -159,9 +157,8 @@ class FreeRunningEngine:
         #: the requested width and therefore describes workers that never existed.
         #:
         #: ``Event.wait`` releases the GIL, which is exactly what lets the main thread
-        #: finish its ``start()`` loop.  Same discipline as
-        #: ``scripts/bench_shards.py::measure_contention``'s barrier, as an Event set
-        #: by the owner rather than a ``Barrier`` a dying worker could break.
+        #: finish its ``start()`` loop.  It is an Event set by the
+        #: owner rather than a ``Barrier`` a dying worker could break.
         self._all_started = threading.Event()
         self._conflicts = 0
         self._discarded = 0
@@ -356,7 +353,7 @@ class FreeRunningEngine:
                     step = self._finish_codelet()
 
                 # The update cycle runs *without stopping the other workers*, which is
-                # the staleness WP0.5 bounded at five codelets. Whichever worker crosses
+                # the staleness WP0.5 bounded at five codelets (see ``PHASE 0 PLAN.md``). Whichever worker crosses
                 # the boundary runs it.
                 if step % update_cycle == 0:
                     with self._commit_lock:
@@ -466,11 +463,10 @@ def run_free(
     runner: EngineRunner,
     workers: int | None = None,
     max_steps: int = 0,
-    shards: int | None = None,
 ) -> FreeRunResult:
     """Convenience: execute a prepared runner free-running and return the telemetry.
 
     ``workers=None`` takes the machine's own count — see
     :func:`server.engine.hardware.worker_count`.
     """
-    return FreeRunningEngine(runner, workers=workers, shards=shards).run(max_steps)
+    return FreeRunningEngine(runner, workers=workers).run(max_steps)

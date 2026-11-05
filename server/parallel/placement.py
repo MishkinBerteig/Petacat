@@ -270,11 +270,6 @@ def start_method(backend: str | None = None) -> str:
     return "forkserver"
 
 
-def safe_to_fork() -> bool:
-    """False once this process has imported ``mlx.core`` (and so possibly Metal)."""
-    return "mlx.core" not in sys.modules
-
-
 def worker_environment(backend: str) -> dict[str, str]:
     """Environment entries a worker must carry so the engine uses *backend*.
 

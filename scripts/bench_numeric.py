@@ -138,7 +138,7 @@ def measure_scaling(
 ) -> list[dict[str, Any]]:
     from server.engine.metadata import MetadataProvider
     from server.engine.numeric.layout import ActivationParams
-    from server.engine.numeric.synthetic import (
+    from tests.support.synthetic_slipnet import (
         REAL_LINKS_PER_NODE,
         synthetic_state,
         synthetic_topology,

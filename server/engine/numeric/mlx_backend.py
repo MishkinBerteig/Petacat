@@ -23,23 +23,22 @@ summed, so the quantity float32 has to represent accurately is an integer no
 larger than a few million, which it represents exactly.  The error that remains
 enters through the decayed activation, not through the reduction.
 
-A trap worth naming: Python scalars go through float32
-------------------------------------------------------
-Mixing a Python ``float`` into an MLX expression does not give it the array's
-precision.  ``mx.array([...], dtype=mx.float64) / 7.08e-48`` evaluates to ``inf``,
-because the scalar is converted to float32 first and 7.08e-48 is below float32's
-smallest denormal.  This is not a float32-versus-float64 issue in the sense the
-section above describes — it bites on the *CPU* backend too, which is nominally
-exact.
+What float32 does and does not do here (measured on MLX 0.32.1)
+----------------------------------------------------------------
+float32 flushes values below about 1.2e-38 to zero on the GPU (``1e-40 * 1.0`` is ``0.0``).
+That cannot happen in Metacat Mode: the smallest non-zero value ever sent to the GPU is 1.0
+(activations, buffers, unhappiness, theme activations) or 18.0 (structure-strength inputs),
+because relative importance is computed on the host in float64 from exact integer ratios
+(``layout.relative_importances``) and the raw importance sums that reach 1e-48 never leave the
+host.  A float64 array divided by a Python scalar such as ``7.08e-48`` is correct on this MLX
+version; the older behaviour, where the scalar went through float32 first, no longer applies
+to float64 arrays.  A bare Python ``float`` mixed into a float32 expression is still float32.
 
-It cost a real defect.  ``round(100 * raw_importance / Σraw)`` is an ordinary
-ratio between 0 and 100, but its operands are sums of decayed descriptor
-activations and reach 1e-48 in normal running; the denominator flushed to zero and
-every relative importance became ``inf``.  Relative importance is now computed on
-the host in float64 (``layout.relative_importances``), so nothing outside [0, 100]
-ever reaches a device.  The general rule this leaves behind: keep reductions
-*inside* the array expression, and treat any Python scalar crossing into MLX as
-though it were float32, because it is.
+Exactness therefore rests on the values, not on the arithmetic: whole activations and buffers,
+a float32-exact ``max_activation`` no larger than 2^20, a ``full_activation_threshold`` that
+float32 rounding does not move across a whole number, and a spread scale that float32 represents
+exactly (``backend.float32_exactness_problem`` states and measures each).  ``exact_backend_for`` refuses a configuration that
+breaks those conditions (see ``backend.exact_backend_for``).
 
 The host round trip that cannot be avoided
 ------------------------------------------
@@ -277,6 +276,11 @@ class MlxSlipnetSession(SlipnetSession):
     def apply_jumps(self, indices: Sequence[int]) -> None:
         if not len(indices):
             return
+        # ``update-activation`` (slipnet.ss:147-151) is a no-op on a frozen node.
+        frozen = np.array(self.frozen, copy=False)
+        indices = [i for i in indices if not frozen[i]]
+        if not indices:
+            return
         with mx.stream(self.device):
             self.activation[mx.array(list(indices), dtype=mx.int32)] = mx.array(
                 self._max_activation, dtype=self.dtype
@@ -330,6 +334,16 @@ class MlxBackend(Backend):
         if c == 0 or s == 0:
             return
         dt = self.dtype
+        if dt == mx.float32:
+            # The theme update rounds ``20 * tanh(...)``; its margin from a ``.5`` boundary
+            # was measured at 3.9e-4 in real runs and 9.3e-6 over a generous domain, which is
+            # a few float32 ulps, so a float32 result is not proven equal to float64's.  The
+            # work is a 27-element vector, dispatch-bound on any device, so the float64 host
+            # implementation costs nothing worth having.
+            from server.engine.numeric import get_backend
+
+            get_backend("python").spread_themes(layout, state, params)
+            return
         with mx.stream(self.device):
             act = mx.array(state.activation, dtype=dt).reshape(c, s)
             valid = mx.array(

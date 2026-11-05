@@ -129,9 +129,6 @@ export interface RunParametersView {
     status?: string;
     justify_mode?: boolean;
     slipnet_nodes?: number;
-    coderack_shards?: number;
-    coderack_capacity_per_shard?: number;
-    staleness_delay?: number;
     numeric_backend?: string | null;
     numeric_device?: string | null;
     parallel?: ParallelTelemetry;
@@ -228,7 +225,6 @@ export interface DetectedMachine {
 export interface DerivedSizes {
   /** Free-running worker threads: one per performance core. */
   workers: number;
-  coderack_shards: number;
   population_workers: number;
   gpu_cores: number;
   gpu_target_threads: number;
@@ -684,7 +680,6 @@ export interface DemoProblem {
   target: string;
   answer: string | null;
   seed: number;
-  mode: string;
   description: string;
 }
 

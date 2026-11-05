@@ -35,9 +35,7 @@ What lives here
     barrier.  Measurably changes cognition (``abce`` 15.0% serially, 9.3% at six
     workers), so the service no longer uses it; kept as the comparison point.
 ``coderack_shards``
-    The locked rack free-running installs, and the sharded benchmark candidates.
-``population``
-    K independent runs across a process pool, and the lockstep batching seam.
+    The locked rack free-running installs.
 """
 
 from __future__ import annotations

@@ -656,7 +656,7 @@ class SpeculativeEngine:
 
     def _eligible_run(self) -> bool:
         ctx = self.runner.ctx
-        return not (ctx.verbose or ctx.track_access or ctx.staleness_delay
+        return not (ctx.verbose or ctx.track_access
                     or ctx.commit_lock is not None)
 
     def install(self) -> None:
@@ -1118,6 +1118,10 @@ class SpeculativeEngine:
                             self._stale[codelet.id] = spec
                             tele["timeouts"] += 1
                             tele["inline"] += 1
+                            # The worker may still be inside its prefix: let it restore its
+                            # own private mutations and leave before the step runs inline,
+                            # exactly as ``_execute_hook`` does for any other stale spec.
+                            self._wait_stale(codelet.id)
                             self._run_inline(codelet, spec.info.writes)
                             return
                         deadline = now + self.grant_timeout
@@ -1215,7 +1219,10 @@ class SpeculativeEngine:
         got = self._plans.get(codelet_type)
         if got is None:
             # The audit holds for the audited body only: an edited one is a barrier.
-            info = self.effects.info(codelet_type, fx.body_digest(self._registry_get(codelet_type).source))
+            info = self.effects.info(
+                codelet_type, fx.body_digest(self._registry_get(codelet_type).source),
+                fx.support_digest(self.runner.ctx.meta),
+            )
             ok = (info.speculate and info.profitable and not info.barrier
                   and (self._only is None or codelet_type in self._only))
             blocks = bool(info.barrier or info.writes & _CONFLICT_MASK)

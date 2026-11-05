@@ -307,7 +307,6 @@ def _expected_tables() -> dict[str, list[dict]]:
             "target": d["target"],
             "answer": d.get("answer"),
             "seed": d["seed"],
-            "mode": d["mode"],
             "description": d.get("description", ""),
         }
         for i, d in enumerate(_file("demo_problems.json"), start=1)

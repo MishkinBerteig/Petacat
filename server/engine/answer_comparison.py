@@ -7,8 +7,12 @@ Scheme source: ``answers.ss:310-333`` (``explain``), ``answers.ss:336-425``
 no genuine linguistic ability whatsoever; its ability to 'speak' is purely an illusion
 arising from a flexible set of phrase-templates".  The templates are therefore *data*,
 and in this port they live in ``seed_data/commentary_templates.json`` — every phrase in
-this module comes from there, and nothing here writes English down in Python.  Editing
-the seed data (or the admin UI, which edits the same row) changes what the program says.
+this module comes from there.  Editing the seed data (or the admin UI, which edits the same
+row) changes what the program says.  The small connecting words the Scheme itself writes
+inline are not templates and stay in Python: function words such as "on ", "and", "ing" and
+"to " that join a phrase to its context, and the ordinals "first" and "second".  They are
+display only, so they affect no cognition (``emit_new_problem`` and ``emit_jootsing`` are
+the same kind of thing in ``commentary.py``).
 
 Two facts about the shape of the output are worth stating before the code:
 

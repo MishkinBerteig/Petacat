@@ -24,25 +24,25 @@ def test_slipnet_node_count(slipnet):
 
 
 def test_node_properties(slipnet):
-    node = slipnet.get_node("plato-a")
+    node = slipnet.nodes["plato-a"]
     assert node.short_name == "a"
     assert node.conceptual_depth == 10
     assert node.activation == 0.0
 
 
 def test_successor_has_intrinsic_link_length(slipnet):
-    succ = slipnet.get_node("plato-successor")
+    succ = slipnet.nodes["plato-successor"]
     assert succ.intrinsic_link_length == 60
 
 
 def test_identity_has_intrinsic_link_length(slipnet):
-    identity = slipnet.get_node("plato-identity")
+    identity = slipnet.nodes["plato-identity"]
     assert identity.intrinsic_link_length == 0
 
 
 def test_node_links_populated(slipnet):
     """Letters should have category links to letter-category."""
-    a = slipnet.get_node("plato-a")
+    a = slipnet.nodes["plato-a"]
     cat_links = a.category_links
     assert len(cat_links) > 0
     assert any(lk.to_node.name == "plato-letter-category" for lk in cat_links)
@@ -50,7 +50,7 @@ def test_node_links_populated(slipnet):
 
 def test_letter_successor_links(slipnet):
     """plato-a should have a lateral successor link to plato-b."""
-    a = slipnet.get_node("plato-a")
+    a = slipnet.nodes["plato-a"]
     succ_links = [
         lk for lk in a.lateral_links
         if lk.to_node.name == "plato-b" and lk.label_node and lk.label_node.name == "plato-successor"
@@ -60,7 +60,7 @@ def test_letter_successor_links(slipnet):
 
 def test_opposite_sliplinks(slipnet):
     """leftmost should have a lateral-sliplink to rightmost labeled opposite."""
-    lm = slipnet.get_node("plato-leftmost")
+    lm = slipnet.nodes["plato-leftmost"]
     opp_links = [
         lk for lk in lm.lateral_sliplinks
         if lk.to_node.name == "plato-rightmost"
@@ -70,7 +70,7 @@ def test_opposite_sliplinks(slipnet):
 
 
 def test_clamp_freezes_node_at_full_activation(slipnet):
-    node = slipnet.get_node("plato-a")
+    node = slipnet.nodes["plato-a"]
     node.clamp(5)
     assert node.frozen
     assert node.activation == 100.0
@@ -78,7 +78,7 @@ def test_clamp_freezes_node_at_full_activation(slipnet):
 
 
 def test_clamp_expires_after_its_cycles(slipnet):
-    node = slipnet.get_node("plato-a")
+    node = slipnet.nodes["plato-a"]
     node.clamp(5)
     for _ in range(5):
         node.tick_clamp()
@@ -88,18 +88,18 @@ def test_clamp_expires_after_its_cycles(slipnet):
 
 def test_spread_activation(slipnet):
     """Activating a node should spread some activation to neighbors."""
-    succ = slipnet.get_node("plato-successor")
+    succ = slipnet.nodes["plato-successor"]
     succ.activation = 100.0
     slipnet.spread_activation(15, threshold=100)
     # Bond-category should get some activation (succ has category link to it)
-    bc = slipnet.get_node("plato-bond-category")
+    bc = slipnet.nodes["plato-bond-category"]
     assert bc.activation > 0
 
 
 def test_clamp_initially_relevant(slipnet, meta):
     slipnet.clamp_initially_relevant(meta)
-    lc = slipnet.get_node("plato-letter-category")
-    sp = slipnet.get_node("plato-string-position-category")
+    lc = slipnet.nodes["plato-letter-category"]
+    sp = slipnet.nodes["plato-string-position-category"]
     assert lc.frozen
     assert sp.frozen
     assert lc.activation == 100.0
@@ -107,9 +107,9 @@ def test_clamp_initially_relevant(slipnet, meta):
 
 def test_partially_active_node_does_not_spread_at_high_threshold(slipnet):
     """A node at 50 activation must not spread when the threshold is 100."""
-    succ = slipnet.get_node("plato-successor")
+    succ = slipnet.nodes["plato-successor"]
     succ.activation = 50.0
-    bc = slipnet.get_node("plato-bond-category")
+    bc = slipnet.nodes["plato-bond-category"]
     bc.activation = 0.0
     slipnet.spread_activation(15, threshold=100)
     # succ is below threshold, so bond-category receives no spread from it.
@@ -118,9 +118,9 @@ def test_partially_active_node_does_not_spread_at_high_threshold(slipnet):
 
 def test_partially_active_node_spreads_at_zero_threshold(slipnet):
     """The same node at 50 activation spreads once the threshold drops to 0."""
-    succ = slipnet.get_node("plato-successor")
+    succ = slipnet.nodes["plato-successor"]
     succ.activation = 50.0
-    bc = slipnet.get_node("plato-bond-category")
+    bc = slipnet.nodes["plato-bond-category"]
     bc.activation = 0.0
     slipnet.spread_activation(15, threshold=0)
     assert bc.activation > 0.0
@@ -179,7 +179,7 @@ def test_shipped_middle_predicate_is_the_group_aware_one(slipnet):
     the ``[rr]`` group is middle — which is what gives the ``b→[rr]`` vertical
     bridge its distinguishing ``middle⇒middle`` concept-mapping.
     """
-    middle = slipnet.get_node("plato-middle")
+    middle = slipnet.nodes["plato-middle"]
     string = _string_with_letters(6)
     rr = _group_over(string, 1, 2)
     jjj = _group_over(string, 3, 5)
@@ -196,13 +196,13 @@ def test_shipped_middle_predicate_says_no_to_the_centre_of_five(slipnet):
     is an edge object, so the reference answers no.  Metacat's "middle" is
     *flanked by the ends*, not *at the centre*.
     """
-    middle = slipnet.get_node("plato-middle")
+    middle = slipnet.nodes["plato-middle"]
     string = _string_with_letters(5)
     assert middle.descriptor_predicate(string.letters[2]) is False
 
 
 def test_shipped_middle_predicate_says_yes_to_the_centre_of_three(slipnet):
-    middle = slipnet.get_node("plato-middle")
+    middle = slipnet.nodes["plato-middle"]
     string = _string_with_letters(3)
     assert middle.descriptor_predicate(string.letters[1]) is True
 
@@ -213,8 +213,8 @@ def test_shipped_leftmost_and_rightmost_predicates_exclude_a_spanning_group(slip
     A group covering the whole string is ``whole``, and must not also answer to
     ``leftmost`` merely because it starts at position 0.
     """
-    leftmost = slipnet.get_node("plato-leftmost")
-    rightmost = slipnet.get_node("plato-rightmost")
+    leftmost = slipnet.nodes["plato-leftmost"]
+    rightmost = slipnet.nodes["plato-rightmost"]
     string = _string_with_letters(3)
     whole = _group_over(string, 0, 2)
 
@@ -250,8 +250,8 @@ class _Recorder:
 
 
 def test_shipped_property_links_are_association_25(slipnet):
-    a = slipnet.get_node("plato-a")
-    z = slipnet.get_node("plato-z")
+    a = slipnet.nodes["plato-a"]
+    z = slipnet.nodes["plato-z"]
     assert [lk.to_node.name for lk in a.property_links] == ["plato-alphabetic-first"]
     assert [lk.to_node.name for lk in z.property_links] == ["plato-alphabetic-last"]
     assert a.property_links[0].degree_of_association() == 25.0
@@ -260,7 +260,7 @@ def test_shipped_property_links_are_association_25(slipnet):
 
 @pytest.mark.parametrize("temperature, expected", [(0, 0.25), (100, 0.325)])
 def test_property_link_gate_is_temperature_adjusted(slipnet, meta, temperature, expected):
-    a = slipnet.get_node("plato-a")
+    a = slipnet.nodes["plato-a"]
     rng = _Recorder()
     a.get_similar_property_links(rng, temperature, meta)
     assert rng.asked == [expected]
@@ -271,7 +271,7 @@ def test_property_link_gate_loosens_as_the_run_gets_confused(slipnet, meta):
     """The whole point of the temperature adjustment: a confused run follows the
     link more readily than a settled one, so ``first``/``last`` are explored when
     exploration is what is wanted."""
-    a = slipnet.get_node("plato-a")
+    a = slipnet.nodes["plato-a"]
     probabilities = []
     for temperature in (0, 50, 100):
         rng = _Recorder()
@@ -279,10 +279,3 @@ def test_property_link_gate_loosens_as_the_run_gets_confused(slipnet, meta):
         probabilities.append(rng.asked[0])
     assert probabilities == sorted(probabilities)
     assert probabilities[0] < probabilities[-1]
-
-
-def test_property_link_gate_without_a_temperature_uses_the_bare_association(slipnet):
-    a = slipnet.get_node("plato-a")
-    rng = _Recorder()
-    a.get_similar_property_links(rng)
-    assert rng.asked == [0.25]

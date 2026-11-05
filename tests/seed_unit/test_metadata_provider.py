@@ -130,7 +130,7 @@ def test_spreading_activation_threshold_param(meta):
 
 def test_loads_enum_values(meta):
     """MetadataProvider should load enum_values from enums.json."""
-    assert len(meta.enum_values) == 14
+    assert len(meta.enum_values) == 13
     assert "run_statuses" in meta.enum_values
     assert "event_types" in meta.enum_values
     assert "bridge_types" in meta.enum_values
@@ -144,9 +144,10 @@ def test_loads_enum_values(meta):
 def test_enum_values_match_expected_counts(meta):
     """Each enum table should have the expected number of values."""
     assert len(meta.enum_values["run_statuses"]) == 6
-    # 17: the 16 original types plus concept_activation, one of the seven
-    # Temporal Trace event types of §4.4.
-    assert len(meta.enum_values["event_types"]) == 17
+    # 15: the 14 types the engine records plus concept_activation, one of the seven
+    # Temporal Trace event types of §4.4 (jootsing and theme_activated were never recorded
+    # and were removed).
+    assert len(meta.enum_values["event_types"]) == 15
     assert len(meta.enum_values["bridge_types"]) == 3
     assert len(meta.enum_values["bridge_orientations"]) == 2
     assert len(meta.enum_values["clause_types"]) == 3
@@ -158,7 +159,6 @@ def test_enum_values_match_expected_counts(meta):
     assert len(meta.enum_values["codelet_phases"]) == 4
     assert len(meta.enum_values["posting_directions"]) == 3
     assert len(meta.enum_values["param_value_types"]) == 6
-    assert len(meta.enum_values["demo_modes"]) == 2
 
 
 def test_the_bottom_up_posting_rules_are_in_the_order_the_engine_posts_them():

@@ -67,7 +67,6 @@ ENUM_MODELS: dict[str, str] = {
     "codelet_phases": "CodeletPhaseDef",
     "posting_directions": "PostingDirectionDef",
     "param_value_types": "ParamValueTypeDef",
-    "demo_modes": "DemoModeDef",
 }
 
 #: The help topics ship in one file, which the `en` suffix names.
@@ -237,7 +236,6 @@ def standard_load_ops(seed_dir: str) -> list[dict]:
                 "target": d["target"],
                 "answer": d.get("answer"),
                 "seed": d["seed"],
-                "mode": d["mode"],
                 "description": d.get("description", ""),
             },
         )

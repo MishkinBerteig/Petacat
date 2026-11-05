@@ -235,7 +235,6 @@ class RunService:
         self._next_fast_id: int = -1
         # Per-runner control state
         self._breakpoints: dict[int, int | None] = {}
-        self._step_sizes: dict[int, int] = {}
         self._stop_flags: dict[int, bool] = {}
         #: What each live run is currently *displaying* over its live state -- an event,
         #: an answer or a snag, as ``(kind, id)`` -- so clicking the same one again
@@ -994,7 +993,6 @@ class RunService:
 
         # Clear control state
         self._breakpoints.pop(run_id, None)
-        self._step_sizes.pop(run_id, None)
         self._stop_flags.pop(run_id, None)
 
         return RunInfo(
@@ -1022,7 +1020,6 @@ class RunService:
         # Remove from in-memory runners
         self._runners.pop(run_id, None)
         self._breakpoints.pop(run_id, None)
-        self._step_sizes.pop(run_id, None)
         self._stop_flags.pop(run_id, None)
 
         if fast:
@@ -1056,7 +1053,6 @@ class RunService:
         # Clear in-memory state
         self._runners.clear()
         self._breakpoints.clear()
-        self._step_sizes.clear()
         self._stop_flags.clear()
 
         # Delete all DB rows
@@ -1473,13 +1469,6 @@ class RunService:
             raise ValueError(f"Run {run_id} not found or not loaded")
         self._breakpoints.pop(run_id, None)
         return {"run_id": run_id, "breakpoint": None}
-
-    def set_step_size(self, run_id: int, step_size: int) -> dict:
-        """Set the step size for the given run."""
-        if run_id not in self._runners:
-            raise ValueError(f"Run {run_id} not found or not loaded")
-        self._step_sizes[run_id] = step_size
-        return {"run_id": run_id, "step_size": step_size}
 
     # ------------------------------------------------------------------
     # Temperature clamping

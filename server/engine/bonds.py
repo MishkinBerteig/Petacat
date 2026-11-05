@@ -110,7 +110,7 @@ class Bond(WorkspaceStructure):
             ),
         )
 
-    def calculate_external_strength(self, rng: RNG | None = None) -> float:
+    def calculate_external_strength(self, rng: RNG) -> float:
         """Bond external strength = local support.
 
         Scheme: bonds.ss:182-183, 162-168.
@@ -119,7 +119,7 @@ class Bond(WorkspaceStructure):
         """
         return self._local_support(rng)
 
-    def _local_support(self, rng: RNG | None = None) -> float:
+    def _local_support(self, rng: RNG) -> float:
         """Support from similar nearby bonds.
 
         Scheme: bonds.ss:162-168.
@@ -168,7 +168,7 @@ class Bond(WorkspaceStructure):
             count += 1
         return count
 
-    def get_local_density(self, rng: RNG | None = None) -> float:
+    def get_local_density(self, rng: RNG) -> float:
         """How much of the neighbourhood is bonded the way this bond is.
 
         Scheme: ``get-local-density`` (bonds.ss:136-160).  The walk steps through
@@ -188,19 +188,16 @@ class Bond(WorkspaceStructure):
         Each step of that walk is a salience-weighted **stochastic** pick, so the
         walk needs a generator and the reference re-rolls it on every strength
         update.  *rng* is the one the calling codelet is drawing from, threaded
-        down from :meth:`WorkspaceStructure.update_strength`; ``None`` means no
-        run context, and the walk then takes the first candidate at each step
-        (see ``WorkspaceObject._pick_neighbor``).
+        down from :meth:`WorkspaceStructure.update_strength`.
         """
         if self.string is None:
             return 100.0
 
         # Trace seam: the walk's draws concern this bond (lockstep spec §5.3).
-        previous = rng.trace_about(self) if rng is not None else None
+        previous = rng.trace_about(self)
         left_neighbors = _walk_neighbors(self.left_object, "left", rng)
         right_neighbors = _walk_neighbors(self.right_object, "right", rng)
-        if rng is not None:
-            rng.trace_about(previous)
+        rng.trace_about(previous)
         num_of_bond_slots = len(left_neighbors) + len(right_neighbors)
 
         if num_of_bond_slots == 0:
@@ -383,7 +380,7 @@ def _disjoint_objects(obj1: Any, obj2: Any) -> bool:
     )
 
 
-def _walk_neighbors(obj: Any, direction: str, rng: RNG | None = None) -> list[Any]:
+def _walk_neighbors(obj: Any, direction: str, rng: RNG) -> list[Any]:
     """Walk left or right from *obj* through positional neighbours.
 
     Scheme: ``neighbors`` inside ``get-local-density`` (bonds.ss:137-145) —

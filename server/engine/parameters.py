@@ -205,17 +205,7 @@ RUN_PARAMETERS: tuple[RunParameter, ...] = (
        "How many codelets may wait at once. The cap is why the codelet mix keeps "
        "tracking the current Workspace instead of drifting: on a typical run the rack "
        "sits at capacity for well over half of all posts, so raising this materially "
-       "reduces eviction pressure. Under free-running the capacity is divided across "
-       "shards, and the shard floor below decides how many shards that capacity "
-       "supports.", 10, 10_000),
-    _p("min_shard_capacity", KIND_INT, GROUP_CODERACK, "Minimum shard capacity",
-       "The fewest codelets a shard may hold under free-running, which bounds the shard "
-       "count at capacity divided by this. Not a tuning knob but a cognition "
-       "measurement: at shards of twelve the give-up stopping state vanished from "
-       "`eqe -> qeq; abbba?` entirely — 0 in 60 runs against 23 serial, on that "
-       "problem's most frequent outcome — because giving up is the end of a sequence "
-       "and each step needs its codelets still on the rack when the next one looks.",
-       1, 10_000),
+       "reduces eviction pressure.", 10, 10_000),
     _p("num_coderack_bins", KIND_INT, GROUP_CODERACK, "Urgency bins",
        "How many urgency levels the rack is divided into. Selection picks a bin with "
        "probability proportional to its count times its urgency weight, then picks "

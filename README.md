@@ -521,6 +521,19 @@ across both is the **set** of stopping states each problem can reach, which is w
 precision and how many tests took each, so "both were run" is something the output
 states rather than something to remember.
 
+**The exactness guard.** A float32 backend (`mlx`) opens a Slipnet only when the configuration
+in force lets it run exactly: `max_activation` a float32-exact value no larger than 2^20,
+`full_activation_threshold` a value float32 rounding does not move across a whole number, and a
+spread scale (`update_cycle_length` over `reference_update_cycle_length`) that float32
+represents exactly. The conditions were measured with `mlx` against `numpy` (five seeds of
+twenty update cycles): 1,048,576 and every smaller ceiling tried, and the fractions 100.125,
+100.25, 100.5, 100.75, 200.5 and 1000.5, were identical; 100.1 and 1,500,000 and above were not;
+a threshold of 50.00000001 (which float32 rounds to 50) was not; scales 1/3 and 5/3 were not.
+Under `auto` a refused configuration runs on `numpy`; an explicit `mlx` raises
+`InexactConfiguration` naming the value. The theme update (`spread_themes`) runs the float64
+host implementation on a float32 backend, because its `round(20 * tanh(...))` margin from a
+`.5` boundary is only a few float32 ulps.
+
 **A 60-minute ceiling.** The run stops at the first test boundary past the
 deadline, keeping every result collected up to that point, and reports itself as
 `RUN TRUNCATED` with the layers marked `INCOMPLETE` and an exit status of 2. A
@@ -1029,12 +1042,14 @@ the setattr stop-the-world described above.
 
 The service no longer reaches it. It stays registered as `"free"` for research scripts
 such as `scripts/compare_frequencies.py`'s multi-worker study, and as the point of
-comparison. `scripts/bench_free_running.py`, `scripts/bench_shards.py`,
-`tests/module/test_free_running.py` and `tests/module/test_coderack_shards.py` still
-exercise it.
+comparison. `scripts/bench_free_running.py` and `tests/module/test_free_running.py` still
+exercise it. It installs the locked rack (`LockedCoderack`); the sharded coderack candidates
+that were built and measured beside it (by codelet family, and per worker) were removed because
+no run mode installs them.
 
 How much staleness cognition tolerates was measured before any of it was written, by
-making the serial loop read state as it stood N codelets ago:
+making the serial loop read state as it stood N codelets ago (a serial probe that has since been
+removed; the figures are kept as the measurement the free-running design rests on):
 - nothing moves at N ≤ 5;
 - by N = 15, runs start failing to converge inside the codelet cap;
 - by N = 50, a genuinely new answer appears.
@@ -1410,7 +1425,6 @@ and a full set of sizes.
 | Size | Rule | Environment variable |
 |---|---|---|
 | Speculative workers | One per core on the fastest performance level (`hw.perflevel0`: the 6 Super cores of an M5 Max). Codelet bodies are interpreted Python and CPU-bound, and the token holder runs on whichever is free. | `PETACAT_WORKERS` |
-| Coderack shards | One per worker, floor of two, bounded further by the capacity a shard needs to hold a jootsing sequence (`min_shard_capacity`). | `PETACAT_CODERACK_SHARDS` |
 | Swarm processes | Every logical core but one. The runs share nothing, so every tier of core adds throughput, and the reserved core leaves the parent and the OS somewhere to run. | `PETACAT_POPULATION_WORKERS` |
 | Executor numeric backend | `off` below 512 Slipnet nodes, `numpy` from there, never the GPU on its own (`server/parallel/placement.py`). | `PETACAT_SWARM_BACKEND`, `PETACAT_SPECULATIVE_BACKEND` |
 | GPU dispatch threads | GPU cores × 1,024, rounded up to a power of two. This is the target the Slipnet kernel splits rows against, so a larger GPU splits more widely in the latency-bound regime. | `PETACAT_GPU_CORES`, `PETACAT_GPU_THREADS_PER_CORE` |
@@ -1579,8 +1593,7 @@ ceiling (`max_theme_activation`), `concept_activation_importance_threshold`,
 and `tests/module/test_wired_numbers.py` changes each wired number and sees the run move.
 
 **Fixed and derived are kept apart.** Fixed parameters are inputs, constant for the Run.
-*Derived* values — which numeric backend actually ran, the shard count sharding settled
-on, the config and memory hashes, the free-running telemetry — are equally part of what a
+*Derived* values — which numeric backend actually ran, the config and memory hashes, the free-running telemetry — are equally part of what a
 Run was, and are shown beside them read-only. Presenting a derived value as settable
 would misrepresent how the engine works.
 

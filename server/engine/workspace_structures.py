@@ -127,9 +127,8 @@ class WorkspaceStructure:
         RNG the *calling codelet* is drawing from — ``ctx.rng``, which under
         free-running is that codelet's own counter-based stream — so a run's
         randomness stays a function of where a codelet ran rather than of the
-        order workers happened to execute in.  ``None`` is for callers with no
-        run context (unit tests): the walk then takes the first candidate at
-        each step rather than inventing a generator of its own.
+        order workers happened to execute in.  ``None`` is for a structure whose external
+        strength draws nothing (a Description).
         """
         internal = self.calculate_internal_strength()
         external = self.calculate_external_strength(rng)
@@ -140,10 +139,7 @@ class WorkspaceStructure:
         # ``a + b`` (its compensated summation only matters from three terms on).
         w2 = 100.0 - internal
         total = internal + w2
-        if total == 0:
-            intrinsic_strength = 0.0
-        else:
-            intrinsic_strength = (internal * internal + external * w2) / total
+        intrinsic_strength = (internal * internal + external * w2) / total
 
         compatibility = self.get_thematic_compatibility()
         thematic_weight = abs(compatibility)
@@ -153,20 +149,13 @@ class WorkspaceStructure:
 
         w2 = 1.0 - thematic_weight
         total = thematic_weight + w2
-        if total == 0:
-            self.strength = round(0.0)
-            return
         pole = 100.0 if compatibility > 0 else 0.0
         self.strength = round((pole * thematic_weight + intrinsic_strength * w2) / total)
 
-    def calculate_internal_strength(self) -> float:
-        return 0.0
-
-    def calculate_external_strength(self, rng: RNG | None = None) -> float:
-        """*rng* is used only by Bond and Group, whose external strength is the
-        stochastic density walk.  Every override takes it so the seam is one
-        signature rather than a special case."""
-        return 0.0
+    # ``calculate_internal_strength()`` and ``calculate_external_strength(rng)`` are
+    # supplied by every concrete structure (Bond, Group, Bridge, Description, Rule).
+    # *rng* is used only by Bond and Group, whose external strength is the stochastic
+    # density walk; every override takes it so the seam is one signature.
 
     def get_thematic_compatibility(self) -> float:
         """How well this structure resonates with the active themes, in -1..+1.

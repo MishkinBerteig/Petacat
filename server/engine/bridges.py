@@ -945,10 +945,7 @@ def _bridge_theme_compatibility_sigmoid(x: float) -> float:
     """Sharpen a raw support value.  Scheme: themes.ss:1115, beta = 4 (the coefficient
     ``bridge_theme_compatibility_sigmoid_beta``)."""
     beta = bound_meta().get_formula_coeff("bridge_theme_compatibility_sigmoid_beta")
-    try:
-        return 2.0 / (1.0 + math.exp(-2.0 * beta * x)) - 1.0
-    except OverflowError:  # pragma: no cover - x is always within -1..+1
-        return -1.0 if x < 0 else 1.0
+    return 2.0 / (1.0 + math.exp(-2.0 * beta * x)) - 1.0
 
 
 # ---------------------------------------------------------------------------

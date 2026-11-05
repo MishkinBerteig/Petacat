@@ -88,8 +88,8 @@ def test_update_cycle_fires(runner):
 
 def test_slipnet_clamped_on_init(runner):
     runner.init_mcat("abc", "abd", "xyz", seed=42)
-    lc = runner.ctx.slipnet.get_node("plato-letter-category")
-    sp = runner.ctx.slipnet.get_node("plato-string-position-category")
+    lc = runner.ctx.slipnet.nodes["plato-letter-category"]
+    sp = runner.ctx.slipnet.nodes["plato-string-position-category"]
     assert lc.frozen
     assert sp.frozen
 
@@ -136,9 +136,9 @@ def test_init_activates_every_initial_descriptor(runner):
     100, which includes ``plato-letter`` via the object-category description."""
     runner.init_mcat("abc", "abd", "xyz", seed=42)
     slipnet = runner.ctx.slipnet
-    assert slipnet.get_node("plato-letter").activation == 100
-    assert slipnet.get_node("plato-a").activation == 100
-    assert slipnet.get_node("plato-leftmost").activation == 100
+    assert slipnet.nodes["plato-letter"].activation == 100
+    assert slipnet.nodes["plato-a"].activation == 100
+    assert slipnet.nodes["plato-leftmost"].activation == 100
 
 
 def test_single_letter_string_activates_object_category(runner):
@@ -146,12 +146,12 @@ def test_single_letter_string_activates_object_category(runner):
     treating a letter and a group as the same role, so the reference activates
     the concept before the run starts."""
     runner.init_mcat("abc", "abd", "z", seed=42)
-    assert runner.ctx.slipnet.get_node("plato-object-category").activation == 100
+    assert runner.ctx.slipnet.nodes["plato-object-category"].activation == 100
 
 
 def test_multi_letter_problem_leaves_object_category_alone(runner):
     runner.init_mcat("abc", "abd", "xyz", seed=42)
-    assert runner.ctx.slipnet.get_node("plato-object-category").activation == 0
+    assert runner.ctx.slipnet.nodes["plato-object-category"].activation == 0
 
 
 def test_thematic_scout_count_follows_the_mapping_deficit(runner):

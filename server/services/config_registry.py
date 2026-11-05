@@ -10,8 +10,8 @@ Built by introspecting the models in ``server/models/metadata.py`` (the configur
   declaration here stops the application importing this module, so a table is never
   silently unaddressable.
 
-``REGISTRY`` is the tables the change API addresses (the 14 enum tables, which are the
-engine's vocabulary, are not among them).  ``ENUM_REGISTRY`` is those 14 and ``LAYER_REGISTRY``
+``REGISTRY`` is the tables the change API addresses (the 13 enum tables, which are the
+engine's vocabulary, are not among them).  ``ENUM_REGISTRY`` is those 13 and ``LAYER_REGISTRY``
 is both: the journal layer (``server/services/journal.py``) writes all of them, because the
 Metacat Standard Configuration's first load and the Admin enum editor do.
 
@@ -56,6 +56,20 @@ _NATURAL_KEYS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "commentary_templates": (("template_key",), ()),
 }
 
+def total_order(key: tuple[str, ...], order: tuple[str, ...]) -> tuple[str, ...]:
+    """The one total order of a table: its declared order columns, then the rest of its key.
+
+    Two rows that tie on ``sort_order`` or ``ordinal`` are ordered by their natural key, so a
+    tie has one answer in the database (``ORDER BY``) and in a ``ConfigDocument`` alike.  A table
+    with no order columns keeps insertion order (``id`` in the database, insertion in a
+    document), which the two paths already agree on: an insert appends, an update keeps the
+    row's place, and a delete removes it.
+    """
+    if not order:
+        return ()
+    return tuple(order) + tuple(c for c in key if c not in order)
+
+
 #: Columns that hold code (a Python body, a predicate or a formula), by table.
 _CODE_COLUMNS: dict[str, frozenset[str]] = {
     "slipnet_node_defs": frozenset({"descriptor_predicate"}),
@@ -81,6 +95,30 @@ class TableSpec:
     order: tuple[str, ...]
     code_columns: frozenset[str]
     json_columns: frozenset[str]
+
+    @property
+    def total_order(self) -> tuple[str, ...]:
+        """The order columns followed by the rest of the key (see :func:`total_order`)."""
+        return total_order(self.key, self.order)
+
+    def order_by(self) -> list[Any]:
+        """``ORDER BY`` clauses for :attr:`total_order`.
+
+        Text columns sort by byte value (``COLLATE "C"``), which is what Python's string order is
+        for UTF-8, and a NULL key part sorts as ``''`` (the document reads it that way), so the
+        database's order does not depend on its locale or on where it puts NULLs.
+        """
+        from sqlalchemy import func, literal
+
+        clauses: list[Any] = []
+        for name in self.total_order:
+            column = self.table.c[name]
+            if column.type.python_type is str:
+                expr = func.coalesce(column, literal("")) if column.nullable else column
+                clauses.append(expr.collate("C"))
+            else:
+                clauses.append(column)
+        return clauses
 
     @property
     def table(self) -> Any:
@@ -188,7 +226,7 @@ _registry, _enums = _build()
 #: The tables the change API addresses, by database table name.
 REGISTRY: Mapping[str, TableSpec] = MappingProxyType(_registry)
 
-#: The 14 enum lookup tables (the engine's vocabulary): written by the layer, not addressed
+#: The 13 enum lookup tables (the engine's vocabulary): written by the layer, not addressed
 #: by the change API.
 ENUM_REGISTRY: Mapping[str, TableSpec] = MappingProxyType(_enums)
 

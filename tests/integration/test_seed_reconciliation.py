@@ -57,7 +57,6 @@ def test_every_trace_event_type_the_engine_emits_is_declared():
         trace_module.RULE_BUILT, trace_module.RULE_BROKEN,
         trace_module.DESCRIPTION_BUILT, trace_module.ANSWER_FOUND,
         trace_module.SNAG, trace_module.CLAMP_START, trace_module.CLAMP_END,
-        trace_module.JOOTSING, trace_module.THEME_ACTIVATED,
         trace_module.CONCEPT_MAPPING_BUILT, trace_module.CONCEPT_ACTIVATION,
     }
     assert event_types <= emitted  # sanity: we listed real constants

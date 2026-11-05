@@ -13,6 +13,7 @@ from server.engine.codelet_dsl import builtins
 from server.engine.coderack import Coderack
 from server.engine.jootsing import _build_theme_overlap_table
 from server.engine.metadata import MetadataProvider
+from server.engine.rng import RNG
 from server.engine.slipnet import SlipnetLink, SlipnetNode
 from tests.support.standard_configuration import make_node
 
@@ -134,7 +135,7 @@ def test_no_describable_bridges_builds_an_identity_rule():
     from server.engine.rules import build_rule_from_bridges
 
     rule = build_rule_from_bridges(
-        "top", [], slipnet=None, rng=None, temperature=50.0,
+        "top", [], slipnet=None, rng=RNG(1), temperature=50.0,
         meta=MetadataProvider.from_standard_configuration(SEED_DIR)
     )
     assert rule is not None and rule.is_identity_rule

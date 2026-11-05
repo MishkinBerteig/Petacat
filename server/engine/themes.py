@@ -55,8 +55,6 @@ ALL_THEME_TYPES = [THEME_TOP_BRIDGE, THEME_BOTTOM_BRIDGE, THEME_VERTICAL_BRIDGE]
 
 RELATION_IDENTITY = "identity"
 RELATION_OPPOSITE = "opposite"
-RELATION_SUCCESSOR = "successor"
-RELATION_PREDECESSOR = "predecessor"
 RELATION_DIFFERENT = "diff"
 
 #: See ``slipnet._UNRESOLVED`` — "not yet decided" is not "decided against".

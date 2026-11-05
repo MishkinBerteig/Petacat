@@ -53,12 +53,6 @@ if TYPE_CHECKING:
 STRUCTURE_BUILT = "built"
 STRUCTURE_BROKEN = "broken"
 
-#: The valence signal (Phase 2).  Delivered by the harness on a channel of its own
-#: rather than perceived as a percept in the Workspace, so it arrives as an event here
-#: rather than as anything the codelets can see.
-VALENCE_LOVE = "love"
-VALENCE_NOT_LOVE = "not-love"
-
 
 @runtime_checkable
 class RunSink(Protocol):
@@ -112,14 +106,6 @@ class RunSink(Protocol):
     def on_answer(self, ctx: EngineContext, answer: str, quality: float) -> None:
         """A codelet reported an answer."""
 
-    def on_valence(self, ctx: EngineContext, signal: str, strength: float) -> None:
-        """An external valence signal arrived (Phase 2).
-
-        Nothing in Phase 0 emits this. It is declared now because the port is the
-        thing later phases attach to, and adding an event to a protocol that already
-        has three implementations is more disruptive than reserving it.
-        """
-
     def on_turn_end(self, ctx: EngineContext) -> None:
         """The Run has stopped — answered, halted, or given up.
 
@@ -157,7 +143,6 @@ class NullSink:
     def on_trace_event(self, ctx: EngineContext, event: TraceEvent) -> None: ...
     def on_structure_change(self, ctx: EngineContext, structure: Any, change: str) -> None: ...
     def on_answer(self, ctx: EngineContext, answer: str, quality: float) -> None: ...
-    def on_valence(self, ctx: EngineContext, signal: str, strength: float) -> None: ...
     def on_turn_end(self, ctx: EngineContext) -> None: ...
 
     def __repr__(self) -> str:

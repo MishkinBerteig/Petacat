@@ -247,6 +247,10 @@ def state_digest(ctx: Any) -> str:
     from tests.lockstep.snapshot import snapshot_record
 
     graph = {k: v for k, v in capture_run_state(ctx).items() if k != "parameters"}
+    # The captured runner section once carried ``staleness_delay`` (always 0). The staleness probe
+    # is gone, and the baseline files were captured with the key, so it stays in the digest
+    # as the constant it always was; the golden files are byte-identical on purpose.
+    graph["runner"] = {**graph["runner"], "staleness_delay": 0}
     snap = snapshot_record(ctx, None, ctx.codelet_count)
     return sha(canonical({"graph": graph, "snapshot": snap}))
 

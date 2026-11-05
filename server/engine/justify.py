@@ -42,12 +42,10 @@ logger = logging.getLogger(__name__)
 _ENGINE_FAILURES = (ImageFailure, _TranslationFailure)
 
 
-def _log_failure(what: str, slipnet: Slipnet | None, error: Exception) -> None:
+def _log_failure(what: str, slipnet: Slipnet, error: Exception) -> None:
     """Say why a rule could not be carried over, naming the roles the configuration lacks
     (a missing role is the usual reason a clause cannot be built)."""
-    unbound = (
-        [name for name, bound in slipnet.roles.items() if not bound] if slipnet is not None else []
-    )
+    unbound = [name for name, bound in slipnet.roles.items() if not bound]
     logger.info(
         "justify: %s failed (%s: %s); roles unbound in this configuration: %s",
         what, type(error).__name__, error, ", ".join(unbound) or "none",
@@ -113,7 +111,7 @@ def attempt_justification(
     *,
     trace: TemporalTrace | None = None,
     themespace: Themespace | None = None,
-    slipnet: Slipnet | None = None,
+    slipnet: Slipnet,
     memory: Any = None,
     codelet_count: int = 0,
     temperature: float,
@@ -330,10 +328,8 @@ def attempt_justification(
         )
 
     # ``trace.ss:112-119``: the grace period is ``codelet-count < last-unclamp-time +
-    # 100``.  Called with the default ``codelet_count=0`` that comparison is true
-    # forever once any clamp has been undone, so after the first unclamp of a run every
-    # justify clamp was denied and Figure 4.13's repeated reorganisation could not
-    # happen.  Both call sites have the real count in scope.
+    # 100``, so the real codelet count has to be passed (a count of 0 would make the
+    # comparison true forever once any clamp had been undone).
     if trace is not None and not trace.permission_to_clamp(
         codelet_count=codelet_count,
         grace_period=meta.get_param("grace_period"),
@@ -406,7 +402,7 @@ def clamp_rules(
     *,
     vertical_theme_pattern: dict[str, Any] | None = None,
     concept_patterns: list[dict[str, Any]] | None = None,
-    codelet_count: int | None = None,
+    codelet_count: int,
     temperature: float,
     coderack: Any = None,
     temperature_control: Any = None,
@@ -418,10 +414,7 @@ def clamp_rules(
     Creates a ClampEvent of type ``justify_clamp``, adds it to the trace,
     and activates it.
     """
-    if codelet_count is None:
-        codelet_count = _get_codelet_count(workspace)
-    # ``trace.ss:112-119`` again — see the note at the unification gate.  With the
-    # default count this test passed exactly once per run.
+    # ``trace.ss:112-119`` again — see the note at the unification gate.
     if not trace.permission_to_clamp(
         codelet_count=codelet_count,
         grace_period=meta.get_param("grace_period"),
@@ -514,7 +507,7 @@ def clamp_rules(
 def unify_rules(
     from_rule: Rule,
     to_rule: Rule,
-    slipnet: Slipnet | None = None,
+    slipnet: Slipnet,
 ) -> list | None:
     """Attempt to unify two rules by parallel traversal of clauses.
 
@@ -554,7 +547,7 @@ def unify_rules(
 def get_unifying_slippages(
     from_rule: Rule,
     to_rule: Rule,
-    slipnet: Slipnet | None = None,
+    slipnet: Slipnet,
 ) -> list[dict[str, Any]]:
     """Extract slippages needed for unification.
 
@@ -596,7 +589,7 @@ def traverse_rule_clauses(
     clauses2: list[RuleClause],
     proc: Any,
     *,
-    slipnet: Slipnet | None = None,
+    slipnet: Slipnet,
 ) -> list[dict[str, Any]] | None:
     """Recursive parallel traversal of rule clause trees.
 
@@ -670,9 +663,9 @@ def traverse_rule_clauses(
 
 def get_vertical_theme_pattern_to_clamp(
     unifying_pattern: list,
-    slipnet: Slipnet | None = None,
+    slipnet: Slipnet,
     *,
-    rng: RNG | None = None,
+    rng: RNG,
     vlog: Any = None,
     meta: Any = None,
 ) -> dict[str, Any]:
@@ -712,7 +705,7 @@ def get_vertical_theme_pattern_to_clamp(
         dim, rel = entry[0], entry[1]
         prob = _retention_probability(entry, pattern_entries, slipnet, identity_percent)
         retention.append(prob)
-        retained = rng.prob(prob) if rng is not None else prob >= 0.5
+        retained = rng.prob(prob)
         if retained:
             final_entries.append((dim, rel))
     if vlog is not None:
@@ -758,7 +751,7 @@ def _relation_name(relation: Any) -> Any:
 def _retention_probability(
     entry: tuple,
     all_entries: list[tuple],
-    slipnet: Slipnet | None,
+    slipnet: Slipnet,
     identity_percent: float,
 ) -> float:
     """Compute the retention probability for a single pattern entry.
@@ -780,7 +773,7 @@ def _retention_probability(
 
 def _add_direction_entry(
     entries: list[tuple[str, str | None]],
-    slipnet: Slipnet | None = None,
+    slipnet: Slipnet,
 ) -> list[tuple[str, str | None]]:
     """Heuristic: add Dir entry if StrPos exists but Dir doesn't.
 
@@ -796,7 +789,7 @@ def _add_direction_entry(
             dir_entry = entry
 
     # With no direction dimension in the configuration there is none to add.
-    dir_node = slipnet.roles.dimension_direction if slipnet is not None else None
+    dir_node = slipnet.roles.dimension_direction
     if (
         dir_node
         and str_pos_entry is not None
@@ -812,7 +805,7 @@ def _add_direction_entry(
 
 def _replace_bond_category_entry(
     entries: list[tuple[str, str | None]],
-    slipnet: Slipnet | None = None,
+    slipnet: Slipnet,
 ) -> list[tuple[str, str | None]]:
     """Heuristic: replace BondCtgy with GroupCtgy.
 
@@ -829,7 +822,7 @@ def _replace_bond_category_entry(
 
     # With no group-category dimension in the configuration there is nothing to replace
     # the bond category with, and the entry is left as it is.
-    group_node = slipnet.roles.dimension_group_category if slipnet is not None else None
+    group_node = slipnet.roles.dimension_group_category
     if bond_ctgy_entry is not None and group_node:
         remaining = [e for e in entries if e is not bond_ctgy_entry]
         if group_ctgy_entry is None:
@@ -868,21 +861,19 @@ def _get_built_rules(workspace: Workspace, *, top: bool) -> list[Rule]:
 def _translate_rule(
     rule: Rule,
     workspace: Workspace,
-    slipnet: Slipnet | None,
+    slipnet: Slipnet,
     *,
-    rng: RNG | None = None,
-    meta: Any = None,
+    rng: RNG,
+    meta: Any,
 ) -> tuple[Rule, list[Any], list[Any]] | None:
     """Translate a rule using vertical bridge slippages.
 
     Returns (translated_rule, slippage_log, supporting_vertical_bridges) or None.
 
     ``rng`` is what lets a translation drag an auxiliary slippage along on a coattail
-    (``slipnet.py:446-447``): ``apply_slippages`` skips coattails entirely without it,
-    and the per-dimension ignore at p=0.4 (``answers.ss:1364-1371``) is likewise a
-    no-op.  The Scheme uses one ``translate`` in both modes, so a justify-mode
-    translation is exactly as free as an answer-finding one; passing no RNG made it
-    strictly more literal.
+    (``slipnet.py:446-447``) and draws the per-dimension ignore at p=0.4
+    (``answers.ss:1364-1371``).  The Scheme uses one ``translate`` in both modes, so a
+    justify-mode translation is exactly as free as an answer-finding one.
     """
     # No early exit when there are no slippages: ``translate`` (``answers.ss:1281-1342``)
     # fails only on a missing reference object or an invalid clause.  A clause whose
@@ -910,7 +901,7 @@ def _translate_rule(
 def _reference_objects(
     rule: Rule,
     string: Any,
-    slipnet: Slipnet | None,
+    slipnet: Slipnet,
 ) -> list[Any]:
     """The objects of *string* that *rule* refers to, Workspace strings excluded.
 
@@ -932,7 +923,7 @@ def _build_translated_string(
     translated_rule: Rule,
     source_string: Any,
     workspace: Workspace,
-    slipnet: Slipnet | None,
+    slipnet: Slipnet,
 ) -> Any:
     """Build the string the translated rule implies and hand its bridges to the rule.
 
@@ -1010,7 +1001,7 @@ def _find_matching_rule(
 def _translated_rule_works(
     translated_rule: Rule,
     workspace: Workspace,
-    slipnet: Slipnet | None,
+    slipnet: Slipnet,
     original_rule_type: str,
 ) -> bool:
     """Check if the translated rule actually works on the other string pair."""
@@ -1062,13 +1053,13 @@ def _attempt_clamp_rules(
     trace: TemporalTrace | None,
     themespace: Themespace | None,
     workspace: Workspace,
-    slipnet: Slipnet | None,
+    slipnet: Slipnet,
     meta: MetadataProvider,
     *,
     vertical_pattern_override: dict[str, Any] | None = None,
     concept_patterns: list[dict[str, Any]] | None = None,
     explanation: str = "Clamping rules",
-    codelet_count: int = 0,
+    codelet_count: int,
     temperature: float,
     coderack: Any = None,
     temperature_control: Any = None,
@@ -1132,7 +1123,7 @@ def _concept_mapping_proc(
     n2: Any,
     results: list[dict[str, Any]],
     *,
-    slipnet: Slipnet | None = None,
+    slipnet: Slipnet,
 ) -> list[dict[str, Any]]:
     """Process two leaf nodes during clause traversal for unification.
 
@@ -1173,22 +1164,11 @@ def _is_slipnet_node(obj: Any) -> bool:
     return hasattr(obj, "activation") and hasattr(obj, "conceptual_depth")
 
 
-def _slip_linked(n1: Any, n2: Any, slipnet: Slipnet | None) -> bool:
+def _slip_linked(n1: Any, n2: Any, slipnet: Slipnet) -> bool:
     """Check if two slipnet nodes are slip-linked."""
     if n1 is n2:
         return True
-    if slipnet is not None and hasattr(slipnet, "slip_linked"):
-        return slipnet.slip_linked(n1, n2) or slipnet.slip_linked(n2, n1)
-    # Fallback: check if they have lateral sliplinks
-    if hasattr(n1, "lateral_sliplinks"):
-        for link in n1.lateral_sliplinks:
-            if link.to_node is n2:
-                return True
-    if hasattr(n2, "lateral_sliplinks"):
-        for link in n2.lateral_sliplinks:
-            if link.to_node is n1:
-                return True
-    return False
+    return slipnet.slip_linked(n1, n2) or slipnet.slip_linked(n2, n1)
 
 
 def _get_category(node: Any) -> Any:
@@ -1203,34 +1183,32 @@ def _get_category(node: Any) -> Any:
     return None
 
 
-def _get_label(n1: Any, n2: Any, slipnet: Slipnet | None) -> str | None:
+def _get_label(n1: Any, n2: Any, slipnet: Slipnet) -> str | None:
     """Get the label (identity, opposite, etc.) between two nodes."""
     if n1 is n2:
         # The identity relation is spelled as the Themespace does.  A configuration
         # without it labels no mapping identity (the mapping is a slippage, "different").
-        if slipnet is not None and not slipnet.relation(RELATION_IDENTITY):
+        if not slipnet.relation(RELATION_IDENTITY):
             return None
         return RELATION_IDENTITY
-    if slipnet is not None and hasattr(slipnet, "get_label"):
-        return slipnet.get_label(n1, n2)
-    return None
+    return slipnet.get_label(n1, n2)
 
 
-def _get_conceptual_depth(node_name: Any, slipnet: Slipnet | None) -> float:
+def _get_conceptual_depth(node_name: Any, slipnet: Slipnet) -> float:
     """Get conceptual depth of a node by name, or of a node object.
 
     A name no node holds, or ``None``, is no node: it has the depth of the engine's Null
     Object (``Absent.conceptual_depth``, 0 -- what has no node is not perceived), so its
     retention probability is 0.  No literal depth is written here.
     """
-    if slipnet is not None and isinstance(node_name, str):
+    if isinstance(node_name, str):
         node = slipnet.nodes.get(node_name)
         if node is not None:
             return node.conceptual_depth
     return getattr(node_name, "conceptual_depth", Absent.conceptual_depth)
 
 
-def _plays(dim: Any, role: str, slipnet: Slipnet | None) -> bool:
+def _plays(dim: Any, role: str, slipnet: Slipnet) -> bool:
     """True if *dim*, a dimension node or the name of one (theme patterns hold names),
     is the node that plays the dimension *role*.  A role nothing holds is played by none."""
     node = slipnet.roles.get(role)
@@ -1250,7 +1228,7 @@ def _is_identity_label(label: Any) -> bool:
 
 def _remove_whole_single_concept_mappings(
     concept_mappings: list[dict[str, Any]],
-    slipnet: Slipnet | None = None,
+    slipnet: Slipnet,
 ) -> list[dict[str, Any]]:
     """Remove the concept-mapping whose CM-type is string-position-category and
     whose descriptor1 is whole or single.
@@ -1376,12 +1354,6 @@ def _build_theme_pattern_dict(
             for dim, rel in entries
         ],
     }
-
-
-def _get_codelet_count(workspace: Workspace) -> int:
-    """Get current codelet count from workspace or default."""
-    return getattr(workspace, "codelet_count", 0)
-
 
 
 

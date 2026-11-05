@@ -61,8 +61,8 @@ async def test_every_catalogued_parameter_is_one_the_engine_reads(app_client):
     import re
 
     read: set[str] = set()
-    # The parallel plugin reads its own parameters (``min_shard_capacity`` is the sharded
-    # coderack's), and it moved out of ``server/engine/`` to ``server/parallel/``.
+    # The parallel plugin may read parameters of its own, and it moved out of
+    # ``server/engine/`` to ``server/parallel/``.
     for root in ("server/engine", "server/parallel"):
         for path in pathlib.Path(root).rglob("*.py"):
             read |= set(re.findall(r'get_param\(\s*["\']([a-z_]+)["\']', path.read_text()))
@@ -239,7 +239,5 @@ async def test_derived_values_report_the_rack_and_telemetry_of_a_parallel_run(ap
 
     derived = (await app_client.get(f"/api/runs/{run_id}/parameters")).json()["derived"]
     assert derived["workers"] == 8
-    assert derived["coderack_shards"] == 1
-    assert derived["coderack_capacity_per_shard"] >= 25
     assert derived["parallel"]["workers"] == 8
     assert derived["parallel"]["executor"] == "speculative"

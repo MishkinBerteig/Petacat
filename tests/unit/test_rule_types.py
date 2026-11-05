@@ -2,6 +2,7 @@
 
 import os
 
+from server.engine.rng import RNG
 from server.engine.metadata import MetadataProvider
 from server.engine.rules import (
     CLAUSE_EXTRINSIC,
@@ -68,9 +69,9 @@ def test_bottom_rule():
 # clauses names no objects, so no string is consulted and None is admissible here.
 def test_translate_top_rule_becomes_bottom():
     rule = Rule(rule_type=RULE_TOP, clauses=[])
-    assert rule.translate(None, None, None, meta=_META).rule_type == RULE_BOTTOM
+    assert rule.translate(None, None, None, rng=RNG(1), meta=_META).rule_type == RULE_BOTTOM
 
 
 def test_translate_bottom_rule_becomes_top():
     rule = Rule(rule_type=RULE_BOTTOM, clauses=[])
-    assert rule.translate(None, None, None, meta=_META).rule_type == RULE_TOP
+    assert rule.translate(None, None, None, rng=RNG(1), meta=_META).rule_type == RULE_TOP

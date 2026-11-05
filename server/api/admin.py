@@ -31,7 +31,6 @@ from server.models.metadata import (
     CodeletPhaseDef,
     CodeletTypeDef,
     CommentaryTemplate,
-    DemoModeDef,
     DemoProblem,
     EngineParam,
     EventTypeDef,
@@ -351,7 +350,6 @@ class DemoProblemRequest(BaseModel):
     target: str
     answer: str | None = None
     seed: int = 0
-    mode: str = "discovery"
     description: str = ""
 
     @model_validator(mode="after")
@@ -372,7 +370,6 @@ class DemoProblemResponse(BaseModel):
     target: str
     answer: str | None
     seed: int
-    mode: str
     description: str
 
 
@@ -868,7 +865,6 @@ async def list_demos(session: AsyncSession = Depends(get_session)):
             target=r.target,
             answer=r.answer,
             seed=r.seed,
-            mode=r.mode,
             description=r.description or "",
         )
         for r in rows
@@ -889,7 +885,6 @@ async def create_demo(
         target=req.target,
         answer=req.answer,
         seed=req.seed,
-        mode=req.mode,
         description=req.description,
     ))
     return DemoProblemResponse(
@@ -901,7 +896,6 @@ async def create_demo(
         target=demo.target,
         answer=demo.answer,
         seed=demo.seed,
-        mode=demo.mode,
         description=demo.description or "",
     )
 
@@ -922,7 +916,6 @@ async def update_demo(
         target=req.target,
         answer=req.answer,
         seed=req.seed,
-        mode=req.mode,
         description=req.description,
     ))
     return DemoProblemResponse(
@@ -934,7 +927,6 @@ async def update_demo(
         target=demo.target,
         answer=demo.answer,
         seed=demo.seed,
-        mode=demo.mode,
         description=demo.description or "",
     )
 
@@ -1449,7 +1441,6 @@ async def export_metadata(session: AsyncSession = Depends(get_session)):
                 "target": r.target,
                 "answer": r.answer,
                 "seed": r.seed,
-                "mode": r.mode,
                 "description": r.description or "",
             }
             for r in demos_result.scalars().all()
@@ -1663,7 +1654,6 @@ _ENUM_TABLES: dict[str, type] = {
     "codelet_phases": CodeletPhaseDef,
     "posting_directions": PostingDirectionDef,
     "param_value_types": ParamValueTypeDef,
-    "demo_modes": DemoModeDef,
 }
 
 

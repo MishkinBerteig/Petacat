@@ -11,6 +11,7 @@ neighbours, which is behaviour of the real ``WorkspaceObject``, so those build a
 real ``WorkspaceString`` over a slipnet faked down to its ``.nodes`` mapping.
 """
 
+from server.engine.rng import RNG
 from server.engine.bonds import Bond
 from server.engine.groups import Group
 from server.engine.rng import TraceSeam
@@ -159,7 +160,7 @@ def test_external_strength_zero_when_no_supporting_bonds():
     a, b = _Obj(0, 0, string=string), _Obj(1, 1, string=string)
     bond = _bond(a, b, _sameness(), _letter_category())
     string.bonds = [bond]
-    assert bond.calculate_external_strength() == 0.0
+    assert bond.calculate_external_strength(RNG(1)) == 0.0
 
 
 def test_num_supporting_bonds_counts_matching_built_disjoint_bond():
@@ -243,7 +244,7 @@ def test_local_density_counts_unbonded_positional_slots():
 
     proposed = _bond(string.objects[2], string.objects[3], successor,
                      _letter_category(), direction=right)
-    assert proposed.get_local_density() == 25.0
+    assert proposed.get_local_density(RNG(1)) == 25.0
 
 
 def test_local_support_of_a_lone_early_bond_is_30_not_60():
@@ -261,7 +262,7 @@ def test_local_support_of_a_lone_early_bond_is_30_not_60():
     proposed = _bond(string.objects[2], string.objects[3], successor,
                      _letter_category(), direction=right)
     assert proposed.get_num_of_local_supporting_bonds() == 1
-    assert proposed.calculate_external_strength() == 30.0
+    assert proposed.calculate_external_strength(RNG(1)) == 30.0
 
 
 def test_local_density_is_100_only_when_the_bond_spans_the_string():
@@ -271,7 +272,7 @@ def test_local_density_is_100_only_when_the_bond_spans_the_string():
     right = FakeNode("plato-right")
     proposed = _bond(string.objects[0], string.objects[1], successor,
                      _letter_category(), direction=right)
-    assert proposed.get_local_density() == 100.0
+    assert proposed.get_local_density(RNG(1)) == 100.0
 
 
 def test_local_density_ignores_a_neighbour_bond_of_another_category():
@@ -283,7 +284,7 @@ def test_local_density_ignores_a_neighbour_bond_of_another_category():
 
     proposed = _bond(string.objects[2], string.objects[3], successor,
                      _letter_category(), direction=right)
-    assert proposed.get_local_density() == 0.0
+    assert proposed.get_local_density(RNG(1)) == 0.0
 
 
 # --- which generator the walk draws from ------------------------------------
@@ -332,39 +333,6 @@ def test_update_strength_hands_its_rng_to_the_density_walk():
     # Walking left from the first ``j`` reaches position 2, where both the letter
     # ``r`` and the group ``[rr]`` are edged: two candidates, so a real draw.
     assert rng.picks > 0
-
-
-def test_the_density_walk_asks_no_one_else_for_a_generator():
-    """Given none, it takes the first candidate rather than finding one.
-
-    The generator used to be hung off the Workspace and read from here, which is
-    how the walk came to bypass the per-codelet streams free-running derives.
-    """
-    string = _real_string("mrrjjj")
-    rr = Group(
-        string=string,
-        group_category=FakeNode("plato-same-group"),
-        bond_facet=_letter_category(),
-        direction=None,
-        objects=[string.objects[1], string.objects[2]],
-        bonds=[],
-    )
-    rr.proposal_level = Group.BUILT
-    string.add_group(rr)
-
-    class _Workspace:
-        def __getattr__(self, name):  # pragma: no cover - must never be reached
-            raise AssertionError(f"the density walk reached the Workspace for {name!r}")
-
-    string.workspace = _Workspace()
-
-    sameness = _sameness()
-    _succ_bond(string, 4, 5, sameness, None)
-    proposed = _bond(string.objects[3], string.objects[4], sameness,
-                     _letter_category())
-
-    # No generator, no exception, and the same answer every time.
-    assert proposed.get_local_density() == proposed.get_local_density()
 
 
 # --- incompatible (slot-conflicting) bonds ---------------------------------

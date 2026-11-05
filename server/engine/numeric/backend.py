@@ -32,8 +32,12 @@ The constraint that shapes the MLX backend: **MLX does not support float64 on th
 GPU.**  Every GPU array is float32.  Activations live in [0, 100] and per-edge
 contributions are rounded to integers before they are summed, so float32 carries
 about 7 significant digits where the reference carries 16.  That is a real
-difference and it is not hidden: ``mlx`` reports ``exact = False`` and the tests
-assert agreement within a measured tolerance rather than bit-for-bit.
+difference and it is not hidden: ``mlx`` reports ``exact = False``.  For a configuration
+whose activations are whole numbers, whose ``max_activation`` is float32-exact and at most 2^20,
+whose ``full_activation_threshold`` float32 does not move across a whole number and whose spread
+scale is exactly representable, the measured result is bit-identical to ``numpy`` (see
+``float32_exactness_problem``); a configuration outside those conditions is refused on a
+float32 backend.
 
 Selection
 ---------
@@ -76,7 +80,7 @@ from __future__ import annotations
 import os
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Iterator, Sequence
+from typing import TYPE_CHECKING, Any, Iterator, Sequence
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from server.engine.numeric.layout import (
@@ -223,7 +227,12 @@ class SlipnetSession(ABC):
 
     @abstractmethod
     def apply_jumps(self, indices: Sequence[int]) -> None:
-        """Set the given nodes to full activation."""
+        """Set the given nodes to full activation, except frozen ones.
+
+        ``jump_candidates`` offers a frozen node too, because the Scheme draws its coin
+        before ``update-activation`` refuses it (``slipnet.ss:377-389``, ``147-151``), so
+        the draw count is unchanged; the refusal happens here, on every backend.
+        """
 
 
 class Backend(ABC):
@@ -478,6 +487,101 @@ def select_backend(n_nodes: int) -> Backend | None:
     if mlx is not None and mlx.is_available() and n_nodes >= gpu_threshold_nodes:
         return get_backend("mlx")
     return best_available(n_nodes)
+
+
+#: The largest ``max_activation`` measured to run exactly on a float32 backend.  Measured with
+#: whole activations, 5 seeds x 20 update cycles, ``mlx`` against ``numpy``: 1,048,576 (2**20)
+#: and every smaller ceiling tried is identical, 1,500,000 differs in 3 of 5 runs and 2,000,000
+#: and above in all 5.  (2**24, where float32 stops holding every whole number, is therefore not
+#: the limit: the spread and decay products overflow float32's exact range first.)
+FLOAT32_MAX_ACTIVATION_LIMIT = 2 ** 20
+
+
+class InexactConfiguration(ValueError):
+    """A float32 backend was asked for explicitly under a configuration it cannot run exactly."""
+
+
+def _float32(value: float) -> float:
+    import struct
+
+    try:
+        return struct.unpack("f", struct.pack("f", value))[0]
+    except OverflowError:
+        return float("inf")
+
+
+def float32_exactness_problem(activation: Any, spread_scale: float) -> str | None:
+    """Why a float32 backend would not match the float64 reference under this configuration.
+
+    ``None`` when it would.  The conditions are the measured ones (``measure_guard.py``,
+    ``measure_guard2.py`` and ``measure_guard3.py`` in
+    ``agents-workspace/metacat-cleanup/round2/S3-dead-open/``; ``mlx`` against ``numpy``, five
+    seeds of twenty update cycles each, from random whole-number activations):
+
+    * ``max_activation`` must be a float32 value no larger than 2**20.  Whole ceilings up to
+      1,048,576 and the dyadic fractions 100.125, 100.25, 100.5, 100.75, 200.5 and 1000.5 were
+      identical; 100.1 differed in 5 of 5, and 1,500,000 and above differed.
+    * ``full_activation_threshold`` is only ever compared with activations, so float32 rounding
+      matters only if it moves the threshold across a whole number: 49.9, 50.5 and 51.2 were
+      identical, 50.00000001 (which float32 rounds to 50) differed in 4 of 5.  The condition is
+      that the threshold and its float32 round trip have the same ceiling.
+    * the spread scale ``update_cycle_length / reference_update_cycle_length`` must be exactly
+      representable in float32.  This one is cautious: scales 1/3 and 5/3 differed in 2 of 5, and
+      2/3 and 4/3 happened to match in this sample, but the primitive-level sweep of stage O
+      found mismatches at 21 of 60 inexact scales, so an inexact scale is refused.
+
+    The values come from the configuration in force, never from Standard's.
+    """
+    import math
+
+    ceiling = activation.max_activation
+    if not (0 < ceiling <= FLOAT32_MAX_ACTIVATION_LIMIT) or _float32(ceiling) != ceiling:
+        return (
+            f"max_activation={ceiling!r} is not a float32-exact value no larger than "
+            f"{FLOAT32_MAX_ACTIVATION_LIMIT}, so float32 activations would differ from the "
+            f"float64 reference"
+        )
+    threshold = activation.full_activation_threshold
+    if math.ceil(threshold) != math.ceil(_float32(threshold)):
+        return (
+            f"full_activation_threshold={threshold!r} changes which whole activations reach it "
+            f"when rounded to float32, so float32 jump windows would differ from the float64 "
+            f"reference"
+        )
+    if _float32(spread_scale) != spread_scale:
+        return (
+            f"the spread scale update_cycle_length / reference_update_cycle_length = "
+            f"{spread_scale!r} is not exactly representable in float32, so spreading would "
+            f"differ from the float64 reference"
+        )
+    return None
+
+
+def exact_backend_for(backend: Backend, activation: Any, spread_scale: float) -> Backend:
+    """*backend* if it can run this configuration exactly, else the guard's answer.
+
+    A float64 backend is always acceptable.  A float32 one (``exact = False``) must pass
+    :func:`float32_exactness_problem`.  Under ``auto`` a refused GPU falls back to the best
+    float64 backend; an explicitly requested one raises :class:`InexactConfiguration`
+    naming the value and why.
+    """
+    if backend.exact:
+        return backend
+    problem = float32_exactness_problem(activation, spread_scale)
+    if problem is None:
+        return backend
+    configured = _policy()[0]
+    if configured != "auto":
+        raise InexactConfiguration(
+            f"the {backend.name!r} backend cannot run this configuration exactly: {problem}. "
+            f"Use PETACAT_NUMERIC_BACKEND=numpy (or auto, which falls back on its own)."
+        )
+    classes = _classes()
+    for name in ("numpy", "python"):
+        cls = classes.get(name)
+        if cls is not None and cls.is_available():
+            return get_backend(name)
+    return get_backend("python")  # pragma: no cover - python is unconditional
 
 
 def reset_backend_cache() -> None:

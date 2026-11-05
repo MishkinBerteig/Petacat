@@ -1,6 +1,6 @@
 """FastAPI router for interactive run controls.
 
-Breakpoints, step size, theme/codelet/temperature/node clamping.
+Breakpoints, theme/codelet/temperature/node clamping.
 """
 
 from __future__ import annotations
@@ -22,10 +22,6 @@ router = APIRouter(prefix="/api/runs/{run_id}", tags=["controls"])
 
 class SetBreakpointRequest(BaseModel):
     codelet_count: int
-
-
-class SetStepSizeRequest(BaseModel):
-    step_size: int
 
 
 class ThemeClampItem(BaseModel):
@@ -153,17 +149,6 @@ async def clear_breakpoint(run_id: int):
     svc = get_run_service()
     try:
         result = svc.clear_breakpoint(run_id)
-    except ValueError as e:
-        raise HTTPException(404, str(e))
-    return result
-
-
-@router.put("/step-size")
-async def set_step_size(run_id: int, req: SetStepSizeRequest):
-    """Set the step size for a run."""
-    svc = get_run_service()
-    try:
-        result = svc.set_step_size(run_id, req.step_size)
     except ValueError as e:
         raise HTTPException(404, str(e))
     return result

@@ -44,7 +44,7 @@ def bare_slipnet(meta: MetadataProvider | None = None):
 
 def synthetic(n_nodes: int, seed: int = 0, **kwargs):
     """``synthetic_topology`` under the Metacat Standard Configuration's activation constants."""
-    from server.engine.numeric.synthetic import synthetic_topology
+    from tests.support.synthetic_slipnet import synthetic_topology
 
     return synthetic_topology(
         n_nodes, standard_activation(), int(standard_meta().get_param("update_cycle_length")),

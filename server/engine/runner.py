@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import logging
 import threading
-from collections import deque
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Any, Iterator
@@ -37,7 +36,6 @@ from server.engine.posting import (
 from server.engine.rng import RNG
 from server.engine.sink import STRUCTURE_BUILT, NullSink, RunSink
 from server.engine.slipnet import Slipnet
-from server.engine.staleness import StaleView
 from server.engine.temperature import Temperature
 from server.engine.verbose import VerboseLog
 from server.engine.themes import Themespace
@@ -221,13 +219,6 @@ class EngineContext:
         #: upwards.  ``None`` only in tests that build a context by hand.
         self.on_update_everything: Any = None
 
-        #: How many codelets behind the live Workspace each codelet reads (WP0.5).
-        #: 0 — the default — is ordinary live execution; nothing in
-        #: ``server/engine/staleness.py`` runs.  See that module for what a
-        #: non-zero value delays and what it deliberately does not.
-        self.staleness_delay: int = 0
-        self.view_history: deque[StaleView] = deque(maxlen=1)
-
         #: Read/write-set tracking (WP4.2).  Absent rather than idle when off, so
         #: serial execution — the permanent reference mode — pays one boolean check
         #: rather than the recorder's cost.
@@ -301,24 +292,6 @@ class EngineContext:
             self.access = AccessRecorder()
         elif not enabled:
             self.access = None
-
-    def set_staleness_delay(self, delay: int) -> None:
-        """Set the read lag, in codelets, and resize the history that serves it.
-
-        The history holds exactly ``delay`` views.  A view is captured at the top of
-        each step, *before* ``codelet_count`` is incremented, so the view taken at
-        the start of codelet *k* is labelled *k-1*; keeping ``delay`` of them leaves
-        the oldest at *k - delay* while codelet *k* runs, which is the lag asked for.
-        """
-        self.staleness_delay = max(0, int(delay))
-        self.view_history = deque(
-            self.view_history, maxlen=max(1, self.staleness_delay)
-        )
-
-    def capture_view(self) -> None:
-        """Record the current Workspace for codelets to read ``delay`` codelets hence."""
-        if self.staleness_delay:
-            self.view_history.append(StaleView(self))
 
 
 class EngineRunner:
@@ -809,12 +782,6 @@ class EngineRunner:
 
     def _step_mcat(self, ctx: EngineContext) -> StepResult:
         result = StepResult()
-
-        # Record the Workspace before this codelet touches it, so that with a
-        # staleness delay configured the codelet reads the state of ``delay``
-        # codelets ago rather than the state it is about to change (WP0.5).  A
-        # no-op at the default delay of 0.
-        ctx.capture_view()
 
         # A safety net rather than the reference's check, which is the one below: the
         # rack is refilled after each codelet, so it is never empty here except at the

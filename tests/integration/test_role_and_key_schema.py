@@ -188,7 +188,7 @@ def test_a_create_without_an_explicit_id_succeeds_after_the_first_load():
             SlipnetLinkDef(from_node="plato-a", to_node="plato-c", link_type="lateral",
                            label_node="plato-successor", link_length=None, fixed_length=False),
             DemoProblem(name="a new demo", initial="abc", modified="abd", target="ijk",
-                        seed=1, mode="discovery"),
+                        seed=1),
             ThemeDimensionDef(slipnet_node="plato-length", valid_relations=["identity"]),
         ]
         session.add_all(rows)

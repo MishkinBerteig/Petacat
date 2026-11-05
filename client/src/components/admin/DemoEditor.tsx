@@ -13,7 +13,6 @@ const COLUMNS: ColumnDef[] = [
   { key: 'target', label: 'Target', type: 'text', width: '9%' },
   { key: 'answer', label: 'Answer', type: 'text', width: '9%' },
   { key: 'seed', label: 'Seed', type: 'number', width: '7%' },
-  { key: 'mode', label: 'Mode', type: 'text', width: '9%' },
   { key: 'description', label: 'Description', type: 'text' },
 ]
 
@@ -30,7 +29,6 @@ function merged(rows: DemoProblem[], id: number, patch: Partial<DemoProblem>) {
     target: take('target') ?? '',
     answer: take('answer') || null,
     seed: Number(take('seed') ?? 0),
-    mode: take('mode') ?? 'discovery',
     description: take('description') ?? '',
   }
 }
@@ -64,8 +62,8 @@ export function DemoEditor({ configuration = GLOBAL_CONFIGURATION_ID }: Configur
   return (
     <div>
       <div className="text-xs text-muted mb-2">
-        {demos.length} demo problems (double-click to edit). A demo is a problem, a seed and
-        a mode; adding one puts it in the Problem Input dropdown.
+        {demos.length} demo problems (double-click to edit). A demo is a problem, an optional
+        answer and a seed; adding one puts it in the Problem Input dropdown.
       </div>
       <EditableTable
         columns={COLUMNS}

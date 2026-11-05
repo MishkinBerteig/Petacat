@@ -203,7 +203,7 @@ JOURNAL_MODULES = (
 )
 WORKER_SIDE_MODULES = (
     "server.engine.runner", "server.engine.metadata", "server.parallel.swarm",
-    "server.parallel.population", "server.parallel.free_running", "server.parallel.update_cycle",
+    "server.parallel.free_running", "server.parallel.update_cycle",
     "server.services.training_mode_session_executor",
 )
 

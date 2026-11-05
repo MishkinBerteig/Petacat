@@ -117,18 +117,6 @@
       "description": "A clamp period ended"
     },
     {
-      "name": "jootsing",
-      "display_label": "Jootsing",
-      "sort_order": 13,
-      "description": "Jumping out of the system \u2014 escaping repetitive failure"
-    },
-    {
-      "name": "theme_activated",
-      "display_label": "Theme Activated",
-      "sort_order": 14,
-      "description": "A theme pattern was activated"
-    },
-    {
       "name": "concept_mapping_built",
       "display_label": "Concept Mapping Built",
       "sort_order": 15,
@@ -413,20 +401,6 @@
       "display_label": "Rational",
       "sort_order": 5,
       "description": "Exact rational parameter value, written n/m"
-    }
-  ],
-  "demo_modes": [
-    {
-      "name": "discovery",
-      "display_label": "Discovery",
-      "sort_order": 0,
-      "description": "Discover the answer to the analogy problem"
-    },
-    {
-      "name": "justification",
-      "display_label": "Justification",
-      "sort_order": 1,
-      "description": "Justify a given answer to the analogy problem"
     }
   ]
 }

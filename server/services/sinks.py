@@ -136,8 +136,6 @@ class TraceRecordingSink:
         if ctx.memory.answers:
             self._answers.append(ctx.memory.answers[0])
 
-    def on_valence(self, ctx: EngineContext, signal: str, strength: float) -> None: ...
-
     def on_turn_end(self, ctx: EngineContext) -> None: ...
 
     # -- service-facing ------------------------------------------------
@@ -378,9 +376,6 @@ class AuditSink(TraceRecordingSink):
     def on_answer(self, ctx: EngineContext, answer: str, quality: float) -> None:
         super().on_answer(ctx, answer, quality)
         self._record(ctx, "answer", {"answer": answer, "quality": quality})
-
-    def on_valence(self, ctx: EngineContext, signal: str, strength: float) -> None:
-        self._record(ctx, "valence", {"signal": signal, "strength": strength})
 
     def on_turn_end(self, ctx: EngineContext) -> None:
         self._end_capture = capture_run_state(ctx)

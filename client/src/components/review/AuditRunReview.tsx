@@ -45,7 +45,6 @@ const ACTION_COLORS: Record<string, string> = {
   structure_built: '#4caf50',
   structure_broken: '#f44336',
   answer: 'var(--success)',
-  valence: '#ffc107',
 };
 
 export function AuditRunReview({ run }: { run: RecordedRun }) {
@@ -403,8 +402,6 @@ function describe(a: AuditAction): string {
       return `${p.structure} #${p.id} strength ${p.strength}`;
     case 'answer':
       return `${p.answer} (quality ${Math.round(p.quality ?? 0)})`;
-    case 'valence':
-      return `${p.signal} ${p.strength}`;
     default:
       return JSON.stringify(p);
   }

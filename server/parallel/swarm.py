@@ -163,7 +163,7 @@ class RunOutcome:
     answers: list[str]
     codelets: int
     seconds: float
-    #: ``status:answer`` — the oracle's key (``population.stopping_state``).
+    #: ``status:answer`` — the oracle's key (the expected-range oracle's stopping state).
     stopping_state: str
     temperature: float = 0.0
     #: Quality of the last answer reported to memory, when one was.
@@ -853,49 +853,7 @@ class Swarm:
         """One task, on whichever worker is free."""
         return self.map([task], meta=meta)[0]
 
-    async def amap(self, tasks, meta: MetadataProvider | None = None, chunksize: int = 1):
-        """``map`` for asyncio callers (the API): runs off the event loop's thread."""
-        import asyncio
-
-        return await asyncio.to_thread(self.map, list(tasks), meta, chunksize)
-
-    def run_seeds(
-        self,
-        initial: str,
-        modified: str,
-        target: str,
-        seeds: Sequence[int],
-        answer: str | None = None,
-        max_steps: int = 20_000,
-        parameters: dict[str, Any] | None = None,
-        backend: str | None = None,
-        meta: MetadataProvider | None = None,
-        executor: str = "serial",
-    ) -> list[RunOutcome]:
-        """The common case: one problem over many seeds, in seed order."""
-        return self.map(
-            (
-                RunTask(initial, modified, target, answer, int(s), max_steps, parameters,
-                        backend, executor)
-                for s in seeds
-            ),
-            meta=meta,
-        )
-
     # -- introspection ------------------------------------------------------
-
-    def worker_info(self) -> list[dict]:
-        """One probe per worker (pid, config hash, backend, QoS actually in force)."""
-        executor, _, _ = self._acquire(None)
-        try:
-            futures = [executor.submit(_worker_probe, 0.05) for _ in range(self.workers)]
-            seen: dict[int, dict] = {}
-            for f in futures:
-                info = f.result()
-                seen[info["pid"]] = info
-            return sorted(seen.values(), key=lambda d: d["pid"])
-        finally:
-            self._release()
 
     def status(self) -> dict:
         """Pool state for ``GET /api/swarm`` — cheap, never starts the pool."""

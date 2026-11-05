@@ -137,21 +137,6 @@ export function RunDerivedPanel() {
                 />
                 <Row label="Numeric device" value={derived.numeric_device} />
                 <Row label="Slipnet nodes" value={derived.slipnet_nodes} />
-                <Row
-                  label="Coderack shards"
-                  value={derived.coderack_shards}
-                  hint="How many racks the coderack divided itself into. 1 is the unsharded rack, which the parallel executor also uses."
-                />
-                <Row
-                  label="Capacity per shard"
-                  value={derived.coderack_capacity_per_shard}
-                  hint="Sharding divides the rack's capacity rather than replicating it, and a shard below 25 is too small for the jootsing sequence to complete."
-                />
-                <Row
-                  label="Staleness delay"
-                  value={derived.staleness_delay}
-                  hint="How many codelets old the values a codelet reads may be."
-                />
               </Section>
 
               <Section title="Identity">

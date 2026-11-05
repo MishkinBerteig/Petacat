@@ -102,9 +102,6 @@ class DerivedSizes(BaseModel):
 
     #: Parallel worker threads (speculative executor): one per performance core.
     workers: int
-    #: Coderack shards: one per worker, floor of two, bounded further by the
-    #: capacity a shard needs.
-    coderack_shards: int
     #: Processes in a population pool: every logical core but one.
     population_workers: int
     #: GPU cores the Metal dispatch is sized for.

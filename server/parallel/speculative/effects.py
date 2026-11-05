@@ -33,6 +33,7 @@ import hashlib
 import json
 import os
 from dataclasses import dataclass
+from typing import Any
 
 READ = "READ"
 WRITE = "WRITE"
@@ -57,6 +58,26 @@ def body_digest(source: str) -> str:
     about to run has the digest the audit saw (:meth:`Effects.info`).
     """
     return hashlib.sha256(source.encode("utf-8")).hexdigest()
+
+
+def support_digest(meta: Any) -> str:
+    """The digest of the configuration's descriptor predicates, as stored in ``effects_data.json``.
+
+    A body digest covers a codelet body only.  A descriptor predicate is a Python expression that
+    audited builtins evaluate (``possible_descriptor`` and ``Slipnet.get_possible_descriptors``,
+    called from the top-down description scout and from the thematic bridge scout), so what it
+    does is part of what the audit saw.  A configuration whose predicates differ from the audited
+    ones is not audited (:meth:`Effects.info`).
+
+    Posting, urgency and count formulas and posting conditions are not covered, on purpose: they
+    are evaluated only by ``EngineRunner._update_cycle``, the opening posting and the snag
+    restart (``runner.py``, ``update_cycle.py``), all of which run on the coordinator with
+    nothing in flight, and never inside a speculated codelet prefix.
+    """
+    h = hashlib.sha256()
+    for name in sorted(meta.slipnet_node_specs):
+        h.update(json.dumps(["node", name, meta.slipnet_node_specs[name].descriptor_predicate]).encode("utf-8"))
+    return h.hexdigest()
 
 
 def mask(names) -> int:
@@ -104,20 +125,27 @@ class TypeInfo:
 
 
 class Effects:
-    def __init__(self, builtins: dict[str, BuiltinEffect], types: dict[str, TypeInfo]) -> None:
+    def __init__(self, builtins: dict[str, BuiltinEffect], types: dict[str, TypeInfo],
+                 support_digest: str = "") -> None:
         self.builtins = builtins
         self.types = types
+        #: The digest of the descriptor predicates the audit saw.
+        self.support_digest = support_digest
         self._unknown = TypeInfo("?", True, ALL, ALL, True, "unclassified: barrier")
 
-    def info(self, codelet_type: str, body_digest: str) -> TypeInfo:
-        """The audited entry for *codelet_type*, only if *body_digest* is the audited body's.
+    def info(self, codelet_type: str, body_digest: str, support: str | None = None) -> TypeInfo:
+        """The audited entry for *codelet_type*, only if the audit holds for what will run.
 
         A body that is not the audited one (edited under an audited name, or a name the audit
         never saw) is a barrier: it runs on the coordinator, in order, as a writer of
-        everything, which is slower and exact.
+        everything, which is slower and exact.  So is every type under a configuration whose
+        descriptor predicates differ from the audited ones (*support*, the
+        :func:`support_digest` of the configuration in force).
         """
         got = self.types.get(codelet_type)
         if got is None or not got.body_digest or got.body_digest != body_digest:
+            return self._unknown
+        if support is not None and support != self.support_digest:
             return self._unknown
         return got
 
@@ -145,7 +173,7 @@ def load(path: str | None = None) -> Effects:
                     e.get("body_digest", ""))
         for n, e in raw["types"].items()
     }
-    eff = Effects(builtins, types)
+    eff = Effects(builtins, types, raw.get("support_digest", ""))
     if path is None:
         _CACHE = eff
     return eff

@@ -189,7 +189,7 @@ def test_malformed_is_400(cfg, label, batch):
 
 
 def test_malformed_names_the_op_and_the_field(cfg):
-    err = refused(cfg, ins("demo_problems", name="d1", initial="a", modified="b", target="c", seed=1, mode="x"),
+    err = refused(cfg, ins("demo_problems", name="d1", initial="a", modified="b", target="c", seed=1),
                   ins("slipnet_node_defs", **node(conceptual_depth="deep")))
     problem = err.problems[0]
     assert problem.op_index == 1 and problem.field == "row.conceptual_depth"
@@ -267,8 +267,7 @@ def test_code_that_does_not_compile_is_422_with_line_and_column(cfg, label, op, 
     if op["op"] == "insert":
         op["row"]["family"] = next(iter(cfg.tables["codelet_families"]))[0]
         op["row"]["phase"] = next(iter(cfg.tables["codelet_phases"]))[0]
-    err = refused(cfg, ins("demo_problems", name="d1", initial="a", modified="b", target="c", seed=1,
-                           mode=next(iter(cfg.tables["demo_modes"]))[0]), op)
+    err = refused(cfg, ins("demo_problems", name="d1", initial="a", modified="b", target="c", seed=1), op)
     p = err.problems[0]
     assert (err.kind, err.status) == ("does_not_compile", 422)
     assert p.op_index == 1 and p.language == language and p.line >= 1 and p.column >= 1

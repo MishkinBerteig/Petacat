@@ -213,12 +213,15 @@ def test_g9_memory_carried_into_a_reduced_configuration(carried, node) -> None:
                      pytest.param("no-opposite", marks=_mark("swarm:no-opposite"))])
 @pytest.mark.numeric_matrix
 def test_g9_a_small_swarm_call_under_a_reduced_configuration(reduced_name) -> None:
-    from server.parallel.swarm import Swarm
+    from server.parallel.swarm import RunTask, Swarm
 
     reduced = rc.a_d_w_z() if reduced_name == "a-d/w-z" else rc.node_removed("plato-opposite")
     problem = ("abc", "abd", "ijk") if reduced_name != "a-d/w-z" else ("abc", "abd", "dcb")
     meta = rc.provider(reduced)
     with Swarm(workers=2, meta=meta) as swarm:
-        outcomes = swarm.run_seeds(*problem, seeds=[1, 2, 3, 4], max_steps=300, meta=meta)
+        outcomes = swarm.map(
+            [RunTask(*problem, None, seed, 300, None, None, "serial") for seed in [1, 2, 3, 4]],
+            meta=meta,
+        )
     assert len(outcomes) == 4
     assert [o.error for o in outcomes] == [None] * 4

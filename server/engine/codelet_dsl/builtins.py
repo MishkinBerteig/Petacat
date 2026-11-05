@@ -35,7 +35,6 @@ from server.engine.groups import Group
 from server.engine.roles import ROLE_BY_NAME, absent
 from server.engine.rules import Rule
 from server.engine.sink import STRUCTURE_BROKEN, STRUCTURE_BUILT
-from server.engine.staleness import current_view
 from server.engine.trace import (
     ANSWER_FOUND,
     BOND_BROKEN,
@@ -232,13 +231,8 @@ def choose_object(ctx: EngineContext, weight_key: str = "intra") -> Any:
     Scheme: ``choose-object`` (``workspace.ss:499-502``) — a ``stochastic-pick``
     over ``temp-adjusted-values``, so the choice sharpens as temperature falls.
     """
-    view = current_view(ctx)
-    chosen = (
-        _choose_from_view(ctx, view, view.all_objects, weight_key)
-        if view is not None
-        else ctx.workspace.choose_object(
-            weight_key, ctx.rng, ctx.temperature.value, ctx.meta
-        )
+    chosen = ctx.workspace.choose_object(
+        weight_key, ctx.rng, ctx.temperature.value, ctx.meta
     )
     _read(ctx, chosen)
     return chosen
@@ -250,35 +244,9 @@ def choose_string_object(ctx: EngineContext, string: Any, weight_key: str = "int
     Scheme: ``choose-object`` (``workspace-strings.ss:340-343``) — a
     ``stochastic-pick`` over ``temp-adjusted-values``.
     """
-    view = current_view(ctx)
-    chosen = (
-        _choose_from_view(ctx, view, view.string_objects(string), weight_key)
-        if view is not None
-        else string.choose_object(weight_key, ctx.rng, ctx.temperature.value, ctx.meta)
-    )
+    chosen = string.choose_object(weight_key, ctx.rng, ctx.temperature.value, ctx.meta)
     _read(ctx, chosen)
     return chosen
-
-
-def _choose_from_view(
-    ctx: EngineContext, view: Any, objects: Any, weight_key: str
-) -> Any:
-    """Salience-weighted choice over a stale view (WP0.5).
-
-    Deliberately one ``weighted_pick`` call over one weight list, matching the live
-    path, so that switching staleness on shifts *which* object is chosen without
-    changing how many random numbers the choice consumes.  The temperature
-    adjustment is read live, not from the view: staleness is a model of reading
-    the *Workspace* late, and temperature is not in the Workspace.
-    """
-    if not objects:
-        return None
-    weights = temp_adjusted_values(
-        [view.object_weight(o, weight_key) for o in objects],
-        ctx.temperature.value,
-        ctx.meta,
-    )
-    return ctx.rng.weighted_pick(objects, weights)
 
 
 def choose_neighbor(ctx: EngineContext, obj: Any) -> Any:
@@ -2519,33 +2487,21 @@ def single_letter_group_probability(ctx: EngineContext, group: Any) -> float:
 
 def get_objects(ctx: EngineContext) -> list:
     """Get all workspace objects."""
-    view = current_view(ctx)
-    if view is not None:
-        return list(view.all_objects)
     return ctx.workspace.all_objects
 
 
 def get_string_objects(ctx: EngineContext, string: Any) -> list:
     """Get objects from a specific string."""
-    view = current_view(ctx)
-    if view is not None:
-        return list(view.string_objects(string))
     return string.objects
 
 
 def get_built_bonds(ctx: EngineContext, string: Any) -> list:
     """Get built bonds from a string."""
-    view = current_view(ctx)
-    if view is not None:
-        return list(view.string_bonds(string))
     return [b for b in string.bonds if b.is_built]
 
 
 def get_built_bridges(ctx: EngineContext, bridge_type: str = "top") -> list:
     """Get built bridges of a given type."""
-    view = current_view(ctx)
-    if view is not None:
-        return list(view.bridges(bridge_type))
     type_map = {
         "top": ctx.workspace.top_bridges,
         "bottom": ctx.workspace.bottom_bridges,

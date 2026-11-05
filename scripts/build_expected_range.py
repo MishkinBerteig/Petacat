@@ -132,6 +132,11 @@ BACKEND_REQUIREMENT = {
 _META: MetadataProvider | None = None
 
 
+def _catalogued_mode(problem: dict) -> str:
+    """A demo with an answer is a justification problem; one without is a discovery problem."""
+    return "justification" if problem.get("answer") is not None else "discovery"
+
+
 def resolve_backend(candidates: tuple[str, ...]) -> str:
     """The first candidate whose dependency is importable.
 
@@ -256,7 +261,7 @@ def saturate(
     return {
         "name": problem["name"],
         "demo_names": problem.get("demo_names", [problem["name"]]),
-        "source_modes": sorted(problem.get("source_modes", {problem["mode"]})),
+        "source_modes": sorted(problem.get("source_modes", {_catalogued_mode(problem)})),
         "initial": problem["initial"],
         "modified": problem["modified"],
         "target": problem["target"],
@@ -392,9 +397,9 @@ def main() -> None:
         key = (p["initial"], p["modified"], p["target"])
         if key in by_triple:
             by_triple[key]["demo_names"].append(p["name"])
-            by_triple[key]["source_modes"].add(p["mode"])
+            by_triple[key]["source_modes"].add(_catalogued_mode(p))
         else:
-            by_triple[key] = {**p, "demo_names": [p["name"]], "source_modes": {p["mode"]}}
+            by_triple[key] = {**p, "demo_names": [p["name"]], "source_modes": {_catalogued_mode(p)}}
     problems = list(by_triple.values())
     deduped = len(all_problems) - len(problems)
     if args.problem:

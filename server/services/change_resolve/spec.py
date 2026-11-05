@@ -55,7 +55,6 @@ REFERENCES: dict[tuple[str, str], tuple[str, bool]] = {
     ("codelet_pattern_defs", "urgency_level"): ("urgency_levels", False),
     ("engine_params", "value_type"): ("param_value_types", False),
     ("formula_coefficients", "value_type"): ("param_value_types", False),
-    ("demo_problems", "mode"): ("demo_modes", False),
 }
 
 #: Unique constraints other than the natural key: ``table -> [column tuples]``.  A NULL part

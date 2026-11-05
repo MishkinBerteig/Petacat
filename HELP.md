@@ -915,7 +915,7 @@ The whole resolved set is stored with a Normal or Audit run, not just what you c
 
 Not every engine setting is offered. Display timings and a handful the port reads nowhere are excluded, because a control that changes nothing is worse than no control. Three parameters that name Slipnet nodes are shown read-only: a wrong node name is not a typo a run recovers from.
 
-Distinct from the derived values shown beside them, which are outputs rather than settings — which numeric backend ran, how the Coderack sharded, the config and memory hashes.
+Distinct from the derived values shown beside them, which are outputs rather than settings — which numeric backend ran, the config and memory hashes.
 
 ### Salience
 

@@ -127,8 +127,8 @@ def _translate_rule_clause(
     from_string: Any,
     to_string: Any,
     slipnet: Any,
-    rng: Any = None,
-    meta: MetadataProvider | None = None,
+    rng: Any,
+    meta: MetadataProvider,
     slippage_log: Any = None,
 ) -> RuleClause | None:
     """Scheme: ``translate-rule-clause`` (``answers.ss:1350-1389``).
@@ -174,7 +174,7 @@ def _translate_rule_clause(
     dimensions = _remq_duplicates(
         [slippage.description_type1 for slippage in possible_transform_slippages]
     )
-    ignored = [d for d in dimensions if rng is not None and rng.prob(ignore_probability)]
+    ignored = [d for d in dimensions if rng.prob(ignore_probability)]
     applicable_transform_slippages = [
         s
         for s in possible_transform_slippages
@@ -360,13 +360,13 @@ def _apply_to_object_description(
     )
 
 
-def _slip(node: Any, slippages: list[Any], rng: Any = None, slippage_log: Any = None) -> Any:
+def _slip(node: Any, slippages: list[Any], rng: Any, slippage_log: Any = None) -> Any:
     """Apply slippages to a Slipnet node.
 
     ``rng`` matters: ``SlipnetNode.apply_slippages`` only makes a *coattail*
     slippage probabilistically (§3.4.1 — "the probability of such coattail
     slippages occurring is a function of the activation of the original
-    slippage's label node").  Called without an RNG it makes none at all.
+    slippage's label node").
     """
     if node is None:
         return None
@@ -1643,8 +1643,8 @@ class Rule(WorkspaceStructure):
         from_string: Any,
         to_string: Any,
         slipnet: Any,
-        rng: Any = None,
-        meta: MetadataProvider | None = None,
+        rng: Any,
+        meta: MetadataProvider,
     ) -> Rule | None:
         """Translate this rule across the vertical mapping.
 
@@ -1700,13 +1700,7 @@ class Rule(WorkspaceStructure):
         # it is used: slippages change the literal/relation mix and the conceptual
         # depths, so copying the source rule's four numbers across describes the
         # wrong rule.
-        if meta is not None:
-            translated.compute_quality(meta)
-        else:
-            translated.quality = self.quality
-            translated.uniformity = self.uniformity
-            translated.abstractness = self.abstractness
-            translated.succinctness = self.succinctness
+        translated.compute_quality(meta)
         translated.mark_as_translated(self, direction)
         translated.transcribe_to_english(meta)  # rules.ss:98, at make-rule
         translated.translation = _translation_result(
@@ -2020,7 +2014,7 @@ def rule_describable_bridge(bridge: Bridge) -> bool:
 
 def abstract_change_descriptions(
     bridges: list[Bridge],
-    rng: RNG | None = None,
+    rng: RNG,
     slipnet: Any = None,
     meta: MetadataProvider | None = None,
 ) -> list[IntrinsicChangeDescription | ExtrinsicChangeDescription]:
@@ -2036,7 +2030,7 @@ def abstract_change_descriptions(
     ----------
     bridges : list[Bridge]
         Horizontal bridges (already filtered by rule_describable_bridge).
-    rng : RNG | None
+    rng : RNG
         Random number generator for probabilistic swap abstraction.
 
     Returns
@@ -2082,9 +2076,9 @@ def abstract_change_descriptions(
             remaining = [s for s in all_swaps if s is not length_swap and s is not objctgy_swap]
 
             # Add Length and ObjCtgy swaps together or not at all
-            should_add = (rng is None) or (rng is not None and rng.prob(swap_prob))
+            should_add = rng.prob(swap_prob)
             if should_add:
-                abstract_subs = (rng is None) or (rng is not None and rng.prob(subobjects_prob))
+                abstract_subs = rng.prob(subobjects_prob)
                 if length_swap is not None:
                     ecd = ExtrinsicChangeDescription(
                         length_swap[0], length_swap[1], length_swap[2]
@@ -2101,10 +2095,10 @@ def abstract_change_descriptions(
                     all_cds.append(ecd)
 
             for swap in remaining:
-                should_add_remaining = (rng is None) or (rng is not None and rng.prob(swap_prob))
+                should_add_remaining = rng.prob(swap_prob)
                 if should_add_remaining:
                     ecd = ExtrinsicChangeDescription(swap[0], swap[1], swap[2])
-                    abstract_subs = (rng is None) or (rng is not None and rng.prob(subobjects_prob))
+                    abstract_subs = rng.prob(subobjects_prob)
                     if abstract_subs:
                         ecd.mark_as_subobjects_swap_if_possible()
                     all_cds.append(ecd)
@@ -2131,7 +2125,7 @@ def abstract_change_descriptions(
         # StrPosCtgy:Opposite => direction reversal abstraction
         if (_spans_left_side(cluster)
                 and _count_strposctgy_opposite_slippages(cluster) == 2):
-            should_add = (rng is None) or (rng is not None and rng.prob(subobjects_prob))
+            should_add = rng.prob(subobjects_prob)
             if should_add:
                 # The direction dimension and the opposite relation.  rules.ss:614-616 uses
                 # the slipnet constants directly; the bridges' concept mappings
@@ -2153,7 +2147,7 @@ def abstract_change_descriptions(
             # draw sits *inside* it, so a failed gate consumes no draw.
             if not _subobjects_gate(cluster, left_enclosing, s_dim, s_desc1, s_desc2):
                 continue
-            should_add = (rng is None) or (rng is not None and rng.prob(subobjects_prob))
+            should_add = rng.prob(subobjects_prob)
             # ``add-intrinsic-change-description`` refuses every individual StrPosCtgy
             # change (rules.ss:557-559), the subobjects ones included -- but only after
             # the draw above, which is outside it.
@@ -2343,9 +2337,9 @@ def sort_templates(templates: list[tuple]) -> list[tuple]:
 def reference_object_to_object_description(
     ref_object: Any,
     slipnet: Slipnet | None,
-    rng: RNG | None,
+    rng: RNG,
     temperature: float,
-    meta: MetadataProvider | None = None,
+    meta: MetadataProvider,
 ) -> tuple:
     """Convert a reference object into a rule object-description.
 
@@ -2438,9 +2432,9 @@ def descriptions_for_rule(obj: Any) -> list[Any]:
 
 def _choose_description_for_rule(
     obj: Any,
-    rng: RNG | None,
+    rng: RNG,
     temperature: float,
-    meta: MetadataProvider | None = None,
+    meta: MetadataProvider,
 ) -> Any:
     """Pick one of the descriptions a rule may name *obj* by.
 
@@ -2458,12 +2452,11 @@ def _choose_description_for_rule(
     candidates = descriptions_for_rule(obj)
     if not candidates:
         return None
-    if len(candidates) == 1 or rng is None:
+    if len(candidates) == 1:
         return candidates[0]
 
     weights = [float(d.descriptor.conceptual_depth) for d in candidates]
-    if meta is not None:
-        weights = temp_adjusted_values(weights, temperature, meta)
+    weights = temp_adjusted_values(weights, temperature, meta)
     if not any(w > 0 for w in weights):
         return candidates[0]
     return rng.weighted_pick(candidates, weights)
@@ -2496,9 +2489,9 @@ def _chez_map(fn: Any, items: list) -> list:
 def instantiate_rule_clause_template(
     template: tuple,
     slipnet: Slipnet | None,
-    rng: RNG | None,
+    rng: RNG,
     temperature: float,
-    meta: MetadataProvider | None = None,
+    meta: MetadataProvider,
 ) -> RuleClause:
     """Instantiate a rule-clause-template into a RuleClause.
 
@@ -2547,9 +2540,9 @@ def _instantiate_change_template(
     ct: tuple,
     obj_desc: tuple,
     slipnet: Slipnet | None,
-    rng: RNG | None,
+    rng: RNG,
     temperature: float,
-    meta: MetadataProvider | None = None,
+    meta: MetadataProvider,
 ) -> RuleChange:
     """Instantiate a single change template into a RuleChange.
 
@@ -2571,14 +2564,13 @@ def _instantiate_change_template(
     # so the choice sharpens toward the deepest descriptor as the temperature
     # falls, and a depth-0 descriptor has probability 0 — no floor
     # (``utilities.ss:443-448``).
-    if len(possible_descriptors) == 1 or rng is None:
+    if len(possible_descriptors) == 1:
         chosen = possible_descriptors[0]
     else:
         weights = [
             float(d.conceptual_depth) for d in possible_descriptors
         ]
-        if meta is not None:
-            weights = temp_adjusted_values(weights, temperature, meta)
+        weights = temp_adjusted_values(weights, temperature, meta)
         chosen = rng.weighted_pick(possible_descriptors, weights)
 
     # If dimension == object_description's desc_type and chosen is a relation,
@@ -3529,7 +3521,7 @@ def _partition_by(pred: Any, items: list) -> list[list]:
 def _bounded_random_partition(
     pred: Any,
     items: list,
-    rng: RNG | None = None,
+    rng: RNG,
     bound: int | None = None,
 ) -> list[list]:
     """Scheme: ``bounded-random-partition`` (``utilities.ss:790-813``).
@@ -3549,8 +3541,6 @@ def _bounded_random_partition(
     """
     if not items:
         return []
-    if rng is None:
-        return _partition_by(pred, items)
 
     if bound is None:
         bound = 1 + rng.randint(len(items))
@@ -3854,10 +3844,10 @@ def build_rule_from_bridges(
     rule_type: str,
     bridges: list[Bridge],
     slipnet: Slipnet,
-    rng: RNG | None,
+    rng: RNG,
     temperature: float,
+    meta: MetadataProvider,
     themespace: Any = None,
-    meta: MetadataProvider | None = None,
     workspace: Workspace | None = None,
 ) -> Rule | None:
     """Full rule-abstraction pipeline: bridges -> change descriptions -> rule.
@@ -3872,14 +3862,14 @@ def build_rule_from_bridges(
         Describable horizontal bridges.
     slipnet : Slipnet
         The slipnet for node lookups.
-    rng : RNG | None
+    rng : RNG
         Random number generator.
     temperature : float
         Current temperature.
+    meta : MetadataProvider
+        Metadata for quality computation.
     themespace : Any
         Themespace for theme pattern extraction.
-    meta : MetadataProvider | None
-        Metadata for quality computation.
 
     Returns
     -------
@@ -3900,8 +3890,7 @@ def build_rule_from_bridges(
         # Identity rule
         rule = Rule(rule_type, [], workspace=workspace)
         rule.set_abstracted_rule_information([], themespace)  # rules.ss:437
-        if meta:
-            rule.compute_quality(meta)
+        rule.compute_quality(meta)
         rule.transcribe_to_english(meta)  # rules.ss:98, at make-rule
         return rule
 
@@ -3928,8 +3917,7 @@ def build_rule_from_bridges(
     # 7. Build rule
     rule = Rule(rule_type, clauses, workspace=workspace)
     rule.set_abstracted_rule_information(templates, themespace)
-    if meta:
-        rule.compute_quality(meta)
+    rule.compute_quality(meta)
     rule.transcribe_to_english(meta)  # rules.ss:98, at make-rule
 
     return rule

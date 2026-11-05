@@ -148,7 +148,6 @@ class DemoProblem:
     target: str
     answer: str | None
     seed: int
-    mode: str  # discovery, justification
     description: str
 
 
@@ -334,7 +333,6 @@ class MetadataProvider:
                 target=d["target"],
                 answer=d.get("answer"),
                 seed=d["seed"],
-                mode=d["mode"],
                 description=d.get("description", ""),
             )
             for d in demos_data

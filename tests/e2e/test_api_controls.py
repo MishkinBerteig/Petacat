@@ -28,18 +28,6 @@ async def test_set_and_clear_breakpoint(app_client):
 
 
 @pytest.mark.asyncio
-async def test_set_step_size(app_client):
-    resp = await app_client.post("/api/runs", json={
-        "initial": "abc", "modified": "abd", "target": "xyz", "seed": SEED,
-    })
-    run_id = resp.json()["run_id"]
-
-    resp = await app_client.put(f"/api/runs/{run_id}/step-size", json={"step_size": 5})
-    assert resp.status_code == 200
-    assert resp.json()["step_size"] == 5
-
-
-@pytest.mark.asyncio
 async def test_clamp_and_unclamp_temperature(app_client):
     resp = await app_client.post("/api/runs", json={
         "initial": "abc", "modified": "abd", "target": "xyz", "seed": SEED,

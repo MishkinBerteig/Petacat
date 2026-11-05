@@ -7,7 +7,7 @@ in ``tests/seed_unit/test_slipnet_node.py``.
 
 from server.engine.rng import RNG
 from server.engine.slipnet import SlipnetLink, SlipnetNode
-from tests.support.standard_configuration import make_node
+from tests.support.standard_configuration import make_node, standard_meta
 
 
 def test_degree_of_association():
@@ -310,7 +310,7 @@ def _node_with_property_links(*lengths):
 def test_similar_property_links_asks_for_the_links_degree_of_association():
     node = _node_with_property_links(75)
     rng = _ScriptedRNG([True])
-    node.get_similar_property_links(rng)
+    node.get_similar_property_links(rng, 0, standard_meta())
     # a→alphabetic-first is length 75, so association 25.
     assert rng.asked == [0.25]
 
@@ -318,20 +318,20 @@ def test_similar_property_links_asks_for_the_links_degree_of_association():
 def test_similar_property_links_keeps_only_the_links_that_win_their_draw():
     node = _node_with_property_links(75, 10)
     rng = _ScriptedRNG([False, True])
-    kept = node.get_similar_property_links(rng)
+    kept = node.get_similar_property_links(rng, 0, standard_meta())
     assert kept == [node.property_links[1]]
 
 
 def test_similar_property_links_can_come_back_empty():
     """An empty result is a fizzle, not a fallback (descriptions.ss:115-117)."""
     node = _node_with_property_links(75)
-    assert node.get_similar_property_links(_ScriptedRNG([False])) == []
+    assert node.get_similar_property_links(_ScriptedRNG([False]), 0, standard_meta()) == []
 
 
 def test_a_node_without_property_links_asks_nothing():
     node = make_node("b", "b", 10)
     rng = _ScriptedRNG([])
-    assert node.get_similar_property_links(rng) == []
+    assert node.get_similar_property_links(rng, 0, standard_meta()) == []
     assert rng.asked == []
 
 

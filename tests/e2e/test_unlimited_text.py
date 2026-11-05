@@ -197,10 +197,8 @@ async def test_unstorable_text_in_a_change_batch_is_a_400_naming_the_field(clean
 
 @pytest.mark.asyncio
 async def test_a_caller_value_for_a_fixed_vocabulary_column_is_checked_first_a_4xx_never_a_500(clean, sessions):
-    """``demo_problems.mode`` is a foreign key to the demo modes: a bad name is refused, not a database error."""
-    demo = {"name": "v", "initial": "a", "modified": "b", "target": "c", "mode": "discovery"}
-    resp = await clean.post("/api/admin/demos", json={**demo, "mode": "no-such-mode"})
-    assert 400 <= resp.status_code < 500, resp.text
+    """A bad value for a fixed vocabulary column is refused, not a database error."""
+    demo = {"name": "v", "initial": "a", "modified": "b", "target": "c"}
     for field in ("name", "section", "description"):
         resp = await post_ascii(clean, "/api/admin/demos", {**demo, field: "a\x00b"})
         assert 400 <= resp.status_code < 500, (field, resp.text)

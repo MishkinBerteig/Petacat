@@ -421,8 +421,8 @@ describe('SessionPanel: creating a session', () => {
 
   it('adds the demo problems to the text', async () => {
     m.getDemos.mockResolvedValue([
-      { id: 1, name: 'a', section: 's', initial: 'abc', modified: 'abd', target: 'ijk', answer: null, seed: 1, mode: 'x', description: '' },
-      { id: 2, name: 'b', section: 's', initial: 'abc', modified: 'abd', target: 'xyz', answer: 'wyz', seed: 1, mode: 'x', description: '' },
+      { id: 1, name: 'a', section: 's', initial: 'abc', modified: 'abd', target: 'ijk', answer: null, seed: 1, description: '' },
+      { id: 2, name: 'b', section: 's', initial: 'abc', modified: 'abd', target: 'xyz', answer: 'wyz', seed: 1, description: '' },
     ])
     await openForm()
     fireEvent.click(screen.getByRole('button', { name: 'Add the demo problems' }))

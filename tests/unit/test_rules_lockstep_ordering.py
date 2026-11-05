@@ -189,7 +189,7 @@ def test_joots_from_justify_clamps_reads_the_most_recent_clamp():
         return c
 
     joots_from_justify_clamps(
-        [clamp("new"), clamp("old")], None, 0, None, None, None, None)
+        [clamp("new"), clamp("old")], None, 0, None, None, None, None, 0)
     assert set(seen) == {"new"}
 
 

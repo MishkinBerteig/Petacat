@@ -9,6 +9,7 @@ the arithmetic non-round) so the tests pin the formula rather than restate it.
 No randomness is involved.
 """
 
+from server.engine.rng import RNG
 from server.engine.groups import Group
 
 from tests.unit._fakes import FakeNode, FakeString
@@ -171,7 +172,7 @@ def test_external_strength_is_100_when_group_spans_string():
     members = [_PosObj(0, 0), _PosObj(1, 1)]
     string = FakeString(objects=list(members), length=2)
     g = _group(members, string=string)
-    assert g.calculate_external_strength() == 100.0
+    assert g.calculate_external_strength(RNG(1)) == 100.0
 
 
 def test_external_strength_zero_without_supporting_groups():
@@ -179,7 +180,7 @@ def test_external_strength_zero_without_supporting_groups():
     string = FakeString(objects=all_objs, groups=[], length=3)
     g = _group(all_objs[:2], string=string)  # not spanning, no sibling groups
     string.groups = [g]
-    assert g.calculate_external_strength() == 0.0
+    assert g.calculate_external_strength(RNG(1)) == 0.0
 
 
 # --- flipping --------------------------------------------------------------
@@ -253,13 +254,13 @@ def test_the_density_walk_substitutes_a_letters_enclosing_group():
     grouped_letter.enclosing_group = neighbour_group
     subject = _WalkObj(0, 1, right_n=grouped_letter)
 
-    assert _walk_group_neighbors(subject, "right") == [neighbour_group]
+    assert _walk_group_neighbors(subject, "right", RNG(1)) == [neighbour_group]
 
 
 def test_the_density_walk_stops_at_the_end_of_the_string():
     from server.engine.groups import _walk_group_neighbors
 
-    assert _walk_group_neighbors(_WalkObj(0, 1), "left") == []
+    assert _walk_group_neighbors(_WalkObj(0, 1), "left", RNG(1)) == []
 
 
 def test_get_all_descriptions_includes_bond_descriptions():

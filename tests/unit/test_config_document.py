@@ -101,7 +101,10 @@ def test_an_insert_into_an_ordered_table_lands_by_its_order_column(base):
     order = [r["sort_order"] for r in new.tables["slipnet_node_defs"].values()]
     assert order == sorted(order)
     keys = [k[0] for k in new.tables["slipnet_node_defs"]]
-    assert keys.index("new-node") == 4  # sort_orders 0, 1, 2, 3 are before it; its tie goes after
+    # sort_orders 0, 1, 2 are before it; it ties with the node at 3, and a tie is ordered by the
+    # natural key (config_registry.total_order), so it lands before that node when its name sorts first.
+    tied = next(k for k, r in base.tables["slipnet_node_defs"].items() if r["sort_order"] == 3)[0]
+    assert keys.index("new-node") == (3 if "new-node" < tied else 4)
     assert [k for k in keys if k != "new-node"] == [k[0] for k in base.tables["slipnet_node_defs"]]
 
 

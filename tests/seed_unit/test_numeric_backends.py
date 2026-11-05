@@ -45,7 +45,7 @@ from server.engine.numeric.layout import (
     ThemeParams,
     ThemeState,
 )
-from server.engine.numeric.synthetic import synthetic_state
+from tests.support.synthetic_slipnet import synthetic_state
 from tests.support.standard_configuration import standard_activation, synthetic
 from server.engine.slipnet import Slipnet
 from server.engine.themes import Themespace

@@ -2,7 +2,7 @@
 
 > **Auto-generated.** Run `python scripts/generate_api_docs.py` to regenerate from the FastAPI application.
 
-185 HTTP routes, plus `WS /ws/runs/{run_id}` for live state push.
+184 HTTP routes, plus `WS /ws/runs/{run_id}` for live state push.
 
 Interactive documentation is served at `/docs` while the API is running.
 
@@ -47,7 +47,6 @@ Metacat Mode: creating, driving and reading a run. On `POST /api/runs`, `mode` i
 | `GET` | `/api/runs/{run_id}/spreading-threshold` | Get Spreading Threshold |
 | `POST` | `/api/runs/{run_id}/spreading-threshold` | Set Spreading Threshold |
 | `POST` | `/api/runs/{run_id}/step` | Step Run |
-| `PUT` | `/api/runs/{run_id}/step-size` | Set Step Size |
 | `POST` | `/api/runs/{run_id}/stop` | Stop Run |
 | `GET` | `/api/runs/{run_id}/telemetry` | Get Run Telemetry |
 | `GET` | `/api/runs/{run_id}/temperature` | Get Temperature |

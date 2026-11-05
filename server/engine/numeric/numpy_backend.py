@@ -153,7 +153,10 @@ class NumpySlipnetSession(SlipnetSession):
 
     def apply_jumps(self, indices: Sequence[int]) -> None:
         if len(indices):
-            self.activation[np.asarray(indices, dtype=np.int64)] = self._max_activation
+            idx = np.asarray(indices, dtype=np.int64)
+            # ``update-activation`` (slipnet.ss:147-151) is a no-op on a frozen node.
+            idx = idx[~self.frozen[idx]]
+            self.activation[idx] = self._max_activation
 
 
 class NumpyBackend(Backend):

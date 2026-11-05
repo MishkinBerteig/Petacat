@@ -29,12 +29,27 @@ from server.parallel.swarm import (
     Swarm,
     default_backend,
     default_swarm_status,
+    _worker_probe,
     run_inprocess,
 )
 
 # Keep runs short: this is a fidelity test, and a capped run is as good a witness as a
 # finished one so long as swarm and serial agree on where it stopped.
 MAX_STEPS = 1500
+
+
+def _worker_info(swarm: Swarm) -> list[dict]:
+    """One probe per worker (pid, config hash, backend, QoS actually in force)."""
+    executor, _, _ = swarm._acquire(None)
+    try:
+        futures = [executor.submit(_worker_probe, 0.05) for _ in range(swarm.workers)]
+        seen: dict[int, dict] = {}
+        for f in futures:
+            info = f.result()
+            seen[info["pid"]] = info
+        return sorted(seen.values(), key=lambda d: d["pid"])
+    finally:
+        swarm._release()
 
 
 def _demo_problems() -> list[tuple]:
@@ -45,7 +60,7 @@ def _demo_problems() -> list[tuple]:
     for p in demo:
         key = (
             p["initial"], p["modified"], p["target"],
-            p.get("answer") if p["mode"] == "justification" else None,
+            p.get("answer"),
         )
         if key not in seen:
             seen.add(key)
@@ -213,9 +228,9 @@ def test_swarm_without_qos_gives_identical_outcomes(meta):
     task = RunTask("abc", "abd", "ijk", None, 9, MAX_STEPS, backend="numpy")
     with Swarm(workers=2, meta=meta, qos=False) as plain, Swarm(workers=2, meta=meta, qos=True) as placed:
         assert plain.run(task).fingerprint() == placed.run(task).fingerprint()
-        assert all(w["qos_applied"] is None for w in plain.worker_info())
+        assert all(w["qos_applied"] is None for w in _worker_info(plain))
         if qos.available():
-            assert all(w["qos"] == "USER_INITIATED" for w in placed.worker_info())
+            assert all(w["qos"] == "USER_INITIATED" for w in _worker_info(placed))
 
 
 # -- configuration ---------------------------------------------------------------------
@@ -228,10 +243,10 @@ def test_config_change_reinitialises_workers(meta):
     task = RunTask("abc", "abd", "mrrjjj", None, 3, 2000, backend="numpy")
     with Swarm(workers=2, meta=meta) as sw:
         first = sw.run(task)
-        assert {w["config_hash"] for w in sw.worker_info()} == {config_hash(meta)}
+        assert {w["config_hash"] for w in _worker_info(sw)} == {config_hash(meta)}
         assert sw.configure(meta) is False  # same hash: nothing to do
         assert sw.configure(other) is True
-        assert {w["config_hash"] for w in sw.worker_info()} == {config_hash(other)}
+        assert {w["config_hash"] for w in _worker_info(sw)} == {config_hash(other)}
         second = sw.run(task)
         assert second.fingerprint() == run_inprocess(task, other).fingerprint()
         assert first.fingerprint() == run_inprocess(task, meta).fingerprint()

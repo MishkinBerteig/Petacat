@@ -114,7 +114,7 @@ def check_progress(
     *,
     justify_mode: bool = False,
     self_watching_enabled: bool = True,
-    rng: RNG | None = None,
+    rng: RNG,
     themespace: Themespace | None = None,
     slipnet: Slipnet | None = None,
     coderack: Any = None,
@@ -161,7 +161,7 @@ def check_progress(
         if vlog is not None:
             vlog.say("progress-achieved", exact(progress))
         action = ""
-        if rng is not None and progress > 0:
+        if progress > 0:
             prob = progress / 100.0
             if rng.prob(prob):
                 action = (
@@ -245,7 +245,7 @@ def check_progress(
         vlog.say("clamp-probability", round_to_100ths(clamp_probability))
 
     # Stochastic check
-    if rng is not None and not rng.prob(clamp_probability):
+    if not rng.prob(clamp_probability):
         if vlog is not None:
             vlog.say("permission-granted-attempt-failed")
         return ProgressWatcherResult(
@@ -310,10 +310,10 @@ def attempt_jootsing(
     themespace: Themespace,
     meta: MetadataProvider,
     commentary: CommentaryLog | None = None,
-    codelet_count: int = 0,
     *,
+    codelet_count: int,
     self_watching_enabled: bool = True,
-    rng: RNG | None = None,
+    rng: RNG,
     slipnet: Slipnet | None = None,
     workspace: Workspace | None = None,
     memory: Any = None,
@@ -363,7 +363,7 @@ def attempt_jootsing(
         if vlog is not None:
             vlog.say("noticing-clamping-pattern")
 
-        if rng is not None and rng.prob(jootsing_prob):
+        if rng.prob(jootsing_prob):
             if vlog is not None:
                 vlog.say("jootsing-from-clamps", clamp_type.replace("_", "-"))
             # Jootsing from clamps
@@ -438,7 +438,7 @@ def attempt_jootsing(
 
     # jootsing.ss:77 ``(stochastic-if* (1- jootsing-probability) (fizzle))`` --
     # the reference's side of the coin (DISCREPANCIES5 A-4).
-    if rng is not None and rng.prob(1.0 - jootsing_probability):
+    if rng.prob(1.0 - jootsing_probability):
         if vlog is not None:
             vlog.say("jootsing-from-snags-failed")
         return JootserResult(pattern_detected=False)
@@ -473,10 +473,7 @@ def attempt_jootsing(
                 round_to_100ths(inclusion_prob),
             )
 
-        if rng is not None:
-            if rng.prob(inclusion_prob):
-                chosen_entries.append(entry)
-        elif inclusion_prob >= 0.5:
+        if rng.prob(inclusion_prob):
             chosen_entries.append(entry)
 
     if not chosen_entries:
@@ -603,7 +600,7 @@ def get_most_recent_event_set(
 
 def get_clamp_jootsing_probability(
     clamps: list[TraceEvent],
-    codelet_count: int = 0,
+    codelet_count: int,
     trace: TemporalTrace | None = None,
     vlog: Any = None,
     *,
@@ -691,8 +688,8 @@ def get_clamp_jootsing_probability(
 
 def joots_from_rule_codelet_clamps(
     clamps: list[TraceEvent],
-    commentary: CommentaryLog | None = None,
-    codelet_count: int = 0,
+    commentary: CommentaryLog | None,
+    codelet_count: int,
     templates: dict[str, Any] | None = None,
 ) -> JootserResult:
     """Break out of rule codelet clamp patterns.
@@ -715,8 +712,8 @@ def joots_from_rule_codelet_clamps(
 
 def joots_from_snag_response_clamps(
     clamps: list[TraceEvent],
-    commentary: CommentaryLog | None = None,
-    codelet_count: int = 0,
+    commentary: CommentaryLog | None,
+    codelet_count: int,
     templates: dict[str, Any] | None = None,
 ) -> JootserResult:
     """Break out of snag response patterns.
@@ -743,9 +740,9 @@ def joots_from_justify_clamps(
     workspace: Workspace | None,
     slipnet: Slipnet | None,
     themespace: Themespace | None,
-    rng: RNG | None,
-    commentary: CommentaryLog | None = None,
-    codelet_count: int = 0,
+    rng: RNG,
+    commentary: CommentaryLog | None,
+    codelet_count: int,
     *,
     memory: Any = None,
     meta: Any = None,
@@ -843,7 +840,7 @@ def joots_from_justify_clamps(
         )
 
     # "Too many unjustified slippages. Fizzling." (``jootsing.ss:220-222``)
-    if rng is not None and len(unjustified) > 1:
+    if len(unjustified) > 1:
         give_up_prob = 1.0 - 1.0 / len(unjustified)
         if rng.prob(give_up_prob):
             if vlog is not None:

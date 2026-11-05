@@ -64,42 +64,20 @@ class ConfigDocumentError(ValueError):
 # Tables: natural key and order
 # ---------------------------------------------------------------------------
 
-#: ``table -> (natural-key columns, order columns)``.
-#:
-#: The key columns are the configuration plan's 3.12.2; they are read from C6's
-#: ``config_registry.REGISTRY`` when it has the table, and this table is the fallback (and
-#: covers the enum tables, which the registry does not address).  The order columns are this
-#: module's own: they reproduce the order ``load_rows_from_db`` queries in, which is what the
-#: engine depends on (the role tables sort by ``(role, ordinal)`` in byte order, for example).
-_LOCAL_SPECS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
-    "slipnet_node_defs": (("name",), ("sort_order",)),
-    "slipnet_link_defs": (("from_node", "to_node", "link_type", "label_node"), ("sort_order",)),
-    "codelet_type_defs": (("name",), ("sort_order",)),
-    "posting_rules": (("rule_key",), ("sort_order",)),
-    "engine_params": (("name",), ("sort_order",)),
-    "urgency_levels": (("name",), ("sort_order",)),
-    "formula_coefficients": (("name",), ("sort_order",)),
-    "commentary_templates": (("template_key",), ()),
-    "demo_problems": (("name",), ()),
-    "theme_dimension_defs": (("slipnet_node",), ()),
-    "slipnet_layout": (("node_name",), ("sort_order",)),
-    "codelet_pattern_defs": (("pattern_name", "codelet_type"), ("ordinal",)),
-    "slipnet_node_roles": (("role", "ordinal"), ("role", "ordinal")),
-    "codelet_type_roles": (("role", "ordinal"), ("role", "ordinal")),
-    "theme_relations": (("name",), ("ordinal",)),
-    **{name: (("name",), ("sort_order",)) for name in ENUM_TABLE_MODELS},
-}
-
-
+# Every table's natural key and order columns come from ``config_registry._NATURAL_KEYS``
+# (see ``_build_specs``); the engine depends on this order (the role tables sort by
+# ``(role, ordinal)`` in byte order, for example).
 def _build_specs() -> dict[str, tuple[tuple[str, ...], tuple[str, ...]]]:
-    specs = dict(_LOCAL_SPECS)
-    try:  # C6's registry, when it is there
-        from server.services.config_registry import REGISTRY
-    except ImportError:
-        return specs
-    for name, (_key, order) in _LOCAL_SPECS.items():
-        if name in REGISTRY:
-            specs[name] = (tuple(REGISTRY[name].key), order)
+    """Each table's ``(key, order)``, read from the one declaration, ``config_registry._NATURAL_KEYS``.
+
+    The enum tables are not in that declaration (the change API does not address them): their
+    key is ``name`` and their order ``sort_order``.
+    """
+    from server.services.config_registry import _NATURAL_KEYS
+
+    specs: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = dict(_NATURAL_KEYS)
+    for name in ENUM_TABLE_MODELS:
+        specs[name] = (("name",), ("sort_order",))
     return specs
 
 
@@ -126,7 +104,16 @@ def key_columns(table: str) -> tuple[str, ...]:
 
 
 def order_columns(table: str) -> tuple[str, ...]:
+    """The declared order columns (``sort_order``, ``ordinal``) of *table*."""
     return _SPECS[table][1]
+
+
+def total_order_columns(table: str) -> tuple[str, ...]:
+    """The table's one total order: the declared columns, then the rest of the natural key."""
+    from server.services.config_registry import total_order
+
+    key, order = _SPECS[table]
+    return total_order(key, order)
 
 
 def _key_of(row: Row, cols: tuple[str, ...]) -> tuple:
@@ -139,10 +126,10 @@ def _key_dict(table: str, key: tuple) -> dict[str, Any]:
 
 
 def _sorted_items(table: str, items: Iterable[tuple[tuple, Row]]) -> list[tuple[tuple, Row]]:
-    order = order_columns(table)
+    order = total_order_columns(table)
     items = list(items)
     if order:
-        items.sort(key=lambda kv: tuple(kv[1][c] for c in order))
+        items.sort(key=lambda kv: tuple("" if kv[1].get(c) is None else kv[1][c] for c in order))
     return items
 
 
@@ -218,7 +205,7 @@ def from_rows(rows: Mapping[str, Iterable[Row]], version: int = 0) -> ConfigDocu
 def _apply_to_table(table: str, current: Table, ops: Sequence[Op]) -> Table:
     """The table after *ops* (all on this table), in order."""
     cols = key_columns(table)
-    order = set(order_columns(table))
+    order = set(total_order_columns(table))
     rows: dict[tuple, Row] = dict(current)
     resort = False
     for op in ops:
@@ -239,10 +226,11 @@ def _apply_to_table(table: str, current: Table, ops: Sequence[Op]) -> Table:
                 raise ConfigDocumentError(f"{table}: update of missing key {key!r}")
             new = {**old, **op["set"]}
             new_key = _key_of(new, cols)
-            if new_key != key:  # re-keyed: the row keeps its place
+            if new_key != key:  # re-keyed: the row keeps its place until the order is re-applied
                 if new_key in rows:
                     raise ConfigDocumentError(f"{table}: re-key onto existing key {new_key!r}")
                 rows = {(new_key if k == key else k): (new if k == key else v) for k, v in rows.items()}
+                resort = resort or bool(order)
             else:
                 rows[key] = new
             resort = resort or bool(order & op["set"].keys())
@@ -539,7 +527,6 @@ def rows_from_standard_files(seed_dir: str) -> dict[str, list[dict[str, Any]]]:
             "target": d["target"],
             "answer": d.get("answer"),
             "seed": d["seed"],
-            "mode": d["mode"],
             "description": d.get("description", ""),
         }
         for d in load("demo_problems.json")

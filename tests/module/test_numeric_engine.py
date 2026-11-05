@@ -24,6 +24,7 @@ import os
 import pytest
 
 from server.engine.metadata import MetadataProvider
+from server.engine.rng import RNG
 from server.engine.numeric import available_backends, get_backend
 from server.engine.numeric.backend import select_backend, use_backend
 from server.engine.runner import EngineRunner
@@ -246,10 +247,10 @@ def test_structure_strength_batching_matches_the_sequential_order(
     assert structures, "no structures were built, so nothing was compared"
 
     with use_backend(None):
-        workspace.update_all_structure_strengths()
+        workspace.update_all_structure_strengths(RNG(7))
         reference = [s.strength for s in structures]
     with use_backend(backend_name):
-        workspace.update_all_structure_strengths()
+        workspace.update_all_structure_strengths(RNG(7))
         observed = [s.strength for s in structures]
 
     assert observed == reference

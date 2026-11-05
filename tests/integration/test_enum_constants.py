@@ -50,15 +50,15 @@ def test_event_type_constants_match_seed(enums_data):
     from server.engine.trace import (
         ANSWER_FOUND, BOND_BROKEN, BOND_BUILT, BRIDGE_BROKEN, BRIDGE_BUILT,
         CLAMP_END, CLAMP_START, CONCEPT_ACTIVATION, CONCEPT_MAPPING_BUILT,
-        DESCRIPTION_BUILT, GROUP_BROKEN, GROUP_BUILT, JOOTSING, RULE_BROKEN,
-        RULE_BUILT, SNAG, THEME_ACTIVATED,
+        DESCRIPTION_BUILT, GROUP_BROKEN, GROUP_BUILT, RULE_BROKEN,
+        RULE_BUILT, SNAG,
     )
     expected = _names(enums_data, "event_types")
     constants = {
         ANSWER_FOUND, BOND_BROKEN, BOND_BUILT, BRIDGE_BROKEN, BRIDGE_BUILT,
         CLAMP_END, CLAMP_START, CONCEPT_ACTIVATION, CONCEPT_MAPPING_BUILT,
-        DESCRIPTION_BUILT, GROUP_BROKEN, GROUP_BUILT, JOOTSING, RULE_BROKEN,
-        RULE_BUILT, SNAG, THEME_ACTIVATED,
+        DESCRIPTION_BUILT, GROUP_BROKEN, GROUP_BUILT, RULE_BROKEN,
+        RULE_BUILT, SNAG,
     }
     assert constants == expected
 
@@ -163,26 +163,15 @@ def test_param_value_types_match_seed(enums_data):
     assert {"int", "float", "bool", "string", "json", "rational"} <= valid_types
 
 
-# ── Demo modes ──
-
-def test_demo_modes_match_seed(enums_data):
-    """Verify seed demo_modes cover all modes used in demo_problems.json."""
-    with open(os.path.join(SEED_DIR, "demo_problems.json")) as f:
-        demos = json.load(f)
-    used_modes = {d["mode"] for d in demos}
-    valid_modes = _names(enums_data, "demo_modes")
-    assert used_modes <= valid_modes, f"Unknown modes: {used_modes - valid_modes}"
-
-
 # ── Seed data structure ──
 
-def test_all_14_enum_tables_present(enums_data):
-    """Verify enums.json contains all 14 expected tables."""
+def test_all_13_enum_tables_present(enums_data):
+    """Verify enums.json contains all 13 expected tables."""
     expected_tables = {
         "run_statuses", "event_types", "bridge_types", "bridge_orientations",
         "clause_types", "rule_types", "theme_types", "proposal_levels",
         "link_types", "codelet_families", "codelet_phases",
-        "posting_directions", "param_value_types", "demo_modes",
+        "posting_directions", "param_value_types",
     }
     assert set(enums_data.keys()) == expected_tables
 

@@ -65,7 +65,6 @@ def pairs(cfg):
     second = list(t["slipnet_node_defs"])[1][0]
     family = next(iter(t["codelet_families"]))[0]
     phase = next(iter(t["codelet_phases"]))[0]
-    mode = next(iter(t["demo_modes"]))[0]
     direction = next(iter(t["posting_directions"]))[0]
     ordered = {r["node_name"] for r in t["slipnet_node_roles"].values() if r["role"] == "rule.dimension_order"}
     unbound = next(k[0] for k in t["slipnet_node_defs"] if k[0] not in ordered)
@@ -164,8 +163,8 @@ def pairs(cfg):
         ("remove_posting_rule", [{"op": "remove_posting_rule", "rule_key": "rule-scout"}],
          [dele("posting_rules", {"rule_key": "rule-scout"})]),
         ("add_demo_problem", [{"op": "add_demo_problem", "name": "d1", "fields": {
-            "initial": "abc", "modified": "abd", "target": "ijk", "seed": 1, "mode": mode}}],
-         [ins("demo_problems", name="d1", initial="abc", modified="abd", target="ijk", seed=1, mode=mode)]),
+            "initial": "abc", "modified": "abd", "target": "ijk", "seed": 1}}],
+         [ins("demo_problems", name="d1", initial="abc", modified="abd", target="ijk", seed=1)]),
     ]
 
 

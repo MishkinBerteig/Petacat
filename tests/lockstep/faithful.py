@@ -5,7 +5,7 @@ backend off (the engine's own float64 object-graph loops) unless
 ``PETACAT_LOCKSTEP_NUMERIC_BACKEND`` names one, fresh episodic memory, the
 standard ``RNG`` interface (a tracing or replaying subclass is passed in), Metacat's
 codelet cap, and the decision-changing mechanisms that have a switch set to Metacat's
-value.  Defaults the spec says to keep (spreading threshold 100, staleness delay 0,
+value.  Defaults the spec says to keep (spreading threshold 100,
 access tracking off, self-watching on) are simply left alone.
 """
 
@@ -61,7 +61,6 @@ def faithful_settings() -> dict[str, Any]:
         "memory": "fresh",  # an episode carries one memory across its runs
         "parameters": dict(FAITHFUL_PARAMETERS),
         "spreading_activation_threshold": 100,
-        "staleness_delay": 0,
         "access_tracking": False,
         "self_watching": True,
     }

@@ -260,7 +260,7 @@ class Group(WorkspaceObject, WorkspaceStructure):
             return 0.0
         return round((bond_factor * bf_weight + length_factor * lf_weight) / total)
 
-    def calculate_external_strength(self, rng: RNG | None = None) -> float:
+    def calculate_external_strength(self, rng: RNG) -> float:
         """External strength: 100 if spanning, otherwise local support.
 
         Scheme: groups.ss:411-414.
@@ -271,7 +271,7 @@ class Group(WorkspaceObject, WorkspaceStructure):
             return 100.0
         return self._local_support(rng)
 
-    def _local_support(self, rng: RNG | None = None) -> float:
+    def _local_support(self, rng: RNG) -> float:
         """Support from similar nearby groups.
 
         Scheme: groups.ss:384-391.
@@ -316,7 +316,7 @@ class Group(WorkspaceObject, WorkspaceStructure):
             count += 1
         return count
 
-    def get_local_density(self, rng: RNG | None = None) -> float:
+    def get_local_density(self, rng: RNG) -> float:
         """Density of similar groups in the local neighborhood.
 
         Scheme: groups.ss:354-383.
@@ -326,8 +326,7 @@ class Group(WorkspaceObject, WorkspaceStructure):
         Each step of the walk is a salience-weighted **stochastic** pick, and the
         reference re-rolls it on every strength update.  *rng* is the calling
         codelet's stream, threaded down from
-        :meth:`WorkspaceStructure.update_strength`; ``None`` means no run context
-        (see ``WorkspaceObject._pick_neighbor``).
+        :meth:`WorkspaceStructure.update_strength`.
         """
         if self.spans_whole_string():
             return 100.0
@@ -337,11 +336,10 @@ class Group(WorkspaceObject, WorkspaceStructure):
 
         # Walk neighbors in both directions
         # Trace seam: the walk's draws concern this group (lockstep spec §5.3).
-        previous = rng.trace_about(self) if rng is not None else None
+        previous = rng.trace_about(self)
         left_neighbors = _walk_group_neighbors(self, "left", rng)
         right_neighbors = _walk_group_neighbors(self, "right", rng)
-        if rng is not None:
-            rng.trace_about(previous)
+        rng.trace_about(previous)
         other_objects = left_neighbors + right_neighbors
         num_of_objects = len(other_objects)
 
@@ -587,7 +585,7 @@ def _disjoint_objects(obj1: Any, obj2: Any) -> bool:
 
 
 def _walk_group_neighbors(
-    group: Group, direction: str, rng: RNG | None = None
+    group: Group, direction: str, rng: RNG
 ) -> list[Any]:
     """Walk left or right from a group through *positional* neighbours.
 

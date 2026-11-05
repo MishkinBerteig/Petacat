@@ -171,7 +171,7 @@ async def test_an_enum_table_edit_is_a_journal_entry(clean, db_session):
     await db_session.rollback()
     start = len(await read_entries(db_session, 1))
     resp = await client.post("/api/admin/db/changes", json={
-        "ops": [{"op": "insert", "table": "demo_modes",
+        "ops": [{"op": "insert", "table": "posting_directions",
                  "row": {"name": "c7_mode", "display_label": "C7", "sort_order": 99, "description": ""}}],
     })
     assert resp.status_code == 200, resp.text
@@ -180,12 +180,12 @@ async def test_an_enum_table_edit_is_a_journal_entry(clean, db_session):
     entries = await read_entries(db_session, 1)
     assert len(entries) == start + 1 and entries[-1]["channel"] == "admin_database"
     again = await client.post("/api/admin/db/changes", json={
-        "ops": [{"op": "insert", "table": "demo_modes",
+        "ops": [{"op": "insert", "table": "posting_directions",
                  "row": {"name": "c7_mode", "display_label": "C7", "sort_order": 99, "description": ""}}],
     })
     assert again.status_code == 409
     mixed = await client.post("/api/admin/db/changes", json={
-        "ops": [{"op": "insert", "table": "demo_modes", "row": {"name": "c7_other"}},
+        "ops": [{"op": "insert", "table": "posting_directions", "row": {"name": "c7_other"}},
                 {"op": "update", "table": "engine_params", "key": {"name": "expiration_period"},
                  "fields": {"value": "9"}}],
     })

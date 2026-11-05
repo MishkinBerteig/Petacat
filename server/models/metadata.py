@@ -31,7 +31,7 @@ def _next_after_last(table_name: str, column_name: str = "sort_order"):
 
 
 # ──────────────────────────────────────────────────────────────────
-# Enum lookup tables (14 tables, all share the same schema pattern)
+# Enum lookup tables (13 tables, all share the same schema pattern)
 # ──────────────────────────────────────────────────────────────────
 
 class RunStatusDef(Base):
@@ -120,13 +120,6 @@ class PostingDirectionDef(Base):
 
 class ParamValueTypeDef(Base):
     __tablename__ = "param_value_types"
-    name = Column(Text, primary_key=True)
-    display_label = Column(Text, nullable=False)
-    sort_order = Column(Integer, nullable=False, default=0)
-    description = Column(Text, default="")
-
-class DemoModeDef(Base):
-    __tablename__ = "demo_modes"
     name = Column(Text, primary_key=True)
     display_label = Column(Text, nullable=False)
     sort_order = Column(Integer, nullable=False, default=0)
@@ -338,9 +331,6 @@ class DemoProblem(Base):
     """Pre-configured demo problem."""
 
     __tablename__ = "demo_problems"
-    __table_args__ = (
-        Index("ix_demo_problems_mode", "mode"),
-    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(Text, nullable=False, unique=True)
@@ -350,7 +340,6 @@ class DemoProblem(Base):
     target = Column(Text, nullable=False)
     answer = Column(Text, nullable=True)
     seed = Column(BigInteger, nullable=False)
-    mode = Column(Text, ForeignKey("demo_modes.name"), nullable=False)
     description = Column(Text, default="")
 
 

@@ -477,8 +477,6 @@ async def get_run_parameters(
 
     if runner is not None and runner.ctx is not None:
         ctx = runner.ctx
-        coderack = ctx.coderack
-        shards = getattr(coderack, "num_shards", 1)
         derived.update(
             {
                 "codelet_count": ctx.codelet_count,
@@ -486,14 +484,6 @@ async def get_run_parameters(
                 "status": runner.status,
                 "justify_mode": ctx.justify_mode,
                 "slipnet_nodes": len(ctx.slipnet.nodes),
-                "coderack_shards": shards,
-                # Sharding divides the rack's capacity rather than replicating it, and
-                # a shard below the floor is too small for the jootsing sequence to
-                # complete — so the per-shard figure is the one worth seeing.
-                "coderack_capacity_per_shard": (
-                    coderack._racks[0].max_size if shards > 1 else coderack.max_size
-                ),
-                "staleness_delay": ctx.staleness_delay,
             }
         )
         telemetry = svc._parallel_telemetry.get(run_id)

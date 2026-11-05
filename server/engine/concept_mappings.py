@@ -223,8 +223,6 @@ class ConceptMapping:
 
         Requires object1 and object2 to be set.
         """
-        if self.object1 is None or self.object2 is None:
-            return True  # Conservative default when objects unavailable
         # Identity mapping of 'whole' is not distinguishing
         if self.is_identity and holds_role(self.descriptor1, "position.whole"):
             return False

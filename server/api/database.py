@@ -5,7 +5,7 @@ guards below are against accidents, not authorisation (R9: there is no authentic
 
 Every table is introspected from ``Base.metadata`` and put in one **class**:
 
-* ``configuration``: every table the journal layer writes (the registry and the 14 enum
+* ``configuration``: every table the journal layer writes (the registry and the 13 enum
   tables).  An edit is a batch through the change API.
 * ``content``: ``help_topics``.  Written directly.
 * ``runtime``: runs, Metacat Mode's Episodic Memory rows and the like.  An edit needs expert
@@ -19,7 +19,7 @@ Every table is introspected from ``Base.metadata`` and put in one **class**:
   ``episodic_memory_protected``).
 
 A configuration edit is a batch through :class:`ChangeService` (``source = admin``,
-``channel = admin_database``), so it is a journal entry like any other.  The 14 enum tables are
+``channel = admin_database``), so it is a journal entry like any other.  The 13 enum tables are
 not addressed by the change API; their edits are resolved ops written by the journal layer
 (``write_immediate``), as the Admin enum editor does.
 

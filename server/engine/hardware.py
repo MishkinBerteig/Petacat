@@ -1,8 +1,8 @@
 """What machine this is, and the sizes derived from it.
 
 Petacat spreads work two ways: codelets across CPU cores, and the numeric
-substrate across GPU cores.  Both need a number — how many worker threads, how
-many coderack shards, how many processes in a population pool, how many GPU
+substrate across GPU cores.  Both need a number — how many worker threads,
+how many processes in the swarm's pool, how many GPU
 threads a dispatch should aim for — and every one of those numbers is a property
 of the machine the process is running on.  This module is where the machine is
 described and where those numbers are computed from the description.
@@ -38,15 +38,6 @@ by an environment variable so a particular run can be pinned:
     for the duration of its mutation, so the workers are placed where the cores
     are fastest.
 
-``PETACAT_CODERACK_SHARDS``
-    Coderack shards for the sharded benchmark candidates
-    (``scripts/bench_shards.py``).  A free-running run does not use them: it
-    installs one rack behind a lock, because a per-worker shard draw is not the
-    serial draw (the draw is urgency-weighted).  Default: one per worker, floor of
-    two.  A sharded rack's capacity is divided across shards rather than replicated, so the
-    effective count is additionally bounded by
-    ``server.parallel.coderack_shards.min_shard_capacity`` (the ``min_shard_capacity`` parameter).
-
 ``PETACAT_POPULATION_WORKERS``
     Processes in a population pool.  Default: every logical core but one.  The
     runs are independent and share nothing, so efficiency cores contribute real
@@ -74,7 +65,6 @@ from dataclasses import asdict, dataclass
 # -- environment variable names ---------------------------------------------
 
 ENV_WORKERS = "PETACAT_WORKERS"
-ENV_SHARDS = "PETACAT_CODERACK_SHARDS"
 ENV_POPULATION_WORKERS = "PETACAT_POPULATION_WORKERS"
 ENV_GPU_CORES = "PETACAT_GPU_CORES"
 ENV_GPU_THREADS_PER_CORE = "PETACAT_GPU_THREADS_PER_CORE"
@@ -92,9 +82,6 @@ FALLBACK_GPU_CORES = 64
 #: How many logical cores a population pool leaves free for the parent process
 #: and the operating system.
 POPULATION_RESERVED_CORES = 1
-
-#: Fewest shards a free-running rack is divided into.
-MIN_SHARDS = 2
 
 _SYSCTL_TIMEOUT_SECONDS = 5.0
 _SYSTEM_PROFILER_TIMEOUT_SECONDS = 30.0
@@ -362,20 +349,6 @@ def worker_count() -> int:
     return max(1, cpu_info().performance_cores)
 
 
-def shard_count(workers: int | None = None) -> int:
-    """Coderack shards for a run with ``workers`` workers.
-
-    One shard per worker, floor of two, for the benchmark candidates.  (Free-running
-    does not shard: see :class:`~server.parallel.coderack_shards.LockedCoderack`.)
-    ``server.parallel.coderack_shards`` bounds this further by the capacity a shard
-    needs to hold a full jootsing sequence.
-    """
-    override = _int_from_environment(ENV_SHARDS, 0)
-    if override > 0:
-        return override
-    return max(MIN_SHARDS, workers if workers is not None else worker_count())
-
-
 def worker_ladder(maximum: int | None = None) -> list[int]:
     """Worker counts a scaling measurement should sample on this machine.
 
@@ -442,7 +415,6 @@ def derived_sizes() -> dict:
     workers = worker_count()
     return {
         "workers": workers,
-        "coderack_shards": shard_count(workers),
         "population_workers": population_worker_count(),
         "gpu_cores": gpu_core_count(),
         "gpu_target_threads": gpu_target_threads(),
@@ -453,7 +425,6 @@ def overrides_in_force() -> dict[str, str]:
     """Environment variables from this module that are set, with their values."""
     names = (
         ENV_WORKERS,
-        ENV_SHARDS,
         ENV_POPULATION_WORKERS,
         ENV_GPU_CORES,
         ENV_GPU_THREADS_PER_CORE,

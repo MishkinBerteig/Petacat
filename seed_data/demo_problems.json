@@ -7,7 +7,6 @@
     "target": "mrrjjj",
     "answer": "mrrjjjj",
     "seed": 1092119323,
-    "mode": "justification",
     "description": "Chapter 5 sample run: justifies mrrjjjj"
   },
   {
@@ -18,7 +17,6 @@
     "target": "mrrjjj",
     "answer": "mrrkkk",
     "seed": 1248075611,
-    "mode": "justification",
     "description": "Chapter 5 sample run: justifies mrrkkk"
   },
   {
@@ -29,7 +27,6 @@
     "target": "xyz",
     "answer": "uyz",
     "seed": 2330176791,
-    "mode": "justification",
     "description": "Chapter 5 sample run: justifies uyz"
   },
   {
@@ -40,7 +37,6 @@
     "target": "xyz",
     "answer": "dyz",
     "seed": 2836825623,
-    "mode": "justification",
     "description": "Chapter 5 sample run: justifies dyz"
   },
   {
@@ -51,7 +47,6 @@
     "target": "mrrjjj",
     "answer": "mrrjjjj",
     "seed": 3729474543,
-    "mode": "justification",
     "description": "Chapter 5 sample run: justifies mrrjjjj"
   },
   {
@@ -62,7 +57,6 @@
     "target": "abbbc",
     "answer": "aaabccc",
     "seed": 789090523,
-    "mode": "justification",
     "description": "Chapter 5 sample run: justifies aaabccc"
   },
   {
@@ -73,7 +67,6 @@
     "target": "xyz",
     "answer": null,
     "seed": 3852097033,
-    "mode": "discovery",
     "description": "Chapter 5 sample run: discovery mode"
   },
   {
@@ -84,7 +77,6 @@
     "target": "abbbc",
     "answer": null,
     "seed": 3557912874,
-    "mode": "discovery",
     "description": "Chapter 5 sample run: discovery mode"
   },
   {
@@ -95,7 +87,6 @@
     "target": "xyz",
     "answer": "xyd",
     "seed": 1760747975,
-    "mode": "justification",
     "description": "Answer comparison: xyz family"
   },
   {
@@ -106,7 +97,6 @@
     "target": "xyz",
     "answer": "wyz",
     "seed": 3100511611,
-    "mode": "justification",
     "description": "Answer comparison: xyz family"
   },
   {
@@ -117,7 +107,6 @@
     "target": "xyz",
     "answer": "dyz",
     "seed": 2107869027,
-    "mode": "justification",
     "description": "Answer comparison: xyz family"
   },
   {
@@ -128,7 +117,6 @@
     "target": "xyz",
     "answer": "xyu",
     "seed": 939480183,
-    "mode": "justification",
     "description": "Answer comparison: xyz family"
   },
   {
@@ -139,7 +127,6 @@
     "target": "xyz",
     "answer": "wyz",
     "seed": 720286361,
-    "mode": "justification",
     "description": "Answer comparison: xyz family"
   },
   {
@@ -150,7 +137,6 @@
     "target": "xyz",
     "answer": "uyz",
     "seed": 2330176791,
-    "mode": "justification",
     "description": "Answer comparison: xyz family"
   },
   {
@@ -161,7 +147,6 @@
     "target": "mrrjjj",
     "answer": "mrrkkk",
     "seed": 4211806334,
-    "mode": "justification",
     "description": "Answer comparison: mrrjjj family"
   },
   {
@@ -172,7 +157,6 @@
     "target": "mrrjjj",
     "answer": "mrrjjjj",
     "seed": 1092119323,
-    "mode": "justification",
     "description": "Answer comparison: mrrjjj family"
   },
   {
@@ -183,7 +167,6 @@
     "target": "mrrjjj",
     "answer": "mrrkkk",
     "seed": 1248075611,
-    "mode": "justification",
     "description": "Answer comparison: mrrjjj family"
   },
   {
@@ -194,7 +177,6 @@
     "target": "mrrjjj",
     "answer": "mrrjjjj",
     "seed": 3729474543,
-    "mode": "justification",
     "description": "Answer comparison: mrrjjj family"
   },
   {
@@ -205,7 +187,6 @@
     "target": "abbba",
     "answer": "baaab",
     "seed": 3635369418,
-    "mode": "justification",
     "description": "Answer comparison: eqe family"
   },
   {
@@ -216,7 +197,6 @@
     "target": "abbba",
     "answer": "aaabaaa",
     "seed": 4209674874,
-    "mode": "justification",
     "description": "Answer comparison: eqe family"
   },
   {
@@ -227,7 +207,6 @@
     "target": "abbbc",
     "answer": null,
     "seed": 2302461154,
-    "mode": "discovery",
     "description": "Answer comparison: eqe family, discovery mode"
   },
   {
@@ -238,7 +217,6 @@
     "target": "abbbc",
     "answer": "aaabccc",
     "seed": 789090523,
-    "mode": "justification",
     "description": "Answer comparison: eqe family"
   },
   {
@@ -249,7 +227,6 @@
     "target": "xxixx",
     "answer": null,
     "seed": 698282038,
-    "mode": "discovery",
     "description": "Implausible rules demo"
   },
   {
@@ -260,7 +237,6 @@
     "target": "xxixx",
     "answer": null,
     "seed": 698282038,
-    "mode": "discovery",
     "description": "Implausible rules demo"
   },
   {
@@ -271,7 +247,6 @@
     "target": "xxixx",
     "answer": null,
     "seed": 175910650,
-    "mode": "discovery",
     "description": "Implausible rules demo"
   },
   {
@@ -282,7 +257,6 @@
     "target": "xxixx",
     "answer": null,
     "seed": 4109591222,
-    "mode": "discovery",
     "description": "Implausible rules demo"
   },
   {
@@ -293,7 +267,6 @@
     "target": "ijkk",
     "answer": "ijll",
     "seed": 2351730219,
-    "mode": "justification",
     "description": "Poor thematic characterizations demo"
   },
   {
@@ -304,7 +277,6 @@
     "target": "ijkk",
     "answer": "hjkk",
     "seed": 1810079903,
-    "mode": "justification",
     "description": "Poor thematic characterizations demo"
   },
   {
@@ -315,7 +287,6 @@
     "target": "xyz",
     "answer": null,
     "seed": 3009318743,
-    "mode": "discovery",
     "description": "Poor thematic characterizations demo"
   },
   {
@@ -326,7 +297,6 @@
     "target": "xyz",
     "answer": null,
     "seed": 2006188493,
-    "mode": "discovery",
     "description": "Poor thematic characterizations demo"
   },
   {
@@ -337,7 +307,6 @@
     "target": "mrrjjj",
     "answer": "mmmrrj",
     "seed": 3538780671,
-    "mode": "justification",
     "description": "Justifies mmmrrj (7794 time steps)"
   },
   {
@@ -348,7 +317,6 @@
     "target": "ijk",
     "answer": "abd",
     "seed": 3386544399,
-    "mode": "justification",
     "description": "Describes a and b as 'changing' in abc->abd (1126 time steps)"
   },
   {
@@ -359,7 +327,6 @@
     "target": "kkjjii",
     "answer": null,
     "seed": 912835776,
-    "mode": "discovery",
     "description": "Answers kji at 1240, kkkjjjiii at 1470, kkjjii at 1485"
   },
   {
@@ -370,7 +337,6 @@
     "target": "z",
     "answer": null,
     "seed": 3861033416,
-    "mode": "discovery",
     "description": "First answers b, then y via coattail slippage (945 time steps)"
   },
   {
@@ -381,7 +347,6 @@
     "target": "glz",
     "answer": null,
     "seed": 1108779034,
-    "mode": "discovery",
     "description": "Answers flz, then dlz, then hlz at step 1721"
   },
   {
@@ -392,7 +357,6 @@
     "target": "ab",
     "answer": null,
     "seed": 4242001,
-    "mode": "discovery",
     "description": "ab -> c with the target identical to the initial string"
   },
   {
@@ -403,7 +367,6 @@
     "target": "bc",
     "answer": null,
     "seed": 4242002,
-    "mode": "discovery",
     "description": "bc -> d with the target identical to the initial string"
   },
   {
@@ -414,7 +377,6 @@
     "target": "xy",
     "answer": null,
     "seed": 4242003,
-    "mode": "discovery",
     "description": "xy -> z with the target identical to the initial string"
   },
   {
@@ -425,7 +387,6 @@
     "target": "zy",
     "answer": null,
     "seed": 4242004,
-    "mode": "discovery",
     "description": "zy -> x, a predecessor step, target identical to the initial"
   },
   {
@@ -436,7 +397,6 @@
     "target": "aabb",
     "answer": null,
     "seed": 4242005,
-    "mode": "discovery",
     "description": "aabb -> cc, a length collapse, target identical to the initial"
   },
   {
@@ -447,7 +407,6 @@
     "target": "abc",
     "answer": null,
     "seed": 4242006,
-    "mode": "discovery",
     "description": "abc -> d with the target identical to the initial string"
   }
 ]

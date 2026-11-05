@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Callable, Mapping
 
-from server.engine.numeric.backend import select_backend
+from server.engine.numeric.backend import exact_backend_for, select_backend
 from server.engine.roles import Roles, absent, resolve_roles
 from server.engine.numeric.layout import (
     ActivationParams,
@@ -488,8 +488,8 @@ class SlipnetNode:
     def get_similar_property_links(
         self,
         rng: RNG,
-        temperature: float | None = None,
-        meta: MetadataProvider | None = None,
+        temperature: float,
+        meta: MetadataProvider,
     ) -> list[SlipnetLink]:
         """The property links short enough to be worth following *right now*.
 
@@ -515,18 +515,13 @@ class SlipnetNode:
         one: it shrinks with a fully-active label node.  Both shipped property
         links are fixed-length, so the distinction does not bite today, but a
         labelled property link added later would want the shrinking behaviour.
-
-        *temperature* and *meta* are optional so a caller with no temperature to
-        hand — a test, or a probe — gets the unadjusted probability rather than a
-        crash.
         """
         from server.engine.formulas import temp_adjusted_probability
 
         kept: list[SlipnetLink] = []
         for link in self.property_links:
             prob = link.degree_of_association() / 100.0
-            if temperature is not None and meta is not None:
-                prob = temp_adjusted_probability(prob, temperature, meta)
+            prob = temp_adjusted_probability(prob, temperature, meta)
             if rng.prob(prob):
                 kept.append(link)
         return kept
@@ -696,7 +691,7 @@ class SlipnetNode:
     def apply_slippages(
         self,
         slippages: list[object],
-        rng: RNG | None = None,
+        rng: RNG,
         sliplog: Any = None,
     ) -> SlipnetNode:
         """Apply a list of slippages (ConceptMappings) to this node.
@@ -747,12 +742,9 @@ class SlipnetNode:
             if sliplink is not None:
                 # §3.4.1: a coattail slippage happens only sometimes, with
                 # probability given by the sliplink's degree of association.
-                # Without an RNG we make no speculative slippage at all —
-                # firing every eligible coattail would mean, for instance, that
+                # Firing every eligible coattail would mean, for instance, that
                 # a first=>last slippage *always* dragged successor=>predecessor
                 # along, which is precisely the determinism §3.4 rejects.
-                if rng is None:
-                    continue
                 prob = sliplink.degree_of_association() / 100.0
                 if rng.prob(prob):
                     related = self.get_related_node(label)
@@ -1098,9 +1090,6 @@ class Slipnet:
 
         return slipnet
 
-    def get_node(self, name: str) -> SlipnetNode:
-        return self.nodes[name]
-
     def relation(self, name: str) -> Any:
         """The node of the theme relation *name* (``identity``, ``opposite``, ``successor``,
         ``predecessor``, or any other ``theme_relations`` row), or that relation's ``Absent``
@@ -1169,7 +1158,12 @@ class Slipnet:
         if backend is None:
             self._numeric = None
         else:
-            self._numeric = backend.open_slipnet(SlipnetTopology.from_slipnet(self))
+            topology = SlipnetTopology.from_slipnet(self)
+            backend = exact_backend_for(
+                backend, topology.activation,
+                self.update_cycle_length / self.reference_update_cycle_length,
+            )
+            self._numeric = backend.open_slipnet(topology)
         return self._numeric
 
     def update_activations(
@@ -1280,34 +1274,6 @@ class Slipnet:
             if link.from_node is from_node:
                 return link.label_node
         return None
-
-    def relationship_between(
-        self, nodes: list[SlipnetNode]
-    ) -> SlipnetNode | None:
-        """Return the common pairwise relationship among consecutive *nodes*.
-
-        Scheme: slipnet.ss:299-306.
-        Applies ``get_label`` to each adjacent pair.  If all labels exist and
-        are the same node, return that relationship; otherwise return None.
-        """
-        if not nodes or any(n is None for n in nodes):
-            return None
-
-        if len(nodes) < 2:
-            return None
-
-        # adjacency-map: apply get_label to each consecutive pair
-        relations: list[SlipnetNode | None] = []
-        for i in range(len(nodes) - 1):
-            relations.append(self.get_label(nodes[i], nodes[i + 1]))
-
-        # All must exist and be the same
-        if any(r is None for r in relations):
-            return None
-        if len(set(id(r) for r in relations)) != 1:
-            return None
-
-        return relations[0]
 
     def slip_linked(self, node1: SlipnetNode, node2: SlipnetNode) -> bool:
         """True if *node1* has a lateral-sliplink to *node2*.

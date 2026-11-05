@@ -16,7 +16,7 @@ def test_the_registry_has_every_addressable_table_and_no_enum_or_help_topic():
         "posting_rules", "codelet_pattern_defs", "engine_params", "formula_coefficients",
         "urgency_levels", "demo_problems", "commentary_templates",
     }
-    assert len(reg.ENUM_REGISTRY) == 14
+    assert len(reg.ENUM_REGISTRY) == 13
     assert "help_topics" not in reg.LAYER_REGISTRY
     assert set(reg.LAYER_REGISTRY) == set(reg.REGISTRY) | set(reg.ENUM_REGISTRY)
     assert set(reg.LAYER_REGISTRY) == set(reg.configuration_table_names())

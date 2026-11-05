@@ -15,7 +15,7 @@ instances plus a million ``SlipnetLink`` instances is gigabytes of Python object
 before any activation has been spread.  The layouts below are therefore designed
 to be the *primary* representation, with ``from_slipnet``/``apply_to_slipnet``
 being an adapter for today's 59-node object graph rather than the intended
-long-term route in.  ``synthetic.py`` builds these structures directly, with no
+long-term route in.  ``tests/support/synthetic_slipnet.py`` builds these structures directly, with no
 object graph anywhere, which is what a 300,000-node Slipnet will do.
 
 Why the edge list is destination-major
@@ -523,8 +523,7 @@ class ObjectValueBatch:
     correction rather than a design preference.  It is ``round(100 * raw / Σraw)``,
     a ratio whose numerator and denominator are sums of decayed activations and
     can legitimately be on the order of 1e-48 — a magnitude float32 cannot
-    represent at all, and which MLX flushes to zero even in a float64 graph
-    because it routes Python scalars through float32.  The ratio is perfectly
+    represent at all (it flushes below about 1.2e-38).  The ratio is perfectly
     well-defined; only the magnitudes are not.  Computing it on the host in
     float64, as the reference already does in its own separate pass
     (workspace-strings.ss:322-338, step 2), keeps every value the backends see

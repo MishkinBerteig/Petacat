@@ -44,9 +44,6 @@ class RecordingSink:
     def on_answer(self, ctx: Any, answer: str, quality: float) -> None:
         self.answers.append((answer, quality))
 
-    def on_valence(self, ctx: Any, signal: str, strength: float) -> None:
-        self.calls.append("valence")
-
     def on_turn_end(self, ctx: Any) -> None:
         self.calls.append("turn_end")
 

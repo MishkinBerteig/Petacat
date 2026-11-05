@@ -59,7 +59,6 @@ function substrate(overrides: Partial<NumericSubstrate> = {}): NumericSubstrate 
     },
     derived: {
       workers: 8,
-      coderack_shards: 8,
       population_workers: 11,
       gpu_cores: 38,
       gpu_target_threads: 65536,

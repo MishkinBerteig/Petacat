@@ -215,8 +215,12 @@ class PythonSlipnetSession(SlipnetSession):
 
     def apply_jumps(self, indices: Sequence[int]) -> None:
         act = self.state.activation
+        frozen = self.state.frozen
         for i in indices:
-            act[i] = self._max_activation
+            # ``update-activation`` (slipnet.ss:147-151) is a no-op on a frozen node:
+            # the coin was drawn, and the jump is refused.
+            if not frozen[i]:
+                act[i] = self._max_activation
 
 
 class PythonBackend(Backend):

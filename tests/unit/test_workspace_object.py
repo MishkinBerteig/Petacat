@@ -423,25 +423,6 @@ def test_the_neighbour_pick_draws_from_the_rng_it_is_given():
     assert rng.picks == 1
 
 
-def test_the_neighbour_pick_looks_for_no_generator_of_its_own():
-    """With no RNG the walk stays defined and consults nothing.
-
-    Specifically it does not go looking on the Workspace. Hanging the run's
-    generator there was how the density walk got randomness before it was
-    threaded from the call site, and it is the back-reference this pins closed:
-    a caller with no RNG gets the first candidate, not a hidden shared one.
-    """
-    string, rr = _string_with_rr_group()
-    m = string.objects[0]
-
-    class _Workspace:
-        def __getattr__(self, name):  # pragma: no cover - must never be reached
-            raise AssertionError(f"the neighbour pick reached the Workspace for {name!r}")
-
-    string.workspace = _Workspace()
-    assert m.choose_right_neighbor(None) is string.objects[1]
-
-
 def test_the_workspace_holds_no_generator_for_the_density_walk_to_find():
     from server.engine.workspace import Workspace
 

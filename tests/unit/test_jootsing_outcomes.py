@@ -201,6 +201,7 @@ def test_decent_rules_in_a_quiet_workspace_post_nothing():
         TemporalTrace(),
         codelet_count=500,
         meta=_FakeMeta(),
+        rng=_ScriptedRNG([]),
     )
 
     assert result.action not in ("post_answer_finder", "post_answer_justifier")

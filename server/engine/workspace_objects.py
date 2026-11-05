@@ -174,7 +174,7 @@ class WorkspaceObject:
                 return n
         return None
 
-    def choose_neighbor(self, rng: RNG | None = None) -> WorkspaceObject | None:
+    def choose_neighbor(self, rng: RNG) -> WorkspaceObject | None:
         """Stochastically pick a neighbor weighted by intra-string salience.
 
         Scheme: workspace-objects.ss:417-423 — a bare
@@ -193,16 +193,16 @@ class WorkspaceObject:
             self.get_all_left_neighbors() + self.get_all_right_neighbors(), rng
         )
 
-    def choose_left_neighbor(self, rng: RNG | None = None) -> WorkspaceObject | None:
+    def choose_left_neighbor(self, rng: RNG) -> WorkspaceObject | None:
         """Scheme: ``choose-left-neighbor`` (workspace-objects.ss:403-408)."""
         return self._pick_neighbor(self.get_all_left_neighbors(), rng)
 
-    def choose_right_neighbor(self, rng: RNG | None = None) -> WorkspaceObject | None:
+    def choose_right_neighbor(self, rng: RNG) -> WorkspaceObject | None:
         """Scheme: ``choose-right-neighbor`` (workspace-objects.ss:410-415)."""
         return self._pick_neighbor(self.get_all_right_neighbors(), rng)
 
     def _pick_neighbor(
-        self, neighbors: list[WorkspaceObject], rng: RNG | None
+        self, neighbors: list[WorkspaceObject], rng: RNG
     ) -> WorkspaceObject | None:
         """``stochastic-pick-by-method neighbors 'get-intra-string-salience``.
 
@@ -229,11 +229,6 @@ class WorkspaceObject:
         if not neighbors:
             return None
         if len(neighbors) == 1:
-            return neighbors[0]
-        if rng is None:
-            # No run context at all — an object built directly by a unit test.
-            # The first candidate keeps the walk defined without inventing a
-            # second source of randomness.  Inside a run every path carries one.
             return neighbors[0]
         weights = [n.salience.get("intra", 1.0) for n in neighbors]
         return rng.weighted_pick(neighbors, weights)

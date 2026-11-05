@@ -57,9 +57,6 @@ class RecordingSink:
     def on_answer(self, ctx, answer, quality):
         self.events.append(("answer", answer, quality))
 
-    def on_valence(self, ctx, signal, strength):
-        self.events.append(("valence", signal, strength))
-
     def on_turn_end(self, ctx):
         self.events.append(("turn_end", ctx.codelet_count))
 

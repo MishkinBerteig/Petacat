@@ -24,7 +24,7 @@ _PRIMITIVES = (type(None), bool, int, str, bytes)
 #: infrastructure, or callables).
 _SKIP = frozenset({
     "verbose_ctx", "ctx", "meta", "slipnet", "workspace", "commentary",
-    "commentary_templates", "_themespace", "sink", "view_history", "_lock",
+    "commentary_templates", "_themespace", "sink", "_lock",
 })
 
 

@@ -19,8 +19,6 @@ import pytest
 from server.engine.sink import (
     STRUCTURE_BROKEN,
     STRUCTURE_BUILT,
-    VALENCE_LOVE,
-    VALENCE_NOT_LOVE,
     NullSink,
     RunSink,
 )
@@ -31,7 +29,6 @@ EXPECTED_EVENTS = {
     "on_trace_event",
     "on_structure_change",
     "on_answer",
-    "on_valence",
     "on_turn_end",
 }
 
@@ -91,7 +88,6 @@ def test_null_sink_is_slotted_and_accumulates_nothing():
 
 def test_constants_are_distinct():
     assert STRUCTURE_BUILT != STRUCTURE_BROKEN
-    assert VALENCE_LOVE != VALENCE_NOT_LOVE
 
 
 def test_a_recording_sink_satisfies_the_protocol_without_inheriting():
@@ -107,7 +103,6 @@ def test_a_recording_sink_satisfies_the_protocol_without_inheriting():
         def on_trace_event(self, ctx, event): self.seen.append("trace_event")
         def on_structure_change(self, ctx, structure, change): self.seen.append(change)
         def on_answer(self, ctx, answer, quality): self.seen.append("answer")
-        def on_valence(self, ctx, signal, strength): self.seen.append(signal)
         def on_turn_end(self, ctx): self.seen.append("turn_end")
 
     recorder = Recorder()
@@ -115,6 +110,5 @@ def test_a_recording_sink_satisfies_the_protocol_without_inheriting():
 
     recorder.on_run_created(None)
     recorder.on_structure_change(None, None, STRUCTURE_BUILT)
-    recorder.on_valence(None, VALENCE_LOVE, 1.0)
     recorder.on_turn_end(None)
-    assert recorder.seen == ["run_created", STRUCTURE_BUILT, VALENCE_LOVE, "turn_end"]
+    assert recorder.seen == ["run_created", STRUCTURE_BUILT, "turn_end"]

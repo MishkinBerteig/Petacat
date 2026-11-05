@@ -39,7 +39,7 @@ def test_none_has_the_absent_depth(slipnet):
 
 
 def test_a_node_name_and_a_node_object_have_the_nodes_depth(slipnet):
-    node = slipnet.get_node("plato-a")
+    node = slipnet.nodes["plato-a"]
     assert justify._get_conceptual_depth("plato-a", slipnet) == node.conceptual_depth == 10
     assert justify._get_conceptual_depth(node, slipnet) == 10
 

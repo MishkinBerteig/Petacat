@@ -54,7 +54,7 @@ def problems():
     seen, out = set(), []
     for p in demo:
         key = (p["initial"], p["modified"], p["target"],
-               p.get("answer") if p["mode"] == "justification" else None)
+               p.get("answer"))
         if key not in seen:
             seen.add(key)
             out.append(key)
@@ -227,3 +227,149 @@ def test_a_digest_is_a_sha256_of_the_source():
     import hashlib
 
     assert fx.body_digest("fizzle()") == hashlib.sha256(b"fizzle()").hexdigest()
+
+
+# -- the audit belongs to the audited descriptor predicates (support digest) ---------------
+
+#: Types the effects table marks speculable but not profitable, and which call a descriptor
+#: predicate (the top-down description scout through ``possible_descriptor``).  Marking them
+#: profitable is a data change, and it is how a predicate comes to run on a worker.
+_UNPROFITABLE_PREDICATE_CALLERS = ("top-down-description-scout", "description-evaluator",
+                                   "important-object-bridge-scout")
+_WRITING_PREDICATE = (
+    "(obj.salience.update({'intra': obj.salience.get('intra', 0.0) + 0.5}) or True) "
+    "and group_length(obj) == 1"
+)
+
+
+def _with_node_predicate(meta, node: str, source: str):
+    import dataclasses
+
+    specs = dict(meta.slipnet_node_specs)
+    specs[node] = dataclasses.replace(specs[node], descriptor_predicate=source)
+    return dataclasses.replace(meta, slipnet_node_specs=specs)
+
+
+def _first(meta, field_name: str) -> str:
+    return next(getattr(r, field_name) for r in meta.posting_rules if getattr(r, field_name))
+
+
+def test_the_standard_configuration_is_the_audited_one(meta):
+    table = fx.load()
+    assert table.support_digest and table.support_digest == fx.support_digest(meta), (
+        "a descriptor predicate changed since the audit; re-audit and update support_digest "
+        "in effects_data.json on purpose"
+    )
+
+
+def test_a_changed_predicate_makes_every_type_a_barrier(meta, bodies):
+    table = fx.load()
+    name = "bond-evaluator"
+    digest = fx.body_digest(bodies[name]["execute_body"])
+    assert table.info(name, digest, fx.support_digest(meta)) is table.types[name]
+    edited = _with_node_predicate(meta, "plato-one", "group_length(obj) == 1 or False")
+    got = table.info(name, digest, fx.support_digest(edited))
+    assert got.barrier and got.reads == fx.ALL and got.writes == fx.ALL
+
+
+def test_the_engine_plans_every_type_as_a_barrier_under_an_edited_predicate(meta):
+    edited = _with_node_predicate(meta, "plato-one", "group_length(obj) == 1 or False")
+    for m, expect_barrier in ((meta, False), (edited, True)):
+        runner = EngineRunner(m)
+        runner.init_mcat("abc", "abd", "ijk", seed=3)
+        engine = SpeculativeEngine(runner, workers=2)
+        plans = [engine._type_plan(t)[0] for t in m.codelet_specs]
+        audited = [p for p in plans if not p.barrier]
+        assert (not audited) if expect_barrier else bool(audited)
+
+
+def test_posting_formulas_are_evaluated_only_where_nothing_is_in_flight():
+    """Why the digest does not cover posting, urgency and count formulas or conditions: their
+    only callers are the update cycle, the opening posting and the snag restart."""
+    import re
+
+    callers = set()
+    root = os.path.join(os.path.dirname(__file__), "..", "..", "server")
+    for dirpath, _dirs, files in os.walk(root):
+        for f in files:
+            if not f.endswith(".py"):
+                continue
+            path = os.path.join(dirpath, f)
+            if f == "posting.py":
+                continue
+            text = open(path).read()
+            if re.search(r"evaluate_(posting_formula|count_formula|condition|urgency)\(", text):
+                callers.add(os.path.relpath(path, root))
+    assert callers == {"engine/runner.py", "parallel/update_cycle.py"}, callers
+    builtins_src = open(os.path.join(root, "engine", "codelet_dsl", "builtins.py")).read()
+    assert "PostingContext" not in builtins_src and "posting_formula" not in builtins_src
+
+
+def _reachable_table(monkeypatch):
+    """The effects table with the unprofitable predicate callers marked profitable."""
+    import dataclasses
+
+    base = fx.load()
+    types = dict(base.types)
+    for name in _UNPROFITABLE_PREDICATE_CALLERS:
+        types[name] = dataclasses.replace(types[name], profitable=True)
+    table = fx.Effects(base.builtins, types, base.support_digest)
+    monkeypatch.setattr(fx, "load", lambda path=None: table)
+    return table
+
+
+def _predicate_threads(monkeypatch, meta, problem, seed):
+    import collections
+    import threading
+
+    import server.engine.slipnet as sl
+
+    seen = collections.Counter()
+    orig = sl.DESCRIPTOR_PREDICATE_NAMESPACE["group_length"]
+
+    def recording(g):
+        seen[threading.current_thread().name] += 1
+        return orig(g)
+
+    monkeypatch.setitem(sl.DESCRIPTOR_PREDICATE_NAMESPACE, "group_length", recording)
+    rec = run_record(meta, problem, seed, "spec", workers=4, max_steps=900)
+    return rec, seen
+
+
+def test_a_predicate_can_run_on_a_worker_inside_a_speculated_prefix(meta, monkeypatch):
+    """The path exists: once a predicate-calling type is allowed to run ahead (a data change in
+    the table), a descriptor predicate is evaluated on a ``spec-worker`` thread."""
+    _reachable_table(monkeypatch)
+    on_workers = 0
+    for problem, seed in ((("abc", "abd", "mrrjjj", None), 1), (("abc", "abd", "xyz", None), 2),
+                          (("abc", "abd", "aabbcc", None), 3)):
+        _rec, seen = _predicate_threads(monkeypatch, meta, problem, seed)
+        on_workers += sum(n for t, n in seen.items() if t != "MainThread")
+    assert on_workers > 0
+
+
+def test_an_edited_writing_predicate_never_runs_on_a_worker_and_is_exact(meta, monkeypatch):
+    """With the digest, the edited configuration is unaudited, so the predicate (which writes)
+    runs only on the coordinator and the run equals the reference."""
+    _reachable_table(monkeypatch)
+    edited = _with_node_predicate(meta, "plato-one", _WRITING_PREDICATE)
+    for problem, seed in ((("abc", "abd", "mrrjjj", None), 1), (("abc", "abd", "xyz", None), 2),
+                          (("abc", "abd", "aabbcc", None), 3)):
+        spec, seen = _predicate_threads(monkeypatch, edited, problem, seed)
+        assert set(seen) <= {"MainThread"}, seen
+        ref = run_record(edited, problem, seed, "ssr", max_steps=900)
+        assert diff(ref, spec) == []
+
+
+def test_without_the_digest_the_same_edit_does_run_on_a_worker(meta, monkeypatch):
+    """The digest is what keeps it off the workers: with the check disabled (the old behaviour)
+    the writing predicate runs on a ``spec-worker`` thread."""
+    table = _reachable_table(monkeypatch)
+    monkeypatch.setattr(fx, "support_digest", lambda m: table.support_digest)
+    edited = _with_node_predicate(meta, "plato-one", _WRITING_PREDICATE)
+    on_workers = 0
+    for problem, seed in ((("abc", "abd", "mrrjjj", None), 1), (("abc", "abd", "xyz", None), 2),
+                          (("abc", "abd", "aabbcc", None), 3)):
+        _rec, seen = _predicate_threads(monkeypatch, edited, problem, seed)
+        on_workers += sum(n for t, n in seen.items() if t != "MainThread")
+    assert on_workers > 0

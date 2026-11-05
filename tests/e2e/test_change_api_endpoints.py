@@ -403,7 +403,7 @@ async def test_a_row_addressed_by_id_or_an_enum_value_is_the_global_configuratio
     assert resp.status_code == 422 and "global" in resp.json()["detail"]
     resp = await clean.put(f"/api/admin/demos/1?configuration={made}", json=demo)
     assert resp.status_code == 422
-    resp = await clean.post(f"/api/admin/enums/demo_modes?configuration={made}", json={
+    resp = await clean.post(f"/api/admin/enums/posting_directions?configuration={made}", json={
         "name": "c14b-mode", "display_label": "x"})
     assert resp.status_code == 422
     assert (await clean.post(f"/api/admin/import?configuration={made}", json={})).status_code == 422
