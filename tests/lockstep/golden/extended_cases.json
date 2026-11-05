@@ -1,0 +1,1725 @@
+{
+ "format": "petacat-golden-extended-cases/1",
+ "about": "Cases of the extended golden baseline (tests/support/golden_extended.py), in selection order. Every case was recorded in Metacat 1.2 and replayed in Petacat without divergence (metacat); why is what it added over the original baseline and the cases before it.",
+ "parameters": {
+  "initial_clamp_fixed_time": true
+ },
+ "backend": "off",
+ "cases": [
+  {
+   "id": "episode/a-aa-b/s1x6-cap4000",
+   "kind": "episode",
+   "problem": [
+    "a",
+    "aa",
+    "b"
+   ],
+   "seeds": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+   ],
+   "cap": 4000,
+   "why": {
+    "engine_lines": 488,
+    "engine_arcs": 716,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [],
+    "most_new_in": [
+     "answer_comparison.py (720)",
+     "workspace_objects.py (138)",
+     "slipnet.py (112)",
+     "themes.py (95)"
+    ]
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 542,
+      "run_length": 542,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     },
+     {
+      "reach": 391,
+      "run_length": 391,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     },
+     {
+      "reach": 121,
+      "run_length": 121,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     },
+     {
+      "reach": 919,
+      "run_length": 919,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     },
+     {
+      "reach": 1667,
+      "run_length": 1667,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     },
+     {
+      "reach": 3094,
+      "run_length": 3094,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ],
+    "answer_report": "a-aa-b: 1/1 episodes identical (order-sensitive); ANS 6/6, EXPL 6/6, CMP 30/30"
+   }
+  },
+  {
+   "id": "discovery/abc-abd-ijk/s1-python-cap3000",
+   "kind": "discovery",
+   "problem": [
+    "abc",
+    "abd",
+    "ijk"
+   ],
+   "seeds": [
+    1
+   ],
+   "cap": 3000,
+   "backend": "python",
+   "why": {
+    "engine_lines": 191,
+    "engine_arcs": 284,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [],
+    "most_new_in": [
+     "numeric/python_backend.py (475)"
+    ]
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 396,
+      "run_length": 396,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ],
+    "replayed_with_numeric_backend": "python"
+   }
+  },
+  {
+   "id": "episode/abc-cba-aabc/s1x6-cap4000",
+   "kind": "episode",
+   "problem": [
+    "abc",
+    "cba",
+    "aabc"
+   ],
+   "seeds": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+   ],
+   "cap": 4000,
+   "why": {
+    "engine_lines": 83,
+    "engine_arcs": 125,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [],
+    "most_new_in": [
+     "answer_comparison.py (174)",
+     "themes.py (21)",
+     "memory.py (9)",
+     "answers.py (4)"
+    ]
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 904,
+      "run_length": 904,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     },
+     {
+      "reach": 613,
+      "run_length": 613,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     },
+     {
+      "reach": 816,
+      "run_length": 816,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     },
+     {
+      "reach": 1832,
+      "run_length": 1832,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     },
+     {
+      "reach": 3482,
+      "run_length": 3482,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     },
+     {
+      "reach": 4000,
+      "run_length": 4000,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ],
+    "answer_report": "abc-cba-aabc: 1/1 episodes identical (order-sensitive); ANS 5/5, EXPL 5/5, CMP 20/20"
+   }
+  },
+  {
+   "id": "discovery/ihg-ih-xyaaa/s1-cap3000",
+   "kind": "discovery",
+   "problem": [
+    "ihg",
+    "ih",
+    "xyaaa"
+   ],
+   "seeds": [
+    1
+   ],
+   "cap": 3000,
+   "why": {
+    "engine_lines": 31,
+    "engine_arcs": 58,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [
+     "snag:conflict",
+     "status:halted"
+    ],
+    "most_new_in": [
+     "snag_explanation.py (32)",
+     "jootsing.py (22)",
+     "workspace_objects.py (12)",
+     "workspace.py (8)"
+    ]
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 3000,
+      "run_length": 3000,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "justify/az-ay-bc-bc/s1-cap5000",
+   "kind": "justify",
+   "problem": [
+    "az",
+    "ay",
+    "bc"
+   ],
+   "seeds": [
+    1
+   ],
+   "answer": "bc",
+   "cap": 5000,
+   "why": {
+    "engine_lines": 26,
+    "engine_arcs": 55,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [],
+    "most_new_in": [
+     "workspace_objects.py (33)",
+     "rules.py (29)",
+     "images.py (19)"
+    ]
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 1805,
+      "run_length": 1805,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "episode/yz-xz-ab/s1x6-cap4000",
+   "kind": "episode",
+   "problem": [
+    "yz",
+    "xz",
+    "ab"
+   ],
+   "seeds": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+   ],
+   "cap": 4000,
+   "why": {
+    "engine_lines": 70,
+    "engine_arcs": 98,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [],
+    "most_new_in": [
+     "answer_comparison.py (150)",
+     "themes.py (18)"
+    ]
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 378,
+      "run_length": 378,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     },
+     {
+      "reach": 1311,
+      "run_length": 1311,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     },
+     {
+      "reach": 2304,
+      "run_length": 2304,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     },
+     {
+      "reach": 2814,
+      "run_length": 2814,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     },
+     {
+      "reach": 1350,
+      "run_length": 1350,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     },
+     {
+      "reach": 1483,
+      "run_length": 1483,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ],
+    "answer_report": "yz-xz-ab: 1/1 episodes identical (order-sensitive); ANS 5/5, EXPL 5/5, CMP 20/20"
+   }
+  },
+  {
+   "id": "discovery/abc-abd-xyz/s1-person-python-cap3000",
+   "kind": "discovery",
+   "problem": [
+    "abc",
+    "abd",
+    "xyz"
+   ],
+   "seeds": [
+    1
+   ],
+   "cap": 3000,
+   "interventions": [
+    {
+     "at": 200,
+     "op": "clamp_codelet_pattern",
+     "pattern": "group"
+    },
+    {
+     "at": 500,
+     "op": "undo_last_clamp"
+    }
+   ],
+   "backend": "python",
+   "why": {
+    "engine_lines": 16,
+    "engine_arcs": 36,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [
+     "clamp:manual_clamp"
+    ],
+    "most_new_in": [
+     "numeric/python_backend.py (25)",
+     "codelet_patterns.py (16)",
+     "trace.py (10)",
+     "coderack.py (1)"
+    ]
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 2746,
+      "run_length": 2746,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ],
+    "replayed_with_numeric_backend": "python"
+   }
+  },
+  {
+   "id": "justify/abc-cba-zyx-abc/s1-cap5000",
+   "kind": "justify",
+   "problem": [
+    "abc",
+    "cba",
+    "zyx"
+   ],
+   "seeds": [
+    1
+   ],
+   "answer": "abc",
+   "cap": 5000,
+   "why": {
+    "engine_lines": 22,
+    "engine_arcs": 43,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [],
+    "most_new_in": [
+     "images.py (49)",
+     "rules.py (16)"
+    ]
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 5000,
+      "run_length": 5000,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "discovery/ijklxyz-iijjkkllxxyyzz-ijklxyz/s1-cap3000",
+   "kind": "discovery",
+   "problem": [
+    "ijklxyz",
+    "iijjkkllxxyyzz",
+    "ijklxyz"
+   ],
+   "seeds": [
+    1
+   ],
+   "cap": 3000,
+   "why": {
+    "engine_lines": 19,
+    "engine_arcs": 31,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [],
+    "most_new_in": [
+     "codelet_dsl/builtins.py (36)",
+     "coderack.py (14)"
+    ]
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 3000,
+      "run_length": 3000,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "discovery/xqc-xqd-mrrjjj/s1-person-cap5000",
+   "kind": "discovery",
+   "problem": [
+    "xqc",
+    "xqd",
+    "mrrjjj"
+   ],
+   "seeds": [
+    1
+   ],
+   "cap": 5000,
+   "interventions": [
+    {
+     "at": 500,
+     "op": "set_self_watching",
+     "enabled": false
+    },
+    {
+     "at": 900,
+     "op": "set_self_watching",
+     "enabled": true
+    }
+   ],
+   "why": {
+    "engine_lines": 4,
+    "engine_arcs": 11,
+    "database_lines": 6,
+    "database_branch_arcs": 6,
+    "features": [],
+    "most_new_in": [
+     "themes.py (9)",
+     "runner.py (6)"
+    ]
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 319,
+      "run_length": 319,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "justify/abc-abd-xyz-wyz/s1-python-cap3000",
+   "kind": "justify",
+   "problem": [
+    "abc",
+    "abd",
+    "xyz"
+   ],
+   "seeds": [
+    1
+   ],
+   "answer": "wyz",
+   "cap": 3000,
+   "backend": "python",
+   "why": {
+    "engine_lines": 9,
+    "engine_arcs": 18,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [],
+    "most_new_in": [
+     "numeric/python_backend.py (24)",
+     "themes.py (3)"
+    ]
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 660,
+      "run_length": 660,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ],
+    "replayed_with_numeric_backend": "python"
+   }
+  },
+  {
+   "id": "justify/wxyz-vxyz-abcd-abce/s1-cap5000",
+   "kind": "justify",
+   "problem": [
+    "wxyz",
+    "vxyz",
+    "abcd"
+   ],
+   "seeds": [
+    1
+   ],
+   "answer": "abce",
+   "cap": 5000,
+   "why": {
+    "engine_lines": 12,
+    "engine_arcs": 15,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [],
+    "most_new_in": [
+     "themes.py (27)"
+    ]
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 3211,
+      "run_length": 3211,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "discovery/kd-dk-rhr/s2-cap3000",
+   "kind": "discovery",
+   "problem": [
+    "kd",
+    "dk",
+    "rhr"
+   ],
+   "seeds": [
+    2
+   ],
+   "cap": 3000,
+   "why": {
+    "engine_lines": 5,
+    "engine_arcs": 6,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [],
+    "most_new_in": [
+     "rules.py (11)"
+    ]
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 332,
+      "run_length": 332,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "justify/abc-abd-iijjkk-iijjk/s1-cap5000",
+   "kind": "justify",
+   "problem": [
+    "abc",
+    "abd",
+    "iijjkk"
+   ],
+   "seeds": [
+    1
+   ],
+   "answer": "iijjk",
+   "cap": 5000,
+   "why": {
+    "engine_lines": 7,
+    "engine_arcs": 14,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [],
+    "most_new_in": [
+     "jootsing.py (15)",
+     "images.py (3)",
+     "themes.py (3)"
+    ]
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 4065,
+      "run_length": 4065,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "episode/abc-cba-mrrjjj/s1x6-cap4000",
+   "kind": "episode",
+   "problem": [
+    "abc",
+    "cba",
+    "mrrjjj"
+   ],
+   "seeds": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+   ],
+   "cap": 4000,
+   "why": {
+    "engine_lines": 13,
+    "engine_arcs": 20,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [],
+    "most_new_in": [
+     "answer_comparison.py (28)",
+     "memory.py (5)"
+    ]
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 842,
+      "run_length": 842,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     },
+     {
+      "reach": 1547,
+      "run_length": 1547,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     },
+     {
+      "reach": 1066,
+      "run_length": 1066,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     },
+     {
+      "reach": 691,
+      "run_length": 691,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     },
+     {
+      "reach": 1168,
+      "run_length": 1168,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     },
+     {
+      "reach": 2924,
+      "run_length": 2924,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ],
+    "answer_report": "abc-cba-mrrjjj: 1/1 episodes identical (order-sensitive); ANS 6/6, EXPL 6/6, CMP 30/30"
+   }
+  },
+  {
+   "id": "discovery/wxyz-wxyy-bcd/s1-cap3000",
+   "kind": "discovery",
+   "problem": [
+    "wxyz",
+    "wxyy",
+    "bcd"
+   ],
+   "seeds": [
+    1
+   ],
+   "cap": 3000,
+   "why": {
+    "engine_lines": 4,
+    "engine_arcs": 7,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [],
+    "most_new_in": [
+     "rule_english.py (8)",
+     "answers.py (3)"
+    ]
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 1354,
+      "run_length": 1354,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "discovery/kk-k-tttnnn/s1-cap3000",
+   "kind": "discovery",
+   "problem": [
+    "kk",
+    "k",
+    "tttnnn"
+   ],
+   "seeds": [
+    1
+   ],
+   "cap": 3000,
+   "why": {
+    "engine_lines": 4,
+    "engine_arcs": 8,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [],
+    "most_new_in": [
+     "verbose.py (5)",
+     "images.py (5)",
+     "jootsing.py (2)"
+    ]
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 3000,
+      "run_length": 3000,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "discovery/qqq-qqqq-qqqqqq/s1-cap3000",
+   "kind": "discovery",
+   "problem": [
+    "qqq",
+    "qqqq",
+    "qqqqqq"
+   ],
+   "seeds": [
+    1
+   ],
+   "cap": 3000,
+   "why": {
+    "engine_lines": 2,
+    "engine_arcs": 6,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [],
+    "most_new_in": [
+     "groups.py (4)",
+     "formulas.py (4)"
+    ]
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 678,
+      "run_length": 678,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "discovery/mhgf-fghm-vvvbbb/s1-cap3000",
+   "kind": "discovery",
+   "problem": [
+    "mhgf",
+    "fghm",
+    "vvvbbb"
+   ],
+   "seeds": [
+    1
+   ],
+   "cap": 3000,
+   "why": {
+    "engine_lines": 0,
+    "engine_arcs": 1,
+    "database_lines": 3,
+    "database_branch_arcs": 3,
+    "features": [],
+    "most_new_in": [
+     "answers.py (1)"
+    ]
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 1252,
+      "run_length": 1252,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "justify/a-b-xyz-xy/s1-cap5000",
+   "kind": "justify",
+   "problem": [
+    "a",
+    "b",
+    "xyz"
+   ],
+   "seeds": [
+    1
+   ],
+   "answer": "xy",
+   "cap": 5000,
+   "why": {
+    "engine_lines": 3,
+    "engine_arcs": 8,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [],
+    "most_new_in": [
+     "codelet_dsl/builtins.py (7)",
+     "trace_display.py (3)",
+     "jootsing.py (1)"
+    ]
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 2374,
+      "run_length": 2374,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "justify/ab-ba-cd-dc/s1-cap5000",
+   "kind": "justify",
+   "problem": [
+    "ab",
+    "ba",
+    "cd"
+   ],
+   "seeds": [
+    1
+   ],
+   "answer": "dc",
+   "cap": 5000,
+   "why": {
+    "engine_lines": 0,
+    "engine_arcs": 0,
+    "database_lines": 3,
+    "database_branch_arcs": 3,
+    "features": [],
+    "most_new_in": []
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 1189,
+      "run_length": 1189,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "discovery/utsr-uts-ttsr/s1-cap3000",
+   "kind": "discovery",
+   "problem": [
+    "utsr",
+    "uts",
+    "ttsr"
+   ],
+   "seeds": [
+    1
+   ],
+   "cap": 3000,
+   "why": {
+    "engine_lines": 2,
+    "engine_arcs": 4,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [],
+    "most_new_in": [
+     "images.py (6)"
+    ]
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 913,
+      "run_length": 913,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "episode/aa-bb-cc/s1x6-clear4-cap4000",
+   "kind": "episode",
+   "problem": [
+    "aa",
+    "bb",
+    "cc"
+   ],
+   "seeds": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+   ],
+   "cap": 4000,
+   "clear_before": [
+    4
+   ],
+   "why": {
+    "engine_lines": 3,
+    "engine_arcs": 4,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [],
+    "most_new_in": [
+     "memory.py (7)"
+    ]
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 376,
+      "run_length": 376,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     },
+     {
+      "reach": 363,
+      "run_length": 363,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     },
+     {
+      "reach": 451,
+      "run_length": 451,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     },
+     {
+      "reach": 362,
+      "run_length": 362,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     },
+     {
+      "reach": 228,
+      "run_length": 228,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     },
+     {
+      "reach": 331,
+      "run_length": 331,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ],
+    "answer_report": "aa-bb-cc: 1/1 episodes identical (order-sensitive); ANS 3/3, EXPL 3/3, CMP 6/6"
+   }
+  },
+  {
+   "id": "justify/abc-abcd-mrrjjj-mrrjjk/s1-cap5000",
+   "kind": "justify",
+   "problem": [
+    "abc",
+    "abcd",
+    "mrrjjj"
+   ],
+   "seeds": [
+    1
+   ],
+   "answer": "mrrjjk",
+   "cap": 5000,
+   "why": {
+    "engine_lines": 3,
+    "engine_arcs": 7,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [],
+    "most_new_in": [
+     "images.py (10)"
+    ]
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 5000,
+      "run_length": 5000,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "discovery/zzy-yzz-cb/s2-cap3000",
+   "kind": "discovery",
+   "problem": [
+    "zzy",
+    "yzz",
+    "cb"
+   ],
+   "seeds": [
+    2
+   ],
+   "cap": 3000,
+   "why": {
+    "engine_lines": 1,
+    "engine_arcs": 5,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [],
+    "most_new_in": [
+     "rules.py (6)"
+    ]
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 2866,
+      "run_length": 2866,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "justify/abc-abd-aabbccdd-abc/s1-cap5000",
+   "kind": "justify",
+   "problem": [
+    "abc",
+    "abd",
+    "aabbccdd"
+   ],
+   "seeds": [
+    1
+   ],
+   "answer": "abc",
+   "cap": 5000,
+   "why": {
+    "engine_lines": 3,
+    "engine_arcs": 5,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [],
+    "most_new_in": [
+     "rule_english.py (8)"
+    ]
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 5000,
+      "run_length": 5000,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "discovery/gfe-gfef-gfe/s1-cap3000",
+   "kind": "discovery",
+   "problem": [
+    "gfe",
+    "gfef",
+    "gfe"
+   ],
+   "seeds": [
+    1
+   ],
+   "cap": 3000,
+   "why": {
+    "engine_lines": 2,
+    "engine_arcs": 4,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [],
+    "most_new_in": [
+     "bridges.py (6)"
+    ]
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 3000,
+      "run_length": 3000,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "discovery/utsr-uuttssrr-baxx/s1-cap3000",
+   "kind": "discovery",
+   "problem": [
+    "utsr",
+    "uuttssrr",
+    "baxx"
+   ],
+   "seeds": [
+    1
+   ],
+   "cap": 3000,
+   "why": {
+    "engine_lines": 0,
+    "engine_arcs": 0,
+    "database_lines": 3,
+    "database_branch_arcs": 3,
+    "features": [],
+    "most_new_in": []
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 3000,
+      "run_length": 3000,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "discovery/uvw-wvu-vwu/s2-cap3000",
+   "kind": "discovery",
+   "problem": [
+    "uvw",
+    "wvu",
+    "vwu"
+   ],
+   "seeds": [
+    2
+   ],
+   "cap": 3000,
+   "why": {
+    "engine_lines": 1,
+    "engine_arcs": 3,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [],
+    "most_new_in": [
+     "snag_explanation.py (4)"
+    ]
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 803,
+      "run_length": 803,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "discovery/rst-rsu-xyz/s1-person-cap5000",
+   "kind": "discovery",
+   "problem": [
+    "rst",
+    "rsu",
+    "xyz"
+   ],
+   "seeds": [
+    1
+   ],
+   "cap": 5000,
+   "interventions": [
+    {
+     "at": 150,
+     "op": "clamp_codelet_pattern",
+     "pattern": "group"
+    },
+    {
+     "at": 400,
+     "op": "clamp_codelet_pattern",
+     "pattern": "rule"
+    },
+    {
+     "at": 900,
+     "op": "undo_last_clamp"
+    }
+   ],
+   "why": {
+    "engine_lines": 1,
+    "engine_arcs": 3,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [],
+    "most_new_in": [
+     "jootsing.py (4)"
+    ]
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 1782,
+      "run_length": 1782,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "justify/aabc-aabd-ijkk-ijkl/s1-cap5000",
+   "kind": "justify",
+   "problem": [
+    "aabc",
+    "aabd",
+    "ijkk"
+   ],
+   "seeds": [
+    1
+   ],
+   "answer": "ijkl",
+   "cap": 5000,
+   "why": {
+    "engine_lines": 2,
+    "engine_arcs": 5,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [],
+    "most_new_in": [
+     "themes.py (4)",
+     "bridges.py (3)"
+    ]
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 5000,
+      "run_length": 5000,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "discovery/qcii-qqcciiii-bcdab/s1-cap3000",
+   "kind": "discovery",
+   "problem": [
+    "qcii",
+    "qqcciiii",
+    "bcdab"
+   ],
+   "seeds": [
+    1
+   ],
+   "cap": 3000,
+   "why": {
+    "engine_lines": 1,
+    "engine_arcs": 3,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [],
+    "most_new_in": [
+     "rules.py (4)"
+    ]
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 3000,
+      "run_length": 3000,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "discovery/defg-ddeeffgg-defg/s1-cap3000",
+   "kind": "discovery",
+   "problem": [
+    "defg",
+    "ddeeffgg",
+    "defg"
+   ],
+   "seeds": [
+    1
+   ],
+   "cap": 3000,
+   "why": {
+    "engine_lines": 1,
+    "engine_arcs": 3,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [],
+    "most_new_in": [
+     "codelet_dsl/builtins.py (4)"
+    ]
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 3000,
+      "run_length": 3000,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "discovery/bcd-bc-xbxmnm/s1-cap3000",
+   "kind": "discovery",
+   "problem": [
+    "bcd",
+    "bc",
+    "xbxmnm"
+   ],
+   "seeds": [
+    1
+   ],
+   "cap": 3000,
+   "why": {
+    "engine_lines": 1,
+    "engine_arcs": 3,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [],
+    "most_new_in": [
+     "images.py (4)"
+    ]
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 3000,
+      "run_length": 3000,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "discovery/yyc-lll-uwxab/s1-cap3000",
+   "kind": "discovery",
+   "problem": [
+    "yyc",
+    "lll",
+    "uwxab"
+   ],
+   "seeds": [
+    1
+   ],
+   "cap": 3000,
+   "why": {
+    "engine_lines": 1,
+    "engine_arcs": 3,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [],
+    "most_new_in": [
+     "rules.py (4)"
+    ]
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 3000,
+      "run_length": 3000,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "justify/aabbcc-aabbdd-ijkkll-ijkkll/s1-cap5000",
+   "kind": "justify",
+   "problem": [
+    "aabbcc",
+    "aabbdd",
+    "ijkkll"
+   ],
+   "seeds": [
+    1
+   ],
+   "answer": "ijkkll",
+   "cap": 5000,
+   "why": {
+    "engine_lines": 1,
+    "engine_arcs": 3,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [],
+    "most_new_in": [
+     "rules.py (4)"
+    ]
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 3161,
+      "run_length": 3161,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "justify/abc-abd-abcde-edcba/s1-cap5000",
+   "kind": "justify",
+   "problem": [
+    "abc",
+    "abd",
+    "abcde"
+   ],
+   "seeds": [
+    1
+   ],
+   "answer": "edcba",
+   "cap": 5000,
+   "why": {
+    "engine_lines": 1,
+    "engine_arcs": 3,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [],
+    "most_new_in": [
+     "images.py (4)"
+    ]
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 5000,
+      "run_length": 5000,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "discovery/abc-abd-ijkk/s1-person-cap5000",
+   "kind": "discovery",
+   "problem": [
+    "abc",
+    "abd",
+    "ijkk"
+   ],
+   "seeds": [
+    1
+   ],
+   "cap": 5000,
+   "interventions": [
+    {
+     "at": 200,
+     "op": "clamp_theme_pattern",
+     "themes": [
+      {
+       "type": "top_bridge",
+       "dimension": "plato-length",
+       "relation": "identity",
+       "activation": 100
+      },
+      {
+       "type": "top_bridge",
+       "dimension": "plato-group-category",
+       "relation": "identity",
+       "activation": 100
+      }
+     ]
+    }
+   ],
+   "why": {
+    "engine_lines": 0,
+    "engine_arcs": 1,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [],
+    "most_new_in": [
+     "trace.py (1)"
+    ]
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 1357,
+      "run_length": 1357,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "discovery/xcb-cbx-xcbc/s1-cap3000",
+   "kind": "discovery",
+   "problem": [
+    "xcb",
+    "cbx",
+    "xcbc"
+   ],
+   "seeds": [
+    1
+   ],
+   "cap": 3000,
+   "why": {
+    "engine_lines": 0,
+    "engine_arcs": 1,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [],
+    "most_new_in": [
+     "rules.py (1)"
+    ]
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 3000,
+      "run_length": 3000,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "discovery/aabb-aabc-xyz/s1-cap5000",
+   "kind": "discovery",
+   "problem": [
+    "aabb",
+    "aabc",
+    "xyz"
+   ],
+   "seeds": [
+    1
+   ],
+   "cap": 5000,
+   "why": {
+    "engine_lines": 0,
+    "engine_arcs": 1,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [],
+    "most_new_in": [
+     "rules.py (1)"
+    ]
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 5000,
+      "run_length": 5000,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  }
+ ]
+}

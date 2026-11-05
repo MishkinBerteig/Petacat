@@ -31,6 +31,13 @@ pass with Verbose mode off must give the same per-codelet RNG counts and the sam
 
 ``capture`` returns text; ``scripts/capture_golden_baseline.py`` writes it and
 ``tests/lockstep/test_golden_baseline.py`` recomputes it and compares.
+
+This baseline is the common case.  The rare paths (a person's clamps, Clear Memory, justify with
+unusual answers, the answer report of an episode, the engine's own object-graph loops and the pure-Python
+backend, runs the cap ends) are in the extended baseline, ``tests/support/golden_extended.py``, which
+records its runs with ``capture_run`` below and whose cases were chosen by coverage and checked against
+Metacat.  ``scripts/golden_coverage.py`` measures how much of the engine and of the database's code
+either baseline reaches.
 """
 
 from __future__ import annotations
@@ -138,12 +145,21 @@ def _unbounded_verbose_log() -> Iterator[None]:
 
 
 def run_observed(meta: Any, problem: Problem, seed: int, answer: str | None, memory: Any,
-                 verbose: bool) -> tuple[Any, Any, list[int], list[str], int]:
+                 verbose: bool, parameters: dict[str, Any] | None = None, cap: int | None = None,
+                 backend: str | None = None, interventions: list[dict[str, Any]] | None = None,
+                 ) -> tuple[Any, Any, list[int], list[str], int]:
     """Run to the end on the pinned backend.
 
     Returns ``(runner, rng, per_codelet_draws, codelet_types, draws_during_init)``.  The
     runner instance's ``step_mcat`` is wrapped, so the engine's own ``run_mcat`` loop
     drives the run unchanged and each step's draw count is read from ``rng.call_count``.
+
+    ``parameters`` (run-level overrides of the configuration, as ``init_mcat`` takes them),
+    ``cap`` (the codelet cap, ``CAP`` when omitted), ``interventions`` (a person's clamps
+    during the run, ``tests/support/interventions.py``) and ``backend`` (the numeric backend,
+    ``BACKEND`` when omitted; ``off`` is the engine's own object-graph loops, the path the
+    lockstep harness compares with Metacat) exist for the extended baseline; the original
+    baseline passes none of them.
     """
     from server.engine.numeric.backend import use_backend
     from server.engine.rng import RNG
@@ -164,10 +180,17 @@ def run_observed(meta: Any, problem: Problem, seed: int, answer: str | None, mem
         return result
 
     runner.step_mcat = observed_step  # type: ignore[method-assign]
-    with use_backend(BACKEND):
-        runner.init_mcat(*problem, answer=answer, seed=seed, memory=memory, rng=rng)
+    if interventions:
+        # a person's clamps: applied before the counted step, so their draws (none) and effects
+        # fall in the next codelet's record
+        from tests.support.interventions import schedule
+
+        schedule(runner, interventions)
+    with use_backend(backend or BACKEND):
+        runner.init_mcat(*problem, answer=answer, seed=seed, memory=memory, rng=rng,
+                         parameters=parameters)
         init_draws = rng.call_count
-        runner.run_mcat(max_steps=CAP)
+        runner.run_mcat(max_steps=CAP if cap is None else cap)
     return runner, rng, draws, types, init_draws
 
 
@@ -230,12 +253,21 @@ def state_digest(ctx: Any) -> str:
 
 def capture_run(meta: Any, problem: Problem, seed: int, answer: str | None, memory: Any,
                 kind: str, run: int | None = None, check_memory: Any = None,
+                parameters: dict[str, Any] | None = None, cap: int | None = None,
+                case: str | None = None, backend: str | None = None,
+                interventions: list[dict[str, Any]] | None = None,
                 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """One run's record and its detail (the full per-codelet draws and English text).
 
     ``memory`` is carried (and changed) by the run.  The verbose-off check run takes
     ``check_memory``, a second Episodic Memory that has followed the same chain of runs
     (a fresh one when omitted).
+
+    ``parameters``, ``cap``, ``case`` and ``backend`` belong to the extended baseline:
+    run-level configuration overrides, a codelet cap other than ``CAP``, the case's own id
+    (which replaces the id built from the problem), a numeric backend other than
+    ``BACKEND`` and a person's interventions.  Each is written into the record only when given (``case`` never), so the
+    original baseline's records are unchanged.
     """
     from server.engine.hashing import memory_hash
     from server.engine.memory import EpisodicMemory
@@ -243,22 +275,26 @@ def capture_run(meta: Any, problem: Problem, seed: int, answer: str | None, memo
     if check_memory is None:
         check_memory = EpisodicMemory()
     with _unbounded_verbose_log():
-        runner, rng, draws, types, init_draws = run_observed(meta, problem, seed, answer, memory, True)
+        runner, rng, draws, types, init_draws = run_observed(
+            meta, problem, seed, answer, memory, True, parameters, cap, backend, interventions)
     ctx = runner.ctx
     state = state_digest(ctx)
 
     # Verbose mode only reads; prove it on this run.
-    quiet, quiet_rng, quiet_draws, quiet_types, _ = run_observed(meta, problem, seed, answer, check_memory, False)
+    quiet, quiet_rng, quiet_draws, quiet_types, _ = run_observed(
+        meta, problem, seed, answer, check_memory, False, parameters, cap, backend, interventions)
+    run_id = case_id(kind, problem, answer, seed, run) if case is None else (
+        case if run is None else f"{case}.r{run}")
     if quiet_draws != draws or quiet_types != types or state_digest(quiet.ctx) != state:
         raise AssertionError(
-            f"Verbose mode changed the run {case_id(kind, problem, answer, seed, run)}: "
+            f"Verbose mode changed the run {run_id}: "
             "narration must read and never decide"
         )
 
     english = english_corpus(runner, meta)
     answers = list(runner._answers)
     record: dict[str, Any] = {
-        "id": case_id(kind, problem, answer, seed, run),
+        "id": run_id,
         "kind": kind,
         "problem": list(problem),
         "seed": seed,
@@ -276,6 +312,14 @@ def capture_run(meta: Any, problem: Problem, seed: int, answer: str | None, memo
         "state": state,
         "english": {name: digest_lines(lines) for name, lines in english.items()},
     }
+    if parameters:
+        record["parameters"] = dict(parameters)
+    if cap is not None:
+        record["cap"] = cap
+    if backend is not None:
+        record["numeric_backend"] = backend
+    if interventions:
+        record["interventions"] = [dict(iv) for iv in interventions]
     if run is not None:
         record["run"] = run
         record["memory"] = memory_hash(memory)

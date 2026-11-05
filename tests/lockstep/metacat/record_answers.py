@@ -69,17 +69,20 @@ PRELUDE = wrap.PRELUDE + r'''(define cur-seed 0)
 '''
 
 
-def driver(problem: list[str], seeds: list[int], cap: int) -> str:
-    """The Scheme driver text: one episode over ``seeds`` with memory carried."""
+def driver(problem: list[str], seeds: list[int], cap: int, clear_before: tuple[int, ...] = ()) -> str:
+    """The Scheme driver text: one episode over ``seeds`` with memory carried (and cleared
+    before the 1-based runs in ``clear_before``, as a person pressing Clear Memory does)."""
     i, m, t = problem
     head = PRELUDE.replace("'I 'M 'T", f"'{i} '{m} '{t}").replace("CAP", str(cap))
-    return (head + "(tell *memory* 'clear)\n" + "".join(f"(one-run {s})\n" for s in seeds)
-            + "(dump)\n(exit 0)\n")
+    body = "".join(("(tell *memory* 'clear)\n" if k in clear_before and k > 1 else "") + f"(one-run {s})\n"
+                   for k, s in enumerate(seeds, 1))
+    return head + "(tell *memory* 'clear)\n" + body + "(dump)\n(exit 0)\n"
 
 
-def record(problem: list[str], seeds: list[int], cap: int = 100000) -> list[str]:
+def record(problem: list[str], seeds: list[int], cap: int = 100000,
+           clear_before: tuple[int, ...] = ()) -> list[str]:
     """Run Metacat; return the END/ANS/EXPL/CMP lines."""
-    out = wrap.run_driver(driver(problem, seeds, cap), "answers-" + "-".join(problem))
+    out = wrap.run_driver(driver(problem, seeds, cap, clear_before), "answers-" + "-".join(problem))
     return wrap.keep_lines(out, "ANS\t", "EXPL\t", "CMP\t", "END\t")
 
 

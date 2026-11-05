@@ -43,6 +43,12 @@
 (define *tr-header-extra* "")
 ;; Set by trace-run: #t when the run ended in an error (an episode stops there).
 (define *tr-failed?* #f)
+;; A person's actions during a run (Metacat Mode surfaces: the Options menu's clamp commands and
+;; "Undo last clamp"): a list of (codelet-count . thunk), ascending.  trace-run stops the run
+;; at each count (a break, as the GUI's pause is), runs the thunk and goes on, up to
+;; *tr-cap*, the run's codelet cap.  Empty for every ordinary recording.
+(define *tr-pending* '())
+(define *tr-cap* #f)
 ;; Number of answers in memory when trace-open ran: in an episode memory carries
 ;; earlier runs' answers, so "this run found an answer" means the count grew.
 (define *tr-answers-before* 0)
@@ -812,12 +818,22 @@
         (assertion-violation 'metacat-message "unrecognized object message"
                              (cdr message))))
     (let ((outcome
-            (guard (c (#t (cons 'error c)))
-              (call/cc
-                (lambda (k)
-                  (set! suspend (lambda () (k 'suspended)))
-                  (set! break (lambda () (k 'capped)))
-                  (run-mcat))))))
+            (let loop ()
+              (let ((o (guard (c (#t (cons 'error c)))
+                         (call/cc
+                           (lambda (k)
+                             (set! suspend (lambda () (k 'suspended)))
+                             (set! break (lambda () (k 'capped)))
+                             (run-mcat))))))
+                (if (and (eq? o 'capped) (pair? *tr-pending*)
+                         (= *codelet-count* (car (car *tr-pending*))))
+                    (begin
+                      ((cdr (car *tr-pending*)))
+                      (set! *tr-pending* (cdr *tr-pending*))
+                      (set! *break-time*
+                        (if (pair? *tr-pending*) (car (car *tr-pending*)) *tr-cap*))
+                      (loop))
+                    o)))))
       (set! *tr-depth* 0)
       (set! *tr-failed?* (pair? outcome))
       (let ((answers (tell *memory* 'get-answers)))

@@ -145,7 +145,7 @@ outside the matrix take it too and the run is entirely what it says it is.
   architecture    92 collected     92 run     92 passed      0 failed      0 skipped  complete
   integration    346 collected    346 run    346 passed      0 failed      0 skipped  complete
   parallel       291 collected    291 run    291 passed      0 failed      0 skipped  complete
-  lockstep       228 collected    228 run    228 passed      0 failed      0 skipped  complete
+  lockstep       239 collected    239 run    239 passed      0 failed      0 skipped  complete
   e2e            552 collected    552 run    552 passed      0 failed      0 skipped  complete
 
   run complete in 13.9 min against a 60 min ceiling
@@ -224,7 +224,7 @@ that allowance.
 | **architecture** | `tests/architecture/` | How the source tree is allowed to depend on itself | The repository's source, `seed_data/*.json`, child interpreters | 92 |
 | **integration** | `tests/integration/` | Agreement between the repository's artifacts, and the harness's own rules | Real `seed_data/*.json`, the ORM declarations, the generated client files, the documentation, a real pytest session | 346 |
 | **parallel** | `tests/parallel/` | The detachable multi-core plugin (`server/parallel/`): each executor against the serial run it claims to equal | Real engine objects and `seed_data/*.json`, worker processes and threads; each test pins the backend it compares on | 291 |
-| **lockstep** | `tests/lockstep/` | Petacat's decision traces against Metacat's: naming, helper conformance, tracing/replay RNGs, determinism guards, the comparer | Real engine in faithful mode (numeric backend off, or a named backend); recorded Metacat traces | 228 |
+| **lockstep** | `tests/lockstep/` | Petacat's decision traces against Metacat's: naming, helper conformance, tracing/replay RNGs, determinism guards, the comparer | Real engine in faithful mode (numeric backend off, or a named backend); recorded Metacat traces | 239 |
 | **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 552 |
 
 Those counts are cases, so they include the second pass the numeric matrix makes
@@ -260,7 +260,7 @@ first**, then move up toward the API and GUI.
 
 All eight layers run in one command — the
 [required command](#the-required-command) — and, since Petacat runs natively, all
-eight actually run: **5,405 cases**, every one of them executed. A layer that is
+eight actually run: **5,416 cases**, every one of them executed. A layer that is
 normally skipped is not a layer that is normally green, and none of these is.
 
 Wall-clock time depends heavily on the machine and on what else it is doing. The
@@ -378,6 +378,22 @@ changing what it records.
   The baseline records behaviour only, not which configuration produced it (no
   configuration hash), so behaviour-preserving changes to the Metacat Standard
   Configuration do not touch it.
+- *The extended golden baseline.* The 188 runs above are the common case: the 19 demo
+  problems and the justify demos at seeds 1-5 and one 8-run episode. They leave rare paths
+  unreached (a weight on one could move wrongly and no run would notice), so
+  `tests/lockstep/golden/extended_baseline.jsonl` and `extended_baseline_rng.json.gz` add
+  cases chosen by coverage: each reaches engine lines or branches, a codelet body,
+  descriptor predicate or posting formula, or a kind of event, snag or clamp that the
+  original runs do not. They include a person's clamps and Undo, Clear Memory between two
+  runs of an episode and the answer report of an episode (the explanation of every answer in
+  memory and the comparison of every ordered pair), justify with unusual answers, runs the
+  codelet cap ends, the engine's own object-graph loops and the pure-Python backend. The
+  case list is `tests/lockstep/golden/extended_cases.json`, and **every case in it was
+  recorded in Metacat 1.2 and replayed in Petacat with no divergence**; a case that did not
+  match is a fidelity defect and is not in the file. `scripts/golden_coverage.py` measures
+  what either baseline reaches. Recapture with
+  `.venv/bin/python scripts/capture_golden_baseline.py --extended --jobs 8` (it writes only
+  the two `extended_` files, so it cannot touch the original baseline) under the same rule as above.
 - *EN0, the no-node-literals lint.* `tests/architecture/test_no_node_literals_in_engine.py`
   with `no_node_literals_allowlist.txt`: the allow-list may only shrink, and since EN11 it is
   empty. The one seed-file read the lint permits is the door,
@@ -597,6 +613,8 @@ changing what it records.
 | `test_desync_fixes.py` | 1 | Prefixes of three Metacat runs beyond the corpus that used to desynchronise the replay (`traces-desync/`) replay to their end with no error and no differing state (DISCREPANCIES5 G-Y2…G-Y4) |
 | `test_episodes.py` | 8 | Episodes and justify mode: recorder driver text, corpus globs, an episode's self-replay with memory carried, a forced fatal, justify self-replay |
 | `test_golden_baseline.py` | 5 | The EN0 golden baseline gate (G3): `tests/lockstep/golden/engine_baseline.jsonl` and `engine_baseline_rng.json.gz`, captured from the Metacat Standard Configuration on the CPU numeric backend (float64), hold for the 19 demo problems and the justify problems at seeds 1-5 and one 8-run episode the answer, codelet count, final temperature, per-codelet RNG call counts, trace and final-state hashes and the English corpus. A quick consistency check and a four-run sample run always; the slow test recomputes everything in a fresh interpreter and compares byte for byte, naming the first differing run and codelet. Outside the numeric matrix (it pins its backend) |
+| `test_extended_tools.py` | 6 | The tools behind the extended golden baseline, without Docker: the recorder's driver text for a person's clamps, Undo, Self-watching mode and Clear Memory, the interventions calling the product's own `RunService` methods, a cleared-memory header honoured by the answer check, and `scripts/golden_coverage.py` attributing the database's code (codelet bodies, descriptor predicates, posting formulas) to its units |
+| `test_golden_extended.py` | 5 | The extended golden baseline gate: `tests/lockstep/golden/extended_baseline.jsonl` and `extended_baseline_rng.json.gz`, 40 cases chosen by coverage, each checked against Metacat, under the faithful parameters on the engine's own loops (backend off) or the pure-Python backend. A consistency check against the case list, a baseline-of-real-runs check and a sample always run; the slow test recomputes everything in a fresh interpreter over a process pool (about 10 s) and compares byte for byte, naming the first differing run, field and codelet; a changed update-cycle length is noticed. Outside the numeric matrix |
 | `test_event_names.py` | 2 | Every Trace event in eight Metacat runs (all event types, all three group directions, flips, slippages on all three bridges, translated rules, the three answer headers) named and headed exactly as Metacat 1.2 logged them |
 | `test_helpers.py` | 11 | Helper conformance: `prob`, `~`, `weighted_pick` and `pick` give Metacat's results for the same draws |
 | `test_naming.py` | 9 | Canonical names for plain values and every kind of object, and the opening state against Metacat's |

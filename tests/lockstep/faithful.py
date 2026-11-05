@@ -123,11 +123,20 @@ class Outcome:
 
 
 def run_faithful(problem: tuple[str, str, str], seed: int, cap: int, rng: Any,
-                 answer: str | None = None, memory: Any = None) -> Outcome:
+                 answer: str | None = None, memory: Any = None,
+                 interventions: list[dict[str, Any]] | None = None,
+                 parameters: dict[str, Any] | None = None) -> Outcome:
     """Run ``problem`` with ``rng`` in faithful mode and say how it ended.
 
     ``answer`` selects justify mode (``init_mcat``'s fourth argument); ``memory`` is
     the episode's ``EpisodicMemory`` carried over from earlier runs (fresh when None).
+
+    ``parameters`` are run-level configuration overrides added to ``FAITHFUL_PARAMETERS``
+    (``self_watching_enabled_default: False`` is Metacat's ``%self-watching-enabled%`` set
+    off, ``record.py --self-watching off``).
+
+    ``interventions`` are a person's clamps during the run (``tests/support/interventions.py``;
+    ``record.py --intervene`` makes Metacat do the same at the same codelet counts).
 
     ``rng`` is installed as ``ctx.rng``, ``ctx.coderack.rng`` and every codelet body's
     ``rng`` by ``init_mcat(..., rng=rng)``.
@@ -145,8 +154,12 @@ def run_faithful(problem: tuple[str, str, str], seed: int, cap: int, rng: Any,
             runner.init_mcat(
                 *problem, answer=answer, seed=seed,
                 memory=memory if memory is not None else EpisodicMemory(),
-                parameters=dict(FAITHFUL_PARAMETERS), rng=rng,
+                parameters={**FAITHFUL_PARAMETERS, **(parameters or {})}, rng=rng,
             )
+            if interventions:
+                from tests.support.interventions import schedule
+
+                schedule(runner, interventions)
             result = runner.run_mcat(max_steps=cap)
         except ReplayStop as stop:
             c = runner.ctx.codelet_count if runner.ctx else 0

@@ -75,6 +75,44 @@ python3 tests/lockstep/metacat/record.py --problem abc abd xyz --seeds 1-5 --epi
 * Validation: `--baseline` runs the unpatched collector-style loop and prints the same `RESULT answer/codelets`
   sequence; the recorder must match it, run for run.
 
+## A person's actions: clears, clamps and Self-watching mode
+
+The extended golden baseline (`tests/lockstep/README.md`, "The extended golden baseline") reaches the
+Metacat Mode surfaces a person drives, and each case is checked against Metacat, so the recorder can do
+what the GUI does.  All three are off unless asked for, and a recording made without them is byte-identical
+to one made before they existed.
+
+```sh
+# Clear Memory pressed before run 4 of a 6-run episode
+python3 tests/lockstep/metacat/record.py --problem abc abd xyz --seeds 1 --episode-runs 6 --episode-clear-before 4
+# the Options menu's codelet clamps, the Clamp Themes dialog, Undo last clamp, the Self-watching check item
+python3 tests/lockstep/metacat/record.py --problem abc abd xyz --seeds 1 --cap 3000 \
+    --intervene "200:clamp-bottom_up,600:undo"
+python3 tests/lockstep/metacat/record.py --problem abc abd xyz --seeds 1 --cap 3000 \
+    --intervene "200:theme=top_bridge/letter-category/identity+top_bridge/string-position-category/opposite"
+python3 tests/lockstep/metacat/record.py --problem abc abd xyz --seeds 1 --cap 3000 --self-watching off
+```
+
+* `--episode-clear-before K[,K...]`: before those 1-based runs the driver evaluates `(tell *memory* 'clear)`, and
+  the run's header carries `memory_cleared: true`.  `run_trace.replay_episode` and
+  `scripts/compare_episode_answers.py` clear Petacat's memory at the same point.
+* `--intervene N:OP[,N:OP...]` (single runs): at codelet N the run stops at a break, the action runs, and the run
+  goes on up to the cap (`*tr-pending*` and `*tr-cap*` in `decision-trace.ss`).  `OP` is `clamp-top_down`,
+  `clamp-bottom_up`, `clamp-group`, `clamp-bridge` or `clamp-rule` (the Options menu, `gui.ss:1221-1245`, the group,
+  bridge and rule patterns against a very-low background), `undo` (Undo last clamp, `gui.ss:595-597`),
+  `self-watching-off` / `self-watching-on` (the check item, `gui.ss:607-626`: off also undoes the last clamp and
+  deletes the themes) or `theme=TYPE/DIM/REL[+TYPE/DIM/REL...]` (the Clamp Themes dialog's result,
+  `gui.ss:905-926`; `DIM` without the `plato-` prefix, `REL` one of identity, successor, predecessor, opposite, diff).
+  The header carries `interventions`; `run_trace` replays them through `tests/support/interventions.py`, which calls
+  the product's own `RunService` methods.  Not with `--episode-runs`.
+* `--self-watching off`: `(set! %self-watching-enabled% #f)` before the run; the header carries `self_watching: false`
+  and the replay runs Petacat with `self_watching_enabled_default` off.
+
+Results: a codelet clamp, an undo and a theme clamp replay with no divergence and no differing snapshot.  Self-watching
+off, from the start or switched off in mid-run, replays with every decision agreeing but with differing state
+snapshots: `Themespace.add_theme` lacks the `%self-watching-enabled%` test of `themes.ss:374-375`, so Petacat keeps
+adding themes that Metacat does not (first at the first `build_structure` of a bridge, `themes.py:481-505`).
+
 ## Record format
 
 Spec section 3 exactly.  Field order: `t, c, ctx, who, [u], n, [about], [scope], kind,

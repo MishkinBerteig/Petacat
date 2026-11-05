@@ -19,6 +19,7 @@ are recorded in `DISCREPANCIES5.md`: the status lines on A-1…D-11 and section 
 | Comparer | `scripts/compare_traces.py` | Computes every check class of spec §7.3 from the replay's pairing, compares snapshots per update cycle, applies the registry, and reports reach, agreement, and the number of update-cycle snapshots whose state differs (proposed structures aside, which the two programs hold differently by design). |
 | Corpus driver and ratchet | `scripts/lockstep_corpus.py`, `ratchet*.json` | Replays and compares a whole corpus in parallel, prints a table, and keeps per-trace reach, agreement, error count and differing state snapshots. A trace may not get worse. `--numeric-backend` replays with a backend on and checks against the same ratchet. |
 | Verbose narration | `metacat/record_verbose.py`, `scripts/compare_verbose.py`, `verbose_metacat.txt.gz`, `test_verbose.py` | Logs what Metacat prints with `%verbose%` on (the per-codelet banner and every `say`, `vprintf`, `vprint`), replays the same run in Petacat with Verbose mode on, and compares the two line for line. `--verbose` on the corpus driver replays with the mode on and checks the same ratchet. |
+| Golden baselines | `golden/engine_baseline*`, `golden/extended_*`, `../support/golden_baseline.py`, `../support/golden_extended.py`, `../../scripts/capture_golden_baseline.py`, `../../scripts/golden_coverage.py` | Byte-for-byte records of what the engine does (answers, per-codelet RNG draws, trace and state hashes, English): the 188 common-case runs, and the extended baseline of rare paths whose every case was checked against Metacat (below). They guard engine refactors, not fidelity; fidelity is what the traces above measure. |
 | Registry | `known_divergences.toml` | Divergences that were triaged and kept. Today it holds only Metacat's own crashes (`Metacat/KNOWN-FAILURES.md`); every port divergence found so far was fixed. |
 
 ## Corpora
@@ -176,6 +177,95 @@ snapshots).
 
 The individual fixes are listed in `DISCREPANCIES5.md` section G (G-A1 … G-W1) and in the
 status lines of A-1 … D-11.
+
+## The extended golden baseline
+
+The golden baseline (`golden/engine_baseline.jsonl`) is 188 runs: the 19 demo problems and the justify
+demos at seeds 1-5, and one 8-run episode. It is the common case. A weight on a rare path can move
+wrongly without any of those runs noticing, so `golden/extended_baseline.jsonl` and
+`extended_baseline_rng.json.gz` record further cases (format and reproduction test:
+`../support/golden_extended.py`, `test_golden_extended.py`). Nothing in the original baseline changed.
+
+**How a case earns its place.** `scripts/golden_coverage.py` runs every case of a baseline in a fresh
+interpreter under coverage.py (branch coverage, `sys.monitoring` core) over `server/engine/**`, and under
+a `sys.monitoring` tool over the code that lives in the database: the 27 codelet bodies, the descriptor
+predicates and the posting formulas, which compile from strings to code objects named `<codelet:NAME>`,
+`<descriptor-predicate:NODE>` and `<posting-formula:TYPE>`. The candidates were about 7,200 runs: the 186
+problems of `list-of-letter-string-analogy-problems.md` and `data/*.txt` (discovery at seeds 1-3, justify
+with the answers Petacat found and with constructed ones, 6-run episodes with and without a Clear Memory),
+5,000 constructed problems (random and edge-shaped: one-letter, equal, doubled, reversed, alphabet
+ends), and a person's actions during a run. The selection is greedy on engine lines, engine arcs,
+database lines, database branch arcs and the kinds of event, snag and clamp: a candidate that adds
+none of them is not in the file. Each case's `why` in `golden/extended_cases.json` says what it added over
+the original baseline and the cases before it.
+
+**Every case was checked against Metacat 1.2.** Each case was recorded with `metacat/record.py` and
+replayed with `scripts/lockstep_corpus.py` in faithful mode: it counts only if the replay reaches the end,
+every decision agrees, there are no unregistered errors and no differing state snapshot. An episode must also
+pass `scripts/compare_episode_answers.py` (the snag explanation, the explanation of each answer in memory and
+the comparison of every ordered pair, as Metacat writes them). A case that failed is a fidelity defect in
+Petacat and is **not** in the file (below). The cases run under the lockstep parameters
+(`initial_clamp_fixed_time`, the Standard Configuration's default being the update-cycle countdown), on the
+engine's own object-graph loops (`off`; three cases on the pure-Python backend, replayed with
+`--numeric-backend python`), which are what the lockstep harness compares with Metacat. The original baseline
+runs the default configuration on NumPy. One caveat: the replay follows Metacat's trajectory, and the baseline
+runs Petacat's own random stream on the same inputs, so the check says that the situations Metacat reaches
+are handled as Metacat handles them, not that the baseline's own trajectory is Metacat's.
+
+**What is in it** (40 cases, 65 runs, 5 episode answer reports; about 30 s in one process, the whole file
+recomputed in 6-10 s over a process pool): 23 discovery cases, 12 justify cases with wrong or unusual answers, 5 episodes; four with a
+person's actions (the Options menu's group and rule codelet clamps, Clamp Themes with two themes, Undo last
+clamp, the Self-watching check item off and on again), one episode with Clear Memory before run 4, 15 runs
+that the codelet cap ends, and the first appearance of `conflict` snags, `manual-clamp` events and cap-ended
+runs in any baseline.
+
+| | Original baseline | Original + extended |
+| --- | --- | --- |
+| Engine lines (`server/engine/**`, 14,178) | 11,381 (80.3 %) | 12,091 (85.3 %) |
+| Engine branches (5,876) | 4,140 | 4,525 |
+| Database code lines (845) | 778 | 793 |
+| Database code branch arcs (718) | 626 | 641 |
+
+```sh
+# Reproduce the file and read the coverage (minutes)
+.venv/bin/python scripts/capture_golden_baseline.py --extended --jobs 8            # writes only extended_*
+.venv/bin/python scripts/golden_coverage.py --which both --jobs 8                  # the table above
+# Record, replay and compare one candidate case
+python3 tests/lockstep/metacat/record.py --problem abc abd xyz --seeds 1 --cap 3000 --intervene "200:clamp-group,500:undo"
+.venv/bin/python scripts/lockstep_corpus.py --traces <out> --out-dir <out>/replays
+```
+
+**Fidelity defects the search found** (cases that did not match; none is in the baseline; first point of
+divergence in each):
+- **Degree of support, `answer-finder`.** `ly → yl; cbaii`, seed 1, codelet 339: Metacat's `stochastic-if*`
+  probability is 0.44, Petacat's 0.45 (`builtins.py` `prob` site, the answer-finder's `(1- (% degree-of-support))`):
+  the chosen rule's degree of support is 56 in Metacat and 55 in Petacat. One decision in 1,894 disagrees;
+  the outcome was the same, so the replay went on. Not diagnosed further.
+- **`Themespace.add_theme` ignores Self-watching mode.** `themes.ss:374-375` returns `#f` when
+  `%self-watching-enabled%` is off; `themes.py:481-505` does not. With Self-watching off from the start, or
+  switched off in mid-run, every decision still agrees but themes Metacat never creates accumulate
+  (first at the first bridge built: `bridge-builder` -> `build_structure` -> `_boost_themespace_activations`
+  -> `boost_theme`), so every update-cycle snapshot after the first differs in `themes.theme(...)`.
+  Of 54 recorded cases (30 with the mode off from the start, 24 switched off in mid-run at codelet 300-500), 52 differ
+  this way and 2 match; in every one all decisions agree (reach = run length, agreement 1.0, no errors) over the
+  3,000-5,000 codelets recorded, which does not say a longer run would not.
+- **A description's time stamp.** `aazzz → azzza; aye`, seed 3: 81 differing snapshots, first at update cycle
+  120, `structures.descriptions[desc(m.2,alphabetic-position-category,alphabetic-last)]`, built at 1670 in
+  Metacat and 1676 in Petacat. The same shape as `DISCREPANCIES5.md` G-T3 (two builders for the same
+  description); not confirmed to be that one.
+- **Not Metacat's to run.** Problem strings with a capital letter or a digit (`abC`, `1234`) are accepted by
+  Petacat and refused by Metacat's recorder (lowercase letters only), so they cannot be checked and are not in the baseline.
+
+Not Metacat Mode surfaces that Petacat has and Metacat lacks, so they cannot be checked and are not in
+the baseline either: clamping a single codelet type, the temperature or a Slipnet node by hand, and the
+spreading-activation threshold control.
+
+**Tools added for this** (`metacat/README.md`, "A person's actions"): `record.py --episode-clear-before`,
+`--intervene` (codelet-pattern clamps, Clamp Themes, Undo last clamp, the Self-watching check item) and
+`--self-watching off`, with the replay side in `run_trace.py`, `faithful.py` and
+`../support/interventions.py` (which calls the product's own `RunService.clamp_codelet_pattern`,
+`clamp_theme_pattern`, `undo_last_clamp` and `set_self_watching`). `scripts/compare_episode_answers.py` had
+stopped working at `d4b4cd2` (`explain_answer` now needs the run's `meta`) and was repaired.
 
 ## Rule English and event names
 

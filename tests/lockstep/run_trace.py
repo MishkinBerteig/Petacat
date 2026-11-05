@@ -98,13 +98,17 @@ def replay_trace(metacat: str | Path, out_dir: str | Path | None = None,
     cap = int(cap if cap is not None else head.get("cap", DEFAULT_CAP))
     out = Path(out_dir) if out_dir else Path(metacat).parent
     path = out / f"{name or seed}.petacat.jsonl.gz"
-    extra = {k: head[k] for k in ("episode_run", "episode_seed") if k in head}
+    extra = {k: head[k] for k in ("episode_run", "episode_seed", "interventions", "self_watching")
+             if k in head}
     extra.update(header_extra or {})
     writer = TraceWriter(path)
     writer.write(header_record(problem, seed, cap, answer=answer,
                                replay_of=Path(metacat).name, **extra))
     rng = ReplayRNG(seed, trace, writer, complemented_sites=complemented_sites)
-    outcome = run_faithful(problem, seed, cap, rng, answer=answer, memory=memory)
+    outcome = run_faithful(problem, seed, cap, rng, answer=answer, memory=memory,
+                           interventions=head.get("interventions"),
+                           parameters={"self_watching_enabled_default": False}
+                           if head.get("self_watching") is False else None)
     _finish(writer, rng, outcome)
     return path, outcome, rng
 
@@ -165,6 +169,11 @@ def replay_episode(metacat: str | Path, out_dir: str | Path | None = None,
             writer.close()
             results.append((path, None, None))
             continue
+        if head.get("memory_cleared"):
+            # the person cleared Episodic Memory before this run (record.py
+            # --episode-clear-before): Metacat's memory is empty, so Petacat's is too
+            memory.clear()
+            in_sync = True
         path, outcome, rng = replay_trace(meta, out_dir, cap, complemented_sites,
                                           memory=memory, name=stem,
                                           header_extra={"memory_in_sync": in_sync}

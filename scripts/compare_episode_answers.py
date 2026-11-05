@@ -107,6 +107,20 @@ def trace_cap(first: Path) -> int:
         return int(json.loads(f.readline()).get("cap", 100000))
 
 
+def episode_clears(first: Path) -> tuple[int, ...]:
+    """The 1-based runs before which the episode's recorder cleared Episodic Memory
+    (a run's trace header carries ``memory_cleared``)."""
+    from tests.lockstep.run_trace import episode_runs as runs_of
+
+    clears = []
+    for p in runs_of(first):
+        with gzip.open(p, "rt") as f:
+            head = json.loads(f.readline())
+        if head.get("memory_cleared"):
+            clears.append(int(head["episode_run"]))
+    return tuple(clears)
+
+
 def petacat_answer_lines(first_trace: Path) -> list[str]:
     """Replay the episode whose first run is ``first_trace``; return ``record_answers.py``-style
     END/ANS/EXPL/CMP lines for the memory it leaves."""
@@ -121,8 +135,11 @@ def petacat_answer_lines(first_trace: Path) -> list[str]:
 
     memory = EpisodicMemory()
     lines = []
+    clears = episode_clears(first_trace)
     for meta in episode_runs(first_trace):
         stem = ".".join(meta.name.split(".")[:2])
+        if int(stem.split(".r")[1]) in clears:
+            memory.clear()  # the person cleared Episodic Memory before this run
         with tempfile.TemporaryDirectory() as out:
             _, outcome, _ = replay_trace(meta, out, memory=memory, name=stem)
         lines.append(f"END\t{stem}\t{outcome.c}\t{outcome.reason}")
@@ -137,7 +154,7 @@ def petacat_answer_lines(first_trace: Path) -> list[str]:
 
     for a in memory.answers:
         lines.append("ANS\t%s\t%s" % (key(a), snag_explanation_for(a, memory, templates)))
-        e = explain_answer(a, memory, templates)
+        e = explain_answer(a, memory, templates, meta=provider)
         lines.append("EXPL\t%s\t%s\t%s" % (key(a), e["eliza_text"], e["technical_text"]))
     for a in memory.answers:
         for b in memory.answers:
@@ -159,7 +176,8 @@ def record_episode(slug: str, seed: int, traces: Path = TRACES, cap: int | None 
     """Metacat's END/ANS/EXPL/CMP lines for the episode of episode seed ``seed``."""
     first = episode_first_trace(slug, seed, traces)
     return record_answers.record(
-        wrap.slug_problem(slug), list(range(seed, seed + runs)), cap or trace_cap(first))
+        wrap.slug_problem(slug), list(range(seed, seed + runs)), cap or trace_cap(first),
+        episode_clears(first))
 
 
 def check_episode(slug: str, seed: int, traces: Path = TRACES, cap: int | None = None,

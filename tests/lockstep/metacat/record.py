@@ -153,9 +153,72 @@ def trace_name(seed: int, episode_runs: int, episode_seed: int | None = None) ->
     return f"{seed}" if not episode_runs else f"{episode_seed}.r{seed - episode_seed + 1}"
 
 
+SCHEME_PATTERN = {
+    "top_down": ("%top-down-codelet-pattern%", "workspace"),
+    "bottom_up": ("%bottom-up-codelet-pattern%", "workspace"),
+    "group": ("(against-background %very-low-urgency% %group-codelet-pattern%)", "group"),
+    "bridge": ("(against-background %very-low-urgency% %bridge-codelet-pattern%)", "workspace"),
+    "rule": ("(against-background %very-low-urgency% %rule-codelet-pattern%)", "rule"),
+}
+
+
+def parse_interventions(text: str) -> list[dict]:
+    """``300:clamp-bottom_up,700:undo`` -> the list the trace header carries."""
+    out = []
+    for item in [x for x in text.split(",") if x]:
+        at, _, op = item.partition(":")
+        if op == "undo":
+            out.append({"at": int(at), "op": "undo_last_clamp"})
+        elif op.startswith("theme="):
+            themes = []
+            for item2 in op[6:].split("+"):
+                typ, dim, rel = item2.split("/")
+                themes.append({"type": typ, "dimension": "plato-" + dim, "relation": rel, "activation": 100})
+            out.append({"at": int(at), "op": "clamp_theme_pattern", "themes": themes})
+        elif op in ("self-watching-off", "self-watching-on"):
+            out.append({"at": int(at), "op": "set_self_watching", "enabled": op.endswith("on")})
+        elif op.startswith("clamp-") and op[6:] in SCHEME_PATTERN:
+            out.append({"at": int(at), "op": "clamp_codelet_pattern", "pattern": op[6:]})
+        else:
+            sys.exit(f"--intervene: unknown action {item!r}")
+    return out
+
+
+def intervention_scheme(interventions: list[dict]) -> str:
+    """The Scheme statements that schedule ``interventions`` (``decision-trace.ss``, ``trace-run``):
+    the GUI's own sequence, ``gui.ss:1231-1245`` (``clamp-codelets-menu-item``) and ``:595-597``."""
+    items = []
+    for iv in interventions:
+        if iv["op"] == "undo_last_clamp":
+            body = "(tell *trace* 'undo-last-clamp)"
+        elif iv["op"] == "clamp_theme_pattern":
+            # the Clamp Themes dialog's result, gui.ss:905-926: one (type (dimension relation activation)...)
+            # pattern per edited theme type; a relation "diff" is #f in themes.ss
+            by_type: dict[str, list[str]] = {}
+            for t in iv["themes"]:
+                rel = "#f" if t["relation"] == "diff" else "plato-" + t["relation"]
+                by_type.setdefault(t["type"], []).append(f"(list {t['dimension']} {rel} %max-theme-activation%)")
+            pats = " ".join(f"(list '{typ.replace('_', '-')} {' '.join(es)})" for typ, es in by_type.items())
+            body = (f"(let ((clamp-event (make-clamp-event 'manual-clamp (list {pats}) '() 'workspace))) "
+                    "(tell *trace* 'undo-last-clamp) (tell *trace* 'add-event clamp-event) "
+                    "(tell clamp-event 'activate))")
+        elif iv["op"] == "set_self_watching":
+            # the Self-watching mode check item, gui.ss:607-626 (the GUI-only widgets left out)
+            body = ("(begin (set! %self-watching-enabled% #t) 'done)" if iv["enabled"] else
+                    "(begin (set! %self-watching-enabled% #f) (tell *trace* 'undo-last-clamp) (delete-themes))")
+        else:
+            pattern, focus = SCHEME_PATTERN[iv["pattern"]]
+            body = (f"(let ((clamp-event (make-clamp-event 'manual-clamp (list {pattern}) '() '{focus}))) "
+                    "(tell *trace* 'undo-last-clamp) (tell *trace* 'add-event clamp-event) "
+                    "(tell clamp-event 'activate))")
+        items.append(f"(cons {iv['at']} (lambda () {body}))")
+    return "(set! *tr-pending* (list " + " ".join(items) + "))"
+
+
 def driver_text(problem: list[str], seed: int, cap: int, revision: str,
                 snapshots: bool, audit: bool, mode: str, answer: str | None = None,
-                episode_runs: int = 0) -> str:
+                episode_runs: int = 0, clear_before: tuple[int, ...] = (),
+                interventions: list[dict] | None = None, self_watching: bool = True) -> str:
     """The per-run Scheme driver (spec 5.2).  Paths are the container's."""
     i, m, t = problem
     slug = slug_of(problem, answer)
@@ -167,6 +230,8 @@ def driver_text(problem: list[str], seed: int, cap: int, revision: str,
         lines.append("(load \"/recorder/random-audit.ss\")")
     lines.append("(load \"/metacat/metacat-headless.ss\")")
     lines.append("(load \"/recorder/decision-trace.ss\")")
+    if not self_watching:
+        lines.append("(set! %self-watching-enabled% #f)")
     if not snapshots:
         lines.append("(set! *tr-snapshots?* #f)")
     if answer:
@@ -185,12 +250,17 @@ def driver_text(problem: list[str], seed: int, cap: int, revision: str,
         for k in range(1, episode_runs + 1):
             run_seed = seed + k - 1
             extra = f",\\\"episode_run\\\":{k},\\\"episode_seed\\\":{seed}"
+            cleared = k in clear_before and k > 1
+            if cleared:
+                extra += ",\\\"memory_cleared\\\":true"
             if answer:
                 extra += f",\\\"answer\\\":\\\"{answer}\\\""
             lines += [
                 f"(if (not *tr-failed?*)",
                 f"  (begin",
                 f"    (set! *tr-header-extra* \"{extra}\")",
+            ] + ([f"    (tell *memory* 'clear)             ; the user clears Episodic Memory before run {k}"]
+                 if cleared else []) + [
                 f"    (trace-open \"{prefix}/{seed}.r{k}.metacat.jsonl\" '({i} {m} {t}) "
                 f"{run_seed} {cap} \"{revision}\")",
                 f"    (init-mcat '{i} '{m} '{t} {a} {run_seed})   ; keeps memory (run.ss:212-213)",
@@ -199,14 +269,20 @@ def driver_text(problem: list[str], seed: int, cap: int, revision: str,
             ]
         lines.append("(exit 0)")
     else:
-        if answer:
-            lines.append(f"(set! *tr-header-extra* \",\\\"answer\\\":\\\"{answer}\\\"\")")
+        extra = f",\\\"answer\\\":\\\"{answer}\\\"" if answer else ""
+        if not self_watching:
+            extra += ",\\\"self_watching\\\":false"
+        if interventions:
+            extra += ",\\\"interventions\\\":" + json.dumps(interventions, separators=(",", ":")).replace('"', '\\"')
+        if extra:
+            lines.append(f"(set! *tr-header-extra* \"{extra}\")")
         lines += [
             f"(trace-open \"{prefix}/{seed}.metacat.jsonl\" '({i} {m} {t}) "
             f"{seed} {cap} \"{revision}\")",
             "(tell *memory* 'clear)                 ; init-mcat keeps memory (run.ss:212-213)",
             f"(init-mcat '{i} '{m} '{t} {a} {seed})",
-            f"(set! *break-time* {cap})",
+            f"(set! *break-time* {interventions[0]['at'] if interventions else cap})",
+        ] + ([f"(set! *tr-cap* {cap})", intervention_scheme(interventions)] if interventions else []) + [
             "(trace-run)",
             "(exit 0)",
         ]
@@ -293,13 +369,15 @@ def last_record(path: Path) -> str:
 
 def record_one(args, source: Path, revision: str, problem: list[str], seed: int) -> dict:
     answer, runs = args.answer, args.episode_runs
+    clears = tuple(int(x) for x in str(args.episode_clear_before).split(",") if x)
     slug = slug_of(problem, answer)
     sub = subdir_of(answer, runs)
     rundir = WORK / f"{slug}-{seed}-{os.getpid()}-{time.monotonic_ns()}"
     (rundir / sub / slug).mkdir(parents=True)
     (rundir / "driver.ss").write_text(
         driver_text(problem, seed, args.cap, revision, not args.no_snapshots,
-                    args.audit, "run", answer, runs))
+                    args.audit, "run", answer, runs, clears,
+                    parse_interventions(args.intervene) or None, args.self_watching == "on"))
     try:
         code, output, wall = run_container(source, rundir, args.timeout)
         stems = [f"{seed}.r{k}" for k in range(1, runs + 1)] if runs else [f"{seed}"]
@@ -381,6 +459,23 @@ def main() -> None:
                         help="record an episode: N runs of the problem in one process, "
                              "memory cleared only before run 1; run k uses seed S+k-1 "
                              "(S = each value of --seeds); traces <S>.r<k> under episodes/")
+    parser.add_argument("--episode-clear-before", default="", metavar="K[,K...]",
+                        help="with --episode-runs: also clear Episodic Memory before these runs "
+                             "(1-based; a person pressing Clear Memory between two runs); "
+                             "each such run's trace header carries memory_cleared")
+    parser.add_argument("--self-watching", choices=["on", "off"], default="on",
+                        help="Metacat's Self-watching mode (%%self-watching-enabled%%, default on); "
+                             "off records a run without themes, clamps and the progress watcher's work; "
+                             "the trace header carries self_watching: false and the replay runs "
+                             "Petacat with self_watching_enabled_default off")
+    parser.add_argument("--intervene", default="", metavar="N:OP[,N:OP...]",
+                        help="a person's actions during a single run (not with --episode-runs): at "
+                             "codelet N, OP is clamp-top_down, clamp-bottom_up, clamp-group, "
+                             "clamp-bridge or clamp-rule (the Options menu's codelet clamps), undo "
+                             "(Undo last clamp), self-watching-off or self-watching-on (the Self-watching "
+                             "mode check item), or theme=TYPE/DIM/REL[+TYPE/DIM/REL...] (the Clamp Themes dialog,"
+                             " e.g. theme=top_bridge/letter-category/identity); e.g. 300:clamp-bottom_up,700:undo.  The trace header "
+                             "carries the list, and the replay applies the same actions")
     parser.add_argument("--answer", metavar="A",
                         help="justify mode: the answer string (lowercase letters); the "
                              "slug gets it as a fourth part, traces go under justify/")
