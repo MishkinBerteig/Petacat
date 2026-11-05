@@ -16,6 +16,7 @@ import pytest
 from server.engine.bonds import Bond
 from server.engine.metadata import MetadataProvider
 from server.engine.start_check import check_run_start
+from tests.support.run_binding import rebind
 from server.engine.workspace_structures import WorkspaceStructure
 
 SEED = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
@@ -80,7 +81,7 @@ def test_the_weakness_exponent_is_read_from_the_bound_configuration(meta):
     s = _S()
     s.strength = 50.0
     assert s.weakness() == 100.0 - 50.0**0.95
-    WorkspaceStructure.bind_meta(
+    rebind(
         dataclasses.replace(
             meta, formula_coefficients={**meta.formula_coefficients, "weakness_exponent": 1.0}
         )
@@ -88,16 +89,40 @@ def test_the_weakness_exponent_is_read_from_the_bound_configuration(meta):
     assert s.weakness() == 50.0
 
 
+def test_a_large_configured_sigmoid_beta_saturates_as_chez_does(meta):
+    """``beta`` is configuration, so ``exp`` can overflow.  Chez gives +inf.0 where Python raises,
+    and 2 over infinity less 1 is -1.0, so a run goes on instead of crashing."""
+    from server.engine.bridges import _bridge_theme_compatibility_sigmoid as sigmoid
+
+    rebind(
+        dataclasses.replace(
+            meta,
+            formula_coefficients={
+                **meta.formula_coefficients,
+                "bridge_theme_compatibility_sigmoid_beta": 1.0e6,
+            },
+        )
+    )
+    assert sigmoid(-1.0) == -1.0  # exp(+2e6) overflows
+    assert sigmoid(1.0) == 1.0  # exp(-2e6) underflows to 0.0, and nothing raises
+
+
 def test_a_structure_with_no_bound_configuration_names_what_needed_it():
     from server.engine.metadata import ConfigurationRequired
 
-    WorkspaceStructure.bind_meta(None)
+    import contextvars
 
     class _S(WorkspaceStructure):
         pass
 
+    def build_and_weigh():
+        # An empty context: no run is bound in it, so nothing can answer.
+        s = _S.__new__(_S)
+        s.strength = 50.0
+        return s.weakness()
+
     with pytest.raises(ConfigurationRequired):
-        _S().weakness()
+        contextvars.Context().run(build_and_weigh)
 
 
 def test_bond_internal_strength_reads_its_factors(meta):
@@ -106,6 +131,6 @@ def test_bond_internal_strength_reads_its_factors(meta):
     bond = _bond(_Obj(0, 0), _Obj(1, 1), _sameness(), _letter_category())
     base = bond.calculate_internal_strength()
     doubled = {**meta.formula_coefficients, "bond_compatibility_factor_same_type": 0.5}
-    WorkspaceStructure.bind_meta(dataclasses.replace(meta, formula_coefficients=doubled))
+    rebind(dataclasses.replace(meta, formula_coefficients=doubled))
     assert isinstance(bond, Bond)
     assert bond.calculate_internal_strength() < base

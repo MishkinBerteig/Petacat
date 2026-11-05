@@ -259,8 +259,10 @@ strength updates are reached from `WorkspaceStructure.update_strength(rng)` and
 `Workspace._update_strengths_batched`, neither of which has one either. There is a
 precedent to follow rather than invent: `WorkspaceStructure._themespace`
 (`workspace_structures.py:28,43`, set from `runner.py:351,366` and
-`review_service.py:110,114`) is already bound as a class attribute for exactly this
-reason. `ThemeParams` (`numeric/layout.py:377-402`) is the precedent for the backends.
+`review_service.py:110,114`) was bound as a class attribute for exactly this
+reason. *(That binding was process-wide, and creating a second run changed the first; round 2
+stage 2 replaced it with the per-run `RunBinding` and its frozen `RunConstants` record,
+`server/engine/run_binding.py`, which is the seam this plan wants.)* `ThemeParams` (`numeric/layout.py:377-402`) is the precedent for the backends.
 
 #### Ordering
 

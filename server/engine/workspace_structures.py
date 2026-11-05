@@ -5,41 +5,38 @@ Scheme source: workspace-structures.ss
 
 from __future__ import annotations
 
-import threading
 from typing import TYPE_CHECKING
 
 from server.engine.ids import KIND_STRUCTURE, next_id
+from server.engine.run_binding import constants, current, set_clock
 
 if TYPE_CHECKING:
     from server.engine.metadata import MetadataProvider
     from server.engine.rng import RNG
 
 
-#: The running engine's codelet count, as ``*codelet-count*`` is for Scheme's
-#: ``make-workspace-structure`` (workspace-structures.ss:22: ``(time-stamp
-#: *codelet-count*)``): every structure is stamped with the count at the moment it is
-#: *made*.  The runner sets it before and after each codelet.  Thread-local, so
-#: engines running in separate threads do not stamp each other's structures.
-_clock = threading.local()
-
-
 def set_structure_clock(codelet_count: int) -> None:
-    _clock.now = codelet_count
+    """Stamp the structures made from now on, in this thread and run, with *codelet_count*.
+
+    ``*codelet-count*`` for Scheme's ``make-workspace-structure``
+    (workspace-structures.ss:22: ``(time-stamp *codelet-count*)``): every structure is
+    stamped with the count at the moment it is *made*.  The runner sets it before and after
+    each codelet.  It lives on the run's binding (``run_binding.RunBinding.clock``), per
+    thread, so engines running in separate threads do not stamp each other's structures and
+    two runs stepped alternately on one thread do not either.
+    """
+    set_clock(codelet_count)
 
 
 def bound_meta() -> MetadataProvider:
-    """The running engine's ``MetadataProvider``, for the coefficients a structure or an
-    object reads when it computes a strength or an importance.
+    """The running engine's ``MetadataProvider``, for the cold paths that need a name, a
+    role or a template (the coefficients a structure reads while it computes a strength are
+    on ``run_binding.constants()``).
 
-    Raises :class:`~server.engine.metadata.ConfigurationRequired` when no run has bound one:
-    nothing falls back to the Metacat Standard Configuration files.
+    Raises :class:`~server.engine.run_binding.NoRunBound` (a ``ConfigurationRequired``) when
+    no run is bound: nothing falls back to the Metacat Standard Configuration files.
     """
-    meta = WorkspaceStructure._meta
-    if meta is None:  # the hot path (weakness, strengths) skips the import below
-        from server.engine.metadata import require_meta
-
-        require_meta(meta, "a workspace structure's coefficient")
-    return meta  # type: ignore[return-value]
+    return current().meta
 
 
 class WorkspaceStructure:
@@ -50,17 +47,13 @@ class WorkspaceStructure:
     EVALUATED = "evaluated"
     BUILT = "built"
 
-    # The Themespace the current run's structures resonate with.  The Scheme uses
-    # a global ``*themespace*``; this mirrors it.  Set by ``init_mcat``.
-    _themespace: object | None = None
-
     def __init__(self) -> None:
         self.id = next_id(KIND_STRUCTURE)
         self.proposal_level = self.PROPOSED
         self.strength: float = 0.0
         #: workspace-structures.ss:22 -- the count when the structure was made (not
         #: when built); the progress-watcher's activity is the age of the youngest.
-        self.time_stamp: int = getattr(_clock, "now", 0)
+        self.time_stamp: int = getattr(current().clock, "now", 0)
         #: The group this structure is a constituent of, if any.  Set for *bonds*
         #: by ``build-group`` (groups.ss:927-928) and cleared by ``break-group``
         #: (groups.ss:988-989); the breaker reads it to decide whether a bond can
@@ -68,33 +61,10 @@ class WorkspaceStructure:
         #: field set is the same on every structure the state graph captures.
         self.enclosing_group: object | None = None
 
-    #: The run's ``MetadataProvider``, which the Themespace holds.  Structure strengths,
-    #: object importances and mapping strengths read their coefficients from it at the
-    #: moment they are computed; nothing is cached, so a run with another configuration
-    #: (or per-run overrides) sees its own values.  Bound with the Themespace, once per run.
-    _meta: object | None = None
-
-    @classmethod
-    def set_themespace(cls, themespace: object | None) -> None:
-        """Bind the Themespace structures consult for thematic compatibility.
-
-        The run's provider travels with it (``Themespace.meta``); binding ``None``
-        leaves the provider alone, since the next run binds its own before it builds
-        anything.
-        """
-        cls._themespace = themespace
-        held = getattr(themespace, "meta", None)
-        if held is not None:
-            cls._meta = held
-
-    @classmethod
-    def bind_meta(cls, meta: object | None) -> None:
-        """Bind the run's provider directly (a test that builds structures without a run)."""
-        cls._meta = meta
-
-    @classmethod
-    def get_themespace(cls) -> object | None:
-        return cls._themespace
+    @staticmethod
+    def get_themespace() -> object | None:
+        """The Themespace of the run this structure belongs to (the one bound now)."""
+        return current().themespace
 
     @property
     def is_built(self) -> bool:
@@ -169,7 +139,7 @@ class WorkspaceStructure:
 
     def weakness(self) -> float:
         """Probability-of-breaking measure. Scheme: workspace-structures.ss:41."""
-        return 100.0 - self.strength ** bound_meta().get_formula_coeff("weakness_exponent")
+        return 100.0 - self.strength ** constants().weakness_exponent
 
     def __repr__(self) -> str:
         return (

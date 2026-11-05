@@ -92,9 +92,9 @@ def group_or_string_token(meta: Any = None) -> str:
     node holding ``object.group`` followed by ``|string``.  A configuration with no such
     node gives ``|string`` (there is no group to collapse; the ``'string`` symbol alone)."""
     if meta is None:
-        from server.engine.workspace_structures import bound_meta
+        from server.engine.run_binding import current
 
-        meta = bound_meta()
+        meta = current().meta
     for spec in getattr(meta, "node_roles", ()) or ():
         if spec.role == _OBJECT_GROUP:
             return spec.node_name + _GROUP_OR_STRING_TAIL

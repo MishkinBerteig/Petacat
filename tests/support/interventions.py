@@ -25,14 +25,13 @@ OPS = ("clamp_codelet_pattern", "undo_last_clamp", "set_self_watching", "clamp_t
 
 
 def apply(runner: Any, intervention: dict[str, Any]) -> None:
-    """Apply one intervention under the run's own id allocator.
+    """Apply one intervention under the run's own scope.
 
-    ``RunService`` calls the two methods outside any allocator, so a clamp event it makes takes
-    its ``event_number`` from the process-wide fallback allocator, whose counter runs across runs
-    (and can collide with the run's own event numbers); ``EngineRunner`` wraps every step in
-    ``use_allocator(ctx.ids)``.  A baseline cannot record a number that depends on what else ran
-    in the process, so the harness does what the runner does.  (Reported to the lead as a defect
-    of the API path; this file does not edit ``server/``.)
+    ``RunService`` opens the run's scope (``EngineContext.scope()``) around every method that
+    names a live run, so a clamp event takes its ``event_number`` from the run's own
+    allocator.  (Before round 2 stage 2 it fell back to a process-wide allocator whose counter
+    ran across runs; the fallback no longer exists.)  The explicit ``use_allocator`` below is
+    kept so the baseline harness does not depend on the service for it.
     """
     from server.engine.ids import use_allocator
     from server.services.run_service import RunService

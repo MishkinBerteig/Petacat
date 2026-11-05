@@ -536,18 +536,18 @@ def test_a_codelet_sees_the_count_of_those_finished_before_it(meta):
 
 
 def test_structures_built_by_workers_are_stamped_with_the_clock(meta):
-    """``set_structure_clock`` is thread-local, so the workers have to set it.
+    """The structure clock is per thread (on the run's binding), so the workers have to set it.
 
     Left unset, every structure made in a worker had ``time_stamp`` 0 and the
     progress-watcher's activity (the age of the youngest structure) was wrong.
     """
-    from server.engine.workspace_structures import _clock
+    from server.engine.run_binding import current
 
     runner = _prepared(meta, seed=7)
     ctx = runner.ctx
     clocks: list[tuple[int, int]] = []
     _record_in_codelet(
-        runner, lambda c: clocks.append((getattr(_clock, "now", 0), ctx.codelet_count))
+        runner, lambda c: clocks.append((getattr(current().clock, "now", 0), ctx.codelet_count))
     )
 
     run_free(runner, workers=1, max_steps=200)

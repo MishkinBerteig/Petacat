@@ -5,41 +5,15 @@ Scheme source: workspace-objects.ss
 
 from __future__ import annotations
 
+from fractions import Fraction
 from typing import TYPE_CHECKING, Any
 
 from server.engine.ids import KIND_OBJECT, next_id
-from server.engine.workspace_structures import bound_meta
-from server.engine.numeric.layout import SalienceWeights
-from fractions import Fraction
+from server.engine.run_binding import constants, exact_fraction
 
 if TYPE_CHECKING:
     from server.engine.descriptions import Description
     from server.engine.rng import RNG
-
-
-def exact_fraction(value: Any) -> Fraction:
-    """``Fraction(value)`` without ``numbers.Rational`` in the way.
-
-    ``Fraction.__new__`` tests a float argument against the ``numbers.Rational`` ABC
-    before it reaches its float branch, and under free-threaded CPython every such
-    ``isinstance`` takes the ABC's weak-set lock -- a lock all threads share, hit
-    thousands of times per run.  A float's exact value is ``as_integer_ratio()``, which
-    is precisely what the float branch uses, so this returns the same ``Fraction``.
-    """
-    if type(value) is float:
-        numerator, denominator = value.as_integer_ratio()
-        return Fraction(numerator, denominator)
-    return Fraction(value)
-
-
-def _exact_coefficient(value: Any) -> Fraction:
-    """A configuration coefficient as an exact rational (``Fraction``).
-
-    The Metacat Standard Configuration stores these as rationals (``"2/3"``); anything
-    else a configuration holds is taken at its exact value.  The caller reads the
-    coefficient by its literal name, which the declared read list checks.
-    """
-    return value if type(value) is Fraction else exact_fraction(value)
 
 
 def _is_generic_descriptor(descriptor: Any) -> bool:
@@ -488,7 +462,8 @@ class WorkspaceObject:
         total = Fraction(0)
         for d in self.get_relevant_descriptions():
             total = total + exact_fraction(getattr(d, "descriptor_activation", 0))
-        cap = exact_fraction(bound_meta().get_formula_coeff("max_raw_importance"))
+        rc = constants()
+        cap = rc.max_raw_importance_exact
         # ``min(cap, total)``: *cap* unless *total* is strictly smaller.  Compared by
         # cross-multiplication of the (positive) denominators, which is what
         # ``Fraction.__lt__`` does -- without the ``numbers.Rational`` check it makes first.
@@ -498,9 +473,7 @@ class WorkspaceObject:
             else cap
         )
         if self.enclosing_group is not None:
-            exact *= _exact_coefficient(
-                bound_meta().get_formula_coeff("enclosed_group_importance_factor")
-            )
+            exact *= rc.enclosed_group_importance_factor_exact
         return exact
 
     def exact_raw_ratio(self) -> tuple[int, int]:
@@ -528,15 +501,14 @@ class WorkspaceObject:
                 n, m = f.numerator, f.denominator
             num = num * m + n * den
             den = den * m
-        cap = exact_fraction(bound_meta().get_formula_coeff("max_raw_importance"))
+        rc = constants()
+        cap = rc.max_raw_importance_exact
         cap_n, cap_d = cap.numerator, cap.denominator
         # ``min(cap, total)``: *cap* unless *total* is strictly smaller.
         if not num * cap_d < cap_n * den:
             num, den = cap_n, cap_d
         if self.enclosing_group is not None:
-            factor = _exact_coefficient(
-                bound_meta().get_formula_coeff("enclosed_group_importance_factor")
-            )
+            factor = rc.enclosed_group_importance_factor_exact
             num, den = num * factor.numerator, den * factor.denominator
         return num, den
 
@@ -552,12 +524,11 @@ class WorkspaceObject:
         total = sum(
             getattr(d, "descriptor_activation", 0) for d in self.get_relevant_descriptions()
         )
-        raw = min(bound_meta().get_formula_coeff("max_raw_importance"), total)
+        rc = constants()
+        raw = min(rc.max_raw_importance, total)
         if self.enclosing_group is not None:
             if enclosed_factor is None:
-                enclosed_factor = float(_exact_coefficient(
-                    bound_meta().get_formula_coeff("enclosed_group_importance_factor")
-                ))
+                enclosed_factor = rc.enclosed_group_importance_factor_float
             raw *= enclosed_factor
         self.raw_importance = raw
 
@@ -577,16 +548,12 @@ class WorkspaceObject:
             self.intra_string_unhappiness = 100.0
         elif self.leftmost_in_string() or self.rightmost_in_string():
             # ``x * numerator / denominator``: with a numerator of 1 this is ``x / 3``.
-            factor = _exact_coefficient(
-                bound_meta().get_formula_coeff("edge_object_bond_factor")
-            )
+            factor = constants().edge_object_bond_factor_exact
             self.intra_string_unhappiness = 100.0 - round(
                 getattr(bonds[0], "strength", 0) * factor.numerator / factor.denominator
             )
         else:
-            factor = _exact_coefficient(
-                bound_meta().get_formula_coeff("interior_object_bond_factor")
-            )
+            factor = constants().interior_object_bond_factor_exact
             total = sum(getattr(b, "strength", 0) for b in bonds)
             self.intra_string_unhappiness = 100.0 - round(
                 total * factor.numerator / factor.denominator
@@ -662,7 +629,7 @@ class WorkspaceObject:
         if self.salience_clamped:
             self.salience["intra"] = 100
         else:
-            w = SalienceWeights.from_metadata(bound_meta())
+            w = constants().salience
             self.salience["intra"] = round(
                 (
                     w.intra_unhappiness * self.intra_string_unhappiness
@@ -684,7 +651,7 @@ class WorkspaceObject:
         h = self.inter_string_unhappiness["horizontal"]
         v = self.inter_string_unhappiness["vertical"]
         ri = self.relative_importance
-        w = SalienceWeights.from_metadata(bound_meta())
+        w = constants().salience
         wu, wi, total = w.inter_unhappiness, w.inter_importance, w.inter_total
 
         stype = self._string_type()
@@ -779,9 +746,9 @@ class WorkspaceObject:
                          if orientation == "horizontal"
                          else getattr(self.enclosing_group, "vertical_bridge", None))
             if eg_bridge is not None:
-                return 100.0 - bound_meta().get_formula_coeff(
-                    "enclosed_group_bridge_factor"
-                ) * getattr(eg_bridge, "strength", 0)
+                return 100.0 - constants().enclosed_group_bridge_factor * getattr(
+                    eg_bridge, "strength", 0
+                )
         return 100.0
 
     def __repr__(self) -> str:

@@ -629,7 +629,7 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# The provider structures read their coefficients from
+# The run structures belong to
 # ═══════════════════════════════════════════════════════════════════════════
 _STRUCTURE_META: list = []
 
@@ -637,22 +637,41 @@ _STRUCTURE_META: list = []
 def pytest_sessionstart(session: pytest.Session) -> None:
     """Load the Metacat Standard Configuration once, before any test runs.
 
-    A bond, a group, a bridge or a concept mapping reads its coefficients from the
-    provider the running engine bound (``WorkspaceStructure.bind_meta``); a test that
-    builds one without running an engine gets the standard configuration bound here.
+    A bond, a group, a bridge or a concept mapping reads its coefficients from the run it
+    belongs to (``server/engine/run_binding.py``); a test that builds one without running an
+    engine gets a run bound for it by ``_test_run`` below, made from the standard
+    configuration loaded here.
     """
     from server.engine.metadata import MetadataProvider
 
     _STRUCTURE_META.append(MetadataProvider.from_standard_configuration(SEED_DATA_DIR))
 
 
-@pytest.fixture(autouse=True)
-def _structure_coefficients() -> Iterator[None]:
-    """Bind the standard configuration for the body of every test, then unbind."""
-    from server.engine.workspace_structures import WorkspaceStructure
+#: The layers whose tests build structures, objects and trace events directly, with no engine
+#: entry point around them, and so need a run to belong to.  Every other layer (architecture,
+#: integration, parallel, lockstep, e2e) runs with **no ambient run at all**: whatever it executes
+#: is a real engine path, and a path that forgot to open its run's scope must raise ``NoRunBound``
+#: there as it would in production, not find a run left behind by a fixture.
+#: ``tests/integration/test_no_ambient_run.py`` holds this to the list.
+AMBIENT_RUN_LAYERS = ("unit", "seed_unit", "module")
 
-    WorkspaceStructure.bind_meta(_STRUCTURE_META[0])
-    try:
+
+@pytest.fixture(autouse=True)
+def _test_run(request: pytest.FixtureRequest) -> Iterator[None]:
+    """Bind a run for the body of a test in ``AMBIENT_RUN_LAYERS``, then unbind it.
+
+    The run is the standard configuration with a fresh identifier allocator, so a test that
+    builds structures directly (no ``EngineRunner``) has a run to belong to.  Tests that
+    run an engine open that engine's own scope on top of this one and restore it on exit.
+    A test that wants another configuration binds its own with ``use_run`` or ``rebind``.
+    A test in any other layer that truly needs a binding binds its own, explicitly.
+    """
+    if _layer_of(request.node.nodeid) not in AMBIENT_RUN_LAYERS:
         yield
-    finally:
-        WorkspaceStructure.bind_meta(None)
+        return
+
+    from server.engine.ids import IdAllocator
+    from server.engine.run_binding import RunBinding, use_run
+
+    with use_run(RunBinding.for_meta(_STRUCTURE_META[0]), IdAllocator()):
+        yield

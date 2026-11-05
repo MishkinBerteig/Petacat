@@ -155,7 +155,9 @@ per-thread replica of the Workspace. The swarm remains the way to use every core
 3. **`top-down-group-scout:category`** should compute `single_letter_group_probability`
    without constructing a `Group`.
 4. **`WorkspaceStructure._themespace`** (`workspace_structures.py:41`) is process-global. It
-   should belong to the run.
+   should belong to the run. *(Done in round 2, stage 2: it is `RunBinding.themespace`, reached
+   through a `ContextVar` each engine entry point and each worker thread binds; see
+   `server/engine/run_binding.py`.)*
 5. **`Coderack.post`** (`coderack.py:349`) should take the eviction stream explicitly.
 6. **`state_graph` restore** (`state_graph.py:574-578`) writes bins directly. After a restore,
    `ClockCoderack` must re-adopt the rack.

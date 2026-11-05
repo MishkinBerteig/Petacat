@@ -44,18 +44,17 @@ context.  Both choices matter:
   a fresh asyncio task with a fresh context, so an allocator bound during run
   creation would simply not be visible when the next request stepped the run.
 
-When nothing is bound — a structure constructed directly in a unit test, or the
-service layer rehydrating episodic memory outside any run — allocation falls back to
-a process-wide default.  That is the old behaviour, kept deliberately for the case
-where there is no run for an identifier to depend on.  Inside a run the run's own
-allocator always wins, which is the property WP0.3 exists to establish.
+When nothing is bound, allocation raises ``NoRunBound``.  There is no process-wide
+default: it was shared run state (two runs, or a run and a test, drew from one counter),
+and the only code that ever reached it was code running outside a run.  Episodic Memory
+numbers its own answers and snags with the allocator it carries, and needs no binding.
 """
 
 from __future__ import annotations
 
 import threading
 from contextlib import contextmanager
-from contextvars import ContextVar
+from contextvars import ContextVar, Token
 from typing import Iterator
 
 #: Identifier kinds.  Each is numbered independently, so a run's third codelet and
@@ -128,16 +127,38 @@ class IdAllocator:
         return f"IdAllocator({self.snapshot()})"
 
 
-#: Allocator used when no run is bound.  See the module docstring: this is for
-#: identifiers with no run to belong to, not a convenience for engine code.
-_DEFAULT = IdAllocator()
-
-_CURRENT: ContextVar[IdAllocator] = ContextVar("petacat_id_allocator", default=_DEFAULT)
+#: The allocator of the run being executed in this context.  There is no default: an
+#: identifier is a run's, and code that allocates one outside a run (``next_id`` with
+#: nothing bound) raises rather than draw from a counter that belongs to the process.
+_CURRENT: ContextVar[IdAllocator] = ContextVar("petacat_id_allocator")
 
 
 def next_id(kind: str) -> int:
     """Claim the next identifier of ``kind`` from the current allocator."""
-    return _CURRENT.get().next(kind)
+    try:
+        allocator = _CURRENT.get()
+    except LookupError:
+        from server.engine.run_binding import NoRunBound
+
+        raise NoRunBound(
+            f"a {kind} identifier was claimed with no run bound in this thread; "
+            "identifiers belong to a run (EngineContext.scope()), and there is no "
+            "process-wide fallback"
+        ) from None
+    return allocator.next(kind)
+
+
+def bind_allocator(allocator: IdAllocator) -> Token:
+    """Make *allocator* current and return the token that ``unbind_allocator`` undoes.
+
+    For a context manager that binds several things at once (``run_binding.use_run``);
+    everything else uses :func:`use_allocator`.
+    """
+    return _CURRENT.set(allocator)
+
+
+def unbind_allocator(token: Token) -> None:
+    _CURRENT.reset(token)
 
 
 @contextmanager

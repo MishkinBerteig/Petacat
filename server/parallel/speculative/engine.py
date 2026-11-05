@@ -100,7 +100,8 @@ from server.engine.codelet_dsl.interpreter import (
     _fizzle,
 )
 from server.engine.codelet_dsl.builtins import get_builtins
-from server.engine.ids import IdAllocator, use_allocator
+from server.engine.ids import IdAllocator
+from server.engine.run_binding import use_run
 from server.engine.runner import EngineContext
 from server.engine.slipnet import SlipnetNode
 from server.engine.workspace_structures import WorkspaceStructure
@@ -153,10 +154,17 @@ class Spec:
     __slots__ = (
         "codelet", "type", "info", "compiled", "pred_cc", "status", "go", "abandon",
         "arbiter", "start", "reads", "step_rel", "live", "worker", "error", "reason",
-        "reexec", "token_held", "snapshot", "committed", "fp0", "deferred", "left",
+        "reexec", "token_held", "snapshot", "committed", "fp0", "deferred", "left", "trap",
     )
 
-    def __init__(self, codelet: Any, info: Any, compiled: Any, pred_cc: int, worker: int) -> None:
+    def __init__(
+        self, codelet: Any, info: Any, compiled: Any, pred_cc: int, worker: int,
+        trap: Callable[["Spec"], None],
+    ) -> None:
+        #: The owning engine's trap: what a guarded write calls when this speculation is
+        #: not live.  Held by the speculation, not by the module, so two engines in one
+        #: process (two runs on the speculative executor) each trap their own writes.
+        self.trap = trap
         self.codelet = codelet
         self.type = codelet.codelet_type
         self.info = info
@@ -221,13 +229,9 @@ class _SpecContext(EngineContext):
 _CONFLICT_MASK = (fx.BIT["workspace"] | fx.BIT["slipnet_act"] | fx.BIT["themespace"]
                   | fx.BIT["temperature"])
 
-#: Set to the running engine's trap while one is installed (one engine per process).
-_GUARD: Callable[["Spec"], None] | None = None
-
-
 def _trap(spec: "Spec") -> None:
-    assert _GUARD is not None
-    _GUARD(spec)
+    """Hand a guarded write to the engine that owns *spec* (``Spec.trap``)."""
+    spec.trap(spec)
 
 
 class _DeferredNode(SlipnetNode):
@@ -576,6 +580,7 @@ class SpeculativeEngine:
         self._threads: list[threading.Thread] = []
         self._flags = _Flags()
         self._installed = False
+        self._trap: Callable[[Spec], None] = self._ensure_live
         self._stale: dict[int, Spec] = {}
         self._wtele: list[dict[str, int]] = []
         #: Counters bumped on the coordinator (merged with the workers' at the end).
@@ -660,7 +665,6 @@ class SpeculativeEngine:
                     or ctx.commit_lock is not None)
 
     def install(self) -> None:
-        global _GUARD
         if self._installed:
             return
         runner = self.runner
@@ -690,7 +694,7 @@ class SpeculativeEngine:
         self._nodes = list(ctx.slipnet.nodes.values())
         for node in self._nodes:
             node.__class__ = _DeferredNode
-        _GUARD = self._probe_trap if self.detect else self._ensure_live
+        self._trap = self._probe_trap if self.detect else self._ensure_live
         _install_class_patches()
 
         # The interpreter.
@@ -725,7 +729,6 @@ class SpeculativeEngine:
         return wrapped
 
     def uninstall(self) -> None:
-        global _GUARD
         if not self._installed:
             return
         if self._direct:
@@ -747,7 +750,6 @@ class SpeculativeEngine:
         ctx.coderack.guard = None
         for node in self._nodes:
             node.__class__ = SlipnetNode
-        _GUARD = None
         _remove_class_patches()
         self.ssr.uninstall()
         self._installed = False
@@ -829,8 +831,9 @@ class SpeculativeEngine:
         flags = self._flags
         spins = self.idle_spins
         long_spins = self.idle_long_spins
-        # The id allocator is a ContextVar, so it must be bound in *this* thread.
-        with use_allocator(_WorkerIds(ctx.ids)):
+        # The run binding and the id allocator are ContextVars, so they must be bound in
+        # *this* thread; the allocator is the guarded proxy.
+        with use_run(ctx.binding, _WorkerIds(ctx.ids)):
             idle = 0
             while not flags.stop:
                 spec = slot.spec
@@ -1308,7 +1311,7 @@ class SpeculativeEngine:
                             compiled = self._compiled(codelet.codelet_type)
                             if compiled is not None:
                                 widx = free.pop()
-                                spec = Spec(codelet, plan[0], compiled, cc + pos, widx)
+                                spec = Spec(codelet, plan[0], compiled, cc + pos, widx, self._trap)
                                 specs[cid] = spec
                                 slot = slots[widx]
                                 tele["assigned"] += 1
@@ -1397,7 +1400,7 @@ class SpeculativeEngine:
 
         ctx = self.runner.ctx
         cc = ctx.__dict__["codelet_count"]
-        probe = Spec(codelet, info, compiled, cc, -1)
+        probe = Spec(codelet, info, compiled, cc, -1, self._trap)
         probe.go = cc
         probe.fp0 = state(ctx)
         self.telemetry["inline"] += 1

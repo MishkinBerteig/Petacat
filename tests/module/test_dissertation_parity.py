@@ -173,58 +173,60 @@ class TestThematicPressure:
         positive activation pushes a compatible structure toward full strength, a
         small negative activation quickly undermines it."""
         runner = _run(meta, "abc", "abd", "ijk", steps=1)
-        ws, ts = runner.ctx.workspace, runner.ctx.themespace
+        with runner.ctx.scope():
+            ws, ts = runner.ctx.workspace, runner.ctx.themespace
 
-        a_initial = ws.initial_string.letters[0]
-        a_modified = ws.modified_string.letters[0]
-        bridge = Bridge(
-            a_initial,
-            a_modified,
-            BRIDGE_TOP,
-            make_concept_mappings(a_initial, a_modified, BRIDGE_TOP),
-        )
-        bridge.update_strength()
-        resting = bridge.strength
+            a_initial = ws.initial_string.letters[0]
+            a_modified = ws.modified_string.letters[0]
+            bridge = Bridge(
+                a_initial,
+                a_modified,
+                BRIDGE_TOP,
+                make_concept_mappings(a_initial, a_modified, BRIDGE_TOP),
+            )
+            bridge.update_strength()
+            resting = bridge.strength
 
-        cluster = next(
-            c
-            for c in ts.clusters
-            if c.theme_type == THEME_TOP_BRIDGE
-            and c.dimension == "plato-string-position-category"
-        )
-        theme = ts.add_theme(
-            THEME_TOP_BRIDGE, cluster.dimension, RELATION_IDENTITY, False
-        )
+            cluster = next(
+                c
+                for c in ts.clusters
+                if c.theme_type == THEME_TOP_BRIDGE
+                and c.dimension == "plato-string-position-category"
+            )
+            theme = ts.add_theme(
+                THEME_TOP_BRIDGE, cluster.dimension, RELATION_IDENTITY, False
+            )
 
-        ts.thematic_pressure_on([THEME_TOP_BRIDGE])
-        theme.clamp(80.0)
-        bridge.update_strength()
-        assert bridge.strength >= resting
+            ts.thematic_pressure_on([THEME_TOP_BRIDGE])
+            theme.clamp(80.0)
+            bridge.update_strength()
+            assert bridge.strength >= resting
 
-        theme.clamp(-80.0)
-        bridge.update_strength()
-        assert bridge.strength < resting
+            theme.clamp(-80.0)
+            bridge.update_strength()
+            assert bridge.strength < resting
 
     def test_one_incompatible_theme_outweighs_two_compatible_ones(self, meta):
         """§4.1.2, p.143: "the incompatible themes will tend to drown out the
         compatible themes, even if the latter outnumber the former"."""
         runner = _run(meta, "abc", "abd", "ijk", steps=1)
-        ts = runner.ctx.themespace
-        ts.thematic_pressure_on([THEME_TOP_BRIDGE])
+        with runner.ctx.scope():
+            ts = runner.ctx.themespace
+            ts.thematic_pressure_on([THEME_TOP_BRIDGE])
 
-        class FakeBridge(Bridge):
-            def get_theme_support_values(self):  # noqa: D102
-                return [0.8, 0.8, -0.8]
+            class FakeBridge(Bridge):
+                def get_theme_support_values(self):  # noqa: D102
+                    return [0.8, 0.8, -0.8]
 
-        ws = runner.ctx.workspace
-        fake = FakeBridge(
-            ws.initial_string.letters[0],
-            ws.modified_string.letters[0],
-            BRIDGE_TOP,
-            [],
-        )
-        assert fake.get_average_theme_support() < 0
-        assert fake.get_thematic_compatibility() < 0
+            ws = runner.ctx.workspace
+            fake = FakeBridge(
+                ws.initial_string.letters[0],
+                ws.modified_string.letters[0],
+                BRIDGE_TOP,
+                [],
+            )
+            assert fake.get_average_theme_support() < 0
+            assert fake.get_thematic_compatibility() < 0
 
 
 # ═══════════════════════════════════════════════════════════════════════════

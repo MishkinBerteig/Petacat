@@ -33,7 +33,7 @@ count every engine-size figure in this document uses. Seed data: 59 slipnet node
 integration + 8 module files run locally; 9 e2e files currently require Docker, which
 WP2.1 removes).
 
-> **As built.** `server/engine/` holds 52 modules and 37,361 lines. The multi-core machinery
+> **As built.** `server/engine/` holds 53 modules and 37,673 lines. The multi-core machinery
 > (`free_running.py`, `coderack_shards.py`, `population.py`) moved out to the detachable
 > plugin package `server/parallel/`, which is not counted here. Later: `population.py`,
 > the sharded coderack candidates (`coderack_shards.py` keeps only the locked rack),
@@ -552,6 +552,18 @@ process — the property that fails today. Numbering restarts per Run rather tha
 continuing from process-wide state.
 *Note:* touches five modules and every object constructor. Do it before parallelism,
 not during; it is a mechanical change now and a merge nightmare later.
+
+*As built, and extended (Metacat finish, round 2, stage 2).* The allocator is held in a
+`ContextVar` (`engine/ids.py`) and bound at every engine entry point and by every worker
+thread (`EngineContext.scope()`). It has **no process-wide fallback**: `next_id` with nothing
+bound raises `NoRunBound`. The same stage found that the Themespace and the provider were
+class attributes of `WorkspaceStructure`, so creating a second run changed the first
+(`abc -> abd; xyz` seed 7: 2,470 codelets became 1,559 when a second run with the *same*
+configuration was created before it finished). Everything a run reaches by implicit lookup
+now lives on its `RunBinding` (`engine/run_binding.py`): the provider, the frozen
+`RunConstants` record resolved once in `init_mcat`, the Themespace, and the structure clock
+(per run and per thread). The review service's binding swap is gone. The only state two
+Metacat Mode runs still share is Metacat's own Episodic Memory, by design.
 
 **WP0.4 — Benchmark harness, checked in.**
 The per-phase instrumentation used to produce the B2 table, as a repeatable script:

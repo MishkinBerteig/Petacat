@@ -6,6 +6,8 @@ Creates runs, steps codelets, persists snapshots, manages lifecycle.
 from __future__ import annotations
 
 import asyncio
+import functools
+import inspect
 from dataclasses import dataclass
 from typing import Any
 
@@ -2165,3 +2167,66 @@ class RunService:
             "codelet_type": codelet_type,
             "clamped": False,
         }
+
+
+# ---------------------------------------------------------------------------
+# Every method that names a live run executes inside that run's scope
+# ---------------------------------------------------------------------------
+
+
+def _in_run_scope(cls: type) -> type:
+    """Make every ``RunService`` method that takes a ``run_id`` execute inside that run's scope.
+
+    A run's structures, objects and trace events reach its identifier allocator, its
+    constants and its Themespace through the binding ``EngineContext.scope()`` installs
+    (``server/engine/run_binding.py``).  The engine's own entry points open one, but this
+    service also reaches into a live run directly: it builds clamp events, imposes theme
+    patterns, restores a displayed event over the live Themespace, serialises bridges
+    (whose strengths are computed from the run's constants).  Those used to work because
+    the bindings were process-wide, which is the defect this removes.  Done here, once, over
+    the class, so that no method has to remember to open a scope and a new one cannot forget.
+    A method for a run that is not loaded is left to say so itself.
+    """
+
+    def wrap(fn):
+        names = list(inspect.signature(fn).parameters)
+        if "run_id" not in names:
+            return fn
+        position = names.index("run_id") - 1  # ``self`` is not among ``args``
+
+        def scope_of(self, args, kwargs):
+            run_id = args[position] if len(args) > position else kwargs.get("run_id")
+            runner = self._runners.get(run_id)
+            ctx = runner.ctx if runner is not None else None
+            return ctx.scope() if ctx is not None else None
+
+        if inspect.iscoroutinefunction(fn):
+
+            @functools.wraps(fn)
+            async def run_async(self, *args, **kwargs):
+                scope = scope_of(self, args, kwargs)
+                if scope is None:
+                    return await fn(self, *args, **kwargs)
+                with scope:
+                    return await fn(self, *args, **kwargs)
+
+            return run_async
+
+        @functools.wraps(fn)
+        def run_sync(self, *args, **kwargs):
+            scope = scope_of(self, args, kwargs)
+            if scope is None:
+                return fn(self, *args, **kwargs)
+            with scope:
+                return fn(self, *args, **kwargs)
+
+        return run_sync
+
+    for name, member in list(vars(cls).items()):
+        if name.startswith("__") or not inspect.isfunction(member):
+            continue
+        setattr(cls, name, wrap(member))
+    return cls
+
+
+_in_run_scope(RunService)

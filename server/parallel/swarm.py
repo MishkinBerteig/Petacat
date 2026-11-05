@@ -589,9 +589,11 @@ class Swarm:
         self._blob: bytes = b""
         self._executor: ProcessPoolExecutor | None = None
         self._lock = threading.RLock()
-        #: Guards ``_inflight`` alone.  ``submit`` releases from a future's done-callback,
-        #: which runs on the pool's management thread while ``_acquire`` may hold ``_lock``
-        #: waiting for that very thread to exit (a broken pool): taking ``_lock`` there deadlocks.
+        #: Guards ``_inflight`` and ``tasks_run``.  ``submit`` settles from a future's
+        #: done-callback, which runs on the pool's management thread while ``_acquire`` may hold
+        #: ``_lock`` waiting for that very thread to exit (a broken pool): taking ``_lock`` there
+        #: deadlocks.  ``tasks_run`` is counted by ``imap_unordered``'s consumer thread and by
+        #: that management thread, so ``+=`` on it is not atomic under free-threaded Python.
         self._count_lock = threading.Lock()
         self._inflight = 0
         self._closed = False
@@ -751,6 +753,19 @@ class Swarm:
         with self._count_lock:
             self._inflight -= 1
 
+    def _count_tasks(self, n: int) -> None:
+        with self._count_lock:
+            self.tasks_run += n
+
+    def _settle(self, ran: int) -> None:
+        """A submitted job is over: count the tasks it ran, then release it, in one step.
+
+        One critical section, tasks first, so a reader that sees ``inflight_jobs`` at 0 also
+        sees the tasks counted."""
+        with self._count_lock:
+            self.tasks_run += ran
+            self._inflight -= 1
+
     def _prepare(
         self, tasks: Iterable[RunTask | EpisodeTask], meta: MetadataProvider | None
     ) -> Iterator[tuple[int, Any]]:
@@ -797,7 +812,7 @@ class Swarm:
                 done, pending = wait(pending, return_when=FIRST_COMPLETED)
                 for future in done:
                     for outcome in future.result():
-                        self.tasks_run += 1
+                        self._count_tasks(1)
                         yield outcome
         except BrokenProcessPool:
             self._drop_pool()
@@ -816,7 +831,11 @@ class Swarm:
 
         For callers that feed work as it arrives (the Batch scheduler) rather than handing
         over a whole job: the call returns at once, the tasks run on one worker, and the job
-        counts as in flight until the future completes.  Backends resolve exactly as
+        counts as in flight until the future completes.  The counters of :meth:`status`
+        (``tasks_run``, ``inflight_jobs``) are settled by the future's done-callback, which
+        ``concurrent.futures`` runs just *after* it wakes whoever waits on ``result()``: a
+        caller that reads the status the instant ``result()`` returns may still see the job in
+        flight, and waits for ``inflight_jobs`` to drop to see it counted.  Backends resolve exactly as
         :meth:`imap_unordered` resolves them.  A ``BrokenProcessPool`` surfaces on the
         future; the next call restarts the pool, and the caller may resubmit (runs are
         deterministic, so a rerun is exact).
@@ -830,9 +849,7 @@ class Swarm:
             raise
 
         def _done(f: Future) -> None:
-            self._release()
-            if not f.cancelled() and f.exception() is None:
-                self.tasks_run += len(batch)
+            self._settle(len(batch) if not f.cancelled() and f.exception() is None else 0)
 
         future.add_done_callback(_done)
         return future
@@ -857,6 +874,8 @@ class Swarm:
 
     def status(self) -> dict:
         """Pool state for ``GET /api/swarm`` — cheap, never starts the pool."""
+        with self._count_lock:  # one snapshot of the two counters, whichever thread settles
+            inflight, tasks_run = self._inflight, self.tasks_run
         with self._lock:
             return {
                 "started": self._executor is not None,
@@ -865,8 +884,8 @@ class Swarm:
                 "start_method": "forkserver",
                 "default_backend": self.backend,
                 "config_hash": self._bound_hash or None,
-                "inflight_jobs": self._inflight,
-                "tasks_run": self.tasks_run,
+                "inflight_jobs": inflight,
+                "tasks_run": tasks_run,
                 "rebinds": self.rebinds,
                 "startup_seconds": self.started_seconds,
                 "qos": self._qos_on and _qos.available(),

@@ -478,10 +478,18 @@ def _capture_rng(rng: Any) -> dict:
 def restore_run_state(runner: Any, state: dict) -> None:
     """Load a captured state into ``runner``, replacing whatever it held.
 
+    Runs inside the runner's own scope (``ctx.scope()``): rebuilding the graph makes
+    structures, which take their identifiers and coefficients from the run they belong to.
+
     ``runner`` must already have been through ``init_mcat`` for the same problem: that
     is what builds the Slipnet from metadata and the four Workspace strings this graph
     refers to by role and by name.
     """
+    with runner.ctx.scope():
+        _restore_run_state(runner, state)
+
+
+def _restore_run_state(runner: Any, state: dict) -> None:
     version = state.get("format_version")
     if version != FORMAT_VERSION:
         raise StateGraphError(

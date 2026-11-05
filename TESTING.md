@@ -145,14 +145,14 @@ outside the matrix take it too and the run is entirely what it says it is.
   gpu  mlx      float32    900 tests
   whole suite requested: the full matrix is required of this run
 
-  unit          1761 collected   1761 run   1761 passed      0 failed      0 skipped  complete
-  seed_unit     1074 collected   1074 run   1073 passed      0 failed      1 skipped  complete
-  module        1005 collected   1005 run   1005 passed      0 failed      0 skipped  complete
+  unit          1762 collected   1762 run   1762 passed      0 failed      0 skipped  complete
+  seed_unit     1074 collected   1074 run   1074 passed      0 failed      0 skipped  complete
+  module        1049 collected   1049 run   1049 passed      0 failed      0 skipped  complete
   architecture    92 collected     92 run     92 passed      0 failed      0 skipped  complete
-  integration    346 collected    346 run    343 passed      0 failed      3 skipped  complete
-  parallel       302 collected    302 run    292 passed      0 failed     10 skipped  complete
+  integration    357 collected    357 run    357 passed      0 failed      0 skipped  complete
+  parallel       304 collected    304 run    304 passed      0 failed     0 skipped  complete
   lockstep       239 collected    239 run    239 passed      0 failed      0 skipped  complete
-  e2e            549 collected    549 run    548 passed      0 failed      1 skipped  complete
+  e2e            555 collected    555 run    555 passed      0 failed      0 skipped  complete
 
   run complete in 13.9 min against a 60 min ceiling
 ```
@@ -200,7 +200,7 @@ A truncated run reports itself as truncated, and the difference from a clean run
 visible three ways:
 
 ```
-  module         1075 collected    198 run    198 passed      0 failed      0 skipped  INCOMPLETE
+  module         1119 collected    198 run    198 passed      0 failed      0 skipped  INCOMPLETE
 
   RUN TRUNCATED: the 60 min ceiling was reached after 60.4 min. Everything above is
   what the run produced before it stopped; the tests it had not reached never ran.
@@ -224,17 +224,17 @@ that allowance.
 
 | Layer | Directory | Scope | May depend on | Cases |
 |-------|-----------|-------|---------------|-------|
-| **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 1761 |
+| **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 1762 |
 | **seed unit** | `tests/seed_unit/` | One class or function, measured against the values Petacat ships with | Real `seed_data/*.json`, and the machine the process is running on | 1074 |
-| **module** | `tests/module/` | Several real components assembled and driven | Real engine objects and `seed_data/*.json`; no DB, no HTTP | 1005 |
+| **module** | `tests/module/` | Several real components assembled and driven | Real engine objects and `seed_data/*.json`; no DB, no HTTP | 1049 |
 | **architecture** | `tests/architecture/` | How the source tree is allowed to depend on itself | The repository's source, `seed_data/*.json`, child interpreters | 92 |
-| **integration** | `tests/integration/` | Agreement between the repository's artifacts, and the harness's own rules | Real `seed_data/*.json`, the ORM declarations, the generated client files, the documentation, a real pytest session | 346 |
-| **parallel** | `tests/parallel/` | The detachable multi-core plugin (`server/parallel/`): each executor against the serial run it claims to equal | Real engine objects and `seed_data/*.json`, worker processes and threads; each test pins the backend it compares on | 302 |
+| **integration** | `tests/integration/` | Agreement between the repository's artifacts, and the harness's own rules | Real `seed_data/*.json`, the ORM declarations, the generated client files, the documentation, a real pytest session | 357 |
+| **parallel** | `tests/parallel/` | The detachable multi-core plugin (`server/parallel/`): each executor against the serial run it claims to equal | Real engine objects and `seed_data/*.json`, worker processes and threads; each test pins the backend it compares on | 304 |
 | **lockstep** | `tests/lockstep/` | Petacat's decision traces against Metacat's: naming, helper conformance, tracing/replay RNGs, determinism guards, the comparer | Real engine in faithful mode (numeric backend off, or a named backend); recorded Metacat traces | 239 |
-| **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 549 |
+| **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 555 |
 
 Those counts are cases, so they include the second pass the numeric matrix makes
-over the 881 backend-sensitive tests.
+over the 922 backend-sensitive tests.
 
 One line decides each layer. Read them as a question about what a new test's
 subject is, and write the test where the answer lands:
@@ -266,7 +266,7 @@ first**, then move up toward the API and GUI.
 
 All eight layers run in one command — the
 [required command](#the-required-command) — and, since Petacat runs natively, all
-eight actually run: **5,416 cases**, every one of them executed. A layer that is
+eight actually run: **5,432 cases**, every one of them executed. A layer that is
 normally skipped is not a layer that is normally green, and none of these is.
 
 Wall-clock time depends heavily on the machine and on what else it is doing. The
@@ -554,6 +554,7 @@ changing what it records.
 | `test_lockstep_structure.py` | 7 | Structure-building fidelity: bridge-proposal scout scope, bond-builder break order, answer string outside justify mode, concept-activation sampling (DISCREPANCIES5 C-5, D-6…D-10) |
 | `test_numeric_engine.py` | 7 | The engine computes the same thing with the substrate engaged |
 | `test_no_seed_reads_at_run_time.py` | 8 | EN1: the engine takes its configuration from the run's `MetadataProvider` and never reads the Metacat Standard Configuration files at run time. A `sys.addaudithook` fixture (local to the module) fails any `open` under `seed_data/` during a Verbose-mode run, a swarm call, an episode with Episodic Memory carried and the comparison and explanation of its answers; and the former fallbacks (rule English parameters, the Verbose catalogue, commentary templates, conceptual depths, reminding and distance) raise when no provider is given |
+| `test_run_binding.py` | 16 | A run is bound to its own configuration, constants, Themespace and clock (round 2, stage 2): every run is identical to the same run alone (codelets, answers, status, every draw, every Trace event, the final state graph) when a second run with the same or another configuration is created before it finishes, when two runs are stepped alternately or one inside the other's step, beside a restored review inspector, on parallel threads running different problems, and under two speculative engines in one process; with no run bound, `current`, `constants`, `next_id` and a structure's construction raise `NoRunBound`; nothing run-wide is left on `WorkspaceStructure`; a run holds the `RunConstants` of its own provider, resolved once, and a changed configuration reaches the next run and not the running one |
 | `test_run_identifiers.py` | 8 | Identifiers depend on the run, not on the process's history |
 | `test_rule_object_descriptions.py` | 8 | What a rule may name its object by, and whether that name finds anything |
 | `test_run_to_answer.py` | 7 | Run-to-answer behaviour at the `EngineRunner` level |
@@ -590,6 +591,7 @@ changing what it records.
 |------|----:|--------|
 | `test_documented_code_shape.py` | 4 | The engine's size, the endpoint count, the builtins module and the Run Controls groups, as the documentation states them |
 | `test_documented_counts.py` | 3 | Every documented layer count, suite total and per-file figure, against the collection that produced it |
+| `test_no_ambient_run.py` | 3 | Only `unit`, `seed_unit` and `module` get an ambient run bound around their tests; `architecture`, `integration`, `parallel`, `lockstep` and `e2e` run with none, so a real path that forgot to open its run's scope raises `NoRunBound` there as in production |
 | `test_configuration_input.py` | 31 | The four input-check classes of the configuration input library (C0, `server/services/configuration_input.py`) as pure functions, with no database, engine or routes: unknown reference, key exists, malformed, does-not-compile, stale base version, and applying operations to a copy |
 | `test_configuration_source.py` | 15 | C2, start-up tests 1-6 of the plan's 3.6, through `server/services/configuration_startup.py` (what `lifespan` calls): the database is the source and not the files; an empty database first-loads with a `configuration_state` row; a loaded database is never re-seeded (edits and deletions survive a restart) even when a seed file changes; the start-up reference equals the seed files whatever the database holds; refusals (unreachable database, rows without a state row, a state that is not `ready`, a state row over empty tables, an older schema, an unparseable parameter, an unreadable seed file); two simultaneous start-ups load once; start-up never writes the seed files. Uses its own scratch database `petacat_c2` (`C2_DATABASE_URL` overrides) |
 | `test_db_seed_equivalence.py` | 16 | C0 gate G4: a database loaded from the Metacat Standard Configuration with no edits yields a provider equal, field by field (order and JSON number typing included), to `MetadataProvider.from_standard_configuration`. `RECORDED_STORAGE_LIMITS` lists what the database cannot carry and may only shrink; EN2 removed the last three (ordinals on the name-keyed tables, `value_type` on formula coefficients, `json` rather than `jsonb`), so it is empty and the providers and `config_hash` must be equal in full. A new table must be added to `_expected_tables`. Uses its own scratch database `petacat_c0` (`C0_HARNESS_DATABASE_URL` overrides), built by `equivalence_harness.py` |
@@ -670,6 +672,7 @@ changing what it records.
 | `test_persistence_modes.py` | 33 | The three persistence modes: Fast, Normal, Audit; a parallel Run is the same at any worker count |
 | `test_run_parameters.py` | 13 | Run parameters are settable per Run, stored, and readable back |
 | `test_run_to_answer.py` | 8 | The Run-to-Answer feature over HTTP |
+| `test_two_runs_over_http.py` | 5 | Two live runs held by one server (round 2, stage 2): run A, driven as the client does (step batches, view polls between them), is codelet-for-codelet and view-for-view the run it is alone when run B is created before A is stepped, with the same configuration (normal and fast) or one edited in between through the Admin API, and when the two are stepped alternately; an open Audit inspector, stepped between A's batches, changes nothing; and no run is bound around an e2e test (the unit/module fixture's ambient run must not hide a server path that forgot its scope) |
 | `test_memory_order.py` | 2 | A restart puts stored answers back newest first by the memory's own identifier, both projections list them oldest first, and forgetting one keeps the rest in order |
 | `test_snag_identity.py` | 5 | A snag is the same snag whichever endpoint served it, and is written once |
 | `test_moment_display.py` | 6 | Event, answer and snag redisplay over the API: print names in the listing, the picture served live and from the stored row, the toggle and the switch, rows with no picture |
@@ -683,7 +686,7 @@ changing what it records.
 
 | File | Fns | Covers |
 |------|----:|--------|
-| `test_swarm.py` | 22 | A swarm outcome is the serial run's, byte for byte: demo problems × seeds, justification, episodes, parameter overrides, both CPU backends; errors come back as outcomes; configuration changes re-initialise workers; `Swarm.submit` (the Training Mode Session executor's entry point) returns futures equal to the serial runs, counts runs in flight and resolves the default backend like `map` |
+| `test_swarm.py` | 24 | A swarm outcome is the serial run's, byte for byte: demo problems × seeds, justification, episodes, parameter overrides, both CPU backends; errors come back as outcomes; configuration changes re-initialise workers; `Swarm.submit` (the Training Mode Session executor's entry point) returns futures equal to the serial runs, counts runs in flight (settled by the done-callback, which runs just after `result()` wakes its waiter, forced deterministically; task counts are not lost to concurrent `+=`) and resolves the default backend like `map` |
 | `test_placement.py` | 13 | The measured backend policy: the CPU by default, never the GPU on its own, the environment overrides |
 | `test_update_cycle.py` | 9 | The plugin's update cycle: faithful is bit-identical to the engine's, stream is identical at every thread count |
 | `test_clock_rack.py` | 12 | The exponential-race coderack draws each codelet with the faithful two-stage draw's probability, and a later post never disturbs an earlier choice it does not beat; the prediction cached for an epoch stays exact until a post passes it |
@@ -948,6 +951,26 @@ the real value is what is being asserted about.
    carry the project's research contribution — the **self-watching**
    machinery: Themespace (`themes.py`), Temporal Trace (`trace.py`), Episodic
    Memory (`memory.py`), and Jootsing (`jootsing.py`).
+
+## A run is bound in the layers that build structures directly
+
+Structures, objects and trace events belong to a run: they take their identifier from its
+allocator and their coefficients, Themespace and clock from its `RunBinding`
+(`server/engine/run_binding.py`), and there is no process-wide fallback for either. The
+autouse fixture `_test_run` in `tests/conftest.py` binds a run for the body of every **`unit`,
+`seed_unit` and `module`** test (the Metacat Standard Configuration and a fresh identifier
+allocator), so a test that builds a bond or a description directly has a run to belong to.
+`architecture`, `integration`, `parallel`, `lockstep` and `e2e` run with **no** ambient run: what
+they execute is a real engine path, and a path that forgot to open its run's scope must raise
+`NoRunBound` there as it would in production, not find a run a fixture left behind
+(`tests/integration/test_no_ambient_run.py`, and an e2e test of the same, hold the fixture to
+that). A test in those layers that builds objects by hand binds its own, explicitly: `use_run` /
+`use_allocator` in a fixture (`tests/parallel/test_clock_rack.py`, `tests/lockstep/test_naming.py`).
+A test that needs structures to read another configuration or another Themespace calls
+`rebind(meta=..., themespace=...)` from `tests/support/run_binding.py`; the fixture restores the
+previous binding when the test ends. A test that wants to show that nothing is bound runs its body
+in `contextvars.Context().run`, an empty context, and expects `NoRunBound`. A test that runs an
+engine opens that engine's own scope on top (`EngineRunner` does it at every entry point).
 
 ## Test doubles (`tests/unit/_fakes.py`)
 

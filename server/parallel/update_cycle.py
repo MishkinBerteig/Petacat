@@ -104,7 +104,6 @@ import time
 from typing import Any, Callable, Sequence
 
 from server.engine.coderack import Codelet
-from server.engine.ids import use_allocator
 from server.engine.numeric.backend import select_backend
 from server.engine.numeric.layout import (
     gather_object_values,
@@ -416,15 +415,19 @@ class UpdateCycle:
         size = team.size
         chunk = -(-n // size)
 
+        scope = self.runner.ctx.scope
+
         def job(member: int) -> None:
             lo = member * chunk
             hi = min(n, lo + chunk)
-            if collect:
-                for i in range(lo, hi):
-                    out[i] = fn(items[i])  # type: ignore[index]
-            else:
-                for i in range(lo, hi):
-                    fn(items[i])
+            # A team member is a thread of its own: it binds the run for itself.
+            with scope():
+                if collect:
+                    for i in range(lo, hi):
+                        out[i] = fn(items[i])  # type: ignore[index]
+                else:
+                    for i in range(lo, hi):
+                        fn(items[i])
 
         team.run(job)
         return out
@@ -459,7 +462,7 @@ class UpdateCycle:
                 "stream policy needs a SplittableRNG bound as ctx.rng "
                 f"(got {type(ctx.rng).__name__})"
             )
-        with use_allocator(ctx.ids):
+        with ctx.scope():
             self._cycle(ctx, stream)
         self.cycles += 1
 

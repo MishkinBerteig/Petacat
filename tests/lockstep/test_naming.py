@@ -43,6 +43,18 @@ def test_an_unnameable_thing_becomes_a_question_mark_name_instead_of_crashing():
 # -- objects, from a real run -------------------------------------------------------
 
 
+@pytest.fixture(autouse=True)
+def _a_run_for_the_hand_built_things():
+    """Three tests here construct a codelet, a bond or a rule by hand.  The lockstep layer has
+    no ambient run (``tests/conftest.py``), so they bind one of their own, explicitly."""
+    from server.engine.ids import IdAllocator
+    from server.engine.run_binding import RunBinding, use_run
+    from tests.support.standard_configuration import standard_meta
+
+    with use_run(RunBinding.for_meta(standard_meta()), IdAllocator()):
+        yield
+
+
 @pytest.fixture(scope="module")
 def finished():
     outcome = run_faithful(("abc", "abd", "xyz"), 1, 700, TracingRNG(1))

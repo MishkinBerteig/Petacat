@@ -9,6 +9,7 @@ No randomness is involved anywhere in this module, so determinism is
 guaranteed by construction.
 """
 
+from tests.support.run_binding import rebind
 from server.engine.descriptions import Description
 
 from tests.unit._fakes import (
@@ -236,33 +237,23 @@ def test_a_target_description_answers_to_bottom_themes_only_in_justify_mode(monk
     target description answering to bottom themes was answering to a cluster set the
     run cannot populate.
     """
-    from server.engine.workspace_structures import WorkspaceStructure
-
     description = _target_description()
 
-    WorkspaceStructure.set_themespace(_ModeThemespace(justify=False))
-    try:
-        assert description.theme_types == ["vertical_bridge"]
+    rebind(themespace=_ModeThemespace(justify=False))
+    assert description.theme_types == ["vertical_bridge"]
 
-        WorkspaceStructure.set_themespace(_ModeThemespace(justify=True))
-        assert description.theme_types == ["vertical_bridge", "bottom_bridge"]
-    finally:
-        WorkspaceStructure.set_themespace(None)
+    rebind(themespace=_ModeThemespace(justify=True))
+    assert description.theme_types == ["vertical_bridge", "bottom_bridge"]
 
 
 def test_the_other_three_string_roles_do_not_depend_on_the_mode():
-    from server.engine.workspace_structures import WorkspaceStructure
-
     roles = {
         "initial": ["top_bridge", "vertical_bridge"],
         "modified": ["top_bridge"],
         "answer": ["bottom_bridge"],
     }
     for justify in (False, True):
-        WorkspaceStructure.set_themespace(_ModeThemespace(justify=justify))
-        try:
-            for role, expected in roles.items():
-                d = _description(obj=FakeObject(string=FakeString(string_type=role)))
-                assert d.theme_types == expected
-        finally:
-            WorkspaceStructure.set_themespace(None)
+        rebind(themespace=_ModeThemespace(justify=justify))
+        for role, expected in roles.items():
+            d = _description(obj=FakeObject(string=FakeString(string_type=role)))
+            assert d.theme_types == expected

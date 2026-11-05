@@ -331,8 +331,68 @@ def test_submit_returns_a_future_of_outcomes_equal_to_serial_and_counts_in_fligh
     chunk = swarm.submit(tasks[:3], meta).result(timeout=120)  # several tasks in one unit
     assert [o.index for o in chunk] == [0, 1, 2]
     assert [o.fingerprint() for o in chunk] == [o.fingerprint() for o in got[:3]]
+    # The counters are settled by the future's done-callback, which ``concurrent.futures`` runs just
+    # AFTER it wakes whoever waits on ``result()`` (see ``test_the_counters_are_settled_after_the_
+    # future_resolves``), so the last job may still be in flight the instant ``result()`` returns.
+    _wait_until_settled(swarm)
     assert swarm.status()["tasks_run"] - before == len(tasks) + 3
     assert swarm.status()["inflight_jobs"] == 0  # released in the done-callback
+
+
+def _wait_until_settled(swarm, seconds: float = 30.0) -> None:
+    import time
+
+    deadline = time.monotonic() + seconds
+    while swarm.status()["inflight_jobs"] and time.monotonic() < deadline:
+        time.sleep(0.005)
+    assert swarm.status()["inflight_jobs"] == 0
+
+
+def test_the_counters_are_settled_after_the_future_resolves(swarm, meta, monkeypatch):
+    """Why a test must wait: ``Future.set_result`` wakes ``result()`` and only then runs the
+    done-callbacks, so the job is still counted in flight when ``result()`` returns.  Forced
+    here by holding the settlement; a reader that sees ``inflight_jobs`` reach 0 sees the
+    tasks counted, because both happen in one critical section."""
+    from server.parallel.swarm import Swarm
+
+    gate = threading.Event()
+    real = Swarm._settle
+
+    def held(self, ran):
+        gate.wait(30)
+        real(self, ran)
+
+    monkeypatch.setattr(Swarm, "_settle", held)
+    before = swarm.status()
+    task = RunTask("abc", "abd", "ijk", None, 3, MAX_STEPS)
+    future = swarm.submit([task], meta)
+    outcomes = future.result(timeout=120)  # resolved ...
+    assert len(outcomes) == 1
+    during = swarm.status()
+    assert during["tasks_run"] == before["tasks_run"]  # ... but not yet counted
+    assert during["inflight_jobs"] == before["inflight_jobs"] + 1  # and still in flight
+    gate.set()
+    _wait_until_settled(swarm)
+    after = swarm.status()
+    assert after["tasks_run"] == before["tasks_run"] + 1
+
+
+def test_task_counts_are_not_lost_when_threads_count_at_once(swarm):
+    """``tasks_run`` is counted by the consumer thread of ``imap_unordered`` and by the pool's
+    management thread; ``+=`` on a shared attribute loses updates under free-threaded Python."""
+    before = swarm.status()["tasks_run"]
+    threads, per = 16, 20_000
+
+    def count():
+        for _ in range(per):
+            swarm._count_tasks(1)
+
+    pool = [threading.Thread(target=count) for _ in range(threads)]
+    for t in pool:
+        t.start()
+    for t in pool:
+        t.join()
+    assert swarm.status()["tasks_run"] - before == threads * per
 
 
 def test_submit_resolves_the_default_backend_like_map(swarm, meta):

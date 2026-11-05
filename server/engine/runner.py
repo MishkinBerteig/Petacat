@@ -23,7 +23,7 @@ from server.engine.codelet_dsl.interpreter import CodeletInterpreter, CodeletReg
 from server.engine.access import AccessRecorder
 from server.engine.coderack import Codelet, Coderack
 from server.engine.eeg import EEG
-from server.engine.ids import IdAllocator, use_allocator
+from server.engine.ids import IdAllocator
 from server.engine.memory import EpisodicMemory
 from server.engine.metadata import MetadataProvider, PostingRuleSpec
 from server.engine.posting import (
@@ -47,7 +47,7 @@ from server.engine.trace import (
     make_concept_activation_monitor,
 )
 from server.engine.workspace import Workspace
-from server.engine.workspace_structures import WorkspaceStructure
+from server.engine.run_binding import RunBinding, RunConstants, use_run
 
 # Run status string constants (values live in DB run_statuses table)
 @contextmanager
@@ -137,6 +137,7 @@ class EngineContext:
         meta: MetadataProvider,
         ids: IdAllocator | None = None,
         sink: RunSink | None = None,
+        binding: RunBinding | None = None,
     ) -> None:
         #: This run's identifier counters.  Held here rather than on the classes that
         #: allocate from it so that a run's identifiers depend on the run and not on
@@ -146,6 +147,16 @@ class EngineContext:
         self.slipnet = slipnet
         self.coderack = coderack
         self.themespace = themespace
+        #: What this run's structures and objects reach by implicit lookup: its provider,
+        #: its constants, its Themespace and its structure clock (``run_binding.py``).
+        #: Held on the context so that every entry point and every worker thread binds
+        #: the same one (``scope``); a context built by hand gets a binding made from its
+        #: own provider.
+        if binding is None:
+            binding = RunBinding.for_meta(meta, themespace)
+        elif binding.themespace is None:
+            binding.themespace = themespace
+        self.binding: RunBinding = binding
         self.trace = trace
         self.memory = memory
         self.temperature = temperature
@@ -231,6 +242,15 @@ class EngineContext:
         #: A codelet is a long read-and-decide followed by a short mutation, so
         #: serialising only the mutation leaves the expensive part parallel.
         self.commit_lock: Any = None
+
+    def scope(self) -> use_run:
+        """``with ctx.scope():`` binds this run's identifier allocator and run binding.
+
+        Every engine entry point opens one, and so does every thread that executes engine
+        code on the run's behalf, because a ``ContextVar`` is per thread and a new thread
+        on the GIL build starts with none.  See ``server/engine/run_binding.py``.
+        """
+        return use_run(self.binding, self.ids)
 
     # -- the generator a codelet draws from ---------------------------------
 
@@ -322,19 +342,23 @@ class EngineRunner:
         self._interpreter = CodeletInterpreter(builtins=get_builtins())
         self._registry = CodeletRegistry.from_metadata(meta, self._interpreter)
 
-    # -- Identifier scoping ------------------------------------------------
+    # -- Run scoping ---------------------------------------------------------
     #
     # Codelets, workspace objects, workspace structures and trace events take their
-    # identifiers from the run's ``IdAllocator``.  They reach it through the binding
-    # in ``server/engine/ids.py`` rather than through their constructors, because the
-    # DSL bodies in ``seed_data/codelet_types.json`` construct structures directly and
+    # identifiers from the run's ``IdAllocator``, and structures reach the run's
+    # coefficients, Themespace and clock through its ``RunBinding``.  Both are reached
+    # through the ContextVars in ``server/engine/ids.py`` and ``run_binding.py`` rather
+    # than through their constructors, because the DSL bodies in ``seed_data/codelet_types.json`` construct structures directly and
     # threading an allocator argument through them would make adding a codelet type a
     # code change again.
     #
-    # The binding is re-established at each entry point rather than once per run.
-    # That is not belt-and-braces: the service layer runs one API request per step,
-    # each in its own asyncio task with its own context, so an allocator bound during
-    # ``init_mcat`` would not be visible to the request that steps the run next.
+    # The binding is re-established at each entry point (``EngineContext.scope``) rather
+    # than once per run, and by each worker thread for itself.  That is not
+    # belt-and-braces: the service layer runs one API request per step, each in its own
+    # asyncio task with its own context, so a binding made during ``init_mcat`` would
+    # not be visible to the request that steps the run next; and a thread on the GIL
+    # build starts with an empty context.  Two runs stepped alternately, or one inside
+    # another's call, each see their own because an entry restores what it replaced.
 
     def init_mcat(
         self,
@@ -357,19 +381,24 @@ class EngineRunner:
         Coderack's ``rng`` and so every codelet body's ``rng`` — the lockstep
         harness (``tests/lockstep/``) passes a tracing or replaying generator here.
         """
-        set_structure_clock(0)  # ``*codelet-count*`` is 0 while the run is set up
-        with use_allocator(IdAllocator()) as ids:
-            # Parameter overrides apply for this Run only, so the metadata is
-            # replaced on the runner rather than mutated: two Runs in one process must
-            # be able to disagree about the update cycle without disturbing each other.
-            if parameters:
-                self.meta = self.meta.with_overrides(parameters)
-            # A configuration that lacks what the engine cannot invent stops the run here,
-            # naming everything missing (configuration-source plan 3.4(c)).
-            require_run_start(self.meta)
+        # Parameter overrides apply for this Run only, so the metadata is
+        # replaced on the runner rather than mutated: two Runs in one process must
+        # be able to disagree about the update cycle without disturbing each other.
+        if parameters:
+            self.meta = self.meta.with_overrides(parameters)
+        # A configuration that lacks what the engine cannot invent stops the run here,
+        # naming everything missing (configuration-source plan 3.4(c)).
+        require_run_start(self.meta)
+        # The run's binding, made once from the configuration this run was given and
+        # never again: a later edit, or a Training Mode Session's configuration changing
+        # between its runs, reaches the next run's ``init_mcat`` and not this one.
+        binding = RunBinding(self.meta, RunConstants.from_metadata(self.meta))
+        binding.clock.now = 0  # ``*codelet-count*`` is 0 while the run is set up
+        ids = IdAllocator()
+        with use_run(binding, ids):
             self._init_mcat(
                 initial, modified, target, answer, seed, memory, ids, commentary, sink,
-                rng,
+                rng, binding,
             )
 
     def _init_mcat(
@@ -384,6 +413,7 @@ class EngineRunner:
         commentary: CommentaryWriter | None = None,
         sink: RunSink | None = None,
         rng: RNG | None = None,
+        binding: RunBinding | None = None,
     ) -> None:
         if rng is None:
             rng = RNG(seed)
@@ -393,10 +423,6 @@ class EngineRunner:
         # Lockstep trace seam: everything drawn while the run is built belongs to the
         # ``init`` unit (a no-op on an ordinary RNG).
         rng.trace_unit(1, "init", "init-mcat")
-
-        # Structures consult the Themespace for thematic compatibility; the
-        # Scheme uses a global *themespace*, so bind ours before building any.
-        WorkspaceStructure.set_themespace(None)
 
         # Build slipnet from metadata
         slipnet = Slipnet.from_metadata(self.meta)
@@ -409,9 +435,11 @@ class EngineRunner:
         coderack = Coderack(self.meta)
         coderack.rng = rng
 
-        # Create themespace, and bind it for structure thematic-compatibility
+        # Create themespace.  Structures consult it for thematic compatibility (the
+        # Scheme's global *themespace*) through the run's binding, which holds it from
+        # here on; nothing built before this point can ask for it.
         themespace = Themespace(self.meta)
-        WorkspaceStructure.set_themespace(themespace)
+        binding.themespace = themespace
 
         # Create trace
         trace = TemporalTrace()
@@ -451,6 +479,7 @@ class EngineRunner:
             meta=self.meta,
             ids=ids,
             sink=sink,
+            binding=binding,
         )
         # A clamp announces itself and its undoing in the commentary (``trace.ss``).
         trace.commentary = commentary
@@ -706,11 +735,12 @@ class EngineRunner:
         )
 
         batch: list[Codelet] = []
-        for _ in range(rounds):
-            for codelet_type in types:
-                batch.append(
-                    Codelet(codelet_type, urgency, time_stamp=ctx.codelet_count)
-                )
+        with ctx.scope():  # public, and a codelet takes its identifier from the run's allocator
+            for _ in range(rounds):
+                for codelet_type in types:
+                    batch.append(
+                        Codelet(codelet_type, urgency, time_stamp=ctx.codelet_count)
+                    )
         return batch
 
     def _post_initial_codelets(self) -> None:
@@ -777,7 +807,7 @@ class EngineRunner:
         ctx = self.ctx
         if ctx is None:
             return StepResult()
-        with use_allocator(ctx.ids):
+        with ctx.scope():
             return self._step_mcat(ctx)
 
     def _step_mcat(self, ctx: EngineContext) -> StepResult:
@@ -929,11 +959,12 @@ class EngineRunner:
         """
         if self._turn_ended or self.ctx is None:
             return
-        # Anything recorded since the last drain — a final snag, an answer event —
-        # must reach the sink before the Run's closing capture.
-        self._emit_new_trace_events(self.ctx)
-        self._turn_ended = True
-        self.ctx.sink.on_turn_end(self.ctx)
+        with self.ctx.scope():
+            # Anything recorded since the last drain — a final snag, an answer event —
+            # must reach the sink before the Run's closing capture.
+            self._emit_new_trace_events(self.ctx)
+            self._turn_ended = True
+            self.ctx.sink.on_turn_end(self.ctx)
 
     def _execute_codelet(self, codelet: Codelet) -> None:
         """Execute a single codelet via the CodeletInterpreter.
@@ -1013,7 +1044,7 @@ class EngineRunner:
             return
         # Bound here as well as in ``step_mcat`` because tests and the service layer
         # both call this directly.
-        with use_allocator(ctx.ids):
+        with ctx.scope():
             self._update_everything(ctx)
 
     def _update_everything(self, ctx: EngineContext) -> None:

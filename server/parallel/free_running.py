@@ -44,7 +44,6 @@ from typing import TYPE_CHECKING, Any
 
 from server.engine import hardware
 from server.parallel.coderack_shards import LockedCoderack
-from server.engine.ids import use_allocator
 from server.engine.runner import (
     STATUS_ANSWER_FOUND,
     STATUS_GAVE_UP,
@@ -252,11 +251,12 @@ class FreeRunningEngine:
         # the GIL and the remaining workers are never created.
         self._all_started.wait()
 
-        # Each worker binds the run's identifier allocator for itself.  The binding is a
-        # ContextVar, so a thread that did not set it would silently allocate from the
-        # process-wide fallback and hand out identifiers that collide with another
-        # worker's — the exact defect WP0.3 removed, reintroduced by threading.
-        with use_allocator(ctx.ids):
+        # Each worker binds the run (its identifier allocator, its constants, its
+        # Themespace and its structure clock) for itself.  The binding is a ContextVar,
+        # so a thread that did not set it would find no run and raise (it used to
+        # allocate from a process-wide fallback, handing out identifiers that collide
+        # with another worker's).
+        with ctx.scope():
             local_rng = SplittableRNG(ctx.rng.seed if hasattr(ctx.rng, "seed") else 0)
 
             while not self._stop.is_set():

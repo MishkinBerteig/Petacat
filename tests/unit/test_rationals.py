@@ -20,7 +20,7 @@ from server.engine.metadata import MetadataProvider
 from server.engine.rational import canonical_rational, format_rational, parse_rational
 from server.engine.start_check import check_run_start
 from server.engine.workspace_objects import WorkspaceObject
-from server.engine.workspace_structures import WorkspaceStructure
+from tests.support.run_binding import rebind
 from server.services.configuration_input import check_param_value, parse_param_value
 
 SEED = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
@@ -148,7 +148,7 @@ def test_update_importance_under_the_standard_rational_is_the_old_double():
 
 
 def test_update_importance_follows_a_non_standard_rational(meta):
-    WorkspaceStructure.bind_meta(_with(meta, **{IMPORTANCE: Fraction(1, 2)}))
+    rebind(_with(meta, **{IMPORTANCE: Fraction(1, 2)}))
     obj = _enclosed_object(100.0)
     obj.update_importance()
     assert obj.raw_importance == 50.0
@@ -161,7 +161,7 @@ def test_the_exact_importance_paths_follow_the_rational(meta, monkeypatch):
     assert obj.exact_raw_importance() == Fraction(90) * Fraction(2, 3)
     n, d = obj.exact_raw_ratio()
     assert Fraction(n, d) == Fraction(60)
-    WorkspaceStructure.bind_meta(_with(meta, **{IMPORTANCE: Fraction(1, 2)}))
+    rebind(_with(meta, **{IMPORTANCE: Fraction(1, 2)}))
     assert obj.exact_raw_importance() == Fraction(45)
     n, d = obj.exact_raw_ratio()
     assert Fraction(n, d) == Fraction(45)
@@ -190,14 +190,14 @@ def test_unhappiness_under_the_standard_rationals_is_the_old_division():
 
 
 def test_unhappiness_follows_non_standard_rationals(meta):
-    WorkspaceStructure.bind_meta(_with(meta, **{EDGE: Fraction(1, 2), INTERIOR: Fraction(1, 4)}))
+    rebind(_with(meta, **{EDGE: Fraction(1, 2), INTERIOR: Fraction(1, 4)}))
     obj = _edge_object()
     obj.update_intra_string_unhappiness()
     assert obj.intra_string_unhappiness == 100.0 - 30
     obj = _interior_object()
     obj.update_intra_string_unhappiness()
     assert obj.intra_string_unhappiness == 100.0 - 30
-    WorkspaceStructure.bind_meta(_with(meta, **{EDGE: Fraction(2, 3)}))
+    rebind(_with(meta, **{EDGE: Fraction(2, 3)}))
     obj = _edge_object()
     obj.update_intra_string_unhappiness()
     assert obj.intra_string_unhappiness == 100.0 - round(60 * 2 / 3)

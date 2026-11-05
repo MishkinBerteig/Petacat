@@ -12,7 +12,8 @@ import math
 from typing import TYPE_CHECKING, Any
 
 from server.engine.slipnet import holds_role, opposite_node
-from server.engine.workspace_structures import WorkspaceStructure, bound_meta
+from server.engine.run_binding import constants
+from server.engine.workspace_structures import WorkspaceStructure
 from server.engine.concept_mappings import ConceptMapping
 from server.engine.groups import Group
 
@@ -66,21 +67,21 @@ class Bond(WorkspaceStructure):
         Scheme: bonds.ss:169-181.
         compatibility_factor * bond_facet_factor * bond_degree_of_assoc
         """
-        meta = bound_meta()
+        rc = constants()
         # Compatibility factor: the same-type value if same object type, else the
         # different-type value (``bond_compatibility_factor_*``)
         from_is_letter = not hasattr(self.from_object, "objects")
         to_is_letter = not hasattr(self.to_object, "objects")
         if from_is_letter == to_is_letter:
-            compat = meta.get_formula_coeff("bond_compatibility_factor_same_type")
+            compat = rc.bond_compatibility_factor_same_type
         else:
-            compat = meta.get_formula_coeff("bond_compatibility_factor_different_type")
+            compat = rc.bond_compatibility_factor_different_type
 
         # Bond facet factor: the letter-category value for it, the other value for others
         if holds_role(self.bond_facet, "dimension.letter_category"):
-            facet_factor = meta.get_formula_coeff("bond_facet_factor_letter_category")
+            facet_factor = rc.bond_facet_factor_letter_category
         else:
-            facet_factor = meta.get_formula_coeff("bond_facet_factor_other")
+            facet_factor = rc.bond_facet_factor_other
 
         assoc = self._bond_degree_of_assoc()
 
@@ -105,7 +106,7 @@ class Bond(WorkspaceStructure):
         return min(
             100.0,
             round(
-                bound_meta().get_formula_coeff("bond_degree_of_assoc_scale")
+                constants().bond_degree_of_assoc_scale
                 * math.sqrt(max(0.0, self.bond_category.degree_of_assoc()))
             ),
         )
@@ -134,7 +135,7 @@ class Bond(WorkspaceStructure):
         adjusted_density = 100.0 * math.sqrt(density / 100.0)
         number_factor = min(
             1.0,
-            bound_meta().get_formula_coeff("local_support_number_factor_base")
+            constants().local_support_number_factor_base
             ** (1.0 / max(1, num_supporting ** 3)),
         )
         return round(adjusted_density * number_factor)

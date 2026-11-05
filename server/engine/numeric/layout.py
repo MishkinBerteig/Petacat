@@ -633,7 +633,7 @@ def relative_importances(objects: Sequence[Any]) -> list[int]:
 
 def gather_object_values(objects: Sequence[Any]) -> ObjectValueBatch:
     """Read the combination stage's inputs off a string's objects."""
-    from server.engine.workspace_structures import bound_meta
+    from server.engine.run_binding import constants
 
     return ObjectValueBatch(
         relative_importance=[o.relative_importance for o in objects],
@@ -647,7 +647,7 @@ def gather_object_values(objects: Sequence[Any]) -> ObjectValueBatch:
         justify_mode=[o._justify_mode() for o in objects],
         prev_horizontal_salience=[o.salience["horizontal_inter"] for o in objects],
         prev_vertical_salience=[o.salience["vertical_inter"] for o in objects],
-        weights=SalienceWeights.from_metadata(bound_meta()),
+        weights=constants().salience,
     )
 
 

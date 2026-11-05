@@ -28,12 +28,21 @@ from collections import Counter
 import pytest
 
 from server.engine.coderack import Codelet, Coderack
+from server.engine.ids import IdAllocator, use_allocator
 from server.engine.metadata import MetadataProvider
 from server.engine.rng import RNG
 from server.parallel.speculative.clock_rack import ClockCoderack
 from server.parallel.speculative.streams import Streams
 
 SEED_DATA = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
+
+
+@pytest.fixture(autouse=True)
+def _codelet_ids():
+    """These tests build bare codelets, which take their identifiers from a run's allocator.
+    The parallel layer has no ambient run (``tests/conftest.py``), so the file binds its own."""
+    with use_allocator(IdAllocator()):
+        yield
 
 
 @pytest.fixture(scope="module")

@@ -37,16 +37,14 @@ not need the inverse machinery.
 from __future__ import annotations
 
 import time
-from contextlib import contextmanager
 from dataclasses import dataclass, field
-from typing import Any, Iterator
+from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.engine.runner import EngineRunner
 from server.engine.state_graph import StateGraphError, restore_run_state
-from server.engine.workspace_structures import WorkspaceStructure
 from server.models.run import (
     AuditAction,
     Run,
@@ -74,44 +72,6 @@ class NotRecorded(ReviewError):
 
 class BackwardsNotSupported(ReviewError):
     """The Audit inspector was asked to step back.  Phase 0 is forward-only."""
-
-
-#: "Leave the binding alone on the way in" — distinct from ``None``, which
-#: ``init_mcat`` itself assigns and is therefore a real value.
-_KEEP = object()
-
-
-@contextmanager
-def _themespace_binding(themespace: Any = _KEEP) -> Iterator[None]:
-    """Restore the process-wide Themespace binding on exit; optionally set one first.
-
-    ``WorkspaceStructure._themespace`` is a class attribute — the Scheme's global
-    ``*themespace*``, mirrored — that structures consult for thematic compatibility
-    (``bridges.py:295``, ``descriptions.py:149``).  ``init_mcat`` assigns it, so
-    constructing an inspector's runner, or stepping one, would otherwise leave every
-    *live* run computing bridge strengths against the inspected Run's themes.
-
-    That hazard is not new — creating a second live run does the same thing — but an
-    inspector is opened while other runs are in flight, which makes it easy to hit and
-    impossible to attribute.  Borrowing and returning confines it to the review call:
-    outside this block the binding is exactly what it was.
-
-    Both uses appear here.  Opening an inspector lets ``init_mcat`` set the binding
-    and only needs it put back, so it passes nothing; stepping one needs the
-    inspector's own Themespace bound for the duration, so it passes that.
-
-    It is sufficient because the engine work inside contains no ``await``.  A
-    synchronous stretch cannot be interleaved with another request on the event loop,
-    so no live run can observe the borrowed binding.  If review ever awaits mid-borrow,
-    that stops being true and this becomes a lock rather than a swap.
-    """
-    previous = WorkspaceStructure.get_themespace()
-    if themespace is not _KEEP:
-        WorkspaceStructure.set_themespace(themespace)
-    try:
-        yield
-    finally:
-        WorkspaceStructure.set_themespace(previous)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -551,27 +511,27 @@ class ReviewService:
 
         runner = EngineRunner(self.meta)
         problem = state["problem"]
-        # ``init_mcat`` rebinds the Themespace every structure in the process
-        # consults, so the binding is put back afterwards; see ``_themespace_binding``.
-        with _themespace_binding():
-            runner.init_mcat(
-                problem["initial"],
-                problem["modified"],
-                problem["target"],
-                problem["answer"],
-                seed=state["rng"]["seed"],
-                # Re-execute under the Run's own parameters, not the process's current
-                # globals.  Without this the inspector walked the engine forward with
-                # whatever the Admin panel holds today, and reported a Themespace that
-                # the recorded Run never produced.
-                parameters=state.get("parameters"),
-            )
-            try:
-                restore_run_state(runner, state)
-            except StateGraphError as exc:
-                raise ReviewError(
-                    f"the Run-start capture for run {run_id} could not be restored: {exc}"
-                ) from None
+        # The inspector's runner binds its own run (its provider, constants and
+        # Themespace) whenever it executes, so opening or stepping it cannot touch a live
+        # run; nothing here swaps a process-wide binding.
+        runner.init_mcat(
+            problem["initial"],
+            problem["modified"],
+            problem["target"],
+            problem["answer"],
+            seed=state["rng"]["seed"],
+            # Re-execute under the Run's own parameters, not the process's current
+            # globals.  Without this the inspector walked the engine forward with
+            # whatever the Admin panel holds today, and reported a Themespace that
+            # the recorded Run never produced.
+            parameters=state.get("parameters"),
+        )
+        try:
+            restore_run_state(runner, state)
+        except StateGraphError as exc:
+            raise ReviewError(
+                f"the Run-start capture for run {run_id} could not be restored: {exc}"
+            ) from None
 
         self._evict_if_needed()
         self._inspectors[run_id] = _Inspector(
@@ -606,15 +566,14 @@ class ReviewService:
 
         target = min(to_codelet, inspector.final_codelet_count)
         runner = inspector.runner
-        with _themespace_binding(runner.ctx.themespace):
-            while runner.ctx.codelet_count < target:
-                before = runner.ctx.codelet_count
-                runner.step_mcat()
-                if runner.ctx.codelet_count == before:
-                    # The coderack emptied and reposting produced nothing — the
-                    # recorded Run cannot be followed further, so stop rather than
-                    # spin.
-                    break
+        while runner.ctx.codelet_count < target:
+            before = runner.ctx.codelet_count
+            runner.step_mcat()
+            if runner.ctx.codelet_count == before:
+                # The coderack emptied and reposting produced nothing — the
+                # recorded Run cannot be followed further, so stop rather than
+                # spin.
+                break
         inspector.last_used = time.monotonic()
         return await self.inspector_state(session, run_id)
 
@@ -643,6 +602,17 @@ class ReviewService:
         )
         changes = [a for a in actions if a.action_type.startswith("structure_")]
 
+        # Read inside the inspector's own run: the views compute from its structures.
+        with ctx.scope():
+            live = {
+                "workspace": _live_workspace(ctx),
+                "slipnet": _live_slipnet(ctx),
+                "coderack": _live_coderack(ctx),
+                "eeg": ctx.eeg.history(),
+                "themespace": _live_themespace(ctx),
+                "trace": _live_trace(ctx),
+            }
+
         return {
             "run_id": run_id,
             "codelet_count": position,
@@ -658,12 +628,7 @@ class ReviewService:
             "recorded_temperature": (
                 actions[0].temperature if actions else None
             ),
-            "workspace": _live_workspace(ctx),
-            "slipnet": _live_slipnet(ctx),
-            "coderack": _live_coderack(ctx),
-            "eeg": ctx.eeg.history(),
-            "themespace": _live_themespace(ctx),
-            "trace": _live_trace(ctx),
+            **live,
         }
 
     def close_inspector(self, run_id: int) -> bool:

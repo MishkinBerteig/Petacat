@@ -19,7 +19,8 @@ from server.engine.themes import (
     THEME_VERTICAL_BRIDGE,
     relation_name_for_label,
 )
-from server.engine.workspace_structures import WorkspaceStructure, bound_meta
+from server.engine.run_binding import constants
+from server.engine.workspace_structures import WorkspaceStructure
 from server.engine.concept_mappings import ConceptMapping
 
 if TYPE_CHECKING:
@@ -237,21 +238,21 @@ class Bridge(WorkspaceStructure):
 
         avg_strength = sum(cm.strength() for cm in rel_dist_cms) / len(rel_dist_cms)
 
-        meta = bound_meta()
+        rc = constants()
 
         # Number-of-CMs factor
         n = len(rel_dist_cms)
         if n == 1:
-            num_factor = meta.get_formula_coeff("bridge_num_cm_factor_1")
+            num_factor = rc.bridge_num_cm_factor_1
         elif n == 2:
-            num_factor = meta.get_formula_coeff("bridge_num_cm_factor_2")
+            num_factor = rc.bridge_num_cm_factor_2
         else:
-            num_factor = meta.get_formula_coeff("bridge_num_cm_factor_3_plus")
+            num_factor = rc.bridge_num_cm_factor_3_plus
 
         # Internal coherence factor
         coherent = self._is_internally_coherent()
-        coherence_factor = meta.get_formula_coeff(
-            "bridge_coherence_factor_coherent" if coherent else "bridge_coherence_factor_incoherent"
+        coherence_factor = (
+            rc.bridge_coherence_factor_coherent if coherent else rc.bridge_coherence_factor_incoherent
         )
 
         result = avg_strength * num_factor * coherence_factor
@@ -309,7 +310,7 @@ class Bridge(WorkspaceStructure):
 
     @staticmethod
     def _singleton_mismatch_factor() -> float:
-        return bound_meta().get_formula_coeff("bridge_singleton_letter_mismatch_factor")
+        return constants().bridge_singleton_letter_mismatch_factor
 
     def calculate_external_strength(self, rng: RNG | None = None) -> float:
         """External strength from supporting bridges.
@@ -458,9 +459,7 @@ class Bridge(WorkspaceStructure):
         values = self.get_theme_support_values()
         if not values:
             return 0.0
-        neg_weight = bound_meta().get_formula_coeff(
-            "bridge_theme_negative_weight_multiplier"
-        ) * len(values)
+        neg_weight = constants().bridge_theme_negative_weight_multiplier * len(values)
         weights = [(neg_weight if v < 0 else 1.0) * abs(v) for v in values]
         if not any(weights):
             return 0.0
@@ -480,7 +479,7 @@ class Bridge(WorkspaceStructure):
         if themespace is None:
             return []
         values: list[float] = []
-        max_activation = bound_meta().get_param("max_theme_activation")
+        max_activation = constants().max_theme_activation
         for theme in themespace.get_active_themes(self.theme_type):
             if self.incompatible_with_theme(theme):
                 values.append(-theme.activation / max_activation)
@@ -944,8 +943,13 @@ def _role_node(obj1: Any, obj2: Any, attr: str) -> Any:
 def _bridge_theme_compatibility_sigmoid(x: float) -> float:
     """Sharpen a raw support value.  Scheme: themes.ss:1115, beta = 4 (the coefficient
     ``bridge_theme_compatibility_sigmoid_beta``)."""
-    beta = bound_meta().get_formula_coeff("bridge_theme_compatibility_sigmoid_beta")
-    return 2.0 / (1.0 + math.exp(-2.0 * beta * x)) - 1.0
+    beta = constants().bridge_theme_compatibility_sigmoid_beta
+    try:
+        return 2.0 / (1.0 + math.exp(-2.0 * beta * x)) - 1.0
+    except OverflowError:
+        # beta is configuration and may be large.  Chez's ``exp`` gives +inf.0 where Python's
+        # raises, and 2 over infinity less 1 is -1.0 whichever sign x has.
+        return -1.0
 
 
 # ---------------------------------------------------------------------------

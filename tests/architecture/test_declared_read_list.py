@@ -38,6 +38,8 @@ _ACCESSORS = ("get_param", "get_formula_coeff", "get_urgency")
 #: fails the test until it is declared here, with the reason.
 _COMPUTED_READS: dict[tuple[str, str, str], str] = {
     ("api/runs.py", "get_param", "p.name"): "the per-run catalogue, shown with None when absent",
+    ("engine/run_binding.py", "get_formula_coeff", "f.metadata['key'] or f.name"): "the name each formula() field declares, checked by _declarator_read",
+    ("engine/run_binding.py", "get_param", "f.metadata['key'] or f.name"): "the name each param() field declares, checked by _declarator_read",
     ("engine/parameters.py", "get_param", "p.name"): "the per-run catalogue, shown with None when absent",
     ("engine/rule_english.py", "get_param", "name"): "the names are passed as literals to _param",
     ("engine/coderack.py", "get_urgency", "background"): "a level named by the clamp table (very_low)",
@@ -58,6 +60,29 @@ _BODY_READ = re.compile(r"meta\.(get_param|get_formula_coeff|get_urgency)\('([a-
 _WRAPPERS = {("engine/rule_english.py", "_param")}
 
 
+#: ``RunConstants`` (``engine/run_binding.py``) declares a field as ``name: T = formula()`` or
+#: ``= param()``, which reads the formula coefficient or engine parameter of the field's own name
+#: (or of the literal passed: ``formula("other")``).  Those declarations are reads like any other.
+_RUN_CONSTANTS_FILE = "engine/run_binding.py"
+_DECLARATORS = {"formula": "get_formula_coeff", "param": "get_param"}
+
+
+def _declarator_read(node: ast.AST) -> tuple[str, str] | None:
+    if not (isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name)):
+        return None
+    call = node.value
+    if not (isinstance(call, ast.Call) and isinstance(call.func, ast.Name)
+            and call.func.id in _DECLARATORS):
+        return None
+    accessor = _DECLARATORS[call.func.id]
+    if call.args:
+        arg = call.args[0]
+        if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+            return accessor, arg.value
+        return None
+    return accessor, node.target.id
+
+
 def _reads() -> tuple[dict[tuple[str, str], set[str]], list[tuple[str, str, str]], list[str]]:
     """(accessor, literal name) -> files; computed reads; reads that pass a default."""
     literal: dict[tuple[str, str], set[str]] = {}
@@ -66,6 +91,11 @@ def _reads() -> tuple[dict[tuple[str, str], set[str]], list[tuple[str, str, str]
     for path in sorted(SERVER.rglob("*.py")):
         rel = path.relative_to(SERVER).as_posix()
         tree = ast.parse(path.read_text())
+        if rel == _RUN_CONSTANTS_FILE:
+            for node in ast.walk(tree):
+                name = _declarator_read(node)
+                if name is not None:
+                    literal.setdefault(name, set()).add(rel)
         for node in ast.walk(tree):
             if not isinstance(node, ast.Call):
                 continue

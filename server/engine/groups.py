@@ -14,7 +14,8 @@ from typing import TYPE_CHECKING, Any
 
 from server.engine.slipnet import holds_role
 from server.engine.workspace_objects import WorkspaceObject
-from server.engine.workspace_structures import WorkspaceStructure, bound_meta
+from server.engine.run_binding import constants
+from server.engine.workspace_structures import WorkspaceStructure
 from server.engine.concept_mappings import ConceptMapping
 from server.engine.descriptions import Description
 
@@ -233,27 +234,27 @@ class Group(WorkspaceObject, WorkspaceStructure):
         assoc = getattr(self.bond_category, "degree_of_assoc", None)
         base = float(assoc()) if assoc is not None else 0.0
         letter_facet = holds_role(self.bond_facet, "dimension.letter_category")
-        meta = bound_meta()
+        rc = constants()
         bond_factor = (
-            base if letter_facet else base * meta.get_formula_coeff("group_bond_facet_other_multiplier")
+            base if letter_facet else base * rc.group_bond_facet_other_multiplier
         )
 
         # Length factor: a step table (1, 2, 3) with a tail (4 or more)
         length = self.length
         if length == 1:
-            length_factor = meta.get_formula_coeff("group_length_factor_1")
+            length_factor = rc.group_length_factor_1
         elif length == 2:
-            length_factor = meta.get_formula_coeff("group_length_factor_2")
+            length_factor = rc.group_length_factor_2
         elif length == 3:
-            length_factor = meta.get_formula_coeff("group_length_factor_3")
+            length_factor = rc.group_length_factor_3
         else:
-            length_factor = meta.get_formula_coeff("group_length_factor_4_plus")
+            length_factor = rc.group_length_factor_4_plus
 
         # Weighted combination with self-weighting exponent
         if bond_factor <= 0:
             return float(length_factor)
 
-        bf_weight = bond_factor ** meta.get_formula_coeff("group_bond_factor_weight_exponent")
+        bf_weight = bond_factor ** rc.group_bond_factor_weight_exponent
         lf_weight = 100.0 - bf_weight
         total = bf_weight + lf_weight
         if total == 0:
@@ -286,7 +287,7 @@ class Group(WorkspaceObject, WorkspaceStructure):
         adjusted_density = 100.0 * math.sqrt(density / 100.0)
         number_factor = min(
             1.0,
-            bound_meta().get_formula_coeff("local_support_number_factor_base")
+            constants().local_support_number_factor_base
             ** (1.0 / max(1, num_supporting ** 3)),
         )
         return round(adjusted_density * number_factor)
