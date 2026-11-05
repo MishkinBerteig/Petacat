@@ -17,7 +17,10 @@ configuration, with no code default (a code default would hide a missing key and
 copy of the value in the code: bug B12).  ``tests/architecture/test_declared_read_list.py``
 holds the list to the code: every literal name passed to ``get_param``, ``get_formula_coeff``
 or ``get_urgency`` is declared here, and every declared name is in the Metacat Standard
-Configuration.  A new read adds its name here.
+Configuration.  The converse holds too: every name stored in ``engine_params``,
+``formula_coefficients`` and ``urgency_levels`` is read (an urgency level also by being named by
+a posting rule's ``urgency_level``, a codelet pattern, a level-naming parameter or the clamp
+background), so a stored number is the only copy of its value.  A new read adds its name here.
 
 ``OPTIONAL_ENGINE_PARAMETERS`` are read with their absence defined (no menu, no labels),
 so a configuration without them still runs.
@@ -32,7 +35,7 @@ from typing import Any
 
 #: Engine parameters read by ``meta.get_param`` with a literal name, and where.
 REQUIRED_ENGINE_PARAMETERS: tuple[tuple[str, str], ...] = (
-    ("concept_activation_importance_threshold", "runner.py, builtins.py"),
+    ("concept_activation_importance_threshold", "runner.py, builtins.py, trace.py"),
     ("concept_mapping_importance_threshold", "builtins.py"),
     ("distance_threshold", "builtins.py"),
     ("dominant_theme_margin", "themes.py, builtins.py, serialization.py, capture_projection.py"),
@@ -50,11 +53,11 @@ REQUIRED_ENGINE_PARAMETERS: tuple[tuple[str, str], ...] = (
     ("initial_temperature", "runner.py"),
     ("initially_clamped_slipnodes", "runner.py, slipnet.py"),
     ("intrinsic_link_lengths", "slipnet.py"),
-    ("jootsing_count_scale", "jootsing.py"),
-    ("max_activation", "numeric/layout.py"),
+    ("jootsing_count_scale", "jootsing.py (clamps and snags)"),
+    ("max_activation", "numeric/layout.py, jootsing.py, justify.py, run_service.py"),
     ("max_clamp_period", "jootsing.py, runner.py, update_cycle.py"),
     ("max_coderack_size", "coderack.py, coderack_shards.py"),
-    ("max_theme_activation", "themes.py, numeric/layout.py, jootsing.py"),
+    ("max_theme_activation", "themes.py, numeric/layout.py, jootsing.py, trace.py, justify.py"),
     ("min_shard_capacity", "coderack_shards.py"),
     ("num_coderack_bins", "coderack.py, capture_projection.py"),
     ("reference_update_cycle_length", "slipnet.py"),
@@ -110,6 +113,12 @@ REQUIRED_FORMULA_COEFFICIENTS: tuple[tuple[str, str], ...] = (
     ("low_prob_scale_factor", "formulas.py"),
     ("low_prob_sqrt_base", "formulas.py"),
     ("low_prob_threshold", "formulas.py"),
+    ("intra_string_salience_importance_weight", "numeric/layout.py (SalienceWeights)"),
+    ("intra_string_salience_unhappiness_weight", "numeric/layout.py (SalienceWeights)"),
+    ("inter_string_salience_importance_weight", "numeric/layout.py (SalienceWeights)"),
+    ("inter_string_salience_unhappiness_weight", "numeric/layout.py (SalienceWeights)"),
+    ("max_raw_importance", "workspace_objects.py"),
+    ("probabilistic_activation_exponent", "numeric/layout.py (ActivationParams)"),
     ("rule_abstractness_sigmoid_beta", "rules.py"),
     ("rule_abstractness_sigmoid_midpoint", "rules.py"),
     ("rule_abstractness_weight", "rules.py"),
@@ -181,7 +190,7 @@ LEVEL_NAMING_PARAMETERS: tuple[str, ...] = (
 REQUIRED_URGENCY_LEVELS: tuple[tuple[str, str], ...] = (
     ("extremely_high", "codelet bodies rule-builder, thematic-bridge-scout, jootser"),
     ("high", "codelet bodies rule-scout, rule-evaluator"),
-    ("low", "runner.py, update_cycle.py, codelet body rule-scout"),
+    ("low", "posting.py (a rule naming no tier), runner.py, codelet body rule-scout"),
     ("very_high", "codelet body thematic-bridge-scout"),
     ("very_low", "run_service.py, trace.py (the rule-codelet clamp's background)"),
 )
@@ -235,6 +244,12 @@ def check_run_start(meta: Any) -> tuple[StartProblem, ...]:
         level = meta.get_param(parameter)
         if level is not None and level not in levels:
             problems.append(StartProblem("I-1", "urgency level", level, parameter))
+    for rule in meta.posting_rules:
+        if rule.urgency_level is not None and rule.urgency_level not in levels:
+            problems.append(
+                StartProblem("I-1", "urgency level", rule.urgency_level,
+                             f"posting rule '{rule.rule_key or rule.codelet_type}'")
+            )
     for pattern, entries in meta.codelet_patterns.items():
         for _codelet_type, level in entries:
             if level not in levels:

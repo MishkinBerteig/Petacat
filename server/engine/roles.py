@@ -93,6 +93,8 @@ class Absent:
     conceptual_depth = 0
     descriptor_predicate = None
     activation = 0.0
+    #: No node, no ceiling: a share of it is 0 (``formulas.share_of_ceiling``).
+    max_activation = 0.0
     activation_buffer = 0.0
     frozen = False
     clamp_cycles_remaining = 0
@@ -160,7 +162,7 @@ class Absent:
     def decay(self) -> None:
         return None
 
-    def clamp(self, cycles: int = 0, activation: float = 100.0) -> None:
+    def clamp(self, cycles: int = 0, activation: float | None = None) -> None:
         return None
 
     def unclamp(self) -> None:

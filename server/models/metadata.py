@@ -280,7 +280,9 @@ class PostingRule(Base):
     sort_order = Column(Integer, nullable=False, default=_next_after_last("posting_rules"))
     codelet_type = Column(Text, nullable=False, index=True)
     direction = Column(Text, ForeignKey("posting_directions.name"), nullable=False)
-    urgency_when_posted = Column(Integer, nullable=True)
+    #: The name of a tier in ``urgency_levels`` that the rule posts at, or ``None`` for a rule
+    #: with a formula (or neither).  A name, not the tier's number, so the tier is stored once.
+    urgency_level = Column(Text, nullable=True)
     urgency_formula = Column(Text, nullable=True)
     posting_formula = Column(Text, default="")
     count_formula = Column(Text, default="")

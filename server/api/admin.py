@@ -1016,7 +1016,7 @@ class PostingRuleRequest(BaseModel):
     rule_key: str | None = None
     codelet_type: str
     direction: str
-    urgency_when_posted: int | None = None
+    urgency_level: str | None = None
     urgency_formula: str | None = None
     posting_formula: str = ""
     count_formula: str = ""
@@ -1030,7 +1030,7 @@ class PostingRuleResponse(BaseModel):
     rule_key: str
     codelet_type: str
     direction: str
-    urgency_when_posted: int | None
+    urgency_level: str | None
     urgency_formula: str | None
     posting_formula: str
     count_formula: str
@@ -1045,7 +1045,7 @@ async def list_posting_rules(session: AsyncSession = Depends(get_session)):
     return [
         PostingRuleResponse(
             id=r.id, rule_key=r.rule_key, codelet_type=r.codelet_type, direction=r.direction,
-            urgency_when_posted=r.urgency_when_posted, urgency_formula=r.urgency_formula,
+            urgency_level=r.urgency_level, urgency_formula=r.urgency_formula,
             posting_formula=r.posting_formula or "", count_formula=r.count_formula or "",
             count_values=r.count_values, condition=r.condition or "always",
             triggering_slipnodes=r.triggering_slipnodes,
@@ -1074,14 +1074,14 @@ async def create_posting_rule(
     row = await _insert(session, PostingRule, dict(
         rule_key=rule_key,
         codelet_type=req.codelet_type, direction=req.direction,
-        urgency_when_posted=req.urgency_when_posted, urgency_formula=req.urgency_formula,
+        urgency_level=req.urgency_level, urgency_formula=req.urgency_formula,
         posting_formula=req.posting_formula, count_formula=req.count_formula,
         count_values=req.count_values, condition=req.condition,
         triggering_slipnodes=req.triggering_slipnodes,
     ))
     return PostingRuleResponse(
         id=row.id, rule_key=row.rule_key, codelet_type=row.codelet_type, direction=row.direction,
-        urgency_when_posted=row.urgency_when_posted, urgency_formula=row.urgency_formula,
+        urgency_level=row.urgency_level, urgency_formula=row.urgency_formula,
         posting_formula=row.posting_formula or "", count_formula=row.count_formula or "",
         count_values=row.count_values, condition=row.condition or "always",
         triggering_slipnodes=row.triggering_slipnodes,
@@ -1096,7 +1096,7 @@ async def update_posting_rule(
     row = await _update(session, PostingRule, key, dict(
         codelet_type=req.codelet_type,
         direction=req.direction,
-        urgency_when_posted=req.urgency_when_posted,
+        urgency_level=req.urgency_level,
         urgency_formula=req.urgency_formula,
         posting_formula=req.posting_formula,
         count_formula=req.count_formula,
@@ -1106,7 +1106,7 @@ async def update_posting_rule(
     ))
     return PostingRuleResponse(
         id=row.id, rule_key=row.rule_key, codelet_type=row.codelet_type, direction=row.direction,
-        urgency_when_posted=row.urgency_when_posted, urgency_formula=row.urgency_formula,
+        urgency_level=row.urgency_level, urgency_formula=row.urgency_formula,
         posting_formula=row.posting_formula or "", count_formula=row.count_formula or "",
         count_values=row.count_values, condition=row.condition or "always",
         triggering_slipnodes=row.triggering_slipnodes,
@@ -1462,7 +1462,7 @@ async def export_metadata(session: AsyncSession = Depends(get_session)):
             {
                 "id": r.id, "rule_key": r.rule_key, "codelet_type": r.codelet_type,
                 "direction": r.direction,
-                "urgency_when_posted": r.urgency_when_posted, "urgency_formula": r.urgency_formula,
+                "urgency_level": r.urgency_level, "urgency_formula": r.urgency_formula,
                 "posting_formula": r.posting_formula or "", "count_formula": r.count_formula or "",
                 "count_values": r.count_values, "condition": r.condition or "always",
                 "triggering_slipnodes": r.triggering_slipnodes,

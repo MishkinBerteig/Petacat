@@ -49,9 +49,12 @@ Offering a control that changes nothing is worse than offering none, so membersh
 here is decided by *what the engine actually reads*.
 
 Formula coefficients and urgency levels stay global.  They are the model's constants
-rather than a run's settings — there are fifty-odd of them, they are already editable in
+rather than a run's settings — there are many of them, they are already editable in
 the Admin panel, and the config hash covers them, so a Run that executed under changed
-coefficients is still distinguishable in the record.
+coefficients is still distinguishable in the record.  Each stored number is the only copy
+of its value: the engine holds no literal beside it, and
+``tests/architecture/test_declared_read_list.py`` fails on a stored parameter, coefficient
+or urgency level that nothing reads.
 """
 
 from __future__ import annotations

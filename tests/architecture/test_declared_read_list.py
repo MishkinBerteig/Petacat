@@ -9,6 +9,12 @@ failing mid-run.  This test keeps that list honest in both directions, by parsin
 * a computed name is declared through each of its concrete names (a conditional expression
   names two), or is one of the few reads listed below whose names come from data;
 * every declared name exists in the Metacat Standard Configuration, and no name is declared twice;
+* the converse: every name stored in ``engine_params``, ``formula_coefficients`` and
+  ``urgency_levels`` is read, by an accessor in ``server/``, by a seed codelet body, or (for a
+  tier) by being named by a posting rule, a codelet pattern, a parameter that names a level or
+  the clamp-background table.  There is no list of exceptions: a stored number nothing reads is
+  a dead row (or a literal in the engine that ignores it), and the test fails until it is read
+  or deleted;
 * no read passes a code default (bug B12): ``get_param(name, default)`` is gone.
 """
 
@@ -41,6 +47,7 @@ _COMPUTED_READS: dict[tuple[str, str, str], str] = {
     ("engine/bridges.py", "get_urgency", "ctx.meta.get_param('bridge_recruit_urgency_level')"): "checked by name",
     ("engine/start_check.py", "get_param", "parameter"): "each LEVEL_NAMING_PARAMETERS name, which is declared",
     ("services/run_service.py", "get_urgency", "level"): "a level a codelet pattern names (checked per entry)",
+    ("engine/posting.py", "get_urgency", "rule.urgency_level"): "a tier a posting rule names (checked per rule)",
 }
 
 #: Reads made by the seed codelet bodies (``seed_data/codelet_types.json``).  They are declared like the
@@ -147,15 +154,16 @@ def test_no_name_is_declared_twice() -> None:
 
 def test_every_declared_name_is_read_somewhere() -> None:
     """A declared name nothing reads would stop a run for no reason."""
-    literal, _, _ = _reads()
-    read = {name for (_, name) in literal}
-    # Names the engine reads by value from a configuration key (the opening batch's level).
+    read = _names_read()
     unread = sorted(
         n
-        for table in (sc.REQUIRED_ENGINE_PARAMETERS, sc.REQUIRED_FORMULA_COEFFICIENTS,
-                      sc.REQUIRED_URGENCY_LEVELS)
+        for accessor, table in (
+            ("get_param", sc.REQUIRED_ENGINE_PARAMETERS),
+            ("get_formula_coeff", sc.REQUIRED_FORMULA_COEFFICIENTS),
+            ("get_urgency", sc.REQUIRED_URGENCY_LEVELS),
+        )
         for n, _ in table
-        if n not in read
+        if n not in read[accessor]
     )
     assert not unread, f"declared, but nothing reads them: {unread}"
 
@@ -164,3 +172,54 @@ def test_every_level_naming_parameter_is_declared() -> None:
     """A parameter whose value names an urgency level is itself read, so it is declared."""
     declared = _declared()["get_param"]
     assert set(sc.LEVEL_NAMING_PARAMETERS) <= declared
+
+
+# --- The converse: every stored name is read --------------------------------------------------
+
+
+def _stored() -> dict[str, set[str]]:
+    return {
+        "get_param": set(json.loads((SEED / "engine_params.json").read_text())),
+        "get_formula_coeff": set(json.loads((SEED / "formula_coefficients.json").read_text())),
+        "get_urgency": set(json.loads((SEED / "urgency_levels.json").read_text())),
+    }
+
+
+def _names_read() -> dict[str, set[str]]:
+    """Every name read, by accessor kind: literal accessor calls in ``server/`` (including the
+    ``rule_english._param`` wrapper), the seed codelet bodies, and, for tiers, the data that
+    names one (posting rules, codelet patterns, level-naming parameters, the clamp background)."""
+    literal, _, _ = _reads()
+    read: dict[str, set[str]] = {kind: set() for kind in _ACCESSORS}
+    for (accessor, name) in literal:
+        read[accessor].add(name)
+
+    posting = json.loads((SEED / "posting_rules.json").read_text())
+    for rule in posting["posting_rules"]:
+        if rule.get("urgency_level"):
+            read["get_urgency"].add(rule["urgency_level"])
+    for entries in posting.get("codelet_patterns", {}).values():
+        for entry in entries:
+            read["get_urgency"].add(entry[1] if isinstance(entry, (list, tuple)) else entry["urgency"])
+    params = json.loads((SEED / "engine_params.json").read_text())
+    for parameter in sc.LEVEL_NAMING_PARAMETERS:
+        read["get_urgency"].add(params[parameter])
+    from server.engine.trace import CLAMP_TYPE_CODELET_BACKGROUNDS
+
+    read["get_urgency"].update(CLAMP_TYPE_CODELET_BACKGROUNDS.values())
+    return read
+
+
+def test_every_stored_name_is_read_somewhere() -> None:
+    """The half the other tests lack: nothing is stored that nothing reads.
+
+    A stored number that nothing reads looks like a setting and does nothing (``default_urgency``),
+    and one the engine repeats as a literal changes nothing when edited (``max_theme_activation``
+    beside ten ``100.0``s).  Each of these names is the only copy of its number: it must be read.
+    """
+    read = _names_read()
+    unread = {
+        accessor: sorted(names - read[accessor]) for accessor, names in _stored().items()
+    }
+    unread = {k: v for k, v in unread.items() if v}
+    assert not unread, f"stored, but nothing reads them: {unread}"

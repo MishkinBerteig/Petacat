@@ -225,7 +225,7 @@ def test_an_object_with_no_legal_description_cannot_be_named(meta):
 
     assert descriptions_for_rule(letter) == []
     assert _object_description_possible(letter) is False
-    assert reference_object_to_object_description(letter, ctx.slipnet)[1] is None
+    assert reference_object_to_object_description(letter, ctx.slipnet, None, 50.0)[1] is None
 
 
 # --- choose-description-for-rule -------------------------------------------

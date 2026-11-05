@@ -282,20 +282,20 @@ def evaluate_count_formula(rule: Any, context: PostingContext) -> int:
         ) from exc
 
 
-def evaluate_urgency(rule: Any, context: PostingContext, default: int) -> int:
+def evaluate_urgency(rule: Any, context: PostingContext) -> int:
     """The urgency *rule* posts its codelets at.
 
     Scheme: ``coderack.ss:575-590`` for the bottom-up tiers, ``slipnet.ss:212-222``
     for the top-down ones.
 
-    A rule states its urgency one of two ways, and the seed data uses both: a fixed
-    ``urgency_when_posted`` for the eleven that post at a named tier's value, or an
-    ``urgency_formula`` for the six whose urgency is computed from the run — the
-    triggering node's depth and activation, the temperature, the theme pressure.
-
-    *default* is what a rule stating neither gets, which the caller supplies because it
-    is a *named* level rather than a number: `low`, resolved through `urgency_levels`.
+    A rule states its urgency one of two ways, and the seed data uses both: a named
+    ``urgency_level`` for the eleven that post at a tier, resolved through ``urgency_levels``
+    (the tier is stored once, as Scheme's ``%low-urgency%`` is), or an ``urgency_formula``
+    for the six whose urgency is computed from the run — the triggering node's depth and
+    activation, the temperature, the theme pressure.  A rule stating neither posts at the
+    tier ``low``.
     """
+    meta = context.ctx.meta
     if rule is not None and rule.urgency_formula:
         code = compile_posting_formula(rule.urgency_formula, rule.codelet_type)
         try:
@@ -309,9 +309,9 @@ def evaluate_urgency(rule: Any, context: PostingContext, default: int) -> int:
                 f"{missing!r}: {rule.urgency_formula!r}. Known names: "
                 f"{', '.join(sorted(POSTING_FORMULA_NAMES))}"
             ) from exc
-    if rule is not None and rule.urgency_when_posted is not None:
-        return int(rule.urgency_when_posted)
-    return default
+    if rule is not None and rule.urgency_level is not None:
+        return int(meta.get_urgency(rule.urgency_level))
+    return int(meta.get_urgency("low"))
 
 
 def evaluate_condition(rule: Any, context: PostingContext) -> bool:

@@ -313,7 +313,7 @@ class Coderack:
         #: ``temperature=`` to ``post``/``remove_old_codelets`` explicitly, and the
         #: runner setting this attribute alongside ``current_time`` would close the gap
         #: entirely.
-        self.current_temperature: float = 100.0
+        self.current_temperature: float = float(meta.get_param("initial_temperature"))
 
     @property
     def total_count(self) -> int:

@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 
 from server.engine.ids import KIND_OBJECT, next_id
 from server.engine.workspace_structures import bound_meta
+from server.engine.numeric.layout import SalienceWeights
 from fractions import Fraction
 
 if TYPE_CHECKING:
@@ -478,7 +479,7 @@ class WorkspaceObject:
     #  (Scheme: workspace-objects.ss:425-601)
     # ------------------------------------------------------------------
 
-    def exact_raw_importance(self, max_raw: float = 300.0) -> Any:
+    def exact_raw_importance(self) -> Any:
         """Raw importance as the exact rational Metacat computes.
 
         Scheme: ``update-raw-importance`` (workspace-objects.ss:425-434) — ``min 300``
@@ -492,7 +493,7 @@ class WorkspaceObject:
         total = Fraction(0)
         for d in self.get_relevant_descriptions():
             total = total + exact_fraction(getattr(d, "descriptor_activation", 0))
-        cap = exact_fraction(max_raw)
+        cap = exact_fraction(bound_meta().get_formula_coeff("max_raw_importance"))
         # ``min(cap, total)``: *cap* unless *total* is strictly smaller.  Compared by
         # cross-multiplication of the (positive) denominators, which is what
         # ``Fraction.__lt__`` does -- without the ``numbers.Rational`` check it makes first.
@@ -507,7 +508,7 @@ class WorkspaceObject:
             )
         return exact
 
-    def exact_raw_ratio(self, max_raw: float = 300.0) -> tuple[int, int]:
+    def exact_raw_ratio(self) -> tuple[int, int]:
         """``exact_raw_importance`` as an integer ratio ``(numerator, denominator)``.
 
         The same exact rational, left unreduced and never wrapped in a ``Fraction``
@@ -532,7 +533,7 @@ class WorkspaceObject:
                 n, m = f.numerator, f.denominator
             num = num * m + n * den
             den = den * m
-        cap = exact_fraction(max_raw)
+        cap = exact_fraction(bound_meta().get_formula_coeff("max_raw_importance"))
         cap_n, cap_d = cap.numerator, cap.denominator
         # ``min(cap, total)``: *cap* unless *total* is strictly smaller.
         if not num * cap_d < cap_n * den:
@@ -544,9 +545,7 @@ class WorkspaceObject:
             num, den = num * factor.numerator, den * factor.denominator
         return num, den
 
-    def update_importance(
-        self, max_raw: float = 300.0, enclosed_factor: float | None = None
-    ) -> None:
+    def update_importance(self, enclosed_factor: float | None = None) -> None:
         """Scheme: ``update-raw-importance`` (``workspace-objects.ss:425-434``).
 
         The enclosed-object factor is the configuration's
@@ -558,7 +557,7 @@ class WorkspaceObject:
         total = sum(
             getattr(d, "descriptor_activation", 0) for d in self.get_relevant_descriptions()
         )
-        raw = min(max_raw, total)
+        raw = min(bound_meta().get_formula_coeff("max_raw_importance"), total)
         if self.enclosing_group is not None:
             if enclosed_factor is None:
                 enclosed_factor = float(_exact_coefficient(
@@ -668,8 +667,13 @@ class WorkspaceObject:
         if self.salience_clamped:
             self.salience["intra"] = 100
         else:
+            w = SalienceWeights.from_metadata(bound_meta())
             self.salience["intra"] = round(
-                (4 * self.intra_string_unhappiness + self.relative_importance) / 5
+                (
+                    w.intra_unhappiness * self.intra_string_unhappiness
+                    + w.intra_importance * self.relative_importance
+                )
+                / w.intra_total
             )
 
     def update_inter_string_salience(self) -> None:
@@ -685,19 +689,21 @@ class WorkspaceObject:
         h = self.inter_string_unhappiness["horizontal"]
         v = self.inter_string_unhappiness["vertical"]
         ri = self.relative_importance
+        w = SalienceWeights.from_metadata(bound_meta())
+        wu, wi, total = w.inter_unhappiness, w.inter_importance, w.inter_total
 
         stype = self._string_type()
         if stype == "initial":
-            self.salience["horizontal_inter"] = round((h + 4 * ri) / 5)
-            self.salience["vertical_inter"] = round((v + 4 * ri) / 5)
+            self.salience["horizontal_inter"] = round((wu * h + wi * ri) / total)
+            self.salience["vertical_inter"] = round((wu * v + wi * ri) / total)
         elif stype == "modified":
-            self.salience["horizontal_inter"] = round((h + 4 * ri) / 5)
+            self.salience["horizontal_inter"] = round((wu * h + wi * ri) / total)
         elif stype == "target":
-            self.salience["vertical_inter"] = round((v + 4 * ri) / 5)
+            self.salience["vertical_inter"] = round((wu * v + wi * ri) / total)
             if self._justify_mode():
-                self.salience["horizontal_inter"] = round((h + 4 * ri) / 5)
+                self.salience["horizontal_inter"] = round((wu * h + wi * ri) / total)
         elif stype == "answer":
-            self.salience["horizontal_inter"] = round((h + 4 * ri) / 5)
+            self.salience["horizontal_inter"] = round((wu * h + wi * ri) / total)
 
     def update_average_salience(self) -> None:
         """Combine intra and inter-string salience.

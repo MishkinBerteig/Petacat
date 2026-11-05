@@ -40,6 +40,8 @@ def dangling_references(doc: cd.ConfigDocument) -> list[str]:
     t = doc.tables
     bad: list[str] = []
     for (table, column), (target, many) in REFERENCES.items():
+        if (table, column) == ("posting_rules", "urgency_level"):
+            continue  # a scalar on a rule, like a level-naming parameter: reported, never rewritten (below)
         for row in t[table].values():
             value = row.get(column)
             if value in (None, ""):
@@ -200,6 +202,14 @@ def test_random_op_sequences_keep_the_document_well_formed(base, seed):
         assert again == (ops, report)  # deterministic
         new = cd.apply_resolved(doc, ops)  # replays without a structural error
         assert dangling_references(new) == [], (seed, batch)
+        # a rule naming a tier the batch removed is not rewritten or deleted: the report names it
+        reported = {(d["table"], d["key"].get("rule_key")) for d in report["dangling"]}
+        for rule in new.tables["posting_rules"].values():
+            before = doc.tables["posting_rules"].get((rule["rule_key"],))
+            was_ok = before is not None and (before.get("urgency_level") is None
+                                             or (before["urgency_level"],) in doc.tables["urgency_levels"])
+            if was_ok and rule.get("urgency_level") and (rule["urgency_level"],) not in new.tables["urgency_levels"]:
+                assert ("posting_rules", rule["rule_key"]) in reported, (seed, batch, rule["rule_key"])
         for name, rows in new.tables.items():
             assert len(rows) == len(set(rows)), name
         applied_ops = [a["op"] for a in report["applied"]]

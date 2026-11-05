@@ -7,17 +7,18 @@ in ``tests/seed_unit/test_slipnet_node.py``.
 
 from server.engine.rng import RNG
 from server.engine.slipnet import SlipnetLink, SlipnetNode
+from tests.support.standard_configuration import make_node
 
 
 def test_degree_of_association():
-    n1 = SlipnetNode("n1", "n1", 50)
-    n2 = SlipnetNode("n2", "n2", 50)
+    n1 = make_node("n1", "n1", 50)
+    n2 = make_node("n2", "n2", 50)
     link = SlipnetLink(n1, n2, "lateral", fixed_link_length=30)
     assert link.degree_of_association() == 70.0
 
 
 def test_probabilistic_jump():
-    node = SlipnetNode("test", "test", 50)
+    node = make_node("test", "test", 50)
     node.activation = 99.0  # Very high activation => very likely to jump
     rng = RNG(42)
     node.probabilistic_jump_to_full(rng)
@@ -35,7 +36,7 @@ def test_probabilistic_jump():
 
 
 def _node_at(activation: float, *, intrinsic_link_length: int = 60) -> SlipnetNode:
-    node = SlipnetNode("label", "label", 50)
+    node = make_node("label", "label", 50)
     node.intrinsic_link_length = intrinsic_link_length
     node.activation = activation
     return node
@@ -122,7 +123,7 @@ def test_a_partially_active_node_jumps_at_the_cube_of_its_activation():
 
 def _decayed(depth: int, start: float, cycles: int) -> float:
     """*start*, decayed *cycles* times by a node of conceptual depth *depth*."""
-    node = SlipnetNode("n", "n", depth)
+    node = make_node("n", "n", depth)
     node.compute_rate_of_decay(15)
     node.activation = start
     for _ in range(cycles):
@@ -177,7 +178,7 @@ def test_decay_leaves_the_activation_an_integer():
     what keeps the whole network on the integers, and the plateaus reachable.
     """
     for depth in range(10, 100, 10):
-        node = SlipnetNode("n", "n", depth)
+        node = make_node("n", "n", depth)
         node.compute_rate_of_decay(15)
         node.activation = 97.0
         for _ in range(40):
@@ -192,7 +193,7 @@ def test_decay_leaves_the_activation_an_integer():
 
 def test_a_frozen_node_does_not_decay():
     """slipnet.ss:174-177 decrements through the buffer, which a frozen node refuses."""
-    node = SlipnetNode("n", "n", 10)
+    node = make_node("n", "n", 10)
     node.compute_rate_of_decay(15)
     node.activation = 100.0
     node.frozen = True
@@ -210,7 +211,7 @@ def test_the_decay_rate_is_exact_at_the_shipped_update_cycle_length():
     representable — in float32 as well, which is what lets the Metal backend
     round identically.
     """
-    node = SlipnetNode("n", "n", 90)
+    node = make_node("n", "n", 90)
     node.compute_rate_of_decay(15)
     assert node._decay_percent == 10.0
     node.activation = 15.0
@@ -220,11 +221,11 @@ def test_the_decay_rate_is_exact_at_the_shipped_update_cycle_length():
 
 def _labeled_lateral_link():
     """A lateral link whose label is fully active (so dynamic length shrinks)."""
-    label = SlipnetNode("label", "label", 50)
+    label = make_node("label", "label", 50)
     label.intrinsic_link_length = 60
     label.activation = 100.0  # Fully active
-    n1 = SlipnetNode("n1", "n1", 50)
-    n2 = SlipnetNode("n2", "n2", 50)
+    n1 = make_node("n1", "n1", 50)
+    n2 = make_node("n2", "n2", 50)
     return SlipnetLink(n1, n2, "lateral", label_node=label)
 
 
@@ -254,15 +255,15 @@ def test_dynamic_degree_does_not_shrink_for_a_label_at_99():
 
 
 def test_fixed_link_intrinsic_degree_is_100_minus_length():
-    n1 = SlipnetNode("n1", "n1", 50)
-    n2 = SlipnetNode("n2", "n2", 50)
+    n1 = make_node("n1", "n1", 50)
+    n2 = make_node("n2", "n2", 50)
     link = SlipnetLink(n1, n2, "lateral", fixed_link_length=30)
     assert link.intrinsic_degree_of_association() == 70.0
 
 
 def test_fixed_link_intrinsic_and_dynamic_degrees_match():
-    n1 = SlipnetNode("n1", "n1", 50)
-    n2 = SlipnetNode("n2", "n2", 50)
+    n1 = make_node("n1", "n1", 50)
+    n2 = make_node("n2", "n2", 50)
     link = SlipnetLink(n1, n2, "lateral", fixed_link_length=30)
     # A fixed-length link has no label, so shrinking never applies.
     assert link.intrinsic_degree_of_association() == link.degree_of_association()
@@ -297,9 +298,9 @@ class _ScriptedRNG:
 
 
 def _node_with_property_links(*lengths):
-    node = SlipnetNode("a", "a", 10)
+    node = make_node("a", "a", 10)
     for i, length in enumerate(lengths):
-        target = SlipnetNode(f"prop{i}", f"prop{i}", 10)
+        target = make_node(f"prop{i}", f"prop{i}", 10)
         node.property_links.append(
             SlipnetLink(node, target, "property", fixed_link_length=length)
         )
@@ -328,7 +329,7 @@ def test_similar_property_links_can_come_back_empty():
 
 
 def test_a_node_without_property_links_asks_nothing():
-    node = SlipnetNode("b", "b", 10)
+    node = make_node("b", "b", 10)
     rng = _ScriptedRNG([])
     assert node.get_similar_property_links(rng) == []
     assert rng.asked == []
@@ -346,8 +347,8 @@ def test_a_frozen_node_receives_no_spreading():
     ``plato-opposite`` to zero (``trace.ss:1512-1514``) — where buffering the spread in
     let the concept climb back on the next flush.
     """
-    source = SlipnetNode("source", "source", 50)
-    target = SlipnetNode("target", "target", 50)
+    source = make_node("source", "source", 50)
+    target = make_node("target", "target", 50)
     source.lateral_links.append(
         SlipnetLink(source, target, "lateral", fixed_link_length=0)
     )
@@ -360,8 +361,8 @@ def test_a_frozen_node_receives_no_spreading():
 
 
 def test_an_unfrozen_node_does_receive_spreading():
-    source = SlipnetNode("source", "source", 50)
-    target = SlipnetNode("target", "target", 50)
+    source = make_node("source", "source", 50)
+    target = make_node("target", "target", 50)
     source.lateral_links.append(
         SlipnetLink(source, target, "lateral", fixed_link_length=0)
     )
@@ -378,7 +379,7 @@ def test_clamping_discards_whatever_the_node_was_about_to_receive():
     Left in place, a jolt a codelet delivered just before the clamp was added on top of
     the clamped value at the next flush.
     """
-    node = SlipnetNode("n", "n", 50)
+    node = make_node("n", "n", 50)
     node.activate_from_workspace()
     assert node.activation_buffer == 100.0
 

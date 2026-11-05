@@ -17,16 +17,9 @@ from typing import TYPE_CHECKING, Any, Callable, Mapping
 
 from server.engine.numeric.backend import select_backend
 from server.engine.roles import Roles, absent, resolve_roles
-#: ``(40% ...)`` at ``slipnet.ss:191``.  The fallback for a node built without a
-#: ``MetadataProvider``; the value in force comes from ``shrunk_link_length_factor``.
-DEFAULT_SHRUNK_LINK_FACTOR = 0.4
-#: The Scheme's own "15" in ``(/ %update-cycle-length% 15)`` (``slipnet.ss:72-73, 183-185``).
-#: As above, for a bare node; the value in force is ``reference_update_cycle_length``.
-DEFAULT_REFERENCE_UPDATE_CYCLE_LENGTH = 15.0
-
 from server.engine.numeric.layout import (
-    DEFAULT_ACTIVATION,
     ActivationParams,
+    jump_probability,
     SlipnetState,
     SlipnetTopology,
 )
@@ -188,6 +181,7 @@ class SlipnetNode:
         "intrinsic_link_length",
         "_decay_percent",
         "_max_activation",
+        "_probabilistic_exponent",
         "_workspace_activation",
         "_full_activation_threshold",
         "_shrunk_link_factor",
@@ -208,7 +202,7 @@ class SlipnetNode:
         name: str,
         short_name: str,
         conceptual_depth: int,
-        activation_params: ActivationParams = DEFAULT_ACTIVATION,
+        activation_params: ActivationParams,
     ) -> None:
         self.name = name
         self.short_name = short_name
@@ -251,6 +245,7 @@ class SlipnetNode:
         # drift from one another.
         self._max_activation: float = activation_params.max_activation
         self._workspace_activation: float = activation_params.workspace_activation
+        self._probabilistic_exponent: float = activation_params.probabilistic_exponent
         self._full_activation_threshold: float = (
             activation_params.full_activation_threshold
         )
@@ -258,9 +253,9 @@ class SlipnetNode:
         #: literal, and *derived* rather than seeded: the reference computes the
         #: shrunk length from the intrinsic one, so a stored table of shrunk lengths
         #: would be a second place for the same fact to be written.
-        self._shrunk_link_factor: float = DEFAULT_SHRUNK_LINK_FACTOR
+        self._shrunk_link_factor: float = activation_params.shrunk_link_length_factor
         #: The update-cycle length the decay and spread rates are expressed against.
-        self._reference_cycle_length: float = DEFAULT_REFERENCE_UPDATE_CYCLE_LENGTH
+        self._reference_cycle_length: float = activation_params.reference_update_cycle_length
 
     def has_role(self, role: str) -> bool:
         return role in self.roles
@@ -541,8 +536,9 @@ class SlipnetNode:
         """Is this node an instance of some category?  Scheme: slipnet.ss:94."""
         return bool(self.category_links)
 
-    def clamp(self, cycles: int = 0, activation: float = 100.0) -> None:
-        """Freeze this node at *activation* — ``slipnet.ss:138-145``.
+    def clamp(self, cycles: int = 0, activation: float | None = None) -> None:
+        """Freeze this node at *activation* — ``slipnet.ss:138-145``.  ``None`` is the node's
+        own ceiling (``max_activation``), the ``%max-activation%`` of the Scheme.
 
         ``activation`` exists because a concept pattern clamps at whatever value the
         pattern names, and one of them is deliberately **0**: a negative ``opposite``
@@ -560,7 +556,7 @@ class SlipnetNode:
         """
         self.frozen = True
         self.clamp_cycles_remaining = cycles
-        self.activation = float(activation)
+        self.activation = float(self._max_activation if activation is None else activation)
         self.activation_buffer = 0.0
 
     def unclamp(self) -> None:
@@ -591,7 +587,7 @@ class SlipnetNode:
         """
         if not self.partially_active():
             return
-        prob = (self.activation / self._max_activation) ** 3
+        prob = jump_probability(self.activation / self._max_activation, self._probabilistic_exponent)
         # slipnet.ss:387-389: the coin is drawn, then ``update-activation`` is a
         # no-op on a frozen node.
         previous = rng.trace_about(self)
@@ -985,27 +981,24 @@ _NO_ALPHABET = Alphabet()
 class Slipnet:
     """The full semantic network."""
 
-    def __init__(self) -> None:
+    def __init__(self, activation_params: ActivationParams, update_cycle_length: int) -> None:
         self.nodes: dict[str, SlipnetNode] = {}
-        #: The run's activation constants.  Replaced in ``from_metadata``; the shipped
-        #: defaults stand for a bare ``Slipnet()``, which only ``from_metadata``
-        #: constructs.  Read by ``SlipnetTopology.from_slipnet``, so a backend
-        #: session and the object graph cannot disagree about the ceiling.
-        self.activation_params: ActivationParams = DEFAULT_ACTIVATION
-        #: ``%update-cycle-length%`` (``run.ss:20``).  Replaced in ``from_metadata``;
-        #: the reference cadence stands for a bare ``Slipnet()``.
-        self.update_cycle_length: int = 15
+        #: The run's activation constants.  Read by ``SlipnetTopology.from_slipnet``, so a
+        #: backend session and the object graph cannot disagree about the ceiling.
+        self.activation_params: ActivationParams = activation_params
+        #: ``%update-cycle-length%`` (``run.ss:20``), the ``update_cycle_length`` parameter.
+        self.update_cycle_length: int = update_cycle_length
         #: ``reference_update_cycle_length``: what ``update_cycle_length`` is divided by
-        #: to scale the decay and spread.  Replaced in ``from_metadata``.
-        self.reference_update_cycle_length: float = DEFAULT_REFERENCE_UPDATE_CYCLE_LENGTH
-        #: The roles, resolved once in ``from_metadata`` (``engine/roles.py``).  A bare
-        #: ``Slipnet()`` has every role absent.
+        #: to scale the decay and spread.
+        self.reference_update_cycle_length: float = activation_params.reference_update_cycle_length
+        #: The roles, resolved once in ``from_metadata`` (``engine/roles.py``).  A Slipnet
+        #: built without ``from_metadata`` has every role absent.
         self.roles: Roles = _NO_ROLES
         #: The relation nodes by relation name, from the ``theme_relations`` table: only the
         #: rows whose node exists (``diff`` has none).  Read through :meth:`relation`.
         self.relations: dict[str, SlipnetNode] = {}
         #: The letters and the numbers, derived in ``from_metadata`` from the ``glyph`` and
-        #: ``numeric_value`` columns.  A bare ``Slipnet()`` has neither.
+        #: ``numeric_value`` columns.  A Slipnet built without ``from_metadata`` has neither.
         self.alphabet: Alphabet = _NO_ALPHABET
         # Resolved on first use rather than here, because ``from_metadata``
         # computes the decay rates *after* constructing the Slipnet and the
@@ -1015,8 +1008,7 @@ class Slipnet:
     @classmethod
     def from_metadata(cls, meta: MetadataProvider) -> Slipnet:
         """Construct full graph from DB-loaded specs."""
-        slipnet = cls()
-        slipnet.activation_params = ActivationParams.from_metadata(meta)
+        slipnet = cls(ActivationParams.from_metadata(meta), int(meta.get_param("update_cycle_length")))
 
         # Create nodes
         for spec in meta.slipnet_node_specs.values():
@@ -1039,15 +1031,6 @@ class Slipnet:
             slipnet.nodes[spec.name] = node
 
         # Set intrinsic link lengths from engine params
-        shrunk_factor = float(
-            meta.get_param("shrunk_link_length_factor")
-        )
-        reference_ucl = float(meta.get_param("reference_update_cycle_length"))
-        for node in slipnet.nodes.values():
-            node._shrunk_link_factor = shrunk_factor
-            node._reference_cycle_length = reference_ucl
-        slipnet.reference_update_cycle_length = reference_ucl
-
         intrinsic_lengths = meta.get_param("intrinsic_link_lengths")
         for node_name, length in intrinsic_lengths.items():
             if node_name in slipnet.nodes:
@@ -1109,8 +1092,7 @@ class Slipnet:
         # Compute decay rates.  Held on the Slipnet as well, because the *spread*
         # scale is computed from the same cycle length once per update and had no
         # other way to reach it.
-        ucl = int(meta.get_param("update_cycle_length"))
-        slipnet.update_cycle_length = ucl
+        ucl = slipnet.update_cycle_length
         for node in slipnet.nodes.values():
             node.compute_rate_of_decay(ucl)
 
@@ -1130,15 +1112,14 @@ class Slipnet:
         node = self.relations.get(name)
         return node if node is not None else absent("relation." + str(name))
 
-    def spread_activation(
-        self, update_cycle_length: int = 15, threshold: int = 100
-    ) -> None:
+    def spread_activation(self, update_cycle_length: int, threshold: int) -> None:
         """One round of activation spreading across all nodes.
 
         Args:
-            update_cycle_length: Number of codelets per update cycle (default 15).
+            update_cycle_length: Number of codelets per update cycle.
             threshold: Minimum activation level for a node to spread to neighbors.
-                At 100 (default), only fully-active nodes spread — matching
+                At 100 (``spreading_activation_threshold`` in the Metacat Standard
+                Configuration), only fully-active nodes spread — matching
                 the original Scheme behaviour (slipnet.ss:383).
                 At 0, all active nodes spread (pre-fix behaviour).
         """
@@ -1192,7 +1173,7 @@ class Slipnet:
         return self._numeric
 
     def update_activations(
-        self, rng: RNG, threshold: int = 100, on_flushed: Any = None
+        self, rng: RNG, threshold: int, on_flushed: Any = None
     ) -> None:
         """Spread activation and do probabilistic jumps.
 

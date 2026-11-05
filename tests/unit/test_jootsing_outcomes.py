@@ -12,6 +12,7 @@ from server.engine.jootsing import (
     get_most_recent_event_set,
 )
 from server.engine.rules import CLAUSE_INTRINSIC, Rule, RuleClause
+from server.engine.temperature import Temperature
 from server.engine.trace import (
     BOND_BUILT,
     ClampEvent,
@@ -33,6 +34,7 @@ class _FakeMeta:
             "grace_period": 100,
             "satisfactory_rule_quality": 80,
             "jootsing_count_scale": 10,
+            "max_activation": 100,
         }.get(name, default)
 
 
@@ -212,6 +214,7 @@ def test_poor_rules_in_a_quiet_workspace_still_reach_the_clamp_attempt():
         codelet_count=500,
         meta=_FakeMeta(),
         rng=_ScriptedRNG([True]),
+        temperature_control=Temperature(50.0),
     )
 
     assert result.action == "clamp_rule_pattern"

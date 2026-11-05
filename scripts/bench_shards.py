@@ -40,7 +40,7 @@ sys.path.insert(0, REPO)
 from server.engine.coderack import Codelet, Coderack  # noqa: E402
 from server.engine import hardware  # noqa: E402
 from server.parallel.coderack_shards import (  # noqa: E402
-    MIN_SHARD_CAPACITY,
+    min_shard_capacity,
     build_candidate,
 )
 from server.engine.metadata import MetadataProvider  # noqa: E402
@@ -295,11 +295,11 @@ def main() -> None:
 
     # The rack's capacity is divided across shards rather than replicated, so the
     # machine's shard count is bounded by how many shards that capacity supports at
-    # ``MIN_SHARD_CAPACITY`` each. Applied here so the header states the shard count
+    # ``min_shard_capacity`` each. Applied here so the header states the shard count
     # the candidates are actually built with.
     requested = args.shards if args.shards else hardware.shard_count()
     supported = max(
-        1, meta.get_param("max_coderack_size") // MIN_SHARD_CAPACITY
+        1, meta.get_param("max_coderack_size") // min_shard_capacity(meta)
     )
     shards = max(1, min(requested, supported))
 

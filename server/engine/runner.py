@@ -186,7 +186,7 @@ class EngineContext:
         self.verbose_mode: bool = False
         self.verbose_step: bool = False
         self.verbose_log: VerboseLog = VerboseLog()
-        self.spreading_activation_threshold: int = 100
+        self.spreading_activation_threshold: int = meta.get_param("spreading_activation_threshold")
 
         #: The Workspace objects the most recent rule application failed on — the
         #: Scheme's ``<failure-result>`` objects (``answers.ss:1145-1150``), which is
@@ -1111,7 +1111,7 @@ class EngineRunner:
         rng.trace_unit(c, "update", "slipnet", u)
         if ctx.self_watching_enabled:
             ctx.themespace.spread_activation_to_slipnet(ctx.slipnet, ctx.rng)
-        threshold = getattr(ctx, "spreading_activation_threshold", 100)
+        threshold = ctx.spreading_activation_threshold
         activations_before = {
             name: node.activation for name, node in ctx.slipnet.nodes.items()
         }
@@ -1354,11 +1354,7 @@ class EngineRunner:
             post_prob = self._compute_posting_probability(thematic_rule)
             ctx.rng.trace_about(thematic_type)
             if ctx.rng.prob(post_prob):
-                urgency = evaluate_urgency(
-                    thematic_rule,
-                    PostingContext(ctx),
-                    default=self.meta.get_urgency("low"),
-                )
+                urgency = evaluate_urgency(thematic_rule, PostingContext(ctx))
                 num = self._compute_num_to_post(thematic_rule)
                 for _ in range(num):
                     batch.append(
@@ -1437,18 +1433,15 @@ class EngineRunner:
 
         Scheme: coderack.ss:575-590.
 
-        Was a fourth switch on the codelet's name, reaching for ``get_urgency("low")``,
-        ``("medium")`` and ``("extremely_low")`` while the rules stated 35, 49 and 7 —
-        the same numbers written twice.  A seed-unit test now pins every
-        ``urgency_when_posted`` to a named level, so the two files cannot drift apart
-        silently now that only one of them is read.
+        Each rule names its tier (``urgency_level``: ``low``, ``medium`` or ``extremely_low``
+        for the bottom-up rules), as the Scheme's ``bottom-up-urgency`` names
+        ``%low-urgency%``, ``%medium-urgency%`` and ``%extremely-low-urgency%``, so the tier is
+        stored once, in ``urgency_levels``.
         """
         ctx = self.ctx
         if ctx is None:
-            return 35
-        return evaluate_urgency(
-            rule, PostingContext(ctx), default=self.meta.get_urgency("low")
-        )
+            return self.meta.get_urgency("low")
+        return evaluate_urgency(rule, PostingContext(ctx))
 
     def _post_top_down_codelets(self, batch: list[Codelet] | None = None) -> None:
         """Collect the cycle's top-down codelets into *batch*.
@@ -1490,9 +1483,7 @@ class EngineRunner:
                 # say the same thing — depth times activation — but that is a fact
                 # about the data, not a constraint the engine should impose.
                 context = PostingContext(ctx, node=node)
-                urgency = evaluate_urgency(
-                    rule, context, default=self.meta.get_urgency("low")
-                )
+                urgency = evaluate_urgency(rule, context)
 
                 # Stochastic posting based on workspace state
                 post_prob = self._compute_posting_probability(rule)

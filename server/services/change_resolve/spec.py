@@ -50,6 +50,7 @@ REFERENCES: dict[tuple[str, str], tuple[str, bool]] = {
     ("posting_rules", "codelet_type"): ("codelet_type_defs", False),
     ("posting_rules", "direction"): ("posting_directions", False),
     ("posting_rules", "triggering_slipnodes"): ("slipnet_node_defs", True),
+    ("posting_rules", "urgency_level"): ("urgency_levels", False),
     ("codelet_pattern_defs", "codelet_type"): ("codelet_type_defs", False),
     ("codelet_pattern_defs", "urgency_level"): ("urgency_levels", False),
     ("engine_params", "value_type"): ("param_value_types", False),

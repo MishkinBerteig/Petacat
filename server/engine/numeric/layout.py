@@ -75,6 +75,25 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 # exactly how the backends would drift apart.
 # ---------------------------------------------------------------------------
 
+def jump_probability(share: float, exponent: float) -> float:
+    """``share ** exponent``: a partially active node's chance of jumping to full activation.
+
+    *share* is ``activation / max_activation``.  The exponent is a stored number
+    (``probabilistic_activation_exponent``) that Training-Mode learning may take to 0 or below,
+    where Python's power raises on a zero share (``0.0 ** -1.0``) and on overflow, and NumPy's
+    gives ``inf``.  It is settled here and in the vectorised backends the same way: a node holding
+    no activation has no chance to jump (0.0), and a power too large to represent is certain
+    (``inf``, which ``RNG.prob`` treats as 1 without a draw).  ``tests/seed_unit/test_numeric_backends.py``
+    compares every backend on these cases.
+    """
+    if share <= 0.0:
+        return 0.0
+    try:
+        return share**exponent
+    except OverflowError:
+        return float("inf")
+
+
 @dataclass(frozen=True)
 class ActivationParams:
     """The three activation constants, resolved once per run from metadata.
@@ -97,9 +116,18 @@ class ActivationParams:
     is what every consumer here has always been given.
     """
 
-    max_activation: float = 100.0
-    workspace_activation: float = 100.0
-    full_activation_threshold: float = 50.0
+    max_activation: float
+    workspace_activation: float
+    full_activation_threshold: float
+    #: ``probabilistic_activation_exponent`` (3, the cube of ``slipnet.ss:387-389``): the power
+    #: of ``activation / max_activation`` that is a partially active node's chance of a jump.
+    probabilistic_exponent: float
+    #: ``shrunk_link_length_factor`` (``(40% new-value)``, ``slipnet.ss:191``) and
+    #: ``reference_update_cycle_length`` (the Scheme's own "15" in
+    #: ``(/ %update-cycle-length% 15)``, ``slipnet.ss:72-73, 183-185``): the rates every node
+    #: scales its links and its decay by.
+    shrunk_link_length_factor: float
+    reference_update_cycle_length: float
 
     @classmethod
     def from_metadata(cls, meta: Any) -> ActivationParams:
@@ -109,13 +137,12 @@ class ActivationParams:
             full_activation_threshold=float(
                 meta.get_param("full_activation_threshold")
             ),
+            probabilistic_exponent=float(
+                meta.get_formula_coeff("probabilistic_activation_exponent")
+            ),
+            shrunk_link_length_factor=float(meta.get_param("shrunk_link_length_factor")),
+            reference_update_cycle_length=float(meta.get_param("reference_update_cycle_length")),
         )
-
-
-#: The shipped values, and the fallback for a topology or a node built without a
-#: ``MetadataProvider`` — ``synthetic.py``, and the ``SlipnetNode``s that unit tests
-#: construct directly.
-DEFAULT_ACTIVATION = ActivationParams()
 
 
 # ---------------------------------------------------------------------------
@@ -172,8 +199,7 @@ class SlipnetTopology:
     #: The run's activation constants.  A field rather than a module global because
     #: they are per-run, and on the *topology* because that is the object a backend
     #: uploads once and never touches again — the same lifecycle these have.
-    #: Defaulted so ``synthetic.py`` and tests that build a topology need no metadata.
-    activation: ActivationParams = DEFAULT_ACTIVATION
+    activation: ActivationParams
 
     @property
     def n_nodes(self) -> int:
@@ -433,6 +459,45 @@ def string_type_code(name: str | None) -> int:
     return _STRING_TYPE_CODES.get(name or "", STRING_OTHER)
 
 
+@dataclass(frozen=True)
+class SalienceWeights:
+    """The weights of the two salience averages, read once from the configuration.
+
+    Scheme: ``(round (/ (+ (* 4 unhappiness) importance) 5))`` (``workspace-objects.ss:524-559``)
+    is a weighted average of an unhappiness and the relative importance.  The weights are the
+    formula coefficients ``intra_string_salience_{unhappiness,importance}_weight`` (80, 20) and
+    ``inter_string_salience_{unhappiness,importance}_weight`` (20, 80), and the divisor is
+    their sum, so the average is ``(wu * unhappiness + wi * importance) / (wu + wi)``.
+    For the shipped weights that is the Scheme's own ``(4u + i) / 5`` and ``(u + 4i) / 5``
+    exactly (``tests/unit/test_salience_weights.py`` compares them over every input).
+
+    Weights that sum to 0 give a divisor of 0, which has no average.  It is settled here, at
+    the read: such a pair becomes (1, 0) over 1, so the salience is the unhappiness alone, as
+    ``formulas.compute_temperature`` returns the unhappiness when its weights sum to 0.
+    """
+
+    intra_unhappiness: float
+    intra_importance: float
+    intra_total: float
+    inter_unhappiness: float
+    inter_importance: float
+    inter_total: float
+
+    @classmethod
+    def from_metadata(cls, meta: Any) -> SalienceWeights:
+        iu = meta.get_formula_coeff("intra_string_salience_unhappiness_weight")
+        ii = meta.get_formula_coeff("intra_string_salience_importance_weight")
+        eu = meta.get_formula_coeff("inter_string_salience_unhappiness_weight")
+        ei = meta.get_formula_coeff("inter_string_salience_importance_weight")
+        iu, ii, eu, ei = float(iu), float(ii), float(eu), float(ei)
+        intra_total, inter_total = iu + ii, eu + ei
+        if intra_total == 0.0:
+            iu, ii, intra_total = 1.0, 0.0, 1.0
+        if inter_total == 0.0:
+            eu, ei, inter_total = 1.0, 0.0, 1.0
+        return cls(iu, ii, intra_total, eu, ei, inter_total)
+
+
 @dataclass
 class ObjectValueBatch:
     """One string's objects, reduced to the scalars the combination stage needs.
@@ -484,6 +549,8 @@ class ObjectValueBatch:
     #: keeps the outputs rectangular, which a ``None`` sentinel would not.
     prev_horizontal_salience: list[float]
     prev_vertical_salience: list[float]
+    #: The salience averages' weights (``SalienceWeights``), one set for the whole batch.
+    weights: SalienceWeights
 
     # Outputs, filled by the backend.  Every one of these is an *integer* in the
     # reference, because each is the result of a bare ``round()``; the backends
@@ -567,6 +634,8 @@ def relative_importances(objects: Sequence[Any]) -> list[int]:
 
 def gather_object_values(objects: Sequence[Any]) -> ObjectValueBatch:
     """Read the combination stage's inputs off a string's objects."""
+    from server.engine.workspace_structures import bound_meta
+
     return ObjectValueBatch(
         relative_importance=[o.relative_importance for o in objects],
         intra_unhappiness=[o.intra_string_unhappiness for o in objects],
@@ -579,6 +648,7 @@ def gather_object_values(objects: Sequence[Any]) -> ObjectValueBatch:
         justify_mode=[o._justify_mode() for o in objects],
         prev_horizontal_salience=[o.salience["horizontal_inter"] for o in objects],
         prev_vertical_salience=[o.salience["vertical_inter"] for o in objects],
+        weights=SalienceWeights.from_metadata(bound_meta()),
     )
 
 

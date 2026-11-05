@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing import Any
 
 from server.engine.bonds import Bond
+from tests.support.standard_configuration import standard_activation, standard_meta
 from server.engine.temperature import Temperature
 from server.engine.trace import (
     SNAG,
@@ -62,6 +63,7 @@ class _FakeSlipnet:
         self.nodes = {name: _FakeSlipnetNode(name) for name in names}
         #: Relation name -> node, as ``Slipnet.relations``.
         self.relations: dict = {}
+        self.activation_params = standard_activation()
 
     def relation(self, name: str):
         from server.engine.roles import absent
@@ -73,6 +75,7 @@ class _FakeThemespace:
     """A Themespace with no clusters — every clamp over it is a no-op."""
 
     clusters: list = []
+    meta = standard_meta()
 
     def thematic_pressure_on(self, types: Any = None) -> None:
         pass
@@ -124,7 +127,7 @@ def test_clamp_activation_unclamps_the_temperature():
     trace = TemporalTrace()
     slipnet = _FakeSlipnet()
     themespace = _FakeThemespace()
-    temperature = Temperature()
+    temperature = Temperature(100.0)
     temperature.clamp(100.0)
 
     trace.add_snag_event(SnagEvent(codelet_count=10, temperature=100.0))
@@ -298,7 +301,7 @@ def test_undo_snag_condition_records_the_progress_it_measured():
     old = _FakeStructure(10.0)
     trace, snag = _snagged_trace([old])
     workspace = _FakeWorkspace([old, _FakeStructure(72.0)])
-    temperature = Temperature()
+    temperature = Temperature(100.0)
     temperature.clamp(100.0)
 
     trace.undo_snag_condition(_FakeThemespace(), _FakeSlipnet(), temperature, workspace)
@@ -409,7 +412,7 @@ def test_deactivating_a_clamp_only_unfreezes_its_own_nodes():
     )
     trace = TemporalTrace()
     trace.add_clamp_event(event)
-    temperature = Temperature()
+    temperature = Temperature(100.0)
     event.activate(trace, _FakeThemespace(), slipnet, None, temperature)
     assert slipnet.nodes["plato-direction-category"].frozen
 
@@ -460,7 +463,7 @@ def test_a_snag_with_no_objects_survives_activation_and_deactivation():
     """The same shape, reached the way the engine reaches it."""
     trace = TemporalTrace()
     slipnet = _FakeSlipnet("plato-a")
-    temperature = Temperature()
+    temperature = Temperature(100.0)
     temperature.clamp(100.0)
 
     snag = SnagEvent(
@@ -532,7 +535,7 @@ def test_a_rule_codelet_clamp_applies_its_pattern_against_a_very_low_background(
         clamped_codelet_patterns=[[("rule-scout", 77)]],
     )
     event.activate(
-        TemporalTrace(), _FakeThemespace(), _FakeSlipnet(), coderack, Temperature()
+        TemporalTrace(), _FakeThemespace(), _FakeSlipnet(), coderack, Temperature(100.0)
     )
     assert coderack.calls == [([("rule-scout", 77)], "very_low")]
 
@@ -548,7 +551,7 @@ def test_other_clamp_types_apply_their_pattern_with_no_background():
         clamped_codelet_patterns=[[("thematic-bridge-scout", 91)]],
     )
     event.activate(
-        TemporalTrace(), _FakeThemespace(), _FakeSlipnet(), coderack, Temperature()
+        TemporalTrace(), _FakeThemespace(), _FakeSlipnet(), coderack, Temperature(100.0)
     )
     assert coderack.calls == [([("thematic-bridge-scout", 91)], None)]
 

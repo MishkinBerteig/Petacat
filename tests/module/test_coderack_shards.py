@@ -20,7 +20,7 @@ import pytest
 from server.engine.coderack import Codelet, Coderack
 from server.parallel.coderack_shards import (
     CANDIDATES,
-    MIN_SHARD_CAPACITY,
+    min_shard_capacity,
     FamilyShardedCoderack,
     LockedCoderack,
     WorkerShardedCoderack,
@@ -327,7 +327,7 @@ def test_sharding_divides_the_capacity_rather_than_replicating_it(meta):
 
 
 def test_shard_count_is_bounded_by_capacity_not_by_worker_count(meta):
-    """A shard below ``MIN_SHARD_CAPACITY`` stops being a coderack.
+    """A shard below ``min_shard_capacity`` stops being a coderack.
 
     Measured on ``eqe -> qeq; abbba?``: at eight shards of twelve, the stopping state
     ``gave_up:`` vanished entirely — 0 in 60 runs, against 23 for the serial engine, and
@@ -342,9 +342,9 @@ def test_shard_count_is_bounded_by_capacity_not_by_worker_count(meta):
     capacity = Coderack(meta).max_size
     for requested in (8, 16, 64):
         rack = WorkerShardedCoderack(meta, requested)
-        assert rack.num_shards <= capacity // MIN_SHARD_CAPACITY
+        assert rack.num_shards <= capacity // min_shard_capacity(meta)
         for inner in rack._racks:
-            assert inner.max_size >= MIN_SHARD_CAPACITY
+            assert inner.max_size >= min_shard_capacity(meta)
 
 
 def test_the_sharded_rack_exposes_seven_bins_however_many_shards(meta):

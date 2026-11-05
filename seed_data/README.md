@@ -10,7 +10,7 @@ knowledge as Petacat ports it. It is not a mode and not a database. It is the st
 | `roles.json` | The roles the engine looks nodes and codelet types up by |
 | `engine_params.json`, `urgency_levels.json`, `formula_coefficients.json` | Parameters, urgency bins and formula coefficients (stored as exact rationals such as `2/3`) |
 | `theme_dimensions.json`, `theme_relations.json` | The Themespace's dimensions and relations |
-| `posting_rules.json` | Which codelets are posted, and when |
+| `posting_rules.json` | Which codelets are posted, and when; a rule's `urgency_level` names a tier of `urgency_levels` |
 | `commentary_templates.json` | The natural-language commentary and Verbose mode's message texts |
 | `demo_problems.json` | The pre-configured analogy problems |
 | `enums.json` | The enum tables (bond categories, proposal levels, and the rest) |
@@ -34,10 +34,14 @@ this directory into the empty one.
 not an external program, not the in-worker learner, and not any Training Mode Session. Those all go
 through the change API and change the database, and the journal records them.
 
-The files change only through a **committed development change**, and only in two cases:
+The files change only through a **committed development change**, and only in three cases:
 
 1. to fix a fidelity bug in Petacat (a place where Petacat differs from Metacat);
-2. to remove a row or field that nothing reads (proven unread by reading the code and by running).
+2. to remove a row or field that nothing reads (proven unread by reading the code and by running);
+3. to make a row that held a copy of a stored value name it instead. A posting rule's
+   `urgency_level` holds the *name* of a tier of `urgency_levels` (`low`, `medium`,
+   `extremely_low`), where it used to hold that tier's number (35, 49, 7), so a tier is stored
+   once and editing it moves every rule that names it. Nothing else about a row changes.
 
 The commit message names the affected rows (table and key), so that anyone comparing a database
 with these files can see why they moved. Adding a row for a new feature, or tuning a value, is a

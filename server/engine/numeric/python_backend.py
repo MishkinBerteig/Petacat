@@ -24,6 +24,7 @@ from server.engine.numeric.layout import (
     STRING_MODIFIED,
     STRING_TARGET,
     ObjectValueBatch,
+    jump_probability,
     SlipnetState,
     SlipnetTopology,
     ThemeLayout,
@@ -37,7 +38,7 @@ class PythonSlipnetSession(SlipnetSession):
 
     __slots__ = (
         "topology", "state", "_scaled_weight", "_scaled_for",
-        "_max_activation", "_full_activation_threshold",
+        "_max_activation", "_full_activation_threshold", "_probabilistic_exponent",
     )
 
     def __init__(self, topology: SlipnetTopology) -> None:
@@ -53,6 +54,7 @@ class PythonSlipnetSession(SlipnetSession):
         # The run's activation constants, read once off the topology.  The hot
         # loops below see a slot load rather than a two-hop attribute chain.
         self._max_activation = topology.activation.max_activation
+        self._probabilistic_exponent = topology.activation.probabilistic_exponent
         self._full_activation_threshold = topology.activation.full_activation_threshold
 
     def load(self, state: SlipnetState) -> None:
@@ -201,7 +203,7 @@ class PythonSlipnetSession(SlipnetSession):
             # the jump's candidates to [50, 100) before drawing at all.
             if not (self._full_activation_threshold <= a < self._max_activation):
                 continue
-            p = (a / self._max_activation) ** 3
+            p = jump_probability(a / self._max_activation, self._probabilistic_exponent)
             # ``RNG.prob`` short-circuits at both ends without touching the
             # stream.  The window above already excludes p == 1 and p == 0, but
             # the guard is kept so this list is defined by the property that
@@ -327,6 +329,9 @@ class PythonBackend(Backend):
         """
         n = len(batch)
         rel = batch.relative_importance
+        w = batch.weights
+        iu, ii, it = w.intra_unhappiness, w.intra_importance, w.intra_total
+        eu, ei, et = w.inter_unhappiness, w.inter_importance, w.inter_total
 
         avg_unhappy: list[int] = []
         s_intra: list[int] = []
@@ -361,7 +366,7 @@ class PythonBackend(Backend):
             if batch.salience_clamped[i]:
                 s_intra.append(100)
             else:
-                s_intra.append(round((4 * intra + ri) / 5))
+                s_intra.append(round((iu * intra + ii * ri) / it))
 
             # inter-string salience (workspace-objects.ss:532-559).  Slots the
             # reference leaves alone keep their previous value.
@@ -370,15 +375,15 @@ class PythonBackend(Backend):
             if batch.salience_clamped[i]:
                 new_h, new_v = 100, 100
             elif stype == STRING_INITIAL:
-                new_h = round((h + 4 * ri) / 5)
-                new_v = round((v + 4 * ri) / 5)
+                new_h = round((eu * h + ei * ri) / et)
+                new_v = round((eu * v + ei * ri) / et)
             elif stype == STRING_MODIFIED:
-                new_h, new_v = round((h + 4 * ri) / 5), prev_v
+                new_h, new_v = round((eu * h + ei * ri) / et), prev_v
             elif stype == STRING_TARGET:
-                new_v = round((v + 4 * ri) / 5)
-                new_h = round((h + 4 * ri) / 5) if justify else prev_h
+                new_v = round((eu * v + ei * ri) / et)
+                new_h = round((eu * h + ei * ri) / et) if justify else prev_h
             elif stype == STRING_ANSWER:
-                new_h, new_v = round((h + 4 * ri) / 5), prev_v
+                new_h, new_v = round((eu * h + ei * ri) / et), prev_v
             else:
                 new_h, new_v = prev_h, prev_v
             s_h.append(new_h)

@@ -636,7 +636,7 @@ _WRITABLE_COLLECTIONS = [
         "posting-rules", "id",
         {
             "codelet_type": "e2e-scout", "direction": "bottom_up",
-            "urgency_when_posted": 30, "urgency_formula": None,
+            "urgency_level": "low", "urgency_formula": None,
             "posting_formula": "", "count_formula": "", "count_values": None,
             "condition": "always", "triggering_slipnodes": None,
         },
@@ -1013,7 +1013,7 @@ async def test_admin_list_posting_rules(app_client):
 
 def _posting_rule_body(codelet_type, **extra):
     return {"codelet_type": codelet_type, "direction": "bottom_up",
-            "urgency_when_posted": 7, "posting_formula": "temperature / 100",
+            "urgency_level": "extremely_low", "posting_formula": "temperature / 100",
             "count_formula": "fixed", "count_values": {"fixed": 1},
             "condition": "always", **extra}
 

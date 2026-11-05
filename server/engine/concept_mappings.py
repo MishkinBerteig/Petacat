@@ -378,7 +378,7 @@ class ConceptMapping:
         pending = self.label.activation_buffer
         if pending != 0.0:
             self.label.activation = max(
-                0.0, min(100.0, self.label.activation + pending)
+                0.0, min(self.label.max_activation, self.label.activation + pending)
             )
             self.label.activation_buffer = 0.0
         if monitor is not None:

@@ -320,7 +320,7 @@ def _expected_tables() -> dict[str, list[dict]]:
             "sort_order": i - 1,
             "codelet_type": pr["codelet_type"],
             "direction": pr["direction"],
-            "urgency_when_posted": pr.get("urgency_when_posted"),
+            "urgency_level": pr.get("urgency_level"),
             "urgency_formula": pr.get("urgency_formula"),
             "posting_formula": pr.get("posting_formula", ""),
             "count_formula": pr.get("count_formula", ""),

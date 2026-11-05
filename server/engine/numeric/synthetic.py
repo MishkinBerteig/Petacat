@@ -55,7 +55,7 @@ from __future__ import annotations
 
 import random
 
-from server.engine.numeric.layout import SlipnetState, SlipnetTopology
+from server.engine.numeric.layout import ActivationParams, SlipnetState, SlipnetTopology
 
 #: Out-degree histogram of the real Slipnet, as ``(degree, count)`` over 59 nodes.
 #: Measured, not assumed — see the module docstring.
@@ -92,14 +92,16 @@ def _expand(histogram: tuple[tuple[float, int], ...]) -> list[float]:
 
 def synthetic_topology(
     n_nodes: int,
+    activation: ActivationParams,
+    update_cycle_length: int,
     links_per_node: float = REAL_LINKS_PER_NODE,
     seed: int = 0,
-    update_cycle_length: int = 15,
 ) -> SlipnetTopology:
     """Build a ``SlipnetTopology`` of ``n_nodes`` with realistic structure.
 
     Deterministic in ``seed``, so a scaling measurement is reproducible and two
-    backends can be compared on literally the same graph.
+    backends can be compared on literally the same graph.  *activation* and *update_cycle_length*
+    are a configuration's (``ActivationParams.from_metadata``, ``update_cycle_length``).
     """
     rng = random.Random(seed)
     target_edges = int(round(links_per_node * n_nodes))
@@ -155,7 +157,7 @@ def synthetic_topology(
     # ``SlipnetNode.compute_rate_of_decay`` uses — a synthetic topology has to be
     # substitutable for a real one, including in what it makes exact.
     depths = [rng.choice(REAL_DEPTHS) for _ in range(n_nodes)]
-    exponent = update_cycle_length / 15.0
+    exponent = update_cycle_length / activation.reference_update_cycle_length
     if exponent == 1.0:
         decay = [float(100 - d) for d in depths]
     else:
@@ -169,6 +171,7 @@ def synthetic_topology(
         in_source=tuple(source),
         in_weight=tuple(weight),
         in_dest=tuple(dest_of_edge),
+        activation=activation,
     )
 
 

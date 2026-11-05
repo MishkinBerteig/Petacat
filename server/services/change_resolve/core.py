@@ -426,6 +426,17 @@ class _Run:
                      "reason": f"names {what}"}
                 )
 
+    def mark_rules_naming_level(self, i: int, level: str, what: str) -> None:
+        """A rule's ``urgency_level`` is a scalar, not an element of a list, so a rule that names
+        *level* is marked dangling (as a level-naming parameter is), never deleted and never
+        nulled: nulling it would quietly post the rule at the tier ``low``."""
+        for e in self.rows(RULES).values():
+            if e.get("urgency_level") == level:
+                self.dangling.append(
+                    {"cause_op": i, "table": RULES, "key": REGISTRY[RULES].key_of(e),
+                     "column": "urgency_level", "reason": f"names {what}"}
+                )
+
     # -- node-keyed parameters ------------------------------------------------------------
 
     def param_json(self, name: str):
@@ -521,6 +532,12 @@ class _Run:
             if r is not None and (r["value"],) not in t[LEVELS]:
                 gaps[("urgency_level", r["value"])] = (
                     f"engine parameter {p!r} names urgency level {r['value']!r}, which the configuration lacks; "
+                    "a run will stop at its start")
+        for rule in t[RULES].values():
+            level = rule.get("urgency_level")
+            if level is not None and (level,) not in t[LEVELS]:
+                gaps[("urgency_level", level)] = (
+                    f"posting rule {rule['rule_key']!r} names urgency level {level!r}, which the configuration lacks; "
                     "a run will stop at its start")
         r = t[PARAMS].get(("initial_codelet_types",))
         if r is not None:
@@ -674,6 +691,7 @@ def _remove_level(r: _Run, i: int, row: Mapping) -> None:
     why = f"removed urgency level {n!r}"
     r.mark_dangling(i, _quoted(n), f"the removed urgency level {n!r}", skip=None)
     r.mark_scalar_params(i, LEVEL_NAMING_PARAMETERS, n, f"the removed urgency level {n!r}")
+    r.mark_rules_naming_level(i, n, f"the removed urgency level {n!r}")
     for e in list(r.rows(PATTERNS).values()):
         if e["urgency_level"] == n:
             r.e_delete(i, PATTERNS, REGISTRY[PATTERNS].key_of(e), reason=f"pattern entry names {why}")
@@ -769,6 +787,9 @@ def _rename_level(r: _Run, i: int, key: Mapping, new: str) -> None:
     r.mark_scalar_params(i, LEVEL_NAMING_PARAMETERS, old, f"the old name {old!r} of a renamed urgency level")
     r.e_update(i, LEVELS, {"name": old}, {"name": new})
     r.cascaded.append({"cause_op": i, "table": LEVELS, "key": {"name": new}, "op": "update", "reason": why})
+    for e in list(r.rows(RULES).values()):
+        if e.get("urgency_level") == old:
+            r.e_update(i, RULES, REGISTRY[RULES].key_of(e), {"urgency_level": new}, reason=f"posting rule references {why}")
     for e in list(r.rows(PATTERNS).values()):
         if e["urgency_level"] == old:
             r.e_update(i, PATTERNS, REGISTRY[PATTERNS].key_of(e), {"urgency_level": new}, reason=f"pattern entry references {why}")

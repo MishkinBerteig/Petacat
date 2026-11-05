@@ -157,6 +157,27 @@ def update_temperature(
     )
 
 
+def share_of_ceiling(activation: float, ceiling: float) -> float:
+    """``activation / ceiling``: the share of the activation ceiling a node holds.
+
+    Scheme: ``%`` (``utilities.ss``) divides by 100, which here is ``%max-activation%``.  The
+    ceiling is configuration (``max_activation``), and Training-Mode learning may set it to 0,
+    where the quotient is undefined.  A node under a ceiling of 0 can hold no activation, so
+    its share is 0.0.
+    """
+    return activation / ceiling if ceiling else 0.0
+
+
+def unfilled_share_of_ceiling(activation: float, ceiling: float) -> float:
+    """``(ceiling - activation) / ceiling``: the share of the ceiling a node has not filled.
+
+    Scheme: ``(% (100- activation))``.  Under a ceiling of 0 the node holds nothing, so all of
+    the room is unfilled: 1.0, which is also what an absent node (activation 0) gave when the
+    ceiling was the literal 100.
+    """
+    return (ceiling - activation) / ceiling if ceiling else 1.0
+
+
 def weighted_average(values: list[float], weights: list[float]) -> float:
     """Compute a weighted average."""
     total_weight = sum(weights)
@@ -220,7 +241,8 @@ def length_description_probability(
     # Base probability before temperature adjustment:
     #   0.5 ^ (group_length^3 * (100 - activation) / 100)
     activation = plato_length.activation
-    exponent = (group_length ** 3) * ((100.0 - activation) / 100.0)
+    ceiling = plato_length.max_activation
+    exponent = (group_length ** 3) * unfilled_share_of_ceiling(activation, ceiling)
     base_prob = base ** exponent
 
     return temp_adjusted_probability(base_prob, temperature, meta)

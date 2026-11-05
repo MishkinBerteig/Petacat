@@ -13,26 +13,23 @@ from typing import TYPE_CHECKING, Any
 
 from server.engine.numeric.backend import select_backend
 from server.engine.numeric.layout import ThemeLayout, ThemeParams, ThemeState
+from server.engine.formulas import share_of_ceiling
 
 if TYPE_CHECKING:
     from server.engine.metadata import MetadataProvider
     from server.engine.slipnet import SlipnetNode
 
-#: ``%max-theme-activation%`` (``themes.ss:20``) — a theme's activation lives in
-#: [-100, +100] (§4.2).
-#:
-#: The fallback, not the value in force.  ``max_theme_activation`` is an engine
-#: parameter and both clips take it from there; this stands in only for a caller that
-#: has no ``MetadataProvider``, which is a hand-built test object rather than a run.
-DEFAULT_MAX_THEME_ACTIVATION = 100.0
+# ``%max-theme-activation%`` (``themes.ss:20``) — a theme's activation lives in
+# [-ceiling, +ceiling] (§4.2, 100 in the Metacat Standard Configuration).  The ceiling is the
+# ``max_theme_activation`` engine parameter, and every clip is given it.
 
 
-def _clip_positive(value: float, ceiling: float = DEFAULT_MAX_THEME_ACTIVATION) -> float:
+def _clip_positive(value: float, ceiling: float) -> float:
     """Scheme: ``clip-positive`` (``themes.ss:34-35``) — clip to [0, +ceiling]."""
     return max(0.0, min(ceiling, value))
 
 
-def _clip_negative(value: float, ceiling: float = DEFAULT_MAX_THEME_ACTIVATION) -> float:
+def _clip_negative(value: float, ceiling: float) -> float:
     """Scheme: ``clip-negative`` (``themes.ss:37-38``) — clip to [-ceiling, 0]."""
     return max(-ceiling, min(0.0, value))
 
@@ -127,8 +124,8 @@ class Theme:
     def boost(
         self,
         factor: float,
-        boost_amount: float = 7.0,
-        max_activation: float = DEFAULT_MAX_THEME_ACTIVATION,
+        boost_amount: float,
+        max_activation: float,
     ) -> None:
         """Boost activation by a factor.
 
@@ -909,9 +906,10 @@ def pick_theme_conjunction(
     (themes.ss:771-775).
     """
     themes: list[Theme] = []
+    ceiling = themespace.meta.get_param("max_theme_activation")
     for cluster in themespace.get_clusters(theme_type):
         max_positive = cluster.get_max_positive_theme_activation()
-        if not rng.prob((max_positive / 100.0) ** 2):
+        if not rng.prob(share_of_ceiling(max_positive, ceiling) ** 2):
             continue
         theme = cluster.pick_positive_theme(rng)
         if theme is not None:

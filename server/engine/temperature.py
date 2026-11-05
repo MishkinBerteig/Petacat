@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 class Temperature:
     """Global temperature state."""
 
-    def __init__(self, initial: float = 100.0) -> None:
+    def __init__(self, initial: float) -> None:
         self.value: float = initial
         self.clamped: bool = False
         self.clamp_value: float = 0.0

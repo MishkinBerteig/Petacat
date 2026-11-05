@@ -209,7 +209,7 @@ class LockedCoderack(ShardedCoderack):
         return f"LockedCoderack({self.total_count} codelets)"
 
 
-#: The fewest codelets a shard may hold.
+#: The fewest codelets a shard may hold (``min_shard_capacity``).
 #:
 #: Measured, and the measurement was a surprise.  Dividing the rack's capacity across
 #: shards is correct — replicating it would give N shards N times the intended
@@ -225,18 +225,9 @@ class LockedCoderack(ShardedCoderack):
 #: it is stuck, and instead answers.  Raising the shard size restores it: 19 at
 #: twenty-five per shard, 27 at fifty, against the serial 23.
 #:
-#: The value now lives in ``engine_params`` as ``min_shard_capacity`` and is read
-#: through the ``MetadataProvider``, so it can be varied per Run.  `PHASE 1 PLAN.md`'s
-#: *Carried forward: parallelism beyond sharding* is why: that sweep has to move the
-#: floor, and could not while this was a module constant.  What remains here is the
-#: fallback for a provider that has no such row — a hand-built one in a test, or a
-#: database seeded before the row existed.
-DEFAULT_MIN_SHARD_CAPACITY = 25
-
-#: Retained under its original name because `hardware.py`, `scripts/bench_shards.py` and
-#: `tests/module/test_coderack_shards.py` document the bound by pointing at it.  It is
-#: the default, not the value in force: ask the provider for that.
-MIN_SHARD_CAPACITY = DEFAULT_MIN_SHARD_CAPACITY
+#: The value is the ``min_shard_capacity`` engine parameter (25 in the Metacat Standard
+#: Configuration), read through the ``MetadataProvider`` by :func:`min_shard_capacity`, so it
+#: can be varied per Run (`PHASE 1 PLAN.md`'s *Carried forward: parallelism beyond sharding*).
 
 
 def min_shard_capacity(meta: MetadataProvider) -> int:
@@ -316,7 +307,7 @@ class _ShardBase(ShardedCoderack):
         #: One write per draw and one read per post is cheap — both threads are
         #: already touching this object for ``_racks`` and ``_locks`` — and it keeps
         #: every shard evicting at the same temperature the run is actually at.
-        self.current_temperature: float = 100.0
+        self.current_temperature: float = float(meta.get_param("initial_temperature"))
 
     def worker_index(self) -> int:
         """This thread's shard, assigned once.

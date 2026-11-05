@@ -551,7 +551,7 @@ def rows_from_standard_files(seed_dir: str) -> dict[str, list[dict[str, Any]]]:
             "sort_order": pos,
             "codelet_type": pr["codelet_type"],
             "direction": pr["direction"],
-            "urgency_when_posted": pr.get("urgency_when_posted"),
+            "urgency_level": pr.get("urgency_level"),
             "urgency_formula": pr.get("urgency_formula"),
             "posting_formula": pr.get("posting_formula", ""),
             "count_formula": pr.get("count_formula", ""),

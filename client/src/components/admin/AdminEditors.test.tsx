@@ -272,7 +272,7 @@ describe('ThemeDimensionEditor — theme dimensions', () => {
 describe('PostingRuleEditor — posting rules', () => {
   const rule = {
     id: 2, codelet_type: 'bottom-up-bond-scout', direction: 'bottom_up',
-    urgency_when_posted: 30, urgency_formula: null, posting_formula: '',
+    urgency_level: 'low', urgency_formula: null, posting_formula: '',
     count_formula: '', count_values: null, condition: 'always',
     triggering_slipnodes: null,
   }
@@ -753,7 +753,7 @@ describe('A refused delete leaves the row where it is', () => {
   it('keeps the posting rule listed, and offers the delete again', async () => {
     const rule = {
       id: 2, codelet_type: 'bottom-up-bond-scout', direction: 'bottom_up',
-      urgency_when_posted: 30, urgency_formula: null, posting_formula: '',
+      urgency_level: 'low', urgency_formula: null, posting_formula: '',
       count_formula: '', count_values: null, condition: 'always',
       triggering_slipnodes: null,
     }

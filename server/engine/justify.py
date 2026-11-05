@@ -115,7 +115,7 @@ def attempt_justification(
     slipnet: Slipnet | None = None,
     memory: Any = None,
     codelet_count: int = 0,
-    temperature: float = 50.0,
+    temperature: float,
     coderack: Any = None,
     temperature_control: Any = None,
     vlog: Any = None,
@@ -406,7 +406,7 @@ def clamp_rules(
     vertical_theme_pattern: dict[str, Any] | None = None,
     concept_patterns: list[dict[str, Any]] | None = None,
     codelet_count: int | None = None,
-    temperature: float | None = None,
+    temperature: float,
     coderack: Any = None,
     temperature_control: Any = None,
 ) -> ClampEvent | None:
@@ -433,7 +433,7 @@ def clamp_rules(
     # Add each rule's theme pattern
     for rule in rules:
         if rule.theme_pattern is not None:
-            tp = _theme_pattern_to_dict(rule.theme_pattern)
+            tp = _theme_pattern_to_dict(rule.theme_pattern, meta)
             if tp:
                 clamped_theme_patterns.append(tp)
 
@@ -446,7 +446,7 @@ def clamp_rules(
         # its thematic pressure on (trace.ss:1530-1536) (G-J2).
         vtp = themespace.get_dominant_theme_pattern(THEME_VERTICAL_BRIDGE)
         if vtp:
-            tp_dict = _theme_pattern_list_to_dict(vtp)
+            tp_dict = _theme_pattern_list_to_dict(vtp, meta)
             if tp_dict:
                 clamped_theme_patterns.append(tp_dict)
 
@@ -482,9 +482,6 @@ def clamp_rules(
     # ``%max-clamp-period%`` (750) the instant it is made, so justify clamps expired
     # after 2–14 codelets instead of lasting up to 750 — the reorganisation Figure 4.13
     # depends on had no time to happen.
-    if temperature is None:
-        temperature = _get_temperature(workspace)
-
     clamp_event = ClampEvent(
         codelet_count=codelet_count,
         temperature=temperature,
@@ -495,6 +492,7 @@ def clamp_rules(
         rules=list(rules),
         progress_focus="workspace",
         slipnet=slipnet,
+        max_activation=float(meta.get_param("max_activation")),
     )
 
     # Add event first so concept-activation events appear after the clamp
@@ -690,7 +688,7 @@ def get_vertical_theme_pattern_to_clamp(
     were, so the same unification always clamped the same pattern.
     """
     if not unifying_pattern or len(unifying_pattern) < 2:
-        return _theme_pattern_list_to_dict(unifying_pattern) if unifying_pattern else {}
+        return _theme_pattern_list_to_dict(unifying_pattern, meta) if unifying_pattern else {}
 
     theme_type = unifying_pattern[0]
     # A Themespace relation is the bare name (``identity``, ``opposite``); the entries a
@@ -738,7 +736,7 @@ def get_vertical_theme_pattern_to_clamp(
         # Fall back to original pattern
         final_entries = [e for e in pattern_entries if isinstance(e, tuple)]
 
-    return _build_theme_pattern_dict(theme_type, final_entries)
+    return _build_theme_pattern_dict(theme_type, final_entries, meta)
 
 
 def _relation_name(relation: Any) -> Any:
@@ -774,7 +772,7 @@ def _retention_probability(
     if dim is not None and _plays(dim, "dimension.string_position", slipnet):
         return 1.0
 
-    cd = _get_conceptual_depth(dim, slipnet) if dim else 50.0
+    cd = _get_conceptual_depth(dim, slipnet)
     identity_factor = float(identity_percent) if _is_identity_label(rel) else 100.0
     return (cd / 100.0) * (identity_factor / 100.0)
 
@@ -1070,7 +1068,7 @@ def _attempt_clamp_rules(
     concept_patterns: list[dict[str, Any]] | None = None,
     explanation: str = "Clamping rules",
     codelet_count: int = 0,
-    temperature: float = 50.0,
+    temperature: float,
     coderack: Any = None,
     temperature_control: Any = None,
     vlog: Any = None,
@@ -1223,9 +1221,7 @@ def _get_conceptual_depth(node_name: Any, slipnet: Slipnet | None) -> float:
         node = slipnet.nodes.get(node_name)
         if node is not None:
             return node.conceptual_depth
-    if hasattr(node_name, "conceptual_depth"):
-        return node_name.conceptual_depth
-    return 50.0
+    return node_name.conceptual_depth
 
 
 def _plays(dim: Any, role: str, slipnet: Slipnet | None) -> bool:
@@ -1320,17 +1316,17 @@ def _flatten_clauses(clauses: list[RuleClause]) -> list:
     return result
 
 
-def _theme_pattern_to_dict(pattern: Any) -> dict[str, Any] | None:
+def _theme_pattern_to_dict(pattern: Any, meta: Any) -> dict[str, Any] | None:
     """Convert a theme pattern (list or dict) to a dict for clamping."""
     if isinstance(pattern, dict):
         return pattern
     if isinstance(pattern, list) and len(pattern) >= 1:
-        return _theme_pattern_list_to_dict(pattern)
+        return _theme_pattern_list_to_dict(pattern, meta)
     return None
 
 
-def _theme_pattern_list_to_dict(pattern: list) -> dict[str, Any]:
-    """Convert a [theme_type, (dim, rel), ...] list to a dict."""
+def _theme_pattern_list_to_dict(pattern: list, meta: Any) -> dict[str, Any]:
+    """Convert a [theme_type, (dim, rel), ...] list to a dict, each entry at ``max_theme_activation``."""
     if not pattern:
         return {}
     theme_type = pattern[0]
@@ -1341,7 +1337,7 @@ def _theme_pattern_list_to_dict(pattern: list) -> dict[str, Any]:
                 {
                     "dimension": item[0],
                     "relation": _theme_relation(item[1]),
-                    "activation": 100.0,
+                    "activation": float(meta.get_param("max_theme_activation")),
                 }
             )
     return {"type": theme_type, "entries": entries}
@@ -1360,13 +1356,17 @@ def _theme_relation(relation: Any) -> Any:
 
 
 def _build_theme_pattern_dict(
-    theme_type: str, entries: list[tuple[str, str | None]]
+    theme_type: str, entries: list[tuple[str, str | None]], meta: Any
 ) -> dict[str, Any]:
-    """Build a theme pattern dict from a theme type and entries."""
+    """Build a theme pattern dict from a theme type and entries, each at ``max_theme_activation``."""
     return {
         "type": theme_type,
         "entries": [
-            {"dimension": dim, "relation": _theme_relation(rel), "activation": 100.0}
+            {
+                "dimension": dim,
+                "relation": _theme_relation(rel),
+                "activation": float(meta.get_param("max_theme_activation")),
+            }
             for dim, rel in entries
         ],
     }
@@ -1377,8 +1377,5 @@ def _get_codelet_count(workspace: Workspace) -> int:
     return getattr(workspace, "codelet_count", 0)
 
 
-def _get_temperature(workspace: Workspace) -> float:
-    """Get current temperature from workspace or default."""
-    return getattr(workspace, "temperature", 50.0)
 
 

@@ -523,7 +523,7 @@ class UpdateCycle:
         slip_rng = rng.split(_label(u, "slipnet")) if stream else ctx.rng
         if ctx.self_watching_enabled:
             ctx.themespace.spread_activation_to_slipnet(ctx.slipnet, slip_rng)
-        threshold = getattr(ctx, "spreading_activation_threshold", 100)
+        threshold = ctx.spreading_activation_threshold
         activations_before = {
             name: node.activation for name, node in ctx.slipnet.nodes.items()
         }
@@ -777,10 +777,7 @@ class UpdateCycle:
                     return None
                 urgency = None
             else:
-                urgency = evaluate_urgency(
-                    rule, PostingContext(ctx, node=node),
-                    default=meta.get_urgency("low"),
-                )
+                urgency = evaluate_urgency(rule, PostingContext(ctx, node=node))
             prob = runner._compute_posting_probability(rule)
             item = _LazyStream(root, _label(u, "post", kind, key))
             if not item.prob(prob):
@@ -788,9 +785,7 @@ class UpdateCycle:
             if kind == "bu":
                 urgency = runner._compute_bottom_up_urgency(rule)
             elif kind == "th":
-                urgency = evaluate_urgency(
-                    rule, PostingContext(ctx), default=meta.get_urgency("low")
-                )
+                urgency = evaluate_urgency(rule, PostingContext(ctx))
             num = evaluate_count_formula(rule, PostingContext(_RngCtx(ctx, item)))
             return urgency, num
 

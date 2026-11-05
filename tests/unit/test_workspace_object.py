@@ -15,6 +15,7 @@ from server.engine.workspace_objects import Letter, WorkspaceObject
 from server.engine.slipnet import SlipnetNode
 
 from tests.unit._fakes import FakeNode, FakeString
+from tests.support.standard_configuration import make_node
 
 
 class _FakeSlipnet:
@@ -26,7 +27,7 @@ class _FakeSlipnet:
 
 
 def test_letter_creation():
-    node = SlipnetNode("plato-a", "a", 10)
+    node = make_node("plato-a", "a", 10)
     letter = Letter(string=None, position=0, letter_category=node)
     assert letter.left_string_pos == 0
     assert letter.right_string_pos == 0
@@ -34,7 +35,7 @@ def test_letter_creation():
 
 
 def test_initial_unhappiness():
-    node = SlipnetNode("plato-a", "a", 10)
+    node = make_node("plato-a", "a", 10)
     letter = Letter(string=None, position=0, letter_category=node)
     assert letter.intra_string_unhappiness == 0.0  # workspace-objects.ss:71
 
@@ -269,7 +270,7 @@ def test_update_importance_sums_relevant_descriptor_activation():
 def test_update_importance_caps_at_max_raw():
     obj = WorkspaceObject(string=None, left_pos=0, right_pos=0)
     obj.descriptions = [_FakeDesc(descriptor_activation=500.0)]
-    obj.update_importance(max_raw=300.0)
+    obj.update_importance()
     assert obj.raw_importance == 300.0
 
 
@@ -277,7 +278,7 @@ def test_update_importance_scaled_down_when_enclosed():
     obj = WorkspaceObject(string=None, left_pos=0, right_pos=0)
     obj.enclosing_group = WorkspaceObject(string=None, left_pos=0, right_pos=1)
     obj.descriptions = [_FakeDesc(descriptor_activation=100.0)]
-    obj.update_importance(max_raw=300.0, enclosed_factor=0.5)
+    obj.update_importance(enclosed_factor=0.5)
     assert obj.raw_importance == 50.0
 
 

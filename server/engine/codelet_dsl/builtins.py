@@ -776,7 +776,7 @@ def propose_description(
     activate_from_workspace(ctx, descriptor)
     desc = Description(obj, description_type, descriptor)
     desc.time_stamp = ctx.codelet_count
-    urgency = round(description_type.activation) if hasattr(description_type, 'activation') else 35
+    urgency = round(description_type.activation)
     post_codelet(ctx, ctx.slipnet.roles.evaluator_description, urgency, structure=desc)
     return desc
 
@@ -1344,7 +1344,7 @@ def _consolidate_group(ctx: EngineContext, group: Group) -> Group | None:
 
 
 from server.engine.concept_mappings import slippage_english_name
-from server.engine.formulas import bond_degree_of_assoc, group_evaluation_probability, length_description_probability
+from server.engine.formulas import bond_degree_of_assoc, group_evaluation_probability, length_description_probability, share_of_ceiling
 from server.engine.groups import Group as GroupClass, attach_length_description
 from server.engine.rules import _generate_image_letters, _get_reference_objects_for_clause, _remq_duplicates, apply_rule as apply_rule_to_string, get_rule_supporting_groups, rule_signature
 from server.engine.trace import AnswerEvent, CONCEPT_MAPPING_BUILT, make_concept_activation_monitor
@@ -2508,8 +2508,10 @@ def single_letter_group_probability(ctx: EngineContext, group: Any) -> float:
         exponent = ctx.meta.get_formula_coeff("single_letter_group_exponent_2_supporting")
     else:
         exponent = ctx.meta.get_formula_coeff("single_letter_group_exponent_3_plus_supporting")
-    length_activation = ctx.slipnet.roles.dimension_length.activation
-    base = (group._local_support(ctx.rng) / 100.0) * (length_activation / 100.0)
+    length = ctx.slipnet.roles.dimension_length
+    base = (group._local_support(ctx.rng) / 100.0) * share_of_ceiling(
+        length.activation, length.max_activation
+    )
     return temp_adjusted_probability(
         base ** exponent, ctx.temperature.value, ctx.meta
     )

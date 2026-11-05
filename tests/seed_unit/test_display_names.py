@@ -36,6 +36,7 @@ from server.engine.slipnet import (
 )
 from server.engine.snag_explanation import explain_failure, snag_object_phrase
 from server.engine.workspace import WorkspaceString
+from tests.support.standard_configuration import make_node
 
 SEED_DIR = Path(__file__).resolve().parents[2] / "seed_data"
 
@@ -218,7 +219,7 @@ def test_renaming_the_nodes_does_not_change_the_display_english():
 
 def test_a_node_with_every_display_column_null_prints_with_the_fallbacks():
     # A learned node: no ``plato-`` prefix, no plain/full/cm name, no article, no short name.
-    bare = SlipnetNode("L1-3", "", 50)
+    bare = make_node("L1-3", "", 50)
     assert bare.plain_name is None and bare.full_name is None
     assert bare.cm_short_name is None and bare.article_an is None
     assert plain_name_of(bare) == "L1-3"
@@ -230,7 +231,7 @@ def test_a_node_with_every_display_column_null_prints_with_the_fallbacks():
 
     # With a short name the chain goes plain_name -> short_name, cm_short_name -> short_name,
     # full_name -> plain_name.
-    short = SlipnetNode("odd", "Odd", 50)
+    short = make_node("odd", "Odd", 50)
     assert plain_name_of(short) == "Odd" and D.cm_short_name(short) == "Odd"
     assert D.full_slipnode_name(short) == "Odd"
     short.plain_name = "plain"

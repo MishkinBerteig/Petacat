@@ -90,7 +90,7 @@ def test_spread_activation(slipnet):
     """Activating a node should spread some activation to neighbors."""
     succ = slipnet.get_node("plato-successor")
     succ.activation = 100.0
-    slipnet.spread_activation(15)
+    slipnet.spread_activation(15, threshold=100)
     # Bond-category should get some activation (succ has category link to it)
     bc = slipnet.get_node("plato-bond-category")
     assert bc.activation > 0

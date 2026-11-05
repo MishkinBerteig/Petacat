@@ -58,7 +58,7 @@ class NumpySlipnetSession(SlipnetSession):
     __slots__ = (
         "topology", "n", "activation", "buffer", "frozen", "clamp_remaining",
         "decay_percent", "src", "dst", "weight", "_scaled_weight", "_scaled_for",
-        "_max_activation", "_full_activation_threshold",
+        "_max_activation", "_full_activation_threshold", "_probabilistic_exponent",
     )
 
     def __init__(self, topology: SlipnetTopology) -> None:
@@ -66,6 +66,7 @@ class NumpySlipnetSession(SlipnetSession):
         # The run's activation constants, read once off the topology.  The hot
         # loops below see a slot load rather than a two-hop attribute chain.
         self._max_activation = topology.activation.max_activation
+        self._probabilistic_exponent = topology.activation.probabilistic_exponent
         self._full_activation_threshold = topology.activation.full_activation_threshold
         n = topology.n_nodes
         self.n = n
@@ -139,7 +140,9 @@ class NumpySlipnetSession(SlipnetSession):
 
     def jump_candidates(self) -> tuple[list[int], list[float]]:
         act = self.activation
-        p = (act / self._max_activation) ** 3
+        share = act / self._max_activation
+        with np.errstate(divide="ignore", over="ignore", invalid="ignore"):
+            p = np.where(share > 0.0, share**self._probabilistic_exponent, 0.0)
         # ``partially-active?`` (slipnet.ss:402-404): [50, 100).
         partial = (act >= self._full_activation_threshold) & (
             act < self._max_activation
@@ -293,10 +296,21 @@ class NumpyBackend(Backend):
             ),
         )
 
-        s_intra = np.where(clamped, 100.0, np.rint((4.0 * intra + rel) / 5.0))
+        # The salience averages, with the weights of ``SalienceWeights``: the numerator is
+        # exactly representable, so x.5 results stay exactly x.5 and ``np.rint`` rounds them
+        # half-to-even as Python's ``round`` does.
+        w = batch.weights
+        s_intra = np.where(
+            clamped, 100.0,
+            np.rint((w.intra_unhappiness * intra + w.intra_importance * rel) / w.intra_total),
+        )
 
-        h_formula = np.rint((h + 4.0 * rel) / 5.0)
-        v_formula = np.rint((v + 4.0 * rel) / 5.0)
+        h_formula = np.rint(
+            (w.inter_unhappiness * h + w.inter_importance * rel) / w.inter_total
+        )
+        v_formula = np.rint(
+            (w.inter_unhappiness * v + w.inter_importance * rel) / w.inter_total
+        )
         writes_h = is_initial | is_modified | is_answer | target_justifying
         writes_v = is_initial | is_target
         s_h = np.where(clamped, 100.0, np.where(writes_h, h_formula, prev_h))

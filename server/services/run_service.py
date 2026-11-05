@@ -911,7 +911,7 @@ class RunService:
             else None,
             justify_mode=runner.ctx.justify_mode,
             spreading_threshold=int(
-                getattr(runner.ctx, "spreading_activation_threshold", 100)
+                runner.ctx.spreading_activation_threshold
             ),
         )
 
@@ -1008,7 +1008,7 @@ class RunService:
             answer=params.answer,
             justify_mode=params.justify_mode,
             spreading_threshold=int(
-                getattr(runner.ctx, "spreading_activation_threshold", 100)
+                runner.ctx.spreading_activation_threshold
             ),
             mode=self._modes.get(run_id, MODE_NORMAL),
             workers=self._workers.get(run_id),
@@ -1779,8 +1779,9 @@ class RunService:
         # ``display`` clears the type and imposes the pattern; ``impose-theme-pattern``
         # creates each named theme (``trace.ss:1519-1528``).
         themespace.delete_theme_type(theme_type)
+        full = float(themespace.meta.get_param("max_theme_activation"))
         for dimension, relation in pairs:
-            themespace.set_theme_activation(theme_type, dimension, relation, 100.0)
+            themespace.set_theme_activation(theme_type, dimension, relation, full)
 
     def restore_themespace(self, run_id: int) -> dict:
         """Stop displaying a past episode and put the live Themespace back."""
@@ -1821,6 +1822,7 @@ class RunService:
                 continue
             overrides.setdefault(theme_type, {})[dimension] = t
 
+        full = float(ctx.meta.get_param("max_theme_activation"))
         patterns = []
         for theme_type, chosen in overrides.items():
             entries = []
@@ -1829,7 +1831,7 @@ class RunService:
                     continue
                 if cluster.dimension in chosen:
                     t = chosen[cluster.dimension]
-                    activation = float(t.get("activation", 100.0))
+                    activation = float(t.get("activation", full))
                     if activation != 0.0:
                         entries.append({
                             "dimension": cluster.dimension,
@@ -1866,6 +1868,7 @@ class RunService:
         ctx = runner.ctx
         valid_types = {c.theme_type for c in ctx.themespace.clusters}
         built = []
+        full = float(ctx.meta.get_param("max_theme_activation"))
         for pattern in patterns:
             theme_type = pattern.get("type", "")
             if theme_type not in valid_types:
@@ -1876,10 +1879,10 @@ class RunService:
                 {
                     "dimension": t.get("dimension"),
                     "relation": t.get("relation"),
-                    "activation": float(t.get("activation", 100.0)),
+                    "activation": float(t.get("activation", full)),
                 }
                 for t in pattern.get("themes", [])
-                if float(t.get("activation", 100.0)) != 0.0
+                if float(t.get("activation", full)) != 0.0
             ]
             built.append({"type": theme_type, "entries": entries})
         if not built:
@@ -1903,6 +1906,7 @@ class RunService:
             codelet_count=ctx.codelet_count,
             temperature=ctx.temperature.value,
             clamp_type="manual_clamp",
+            max_activation=float(ctx.meta.get_param("max_activation")),
             clamped_theme_patterns=patterns,
             clamped_concept_patterns=[],
             clamped_codelet_patterns=[],

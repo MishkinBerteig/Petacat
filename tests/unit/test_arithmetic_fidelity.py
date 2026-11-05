@@ -14,6 +14,7 @@ from server.engine.coderack import Coderack
 from server.engine.jootsing import _build_theme_overlap_table
 from server.engine.metadata import MetadataProvider
 from server.engine.slipnet import SlipnetLink, SlipnetNode
+from tests.support.standard_configuration import make_node
 
 SEED_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
 
@@ -58,8 +59,8 @@ def test_posting_rules_do_not_round_top_down_or_thematic_urgency():
 def test_spread_amount_rounds_the_exact_product():
     # slipnet.ss:181-186: round(assoc * act / 100) exact.  assoc 70, act 45 -> 31.5 -> 32.
     for activation, expected in ((45, 32), (85, 60)):
-        src = SlipnetNode("a", "a", 50)
-        dst = SlipnetNode("b", "b", 50)
+        src = make_node("a", "a", 50)
+        dst = make_node("b", "b", 50)
         link = SlipnetLink(src, dst, "lateral", fixed_link_length=30)
         src.lateral_links.append(link)
         src.activation = activation
@@ -80,7 +81,7 @@ def _ctx(length_activation=50.0):
 
     return SimpleNamespace(
         slipnet=SimpleNamespace(
-            roles=SimpleNamespace(dimension_length=SimpleNamespace(activation=length_activation))
+            roles=SimpleNamespace(dimension_length=SimpleNamespace(activation=length_activation, max_activation=100.0))
         ),
         temperature=SimpleNamespace(value=50.0),
         meta=MetadataProvider.from_standard_configuration(SEED_DIR),
@@ -133,7 +134,8 @@ def test_no_describable_bridges_builds_an_identity_rule():
     from server.engine.rules import build_rule_from_bridges
 
     rule = build_rule_from_bridges(
-        "top", [], slipnet=None, meta=MetadataProvider.from_standard_configuration(SEED_DIR)
+        "top", [], slipnet=None, rng=None, temperature=50.0,
+        meta=MetadataProvider.from_standard_configuration(SEED_DIR)
     )
     assert rule is not None and rule.is_identity_rule
     assert rule.rule_clause_templates == []
@@ -155,7 +157,7 @@ def test_probabilistic_jump_is_a_noop_on_a_frozen_node():
     # slipnet.ss:387-389: update-activation is wrapped in (if* (not frozen?) ...).
     from server.engine.rng import RNG
 
-    node = SlipnetNode("n", "n", 50)
+    node = make_node("n", "n", 50)
     node.activation = 99.0
     node.frozen = True
     node.probabilistic_jump_to_full(RNG(1))

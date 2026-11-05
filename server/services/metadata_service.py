@@ -169,7 +169,7 @@ def _field_posting_rules(tables: Mapping[str, Any]) -> list[PostingRuleSpec]:
         PostingRuleSpec(
             codelet_type=r["codelet_type"],
             direction=r["direction"],
-            urgency_when_posted=r.get("urgency_when_posted"),
+            urgency_level=r.get("urgency_level"),
             urgency_formula=r.get("urgency_formula"),
             posting_formula=r.get("posting_formula") or "",
             count_formula=r.get("count_formula") or "",

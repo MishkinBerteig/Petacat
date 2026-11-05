@@ -707,12 +707,12 @@ async def test_a_group_scout_count_costs_no_draw_before_any_bond_exists(db_sessi
 
 
 # ──────────────────────────────────────────────────────────────────
-# urgency_when_posted / urgency_formula
+# urgency_level / urgency_formula
 # ──────────────────────────────────────────────────────────────────
 
 
-async def test_changing_a_rules_posted_urgency_changes_the_run(db_session):
-    """Direction 2 for `urgency_when_posted`.
+async def test_changing_a_rules_urgency_level_changes_the_run(db_session):
+    """Direction 2 for `urgency_level` on a posting rule.
 
     Urgency is what the rack's two-stage weighted draw selects on, so raising a scout
     family from low to extremely-high changes which codelets run and in what order
@@ -723,13 +723,36 @@ async def test_changing_a_rules_posted_urgency_changes_the_run(db_session):
     await db_session.execute(
         update(PostingRule)
         .where(PostingRule.codelet_type == "bottom-up-bond-scout")
-        .values(urgency_when_posted=91)
+        .values(urgency_level="extremely_high")
     )
     await db_session.commit()
 
     changed = run_outcome(await load_metadata_from_db(db_session))
 
     assert changed != shipped
+
+
+async def test_changing_a_tier_of_the_urgency_levels_changes_the_run(db_session):
+    """Direction 2 for `urgency_levels`: a rule names its tier, so editing the tier moves it.
+
+    `low` is the tier of the bottom-up scouts, and `medium` and `extremely_low` are the tiers
+    of the progress-watcher, the jootser and the breaker.  Each one is read, and each moves
+    the run.
+    """
+    from server.models.metadata import UrgencyLevel
+
+    shipped = run_outcome(await load_metadata_from_db(db_session))
+    seen = {shipped}
+    for tier, value in (("low", 91), ("medium", 91), ("extremely_low", 91)):
+        row = await db_session.get(UrgencyLevel, tier)
+        original = row.value
+        row.value = value
+        await db_session.commit()
+        changed = run_outcome(await load_metadata_from_db(db_session))
+        row.value = original
+        await db_session.commit()
+        assert changed != shipped, f"the tier {tier!r} moved nothing"
+        seen.add(changed)
 
 
 async def test_changing_a_rules_urgency_formula_changes_the_run(db_session):

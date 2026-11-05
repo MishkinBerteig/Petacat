@@ -28,7 +28,9 @@ from server.engine.themes import (
     theme_support_tester,
 )
 from server.engine.workspace_objects import WorkspaceObject
+from tests.support.standard_configuration import standard_meta
 from tests.support.theme_fixtures import populate
+from tests.support.standard_configuration import make_node
 
 
 # --- test doubles ----------------------------------------------------------
@@ -177,6 +179,8 @@ def _themespace(clusters: list[ThemeCluster], active: list[str]):
     """The slice of ``Themespace`` the scout's choosers actually consult."""
 
     class _TS:
+        meta = standard_meta()
+
         def get_active_bridge_theme_types(self) -> list[str]:
             return list(active)
 
@@ -525,9 +529,9 @@ def test_related_node_can_be_asked_for_by_relation_name():
     its original category and direction — which made the whole of themes.ss:996-1010
     a no-op.
     """
-    succgrp = SlipnetNode("plato-succgrp", "succgrp", 50)
-    predgrp = SlipnetNode("plato-predgrp", "predgrp", 50)
-    opposite = SlipnetNode("plato-opposite", "opp", 90)
+    succgrp = make_node("plato-succgrp", "succgrp", 50)
+    predgrp = make_node("plato-predgrp", "predgrp", 50)
+    opposite = make_node("plato-opposite", "opp", 90)
     succgrp.lateral_sliplinks.append(
         SlipnetLink(succgrp, predgrp, "lateral_sliplink", opposite)
     )
@@ -543,7 +547,7 @@ def test_label_degree_of_assoc_shrinks_when_the_label_is_fully_active():
     coattail slippages markedly more likely — the Slipnet's state feeding directly
     into how far one slippage drags others.
     """
-    opposite = SlipnetNode("plato-opposite", "opp", 90)
+    opposite = make_node("plato-opposite", "opp", 90)
     opposite.intrinsic_link_length = 80
     assert opposite.degree_of_assoc() == 20.0
     opposite.activation = 100.0

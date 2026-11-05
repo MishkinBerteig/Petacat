@@ -45,7 +45,7 @@ by an environment variable so a particular run can be pinned:
     serial draw (the draw is urgency-weighted).  Default: one per worker, floor of
     two.  A sharded rack's capacity is divided across shards rather than replicated, so the
     effective count is additionally bounded by
-    ``server.parallel.coderack_shards.MIN_SHARD_CAPACITY``.
+    ``server.parallel.coderack_shards.min_shard_capacity`` (the ``min_shard_capacity`` parameter).
 
 ``PETACAT_POPULATION_WORKERS``
     Processes in a population pool.  Default: every logical core but one.  The

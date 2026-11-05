@@ -27,6 +27,12 @@ _META = _MetadataProvider.from_standard_configuration(
 T = _META.commentary_templates
 
 
+class _Themespace:
+    """The one thing a bare clamp reads off the Themespace: its configuration."""
+
+    meta = _META
+
+
 def _trace() -> tuple[TemporalTrace, CommentaryLog]:
     trace = TemporalTrace()
     log = CommentaryLog()
@@ -38,7 +44,7 @@ def _trace() -> tuple[TemporalTrace, CommentaryLog]:
 def _clamp(trace: TemporalTrace, clamp_type: str, focus: str = "rule") -> ClampEvent:
     event = ClampEvent(100, 50.0, clamp_type=clamp_type, progress_focus=focus)
     trace.add_clamp_event(event)
-    event.activate(trace, None, None, None, None)
+    event.activate(trace, _Themespace(), None, None, None)
     return event
 
 
@@ -108,7 +114,7 @@ def test_a_bare_trace_is_silent():
     trace = TemporalTrace()
     event = ClampEvent(100, 50.0, clamp_type="rule_codelet_clamp")
     trace.add_clamp_event(event)
-    event.activate(trace, None, None, None, None)
+    event.activate(trace, _Themespace(), None, None, None)
     trace.undo_last_clamp(None, None, 200)
 
 

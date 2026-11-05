@@ -522,3 +522,79 @@ def test_add_node_roles_params_and_layout(cfg):
     assert refused(cfg, {"op": "add_node", "name": "x1", "fields": {**NEW, "name": "other"}}).kind == "malformed"
     assert refused(cfg, {"op": "add_node", "name": "x1", "fields": NEW, "params": {"nope": 1}}).kind == "unknown_reference"
     assert refused(cfg, {"op": "add_node", "name": "x1", "fields": NEW, "links": [{"to": "nope", "type": "lateral"}]}).kind == "unknown_reference"
+
+
+# --- a posting rule names a tier of the urgency levels (stage W) -----------------------------------
+
+
+def _rules_naming(doc, tier):
+    return sorted(r["rule_key"] for r in doc.tables["posting_rules"].values() if r.get("urgency_level") == tier)
+
+
+def _outcome(meta):
+    from server.engine.runner import EngineRunner
+
+    runner = EngineRunner(meta)
+    runner.init_mcat("abc", "abd", "xyz", None, seed=1)
+    runner.run_mcat(max_steps=600)
+    return runner.status, runner.ctx.codelet_count, runner.ctx.rng.call_count
+
+
+@pytest.mark.numeric_matrix
+def test_renaming_a_tier_rewrites_the_rules_that_name_it_and_the_run_matches(cfg):
+    from server.engine.start_check import check_run_start
+
+    assert _rules_naming(cfg, "medium") == ["jootser", "progress-watcher"]
+    ops, report = run(cfg, upd("urgency_levels", {"name": "medium"}, name="middling"))
+    doc = cd.apply_resolved(cfg, ops)
+    assert _rules_naming(doc, "medium") == [] and _rules_naming(doc, "middling") == ["jootser", "progress-watcher"]
+    assert cascaded(report, "posting_rules")
+    assert not [d for d in report["dangling"] if d["table"] == "posting_rules"]
+    assert check_run_start(cd.provider(doc)) == ()
+    assert _outcome(cd.provider(doc)) == _outcome(cd.provider(cfg))
+
+
+def test_renaming_low_rewrites_its_six_rules(cfg):
+    assert len(_rules_naming(cfg, "low")) == 6
+    ops, report = run(cfg, upd("urgency_levels", {"name": "low"}, name="lo"))
+    doc = cd.apply_resolved(cfg, ops)
+    assert _rules_naming(doc, "low") == [] and len(_rules_naming(doc, "lo")) == 6
+    # the engine and a codelet body still read the tier ``low`` by name, so the run-start report says so
+    assert any(e["kind"] == "run_start" and e["name"] == "low" for e in report["effects"])
+
+
+def test_removing_a_tier_that_rules_name_is_reported_and_the_run_is_refused(cfg):
+    from server.engine.start_check import RunStartError, require_run_start
+
+    ops, report = run(cfg, {"op": "delete", "table": "urgency_levels", "key": {"name": "extremely_low"}})
+    assert [(d["table"], d["key"], d["column"]) for d in report["dangling"] if d["table"] == "posting_rules"] == [
+        ("posting_rules", {"rule_key": "breaker"}, "urgency_level")]
+    assert any(e["kind"] == "run_start" and e["name"] == "extremely_low"
+               and "posting rule 'breaker'" in e["message"] for e in report["effects"])
+    doc = cd.apply_resolved(cfg, ops)
+    # the rule is neither deleted nor quietly sent to ``low``
+    assert doc.tables["posting_rules"][("breaker",)]["urgency_level"] == "extremely_low"
+    with pytest.raises(RunStartError, match="urgency level 'extremely_low' \\(posting rule 'breaker'\\)"):
+        require_run_start(cd.provider(doc))
+
+
+@pytest.mark.numeric_matrix
+def test_removing_a_tier_no_rule_names_is_allowed_and_a_run_starts(cfg):
+    from server.engine.start_check import check_run_start
+
+    ops, report = run(cfg, {"op": "delete", "table": "urgency_levels", "key": {"name": "very_high"}},
+                      {"op": "delete", "table": "urgency_levels", "key": {"name": "high"}})
+    assert not [d for d in report["dangling"] if d["table"] == "posting_rules"]
+    # a tier only rules name is not a read of the engine: removing it and repointing its rule is allowed
+    ops2, report2 = run(cfg, upd("posting_rules", {"rule_key": "breaker"}, urgency_level="very_low"),
+                        {"op": "delete", "table": "urgency_levels", "key": {"name": "extremely_low"}})
+    doc = cd.apply_resolved(cfg, ops2)
+    assert check_run_start(cd.provider(doc)) == ()
+    assert _outcome(cd.provider(doc))[0] in {"answer_found", "gave_up", "halted", "running"}
+
+
+def test_a_rule_naming_an_unknown_tier_is_refused_by_the_reference_check(cfg):
+    err = refused(cfg, upd("posting_rules", {"rule_key": "breaker"}, urgency_level="no-such-tier"))
+    assert err.kind == "unknown_reference"
+    err = refused(cfg, ins("posting_rules", rule_key="new-rule", codelet_type="rule-scout", direction="bottom_up", urgency_level="no-such-tier"))
+    assert err.kind == "unknown_reference"

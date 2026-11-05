@@ -38,13 +38,15 @@ from server.engine.metadata import MetadataProvider
 from server.engine.numeric import available_backends, get_backend
 from server.engine.numeric.layout import (
     ObjectValueBatch,
+    SalienceWeights,
     SlipnetState,
     SlipnetTopology,
     ThemeLayout,
     ThemeParams,
     ThemeState,
 )
-from server.engine.numeric.synthetic import synthetic_state, synthetic_topology
+from server.engine.numeric.synthetic import synthetic_state
+from tests.support.standard_configuration import standard_activation, synthetic
 from server.engine.slipnet import Slipnet
 from server.engine.themes import Themespace
 from tests.support.theme_fixtures import populate
@@ -298,6 +300,7 @@ def test_every_backend_rounds_spreading_halfway_cases_to_even(backend_name: str)
         in_source=(0, 1),
         in_weight=(70.0, 70.0),
         in_dest=(2, 3),
+        activation=standard_activation(),
     )
     session = get_backend(backend_name).open_slipnet(topology)
     session.load(
@@ -366,7 +369,7 @@ def test_an_integral_slipnet_stays_integral_on_synthetic_sizes(
     exactly.  A fractional activation anywhere means something on the path
     stopped rounding.
     """
-    observed = _drive_integral(backend_name, synthetic_topology(n_nodes, seed=n_nodes), 0.0, 5)
+    observed = _drive_integral(backend_name, synthetic(n_nodes, seed=n_nodes), 0.0, 5)
     assert all(a == int(a) for a in observed), (
         f"{backend_name} left a fractional activation at {n_nodes} nodes"
     )
@@ -396,7 +399,7 @@ def test_backends_agree_unit_for_unit_when_only_full_nodes_spread(
     reference, which spreads from fully-active nodes alone.  The companion test
     above therefore asserts integrality at threshold 0 rather than agreement.
     """
-    topology = synthetic_topology(n_nodes, seed=n_nodes)
+    topology = synthetic(n_nodes, seed=n_nodes)
     assert _drive_integral(backend_name, topology, 100.0, 5) == _drive_integral(
         "python", topology, 100.0, 5
     )
@@ -406,7 +409,7 @@ def test_backends_agree_unit_for_unit_when_only_full_nodes_spread(
 @pytest.mark.parametrize("n_nodes", [1, 200, 5000])
 def test_backends_agree_on_synthetic_slipnets(backend_name: str, n_nodes: int) -> None:
     """Sizes the real Slipnet cannot reach, including the degenerate single node."""
-    topology = synthetic_topology(n_nodes, seed=n_nodes)
+    topology = synthetic(n_nodes, seed=n_nodes)
     state = synthetic_state(topology, seed=n_nodes + 1)
     reference = _drive("python", topology, state, cycles=5)
     observed = _drive(backend_name, topology, state, cycles=5)
@@ -508,6 +511,8 @@ def test_object_value_combination_agrees_exactly(backend_name: str) -> None:
     rng = random.Random(11)
     n = 40
     inputs = dict(
+        weights=SalienceWeights.from_metadata(MetadataProvider.from_standard_configuration(
+            os.path.join(os.path.dirname(__file__), "..", "..", "seed_data"))),
         relative_importance=[rng.randrange(0, 101) for _ in range(n)],
         intra_unhappiness=[rng.uniform(0, 100) for _ in range(n)],
         horizontal_unhappiness=[rng.uniform(0, 100) for _ in range(n)],
@@ -520,7 +525,7 @@ def test_object_value_combination_agrees_exactly(backend_name: str) -> None:
     )
 
     def run(name: str) -> tuple:
-        batch = ObjectValueBatch(**{k: list(v) for k, v in inputs.items()})
+        batch = ObjectValueBatch(**{k: (v if k == 'weights' else list(v)) for k, v in inputs.items()})
         get_backend(name).combine_object_values(batch)
         return (
             batch.average_unhappiness,
@@ -645,7 +650,7 @@ def test_topology_indptr_is_consistent_with_the_edge_arrays(
 
 def test_synthetic_topology_matches_the_real_density() -> None:
     """The scaling curve is only meaningful if the synthetic graph resembles the real one."""
-    topology = synthetic_topology(10_000, seed=1)
+    topology = synthetic(10_000, seed=1)
     assert topology.n_nodes == 10_000
     assert abs(topology.n_edges / 10_000 - 202 / 59) < 0.01
     in_degrees = [
@@ -684,7 +689,7 @@ def test_the_metal_kernel_and_the_composed_mlx_graph_agree() -> None:
     """
     from server.engine.numeric.mlx_backend import MlxBackend
 
-    topology = synthetic_topology(3000, seed=3)
+    topology = synthetic(3000, seed=3)
     state = synthetic_state(topology, seed=4)
 
     def drive(backend) -> list[float]:
@@ -712,7 +717,7 @@ def test_every_lane_count_computes_the_same_answer(lanes: int) -> None:
     from server.engine.numeric import metal_kernels
     from server.engine.numeric.mlx_backend import MlxBackend
 
-    topology = synthetic_topology(4000, seed=8)
+    topology = synthetic(4000, seed=8)
     state = synthetic_state(topology, seed=9)
     reference = _drive("python", topology, state, cycles=4)
 
@@ -948,3 +953,120 @@ def _reference_run() -> dict:
         "rng_calls": runner.ctx.rng.call_count,
     }
 
+
+
+# --- The numbers the backends read from the configuration -------------------------------------
+
+
+@pytest.mark.parametrize("backend_name", ALL_ALTERNATIVES + ["python"])
+def test_changing_the_salience_weights_changes_the_salience_on_every_backend(backend_name: str) -> None:
+    """The four ``*_string_salience_*_weight`` coefficients are the only copy of (4u+i)/5 and (u+4i)/5."""
+    import dataclasses
+    import random
+
+    base = MetadataProvider.from_standard_configuration(
+        os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
+    )
+    rng = random.Random(5)
+    n = 200
+    rel = [rng.randrange(0, 101) for _ in range(n)]
+    unhappiness = [float(rng.randrange(0, 101)) for _ in range(n)]
+
+    def run(weights: tuple[float, float, float, float]):
+        meta = dataclasses.replace(base, formula_coefficients={
+            **base.formula_coefficients,
+            "intra_string_salience_unhappiness_weight": weights[0],
+            "intra_string_salience_importance_weight": weights[1],
+            "inter_string_salience_unhappiness_weight": weights[2],
+            "inter_string_salience_importance_weight": weights[3],
+        })
+        batch = ObjectValueBatch(
+            relative_importance=list(rel), intra_unhappiness=list(unhappiness),
+            horizontal_unhappiness=list(unhappiness), vertical_unhappiness=list(unhappiness),
+            salience_clamped=[False] * n, string_type=[0] * n, justify_mode=[False] * n,
+            prev_horizontal_salience=[0.0] * n, prev_vertical_salience=[0.0] * n,
+            weights=SalienceWeights.from_metadata(meta),
+        )
+        get_backend(backend_name).combine_object_values(batch)
+        return batch
+
+    shipped = run((80.0, 20.0, 20.0, 80.0))
+    assert shipped.intra_salience == [round((4 * u + r) / 5) for u, r in zip(unhappiness, rel)]
+    assert shipped.horizontal_salience == [round((u + 4 * r) / 5) for u, r in zip(unhappiness, rel)]
+    swapped = run((20.0, 80.0, 80.0, 20.0))
+    assert swapped.intra_salience == [round((u + 4 * r) / 5) for u, r in zip(unhappiness, rel)]
+    assert swapped.horizontal_salience == [round((4 * u + r) / 5) for u, r in zip(unhappiness, rel)]
+    assert swapped.intra_salience != shipped.intra_salience
+    # Weights that sum to 0 have no average: the salience is then the unhappiness alone.
+    flat = run((0.0, 0.0, 0.0, 0.0))
+    assert flat.intra_salience == [round(u) for u in unhappiness]
+    assert flat.horizontal_salience == [round(u) for u in unhappiness]
+
+
+@pytest.mark.parametrize("backend_name", ALL_ALTERNATIVES + ["python"])
+def test_changing_the_probabilistic_exponent_changes_the_jump_probabilities(backend_name: str) -> None:
+    """``probabilistic_activation_exponent`` is the power every backend raises ``a / max`` to."""
+    import dataclasses
+
+    acts = [float(a) for a in range(40, 100)]
+    n = len(acts)
+
+    def probabilities(exponent: float, ceiling: float = 100.0) -> dict[int, float]:
+        topology = SlipnetTopology(
+            node_names=tuple(f"n{i}" for i in range(n)), decay_percent=(0.0,) * n,
+            conceptual_depth=(50.0,) * n, in_indptr=(0,) * (n + 1), in_source=(), in_weight=(),
+            in_dest=(),
+            activation=dataclasses.replace(
+                standard_activation(), max_activation=ceiling, probabilistic_exponent=exponent
+            ),
+        )
+        session = get_backend(backend_name).open_slipnet(topology)
+        session.load(SlipnetState(activation=list(acts), buffer=[0.0] * n, frozen=[False] * n,
+                                  clamp_remaining=[0] * n))
+        indices, probs = session.jump_candidates()
+        return dict(zip(indices, probs))
+
+    cubed = probabilities(3.0)
+    squared = probabilities(2.0)
+    assert cubed and set(cubed) == set(squared)
+    for i, p in cubed.items():
+        assert p == pytest.approx((acts[i] / 100.0) ** 3, abs=1e-12)
+        assert squared[i] == pytest.approx((acts[i] / 100.0) ** 2, abs=1e-12)
+    # and the ratio follows the ceiling: at 200 the window is [50, 200) and a node at 99 is at (99/200)**3
+    doubled = probabilities(3.0, ceiling=200.0)
+    assert {acts[i] for i in doubled} == {a for a in acts if a >= 50.0}
+    for i, p in doubled.items():
+        assert p == pytest.approx((acts[i] / 200.0) ** 3, abs=1e-12)
+
+
+@pytest.mark.parametrize("exponent", [-2000.0, -1.0, 0.0, 0.5, 3.0])
+def test_every_backend_defines_the_jump_probability_at_a_zero_share_and_at_overflow(exponent: float) -> None:
+    """``probabilistic_activation_exponent`` may be taken to 0 or below.  With
+    ``full_activation_threshold`` 0 a node holding 0 is partially active, and ``0.0 ** -1.0``
+    raises in Python while NumPy gives ``inf``; ``0.5 ** -2000`` overflows in Python only.  The
+    candidates and their probabilities must be the same list on every backend, and none may raise."""
+    import dataclasses
+
+    acts = [0.0, 0.5, 1.0, 10.0, 50.0, 99.0, 100.0]
+    n = len(acts)
+
+    def candidates(backend_name: str):
+        topology = SlipnetTopology(
+            node_names=tuple(f"n{i}" for i in range(n)), decay_percent=(0.0,) * n,
+            conceptual_depth=(50.0,) * n, in_indptr=(0,) * (n + 1), in_source=(), in_weight=(),
+            in_dest=(),
+            activation=dataclasses.replace(
+                standard_activation(), full_activation_threshold=0.0, probabilistic_exponent=exponent
+            ),
+        )
+        session = get_backend(backend_name).open_slipnet(topology)
+        session.load(SlipnetState(activation=list(acts), buffer=[0.0] * n, frozen=[False] * n,
+                                  clamp_remaining=[0] * n))
+        return session.jump_candidates()
+
+    reference = candidates("python")
+    assert 0 not in reference[0], "a node holding nothing never jumps"
+    for backend_name in ALL_ALTERNATIVES:
+        indices, probs = candidates(backend_name)
+        assert indices == reference[0]
+        assert probs == pytest.approx(reference[1], rel=1e-5)

@@ -26,6 +26,7 @@ from server.engine.start_check import (
 )
 from tests.support import reduced_configurations as rc
 from tests.support.role_table import CODELET_ROLES, ORDERED_ROLES, SINGLE_ROLES, role_attr
+from tests.support.standard_configuration import bare_slipnet
 
 SEED_DIR = Path(__file__).resolve().parents[2] / "seed_data"
 
@@ -115,7 +116,7 @@ def test_roles_never_hold_none() -> None:
     with pytest.raises(AttributeError):
         empty.dimension_length = 1  # type: ignore[misc]
     # A bare Slipnet has every role absent.
-    assert Slipnet().roles.get("dimension.length") is R.absent("dimension.length")
+    assert bare_slipnet().roles.get("dimension.length") is R.absent("dimension.length")
 
 
 def test_every_role_of_the_standard_configuration_is_bound(slipnet) -> None:

@@ -97,7 +97,7 @@ class CodeletSpec:
 class PostingRuleSpec:
     codelet_type: str
     direction: str  # bottom_up, top_down, thematic
-    urgency_when_posted: int | None
+    urgency_level: str | None  # a name in urgency_levels
     urgency_formula: str | None
     posting_formula: str
     count_formula: str
@@ -296,7 +296,7 @@ class MetadataProvider:
             PostingRuleSpec(
                 codelet_type=pr["codelet_type"],
                 direction=pr["direction"],
-                urgency_when_posted=pr.get("urgency_when_posted"),
+                urgency_level=pr.get("urgency_level"),
                 urgency_formula=pr.get("urgency_formula"),
                 posting_formula=pr.get("posting_formula", ""),
                 count_formula=pr.get("count_formula", ""),

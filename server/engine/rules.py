@@ -2342,9 +2342,9 @@ def sort_templates(templates: list[tuple]) -> list[tuple]:
 
 def reference_object_to_object_description(
     ref_object: Any,
-    slipnet: Slipnet | None = None,
-    rng: RNG | None = None,
-    temperature: float = 50.0,
+    slipnet: Slipnet | None,
+    rng: RNG | None,
+    temperature: float,
     meta: MetadataProvider | None = None,
 ) -> tuple:
     """Convert a reference object into a rule object-description.
@@ -2438,8 +2438,8 @@ def descriptions_for_rule(obj: Any) -> list[Any]:
 
 def _choose_description_for_rule(
     obj: Any,
-    rng: RNG | None = None,
-    temperature: float = 50.0,
+    rng: RNG | None,
+    temperature: float,
     meta: MetadataProvider | None = None,
 ) -> Any:
     """Pick one of the descriptions a rule may name *obj* by.
@@ -2461,7 +2461,7 @@ def _choose_description_for_rule(
     if len(candidates) == 1 or rng is None:
         return candidates[0]
 
-    weights = [float(getattr(d.descriptor, "conceptual_depth", 50)) for d in candidates]
+    weights = [float(d.descriptor.conceptual_depth) for d in candidates]
     if meta is not None:
         weights = temp_adjusted_values(weights, temperature, meta)
     if not any(w > 0 for w in weights):
@@ -2495,9 +2495,9 @@ def _chez_map(fn: Any, items: list) -> list:
 
 def instantiate_rule_clause_template(
     template: tuple,
-    slipnet: Slipnet | None = None,
-    rng: RNG | None = None,
-    temperature: float = 50.0,
+    slipnet: Slipnet | None,
+    rng: RNG | None,
+    temperature: float,
     meta: MetadataProvider | None = None,
 ) -> RuleClause:
     """Instantiate a rule-clause-template into a RuleClause.
@@ -2575,7 +2575,7 @@ def _instantiate_change_template(
         chosen = possible_descriptors[0]
     else:
         weights = [
-            float(getattr(d, "conceptual_depth", 50)) for d in possible_descriptors
+            float(d.conceptual_depth) for d in possible_descriptors
         ]
         if meta is not None:
             weights = temp_adjusted_values(weights, temperature, meta)
@@ -3854,8 +3854,8 @@ def build_rule_from_bridges(
     rule_type: str,
     bridges: list[Bridge],
     slipnet: Slipnet,
-    rng: RNG | None = None,
-    temperature: float = 50.0,
+    rng: RNG | None,
+    temperature: float,
     themespace: Any = None,
     meta: MetadataProvider | None = None,
     workspace: Workspace | None = None,

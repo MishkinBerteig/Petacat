@@ -10,6 +10,7 @@ from server.engine.concept_mappings import ConceptMapping
 from server.engine.slipnet import SlipnetNode
 
 from tests.unit._fakes import FakeLink, FakeNode, FakeObject, FakeString
+from tests.support.standard_configuration import make_node
 
 
 def _identity(descriptor=None, description_type=None):
@@ -150,8 +151,8 @@ def _cm_with_types_at(activation: float) -> ConceptMapping:
     (concept-mappings.ss:107-109) asks ``fully-active?``, which is exact equality
     with %max-activation% (slipnet.ss:392-394), not the >= 50 threshold.
     """
-    dt1 = SlipnetNode("plato-letter-category", "lettctgy", 20)
-    dt2 = SlipnetNode("plato-letter-category", "lettctgy", 20)
+    dt1 = make_node("plato-letter-category", "lettctgy", 20)
+    dt2 = make_node("plato-letter-category", "lettctgy", 20)
     dt1.activation = activation
     dt2.activation = activation
     return ConceptMapping(dt1, FakeNode("plato-a"), dt2, FakeNode("plato-a"))

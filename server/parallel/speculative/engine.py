@@ -599,7 +599,7 @@ class SpeculativeEngine:
         self._eligible = False
         self._t_update = 0.0
         self._t_codelets = 0.0
-        self.ucl = 15
+        self.ucl = runner.meta.get_param("update_cycle_length")
         self._skip = 0
 
     # -- namespace template ------------------------------------------------

@@ -282,6 +282,7 @@ class ClampEvent(TraceEvent):
         structures: list[Any] | None = None,
         description: str = "",
         slipnet: Any = None,
+        max_activation: float | None = None,
     ) -> None:
         super().__init__(
             event_type=CLAMP_START,
@@ -302,8 +303,11 @@ class ClampEvent(TraceEvent):
         # pass ``slipnet`` and the pin is there from the start; without it the pin is added
         # when the event is activated (``activate`` derives again with its Slipnet).
         opposite = slipnet.relation("opposite") if slipnet is not None else None
+        # The concept pins are at ``%max-activation%``: the Slipnet's, or *max_activation* (the
+        # configuration's) from a caller that has no Slipnet yet.
+        ceiling = slipnet.activation_params.max_activation if slipnet is not None else max_activation
         self.clamped_concept_patterns = list(clamped_concept_patterns or []) + [
-            _associated_concept_pattern(p, opposite) for p in self.clamped_theme_patterns
+            _associated_concept_pattern(p, opposite, ceiling) for p in self.clamped_theme_patterns
         ]
         self.clamped_codelet_patterns = clamped_codelet_patterns or []
         self.rules = rules or []
@@ -400,7 +404,10 @@ class ClampEvent(TraceEvent):
         # does, which also left clamp progress and the event counts short.
         if monitor is None:
             monitor = make_concept_activation_monitor(
-                trace, self.codelet_count, self.temperature, 85
+                trace,
+                self.codelet_count,
+                self.temperature,
+                themespace.meta.get_param("concept_activation_importance_threshold"),
             )
 
         # Clamp theme patterns
@@ -706,7 +713,9 @@ def clamp_theme_pattern(pattern: Any, themespace: Themespace) -> None:
             for entry in entries:
                 dim = entry.get("dimension")
                 rel = entry.get("relation")
-                act = entry.get("activation", 100.0)
+                act = entry.get("activation")
+                if act is None:
+                    act = float(themespace.meta.get_param("max_theme_activation"))
                 if dim is not None:
                     _set_theme_activation(themespace, theme_type, dim, rel, act)
 
@@ -724,10 +733,11 @@ def clamp_theme_pattern(pattern: Any, themespace: Themespace) -> None:
             # happens to name no entries clamps nothing, and reading its emptiness as
             # "this is the other spelling" made the literal key ``"entries"`` a
             # dimension name.
+            full = float(themespace.meta.get_param("max_theme_activation"))
             for dim, rel in pattern.items():
                 if dim == "type":
                     continue
-                _set_theme_activation(themespace, theme_type, dim, rel, 100.0)
+                _set_theme_activation(themespace, theme_type, dim, rel, full)
 
             for cluster in themespace.clusters:
                 if cluster.theme_type == theme_type:
@@ -773,8 +783,11 @@ def unclamp_theme_pattern(pattern: Any, themespace: Themespace) -> None:
         themespace.unclamp_all()
 
 
-def _concept_pattern_entries(pattern: Any) -> list[tuple[str, float]]:
+def _concept_pattern_entries(pattern: Any) -> list[tuple[str, float | None]]:
     """``(node_name, activation)`` pairs out of either concept-pattern spelling.
+
+    An entry that names no activation gives ``None``, which ``SlipnetNode.clamp`` reads as
+    the node's own ceiling (``max_activation``).
 
     Which spelling a pattern is in is decided by whether ``"entries"`` is *present*,
     not by whether it is non-empty.  An empty list is a perfectly good pattern — it is
@@ -791,7 +804,8 @@ def _concept_pattern_entries(pattern: Any) -> list[tuple[str, float]]:
         for entry in pattern["entries"]:
             node_name = entry.get("node")
             if node_name:
-                out.append((node_name, float(entry.get("activation", 100.0))))
+                activation = entry.get("activation")
+                out.append((node_name, None if activation is None else float(activation)))
         return out
     # Simple dict: node_name -> activation
     return [
@@ -844,7 +858,7 @@ def unclamp_concept_pattern(pattern: Any, slipnet: Slipnet) -> None:
             node.unclamp()
 
 
-def theme_pattern_entries(pattern: Any) -> list[tuple[str, str | None, float]]:
+def theme_pattern_entries(pattern: Any) -> list[tuple[str, str | None, float | None]]:
     """``(dimension, relation, activation)`` triples out of either pattern spelling.
 
     Petacat carries theme patterns in two shapes — the structured dict
@@ -852,30 +866,32 @@ def theme_pattern_entries(pattern: Any) -> list[tuple[str, str | None, float]]:
     Scheme-shaped list ``[t, (dimension, relation), ...]`` returned by
     ``get_dominant_theme_pattern``.  Everything that has to *read* a pattern rather
     than clamp it goes through here, so a new reader cannot silently understand only
-    one of them.  The default activation is ``%max-theme-activation%``, matching
-    ``trace.ss:1509`` (a two-element entry means "at full activation").
+    one of them.  An entry that names no activation gives ``None``, matching ``trace.ss:1509``
+    (a two-element entry means "at full activation", ``%max-theme-activation%``); the
+    reader that needs the number reads it from the configuration.
     """
     if not pattern:
         return []
     if isinstance(pattern, dict):
-        out: list[tuple[str, str | None, float]] = []
+        out: list[tuple[str, str | None, float | None]] = []
         for entry in pattern.get("entries", []):
             if isinstance(entry, dict):
                 dim = entry.get("dimension")
                 if dim is None:
                     continue
+                activation = entry.get("activation")
                 out.append(
-                    (dim, entry.get("relation"), float(entry.get("activation", 100.0)))
+                    (dim, entry.get("relation"), None if activation is None else float(activation))
                 )
             elif len(entry) >= 2:
-                act = float(entry[2]) if len(entry) > 2 else 100.0
+                act = float(entry[2]) if len(entry) > 2 else None
                 out.append((entry[0], entry[1], act))
         return out
     if isinstance(pattern, (list, tuple)):
         out = []
         for entry in pattern[1:]:
             if isinstance(entry, (list, tuple)) and len(entry) >= 2:
-                act = float(entry[2]) if len(entry) > 2 else 100.0
+                act = float(entry[2]) if len(entry) > 2 else None
                 out.append((entry[0], entry[1], act))
         return out
     return []
@@ -886,7 +902,7 @@ def get_associated_concept_pattern(theme_pattern: Any, slipnet: Any) -> dict[str
 
     Scheme: ``get-associated-concept-pattern`` (``trace.ss:1503-1516``).  For every
     entry, the theme's **dimension node** is pinned at ``%max-activation%``; and when
-    the relation is ``opposite``, the opposite relation's node is pinned at 100 for a positive
+    the relation is ``opposite``, the opposite relation's node is pinned at ``%max-activation%`` for a positive
     theme and at **0** for a negative one — a negative snag-response clamp does not
     merely stop favouring "opposite", it actively suppresses the concept.
 
@@ -896,24 +912,31 @@ def get_associated_concept_pattern(theme_pattern: Any, slipnet: Any) -> dict[str
     The opposite relation's node comes from *slipnet*; with no opposite relation in the
     configuration there is no such node to pin and only the dimension nodes are.
     """
-    return _associated_concept_pattern(theme_pattern, slipnet.relation("opposite"))
+    return _associated_concept_pattern(
+        theme_pattern, slipnet.relation("opposite"), slipnet.activation_params.max_activation
+    )
 
 
-def _associated_concept_pattern(theme_pattern: Any, opposite: Any) -> dict[str, Any]:
+def _associated_concept_pattern(
+    theme_pattern: Any, opposite: Any, ceiling: float | None
+) -> dict[str, Any]:
     """:func:`get_associated_concept_pattern` given the opposite relation's node, or
-    ``None`` where there is none (a clamp event built before its Slipnet is known)."""
-    pairs: list[tuple[str, float]] = []
+    ``None`` where there is none, and the Slipnet's ``max_activation`` *ceiling*, or ``None``
+    for a clamp event built before its Slipnet is known (``activate`` derives it again)."""
+    pairs: list[tuple[str, float | None]] = []
     for dimension, relation, activation in theme_pattern_entries(theme_pattern):
-        pairs.append((dimension, 100.0))
+        pairs.append((dimension, ceiling))
         if relation == "opposite" and opposite:
-            pairs.append((opposite.name, 100.0 if activation > 0 else 0.0))
+            # An entry that names no activation is at full activation, so positive.
+            positive = activation is None or activation > 0
+            pairs.append((opposite.name, ceiling if positive else 0.0))
     # ``(remove-duplicates (flatmap ...))`` (``trace.ss:1506``): ``remove-duplicates``
     # keeps the LAST occurrence (``utilities.ss:915-929``, DISCREPANCIES5 C-2), so a
     # pair named twice sits where it is named last.  Clamping follows this order and
     # each clamp can log a concept-activation event, so the order is visible in the
     # trace: ``rst-rsu-xyz-wyz`` seed 4 logs ObjectCtgy before Opposite.
     entries: list[dict[str, Any]] = []
-    seen: set[tuple[str, float]] = set()
+    seen: set[tuple[str, float | None]] = set()
     for pair in reversed(pairs):
         if pair in seen:
             continue

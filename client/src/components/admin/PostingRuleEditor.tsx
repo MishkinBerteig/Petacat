@@ -7,7 +7,7 @@ interface PostingRule {
   id: number
   codelet_type: string
   direction: string
-  urgency_when_posted: number | null
+  urgency_level: string | null
   urgency_formula: string | null
   posting_formula: string
   count_formula: string
@@ -20,7 +20,7 @@ const COLUMNS: ColumnDef[] = [
   { key: 'id', label: 'ID', type: 'readonly', width: '5%' },
   { key: 'codelet_type', label: 'Codelet Type', type: 'text', width: '18%' },
   { key: 'direction', label: 'Direction', type: 'text', width: '10%' },
-  { key: 'urgency_when_posted', label: 'Urgency', type: 'number', width: '8%' },
+  { key: 'urgency_level', label: 'Urgency Level', type: 'text', width: '8%' },
   { key: 'urgency_formula', label: 'Urgency Formula', type: 'text', width: '13%' },
   { key: 'posting_formula', label: 'Posting Formula', type: 'text', width: '13%' },
   { key: 'count_formula', label: 'Count Formula', type: 'text', width: '11%' },
@@ -37,8 +37,8 @@ function merged(rows: PostingRule[], id: number, patch: Partial<PostingRule>) {
   return {
     codelet_type: pick('codelet_type', ''),
     direction: pick('direction', ''),
-    urgency_when_posted: patch.urgency_when_posted !== undefined
-      ? patch.urgency_when_posted : (c?.urgency_when_posted ?? null),
+    urgency_level: patch.urgency_level !== undefined
+      ? patch.urgency_level : (c?.urgency_level ?? null),
     urgency_formula: patch.urgency_formula !== undefined
       ? patch.urgency_formula : (c?.urgency_formula ?? null),
     posting_formula: pick('posting_formula', ''),

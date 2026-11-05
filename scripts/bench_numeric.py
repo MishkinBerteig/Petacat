@@ -135,18 +135,25 @@ def measure_scaling(
     repeats: int,
     say: Callable[[str], None],
 ) -> list[dict[str, Any]]:
+    from server.engine.metadata import MetadataProvider
+    from server.engine.numeric.layout import ActivationParams
     from server.engine.numeric.synthetic import (
         REAL_LINKS_PER_NODE,
         synthetic_state,
         synthetic_topology,
     )
 
+    meta = MetadataProvider.from_standard_configuration(SEED_DIR)
+
     variants = _backend_variants(backend_names)
     rows: list[dict[str, Any]] = []
 
     for n_nodes in sizes:
         say(f"  building a synthetic Slipnet of {n_nodes:,} nodes")
-        topology = synthetic_topology(n_nodes, seed=n_nodes)
+        topology = synthetic_topology(
+            n_nodes, ActivationParams.from_metadata(meta), int(meta.get_param("update_cycle_length")),
+            seed=n_nodes,
+        )
         state = synthetic_state(topology, seed=n_nodes + 1)
         row: dict[str, Any] = {
             "nodes": n_nodes,

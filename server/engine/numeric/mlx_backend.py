@@ -105,7 +105,7 @@ class MlxSlipnetSession(SlipnetSession):
         "topology", "device", "dtype", "use_kernel", "n", "lanes",
         "activation", "buffer", "frozen", "clamp_remaining",
         "decay_percent", "indptr", "source", "dest", "weight", "_zero",
-        "_max_activation", "_full_activation_threshold",
+        "_max_activation", "_full_activation_threshold", "_probabilistic_exponent",
     )
 
     def __init__(
@@ -119,6 +119,7 @@ class MlxSlipnetSession(SlipnetSession):
         # The run's activation constants, read once off the topology.  The hot
         # loops below see a slot load rather than a two-hop attribute chain.
         self._max_activation = topology.activation.max_activation
+        self._probabilistic_exponent = topology.activation.probabilistic_exponent
         self._full_activation_threshold = topology.activation.full_activation_threshold
         self.device = device
         self.dtype = dtype
@@ -262,7 +263,9 @@ class MlxSlipnetSession(SlipnetSession):
         """
         mx.eval(self.activation)
         act = np.array(self.activation, copy=False).astype(np.float64)
-        p = (act / self._max_activation) ** 3
+        share = act / self._max_activation
+        with np.errstate(divide="ignore", over="ignore", invalid="ignore"):
+            p = np.where(share > 0.0, share**self._probabilistic_exponent, 0.0)
         # ``partially-active?`` (slipnet.ss:402-404): [50, 100).
         partial = (act >= self._full_activation_threshold) & (
             act < self._max_activation
@@ -457,22 +460,27 @@ class MlxBackend(Backend):
             # and ``mx.round`` then took it to 27 where the reference gives 26.
             # Pinning the coefficients to the array's dtype is what makes this
             # backend the float64 one it claims to be.
-            # The scheme's 1/5 and 4/5 weights are applied as one division of an
+            # The salience weights (``SalienceWeights``) are applied as one division of an
             # exactly-representable numerator, so x.5 results stay exactly x.5
             # and round half-to-even as in Metacat (rationals).
-            c4 = mx.array(4.0, dtype=dt)
-            c5 = mx.array(5.0, dtype=dt)
-            s_intra = mx.where(clamped, hundred, mx.round((c4 * intra + rel) / c5))
+            w = batch.weights
+            iu = mx.array(w.intra_unhappiness, dtype=dt)
+            ii = mx.array(w.intra_importance, dtype=dt)
+            it = mx.array(w.intra_total, dtype=dt)
+            eu = mx.array(w.inter_unhappiness, dtype=dt)
+            ei = mx.array(w.inter_importance, dtype=dt)
+            et = mx.array(w.inter_total, dtype=dt)
+            s_intra = mx.where(clamped, hundred, mx.round((iu * intra + ii * rel) / it))
 
             writes_h = is_initial | is_modified | is_answer | (is_target & justify)
             writes_v = is_initial | is_target
             s_h = mx.where(
                 clamped, hundred,
-                mx.where(writes_h, mx.round((h + c4 * rel) / c5), prev_h),
+                mx.where(writes_h, mx.round((eu * h + ei * rel) / et), prev_h),
             )
             s_v = mx.where(
                 clamped, hundred,
-                mx.where(writes_v, mx.round((v + c4 * rel) / c5), prev_v),
+                mx.where(writes_v, mx.round((eu * v + ei * rel) / et), prev_v),
             )
 
             s_avg = mx.where(

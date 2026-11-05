@@ -232,19 +232,14 @@ def test_every_posting_formula_uses_only_names_the_engine_supplies():
         )
 
 
-def test_each_posted_urgency_is_one_of_the_named_urgency_levels():
-    """`urgency_when_posted` and `urgency_levels` must not drift apart.
+def test_each_posting_rule_names_a_tier_of_the_urgency_levels():
+    """A posting rule names its tier; it never holds the tier's number.
 
-    The engine used to reach these through `meta.get_urgency("low")`, `("medium")` and
-    `("extremely_low")`, while the rules stated 35, 49 and 7 — the same numbers written
-    twice, in two files, with nothing holding them together.  Now that the rules are
-    what the engine reads, editing `urgency_levels.json` would move one and not the
-    other, which is `PHASE 1 PLAN.md` §0.2(c)'s two-definitions problem arriving by the
-    back door.
-
-    Pinning every posted urgency to *some* named level is what makes that visible: it
-    does not stop an admin choosing 42, but it does stop the shipped configuration
-    quietly ceasing to mean what the named levels say.
+    The rules used to hold 35, 49 and 7 beside `urgency_levels`' `low`, `medium` and
+    `extremely_low`: the same numbers written twice, so editing a tier moved nothing the
+    rules posted at (and `medium` and `extremely_low` were read by nothing).  A rule now
+    says `urgency_level: "low"`, as the Scheme's `bottom-up-urgency` says `%low-urgency%`
+    (`coderack.ss:575-590`), and the engine resolves it through `urgency_levels`.
     """
     import os
 
@@ -253,21 +248,19 @@ def test_each_posted_urgency_is_one_of_the_named_urgency_levels():
     seed_dir = os.path.join(os.path.dirname(__file__), "..", "..", "seed_data")
     meta = MetadataProvider.from_standard_configuration(seed_dir)
 
-    named = set(meta.urgency_levels.values())
     for rule in meta.posting_rules:
-        if rule.urgency_when_posted is None:
+        if rule.urgency_level is None:
             continue
-        assert rule.urgency_when_posted in named, (
-            f"{rule.codelet_type} posts at urgency {rule.urgency_when_posted}, which is "
-            f"no named level: {sorted(meta.urgency_levels.items(), key=lambda kv: kv[1])}"
+        assert rule.urgency_level in meta.urgency_levels, (
+            f"{rule.codelet_type} posts at the tier {rule.urgency_level!r}, which is no "
+            f"urgency level: {sorted(meta.urgency_levels)}"
         )
 
-    # And the three the engine used to name, specifically.
-    by_type = {r.codelet_type: r.urgency_when_posted for r in meta.posting_rules}
-    assert by_type["bottom-up-bond-scout"] == meta.get_urgency("low")
-    assert by_type["progress-watcher"] == meta.get_urgency("medium")
-    assert by_type["jootser"] == meta.get_urgency("medium")
-    assert by_type["breaker"] == meta.get_urgency("extremely_low")
+    by_type = {r.codelet_type: r.urgency_level for r in meta.posting_rules}
+    assert by_type["bottom-up-bond-scout"] == "low"
+    assert by_type["progress-watcher"] == "medium"
+    assert by_type["jootser"] == "medium"
+    assert by_type["breaker"] == "extremely_low"
 
 
 def test_every_condition_is_a_predicate_the_engine_can_evaluate():

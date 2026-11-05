@@ -562,6 +562,7 @@ class TestTraceAndSelfWatching:
         flushed = {}
         ctx.slipnet.update_activations(
             ctx.rng,
+            ctx.spreading_activation_threshold,
             on_flushed=lambda: flushed.update(
                 {name: n.activation for name, n in ctx.slipnet.nodes.items()}
             ),

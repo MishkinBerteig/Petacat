@@ -71,14 +71,14 @@ _SPREAD_PARAMS = {
 
 def test_boost_raises_activation():
     t = Theme(THEME_TOP_BRIDGE, "direction", "identity")
-    t.boost(factor=100.0, boost_amount=7.0)  # round(0 + 1.0 * 7) = 7
+    t.boost(factor=100.0, boost_amount=7.0, max_activation=100.0)  # round(0 + 1.0 * 7) = 7
     assert t.activation == 7.0
 
 
 def test_boost_caps_activation_at_100():
     t = Theme(THEME_TOP_BRIDGE, "direction", "identity")
     t.activation = 98.0
-    t.boost(factor=100.0, boost_amount=7.0)  # 98 + 7 -> capped 100
+    t.boost(factor=100.0, boost_amount=7.0, max_activation=100.0)  # 98 + 7 -> capped 100
     assert t.activation == 100.0
 
 
@@ -89,7 +89,7 @@ def test_boost_clips_at_zero_rather_than_going_negative():
     take a theme up to +100 and can take a negative theme up to zero, and stops there.
     """
     t = Theme(THEME_TOP_BRIDGE, "direction", "identity")
-    t.boost(factor=-100.0, boost_amount=7.0)
+    t.boost(factor=-100.0, boost_amount=7.0, max_activation=100.0)
     assert t.activation == 0.0
 
 
@@ -97,7 +97,7 @@ def test_boost_moves_a_negative_theme_toward_zero():
     """One signed activation: boosting a theme at -50 gives ``clip_positive(-43)``."""
     t = Theme(THEME_TOP_BRIDGE, "direction", "identity")
     t.activation = -50.0
-    t.boost(factor=100.0, boost_amount=7.0)
+    t.boost(factor=100.0, boost_amount=7.0, max_activation=100.0)
     assert t.activation == 0.0
 
 

@@ -275,8 +275,9 @@ def check_progress(
     # the 50.0 default.
     clamp_event = ClampEvent(
         codelet_count=codelet_count,
-        temperature=float(getattr(temperature_control, "value", 50.0)),
+        temperature=float(temperature_control.value),
         clamp_type="rule_codelet_clamp",
+        max_activation=float(meta.get_param("max_activation")),
         clamped_theme_patterns=[],
         clamped_concept_patterns=[],
         clamped_codelet_patterns=[
@@ -425,7 +426,7 @@ def attempt_jootsing(
 
     # Compute jootsing probability from overlap and snag count
     jootsing_probability = (max_overlap / 100.0) * min(
-        1.0, 10 * num_snags / 100.0
+        1.0, meta.get_param("jootsing_count_scale") * num_snags / 100.0
     )
 
     if vlog is not None:
@@ -508,8 +509,9 @@ def attempt_jootsing(
     # stamped every snag-response clamp with the 50.0 default.
     clamp_event = ClampEvent(
         codelet_count=codelet_count,
-        temperature=float(getattr(temperature_control, "value", 50.0)),
+        temperature=float(temperature_control.value),
         clamp_type="snag_response_clamp",
+        max_activation=float(meta.get_param("max_activation")),
         # ``jootsing.ss:113-118`` passes both patterns to one clamp event and
         # ``make-clamp-event`` (``trace.ss:523-532``) sorts them BY TYPE.  The codelet
         # pattern belongs in the codelet slot: left among the theme patterns it was

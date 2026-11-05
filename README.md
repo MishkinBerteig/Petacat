@@ -28,7 +28,7 @@ license change was authorised by Dr. Marshall directly (see
 > end-to-end. Episodic Memory (Metacat-Mode learning) shapes the runs that inherit it: a run
 > declines an answer already held for the same problem and rules, so repeating a
 > problem across Metacat Mode's [episodic runs](#persistence-modes-and-episodic-runs)
-> (which are Metacat Mode and not Training Mode) explores a different answer each time. It ships with 5,343 test cases covering the engine, the API, and the
+> (which are Metacat Mode and not Training Mode) explores a different answer each time. It ships with 5,384 test cases covering the engine, the API, and the
 > help/config system, run on both the CPU and the GPU numeric backends. Underneath the seven components sits an execution
 > substrate — three [persistence modes](#persistence-modes-and-episodic-runs),
 > a [GPU numeric substrate](#the-numeric-substrate), and
@@ -455,8 +455,8 @@ Petacat has two test suites:
   plugin against the serial runs it claims to equal), `lockstep` (Petacat's decision
   traces against Metacat's), and `e2e` (full HTTP
   stack against a running database). All eight run in a single command against
-  the local Postgres — 5,343 cases, which includes the numeric matrix's second
-  pass over the 881 backend-sensitive tests. See
+  the local Postgres — 5,384 cases, which includes the numeric matrix's second
+  pass over the 897 backend-sensitive tests. See
   [TESTING.md](TESTING.md) for the layer breakdown, the numeric backend matrix,
   the session ceiling, the unit-test rules, determinism requirements, test-double
   conventions, how to run the suite under the free-threaded interpreter, and what
@@ -1407,7 +1407,7 @@ and a full set of sizes.
 | Size | Rule | Environment variable |
 |---|---|---|
 | Speculative workers | One per core on the fastest performance level (`hw.perflevel0`: the 6 Super cores of an M5 Max). Codelet bodies are interpreted Python and CPU-bound, and the token holder runs on whichever is free. | `PETACAT_WORKERS` |
-| Coderack shards | One per worker, floor of two, bounded further by the capacity a shard needs to hold a jootsing sequence (`MIN_SHARD_CAPACITY`). | `PETACAT_CODERACK_SHARDS` |
+| Coderack shards | One per worker, floor of two, bounded further by the capacity a shard needs to hold a jootsing sequence (`min_shard_capacity`). | `PETACAT_CODERACK_SHARDS` |
 | Swarm processes | Every logical core but one. The runs share nothing, so every tier of core adds throughput, and the reserved core leaves the parent and the OS somewhere to run. | `PETACAT_POPULATION_WORKERS` |
 | Executor numeric backend | `off` below 512 Slipnet nodes, `numpy` from there, never the GPU on its own (`server/parallel/placement.py`). | `PETACAT_SWARM_BACKEND`, `PETACAT_SPECULATIVE_BACKEND` |
 | GPU dispatch threads | GPU cores × 1,024, rounded up to a power of two. This is the target the Slipnet kernel splits rows against, so a larger GPU splits more widely in the latency-bound regime. | `PETACAT_GPU_CORES`, `PETACAT_GPU_THREADS_PER_CORE` |
@@ -1564,6 +1564,16 @@ pinned by a test. A control that changes nothing is worse than no control.
 Formula coefficients and urgency levels stay global and Admin-editable: they are the
 model's constants rather than a Run's settings. The config hash covers them, so a Run
 that executed under changed coefficients is still distinguishable in the record.
+
+**A stored number is the only copy of its value.** The engine holds no literal beside a stored
+parameter, coefficient or urgency level, so changing one changes the behaviour it names on every
+numeric backend and every engine path: the activation ceiling (`max_activation`), the theme
+ceiling (`max_theme_activation`), `concept_activation_importance_threshold`,
+`jootsing_count_scale`, `probabilistic_activation_exponent`, the four
+`*_string_salience_*_weight` coefficients and `max_raw_importance`. A posting rule's
+`urgency_level` names a tier of `urgency_levels` rather than repeating its number. A test
+(`tests/architecture/test_declared_read_list.py`) fails on any stored name that nothing reads,
+and `tests/module/test_wired_numbers.py` changes each wired number and sees the run move.
 
 **Fixed and derived are kept apart.** Fixed parameters are inputs, constant for the Run.
 *Derived* values — which numeric backend actually ran, the shard count sharding settled
