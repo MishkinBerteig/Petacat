@@ -1812,14 +1812,13 @@ async def regenerate_help_docs(
 
     Returns a JSON object describing what was touched.
     """
-    import os
+    from server.config import SEED_DATA_DIR
     from server.services.help_docs import regenerate_all
-    from server.main import _sync_help_topics
+    from server.services.standard_configuration import sync_help_topics
 
-
-    # Step 1: upsert DB rows from JSON
+    # Step 1: upsert DB rows from JSON (sync_help_topics commits)
     try:
-        await _sync_help_topics(session)
+        await sync_help_topics(session, SEED_DATA_DIR)
     except Exception as e:
         raise HTTPException(500, f"DB sync failed: {e}") from e
 

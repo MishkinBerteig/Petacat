@@ -33,7 +33,7 @@ count every engine-size figure in this document uses. Seed data: 59 slipnet node
 integration + 8 module files run locally; 9 e2e files currently require Docker, which
 WP2.1 removes).
 
-> **As built.** `server/engine/` holds 54 modules and 37,844 lines. The multi-core machinery
+> **As built.** `server/engine/` holds 54 modules and 37,850 lines. The multi-core machinery
 > (`free_running.py`, `coderack_shards.py`, `population.py`) moved out to the detachable
 > plugin package `server/parallel/`, which is not counted here.
 
@@ -1407,6 +1407,9 @@ an override: **20 passed, no novel or missing states**, which is the gate that m
 most here, because the float32 path is now what every run takes. The GPU row is the substantive one: float32 genuinely
 flips jump draws, so the runs diverge and land on different answers, and the reachable
 *set* is still unchanged. That is the oracle's claim tested a second, independent way.
+(Later measurement, 2026-11: under the Metacat Standard Configuration the GPU matched the
+float64 reference in every recorded field over 768 runs, so the "flips jump draws" reading
+above does not hold for it; see `TESTING.md`, "What float32 can and cannot promise".)
 
 **The check found a real defect.** On `eqe→qeq; abbbc` the engine reaches states where all
 raw importances are ~2.4e-48. The ratio is an ordinary 33, but **MLX routes Python

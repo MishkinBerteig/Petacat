@@ -107,7 +107,7 @@ def test_exact_backends_reproduce_the_run_bit_for_bit(
 def test_every_backend_reaches_a_valid_stopping_state(
     meta: MetadataProvider, backend_name: str
 ) -> None:
-    """Including the float32 one, which is allowed to reach a *different* answer.
+    """Including the float32 one, held to the conservative assertion below.
 
     Not a substitute for the expected-range check — one run per backend says
     nothing about the reachable set — but it catches a backend that produces

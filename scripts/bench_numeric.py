@@ -50,9 +50,10 @@ What is measured
     Whole runs of the profile problem under each backend, so that "did the 59-node
     engine get slower" is answerable from the same command that produces the
     scaling curve.  Reports codelets per second and the answer reached — the
-    latter because the float32 backend is *expected* to reach different answers on
-    some seeds, and a benchmark that hid that would be hiding the most important
-    thing it knows.
+    latter because the float32 backend may reach a different answer with fractional
+    activations (under the Metacat Standard Configuration it has matched the float64
+    reference on every run measured), and a benchmark that hid a difference would be
+    hiding the most important thing it knows.
 
 Usage
 -----
@@ -442,11 +443,11 @@ def report_engine(results: dict[str, Any], out: Callable[[str], None]) -> None:
         )
     out("")
     out(
-        "  A different codelet count is not a defect.  The float32 backend perturbs\n"
-        "  activations in the seventh significant digit, which occasionally flips a\n"
-        "  probabilistic-jump draw and from there the random stream diverges.  What\n"
-        "  must not change is the *set* of reachable answers, which is the\n"
-        "  expected-range oracle's question, not this benchmark's."
+        "  Under the Metacat Standard Configuration the float32 backend has matched the\n"
+        "  float64 reference on every run measured (whole-number activations).  With\n"
+        "  fractional activations a different codelet count is possible and is not by\n"
+        "  itself a defect.  What must not change is the *set* of reachable answers,\n"
+        "  which is the compare_to_metacat question, not this benchmark's."
     )
 
 

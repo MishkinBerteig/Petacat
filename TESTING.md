@@ -44,15 +44,29 @@ half. The `gpu` role appears when MLX is installed and its Metal probe succeeds,
 and is reported as not installed otherwise, which is the same skip-rather-than-fail
 rule the rest of the suite follows.
 
-**Why float32 diverges on individual runs while the reachable set holds.**
+**What float32 can and cannot promise.**
 Activations live in [0, 100], and float32 carries about seven significant digits
-where float64 carries sixteen. A Slipnet activation that has decayed to a subnormal
-survives in float64 and flushes to zero in float32, which changes the
-`jump_candidates` list, which changes how many draws the run consumes, which sends
-every subsequent probabilistic decision somewhere else. A given seed therefore
-reaches a different answer on the GPU than on the CPU. That is right behaviour:
-Petacat is stochastic by design, so a different-but-valid run is a correct run, and
-the same thing happens whenever a new scheduler or a new generator reorders the
+where float64 carries sixteen. Under the Metacat Standard Configuration that
+difference has not been seen to matter. The Slipnet update rounds every decay and
+every per-edge contribution to a whole number before anything is summed
+(`numpy_backend.py` `np.rint`, `mlx_backend.py` `mx.round` and the fused kernel's
+`rint`), so an activation is always a whole number between 0 and 100, which float32
+represents exactly, and the activation never decays to a subnormal.
+
+*Measured:* 768 runs (the 41 demo problems, seeds 101 to 112, discovery and
+justification). `mlx` on the Metal GPU in float32, through the fused kernel
+(`_update_fused`, confirmed by call counts), equalled `off` in float64 in every
+recorded field: status, codelet count, answers, RNG draws, a hash of the Trace, a
+hash of the temperature series and every final activation. `numpy` and `mlx-cpu`
+did too. That is 768 runs at seeds outside the golden set, not a proof for every
+seed. *Inferred, not measured:* that the whole-number rounding is why.
+
+The two precisions can still part when activations are fractional. With the
+Slipnet's rounding removed, a measurement made while planning v2.0 found the float64
+engines identical to each other while `mlx` against `numpy` was run-identical in 116
+of 120 runs and state-identical in 0 of 120, and found the GPU reading 0 for activations float64 holds as positive (below
+1.18e-38, a subnormal flush). A seed that forks that way reaches a different but
+valid run, as it would under any new scheduler or generator that reorders the
 draws. What must hold across the two halves is the **set** of stopping states each
 problem can reach. That question is no longer asked of Petacat's own past but of
 Metacat's published sets, by `scripts/compare_to_metacat.py` — see
@@ -121,18 +135,18 @@ outside the matrix take it too and the run is entirely what it says it is.
 
 ```
 ============================= petacat test matrix ==============================
-  cpu  numpy    float64    897 tests
-  gpu  mlx      float32    897 tests
+  cpu  numpy    float64    900 tests
+  gpu  mlx      float32    900 tests
   whole suite requested: the full matrix is required of this run
 
-  unit          1756 collected   1756 run   1756 passed      0 failed      0 skipped  complete
-  seed_unit     1047 collected   1047 run   1047 passed      0 failed      0 skipped  complete
-  module        1073 collected   1073 run   1073 passed      0 failed      0 skipped  complete
+  unit          1763 collected   1763 run   1763 passed      0 failed      0 skipped  complete
+  seed_unit     1057 collected   1057 run   1057 passed      0 failed      0 skipped  complete
+  module        1075 collected   1075 run   1075 passed      0 failed      0 skipped  complete
   architecture    92 collected     92 run     92 passed      0 failed      0 skipped  complete
   integration    346 collected    346 run    346 passed      0 failed      0 skipped  complete
   parallel       291 collected    291 run    291 passed      0 failed      0 skipped  complete
   lockstep       228 collected    228 run    228 passed      0 failed      0 skipped  complete
-  e2e            551 collected    551 run    551 passed      0 failed      0 skipped  complete
+  e2e            552 collected    552 run    552 passed      0 failed      0 skipped  complete
 
   run complete in 13.9 min against a 60 min ceiling
 ```
@@ -180,7 +194,7 @@ A truncated run reports itself as truncated, and the difference from a clean run
 visible three ways:
 
 ```
-  module         1073 collected    198 run    198 passed      0 failed      0 skipped  INCOMPLETE
+  module         1075 collected    198 run    198 passed      0 failed      0 skipped  INCOMPLETE
 
   RUN TRUNCATED: the 60 min ceiling was reached after 60.4 min. Everything above is
   what the run produced before it stopped; the tests it had not reached never ran.
@@ -204,14 +218,14 @@ that allowance.
 
 | Layer | Directory | Scope | May depend on | Cases |
 |-------|-----------|-------|---------------|-------|
-| **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 1756 |
-| **seed unit** | `tests/seed_unit/` | One class or function, measured against the values Petacat ships with | Real `seed_data/*.json`, and the machine the process is running on | 1047 |
-| **module** | `tests/module/` | Several real components assembled and driven | Real engine objects and `seed_data/*.json`; no DB, no HTTP | 1073 |
+| **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 1763 |
+| **seed unit** | `tests/seed_unit/` | One class or function, measured against the values Petacat ships with | Real `seed_data/*.json`, and the machine the process is running on | 1057 |
+| **module** | `tests/module/` | Several real components assembled and driven | Real engine objects and `seed_data/*.json`; no DB, no HTTP | 1075 |
 | **architecture** | `tests/architecture/` | How the source tree is allowed to depend on itself | The repository's source, `seed_data/*.json`, child interpreters | 92 |
 | **integration** | `tests/integration/` | Agreement between the repository's artifacts, and the harness's own rules | Real `seed_data/*.json`, the ORM declarations, the generated client files, the documentation, a real pytest session | 346 |
 | **parallel** | `tests/parallel/` | The detachable multi-core plugin (`server/parallel/`): each executor against the serial run it claims to equal | Real engine objects and `seed_data/*.json`, worker processes and threads; each test pins the backend it compares on | 291 |
 | **lockstep** | `tests/lockstep/` | Petacat's decision traces against Metacat's: naming, helper conformance, tracing/replay RNGs, determinism guards, the comparer | Real engine in faithful mode (numeric backend off, or a named backend); recorded Metacat traces | 228 |
-| **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 551 |
+| **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 552 |
 
 Those counts are cases, so they include the second pass the numeric matrix makes
 over the 881 backend-sensitive tests.
@@ -246,7 +260,7 @@ first**, then move up toward the API and GUI.
 
 All eight layers run in one command — the
 [required command](#the-required-command) — and, since Petacat runs natively, all
-eight actually run: **5,384 cases**, every one of them executed. A layer that is
+eight actually run: **5,404 cases**, every one of them executed. A layer that is
 normally skipped is not a layer that is normally green, and none of these is.
 
 Wall-clock time depends heavily on the machine and on what else it is doing. The
@@ -291,14 +305,16 @@ want the number.
 > (`FreeRunningEngine._all_started`); the lesson kept here is that a red in this
 > file is about scheduling until proven otherwise.
 >
-> The reason a backend can matter at all is that the default `mlx` path forks a
-> run's random stream: float32 flushes the Slipnet's decayed subnormal
-> activations to zero, which changes the `jump_candidates` list and shifts every
-> subsequent draw. So a failure seen only under `mlx` is a different run, not a
-> different degree of safety. The file is in the numeric matrix, so each case
+> A backend can still matter. Under the Metacat Standard Configuration `mlx`
+> (float32, Metal GPU) equalled `off` (float64) in every recorded field over 768
+> runs (41 problems, seeds 101 to 112; see "What float32 can and cannot promise"),
+> so a failure seen only under `mlx` must **not** be written off as a seed
+> difference: investigate it as a defect, in the float32 path or in the test.
+> Only with fractional activations (a configuration that removes the Slipnet's
+> rounding) is a fork of the random stream a known cause. The file is in the numeric matrix, so each case
 > carries its backend in its name — `…[numpy]` and `…[mlx]` sit side by side in
-> the report, and a red `[mlx]` beside a green `[numpy]` is that seed difference
-> while both red is a concurrency defect. Note also that the "group reachable from a bond but absent from its
+> the report. A red `[mlx]` beside a green `[numpy]` is a float32-path
+> defect until shown otherwise, and both red is a concurrency defect. Note also that the "group reachable from a bond but absent from its
 > string's object list" symptom occurs *serially* too, and the file documents it
 > as a pre-existing property rather than a race.
 
@@ -472,6 +488,7 @@ changing what it records.
 | `test_fallback_instrumentation.py` | 4 | The silent-fallback observer (EN0, `tests/support/fallback_instrumentation.py`) sees the three blanket `except Exception` blocks of `justify.py` and a lookup of an absent Slipnet node, and changes nothing else; `scripts/count_silent_fallbacks.py` makes the count over the whole baseline set |
 | `test_formulas.py` | 10 | The temperature-dependent formulas against the seeded coefficients |
 | `test_hardware.py` | 21 | The machine description and the sizes derived from it: real probes, faked probes, environment overrides |
+| `test_justify_conceptual_depth.py` | 5 | Justify's retention of a pattern entry naming no node: `Absent`'s depth, probability 0, entry dropped |
 | `test_metacat_display_seed.py` | 5 | Seed data that exists so a display can match Metacat: every Metacat demo, the Themespace's dimension and relation names |
 | `test_metadata_provider.py` | 25 | `MetadataProvider` loading every seed collection |
 | `test_numeric_backends.py` | 30 | The numeric backends against the reference (decay and spreading against exact rationals, including spreading's halfway cases), and the engine without them; and that changing the four salience weights or `probabilistic_activation_exponent` changes the result on every backend, and the jump probability is defined at a zero share and at overflow identically on every backend (stage W) |
@@ -623,6 +640,7 @@ changing what it records.
 | `test_api_runs.py` | 25 | The runs API with persistence |
 | `test_api_system.py` | 8 | The system endpoints: what is executing, not what was recorded |
 | `test_help_api.py` | 7 | The help topics API |
+| `test_help_regenerate_route.py` | 1 | `POST /api/admin/help/regenerate` syncs the help topic rows and commits them (`regenerate_all` patched) |
 | `test_persistence.py` | 4 | Snapshot save/restore and the DB metadata round-trip |
 | `test_persistence_modes.py` | 33 | The three persistence modes: Fast, Normal, Audit; a parallel Run is the same at any worker count |
 | `test_run_parameters.py` | 13 | Run parameters are settable per Run, stored, and readable back |
@@ -634,7 +652,7 @@ changing what it records.
 | `test_training_mode_sessions_api.py` | 47 | Training Mode Sessions over HTTP: every stored run is the serial run; the 25 + 5 workflow (problems added while it runs); the finished long-poll; pause, resume, close, cancel, delete; the database written only when a problem finishes; a restart redoes what was cut off to the identical result and rebuilds the shared memory exactly; one worker is a serial episode and many replay from the merge log; fair sharing of the cores; every error policy; worker-failure retries, charged only to the run that broke the pool; a policy pause survives a concurrent status change; live counts never step backwards; a summary's finished cursor comes from the same snapshot as its counts; seed ranges fit the database; configuration change stalls or is adopted; validation, export, defaults and fixed settings |
 | `test_unicode_problem_strings.py` | 6 | Any Unicode text end to end: a Training Mode Session of 20 corpus problems runs, is Stopped and reads back exactly from the database and the API; NFC and NFD problems both kept; Metacat Mode runs store and return the corpus exactly (runs row, Review, Run History); demo problems take Unicode names, sections and strings; U+0000 and a lone surrogate are a 422 in sessions, runs and demo problems; empty strings are a 422, not a crash, in runs and the Swarm |
 | `test_unlimited_text.py` | 9 | All other text is unlimited too: a Training Mode Session's name and note and a configuration's name and note of any length and script are stored and returned exactly; configuration text (names, labels, formulas, a multi-character glyph) round-trips through the change API, and codelet type and help topic text holds any length; the journal's actor, channel, group and note are stored exactly; U+0000 and a lone surrogate are a 4xx naming the field at every entry point (session, configuration, and every string and key of a change batch); a caller's value for a fixed-vocabulary column is checked first, a 4xx never a 500 |
-| `test_step0_config_from_db.py` | 48 | Step 0's guard tests: a shipped value reproduces the run and a changed one moves it |
+| `test_step0_config_from_db.py` | 49 | Step 0's guard tests: a shipped value reproduces the run and a changed one moves it |
 
 **`tests/parallel/` — the multi-core plugin against the serial runs it claims to equal**
 

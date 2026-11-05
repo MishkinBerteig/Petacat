@@ -28,7 +28,7 @@ license change was authorised by Dr. Marshall directly (see
 > end-to-end. Episodic Memory (Metacat-Mode learning) shapes the runs that inherit it: a run
 > declines an answer already held for the same problem and rules, so repeating a
 > problem across Metacat Mode's [episodic runs](#persistence-modes-and-episodic-runs)
-> (which are Metacat Mode and not Training Mode) explores a different answer each time. It ships with 5,384 test cases covering the engine, the API, and the
+> (which are Metacat Mode and not Training Mode) explores a different answer each time. It ships with 5,404 test cases covering the engine, the API, and the
 > help/config system, run on both the CPU and the GPU numeric backends. Underneath the seven components sits an execution
 > substrate — three [persistence modes](#persistence-modes-and-episodic-runs),
 > a [GPU numeric substrate](#the-numeric-substrate), and
@@ -455,8 +455,8 @@ Petacat has two test suites:
   plugin against the serial runs it claims to equal), `lockstep` (Petacat's decision
   traces against Metacat's), and `e2e` (full HTTP
   stack against a running database). All eight run in a single command against
-  the local Postgres — 5,384 cases, which includes the numeric matrix's second
-  pass over the 897 backend-sensitive tests. See
+  the local Postgres — 5,404 cases, which includes the numeric matrix's second
+  pass over the 900 backend-sensitive tests. See
   [TESTING.md](TESTING.md) for the layer breakdown, the numeric backend matrix,
   the session ceiling, the unit-test rules, determinism requirements, test-double
   conventions, how to run the suite under the free-threaded interpreter, and what
@@ -509,11 +509,12 @@ default and in float64 on the CPU when asked, and every test whose outcome that
 arithmetic produces runs once on each. The two halves answer different questions.
 The CPU half is float64, agrees with the pure-Python reference exactly, and holds
 a seeded run to the same values and the same number of random draws. The GPU half
-is float32, because Apple's GPUs have no double-precision units: a decayed
-activation that float64 keeps flushes to zero in float32, which changes how many
-draws the run consumes and sends every later probabilistic decision elsewhere. So
-a given seed reaches a different answer on the GPU, which is a correct run —
-Petacat is stochastic, and a different-but-valid run is a right answer. What holds
+is float32, because Apple's GPUs have no double-precision units. Under the Metacat
+Standard Configuration that has not been seen to matter: the Slipnet rounds to whole
+numbers, which float32 holds exactly, and over 768 measured runs (41 problems, seeds 101
+to 112) the GPU equalled the float64 reference in every recorded field. With fractional
+activations the two can part, and a correct but different run follows. The matrix does
+not rely on the measurement, so the GPU half keeps conservative assertions. What holds
 across both is the **set** of stopping states each problem can reach, which is what
 `scripts/compare_to_metacat.py` compares against Metacat's own oracle. Every session ends with a
 `petacat test matrix` block naming the backends that were exercised, their
@@ -727,10 +728,12 @@ alternatives is the only way the policy above can be defended:
 | `PETACAT_NUMERIC_MIN_GPU_NODES` | The Slipnet size at or above which `auto` prefers the GPU. Zero by default. Set it to ~10000 to reinstate size-gated selection when what you actually want is to profile the CPU path. |
 
 The three float64 backends are bit-identical to the reference — same answer,
-same codelet count, same number of random draws. The GPU is float32 and
-genuinely flips some jump draws, so its runs diverge and land on different
-answers; the *set* of answers reachable is unchanged, which is the standard
-every change in this layer is held to.
+same codelet count, same number of random draws. The GPU is float32. Under the
+Metacat Standard Configuration it matched the float64 reference in every recorded field
+over 768 measured runs (41 problems, seeds 101 to 112), probably because the Slipnet's
+activations are whole numbers; with fractional activations its runs can diverge and land on
+different answers. Either way what must hold is the *set* of answers reachable, which is the
+standard every change in this layer is held to.
 
 ## Parallelism: the `server/parallel/` plugin
 

@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Any
 
 from server.engine.images import ImageFailure
 from server.engine.metadata import require_meta
+from server.engine.roles import Absent
 from server.engine.rules import (
     RULE_TOP, Rule, RuleClause, RuleChange, _TranslationFailure, rules_equal,
 )
@@ -1216,12 +1217,17 @@ def _get_label(n1: Any, n2: Any, slipnet: Slipnet | None) -> str | None:
 
 
 def _get_conceptual_depth(node_name: Any, slipnet: Slipnet | None) -> float:
-    """Get conceptual depth of a node by name."""
+    """Get conceptual depth of a node by name, or of a node object.
+
+    A name no node holds, or ``None``, is no node: it has the depth of the engine's Null
+    Object (``Absent.conceptual_depth``, 0 -- what has no node is not perceived), so its
+    retention probability is 0.  No literal depth is written here.
+    """
     if slipnet is not None and isinstance(node_name, str):
         node = slipnet.nodes.get(node_name)
         if node is not None:
             return node.conceptual_depth
-    return node_name.conceptual_depth
+    return getattr(node_name, "conceptual_depth", Absent.conceptual_depth)
 
 
 def _plays(dim: Any, role: str, slipnet: Slipnet | None) -> bool:
