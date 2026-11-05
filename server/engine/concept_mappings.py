@@ -21,8 +21,29 @@ if TYPE_CHECKING:
 # Every test of "which concept is this" below is a node-side role or relation read
 # (``holds_role``, ``node.relation``): a mapping holds nodes but no Slipnet handle.  A node
 # or label nothing holds (``None``, a stand-in) plays no role.
+from server.engine.formulas import ratio_of, round_ratio
 from server.engine.slipnet import holds_role
 from server.engine.run_binding import constants
+
+
+def _is_whole(exponent: Any) -> bool:
+    """Is *exponent* a non-negative whole number (``^2`` in the Scheme), as an int or a whole float?"""
+    return exponent >= 0 and float(exponent).is_integer()
+
+
+def _rounded_depth_product(assoc: Any, depth: Any, exponent: int, sign: int) -> int:
+    """``round(assoc * (1 + sign * (depth/100) ** exponent))``, exactly, half to even.
+
+    Metacat's ``(round (* assoc (+ 1 (^2 (% depth)))))`` (``concept-mappings.ss:131-141``) is
+    a ratio of whole numbers throughout; floats do not reproduce its halves.
+    """
+    a_n, a_d = ratio_of(assoc)
+    d_n, d_d = ratio_of(depth)
+    scale = 100**exponent
+    return round_ratio(
+        a_n * (scale * d_d**exponent + sign * d_n**exponent),
+        a_d * d_d**exponent * scale,
+    )
 
 
 def _relation_of(label: Any) -> Any:
@@ -128,7 +149,13 @@ class ConceptMapping:
             return 100.0
 
         depth = self.conceptual_depth
-        bonus = 1.0 + (depth / 100.0) ** constants().concept_mapping_depth_bonus_exponent
+        exponent = constants().concept_mapping_depth_bonus_exponent
+        if _is_whole(exponent):
+            # ``(round (* assoc (+ 1 (^2 (% depth)))))`` is exact in Metacat (concept-mappings.ss:131-135):
+            # ``50 * (1 + 0.3 ** 2)`` is 54.50000000000001 in floats and exactly 54.5, which rounds to 54.
+            e = int(exponent)
+            return _rounded_depth_product(assoc, depth, e, 1)
+        bonus = 1.0 + (depth / 100.0) ** exponent
         return round(assoc * bonus)
 
     def slippability(self) -> float:
@@ -142,7 +169,11 @@ class ConceptMapping:
             return 100.0
 
         depth = self.conceptual_depth
-        penalty = 1.0 - (depth / 100.0) ** constants().concept_mapping_depth_penalty_exponent
+        exponent = constants().concept_mapping_depth_penalty_exponent
+        if _is_whole(exponent):
+            e = int(exponent)
+            return max(0.0, _rounded_depth_product(assoc, depth, e, -1))
+        penalty = 1.0 - (depth / 100.0) ** exponent
         return max(0.0, round(assoc * penalty))
 
     @property

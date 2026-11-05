@@ -531,9 +531,15 @@
             ;; Two evaluators/builders can agree on name, stamp, urgency and bin
             ;; yet carry different proposals of the same structure name (made at
             ;; different times).  Log the proposal's own time stamp so replay
-            ;; can tell them apart.
+            ;; can tell them apart.  A description is such a proposal too: two
+            ;; top-down description scouts can propose one description at two
+            ;; times (`aazzz -> azzza; aye` seed 3, `desc(m.2,...,alphabetic-last)`
+            ;; proposed at 1670 and 1676, one of them built), and a rule is
+            ;; (`wxyz -> vxyz; abcd` seeds 10 and 57: several rule evaluators restamped to
+            ;; one time).
             (if (and (pair? args)
-                     (memq (tell (car args) 'object-type) '(bond group bridge)))
+                     (memq (tell (car args) 'object-type)
+                           '(bond group bridge description rule)))
                 (begin (tr-put ",\"picked_arg_stamp\":")
                        (tr-num (tell (car args) 'get-time-stamp))))))))))
 

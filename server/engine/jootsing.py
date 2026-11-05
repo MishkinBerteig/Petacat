@@ -14,10 +14,9 @@ from server.engine.verbose import exact, round_to_100ths
 
 import logging
 from dataclasses import replace
-from fractions import Fraction
 from typing import TYPE_CHECKING, Any
 
-from server.engine.formulas import weighted_average
+from server.engine.formulas import round_ratio, weighted_average
 from server.engine.trace import (
     ANSWER_FOUND,
     CLAMP_START,
@@ -626,7 +625,7 @@ def get_clamp_jootsing_probability(
         t = clamp.codelet_count
         if codelet_count > 0:
             # 100* rounds (jootsing.ss:127-129, utilities.ss:544).
-            elapsed_time_weights.append(float(round(Fraction(100 * t, codelet_count))))
+            elapsed_time_weights.append(float(round_ratio(100 * t, codelet_count)))
         else:
             elapsed_time_weights.append(100.0)
 
@@ -1107,7 +1106,7 @@ def _build_theme_overlap_table(
     table: list[tuple[dict[str, Any], float]] = []
     for group in equiv_groups:
         # 100* rounds (jootsing.ss:64-65, utilities.ss:544).
-        overlap = float(round(Fraction(100 * len(group), num_events)))
+        overlap = float(round_ratio(100 * len(group), num_events))
         table.append((group[0], overlap))
 
     return table

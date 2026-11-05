@@ -115,6 +115,7 @@ def attempt_justification(
     memory: Any = None,
     codelet_count: int = 0,
     temperature: float,
+    self_watching_enabled: bool,
     coderack: Any = None,
     temperature_control: Any = None,
     vlog: Any = None,
@@ -234,6 +235,7 @@ def attempt_justification(
                 meta,
                 codelet_count=codelet_count,
                 temperature=temperature,
+                self_watching_enabled=self_watching_enabled,
                 coderack=coderack,
                 temperature_control=temperature_control,
                 concept_patterns=[_get_concept_pattern_dict(matching_rule)],
@@ -306,6 +308,7 @@ def attempt_justification(
                 meta,
                 codelet_count=codelet_count,
                 temperature=temperature,
+                self_watching_enabled=self_watching_enabled,
                 coderack=coderack,
                 temperature_control=temperature_control,
                 concept_patterns=[_get_concept_pattern_dict(translated_rule)],
@@ -331,6 +334,7 @@ def attempt_justification(
     # 100``, so the real codelet count has to be passed (a count of 0 would make the
     # comparison true forever once any clamp had been undone).
     if trace is not None and not trace.permission_to_clamp(
+        self_watching_enabled=self_watching_enabled,
         codelet_count=codelet_count,
         grace_period=meta.get_param("grace_period"),
     ):
@@ -376,6 +380,7 @@ def attempt_justification(
         meta,
         codelet_count=codelet_count,
         temperature=temperature,
+        self_watching_enabled=self_watching_enabled,
         coderack=coderack,
         temperature_control=temperature_control,
         vertical_pattern_override=vertical_pattern,
@@ -404,6 +409,7 @@ def clamp_rules(
     concept_patterns: list[dict[str, Any]] | None = None,
     codelet_count: int,
     temperature: float,
+    self_watching_enabled: bool,
     coderack: Any = None,
     temperature_control: Any = None,
 ) -> ClampEvent | None:
@@ -416,6 +422,7 @@ def clamp_rules(
     """
     # ``trace.ss:112-119`` again — see the note at the unification gate.
     if not trace.permission_to_clamp(
+        self_watching_enabled=self_watching_enabled,
         codelet_count=codelet_count,
         grace_period=meta.get_param("grace_period"),
     ):
@@ -1061,6 +1068,7 @@ def _attempt_clamp_rules(
     explanation: str = "Clamping rules",
     codelet_count: int,
     temperature: float,
+    self_watching_enabled: bool,
     coderack: Any = None,
     temperature_control: Any = None,
     vlog: Any = None,
@@ -1075,6 +1083,7 @@ def _attempt_clamp_rules(
         # justify.ss:77-85, 122-130: both clamp branches say this much first.
         vlog.say("attempting-to-clamp-rules")
         if trace.permission_to_clamp(
+            self_watching_enabled=self_watching_enabled,
             codelet_count=codelet_count,
             grace_period=meta.get_param("grace_period"),
         ):
@@ -1089,6 +1098,7 @@ def _attempt_clamp_rules(
         meta,
         codelet_count=codelet_count,
         temperature=temperature,
+        self_watching_enabled=self_watching_enabled,
         coderack=coderack,
         temperature_control=temperature_control,
         vertical_theme_pattern=vertical_pattern_override,

@@ -66,7 +66,7 @@ import mlx.core as mx
 import numpy as np
 
 from server.engine.numeric import metal_kernels
-from server.engine.numeric.backend import Backend, SlipnetSession
+from server.engine.numeric.backend import UNAVAILABLE_REASONS, Backend, SlipnetSession
 from server.engine.numeric.layout import (
     STRING_ANSWER,
     STRING_INITIAL,
@@ -92,8 +92,10 @@ def _gpu_usable() -> bool:
         probe = mx.array([1.0, 2.0], dtype=mx.float32)
         with mx.stream(mx.gpu):
             mx.eval(probe * probe)
-    except Exception:  # pragma: no cover - depends on the machine
+    except Exception as exc:  # pragma: no cover - depends on the machine
+        UNAVAILABLE_REASONS["mlx"] = f"the Metal probe raised {exc!r}"
         return False
+    UNAVAILABLE_REASONS.pop("mlx", None)
     return True
 
 
@@ -174,10 +176,23 @@ class MlxSlipnetSession(SlipnetSession):
 
     def update(self, threshold: float, scale: float) -> None:
         with mx.stream(self.device):
-            if self.use_kernel and self.n:
-                self._update_fused(threshold, scale)
-            else:
-                self._update_composed(threshold, scale)
+            if self.use_kernel and self.n and not metal_kernels.disabled_reason():
+                before = (self.activation, self.buffer)
+                try:
+                    self._update_fused(threshold, scale)
+                    self.buffer = self._zero
+                    mx.eval(self.activation)
+                    return
+                except RuntimeError as exc:
+                    # The kernel's Metal library is built on first use and the compiler service can be
+                    # unreachable under load.  Nothing of this update was kept: redo it composed.
+                    # Only that failure: any other error is a fault, not a reason to change path.
+                    if not metal_kernels.is_compiler_failure(exc):
+                        raise
+                    metal_kernels.disable(str(exc))
+                    self.use_kernel = False
+                    self.activation, self.buffer = before
+            self._update_composed(threshold, scale)
             self.buffer = self._zero
             # Forced here rather than left lazy.  ``jump_candidates`` needs the
             # result on the host in the very next call, so deferring the
@@ -311,7 +326,8 @@ class MlxBackend(Backend):
 
     def open_slipnet(self, topology: SlipnetTopology) -> SlipnetSession:
         return MlxSlipnetSession(
-            topology, self.device, self.dtype, self.use_kernel
+            topology, self.device, self.dtype,
+            self.use_kernel and not metal_kernels.disabled_reason(),
         )
 
     # -- Themespace ---------------------------------------------------------
@@ -627,8 +643,10 @@ class MlxCpuBackend(MlxBackend):
         try:
             with mx.stream(mx.cpu):
                 mx.eval(mx.array([1.0], dtype=mx.float64) * 2.0)
-        except Exception:  # pragma: no cover - depends on the MLX build
+        except Exception as exc:  # pragma: no cover - depends on the MLX build
+            UNAVAILABLE_REASONS["mlx-cpu"] = f"the MLX CPU probe raised {exc!r}"
             return False
+        UNAVAILABLE_REASONS.pop("mlx-cpu", None)
         return True
 
 

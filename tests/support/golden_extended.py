@@ -24,7 +24,7 @@ case may name another (``python``, the pure-Python reference backend, replayed a
 ``--numeric-backend python``).
 
 A case is ``{"id", "kind", "problem", "seeds", "answer", "cap", "clear_before", "interventions",
-"backend", "why", "metacat"}`` (the last two are documentation: what it added, and its Metacat check):
+"backend", "parameters", "why", "metacat"}`` (the last two are documentation: what it added, and its Metacat check):
 
 * ``kind`` ``"discovery"`` or ``"justify"``: one run per seed, a fresh Episodic Memory each;
 * ``kind`` ``"episode"``: one run per seed in order with one Episodic Memory carried, which is
@@ -33,6 +33,8 @@ A case is ``{"id", "kind", "problem", "seeds", "answer", "cap", "clear_before", 
   two-voice explanation of every answer in memory and the comparison text of every ordered
   pair (``answers.ss`` ``get-snag-explanation``, ``explain``, ``get-answer-comparison-text``;
   the lockstep tool ``scripts/compare_episode_answers.py`` checks them against Metacat);
+* ``parameters`` (optional) are the case's own faithful-mode parameters, laid over the file's: the cases
+  that run with Self-watching mode off from the start say ``{"self_watching_enabled_default": false}``;
 * ``cap`` is the case's codelet cap (the original baseline's ``CAP`` when absent);
 * ``interventions`` are a person's actions at given codelet counts (``tests/support/interventions.py``):
   a codelet-pattern clamp, Clamp Themes, Undo last clamp, Self-watching mode off or on.
@@ -97,6 +99,7 @@ def capture_case(meta: Any, case: dict[str, Any], parameters: dict[str, Any],
     from server.engine.hashing import memory_hash
     from server.engine.memory import EpisodicMemory
 
+    parameters = {**parameters, **case.get("parameters", {})}
     problem = tuple(case["problem"])
     answer = case.get("answer")
     cap = case.get("cap")
@@ -162,6 +165,70 @@ def iter_cases(jobs: int = 1, progress: Callable[[str], None] | None = None,
                     progress(c["id"])
                 results.append(res)
     return [pair for res in results for pair in res]
+
+
+def normalised(x: Any) -> Any:
+    """*x* with every number a float, so ``0`` and ``0.0`` are one value; nothing else is merged.
+
+    A numeric backend may hold a quantity as an int on one path and a float on another (a
+    zero, an activation that has never moved).  That is not a difference in what the run did,
+    and it is the only difference the backends have in the final state (checked on all four).
+    """
+    if isinstance(x, bool):
+        return x
+    if isinstance(x, (int, float)):
+        return float(x)
+    if isinstance(x, list):
+        return [normalised(v) for v in x]
+    if isinstance(x, dict):
+        return {k: normalised(v) for k, v in x.items()}
+    return x
+
+
+def capture_case_normalised(meta: Any, case: dict[str, Any], parameters: dict[str, Any],
+                            backend: str | None) -> tuple[list[dict[str, Any]], list[str]]:
+    """One case's records and the digest of each run's final state with numbers normalised.
+
+    The digest is the one ``golden_baseline.state_digest`` takes (state graph without its parameter
+    table, plus the lockstep snapshot), computed on ``normalised`` content.
+    """
+    from server.engine.state_graph import capture_run_state
+    from tests.lockstep.snapshot import snapshot_record
+
+    digests: list[str] = []
+    original = gb.state_digest
+
+    def spy(ctx: Any) -> str:
+        graph = {k: v for k, v in capture_run_state(ctx).items() if k != "parameters"}
+        snap = snapshot_record(ctx, None, ctx.codelet_count)
+        digests.append(gb.sha(json.dumps(
+            normalised(json.loads(gb.canonical({"graph": graph, "snapshot": snap}))), sort_keys=True)))
+        return original(ctx)
+
+    gb.state_digest = spy
+    try:
+        records = [r for r, _ in capture_case(meta, case, parameters, backend)]
+    finally:
+        gb.state_digest = original
+    return records, digests
+
+
+def _normalised_worker(args: tuple[dict[str, Any], dict[str, Any], str | None],
+                       ) -> tuple[list[dict[str, Any]], list[str]]:
+    global _META
+    if _META is None:
+        _META = gb.load_meta()
+    case, parameters, backend = args
+    return capture_case_normalised(_META, case, parameters, backend)
+
+
+def capture_all_normalised(backend: str | None, jobs: int,
+                           ) -> list[tuple[list[dict[str, Any]], list[str]]]:
+    """Every case on *backend* (``None``: the case's own, as committed), cases in a process pool."""
+    spec = load_cases()
+    work = [(c, spec["parameters"], backend or c.get("backend") or spec["backend"]) for c in spec["cases"]]
+    with ProcessPoolExecutor(jobs) as pool:
+        return list(pool.map(_normalised_worker, work, chunksize=1))
 
 
 def header_record(spec: dict[str, Any], cases_text: str) -> dict[str, Any]:

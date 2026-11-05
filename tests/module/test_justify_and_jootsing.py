@@ -441,6 +441,7 @@ def test_a_working_translation_the_workspace_does_not_support_goes_to_the_clamp(
         memory=engine.ctx.memory,
         codelet_count=300,
         temperature=engine.ctx.temperature.value,
+        self_watching_enabled=engine.ctx.self_watching_enabled,
         coderack=engine.ctx.coderack,
         temperature_control=engine.ctx.temperature,
     )
@@ -482,6 +483,7 @@ def test_a_translation_the_workspace_does_support_is_reported_as_justified(
         memory=engine.ctx.memory,
         codelet_count=300,
         temperature=engine.ctx.temperature.value,
+        self_watching_enabled=engine.ctx.self_watching_enabled,
         coderack=engine.ctx.coderack,
         temperature_control=engine.ctx.temperature,
     )
@@ -512,6 +514,7 @@ def test_the_translated_rule_gains_the_bridges_and_theme_pattern_it_implies(
         memory=engine.ctx.memory,
         codelet_count=300,
         temperature=engine.ctx.temperature.value,
+        self_watching_enabled=engine.ctx.self_watching_enabled,
         coderack=engine.ctx.coderack,
         temperature_control=engine.ctx.temperature,
     )
@@ -542,6 +545,7 @@ def test_the_justify_clamp_carries_the_real_codelet_patterns(engine, meta):
         memory=engine.ctx.memory,
         codelet_count=300,
         temperature=engine.ctx.temperature.value,
+        self_watching_enabled=engine.ctx.self_watching_enabled,
         coderack=engine.ctx.coderack,
         temperature_control=engine.ctx.temperature,
     )
@@ -572,6 +576,7 @@ def test_a_justify_clamp_is_denied_only_inside_the_real_grace_period(engine, met
         slipnet=engine.ctx.slipnet, memory=engine.ctx.memory,
         codelet_count=150,
         temperature=engine.ctx.temperature.value,
+        self_watching_enabled=engine.ctx.self_watching_enabled,
         coderack=engine.ctx.coderack,
         temperature_control=engine.ctx.temperature,
     )
@@ -583,6 +588,7 @@ def test_a_justify_clamp_is_denied_only_inside_the_real_grace_period(engine, met
         slipnet=engine.ctx.slipnet, memory=engine.ctx.memory,
         codelet_count=250,
         temperature=engine.ctx.temperature.value,
+        self_watching_enabled=engine.ctx.self_watching_enabled,
         coderack=engine.ctx.coderack,
         temperature_control=engine.ctx.temperature,
     )

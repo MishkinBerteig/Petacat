@@ -378,6 +378,10 @@ class Themespace:
         #: It grows only through :meth:`add_theme` and shrinks through
         #: :meth:`delete_theme_type`; nothing is created up front.
         self.all_themes: list[Theme] = []
+        #: ``%self-watching-enabled%`` (``setup.ss:40``), as the run's context sets it.  While it
+        #: is off :meth:`add_theme` adds nothing (``themes.ss:374-375``); the run's
+        #: ``EngineContext.self_watching_enabled`` keeps it current.
+        self.self_watching_enabled: bool = True
 
         # Build clusters from theme dimension specs
         for dim_spec in meta.theme_dimensions:
@@ -487,8 +491,13 @@ class Themespace:
 
         The existing theme if there is one; otherwise a new one, unless the cluster
         is frozen and *check_if_frozen* (``add-theme-if-possible``), or the relation
-        is not one the cluster allows.
+        is not one the cluster allows.  With Self-watching mode off it is always ``None``,
+        for an existing theme as well, unless a past episode is on display
+        (``themes.ss:374-375``: ``*display-mode?*``, which :attr:`displaying_past_state` is
+        here), since showing a past pattern is not the program thinking.
         """
+        if not self.self_watching_enabled and not self.displaying_past_state:
+            return None
         cluster = self.get_cluster(theme_type, dimension)
         if cluster is None:
             return None
@@ -610,6 +619,10 @@ class Themespace:
         saved = getattr(self, "_saved_state", None)
         if saved is None:
             return False
+        # Display mode ends first: ``restore-current-state`` redraws the Workspace, which clears
+        # ``*display-mode?*`` (``workspace-graphics.ss:80-88, 674``), before it asks the Themespace,
+        # so with Self-watching off nothing below is put back.
+        self._saved_state = None
         for tt in ALL_THEME_TYPES:
             self.delete_theme_type(tt)
             for cluster in self.get_clusters(tt):
@@ -629,7 +642,6 @@ class Themespace:
             cluster = self.get_cluster(tt, dim)
             if cluster is not None and frozen:
                 cluster.frozen = True
-        self._saved_state = None
         return True
 
     @property

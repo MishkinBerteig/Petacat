@@ -58,36 +58,43 @@ def test_a_free_run_completes_at_every_worker_count(meta, workers):
     assert result.workers == workers
 
 
-def test_every_worker_does_some_work(meta):
-    """A configuration where one worker does everything is not parallel.
+def test_the_whole_pool_exists_before_any_worker_touches_the_rack(meta, monkeypatch):
+    """A pool that was never built is not parallel.
 
     The failure this catches is real and was live: the pool used to be built *while
     the first worker was already executing*, and ``Thread.start()`` ends in
     ``self._started.wait()``.  A worker running interpreted codelet bodies makes no
     call that releases the GIL, so the main thread could lose that handoff for the
-    whole run — one ``start()`` measured at 466 ms of a 465 ms run — and threads 2..N
+    whole run -- one ``start()`` measured at 466 ms of a 465 ms run -- and threads 2..N
     were never constructed at all.  ``_per_worker`` is preallocated to the requested
     width, so the telemetry read ``[4001, 0, 0, 0]``: three workers reported as idle
-    that had never existed.  It failed about 40% of the time, bimodally — either an
-    even split or a total monopoly, nothing in between.
+    that had never existed.  ``FreeRunningEngine._all_started`` now gates the workers
+    until the pool is built.
 
-    ``FreeRunningEngine._all_started`` now gates the workers until the pool is built,
-    which is also what removes this test's old precondition.  It used to require
-    ``codelet_count > 2000`` before judging the distribution, because "the last thread
-    started can legitimately never be scheduled before the stop flag is set" — true
-    when the threads started at different times, and no longer true when they all wait
-    for the same Event.  Keeping it would have made the test fail on exactly the runs
-    the fix improved: four workers genuinely running answer this problem before 2,000
-    codelets more often than one worker did.
+    This checks that directly, at the first touch of the rack.  It used to assert that
+    every worker claimed a codelet, which no scheduler promises: on the GIL build with
+    the NumPy backend a waiting worker can be held off for 400 ms (a waiter asks for the
+    GIL only when its 5 ms wait times out, and the running worker's releases restart
+    that wait, so 5 of 950 runs of this problem with seed 42 ended with a worker that
+    had started and had not yet had a turn, against 0 of 400 on the ``off`` backend at
+    the same load).  That is a late start in a short run, and the run is correct.
     """
     runner = EngineRunner(meta)
     runner.init_mcat("eeqee", "qeeq", "xxixx", seed=42)
+    alive_before = threading.active_count()
+    alive_at_first_touch: list[int] = []
+    choose = LockedCoderack.choose_and_remove
+
+    def spy(self, temperature, rng, worker=None):
+        if not alive_at_first_touch:
+            alive_at_first_touch.append(threading.active_count() - alive_before)
+        return choose(self, temperature, rng, worker)
+
+    monkeypatch.setattr(LockedCoderack, "choose_and_remove", spy)
     result = run_free(runner, workers=4, max_steps=4000)
 
+    assert alive_at_first_touch == [4]
     assert len(result.per_worker) == 4
-    assert all(count > 0 for count in result.per_worker), result.per_worker
-    # And no single worker monopolised it.
-    assert max(result.per_worker) < 0.9 * result.codelet_count, result.per_worker
 
 
 def test_the_codelet_count_is_the_sum_of_what_workers_did(meta):

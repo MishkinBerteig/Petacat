@@ -318,6 +318,11 @@ _GPU_PREFERENCE = ("mlx", "numpy", "python")
 
 _INSTANCES: dict[str, Backend] = {}
 _CLASSES: dict[str, type[Backend]] | None = None
+#: Why a backend is not usable in this process: the ``ImportError`` that kept its module out of the
+#: registry, or what its availability probe raised.  Named in :class:`BackendUnavailable`, because a
+#: probe that answers "no" without saying why (a Metal start-up failing under load) is otherwise
+#: indistinguishable from a machine that has no GPU.
+UNAVAILABLE_REASONS: dict[str, str] = {}
 
 
 def _classes() -> dict[str, type[Backend]]:
@@ -347,15 +352,15 @@ def _classes() -> dict[str, type[Backend]]:
         from server.engine.numeric.numpy_backend import NumpyBackend
 
         registry["numpy"] = NumpyBackend
-    except ImportError:
-        pass
+    except ImportError as exc:
+        UNAVAILABLE_REASONS["numpy"] = f"import failed: {exc!r}"
     try:
         from server.engine.numeric.mlx_backend import MlxBackend, MlxCpuBackend
 
         registry["mlx"] = MlxBackend
         registry["mlx-cpu"] = MlxCpuBackend
-    except ImportError:
-        pass
+    except ImportError as exc:
+        UNAVAILABLE_REASONS["mlx"] = UNAVAILABLE_REASONS["mlx-cpu"] = f"import failed: {exc!r}"
     _CLASSES = registry
     return registry
 
@@ -386,8 +391,10 @@ def get_backend(name: str) -> Backend:
     classes = _classes()
     cls = classes.get(name)
     if cls is None or not cls.is_available():
+        reason = UNAVAILABLE_REASONS.get(name)
         raise BackendUnavailable(
-            f"numeric backend {name!r} is not available; available backends are "
+            f"numeric backend {name!r} is not available"
+            f"{f' ({reason})' if reason else ''}; available backends are "
             f"{available_backends()}. Install the optional dependency "
             f"(`pip install petacat[gpu]`) or choose another backend."
         )

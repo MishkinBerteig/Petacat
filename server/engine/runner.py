@@ -185,7 +185,10 @@ class EngineContext:
         #: still go on to find a genuinely *different* answer, as MetaCat does.
         self.run_ended: bool = False
         self.justify_mode: bool = False
-        self.self_watching_enabled: bool = True
+        #: ``%self-watching-enabled%`` (``setup.ss:40``), kept on :attr:`self_watching_enabled`
+        #: and mirrored onto the Themespace, whose ``add-theme`` reads it (``themes.ss:374``).
+        self._self_watching_enabled: bool = True
+        self.themespace.self_watching_enabled = True
         #: Verbose mode (``%verbose%``, ``gui.ss:790-794``): the narration of what the
         #: codelets do.  ``verbose`` is what every guard reads; it is the Options menu's
         #: switch (``verbose_mode``) or'd with step mode's (``verbose_step``), as
@@ -278,6 +281,18 @@ class EngineContext:
         """Replace the *run's* generator.  Restore and a few tests do this; a
         codelet stream is bound with :meth:`use_codelet_rng` instead."""
         self._rng = value
+
+    @property
+    def self_watching_enabled(self) -> bool:
+        """Is Self-watching mode on?  Scheme: ``%self-watching-enabled%`` (``setup.ss:40``)."""
+        return self._self_watching_enabled
+
+    @self_watching_enabled.setter
+    def self_watching_enabled(self, value: bool) -> None:
+        """Switch it, and tell the Themespace, which refuses to add a theme while it is off
+        (``themes.ss:374-375``).  Every write goes through here, so the two never disagree."""
+        self._self_watching_enabled = value
+        self.themespace.self_watching_enabled = value
 
     def set_verbose(self, mode: bool | None = None, step: bool | None = None) -> None:
         """Switch Verbose mode (``mode``) or Verbose step mode (``step``) on or off.

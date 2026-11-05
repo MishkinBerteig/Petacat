@@ -24,7 +24,17 @@ from server.engine.metadata import require_meta
 from server.engine.roles import absent
 from server.engine.slipnet import holds_role as _holds
 from server.engine.workspace_structures import WorkspaceStructure
-from server.engine.formulas import sigmoid, temp_adjusted_values, weighted_average
+from server.engine.formulas import (
+    ratio_add,
+    ratio_div,
+    ratio_mul,
+    ratio_of,
+    round_exact,
+    round_ratio,
+    sigmoid,
+    temp_adjusted_values,
+    weighted_average,
+)
 from server.engine.images import (
     ImageFailure,
     StringImage,
@@ -1004,6 +1014,28 @@ class RuleChange:
         return f"Change({frm}->{to})"
 
 
+def rule_quality(uniformity: Any, abstractness: Any, succinctness: Any,
+                 abstractness_weight: Any, succinctness_weight: Any) -> int:
+    """``(round (* (% uniformity) (weighted-average (list abstractness succinctness) (list 3 2))))``.
+
+    Scheme: ``compute-rule-quality`` (``rules.ss:1554-1559``).  It is a ratio of whole numbers all
+    the way, so it is rounded as one: ``0.7 * 45`` is ``31.499999999999996`` where ``7/10 * 45`` is
+    exactly 31.5, which rounds to 32.  A weight total of 0 gives ``weighted-average`` 0, as it does there.
+    """
+    total = ratio_add(ratio_of(abstractness_weight), ratio_of(succinctness_weight))
+    if total[0] == 0:
+        return 0
+    combined = ratio_div(
+        ratio_add(
+            ratio_mul(ratio_of(abstractness_weight), ratio_of(abstractness)),
+            ratio_mul(ratio_of(succinctness_weight), ratio_of(succinctness)),
+        ),
+        total,
+    )
+    num, den = ratio_mul(ratio_of(uniformity), combined)
+    return round_ratio(num, 100 * den)
+
+
 class RuleClause:
     """One clause of a rule — describes one aspect of the transformation."""
 
@@ -1204,11 +1236,7 @@ class Rule(WorkspaceStructure):
         # (``rules.ss:1662``) — a different quantity entirely.
         abs_weight = meta.get_formula_coeff("rule_abstractness_weight")  # 3
         succ_weight = meta.get_formula_coeff("rule_succinctness_weight")  # 2
-        combined = weighted_average(
-            [self.abstractness, self.succinctness],
-            [abs_weight, succ_weight],
-        )
-        self.quality = round((self.uniformity / 100.0) * combined)
+        self.quality = rule_quality(self.uniformity, self.abstractness, self.succinctness, abs_weight, succ_weight)
 
     def _compute_uniformity(self, meta: MetadataProvider) -> None:
         """§3.3.5 "Uniformity" — ``compute-rule-uniformity`` (``rules.ss:1552-1596``).
@@ -1429,20 +1457,26 @@ class Rule(WorkspaceStructure):
                 return False
         return True
 
-    def get_degree_of_support(self, workspace: Workspace) -> float:
-        """Product of supporting bridge strengths (as fractions).
+    def get_degree_of_support(self, workspace: Workspace) -> int:
+        """Product of supporting bridge strengths (as fractions), as a whole number 0..100.
 
-        Scheme: rules.ss:237-242 — ``(100* (product ...))``, and the product of the
-        empty list is 1, so a rule resting on no bridges is fully supported.
+        Scheme: rules.ss:237-242 -- ``(100* (product (map (lambda (b) (% strength)) ...)))``,
+        and the product of the empty list is 1, so a rule resting on no bridges is fully
+        supported.
+
+        The product is EXACT.  A bridge's strength is a whole number (``update_strength``
+        rounds it), so Metacat's ``(% strength)`` is the exact ratio ``strength/100``, their
+        product is exact, and ``100*`` rounds an exact ratio half to even.  A float product
+        does not: ``0.75 * 0.74 * 100`` is ``55.49999999999999`` where ``3/4 * 37/50 * 100`` is
+        exactly ``111/2``, which rounds to 56 (``ly -> yl; cbaii``, seed 1, codelet 339: the
+        chosen rule's degree of support was 55 here and 56 in Metacat).  See
+        :func:`server.engine.formulas.round_exact`.
         """
-        product = 1.0
+        strengths = []
         for b in self.supporting_bridges:
             equiv = _get_equivalent_bridge(workspace, b)
-            if equiv is not None:
-                product *= equiv.strength / 100.0
-            else:
-                product *= 0.0
-        return round(100.0 * product)
+            strengths.append(equiv.strength if equiv is not None else 0)
+        return round_exact([100, *strengths], [100] * len(strengths))
 
     def currently_works(self, workspace: Workspace, slipnet: Slipnet) -> bool:
         """Test if applying this rule to its source string reproduces the target.
@@ -3156,24 +3190,35 @@ def _check_for_conflicts(transforms: list[tuple]) -> None:
             )
         )
 
-    for i in range(len(descriptions)):
-        ic1, _ = descriptions[i]
-        for j in range(i + 1, len(descriptions)):
-            ic2, _ = descriptions[j]
-            if ic1.conflicts(ic2):
-                # Scheme's CONFLICT failure-result names both objects and both
-                # dimensions (``rules.ss:1331-1335``).
-                raise ImageFailure(
-                    "Conflicting transforms: "
-                    f"{getattr(ic1.dimension, 'short_name', '?')} of "
-                    f"{_ascii_name(ic1.reference_object)} vs "
-                    f"{getattr(ic2.dimension, 'short_name', '?')} of "
-                    f"{_ascii_name(ic2.reference_object)}",
-                    objects=[ic1.reference_object, ic2.reference_object],
-                    kind=ImageFailure.CONFLICT,
-                    dimension=ic1.dimension,
-                    dimension2=ic2.dimension,
-                )
+    # ``pairwise-map`` (utilities.ss:758-768) is ``(append (map (lambda (x) (proc (1st l) x)) (rest l))
+    # (pairwise-map (rest l)))``, and Chez evaluates the recursive call first and the ``map`` in its
+    # own order (see ``_chez_map``), so the conflict reported is the first one in THAT order, not the
+    # first by index (``wxyz -> xxyz; fgzzz`` seed 3: Metacat reports length against length of the
+    # fgzzz group, where the index order found letter-category of the fg group first).
+    def check(i: int, j: int) -> None:
+        ic1, ic2 = descriptions[i][0], descriptions[j][0]
+        if ic1.conflicts(ic2):
+            # Scheme's CONFLICT failure-result names both objects and both
+            # dimensions (``rules.ss:1331-1335``).
+            raise ImageFailure(
+                "Conflicting transforms: "
+                f"{getattr(ic1.dimension, 'short_name', '?')} of "
+                f"{_ascii_name(ic1.reference_object)} vs "
+                f"{getattr(ic2.dimension, 'short_name', '?')} of "
+                f"{_ascii_name(ic2.reference_object)}",
+                objects=[ic1.reference_object, ic2.reference_object],
+                kind=ImageFailure.CONFLICT,
+                dimension=ic1.dimension,
+                dimension2=ic2.dimension,
+            )
+
+    def visit(i: int) -> None:
+        if i >= len(descriptions):
+            return
+        visit(i + 1)
+        _chez_map(lambda j: check(i, j), list(range(i + 1, len(descriptions))))
+
+    visit(0)
 
 
 def _group_transforms_by_object(
@@ -3206,8 +3251,12 @@ def _apply_transforms(
 
     Scheme: apply-transforms (rules.ss:1341-1350).
     """
-    # Sort transforms by application order
-    ordered = sorted(transforms, key=lambda t: _apply_before_key(t, image, slipnet))
+    # ``(sort (apply-before? (tell image 'get-length)) transforms)``: Chez's merge sort with a
+    # predicate that is not a strict order, so the result is whatever its steps give (``chez_sort``).
+    image_length = getattr(image, "get_length", lambda: None)()
+    ordered = chez_sort(
+        lambda t1, t2: _apply_before(t1, t2, image_length, slipnet), list(transforms)
+    )
 
     for transform in ordered:
         dim, desc = transform
@@ -3230,26 +3279,21 @@ def _apply_transforms(
             raise
 
 
-def _apply_before_key(
-    transform: tuple, image: Any, slipnet: Slipnet,
-) -> tuple:
-    """Sort key for transform application order.
+def _apply_before(
+    t1: tuple, t2: tuple, image_length: Any, slipnet: Slipnet,
+) -> bool:
+    """``apply-before?`` (``rules.ss:1395-1403``): does transform *t1* go before *t2*?
 
-    Scheme: apply-before? (rules.ss:1391-1399).
-    GroupCtgy first, then ObjCtgy:letter, then length (if length-first),
-    then everything else.
+    Not a strict order (``t1`` before ``t2`` and ``t2`` before ``t1`` can both hold), which is why
+    :func:`_apply_transforms` sorts with :func:`chez_sort` and not with a numeric key: a key gave
+    ``xyy`` where Metacat's merge sort gives ``yzz`` (``zyx -> xyy; z`` seed 1).
     """
-    dim, desc = transform
-    if _holds(dim, _DIM_GROUP_CATEGORY):
-        return (0,)
-    if _holds(desc, _OBJECT_LETTER):
-        return (1,)
-    if _holds(dim, _DIM_LENGTH):
-        img_length = getattr(image, "get_length", lambda: None)()
-        if change_length_first(desc, img_length, slipnet):
-            return (2,)
-        return (8,)
-    return (5,)
+    return bool(
+        _holds(t1[0], _DIM_GROUP_CATEGORY)
+        or _holds(t1[1], _OBJECT_LETTER)
+        or (_holds(t1[0], _DIM_LENGTH) and change_length_first(t1[1], image_length, slipnet))
+        or (_holds(t2[0], _DIM_LENGTH) and not change_length_first(t2[1], image_length, slipnet))
+    )
 
 
 def _transform_image(

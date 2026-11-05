@@ -1268,10 +1268,14 @@ async def test_a_live_session_issues_no_database_write_until_stop(app_client, se
         assert resp.status_code == 200, (path, resp.text)
     assert (await get("/api/training-mode/sessions")).status_code == 200
     post, patch = app_client.post, app_client.patch
+    # Paused BEFORE the problems are added: a running session dispatches an added problem at once, and
+    # whether its three runs have finished by the time of the cancel below is a race (a finished problem's
+    # cancel is a no-op that keeps its runs: 24 runs unsaved instead of 21; a problem cut off mid-way keeps
+    # the runs that had finished).  Paused, the first added problem is still queued when it is cancelled.
+    assert (await post(_api(bid, "/pause"))).status_code == 200
     added = await post(_api(bid, "/problems"), json={"problems": [problem(10), problem(11)]})
     assert added.status_code == 201 and added.json()["persisted"] is False
     assert (await patch(_api(bid), json={"name": "live name", "note": "live note", "policy": {"max_retries": 7}})).status_code == 200
-    assert (await post(_api(bid, "/pause"))).status_code == 200
     assert (await post(_api(bid, f"/problems/{added.json()['problem_ids'][0]}/cancel"))).status_code == 200
     assert (await post(_api(bid, "/resume"))).status_code == 200
     await until_state(app_client, bid, "idle")
@@ -1740,3 +1744,78 @@ async def test_the_export_of_a_live_session_says_it_ends_with_a_tail_from_memory
     await stop(app_client, bid)
     stored = await app_client.get(_api(bid, "/export"), params={"what": "runs", "format": "json"})
     assert "x-export-source" not in stored.headers and stored.text == live.text
+
+
+# ---------------------------------------------------------------------------
+# Start must not finish a problem whose runs the scheduler has already dispatched
+# ---------------------------------------------------------------------------
+
+
+class _SchedulerRunsAfterTheLoad:
+    """Stands for ``TrainingModeSessionService._factory`` and lets the scheduler run in the gap.
+
+    ``start_session`` makes the session live inside its ``async with self._factory()`` block and
+    leaves the block by awaiting the database session's close, which yields to the event loop.  A
+    scheduler that is busy (with another session, say) takes that turn.  This exit does exactly
+    that, deterministically: after the real exit it runs one ``_fill`` pass, which dispatches the
+    new session's seeds out of ``lp.todo`` into in-flight runs.  Only the first use does it, so
+    only the Start under test is affected.
+    """
+
+    def __init__(self, service, real_factory):
+        self.service, self.real, self.fired = service, real_factory, False
+
+    def __call__(self):
+        outer, inner = self, self.real()
+
+        class _Block:
+            async def __aenter__(self):
+                return await inner.__aenter__()
+
+            async def __aexit__(self, *exc):
+                result = await inner.__aexit__(*exc)
+                if not outer.fired:
+                    outer.fired = True
+                    await outer.service._fill()
+                return result
+
+        return _Block()
+
+
+async def _assert_every_problem_finished_with_all_its_runs(app_client, bid: int, problems: int, seeds: int):
+    done = await until_state(app_client, bid, "idle")
+    assert done["problems"]["finished"] == problems
+    assert done["runs"]["done"] == problems * seeds
+    # What the problem list says for each problem is what its runs say, and Stop stores that.
+    for _ in range(2):
+        listing = (await app_client.get(_api(bid, "/problems"), params={"limit": 50})).json()["problems"]
+        assert [p["runs_done"] for p in listing] == [seeds] * problems, listing
+        await stop(app_client, bid)
+
+
+@pytest.mark.asyncio
+async def test_a_start_whose_seeds_the_scheduler_dispatches_before_it_returns_still_tallies_every_run(
+    app_client, sessions
+):
+    """Start leaves its ``async with`` block, which yields; the scheduler may dispatch the new
+    session's only seed of a problem in that gap.  An empty ``lp.todo`` then does not mean every
+    seed was stored, and finishing the problem there froze a tally of zero runs."""
+    made = await create(app_client, 2, seeds_per_problem=1, start=False)
+    bid = made["session"]["id"]
+    sessions._factory = gap = _SchedulerRunsAfterTheLoad(sessions, sessions._factory)
+    started = await app_client.post(_api(bid, "/start"))
+    assert started.status_code == 200 and gap.fired
+    await _assert_every_problem_finished_with_all_its_runs(app_client, bid, 2, 1)
+
+
+@pytest.mark.asyncio
+async def test_a_session_started_again_after_a_stop_is_not_finished_early_by_the_same_gap(app_client, sessions):
+    """Resuming after a restart or a Stop is another Start (``test_a_graceful_shutdown_stops_every_live_session``
+    saw two problems finished with one run each of two)."""
+    made = await create(app_client, 2, seeds_per_problem=2, start=False)
+    bid = made["session"]["id"]
+    await app_client.post(_api(bid, "/start"), json={"paused": True})
+    await stop(app_client, bid)
+    sessions._factory = gap = _SchedulerRunsAfterTheLoad(sessions, sessions._factory)
+    assert (await app_client.post(_api(bid, "/start"))).status_code == 200 and gap.fired
+    await _assert_every_problem_finished_with_all_its_runs(app_client, bid, 2, 2)

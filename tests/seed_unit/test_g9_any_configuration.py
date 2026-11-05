@@ -224,4 +224,5 @@ def test_g9_a_small_swarm_call_under_a_reduced_configuration(reduced_name) -> No
             meta=meta,
         )
     assert len(outcomes) == 4
-    assert [o.error for o in outcomes] == [None] * 4
+    errors = [o.error for o in outcomes]
+    assert errors == [None] * 4, "\n".join(e for e in errors if e)  # the workers' own tracebacks, whole

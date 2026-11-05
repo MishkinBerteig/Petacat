@@ -6,8 +6,9 @@ clamps a codelet pattern (``gui.ss:1221-1245``), its Control menu undoes the las
 mid-run (``gui.ss:607-626``).  Petacat offers the same four through
 ``RunService.clamp_theme_pattern``, ``RunService.clamp_codelet_pattern``,
 ``RunService.undo_last_clamp`` and ``RunService.set_self_watching``.  This module calls
-those very methods on a stand-in service that holds one runner, so a test applies the code the
-API runs and not a copy of it.
+those very methods, bare, on a stand-in service that holds one runner, so a test applies the code
+the API runs and not a copy of it.  The class opens the run's scope around each of them
+(``run_service._in_run_scope``).
 
 An intervention is ``{"at": N, "op": "clamp_codelet_pattern", "pattern": "bottom_up"}`` or
 ``{"at": N, "op": "undo_last_clamp"}`` or ``{"at": N, "op": "set_self_watching", "enabled": false}``: it happens when the run has completed N codelets, before
@@ -25,37 +26,33 @@ OPS = ("clamp_codelet_pattern", "undo_last_clamp", "set_self_watching", "clamp_t
 
 
 def apply(runner: Any, intervention: dict[str, Any]) -> None:
-    """Apply one intervention under the run's own scope.
+    """Apply one intervention by calling the product's own ``RunService`` method, bare.
 
     ``RunService`` opens the run's scope (``EngineContext.scope()``) around every method that
-    names a live run, so a clamp event takes its ``event_number`` from the run's own
-    allocator.  (Before round 2 stage 2 it fell back to a process-wide allocator whose counter
-    ran across runs; the fallback no longer exists.)  The explicit ``use_allocator`` below is
-    kept so the baseline harness does not depend on the service for it.
+    names a live run, so an event number a clamp takes is the run's own and does not depend on
+    what else ran in the process.
     """
-    from server.engine.ids import use_allocator
     from server.services.run_service import RunService
 
     service = RunService.__new__(RunService)
     service._runners = {0: runner}
     service._store = SimpleNamespace(current=lambda: runner.meta)
     op = intervention["op"]
-    with use_allocator(runner.ctx.ids):
-        if op == "clamp_codelet_pattern":
-            service.clamp_codelet_pattern(0, intervention["pattern"])
-        elif op == "undo_last_clamp":
-            service.undo_last_clamp(0)
-        elif op == "clamp_theme_pattern":
-            # one pattern per theme type, in the order the types first appear
-            patterns: dict[str, list[dict[str, Any]]] = {}
-            for theme in intervention["themes"]:
-                patterns.setdefault(theme["type"], []).append(
-                    {k: theme[k] for k in ("dimension", "relation", "activation")})
-            service.clamp_theme_pattern(0, [{"type": t, "themes": ts} for t, ts in patterns.items()])
-        elif op == "set_self_watching":
-            service.set_self_watching(0, bool(intervention["enabled"]))
-        else:
-            raise ValueError(f"unknown intervention {op!r}")
+    if op == "clamp_codelet_pattern":
+        service.clamp_codelet_pattern(0, intervention["pattern"])
+    elif op == "undo_last_clamp":
+        service.undo_last_clamp(0)
+    elif op == "clamp_theme_pattern":
+        # one pattern per theme type, in the order the types first appear
+        patterns: dict[str, list[dict[str, Any]]] = {}
+        for theme in intervention["themes"]:
+            patterns.setdefault(theme["type"], []).append(
+                {k: theme[k] for k in ("dimension", "relation", "activation")})
+        service.clamp_theme_pattern(0, [{"type": t, "themes": ts} for t, ts in patterns.items()])
+    elif op == "set_self_watching":
+        service.set_self_watching(0, bool(intervention["enabled"]))
+    else:
+        raise ValueError(f"unknown intervention {op!r}")
 
 
 def schedule(runner: Any, interventions: list[dict[str, Any]] | None) -> None:

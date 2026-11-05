@@ -1176,7 +1176,7 @@ class TemporalTrace:
 
     def permission_to_clamp(
         self,
-        self_watching_enabled: bool = True,
+        self_watching_enabled: bool,
         *,
         codelet_count: int,
         grace_period: int,

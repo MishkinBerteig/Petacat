@@ -17,7 +17,6 @@ Organized by category:
 from __future__ import annotations
 
 import logging
-from fractions import Fraction
 
 from typing import TYPE_CHECKING, Any
 
@@ -30,7 +29,7 @@ from server.engine.bridges import Bridge
 from server.engine.coderack import Codelet
 from server.engine.concept_mappings import ConceptMapping
 from server.engine.descriptions import Description
-from server.engine.formulas import temp_adjusted_probability, temp_adjusted_values
+from server.engine.formulas import round_ratio, temp_adjusted_probability, temp_adjusted_values
 from server.engine.groups import Group
 from server.engine.roles import ROLE_BY_NAME, absent
 from server.engine.rules import Rule
@@ -1332,25 +1331,21 @@ def _adjacent_bonds(
     (groups.ss:714-726, 752-764) — ``bonded?`` (bonds.ss:516-523) reuses the
     existing bond, otherwise a fresh one is made *and built* on the spot.
 
-    Returns ``None`` when a positional slot is held by an unrelated bond, which
-    the reference cannot reach and which resolves here as a fizzle.
+    Never ``None`` now (the callers still test for it): a slot held by an unrelated bond is
+    overwritten, as ``build-bond`` does, and was once a fizzle.
     """
     bonds: list[Bond] = []
     for left, right in zip(objects, objects[1:]):
         existing = getattr(left, "right_bond", None)
-        if existing is not None:
-            # ``bonded?`` (bonds.ss:516-523) asks whether the two are joined, in
-            # either orientation; a sameness bond occupies the slot whichever way
-            # its from/to happen to run.
-            if existing.right_object is right:
-                bonds.append(existing)
-                continue
-            # The slot is held by something else entirely — unreachable in the
-            # reference, where the fights are already won, but reachable under
-            # free-running where they were fought on a stale read.  Fizzle.
-            return None
-        if getattr(right, "left_bond", None) is not None:
-            return None
+        # ``bonded?`` (bonds.ss:516-523) asks whether the two are joined, in either orientation; a
+        # sameness bond occupies the slot whichever way its from/to happen to run.
+        if existing is not None and existing.right_object is right:
+            bonds.append(existing)
+            continue
+        # Otherwise a fresh bond is made and built on the spot, and ``build-bond`` (bonds.ss:410-422) just
+        # overwrites the two positional pointers: a bond that held the slot (a stale bond from a group to a
+        # letter now inside the next group, ``pqrs -> ppqqrrss; ttt`` seed 1) stays in the string's bond
+        # list, as it does in Metacat, and no longer sits in the object's slot.
         bond = Bond(
             left,
             right,
@@ -1366,7 +1361,7 @@ def _adjacent_bonds(
             ctx.verbose_log.print_object(bond, level="new")
             ctx.verbose_log.mark_built(bond)
         bond.proposal_level = bond.BUILT
-        left.string.add_bond(bond)
+        left.string.add_bond(bond, displacing=True)
         activate_from_workspace(ctx, bond_category)
         ctx.sink.on_structure_change(ctx, bond, STRUCTURE_BUILT)
         bonds.append(bond)
@@ -2452,7 +2447,7 @@ def descriptor_support(ctx: EngineContext, string: Any, descriptor: Any) -> floa
         if any(d.descriptor is descriptor for d in g.get_all_descriptions())
     )
     # 100* rounds (workspace-structure-formulas.ss:44-54, utilities.ss:544).
-    return float(round(Fraction(100 * described, len(groups))))
+    return float(round_ratio(100 * described, len(groups)))
 
 
 def single_letter_group_probability(ctx: EngineContext, group: Any) -> float:

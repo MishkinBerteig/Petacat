@@ -9,7 +9,7 @@ Scheme source: formulas.ss
 from __future__ import annotations
 
 import math
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from server.engine.metadata import MetadataProvider
@@ -109,6 +109,71 @@ def bond_degree_of_assoc(bond_category: SlipnetNode, meta: MetadataProvider) -> 
         return 0.0
     scale = meta.get_formula_coeff("bond_degree_of_assoc_scale")  # 11
     return min(100.0, round(scale * math.sqrt(max(0.0, degree()))))
+
+
+# ---------------------------------------------------------------------------
+# Exact rounding
+# ---------------------------------------------------------------------------
+#
+# Metacat computes with Scheme's numeric tower: whole numbers, and the ratios of whole
+# numbers they make (``(% 75)`` is the exact ``3/4``), stay *exact* until a float enters, and
+# its ``round`` (``utilities.ss:251``) of an exact ratio is half-to-even on the exact value.  A
+# float product does not reproduce that: ``0.75 * 0.74 * 100`` is ``55.49999999999999`` where
+# ``3/4 * 37/50 * 100`` is exactly ``111/2``, which rounds to 56.  Where the Scheme is exact and
+# the arithmetic is more than one correctly rounded division of whole numbers, the engine
+# rounds through these helpers.  They use whole-number arithmetic only (``as_integer_ratio``
+# is exact for an int, a float and a ``Fraction`` alike), so no rational type is involved.
+
+
+def ratio_of(x: Any) -> tuple[int, int]:
+    """The exact value of *x* as ``(numerator, denominator)``, denominator positive."""
+    return x.as_integer_ratio()
+
+
+def ratio_mul(p: tuple[int, int], q: tuple[int, int]) -> tuple[int, int]:
+    return p[0] * q[0], p[1] * q[1]
+
+
+def ratio_add(p: tuple[int, int], q: tuple[int, int]) -> tuple[int, int]:
+    return p[0] * q[1] + q[0] * p[1], p[1] * q[1]
+
+
+def ratio_div(p: tuple[int, int], q: tuple[int, int]) -> tuple[int, int]:
+    """``p / q``; ``ZeroDivisionError`` if *q* is zero."""
+    if q[0] == 0:
+        raise ZeroDivisionError("ratio_div by zero")
+    return (p[0] * q[1], p[1] * q[0]) if q[0] > 0 else (-p[0] * q[1], -p[1] * q[0])
+
+
+def round_ratio(numerator: int, denominator: int) -> int:
+    """``numerator / denominator`` rounded half to even, in whole-number arithmetic.
+
+    This is Scheme's ``round`` of an exact ratio (and Python's ``round`` of the same exact
+    value), without a float on the way.  *denominator* must not be zero.
+    """
+    if denominator < 0:
+        numerator, denominator = -numerator, -denominator
+    quotient, remainder = divmod(numerator, denominator)
+    twice = 2 * remainder
+    if twice > denominator or (twice == denominator and quotient & 1):
+        quotient += 1
+    return quotient
+
+
+def round_exact(numerators: Any, denominators: Any = ()) -> int:
+    """Round ``prod(numerators) / prod(denominators)`` half to even, exactly.
+
+    Every factor is taken at its exact value, so ``round_exact((100, 75, 74), (100, 100))``
+    is Scheme's ``(100* (* (% 75) (% 74)))``, 56.
+    """
+    num, den = 1, 1
+    for x in numerators:
+        n, d = ratio_of(x)
+        num, den = num * n, den * d
+    for x in denominators:
+        n, d = ratio_of(x)
+        num, den = num * d, den * n
+    return round_ratio(num, den)
 
 
 def temp_adjusted_values(

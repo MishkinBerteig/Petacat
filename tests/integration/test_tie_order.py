@@ -165,6 +165,7 @@ def test_tied_rows_of_every_engine_ordered_table_come_out_in_the_same_order_on_b
         assert from_db.index(unnamed) < from_db.index(named)
 
 
+@pytest.mark.numeric_matrix
 def test_a_configuration_with_tied_nodes_and_links_gives_one_provider_and_one_run_on_both_paths():
     from tests.integration.equivalence_harness import run_signature
 

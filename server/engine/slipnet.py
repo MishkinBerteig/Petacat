@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Callable, Mapping
 
+from server.engine.formulas import round_exact
 from server.engine.numeric.backend import exact_backend_for, select_backend
 from server.engine.roles import Roles, absent, resolve_roles
 from server.engine.numeric.layout import (
@@ -180,6 +181,7 @@ class SlipnetNode:
         "incoming_links",
         "intrinsic_link_length",
         "_decay_percent",
+        "_decay_exact",
         "_max_activation",
         "_probabilistic_exponent",
         "_workspace_activation",
@@ -238,6 +240,9 @@ class SlipnetNode:
         self.cm_short_name: str | None = None
         self.article_an: bool | None = None
         self._decay_percent: float = 0.0
+        #: ``(numerator, denominator)`` of the exact decay percentage when the rate is a ratio of
+        #: whole numbers other than a whole percentage (a whole-number exponent above 1); else ``None``.
+        self._decay_exact: tuple[int, int] | None = None
         self.descriptor_predicate: Callable[..., bool] | None = None
         # Flat scalars rather than a reference to the params object: these are read on
         # the engine's hottest paths, and one attribute load is cheaper than two.
@@ -290,8 +295,17 @@ class SlipnetNode:
         direct float form.
         """
         exponent = update_cycle_length / self._reference_cycle_length
+        self._decay_exact = None
         if exponent == 1.0:
             self._decay_percent = float(100 - self.conceptual_depth)
+        elif exponent > 1.0 and exponent.is_integer():
+            # ``(expt 7/10 2)`` is exact: the rate is ``1 - (depth/100)^e``, a ratio of whole numbers.
+            e = int(exponent)
+            d_n, d_d = self.conceptual_depth.as_integer_ratio()
+            self._decay_exact = (100 * (100**e * d_d**e - d_n**e), 100**e * d_d**e)
+            self._decay_percent = 100.0 * (
+                1.0 - (self.conceptual_depth / 100.0) ** exponent
+            )
         else:
             self._decay_percent = 100.0 * (
                 1.0 - (self.conceptual_depth / 100.0) ** exponent
@@ -404,7 +418,10 @@ class SlipnetNode:
         """
         if self.frozen:
             return
-        self.activation_buffer -= round(self._decay_percent * self.activation / 100.0)
+        if self._decay_exact is None:
+            self.activation_buffer -= round(self._decay_percent * self.activation / 100.0)
+        else:
+            self.activation_buffer -= round_exact((self._decay_exact[0], self.activation), (self._decay_exact[1], 100))
 
     def spread_activation_to_neighbors(self, update_cycle_length: int) -> None:
         """Spread activation to linked nodes.
@@ -421,13 +438,18 @@ class SlipnetNode:
         """
         if self.activation <= 0:
             return
-        scale = update_cycle_length / self._reference_cycle_length
+        reference = self._reference_cycle_length
+        scale = update_cycle_length / reference
         for link in self.outgoing_links:
             if link.to_node.frozen:
                 continue
             assoc = link.intrinsic_degree_of_association()
             # slipnet.ss:181-186: rounds the exact rational; multiply before dividing.
-            amount = round(scale * assoc * self.activation / 100.0)
+            if update_cycle_length == reference:  # scale is exactly 1: one division of whole numbers
+                amount = round(scale * assoc * self.activation / 100.0)
+            else:
+                # ``(* (/ ucl 15) (% assoc) activation)`` is exact in Metacat; ``14/15`` is not a float.
+                amount = round_exact((update_cycle_length, assoc, self.activation), (reference, 100))
             if amount > 0:
                 link.to_node.activation_buffer += amount
 
@@ -1200,7 +1222,10 @@ class Slipnet:
         # the parameter changes and a guard test on the run would pass.
         ucl = self.update_cycle_length
         session = self._numeric_session()
-        if session is None:
+        # The backends scale by a float ``ucl/15``; Metacat's ``(/ ucl 15)`` is exact, so any cycle
+        # length but the reference's takes the loops, which round exactly (see
+        # ``spread_activation_to_neighbors``).  At the reference length the scale is exactly 1.
+        if session is None or ucl != self.reference_update_cycle_length:
             self.spread_activation(ucl, threshold=threshold)
             if on_flushed is not None:
                 on_flushed()

@@ -145,12 +145,14 @@ def original_cases() -> list[dict]:
     return cases
 
 
-def extended_cases() -> list[dict]:
+def extended_cases(extra: Path | None = None) -> list[dict]:
+    """The extended baseline's cases, plus the cases of the JSON list *extra* (candidates being measured)."""
     from tests.support import golden_extended as ge
 
     spec = ge.load_cases()
+    cases = list(spec["cases"]) + (json.loads(extra.read_text()) if extra is not None else [])
     return [{"id": c["id"], "extended": c, "parameters": spec["parameters"], "backend": c.get("backend") or spec.get("backend")}
-            for c in spec["cases"]]
+            for c in cases]
 
 
 def run_case(case: dict) -> dict:
@@ -215,7 +217,7 @@ def import_baseline() -> dict:
 # --------------------------------------------------------------------------- the report
 
 
-def measure(cases: list[dict], jobs: int) -> dict:
+def measure(cases: list[dict], jobs: int, keep: Path | None = None) -> dict:
     engine: dict[str, list[set]] = {}
     db_lines: set = set()
     db_branches: set = set()
@@ -228,7 +230,13 @@ def measure(cases: list[dict], jobs: int) -> dict:
 
     absorb(import_baseline())
     with ProcessPoolExecutor(jobs, max_tasks_per_child=1) as pool:
-        for result in pool.map(run_case, cases):
+        for case, result in zip(cases, pool.map(run_case, cases)):
+            if keep is not None:
+                keep.mkdir(parents=True, exist_ok=True)
+                (keep / (case["id"].replace("/", "_") + ".json")).write_text(json.dumps({
+                    "id": case["id"],
+                    "engine": {f: [lines, arcs] for f, (lines, arcs) in result["engine"].items()},
+                    "db_lines": result["db_lines"], "db_branches": result["db_branches"]}))
             absorb(result["engine"])
             db_lines |= {tuple(x) for x in result["db_lines"]}
             db_branches |= {tuple(x) for x in result["db_branches"]}
@@ -285,11 +293,15 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--which", choices=["original", "extended", "both"], default="both")
     ap.add_argument("--jobs", type=int, default=max(1, (os.cpu_count() or 2) // 2))
     ap.add_argument("--out", type=Path, default=ROOT / "agents-workspace" / "golden-coverage")
+    ap.add_argument("--extra-cases", type=Path, default=None,
+                    help="a JSON list of further extended-format cases to measure with the baseline")
+    ap.add_argument("--keep", type=Path, default=None,
+                    help="write each case's own reached lines, arcs and database sets here (one JSON file per case)")
     args = ap.parse_args(argv)
     cases = (original_cases() if args.which in ("original", "both") else []) \
-        + (extended_cases() if args.which in ("extended", "both") else [])
+        + (extended_cases(args.extra_cases) if args.which in ("extended", "both") else [])
     started = time.time()
-    measured = measure(cases, args.jobs)
+    measured = measure(cases, args.jobs, args.keep)
     full = report(measured, args.out)
     s = full["summary"]
     print(f"{len(cases)} cases in {time.time() - started:.0f}s ({args.which})")

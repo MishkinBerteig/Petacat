@@ -231,6 +231,34 @@ SLIPNET_UPDATE_INPUTS = (
 
 _CACHE: dict[str, Any] = {}
 
+#: Why the fused kernel cannot be used in this process, or ``""``.  ``mx.fast.metal_kernel`` builds its
+#: Metal library from source on first use, which needs macOS's compiler service (``MTLCompilerService``);
+#: under load that service can be unreachable ("Unable to build metal library from source"), and the
+#: error surfaces mid-run.  The composed MLX operations do the same computation without it
+#: (``MlxSlipnetSession._update_composed``), so a session that meets the failure carries on with them.
+_DISABLED: list[str] = []
+
+
+def is_compiler_failure(error: BaseException) -> bool:
+    """Is this the failure to build the kernel's Metal library from source?"""
+    return "Unable to build metal library" in str(error)
+
+
+def disabled_reason() -> str:
+    """Why the fused kernel is off in this process, or ``""``."""
+    return _DISABLED[0] if _DISABLED else ""
+
+
+def disable(reason: str) -> None:
+    """Stop using the fused kernel in this process, saying so once."""
+    if not _DISABLED:
+        import logging
+
+        _DISABLED.append(reason)
+        logging.getLogger(__name__).warning(
+            "the fused Metal kernel is unavailable (%s); the MLX backend uses its composed operations "
+            "instead, which compute the same result", reason.strip().splitlines()[0] if reason.strip() else reason)
+
 
 def slipnet_update_kernel() -> Any:
     """Compile (once) and return the fused update kernel.

@@ -28,7 +28,7 @@ license change was authorised by Dr. Marshall directly (see
 > end-to-end. Episodic Memory (Metacat-Mode learning) shapes the runs that inherit it: a run
 > declines an answer already held for the same problem and rules, so repeating a
 > problem across Metacat Mode's [episodic runs](#persistence-modes-and-episodic-runs)
-> (which are Metacat Mode and not Training Mode) explores a different answer each time. It ships with 5,432 test cases covering the engine, the API, and the
+> (which are Metacat Mode and not Training Mode) explores a different answer each time. It ships with 5,489 test cases covering the engine, the API, and the
 > help/config system, run on both the CPU and the GPU numeric backends. Underneath the seven components sits an execution
 > substrate — three [persistence modes](#persistence-modes-and-episodic-runs),
 > a [GPU numeric substrate](#the-numeric-substrate), and
@@ -455,8 +455,8 @@ Petacat has two test suites:
   plugin against the serial runs it claims to equal), `lockstep` (Petacat's decision
   traces against Metacat's), and `e2e` (full HTTP
   stack against a running database). All eight run in a single command against
-  the local Postgres — 5,432 cases, which includes the numeric matrix's second
-  pass over the 900 backend-sensitive tests. See
+  the local Postgres — 5,489 cases, which includes the numeric matrix's second
+  pass over the 910 backend-sensitive tests. See
   [TESTING.md](TESTING.md) for the layer breakdown, the numeric backend matrix,
   the session ceiling, the unit-test rules, determinism requirements, test-double
   conventions, how to run the suite under the free-threaded interpreter, and what
@@ -967,7 +967,9 @@ Slipnet, nowhere:
 - **Under many processes, MLX collapses:**
   - a 17-worker swarm on `mlx` peaked at 8.9 runs/s, against 87 on `off`;
   - from 16 concurrent workers Metal failed to load kernels (`MTLCompilerService`
-    unreachable).
+    unreachable). The fused Slipnet kernel builds its Metal library on first use, so the failure
+    used to end the run with a `RuntimeError`; the MLX backend now catches it, says so once in the
+    log and carries on with its composed operations, which compute the same result.
 - **Batching doesn't rescue it.** Batching K runs' Slipnet updates into one `[K, 59]`
   dispatch beats K separate NumPy updates from K ≈ 30, but a float64 batched CPU
   update until K ≈ 256–512, so the end-to-end gain is bounded at a few per cent.

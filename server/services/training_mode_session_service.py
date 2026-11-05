@@ -1914,7 +1914,11 @@ class TrainingModeSessionService:
             self._starting.discard(session_id)
         self._check_configs()
         for lp in list(lt.problems.values()):
-            if lp.status == "queued" and not lp.todo:  # every seed was stored: it only has to finish
+            # Every seed was stored: it only has to finish.  The test is the one ``_record`` uses.  An
+            # empty ``lp.todo`` is not it: the block above yielded to the event loop with the session
+            # already live, so the scheduler may have dispatched the last seeds meanwhile, and a
+            # problem finished here would keep a tally short of the runs still in flight.
+            if lp.status == "queued" and len(lp.outcomes) >= lp.seeds:
                 lp.started_at = lp.started_at or _utcnow()
                 self._finish_problem(lt, lp, "finished")
         await self._announce(session_id)

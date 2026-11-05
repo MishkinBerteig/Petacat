@@ -108,10 +108,10 @@ python3 tests/lockstep/metacat/record.py --problem abc abd xyz --seeds 1 --cap 3
 * `--self-watching off`: `(set! %self-watching-enabled% #f)` before the run; the header carries `self_watching: false`
   and the replay runs Petacat with `self_watching_enabled_default` off.
 
-Results: a codelet clamp, an undo and a theme clamp replay with no divergence and no differing snapshot.  Self-watching
-off, from the start or switched off in mid-run, replays with every decision agreeing but with differing state
-snapshots: `Themespace.add_theme` lacks the `%self-watching-enabled%` test of `themes.ss:374-375`, so Petacat keeps
-adding themes that Metacat does not (first at the first `build_structure` of a bridge, `themes.py:481-505`).
+Results: a codelet clamp, an undo, a theme clamp and Self-watching off (from the start or switched off in mid-run,
+also in justify mode) replay with no divergence and no differing snapshot. (`Themespace.add_theme` once ignored
+`%self-watching-enabled%`, `themes.ss:374-375`, and the justify clamps asked `permission-to-clamp?` with the mode
+assumed on; both are fixed.)
 
 ## Record format
 
@@ -133,7 +133,7 @@ Spec section 3 exactly.  Field order: `t, c, ctx, who, [u], n, [about], [scope],
 | --- | --- | --- |
 | `prob?`, `~`, `random-pick`, `stochastic-pick`, `stochastic-select` | `set!` at run time (`decision-trace.ss`) | Outermost call logs on completion (`prob`, `perturb`, `choice`); a depth counter silences nested helper calls (`~` -> `prob?`, `stochastic-pick` -> `random-pick`) |
 | `stochastic-if*` | macro in `syntactic-sugar.ss` | Coin drawn first as before, then `p`, then `trace-hook-if p result` (a macro cannot be wrapped at run time) |
-| `'choose-codelet` | `coderack.ss` | One `choice` (`ctx` `choose`, `who` `coderack`) over every codelet in `codelet-list` order, weight = its bin's urgency at the current temperature, plus `stamps`/`picked_stamp`; the two inner draws are suppressed |
+| `'choose-codelet` | `coderack.ss` | One `choice` (`ctx` `choose`, `who` `coderack`) over every codelet in `codelet-list` order, weight = its bin's urgency at the current temperature, plus `stamps`/`picked_stamp`, and `picked_arg_stamp`, the time stamp of the proposal a bond, group, bridge, description or rule codelet carries (two proposals of one structure agree on everything else); the two inner draws are suppressed |
 | `'delete-codelets` | `coderack.ss` | One `choice` per eviction over `codelet-list` with `'get-removal-weight`, same `stamps`; `site` `evict@<who>`, unit unchanged |
 | codelet `'run` | `coderack.ss` | Sets `c`/`who`; top-down scouts get `scope` = name of their second argument |
 | `rules.ss:582` | `(add1 (trace-hook-int (length bridges)))` | `int` record, `result` is the raw 0-based draw |

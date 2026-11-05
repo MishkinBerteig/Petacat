@@ -333,3 +333,50 @@ def test_reference_crash_needs_a_matching_trace():
     pet = ct.Trace.from_records([{**HEADER, "seed": 2}, *pair_up(m), end(c=5)])
     rep = ct.compare_traces(meta, pet, REGISTRY)
     assert rep.counts == {"end": 1}
+
+
+# -- Metacat's crash on a group of six or more objects (DISCREPANCIES5.md R1) ---------------------
+
+_LONG = "bridge-builder(bridge(top,group(i.0-2,samegrp,-,letter-category),group(m.0-5,samegrp,-,letter-category)))"
+_SHORT = "bridge-builder(bridge(top,group(i.0-2,samegrp,-,letter-category),group(m.0-4,samegrp,-,letter-category)))"
+_NOT_PROCEDURE = "Exception: attempt to apply non-procedure #f"
+_SHIPPED = ct.Registry.load(ct.DEFAULT_REGISTRY)
+
+
+def _crash_trace(picked, error=_NOT_PROCEDURE, problem=("aaa", "aaaaaa", "aaa"), seed=1):
+    header = {**HEADER, "problem": list(problem), "seed": seed}
+    decision = {"t": "decision", "c": 609, "ctx": "choose", "who": "coderack", "n": 0, "kind": "choice",
+                "options": [picked, "breaker"], "weights": [1.0, 1.0], "picked": picked, "site": "m"}
+    meta_end = {"t": "end", "c": 609, "reason": "error", "error": error, "codelets": 608}
+    meta = ct.Trace.from_records([header, decision, meta_end])
+    pet = ct.Trace.from_records([{**header, "engine": "petacat"}, {**decision, "pair": 0},
+                                 {**decision, "c": 610, "pair": None},  # Petacat runs on
+                                 end(c=611)])
+    return ct.compare_traces(meta, pet, _SHIPPED)
+
+
+def test_a_metacat_crash_of_the_group_of_six_shape_is_registered_by_its_shape_not_by_seed():
+    for problem, seed in ((("aaa", "aaaaaa", "aaa"), 1), (("lll", "llllll", "lll"), 7), (("qhqsss", "qqhhqqssssss", "qhqsss"), 99)):
+        rep = _crash_trace(_LONG, problem=problem, seed=seed)
+        assert rep.unregistered_error_count == 0, (problem, seed, rep.counts)
+        assert "REF:crash-bridge-builder-group-of-6-or-more" in rep.registered_counts
+
+
+def test_any_other_metacat_crash_is_still_an_error():
+    assert _crash_trace(_SHORT).unregistered_error_count > 0  # a group of five has a number node
+    assert _crash_trace("rule-builder(rule(top,()))").unregistered_error_count > 0
+    assert _crash_trace(_LONG, error="Exception: unrecognized object message").unregistered_error_count > 0
+
+
+def test_the_smallest_group_of_six_crash_replays_to_its_end_with_the_crash_registered(tmp_path):
+    """``aaa -> aaaaaa; aaa`` seed 1, recorded in Metacat 1.2: it crashes in codelet 609 (608 run), a
+    ``bridge-builder`` of a bridge to the six-letter group.  Petacat agrees with it on every decision up to
+    that codelet, and goes on; the findings from there are registered as DISC5:R1."""
+    from tests.lockstep.run_trace import replay_trace
+
+    metacat = Path(__file__).parent / "data" / "crash-aaa-aaaaaa-aaa.seed1.metacat.jsonl.gz"
+    petacat, _outcome, _ = replay_trace(str(metacat), str(tmp_path))
+    rep = ct.compare_traces(ct.Trace.load(str(metacat)), ct.Trace.load(str(petacat)), _SHIPPED)
+    assert rep.unregistered_error_count == 0 and rep.agreement == 1.0
+    assert rep.registered_counts.get("REF:crash-bridge-builder-group-of-6-or-more", 0) > 0
+    assert rep.state_snapshots_differing == 0

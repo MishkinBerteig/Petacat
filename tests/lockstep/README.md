@@ -125,11 +125,12 @@ leaving out proposed structures, which the two programs hold differently by desi
 | Justify mode (85 runs) | 38,690 | none |
 | Episodes (536 runs) | 434,387 | 454, all in the three runs at `abc-abd-glz` seed 3 |
 
-What remains is one harness gap, not an engine difference: two builders for the same
-description that agree on everything the recorder logs, so replay cannot tell which one
-Metacat ran. Petacat builds the other proposal, whose time stamp differs
-(`DISCREPANCIES5.md` G-T3). The re-run also found two faults that the decisions had
-hidden:
+The one harness gap these corpora had, two builders (or two evaluators) for the same description or rule that
+agree on everything the recorder logged, so replay could not tell which one Metacat ran, is closed: the recorder
+now logs the proposal's own time stamp for a description and a rule as it did for a bond, a group and a bridge
+(`DISCREPANCIES5.md` G-T3). The corpora above were recorded before that, so the differing snapshots in the table
+(and the ratchets that carry them) are the old figures; re-recorded, those traces replay with none. The re-run also
+found two faults that the decisions had hidden:
 - **The snapshot writer** left out the translated rule justify mode adds without
   building it. That came to 8,682 snapshots across 40 justify traces. The API's rule
   list had the same filter, so the dashboard did not show that rule; both are fixed.
@@ -199,6 +200,18 @@ database lines, database branch arcs and the kinds of event, snag and clamp: a c
 none of them is not in the file. Each case's `why` in `golden/extended_cases.json` says what it added over
 the original baseline and the cases before it.
 
+**Every case runs on every numeric backend.** The committed records ran on `off`. The slow test
+`test_every_extended_case_does_the_same_on_each_numeric_backend` (one per backend: `numpy`, `python`, `mlx-cpu`,
+`mlx`) runs every case on that backend in a process pool and compares each field of each record with the committed
+backend's recomputation, and the final state with numbers normalised (a value that is `0` on one path and `0.0` on
+another is one value; that is the only way the raw `state` hash differs). A backend that is not installed or usable
+is reported as a skip, never a pass.
+
+**The two Metacat variants record the same.** `Metacat/build/source` is the known-failure-fixes variant. All 40
+original cases (65 traces) were recorded with `record.py --reference` and with `--known-failures-patch`: the traces
+are byte-identical apart from the header's `revision`. (`record_answers.py` runs only the build as it stands, so the
+five episodes' answer reports were not recorded on both; the runs they follow are identical.)
+
 **Every case was checked against Metacat 1.2.** Each case was recorded with `metacat/record.py` and
 replayed with `scripts/lockstep_corpus.py` in faithful mode: it counts only if the replay reaches the end,
 every decision agrees, there are no unregistered errors and no differing state snapshot. An episode must also
@@ -212,47 +225,79 @@ runs the default configuration on NumPy. One caveat: the replay follows Metacat'
 runs Petacat's own random stream on the same inputs, so the check says that the situations Metacat reaches
 are handled as Metacat handles them, not that the baseline's own trajectory is Metacat's.
 
-**What is in it** (40 cases, 65 runs, 5 episode answer reports; about 30 s in one process, the whole file
-recomputed in 6-10 s over a process pool): 23 discovery cases, 12 justify cases with wrong or unusual answers, 5 episodes; four with a
+**What is in it** (69 cases, 109 runs, 8 episode answer reports; about 30 s in one process, the whole file
+recomputed in 6-12 s over a process pool): 42 discovery cases, 19 justify cases, 8 episodes; four with a
 person's actions (the Options menu's group and rule codelet clamps, Clamp Themes with two themes, Undo last
 clamp, the Self-watching check item off and on again), one episode with Clear Memory before run 4, 15 runs
 that the codelet cap ends, and the first appearance of `conflict` snags, `manual-clamp` events and cap-ended
-runs in any baseline.
+runs in any baseline. Five cases (`-selfwatchingoff-`) run with Self-watching mode off from the start, through a
+per-case `parameters` entry (`self_watching_enabled_default: false`). Twenty-nine were added by stage F of round 2 after
+the fidelity fixes below: the two that exposed a defect (`ly -> yl; cbaii`, `aazzz -> azzza; aye`), the five
+Self-watching-off cases, 16 from stage W's wide check (N1, N2, defect A in an episode, the Self-watching switch at codelet 302, the cluster C runs and the long N3 run) and 6 that reach lines nothing before reached. They add no engine or database line or branch to the coverage below (measured: the
+posting rules give a Self-watching codelet probability 0 while the mode is off, so its fizzle lines can only be
+reached by a codelet already on the rack when the mode is switched off, as in `xqc-xqd-mrrjjj`); the five
+Self-watching-off cases change Petacat's own record on the code before the fix (the `state` hash for three; the
+decisions too for the two justify cases), whereas the other two do not: the baseline runs Petacat's own random
+stream, which neither defect moved in these runs, so they only show that the situation Metacat reaches is handled
+as Metacat handles it (`tests/unit/test_fidelity_fixes.py` guards the degree of support, and the recorder the time stamp).
 
 | | Original baseline | Original + extended |
 | --- | --- | --- |
-| Engine lines (`server/engine/**`, 14,178) | 11,381 (80.3 %) | 12,091 (85.3 %) |
-| Engine branches (5,876) | 4,140 | 4,525 |
-| Database code lines (845) | 778 | 793 |
-| Database code branch arcs (718) | 626 | 641 |
+| Engine lines (`server/engine/**`, 14,259) | 11,431 (80.2 %) | 12,149 (85.2 %) |
+| Engine branches (5,886) | 4,139 | 4,533 |
+| Database code lines (846) | 779 | 795 |
+| Database code branch arcs (718) | 626 | 644 |
 
 ```sh
 # Reproduce the file and read the coverage (minutes)
 .venv/bin/python scripts/capture_golden_baseline.py --extended --jobs 8            # writes only extended_*
 .venv/bin/python scripts/golden_coverage.py --which both --jobs 8                  # the table above
+# Measure candidate cases (extended-format JSON) with the baseline
+.venv/bin/python scripts/golden_coverage.py --which both --jobs 8 --extra-cases candidates.json
 # Record, replay and compare one candidate case
 python3 tests/lockstep/metacat/record.py --problem abc abd xyz --seeds 1 --cap 3000 --intervene "200:clamp-group,500:undo"
 .venv/bin/python scripts/lockstep_corpus.py --traces <out> --out-dir <out>/replays
 ```
 
-**Fidelity defects the search found** (cases that did not match; none is in the baseline; first point of
-divergence in each):
+**Fidelity defects the search found, and what fixed them** (round 2, stage F; each case is now in the file):
 - **Degree of support, `answer-finder`.** `ly → yl; cbaii`, seed 1, codelet 339: Metacat's `stochastic-if*`
-  probability is 0.44, Petacat's 0.45 (`builtins.py` `prob` site, the answer-finder's `(1- (% degree-of-support))`):
-  the chosen rule's degree of support is 56 in Metacat and 55 in Petacat. One decision in 1,894 disagrees;
-  the outcome was the same, so the replay went on. Not diagnosed further.
-- **`Themespace.add_theme` ignores Self-watching mode.** `themes.ss:374-375` returns `#f` when
-  `%self-watching-enabled%` is off; `themes.py:481-505` does not. With Self-watching off from the start, or
-  switched off in mid-run, every decision still agrees but themes Metacat never creates accumulate
-  (first at the first bridge built: `bridge-builder` -> `build_structure` -> `_boost_themespace_activations`
-  -> `boost_theme`), so every update-cycle snapshot after the first differs in `themes.theme(...)`.
-  Of 54 recorded cases (30 with the mode off from the start, 24 switched off in mid-run at codelet 300-500), 52 differ
-  this way and 2 match; in every one all decisions agree (reach = run length, agreement 1.0, no errors) over the
-  3,000-5,000 codelets recorded, which does not say a longer run would not.
-- **A description's time stamp.** `aazzz → azzza; aye`, seed 3: 81 differing snapshots, first at update cycle
-  120, `structures.descriptions[desc(m.2,alphabetic-position-category,alphabetic-last)]`, built at 1670 in
-  Metacat and 1676 in Petacat. The same shape as `DISCREPANCIES5.md` G-T3 (two builders for the same
-  description); not confirmed to be that one.
+  probability was 0.44, Petacat's 0.45. A bridge's strength is a whole number, so Metacat's `(% strength)` is an
+  exact rational and `rules.ss:237-242`'s `(100* (product ...))` is exact: 75 and 74 give 111/2, which rounds
+  half to even to 56. Petacat multiplied floats (`0.75 * 0.74 * 100` is 55.49999999999999) and got 55.
+  `Rule.get_degree_of_support` now multiplies `Fraction`s.
+- **`Themespace.add_theme` ignored Self-watching mode.** `themes.ss:374-375` returns `#f` when
+  `%self-watching-enabled%` is off. `Themespace.self_watching_enabled`, kept in step by
+  `EngineContext.self_watching_enabled` (a property), is now tested first. Every other use of the flag was
+  audited against the Scheme (`coderack.ss:469` posting, `trace.ss:117` `permission-to-clamp?`,
+  `jootsing.ss:25,258` and `themes.ss:752` the three self-watching codelets, `gui.ss:607-626` the switch):
+  all agreed except one. The justify clamps (`justify.ss:79,124,138`) asked `permission-to-clamp?` with the flag
+  defaulted to on, so a justify run with the mode off diverged at once (`abc → abd; xyz`, answer `wyz`, from
+  codelet 488); `TemporalTrace.permission_to_clamp` takes the flag with no default, and `attempt_justification`,
+  `clamp_rules` and the `answer-justifier` body pass it. The runner's `if ctx.self_watching_enabled` guards around
+  the Themespace's spreading (`run.ss:313-314` has none) are now redundant, since no theme exists while the mode is off,
+  and are kept. Of the 54 cases recorded earlier all 54 now match, and so do three justify cases with the mode off.
+- **The same mistake in four more places**, found by auditing every `round`, `100*`, `floor`, `truncate` and `ceiling`
+  of the Scheme (instrumented in Metacat, 123 runs, 65 sites reached; the table is `agents-workspace/metacat-cleanup/round2/F-fidelity/ROUNDING-AUDIT.tsv`, not part of the repository).
+  Scheme's whole numbers and the ratios they make stay exact until a float enters, and `round` of an exact ratio is
+  half to even on the exact value. Where Petacat went through a float product, the exact halves were lost:
+  `ConceptMapping.strength` and `slippability` (association 50, depth 30 gave 55 for Metacat's 54; association 50,
+  depth 90 gave 9 for 10), `compute-rule-quality` (uniformity 70, abstractness 37, succinctness 57 gave 31 for 32;
+  98 of 1,030,301 combinations, 14 of them reachable), the Slipnet's spread at an `update_cycle_length` other than 15
+  (186 of 612,060 combinations; the float backends are not used then), and the decay at a whole-number exponent above
+  1. All now round through `server/engine/formulas.py` (`round_exact`, `round_ratio`: whole-number arithmetic, no
+  rational type), with exhaustive tests in `tests/unit/test_exact_rounding.py`. The other 60 sites are one correctly
+  rounded division of whole numbers, a float in Metacat too, or display; each is a row of the audit.
+- **Stage W's wide check** (4,384 runs against Metacat, `DISCREPANCIES5.md` F-N1, F-N2, F-N4, F-C, R1): the order
+  `check-for-conflicts` and `apply-transforms` take (Chez's `pairwise-map` and merge sort), a consolidated group built over
+  a slot a stale bond holds (`build-bond` overwrites the pointers), and the recording limit behind stage W's "cluster C"
+  and its long N3 run, which re-recorded replay with no difference. The one thing left is not a defect to fix: Metacat itself
+  crashes on a `bridge-builder` of a group of six or more objects (`slipnet.ss:495`, `bridges.ss:1404-1407`,
+  `concept-mappings.ss:40`; 83 of the 4,384 runs). Petacat's guard at `builtins.py` stays, and `known_divergences.toml`
+  registers the crash by its shape (`REF:crash-bridge-builder-group-of-6-or-more`), not by seed.
+- **A description's time stamp** was not an engine fault. `aazzz → azzza; aye`, seed 3: two top-down description scouts
+  proposed `desc(m.2,alphabetic-position-category,alphabetic-last)` at 1670 and 1676, both builders agreed on every
+  field the recorder logged, and replay took the later one (`DISCREPANCIES5.md` G-T3). Fixed in the recorder
+  (`decision-trace.ss`, `picked_arg_stamp` for a description and a rule); no engine change.
 - **Not Metacat's to run.** Problem strings with a capital letter or a digit (`abC`, `1234`) are accepted by
   Petacat and refused by Metacat's recorder (lowercase letters only), so they cannot be checked and are not in the baseline.
 
@@ -264,7 +309,8 @@ spreading-activation threshold control.
 `--intervene` (codelet-pattern clamps, Clamp Themes, Undo last clamp, the Self-watching check item) and
 `--self-watching off`, with the replay side in `run_trace.py`, `faithful.py` and
 `../support/interventions.py` (which calls the product's own `RunService.clamp_codelet_pattern`,
-`clamp_theme_pattern`, `undo_last_clamp` and `set_self_watching`). `scripts/compare_episode_answers.py` had
+`clamp_theme_pattern`, `undo_last_clamp` and `set_self_watching`, bare: each binds the run's own id allocator, so
+a clamp event's number is the run's and not the process's). `scripts/compare_episode_answers.py` had
 stopped working at `d4b4cd2` (`explain_answer` now needs the run's `meta`) and was repaired.
 
 ## Rule English and event names

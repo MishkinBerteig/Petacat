@@ -1061,7 +1061,7 @@
    ],
    "uses_cc": true,
    "why": "BARRIER (clamp state). Passes trace/themespace/slipnet/memory/coderack/temperature objects directly into the engine function.",
-   "body_digest": "8175e0f9fa8089d7e6abb628f509c56658ec543c3cd05bee28af2305f1c14ed8"
+   "body_digest": "fa08b9a5ecafa1f0fffde9162f468265f46a3aa8cccee71da0100540a8056996"
   },
   "thematic-bridge-scout": {
    "barrier": false,

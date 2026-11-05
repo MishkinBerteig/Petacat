@@ -1720,6 +1720,1276 @@
      }
     ]
    }
+  },
+  {
+   "id": "discovery/ly-yl-cbaii/s1-cap3000",
+   "kind": "discovery",
+   "problem": [
+    "ly",
+    "yl",
+    "cbaii"
+   ],
+   "seeds": [
+    1
+   ],
+   "cap": 3000,
+   "why": {
+    "engine_lines": 0,
+    "engine_arcs": 0,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [
+     "a rule's degree of support is an exact product: bridges of strength 75 and 74 give 56 (Metacat's rationals), not 55 (the float product)"
+    ],
+    "most_new_in": [],
+    "note": "no line or branch that the cases before it leave unreached; admitted for the fidelity defect it exposed (stage F)"
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 339,
+      "run_length": 339,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "discovery/aazzz-azzza-aye/s3-cap8000",
+   "kind": "discovery",
+   "problem": [
+    "aazzz",
+    "azzza",
+    "aye"
+   ],
+   "seeds": [
+    3
+   ],
+   "cap": 8000,
+   "why": {
+    "engine_lines": 0,
+    "engine_arcs": 0,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [
+     "two top-down description scouts propose one description at two times (1670, 1676) and the earlier one is built"
+    ],
+    "most_new_in": [],
+    "note": "no line or branch that the cases before it leave unreached; admitted for the fidelity defect it exposed (stage F)"
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 7367,
+      "run_length": 7367,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "discovery/abc-abd-xyz/s1-selfwatchingoff-cap3000",
+   "kind": "discovery",
+   "problem": [
+    "abc",
+    "abd",
+    "xyz"
+   ],
+   "seeds": [
+    1
+   ],
+   "cap": 3000,
+   "parameters": {
+    "self_watching_enabled_default": false
+   },
+   "why": {
+    "engine_lines": 0,
+    "engine_arcs": 0,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [
+     "Self-watching mode off from the start: add-theme adds nothing, no thematic-bridge-scout, progress-watcher or jootser is posted"
+    ],
+    "most_new_in": [],
+    "note": "no line or branch that the cases before it leave unreached; admitted for the fidelity defect it exposed (stage F)"
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 1455,
+      "run_length": 1455,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "discovery/abc-abd-mrrjjj/s1-selfwatchingoff-cap3000",
+   "kind": "discovery",
+   "problem": [
+    "abc",
+    "abd",
+    "mrrjjj"
+   ],
+   "seeds": [
+    1
+   ],
+   "cap": 3000,
+   "parameters": {
+    "self_watching_enabled_default": false
+   },
+   "why": {
+    "engine_lines": 0,
+    "engine_arcs": 0,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [
+     "Self-watching mode off from the start (group problem)"
+    ],
+    "most_new_in": [],
+    "note": "no line or branch that the cases before it leave unreached; admitted for the fidelity defect it exposed (stage F)"
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 706,
+      "run_length": 706,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "discovery/rst-rsu-xyz/s2-selfwatchingoff-cap3000",
+   "kind": "discovery",
+   "problem": [
+    "rst",
+    "rsu",
+    "xyz"
+   ],
+   "seeds": [
+    2
+   ],
+   "cap": 3000,
+   "parameters": {
+    "self_watching_enabled_default": false
+   },
+   "why": {
+    "engine_lines": 0,
+    "engine_arcs": 0,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [
+     "Self-watching mode off from the start (successor problem)"
+    ],
+    "most_new_in": [],
+    "note": "no line or branch that the cases before it leave unreached; admitted for the fidelity defect it exposed (stage F)"
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 2500,
+      "run_length": 2500,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "justify/abc-abd-xyz-wyz/s1-selfwatchingoff-cap3000",
+   "kind": "justify",
+   "problem": [
+    "abc",
+    "abd",
+    "xyz"
+   ],
+   "seeds": [
+    1
+   ],
+   "answer": "wyz",
+   "cap": 3000,
+   "parameters": {
+    "self_watching_enabled_default": false
+   },
+   "why": {
+    "engine_lines": 0,
+    "engine_arcs": 0,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [
+     "justify mode with Self-watching off: the justify clamps ask permission-to-clamp? with the real flag and are denied"
+    ],
+    "most_new_in": [],
+    "note": "no line or branch that the cases before it leave unreached; admitted for the fidelity defect it exposed (stage F)"
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 3000,
+      "run_length": 3000,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "justify/az-ay-bc-bc/s1-selfwatchingoff-cap3000",
+   "kind": "justify",
+   "problem": [
+    "az",
+    "ay",
+    "bc"
+   ],
+   "seeds": [
+    1
+   ],
+   "answer": "bc",
+   "cap": 3000,
+   "parameters": {
+    "self_watching_enabled_default": false
+   },
+   "why": {
+    "engine_lines": 0,
+    "engine_arcs": 0,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [
+     "justify mode with Self-watching off, an answer reached by a wrong rule"
+    ],
+    "most_new_in": [],
+    "note": "no line or branch that the cases before it leave unreached; admitted for the fidelity defect it exposed (stage F)"
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 907,
+      "run_length": 907,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "discovery/wxyz-xxyz-fgzzz/s3-cap5000",
+   "kind": "discovery",
+   "problem": [
+    "wxyz",
+    "xxyz",
+    "fgzzz"
+   ],
+   "seeds": [
+    3
+   ],
+   "cap": 5000,
+   "why": {
+    "engine_lines": 0,
+    "engine_arcs": 0,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [
+     "N1: Chez's pairwise-map order decides which conflict check-for-conflicts reports (rules.ss:1321-1338)"
+    ],
+    "most_new_in": [],
+    "note": "no line or branch that the cases before it leave unreached; admitted for the fidelity defect it exposed (stage F, from stage W's wide check)"
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 5000,
+      "run_length": 5000,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     },
+     {
+      "reach": 5000,
+      "run_length": 5000,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "discovery/zyx-xyy-z/s1-cap5000",
+   "kind": "discovery",
+   "problem": [
+    "zyx",
+    "xyy",
+    "z"
+   ],
+   "seeds": [
+    1
+   ],
+   "cap": 5000,
+   "why": {
+    "engine_lines": 0,
+    "engine_arcs": 0,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [
+     "N2: apply-transforms sorts with apply-before?, which is not a strict order (rules.ss:1341-1350, 1395-1403)"
+    ],
+    "most_new_in": [],
+    "note": "no line or branch that the cases before it leave unreached; admitted for the fidelity defect it exposed (stage F, from stage W's wide check)"
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 3596,
+      "run_length": 3596,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "episode/cy-yc-dc/s6x6-clear3-cap4000",
+   "kind": "episode",
+   "problem": [
+    "cy",
+    "yc",
+    "dc"
+   ],
+   "seeds": [
+    6,
+    7,
+    8,
+    9,
+    10,
+    11
+   ],
+   "cap": 4000,
+   "clear_before": [
+    3
+   ],
+   "why": {
+    "engine_lines": 0,
+    "engine_arcs": 0,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [
+     "defect A in an episode with Clear Memory before run 3: the answer-finder's degree of support, runs 5 and 6"
+    ],
+    "most_new_in": [],
+    "note": "no line or branch that the cases before it leave unreached; admitted for the fidelity defect it exposed (stage F, from stage W's wide check)"
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 139,
+      "run_length": 139,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     },
+     {
+      "reach": 927,
+      "run_length": 927,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     },
+     {
+      "reach": 480,
+      "run_length": 480,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     },
+     {
+      "reach": 258,
+      "run_length": 258,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     },
+     {
+      "reach": 3062,
+      "run_length": 3062,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     },
+     {
+      "reach": 4000,
+      "run_length": 4000,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "discovery/pqrs-ppqqrrss-ttt/s1-person-cap3000",
+   "kind": "discovery",
+   "problem": [
+    "pqrs",
+    "ppqqrrss",
+    "ttt"
+   ],
+   "seeds": [
+    1
+   ],
+   "cap": 3000,
+   "interventions": [
+    {
+     "at": 302,
+     "op": "set_self_watching",
+     "enabled": false
+    }
+   ],
+   "why": {
+    "engine_lines": 0,
+    "engine_arcs": 0,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [
+     "Self-watching switched off at codelet 302, then a group consolidated over a slot a stale bond holds (build-bond overwrites the pointers)"
+    ],
+    "most_new_in": [],
+    "note": "no line or branch that the cases before it leave unreached; admitted for the fidelity defect it exposed (stage F, from stage W's wide check)"
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 3000,
+      "run_length": 3000,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "discovery/ywvut-olt-nvn/s1-cap5000",
+   "kind": "discovery",
+   "problem": [
+    "ywvut",
+    "olt",
+    "nvn"
+   ],
+   "seeds": [
+    1
+   ],
+   "cap": 5000,
+   "why": {
+    "engine_lines": 0,
+    "engine_arcs": 0,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [
+     "two proposals of one description or rule at the same time stamp (G-T3 family)"
+    ],
+    "most_new_in": [],
+    "note": "no line or branch that the cases before it leave unreached; admitted for the fidelity defect it exposed (stage F, from stage W's wide check)"
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 4383,
+      "run_length": 4383,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "discovery/e-r-xxab/s1-cap5000",
+   "kind": "discovery",
+   "problem": [
+    "e",
+    "r",
+    "xxab"
+   ],
+   "seeds": [
+    1
+   ],
+   "cap": 5000,
+   "why": {
+    "engine_lines": 0,
+    "engine_arcs": 0,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [
+     "two proposals of one description or rule at the same time stamp (G-T3 family)"
+    ],
+    "most_new_in": [],
+    "note": "no line or branch that the cases before it leave unreached; admitted for the fidelity defect it exposed (stage F, from stage W's wide check)"
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 3521,
+      "run_length": 3521,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "discovery/crhg-ccrhg-ayxz/s1-cap5000",
+   "kind": "discovery",
+   "problem": [
+    "crhg",
+    "ccrhg",
+    "ayxz"
+   ],
+   "seeds": [
+    1
+   ],
+   "cap": 5000,
+   "why": {
+    "engine_lines": 0,
+    "engine_arcs": 0,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [
+     "two proposals of one description or rule at the same time stamp (G-T3 family)"
+    ],
+    "most_new_in": [],
+    "note": "no line or branch that the cases before it leave unreached; admitted for the fidelity defect it exposed (stage F, from stage W's wide check)"
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 5000,
+      "run_length": 5000,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "discovery/xzyb-n-xzyb/s1-cap5000",
+   "kind": "discovery",
+   "problem": [
+    "xzyb",
+    "n",
+    "xzyb"
+   ],
+   "seeds": [
+    1
+   ],
+   "cap": 5000,
+   "why": {
+    "engine_lines": 0,
+    "engine_arcs": 0,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [
+     "two proposals of one description or rule at the same time stamp (G-T3 family)"
+    ],
+    "most_new_in": [],
+    "note": "no line or branch that the cases before it leave unreached; admitted for the fidelity defect it exposed (stage F, from stage W's wide check)"
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 4731,
+      "run_length": 4731,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "discovery/abc-abd-glz/s3-cap6000",
+   "kind": "discovery",
+   "problem": [
+    "abc",
+    "abd",
+    "glz"
+   ],
+   "seeds": [
+    3
+   ],
+   "cap": 6000,
+   "why": {
+    "engine_lines": 0,
+    "engine_arcs": 0,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [
+     "two proposals of one description or rule at the same time stamp (G-T3 family)"
+    ],
+    "most_new_in": [],
+    "note": "no line or branch that the cases before it leave unreached; admitted for the fidelity defect it exposed (stage F, from stage W's wide check)"
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 2846,
+      "run_length": 2846,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     },
+     {
+      "reach": 2406,
+      "run_length": 2406,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     },
+     {
+      "reach": 2973,
+      "run_length": 2973,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "discovery/zbwn-nbwn-jinn/s2-person-cap3000",
+   "kind": "discovery",
+   "problem": [
+    "zbwn",
+    "nbwn",
+    "jinn"
+   ],
+   "seeds": [
+    2
+   ],
+   "cap": 3000,
+   "interventions": [
+    {
+     "at": 900,
+     "op": "clamp_codelet_pattern",
+     "pattern": "rule"
+    }
+   ],
+   "why": {
+    "engine_lines": 0,
+    "engine_arcs": 0,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [
+     "two proposals of one description or rule at the same time stamp (G-T3 family)"
+    ],
+    "most_new_in": [],
+    "note": "no line or branch that the cases before it leave unreached; admitted for the fidelity defect it exposed (stage F, from stage W's wide check)"
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 1664,
+      "run_length": 1664,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "discovery/chww-jjjj-idi/s2-person-cap3000",
+   "kind": "discovery",
+   "problem": [
+    "chww",
+    "jjjj",
+    "idi"
+   ],
+   "seeds": [
+    2
+   ],
+   "cap": 3000,
+   "interventions": [
+    {
+     "at": 136,
+     "op": "clamp_codelet_pattern",
+     "pattern": "group"
+    },
+    {
+     "at": 633,
+     "op": "clamp_codelet_pattern",
+     "pattern": "rule"
+    },
+    {
+     "at": 790,
+     "op": "undo_last_clamp"
+    }
+   ],
+   "why": {
+    "engine_lines": 0,
+    "engine_arcs": 0,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [
+     "two proposals of one description or rule at the same time stamp (G-T3 family)"
+    ],
+    "most_new_in": [],
+    "note": "no line or branch that the cases before it leave unreached; admitted for the fidelity defect it exposed (stage F, from stage W's wide check)"
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 3000,
+      "run_length": 3000,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "discovery/rst-rsu-xyz/s1-person-cap3000",
+   "kind": "discovery",
+   "problem": [
+    "rst",
+    "rsu",
+    "xyz"
+   ],
+   "seeds": [
+    1
+   ],
+   "cap": 3000,
+   "interventions": [
+    {
+     "at": 49,
+     "op": "clamp_codelet_pattern",
+     "pattern": "group"
+    },
+    {
+     "at": 780,
+     "op": "undo_last_clamp"
+    }
+   ],
+   "why": {
+    "engine_lines": 0,
+    "engine_arcs": 0,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [
+     "two proposals of one description or rule at the same time stamp (G-T3 family)"
+    ],
+    "most_new_in": [],
+    "note": "no line or branch that the cases before it leave unreached; admitted for the fidelity defect it exposed (stage F, from stage W's wide check)"
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 2659,
+      "run_length": 2659,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "episode/wxyz-vxyz-abcd/s8x6-cap4000",
+   "kind": "episode",
+   "problem": [
+    "wxyz",
+    "vxyz",
+    "abcd"
+   ],
+   "seeds": [
+    8,
+    9,
+    10,
+    11,
+    12,
+    13
+   ],
+   "cap": 4000,
+   "why": {
+    "engine_lines": 0,
+    "engine_arcs": 0,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [
+     "two proposals of one description or rule at the same time stamp (G-T3 family)"
+    ],
+    "most_new_in": [],
+    "note": "no line or branch that the cases before it leave unreached; admitted for the fidelity defect it exposed (stage F, from stage W's wide check)"
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 2753,
+      "run_length": 2753,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     },
+     {
+      "reach": 4000,
+      "run_length": 4000,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     },
+     {
+      "reach": 3489,
+      "run_length": 3489,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     },
+     {
+      "reach": 2296,
+      "run_length": 2296,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     },
+     {
+      "reach": 3636,
+      "run_length": 3636,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     },
+     {
+      "reach": 4000,
+      "run_length": 4000,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "justify/zzzcab-zzzcab-zzzcab/s1-cap5000",
+   "kind": "justify",
+   "problem": [
+    "zzzcab",
+    "zzzcab",
+    "zzzcab"
+   ],
+   "seeds": [
+    1
+   ],
+   "answer": "zzzcab",
+   "cap": 5000,
+   "why": {
+    "engine_lines": 0,
+    "engine_arcs": 0,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [
+     "two proposals of one description or rule at the same time stamp (G-T3 family)"
+    ],
+    "most_new_in": [],
+    "note": "no line or branch that the cases before it leave unreached; admitted for the fidelity defect it exposed (stage F, from stage W's wide check)"
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 4090,
+      "run_length": 4090,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "discovery/jklcba-jklcbb-kljzj/s3-cap60000",
+   "kind": "discovery",
+   "problem": [
+    "jklcba",
+    "jklcbb",
+    "kljzj"
+   ],
+   "seeds": [
+    3
+   ],
+   "cap": 60000,
+   "why": {
+    "engine_lines": 0,
+    "engine_arcs": 0,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [
+     "N3: a long run (22,716 codelets) whose description-evaluator tie only the proposal's own time stamp resolves"
+    ],
+    "most_new_in": [],
+    "note": "no line or branch that the cases before it leave unreached; admitted for the fidelity defect it exposed (stage F, from stage W's wide check)"
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 22716,
+      "run_length": 22716,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "episode/wxyz-vxyz-abcd/s6x6-cap4000",
+   "kind": "episode",
+   "problem": [
+    "wxyz",
+    "vxyz",
+    "abcd"
+   ],
+   "seeds": [
+    6,
+    7,
+    8,
+    9,
+    10,
+    11
+   ],
+   "cap": 4000,
+   "why": {
+    "engine_lines": 0,
+    "engine_arcs": 0,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [
+     "two proposals of one description or rule at the same time stamp (G-T3 family)"
+    ],
+    "most_new_in": [],
+    "note": "no line or branch that the cases before it leave unreached; admitted for the fidelity defect it exposed (stage F, from stage W's wide check)"
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 3265,
+      "run_length": 3265,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     },
+     {
+      "reach": 4000,
+      "run_length": 4000,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     },
+     {
+      "reach": 2753,
+      "run_length": 2753,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     },
+     {
+      "reach": 4000,
+      "run_length": 4000,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     },
+     {
+      "reach": 3489,
+      "run_length": 3489,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     },
+     {
+      "reach": 2296,
+      "run_length": 2296,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "justify/vwx-xwv-bobmqm-mqmbob/s1-cap5000",
+   "kind": "justify",
+   "problem": [
+    "vwx",
+    "xwv",
+    "bobmqm"
+   ],
+   "seeds": [
+    1
+   ],
+   "answer": "mqmbob",
+   "cap": 5000,
+   "why": {
+    "engine_lines": 3,
+    "engine_arcs": 3,
+    "database_lines": 1,
+    "database_branch_arcs": 1,
+    "features": [
+     "found by stage W's wide check (4,384 runs against Metacat); reaches lines the cases before it leave unreached"
+    ],
+    "most_new_in": []
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 5000,
+      "run_length": 5000,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "justify/zzzy-yzzz-lll-llm/s1-cap5000",
+   "kind": "justify",
+   "problem": [
+    "zzzy",
+    "yzzz",
+    "lll"
+   ],
+   "seeds": [
+    1
+   ],
+   "answer": "llm",
+   "cap": 5000,
+   "why": {
+    "engine_lines": 3,
+    "engine_arcs": 2,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [
+     "found by stage W's wide check (4,384 runs against Metacat); reaches lines the cases before it leave unreached"
+    ],
+    "most_new_in": []
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 5000,
+      "run_length": 5000,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "discovery/ndnroh-ndnrohi-bbbxnx/s1-person-cap3000",
+   "kind": "discovery",
+   "problem": [
+    "ndnroh",
+    "ndnrohi",
+    "bbbxnx"
+   ],
+   "seeds": [
+    1
+   ],
+   "cap": 3000,
+   "interventions": [
+    {
+     "at": 839,
+     "op": "clamp_codelet_pattern",
+     "pattern": "bottom_up"
+    },
+    {
+     "at": 1122,
+     "op": "clamp_theme_pattern",
+     "themes": [
+      {
+       "type": "vertical_bridge",
+       "dimension": "plato-string-position-category",
+       "relation": "diff",
+       "activation": 100
+      },
+      {
+       "type": "top_bridge",
+       "dimension": "plato-string-position-category",
+       "relation": "predecessor",
+       "activation": 100
+      }
+     ]
+    }
+   ],
+   "why": {
+    "engine_lines": 1,
+    "engine_arcs": 3,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [
+     "found by stage W's wide check (4,384 runs against Metacat); reaches lines the cases before it leave unreached"
+    ],
+    "most_new_in": []
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 3000,
+      "run_length": 3000,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "justify/qwx-qw-nop-qwx/s1-cap5000",
+   "kind": "justify",
+   "problem": [
+    "qwx",
+    "qw",
+    "nop"
+   ],
+   "seeds": [
+    1
+   ],
+   "answer": "qwx",
+   "cap": 5000,
+   "why": {
+    "engine_lines": 1,
+    "engine_arcs": 1,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [
+     "found by stage W's wide check (4,384 runs against Metacat); reaches lines the cases before it leave unreached"
+    ],
+    "most_new_in": []
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 4762,
+      "run_length": 4762,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "discovery/bbbpqr-bbbpqq-ef/s1-cap5000",
+   "kind": "discovery",
+   "problem": [
+    "bbbpqr",
+    "bbbpqq",
+    "ef"
+   ],
+   "seeds": [
+    1
+   ],
+   "cap": 5000,
+   "why": {
+    "engine_lines": 1,
+    "engine_arcs": 1,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [
+     "found by stage W's wide check (4,384 runs against Metacat); reaches lines the cases before it leave unreached"
+    ],
+    "most_new_in": []
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 5000,
+      "run_length": 5000,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "justify/wxyz-wwxyz-gwxtu-wxyz/s1-cap5000",
+   "kind": "justify",
+   "problem": [
+    "wxyz",
+    "wwxyz",
+    "gwxtu"
+   ],
+   "seeds": [
+    1
+   ],
+   "answer": "wxyz",
+   "cap": 5000,
+   "why": {
+    "engine_lines": 0,
+    "engine_arcs": 0,
+    "database_lines": 0,
+    "database_branch_arcs": 2,
+    "features": [
+     "found by stage W's wide check (4,384 runs against Metacat); reaches lines the cases before it leave unreached"
+    ],
+    "most_new_in": []
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 4956,
+      "run_length": 4956,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
   }
  ]
 }

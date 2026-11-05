@@ -83,7 +83,9 @@ def test_the_extended_files_are_consistent() -> None:
         assert gb.sha(",".join(map(str, draws))) == r["rng_per_codelet"], r["id"]
         assert sidecar[r["id"]]["init"] + sum(draws) == r["rng_total"], r["id"]
         assert set(r["english"]) == {"rule_english", "commentary", "verbose", "trace_display", "snag"}
-        assert r["parameters"] == spec["parameters"]
+        case_of = next(c for c in spec["cases"]
+                       if r["id"] == c["id"] or r["id"].startswith(c["id"] + "/") or r["id"].startswith(c["id"] + ".r"))
+        assert r["parameters"] == {**spec["parameters"], **case_of.get("parameters", {})}
         assert r["numeric_backend"] == next(
             c.get("backend", spec["backend"]) for c in spec["cases"] if r["id"].startswith(c["id"]))
     for r in records:
@@ -164,6 +166,52 @@ def test_the_whole_extended_baseline_reproduces_byte_for_byte(tmp_path: Path) ->
         pytest.fail("extended golden baseline differs from the recomputed one.\n" + message)
     assert (tmp_path / ge.RNG_DETAIL_PATH.name).read_bytes() == ge.RNG_DETAIL_PATH.read_bytes(), \
         "extended per-codelet RNG sidecar differs"
+
+
+#: The numeric backends a run can use.  ``off`` (the engine's own loops) is what the committed
+#: records ran on; these four must do the same thing as it.
+CROSS_BACKENDS = ["numpy", "python", "mlx-cpu", "mlx"]
+
+
+@pytest.fixture(scope="module")
+def committed_backend_runs() -> list:
+    """Every extended case recomputed on its committed backend, with normalised state digests."""
+    return ge.capture_all_normalised(None, max(1, min(8, (os.cpu_count() or 2) - 1)))
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("backend", CROSS_BACKENDS)
+def test_every_extended_case_does_the_same_on_each_numeric_backend(backend: str, committed_backend_runs) -> None:
+    """The rare paths of Metacat Mode do not depend on the numeric backend.
+
+    The committed records ran on ``off`` (three cases on ``python``).  Here every case runs on
+    *backend* and is compared with the committed backend's recomputation: every field of every
+    record (the answer, the codelet count, the draws of each codelet, the English, the hashes) and
+    the final state with numbers normalised (a value that is ``0`` on one path and ``0.0`` on
+    another is one value; the raw ``state`` hash differs only so).  A backend that is not
+    available here is a skip, never a pass.
+    """
+    from server.engine.numeric.backend import available_backends
+
+    if backend not in available_backends():
+        pytest.skip(f"numeric backend {backend!r} is not available here")
+    jobs = max(1, min(8, (os.cpu_count() or 2) - 1))
+    other = ge.capture_all_normalised(backend, jobs)
+    spec = _spec()
+    differences: list[str] = []
+    runs = 0
+    for case, (recs_a, states_a), (recs_b, states_b) in zip(spec["cases"], committed_backend_runs, other):
+        if states_a != states_b:
+            differences.append(f"{case['id']}: the final state differs beyond number form")
+        for a, b in zip(recs_a, recs_b):
+            runs += 1
+            keys = (set(a) | set(b)) - {"numeric_backend", "state"}
+            bad = sorted(k for k in keys if a.get(k) != b.get(k))
+            if bad:
+                differences.append(f"{a['id']}: {bad}")
+        assert len(recs_a) == len(recs_b)
+    assert runs == len(_records())
+    assert not differences, f"on {backend}:\n" + "\n".join(differences[:20])
 
 
 def test_the_extended_baseline_notices_a_change_in_behaviour() -> None:

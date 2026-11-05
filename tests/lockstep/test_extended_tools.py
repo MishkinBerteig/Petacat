@@ -133,3 +133,53 @@ def test_the_coverage_tool_attributes_database_code_to_its_units() -> None:
         monitor.stop()
     assert {line for name, line in monitor.lines if name == "<codelet:probe>"} == {1, 2, 3}
     assert len([b for b in monitor.branches if b[0] == "<codelet:probe>"]) == 1
+
+
+# -- two proposals of one description: told apart by the proposal's own time stamp ---------------
+
+
+def test_the_recorder_stamps_a_description_proposal_and_replay_tells_two_apart(tmp_path: Path, monkeypatch) -> None:
+    """``aazzz -> azzza; aye`` seed 3: two top-down description scouts proposed
+    ``desc(m.2,alphabetic-position-category,alphabetic-last)`` at 1670 and 1676, both evaluators and
+    builders agreed on name, stamp and urgency, and the one Metacat built was stamped 1670 while
+    Petacat's replay took the later one (first differing snapshot, update cycle 120).  The recorder
+    must log the proposal's stamp for a description as it does for a bond, group or bridge, and
+    replay must use it."""
+    from types import SimpleNamespace
+
+    from tests.lockstep import replay_rng as rr
+    from tests.lockstep import tracing_rng as tr
+    from tests.lockstep.trace_io import TraceWriter
+
+    recorder = (Path(__file__).parent / "metacat" / "decision-trace.ss").read_text()
+    assert "'(bond group bridge description rule)" in recorder
+
+    def codelet(cid, proposal_stamp):
+        return SimpleNamespace(
+            id=cid, codelet_type="description-builder", time_stamp=1764, urgency=76.0,
+            original_urgency=76.0,
+            arguments={"structure": SimpleNamespace(time_stamp=proposal_stamp)})
+
+    first, second = codelet(1, 1670), codelet(2, 1676)
+    name = "description-builder(desc(m.2,alphabetic-position-category,alphabetic-last))"
+    monkeypatch.setattr(tr, "option_name", lambda o: name if hasattr(o, "codelet_type") else str(o))
+    monkeypatch.setattr(rr, "option_name", lambda o: name if hasattr(o, "codelet_type") else str(o), raising=False)
+    monkeypatch.setattr(rr, "name_of", lambda o: name if hasattr(o, "codelet_type") else str(o))
+    monkeypatch.setattr(rr, "choice_fields", lambda items, weights, idx, uniform: {
+        "options": [name for _ in idx], "weights": [float(weights[i]) for i in idx]})
+
+    records = [
+        {"t": "header", "format": 1},
+        {"t": "decision", "c": 1796, "ctx": "choose", "who": "coderack", "n": 0, "kind": "choice",
+         "options": [name, name], "weights": [105.0, 105.0], "picked": name, "stamps": [1764, 1764],
+         "picked_stamp": 1764, "picked_weight": 105.0, "picked_urgency": 76.0,
+         "picked_original_urgency": 76.0, "picked_arg_stamp": 1676, "site": "choose-codelet@coderack"},
+        {"t": "end", "c": 1797, "reason": "cap"},
+    ]
+    path = tmp_path / "t.jsonl"
+    path.write_text("\n".join(json.dumps(r) for r in records) + "\n")
+    rng = rr.ReplayRNG(1, rr.MetacatTrace(path), TraceWriter(tmp_path / "out.jsonl"))
+    rng.tc.c, rng.tc.ctx, rng.tc.who = 1796, "choose", "coderack"
+    chosen = rng._decide_composite("choose", [first, second], [105.0, 105.0], [1764, 1764],
+                                   [0, 1], False, lambda: None)
+    assert chosen is second, "replay took the proposal stamped 1670 where Metacat took 1676"

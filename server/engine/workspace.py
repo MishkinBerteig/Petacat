@@ -143,7 +143,7 @@ class WorkspaceString:
     def letters(self) -> list[Letter]:
         return [o for o in self.objects if isinstance(o, Letter)]
 
-    def add_bond(self, bond: Bond) -> None:
+    def add_bond(self, bond: Bond, *, displacing: bool = False) -> None:
         # Scheme: ``build-bond`` (bonds.ss:410-422).  The two positional slots must
         # already be free — ``bond-builder`` breaks every bond it displaced
         # (bonds.ss:403-404) *before* calling this.  Overwriting an occupied slot
@@ -151,14 +151,17 @@ class WorkspaceString:
         # support and still reported as built, with both its pointers now naming
         # someone else's bond.  That is a corrupt string, and the corruption shows
         # up far from its cause, so refuse it here instead.
+        # ``displacing``: the group builder's consolidation (groups.ss:714-726, 752-764) builds a bond
+        # into a slot another bond holds and Metacat simply overwrites the pointers; the displaced bond
+        # stays in the string's list.  Nothing else may.
         occupant = bond.left_object.right_bond
-        if occupant is not None and occupant is not bond:
+        if not displacing and occupant is not None and occupant is not bond:
             raise AssertionError(
                 f"right slot of {bond.left_object} is already held by {occupant}: "
                 f"the builder must break incompatible bonds before building {bond}"
             )
         occupant = bond.right_object.left_bond
-        if occupant is not None and occupant is not bond:
+        if not displacing and occupant is not None and occupant is not bond:
             raise AssertionError(
                 f"left slot of {bond.right_object} is already held by {occupant}: "
                 f"the builder must break incompatible bonds before building {bond}"
