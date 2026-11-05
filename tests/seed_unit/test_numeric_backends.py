@@ -1070,3 +1070,39 @@ def test_every_backend_defines_the_jump_probability_at_a_zero_share_and_at_overf
         indices, probs = candidates(backend_name)
         assert indices == reference[0]
         assert probs == pytest.approx(reference[1], rel=1e-5)
+
+
+@pytest.mark.skipif("mlx" not in available_backends(), reason="MLX is not installed")
+def test_a_reader_arriving_mid_build_sees_a_complete_class_registry(monkeypatch) -> None:
+    """``_classes`` builds the registry whole before publishing it.
+
+    A second thread that calls ``_classes()`` while the first is between its imports is
+    modelled deterministically: the ``mlx_backend`` import is replaced by an object whose first
+    ``MlxBackend`` lookup calls ``_classes()`` re-entrantly, which is exactly the view such a
+    thread would have.  That view must already hold ``mlx`` and ``mlx-cpu``; a registry filled
+    entry by entry and read when merely non-empty would show only ``python`` and ``numpy``.
+    """
+    import importlib
+    from server.engine.numeric import backend
+
+    real = importlib.import_module("server.engine.numeric.mlx_backend")
+    nested: list[dict] = []
+    entered: list[bool] = []
+
+    class Fake:
+        def __getattr__(self, name):
+            if name == "MlxBackend" and not entered:
+                entered.append(True)
+                nested.append(dict(backend._classes()))
+            return getattr(real, name)
+
+    backend.reset_backend_cache()
+    try:
+        monkeypatch.setitem(sys.modules, "server.engine.numeric.mlx_backend", Fake())
+        final = backend._classes()
+        assert nested, "the nested lookup never ran, so the build was not interrupted"
+        assert {"mlx", "mlx-cpu"} <= set(nested[0])
+        assert set(nested[0]) == set(final)
+    finally:
+        monkeypatch.undo()
+        backend.reset_backend_cache()

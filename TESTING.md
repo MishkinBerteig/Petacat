@@ -140,7 +140,7 @@ outside the matrix take it too and the run is entirely what it says it is.
   whole suite requested: the full matrix is required of this run
 
   unit          1763 collected   1763 run   1763 passed      0 failed      0 skipped  complete
-  seed_unit     1057 collected   1057 run   1057 passed      0 failed      0 skipped  complete
+  seed_unit     1058 collected   1058 run   1058 passed      0 failed      0 skipped  complete
   module        1075 collected   1075 run   1075 passed      0 failed      0 skipped  complete
   architecture    92 collected     92 run     92 passed      0 failed      0 skipped  complete
   integration    346 collected    346 run    346 passed      0 failed      0 skipped  complete
@@ -219,7 +219,7 @@ that allowance.
 | Layer | Directory | Scope | May depend on | Cases |
 |-------|-----------|-------|---------------|-------|
 | **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 1763 |
-| **seed unit** | `tests/seed_unit/` | One class or function, measured against the values Petacat ships with | Real `seed_data/*.json`, and the machine the process is running on | 1057 |
+| **seed unit** | `tests/seed_unit/` | One class or function, measured against the values Petacat ships with | Real `seed_data/*.json`, and the machine the process is running on | 1058 |
 | **module** | `tests/module/` | Several real components assembled and driven | Real engine objects and `seed_data/*.json`; no DB, no HTTP | 1075 |
 | **architecture** | `tests/architecture/` | How the source tree is allowed to depend on itself | The repository's source, `seed_data/*.json`, child interpreters | 92 |
 | **integration** | `tests/integration/` | Agreement between the repository's artifacts, and the harness's own rules | Real `seed_data/*.json`, the ORM declarations, the generated client files, the documentation, a real pytest session | 346 |
@@ -260,7 +260,7 @@ first**, then move up toward the API and GUI.
 
 All eight layers run in one command — the
 [required command](#the-required-command) — and, since Petacat runs natively, all
-eight actually run: **5,404 cases**, every one of them executed. A layer that is
+eight actually run: **5,405 cases**, every one of them executed. A layer that is
 normally skipped is not a layer that is normally green, and none of these is.
 
 Wall-clock time depends heavily on the machine and on what else it is doing. The
@@ -491,7 +491,7 @@ changing what it records.
 | `test_justify_conceptual_depth.py` | 5 | Justify's retention of a pattern entry naming no node: `Absent`'s depth, probability 0, entry dropped |
 | `test_metacat_display_seed.py` | 5 | Seed data that exists so a display can match Metacat: every Metacat demo, the Themespace's dimension and relation names |
 | `test_metadata_provider.py` | 25 | `MetadataProvider` loading every seed collection |
-| `test_numeric_backends.py` | 30 | The numeric backends against the reference (decay and spreading against exact rationals, including spreading's halfway cases), and the engine without them; and that changing the four salience weights or `probabilistic_activation_exponent` changes the result on every backend, and the jump probability is defined at a zero share and at overflow identically on every backend (stage W) |
+| `test_numeric_backends.py` | 31 | The numeric backends against the reference (decay and spreading against exact rationals, including spreading's halfway cases), and the engine without them; and that changing the four salience weights or `probabilistic_activation_exponent` changes the result on every backend, and the jump probability is defined at a zero share and at overflow identically on every backend (stage W), and that a reader arriving while the class registry is being built sees it complete |
 | `test_reduced_configurations.py` | 14 | The reduced-configuration fixture generator (EN0, `tests/support/reduced_configurations.py` and `configuration_cascade.py`): nothing left that names a removed node or codelet type, the cascade removes what the plan's rules say, a provider loads from each; the engine is not run on them yet |
 | `test_standard_configuration_roles.py` | 14 | EN2: the Metacat Standard Configuration binds every role of `tests/support/role_table.py` to the node or codelet type today's code names (the two ordered roles in today's order), carries the five theme relations, `plain_name`, `glyph`, `numeric_value` and the display columns that reproduce the tables they replace, unique `rule_key`s and unique link keys, and the provider loads them |
 | `test_display_names.py` | 4 | EN5a: display text comes from the node columns: renamed nodes keep their printed text byte for byte, all-NULL columns fall back, and unbound roles or removed nodes still print |

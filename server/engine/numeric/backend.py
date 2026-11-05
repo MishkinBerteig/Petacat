@@ -308,7 +308,7 @@ _CPU_PREFERENCE = ("numpy", "python")
 _GPU_PREFERENCE = ("mlx", "numpy", "python")
 
 _INSTANCES: dict[str, Backend] = {}
-_CLASSES: dict[str, type[Backend]] = {}
+_CLASSES: dict[str, type[Backend]] | None = None
 
 
 def _classes() -> dict[str, type[Backend]]:
@@ -319,26 +319,36 @@ def _classes() -> dict[str, type[Backend]]:
     including the expected-range oracle's worker pool, which starts a fresh
     interpreter per core and would pay ~150 ms of MLX import for a backend it may
     never use.
+
+    The registry is built in a local dict and published by rebinding ``_CLASSES``
+    once, complete.  Filling the shared dict entry by entry and treating "non-empty"
+    as "finished" would let a second thread arriving mid-build read a registry
+    missing its later entries, and on the free-threaded build readers do not take
+    the dict's lock, so only a rebind guarantees that nobody sees a partial one.
+    Two threads that both build do redundant work and publish equal registries.
     """
-    if _CLASSES:
-        return _CLASSES
+    global _CLASSES
+    registry = _CLASSES
+    if registry is not None:
+        return registry
     from server.engine.numeric.python_backend import PythonBackend
 
-    _CLASSES["python"] = PythonBackend
+    registry = {"python": PythonBackend}
     try:
         from server.engine.numeric.numpy_backend import NumpyBackend
 
-        _CLASSES["numpy"] = NumpyBackend
+        registry["numpy"] = NumpyBackend
     except ImportError:
         pass
     try:
         from server.engine.numeric.mlx_backend import MlxBackend, MlxCpuBackend
 
-        _CLASSES["mlx"] = MlxBackend
-        _CLASSES["mlx-cpu"] = MlxCpuBackend
+        registry["mlx"] = MlxBackend
+        registry["mlx-cpu"] = MlxCpuBackend
     except ImportError:
         pass
-    return _CLASSES
+    _CLASSES = registry
+    return registry
 
 
 def backend_names() -> list[str]:
@@ -477,10 +487,14 @@ def reset_backend_cache() -> None:
     ``PETACAT_NUMERIC_BACKEND`` and, in one case, make MLX unimportable to prove
     the engine still runs without it, which requires the lazy class registry to be
     re-evaluated.
+
+    The class registry is dropped by rebinding it to ``None``, not by clearing the
+    dict in place: a reader holding the old dict keeps a complete registry, where a
+    clear would show it an empty or half-emptied one (see ``_classes``).
     """
-    global _POLICY
+    global _POLICY, _CLASSES
     _INSTANCES.clear()
-    _CLASSES.clear()
+    _CLASSES = None
     _POLICY = None
 
 
