@@ -700,8 +700,6 @@ export interface SlipnetNodeDef {
 // --- Layout ----------------------------------------------------------------
 
 export interface SlipnetLayout {
-  grid_rows: number;
-  grid_cols: number;
   node_positions: Record<string, [number, number]>;
 }
 

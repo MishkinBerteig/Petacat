@@ -15,9 +15,12 @@ Requires: a local Postgres — start it with `scripts/dev.sh db`.  The endpoint 
 needs none, which is the subject of the last test in this file.
 """
 
+import os
+
 import pytest
 
 from server.engine import hardware
+from server.engine.numeric.backend import ENV_BACKEND
 from server.engine.numeric import available_backends, select_backend
 
 
@@ -31,7 +34,9 @@ async def test_numeric_substrate_reports_the_selected_backend(app_client):
     expected = select_backend(data["slipnet_nodes"])
     assert data["backend"] == (expected.name if expected is not None else None)
     assert data["available"] == available_backends()
-    assert data["policy"] == "auto"
+    # The policy this test session selected: ``auto`` unless ``--numeric-backends`` set the
+    # environment variable, which the suite does with the chosen backend's name.
+    assert data["policy"] == (os.environ.get(ENV_BACKEND) or "auto").strip().lower()
 
 
 @pytest.mark.asyncio

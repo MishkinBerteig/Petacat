@@ -211,8 +211,8 @@ def test_a_parameter_override_keeps_the_type_the_seed_data_ships(harness):
     assert (name, value) == ("verbatim_rule_probability", 0.25)
     assert isinstance(value, float)
 
-    name, value = harness._parse_param("justify_mode_default=true")
-    assert (name, value) == ("justify_mode_default", True)
+    name, value = harness._parse_param("self_watching_enabled_default=true")
+    assert (name, value) == ("self_watching_enabled_default", True)
     assert isinstance(value, bool)
 
 

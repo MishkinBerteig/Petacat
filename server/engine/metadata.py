@@ -87,7 +87,6 @@ class CodeletSpec:
     name: str
     family: str  # bond, group, bridge, description, rule, answer, meta, breaker
     phase: str  # scout, evaluator, builder, other
-    default_urgency: int | None
     description: str
     source_file: str
     source_line: int
@@ -283,7 +282,6 @@ class MetadataProvider:
                 name=c["name"],
                 family=c["family"],
                 phase=c["phase"],
-                default_urgency=c.get("default_urgency"),
                 description=c.get("description", ""),
                 source_file=c.get("source_file", ""),
                 source_line=c.get("source_line", 0),

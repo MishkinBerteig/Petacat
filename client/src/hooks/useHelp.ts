@@ -60,7 +60,6 @@ export interface CodeletHelpContent {
   name: string;
   family: string;
   phase: string;
-  default_urgency: number;
   description: string;
   source_file: string;
   source_line: number;
@@ -148,7 +147,6 @@ export const useHelpStore = create<HelpStoreState>((set) => ({
               name: data.name,
               family: data.family,
               phase: data.phase,
-              default_urgency: data.default_urgency,
               description: data.description,
               source_file: data.source_file,
               source_line: data.source_line,

@@ -34,11 +34,14 @@ this directory into the empty one.
 not an external program, not the in-worker learner, and not any Training Mode Session. Those all go
 through the change API and change the database, and the journal records them.
 
-The files change only through a **committed development change**, and only to fix a fidelity bug in
-Petacat (a place where Petacat differs from Metacat). The commit message names the affected rows
-(table and key), so that anyone comparing a database with these files can see why they moved.
-Adding a row for a new feature, or tuning a value, is a change to a configuration in the database,
-not to these files.
+The files change only through a **committed development change**, and only in two cases:
+
+1. to fix a fidelity bug in Petacat (a place where Petacat differs from Metacat);
+2. to remove a row or field that nothing reads (proven unread by reading the code and by running).
+
+The commit message names the affected rows (table and key), so that anyone comparing a database
+with these files can see why they moved. Adding a row for a new feature, or tuning a value, is a
+change to a configuration in the database, not to these files.
 
 ## Using it
 

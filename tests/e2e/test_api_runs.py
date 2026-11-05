@@ -290,38 +290,6 @@ async def test_answer_appears_in_workspace(app_client):
         )
 
 
-@pytest.mark.asyncio
-async def test_no_mid_run_snapshots_are_written(app_client, db_session):
-    """Mid-run snapshots are retired (WP3.3, defect D1).
-
-    This test previously asserted the opposite — that stepping past a cycle boundary
-    produced at least two ``cycle_snapshots`` rows. That behaviour is what WP3.3
-    removes, so the assertion is inverted rather than deleted: it now pins the absence,
-    which is the thing that could silently come back.
-
-    The snapshots were written every fifteenth codelet, cost 18–27% of engine time, and
-    **no code path could read them back** — the four ``restore_*`` functions were called
-    from nowhere, ``prune_old_snapshots`` was never called either, and there was no
-    coderack or workspace restore at all. A production database held 230 MB of them for
-    ten runs. Complete, genuinely restorable state capture arrives with WP3.4 and is
-    written at the two Run boundaries instead.
-    """
-    resp = await app_client.post("/api/runs", json={
-        "initial": "abc", "modified": "abd", "target": "xyz", "seed": SEED,
-    })
-    run_id = resp.json()["run_id"]
-
-    # Step well past a cycle boundary (15 codelets).
-    await app_client.post(f"/api/runs/{run_id}/step", json={"n": 30})
-
-    from sqlalchemy import select, func
-    from server.models.run import CycleSnapshot
-    result = await db_session.execute(
-        select(func.count()).select_from(CycleSnapshot).where(CycleSnapshot.run_id == run_id)
-    )
-    assert result.scalar() == 0
-
-
 # ---------------------------------------------------------------------------
 # Run identity — which configuration and which memory a run executed against
 #

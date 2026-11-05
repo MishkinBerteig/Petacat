@@ -469,46 +469,6 @@ describe('SlipnetLinkEditor — a length of zero and a length left unsaid', () =
   })
 })
 
-describe('CodeletEditor — an urgency of zero and an urgency left unsaid', () => {
-  const codelet = {
-    name: 'bottom-up-bond-scout', family: 'scout', phase: 'scout',
-    default_urgency: 35, description: '', execute_body: 'pass',
-  }
-
-  /** Open the type in the detail pane and put it into edit mode. */
-  async function startEditing() {
-    fireEvent.click(await screen.findByText('bottom-up-bond-scout'))
-    fireEvent.click(screen.getByRole('button', { name: /^Edit$/ }))
-  }
-
-  it('saves an urgency of zero', async () => {
-    serve([codelet])
-    render(<CodeletEditor />)
-
-    await startEditing()
-    fireEvent.change(screen.getByLabelText(/Urgency/), { target: { value: '0' } })
-    fireEvent.click(screen.getByRole('button', { name: /^Save$/ }))
-
-    await waitFor(() => expect(calls).toHaveLength(1))
-    expect(calls[0]).toMatchObject({
-      method: 'PUT', url: '/api/admin/codelets/bottom-up-bond-scout',
-    })
-    expect(calls[0].body.default_urgency).toBe(0)
-  })
-
-  it('saves a blank urgency as none at all', async () => {
-    serve([codelet])
-    render(<CodeletEditor />)
-
-    await startEditing()
-    fireEvent.change(screen.getByLabelText(/Urgency/), { target: { value: '' } })
-    fireEvent.click(screen.getByRole('button', { name: /^Save$/ }))
-
-    await waitFor(() => expect(calls).toHaveLength(1))
-    expect(calls[0].body.default_urgency).toBeNull()
-  })
-})
-
 // --- the two long-text collections ------------------------------------------
 
 describe('CommentaryTemplateEditor — the program\'s English', () => {
@@ -659,7 +619,7 @@ describe('A failed load says why, in place of the list', () => {
   it('offers the retry, and shows the list once it succeeds', async () => {
     const codelet = {
       name: 'bottom-up-bond-scout', family: 'scout', phase: 'scout',
-      default_urgency: 35, description: '', execute_body: 'pass',
+      description: '', execute_body: 'pass',
     }
     let answered = false
     stubFetch(() => {
@@ -868,7 +828,7 @@ describe('The two long-text editors report their own refusals', () => {
   it('reports a codelet body the server will not take', async () => {
     const codelet = {
       name: 'bottom-up-bond-scout', family: 'scout', phase: 'scout',
-      default_urgency: 35, description: '', execute_body: 'pass',
+      description: '', execute_body: 'pass',
     }
     stubFetch((_url, init) =>
       method(init) === 'PUT'

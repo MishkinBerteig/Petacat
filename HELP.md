@@ -194,7 +194,7 @@ The Metacat Standard Configuration is the set of files in seed_data/: the Slipne
 
 The files are read once, when the server starts against an empty database, and written into the database in one step recorded as the first entry of the journal. From then on the database is the one source of truth: the engine is handed whatever the database holds, and nothing reads the files again. Editing a file does not change a running installation, and clearing the database is a development move that makes the next start load the files again.
 
-Nothing the application does writes the seed files: not the Admin view, not Import, not a reset, and not any Training-Mode learning source. They change only through a committed development change, made to fix a fidelity bug in Petacat and naming the rows it affects.
+Nothing the application does writes the seed files: not the Admin view, not Import, not a reset, and not any Training-Mode learning source. They change only through a committed development change, made to fix a fidelity bug in Petacat or to remove a row that nothing reads, and naming the rows it affects.
 
 The Admin view can still show how a configuration differs from the Metacat Standard Configuration (the banner and the Status and reset tab count the differing rows) and can put rows, or everything, back to it with Reset to the Metacat Standard Configuration or Restore selected. A reset is an ordinary journal entry and can be undone.
 
@@ -689,8 +689,7 @@ Destructive or utility operations exposed via the Admin view. These topics are a
 
 **Technical details:**
 
-- Calls DELETE /api/runs, which deletes all rows from the runs, trace_events, answer_descriptions, snag_descriptions and (legacy, no longer written) cycle_snapshots tables, and the episodic_memory_clears rows (the Episodic Memory clear markers and their notes) with them.
-- It does NOT currently delete the run_state_captures or audit_actions rows that Normal and Audit runs wrote, so those are left behind without the runs they belong to.
+- Calls DELETE /api/runs, which deletes all rows from the runs, trace_events, run_state_captures, audit_actions, answer_descriptions and snag_descriptions tables, and the episodic_memory_clears rows (the Episodic Memory clear markers and their notes) with them.
 - Calls DELETE /api/memory to clear the in-memory episodic memory store.
 - Resets all Zustand store state: runId, workspace, slipnet, coderack, themespace, trace, memory, temperature, commentary, and codeletCount.
 - Bumps the store epoch to force all components to re-fetch and re-render.

@@ -32,7 +32,6 @@ from server.models.run import (
     _utcnow,
     AnswerDescriptionRow,
     AuditAction,
-    CycleSnapshot,
     Run,
     RunStateCapture,
     SnagDescriptionRow,
@@ -962,10 +961,7 @@ class RunService:
         if threshold is not None:
             runner.ctx.spreading_activation_threshold = threshold
 
-        # Delete old snapshots and trace events
-        await session.execute(
-            delete(CycleSnapshot).where(CycleSnapshot.run_id == run_id)
-        )
+        # Delete old trace events
         # The tables Phase 0 added. Without these a deleted run left its boundary
         # captures and its audit log behind — rows keyed to a run id that no longer
         # exists, which nothing would ever read and nothing would ever clean up.
@@ -1040,9 +1036,6 @@ class RunService:
             return
 
         # Delete associated rows
-        await session.execute(
-            delete(CycleSnapshot).where(CycleSnapshot.run_id == run_id)
-        )
         # The tables Phase 0 added. Without these a deleted run left its boundary
         # captures and its audit log behind — rows keyed to a run id that no longer
         # exists, which nothing would ever read and nothing would ever clean up.
@@ -1067,7 +1060,6 @@ class RunService:
         self._stop_flags.clear()
 
         # Delete all DB rows
-        await session.execute(delete(CycleSnapshot))
         await session.execute(delete(RunStateCapture))
         await session.execute(delete(AuditAction))
         # A clear marker is placed by the id of the run before it; with every run gone

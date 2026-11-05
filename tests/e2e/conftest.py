@@ -128,7 +128,7 @@ async def setup_db(test_engine, schema_lock):
     """Create all tables and seed metadata once per session."""
     # Import all models so Base.metadata knows about them
     from server.models.metadata import Base  # noqa
-    import server.models.run  # noqa — registers Run, CycleSnapshot, etc. on Base.metadata
+    import server.models.run  # noqa — registers Run, TraceEventRow, etc. on Base.metadata
     import server.models.training_mode_session  # noqa — registers training_mode_sessions, training_mode_session_problems, ...
 
     async with test_engine.begin() as conn:

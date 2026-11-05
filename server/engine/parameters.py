@@ -27,7 +27,7 @@ be would be a lie about how the engine works.
 
 What is deliberately *not* here
 -------------------------------
-The rest of ``engine_params.json`` is not offered, for three different reasons, and
+The rest of ``engine_params.json`` is not offered, for two different reasons, and
 the difference matters more than the count:
 
 * **Read by the engine, but not a number in a range.**  ``initial_codelet_types``,
@@ -38,10 +38,6 @@ the difference matters more than the count:
   not yet.  All of them are wired.
 * **Read by another layer.**  ``clampable_codelet_patterns`` is consulted by the
   control API, not by the engine; a run reads it zero times.
-* **Read by nothing at all.**  ``max_temperature``,
-  ``garbage_collect_cycles``, ``step_cycles``, ``eliza_mode_default``,
-  ``justify_mode_default`` and the display timings.  Some are Scheme-era, some are
-  features the port does not have, some are overtaken by the run request.
 
 **No count is written here on purpose.**  Every prose enumeration of this in the
 repository had drifted from the source it claimed to be verified against by the time

@@ -1,5 +1,4 @@
 {
-  "cluster_types": ["top_bridge", "bottom_bridge", "vertical_bridge"],
   "dimensions": [
     {
       "slipnet_node": "plato-letter-category",

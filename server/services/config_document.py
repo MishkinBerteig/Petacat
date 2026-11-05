@@ -512,7 +512,6 @@ def rows_from_standard_files(seed_dir: str) -> dict[str, list[dict[str, Any]]]:
             "sort_order": pos,
             "family": c["family"],
             "phase": c["phase"],
-            "default_urgency": c.get("default_urgency"),
             "description": c.get("description", ""),
             "source_file": c.get("source_file", ""),
             "source_line": c.get("source_line", 0),

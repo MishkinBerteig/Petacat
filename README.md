@@ -429,7 +429,7 @@ time (the global one, which Metacat Mode uses, unless you open a Training Mode S
   **Urgency Levels**, **Formula Coefficients**, **Demo Problems**, **Enum Tables**, **Theme Dimensions**,
   **Posting Rules**, **Commentary Templates**, **Slipnet Layout** and **Help Topics** (the in-app help
   text, backed by `seed_data/help_topics.en.json`): editable tables over the seed data's 59 nodes, 202
-  links, 27 codelet types, 89 formula coefficients and the rest
+  links, 27 codelet types, 79 formula coefficients and the rest
 - **History**: the journal, with undo
 - **Database (all modes)**: browse any table, edit the safe ones
 
@@ -1053,7 +1053,7 @@ the next start load the files again. Petacat has no database migrations.
 
 Nothing at run time writes the files: not the Admin view, not Import, not a reset, and not any
 Training-Mode learning source. They change only through a committed development change that fixes
-a fidelity bug and names the rows it touches. See [`seed_data/README.md`](seed_data/README.md).
+a fidelity bug, or removes a row that nothing reads, and names the rows it touches. See [`seed_data/README.md`](seed_data/README.md).
 
 From the command line, `.venv/bin/python -m server.config status | diff | reset-to-standard --yes |
 restore-selected --row TABLE KEY_JSON | verify-journal` (each with `--configuration ID` and `--json`)
@@ -1553,10 +1553,10 @@ Omitted parameters keep the global default. An unknown name, an out-of-range val
 wrongly-typed one is a **400**, checked before anything is created — ignoring a typo
 would produce a Run at the default whose record claimed the override was applied.
 
-**The remaining entries are deliberately not offered.** Display timings
-(`initial_speed`, `text_scroll_pause`, the flash settings), Scheme-era implementation
-details (`garbage_collect_cycles`, `step_cycles`), and several the port reads nowhere at
-all (`expiration_period`, `max_theme_activation`, `workspace_activation`). Membership is
+**The remaining entries are deliberately not offered.** They are the entries the engine
+reads but that are not a number in a range, and the ones another layer reads. A parameter
+that nothing reads is not stored: the display timings, the Scheme-era cycle counts and the
+other dead entries were deleted from the Metacat Standard Configuration. Membership is
 decided by what the engine actually reads — verified against every `get_param` call site
 in `server/engine/**` *and* in the codelet bodies in `seed_data/codelet_types.json`, and
 pinned by a test. A control that changes nothing is worse than no control.
@@ -1673,8 +1673,8 @@ files are not read again (see [`seed_data/README.md`](seed_data/README.md) and
 | `codelet_types.json` | 27 codelet types with Python execute bodies |
 | `engine_params.json` | Runtime parameters and thresholds |
 | `urgency_levels.json` | 7 urgency bin values |
-| `formula_coefficients.json` | 89 formula weights |
-| `theme_dimensions.json` | 9 conceptual dimensions across 3 cluster types |
+| `formula_coefficients.json` | 79 formula weights |
+| `theme_dimensions.json` | 9 conceptual dimensions |
 | `demo_problems.json` | 41 pre-configured analogy problems |
 | `posting_rules.json` | Codelet posting rules |
 | `commentary_templates.json` | Natural-language output templates, and Verbose mode's 200-odd message texts (`verbose_messages`) |

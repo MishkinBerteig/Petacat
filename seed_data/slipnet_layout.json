@@ -1,6 +1,4 @@
 {
-  "grid_rows": 5,
-  "grid_cols": 13,
   "node_positions": {
     "plato-opposite": [0, 0],
     "plato-string-position-category": [0, 1],

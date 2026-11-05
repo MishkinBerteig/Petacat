@@ -901,6 +901,9 @@ def test_engine_runs_identically_with_mlx_and_numpy_absent() -> None:
         capture_output=True,
         text=True,
         timeout=300,
+        # The probe checks the default policy; ``--numeric-backends`` pins the policy to a
+        # backend in this process's environment, and a pinned NumPy cannot be absent.
+        env={k: v for k, v in os.environ.items() if k != "PETACAT_NUMERIC_BACKEND"},
     )
     assert completed.returncode == 0, (
         "The engine failed in an interpreter with MLX and NumPy unimportable. "

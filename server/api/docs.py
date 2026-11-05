@@ -51,7 +51,6 @@ async def codelet_help(
         "name": codelet.name,
         "family": codelet.family,
         "phase": codelet.phase,
-        "default_urgency": codelet.default_urgency,
         "description": codelet.description or "",
         "source_file": codelet.source_file or "",
         "source_line": codelet.source_line or 0,

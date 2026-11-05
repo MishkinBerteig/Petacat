@@ -8,14 +8,13 @@ interface CodeletDef {
   name: string
   family: string
   phase: string
-  default_urgency: number | null
   description: string
   execute_body: string
 }
 
 /** A blank definition for "+ New": a new type is created by saving this. */
 const EMPTY: CodeletDef = {
-  name: '', family: '', phase: '', default_urgency: null, description: '', execute_body: '',
+  name: '', family: '', phase: '', description: '', execute_body: '',
 }
 
 export function CodeletEditor({ configuration = GLOBAL_CONFIGURATION_ID }: ConfigurationProp) {
@@ -167,7 +166,6 @@ export function CodeletEditor({ configuration = GLOBAL_CONFIGURATION_ID }: Confi
                 <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
                   <label style={{ fontSize: 11 }}>Family: <input value={editing.family} onChange={e => setEditing(ed => ed ? { ...ed, family: e.target.value } : ed)} style={{ width: 100, fontSize: 11 }} /></label>
                   <label style={{ fontSize: 11 }}>Phase: <input value={editing.phase} onChange={e => setEditing(ed => ed ? { ...ed, phase: e.target.value } : ed)} style={{ width: 100, fontSize: 11 }} /></label>
-                  <label style={{ fontSize: 11 }}>Urgency: <input type="number" value={editing.default_urgency ?? ''} onChange={e => setEditing(ed => ed ? { ...ed, default_urgency: e.target.value ? Number(e.target.value) : null } : ed)} style={{ width: 60, fontSize: 11 }} /></label>
                 </div>
                 <label style={{ fontSize: 11, display: 'block', marginBottom: 4 }}>
                   Description:
@@ -197,7 +195,6 @@ export function CodeletEditor({ configuration = GLOBAL_CONFIGURATION_ID }: Confi
             ) : (
               <>
                 <div className="text-sm mb-1">Family: {detail.family} | Phase: {detail.phase}</div>
-                <div className="text-sm mb-1">Default urgency: {detail.default_urgency ?? 'dynamic'}</div>
                 <div className="text-sm mb-2">{detail.description}</div>
                 <div className="text-xs text-muted mb-1">execute_body:</div>
                 <pre style={{

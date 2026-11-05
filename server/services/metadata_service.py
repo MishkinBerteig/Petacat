@@ -155,7 +155,6 @@ def _field_codelet_specs(tables: Mapping[str, Any]) -> dict[str, CodeletSpec]:
             name=r["name"],
             family=r["family"],
             phase=r["phase"],
-            default_urgency=r.get("default_urgency"),
             description=r.get("description") or "",
             source_file=r.get("source_file") or "",
             source_line=r.get("source_line") or 0,

@@ -62,7 +62,6 @@ export function HelpPopover(props: HelpPopoverProps) {
       metadata = {
         Family: helpContent.family,
         Phase: helpContent.phase,
-        'Default urgency': helpContent.default_urgency,
       };
       if (helpContent.source_file) {
         metadata['Source'] = `${helpContent.source_file}:${helpContent.source_line}`;

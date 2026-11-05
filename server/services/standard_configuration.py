@@ -208,7 +208,6 @@ def standard_load_ops(seed_dir: str) -> list[dict]:
                 "name": c["name"],
                 "family": c["family"],
                 "phase": c["phase"],
-                "default_urgency": c.get("default_urgency"),
                 "description": c.get("description", ""),
                 "source_file": c.get("source_file", ""),
                 "source_line": c.get("source_line", 0),

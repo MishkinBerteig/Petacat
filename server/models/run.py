@@ -49,10 +49,8 @@ class RunStateCapture(Base):
     one after the last. That is the whole of what Normal persists, and it is enough to
     re-execute the Run — reload the start state, run, and the end state must follow.
 
-    Replaces ``cycle_snapshots``, which wrote a ~43 KB blob every fifteenth codelet
-    that no code path could read back. The difference is not the cadence but the
-    content: this is the id-based object graph from ``server/engine/state_graph.py``,
-    complete enough to restore, where the old blob was assembled for display.
+    It is the id-based object graph from ``server/engine/state_graph.py``, complete
+    enough to restore.
     """
 
     __tablename__ = "run_state_captures"
@@ -115,7 +113,6 @@ class Run(Base):
     seed = Column(BigInteger, nullable=False)
     status = Column(String(16), ForeignKey("run_statuses.name"), default="initialized")
     justify_mode = Column(Boolean, default=False)
-    self_watching = Column(Boolean, default=True)
     codelet_count = Column(Integer, default=0)
     temperature = Column(Float, default=100.0)
     #: Which Slipnet nodes were allowed to spread during this run (0-100).
@@ -147,29 +144,6 @@ class Run(Base):
     #: at the time of reading, so the Run's meaning would quietly drift. Written for
     #: Normal and Audit; a Fast Run has no row, by design.
     parameters = Column(JSONB, nullable=True)
-    created_at = Column(DateTime, default=_utcnow)
-    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
-
-
-class CycleSnapshot(Base):
-    """Full engine state checkpoint for resume/replay."""
-
-    __tablename__ = "cycle_snapshots"
-    __table_args__ = (
-        Index("ix_cycle_snapshots_run_step", "run_id", "codelet_count"),
-    )
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    run_id = Column(Integer, nullable=False, index=True)
-    codelet_count = Column(Integer, nullable=False)
-    temperature = Column(Float, nullable=False)
-    rng_state = Column(JSONB, nullable=False)  # Pickled RNG state
-    workspace_state = Column(JSONB, nullable=False)  # Serialized workspace structures
-    slipnet_state = Column(JSONB, nullable=False)  # Node activations
-    coderack_state = Column(JSONB, nullable=False)  # Bin contents
-    themespace_state = Column(JSONB, nullable=False)  # Theme activations
-    trace_state = Column(JSONB, nullable=False)  # Clamp period state
-    runner_state = Column(JSONB, nullable=False)  # Control state
     created_at = Column(DateTime, default=_utcnow)
 
 

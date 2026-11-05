@@ -292,7 +292,6 @@ class CodeletTypeRequest(BaseModel):
     name: str
     family: str
     phase: str
-    default_urgency: int | None = None
     description: str = ""
     source_file: str = ""
     source_line: int = 0
@@ -303,7 +302,6 @@ class CodeletTypeResponse(BaseModel):
     name: str
     family: str
     phase: str
-    default_urgency: int | None
     description: str
     source_file: str
     source_line: int
@@ -565,7 +563,6 @@ async def list_codelet_types(session: AsyncSession = Depends(get_session)):
             name=r.name,
             family=r.family,
             phase=r.phase,
-            default_urgency=r.default_urgency,
             description=r.description or "",
             source_file=r.source_file or "",
             source_line=r.source_line or 0,
@@ -585,7 +582,6 @@ async def create_codelet_type(
         name=req.name,
         family=req.family,
         phase=req.phase,
-        default_urgency=req.default_urgency,
         description=req.description,
         source_file=req.source_file,
         source_line=req.source_line,
@@ -595,7 +591,6 @@ async def create_codelet_type(
         name=codelet.name,
         family=codelet.family,
         phase=codelet.phase,
-        default_urgency=codelet.default_urgency,
         description=codelet.description or "",
         source_file=codelet.source_file or "",
         source_line=codelet.source_line or 0,
@@ -614,7 +609,6 @@ async def update_codelet_type(
     codelet = await _update(session, CodeletTypeDef, key, dict(
         family=req.family,
         phase=req.phase,
-        default_urgency=req.default_urgency,
         description=req.description,
         source_file=req.source_file,
         source_line=req.source_line,
@@ -624,7 +618,6 @@ async def update_codelet_type(
         name=codelet.name,
         family=codelet.family,
         phase=codelet.phase,
-        default_urgency=codelet.default_urgency,
         description=codelet.description or "",
         source_file=codelet.source_file or "",
         source_line=codelet.source_line or 0,
@@ -1423,7 +1416,6 @@ async def export_metadata(session: AsyncSession = Depends(get_session)):
                 "name": r.name,
                 "family": r.family,
                 "phase": r.phase,
-                "default_urgency": r.default_urgency,
                 "description": r.description or "",
                 "source_file": r.source_file or "",
                 "source_line": r.source_line or 0,

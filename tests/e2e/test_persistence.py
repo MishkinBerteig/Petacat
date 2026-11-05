@@ -78,21 +78,14 @@ async def test_codelet_execute_body_round_trip(db_session):
 
 
 @pytest.mark.asyncio
-async def test_trace_events_persist_without_mid_run_snapshots(app_client, db_session):
+async def test_trace_events_persist(app_client, db_session):
     """The record of a stepped run is its Trace, written in one batch (WP3.3).
 
-    This replaces a test that asserted a ``cycle_snapshots`` row existed after fifteen
-    codelets and inspected its seven JSONB columns. Those snapshots are retired: they
-    were write-only — nothing ever called the ``restore_*`` functions — and cost
-    18-27% of engine time to produce 1-6 MB per run that no code path could read.
-
-    What replaces the assertion is the property that actually matters now: stepping a
-    run persists its trace events, and it does so without writing snapshots. The events
-    are buffered by the run's sink during the step loop and staged once per API call
-    rather than awaited per codelet.
+    Stepping a run persists its trace events. The events are buffered by the run's sink
+    during the step loop and staged once per API call rather than awaited per codelet.
     """
     from sqlalchemy import func, select
-    from server.models.run import CycleSnapshot, TraceEventRow
+    from server.models.run import TraceEventRow
 
     resp = await app_client.post("/api/runs", json={
         "initial": "abc", "modified": "abd", "target": "xyz", "seed": SEED,
@@ -101,11 +94,6 @@ async def test_trace_events_persist_without_mid_run_snapshots(app_client, db_ses
 
     # Far enough for the run to record trace events of its own.
     await app_client.post(f"/api/runs/{run_id}/run", json={"max_steps": 1200})
-
-    snapshots = await db_session.execute(
-        select(func.count()).select_from(CycleSnapshot).where(CycleSnapshot.run_id == run_id)
-    )
-    assert snapshots.scalar() == 0
 
     events = await db_session.execute(
         select(TraceEventRow)

@@ -33,7 +33,7 @@ count every engine-size figure in this document uses. Seed data: 59 slipnet node
 integration + 8 module files run locally; 9 e2e files currently require Docker, which
 WP2.1 removes).
 
-> **As built.** `server/engine/` holds 54 modules and 37,708 lines. The multi-core machinery
+> **As built.** `server/engine/` holds 54 modules and 37,702 lines. The multi-core machinery
 > (`free_running.py`, `coderack_shards.py`, `population.py`) moved out to the detachable
 > plugin package `server/parallel/`, which is not counted here.
 
@@ -1477,7 +1477,10 @@ The other 18 are deliberately not offered. Display timings (`initial_speed`,
 `text_scroll_pause`, the flash settings), Scheme-era implementation details
 (`garbage_collect_cycles`, `step_cycles`), and several the port reads nowhere at all
 (`expiration_period`, `max_theme_activation`, `workspace_activation`,
-`shrunk_link_lengths`). **Membership is decided by what the engine actually reads**,
+`shrunk_link_lengths`). (As built since: the eleven that nothing reads at all, among them
+those display timings and the two Scheme-era cycle counts, were deleted from the Metacat
+Standard Configuration in the final Metacat cleanup, so `engine_params.json` now holds
+fewer entries than the 43 counted here.) **Membership is decided by what the engine actually reads**,
 verified against every `get_param` call site in `server/engine/**` *and* in the codelet
 bodies stored in `seed_data/codelet_types.json` — and pinned by a test, because offering
 a control that changes nothing is worse than offering none.

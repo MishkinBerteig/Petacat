@@ -693,7 +693,7 @@ def _prerequisites(path: str, row: dict) -> list[tuple[str, dict]]:
     if path == "posting-rules":
         return [("codelets", {
             "name": row["codelet_type"], "family": "bond", "phase": "scout",
-            "default_urgency": 30, "execute_body": "fizzle()",
+            "execute_body": "fizzle()",
         })]
     return []
 
@@ -751,7 +751,7 @@ async def test_a_codelet_type_can_be_created_and_deleted(app_client):
         "/api/admin/codelets",
         json={
             "name": "e2e-scout", "family": "bond", "phase": "scout",
-            "default_urgency": 30, "description": "created by a test",
+            "description": "created by a test",
             "source_file": "", "source_line": 0, "execute_body": "fizzle()",
         },
     )
@@ -773,7 +773,7 @@ async def test_an_unknown_codelet_family_is_refused_by_the_change_api(app_client
         "/api/admin/codelets",
         json={
             "name": "e2e-bad-family", "family": "not-a-family", "phase": "scout",
-            "default_urgency": 30, "description": "", "source_file": "",
+            "description": "", "source_file": "",
             "source_line": 0, "execute_body": "fizzle()",
         },
     )

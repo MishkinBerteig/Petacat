@@ -219,7 +219,6 @@ class CodeletTypeDef(Base):
     sort_order = Column(Integer, nullable=False, default=0, index=True)
     family = Column(Text, ForeignKey("codelet_families.name"), nullable=False)
     phase = Column(Text, ForeignKey("codelet_phases.name"), nullable=False)
-    default_urgency = Column(Integer, nullable=True)
     description = Column(Text, default="")
     source_file = Column(Text, default="")
     source_line = Column(Integer, default=0)

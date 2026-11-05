@@ -32,7 +32,6 @@ def test_loads_codelet_types(meta):
     spec = meta.codelet_specs["bottom-up-bond-scout"]
     assert spec.family == "bond"
     assert spec.phase == "scout"
-    assert spec.default_urgency == 35
 
 
 def test_loads_urgency_levels(meta):
@@ -355,8 +354,8 @@ def test_the_clampable_patterns_are_five_of_the_nine():
         assert key in meta.codelet_patterns, f"{name} names no pattern"
 
 
-#: Engine parameters that are read by something other than the engine's own run loop,
-#: or by nothing at all.  Every other key in ``engine_params.json`` must be a run
+#: Engine parameters that are read by something other than the engine's own run loop.
+#: Every other key in ``engine_params.json`` must be a run
 #: parameter.  Keeping the classification here rather than in prose is deliberate:
 #: every written-out count of this in the repository had drifted from the source it
 #: claimed to describe, in one case by five.
@@ -407,22 +406,6 @@ _READ_BY_ANOTHER_LAYER = {
     "theme_relation_labels",
 }
 
-#: Read by nothing: Scheme-era, unported, superseded by the run request, or display.
-_READ_BY_NOTHING = {
-    "max_temperature",
-    "garbage_collect_cycles",
-    "step_cycles",
-    "eliza_mode_default",
-    "justify_mode_default",
-    "initial_speed",
-    "max_num_of_flashes",
-    "max_flash_pause",
-    "max_snag_pause",
-    "text_scroll_pause",
-    "codelet_highlight_pause",
-}
-
-
 def test_every_engine_parameter_is_classified():
     """No parameter may be silently neither offered nor accounted for.
 
@@ -445,7 +428,6 @@ def test_every_engine_parameter_is_classified():
         offered
         | _READ_BY_THE_ENGINE_BUT_NOT_OFFERED
         | _READ_BY_ANOTHER_LAYER
-        | _READ_BY_NOTHING
     )
 
     unclassified = keys - classified
@@ -459,7 +441,7 @@ def test_every_engine_parameter_is_classified():
 
 
 def test_a_parameter_is_not_both_offered_and_excused():
-    """The four groups partition; nothing sits in two of them."""
+    """The three groups partition; nothing sits in two of them."""
     from server.engine.parameters import RUN_PARAMETERS
 
     offered = {p.name for p in RUN_PARAMETERS}
@@ -467,7 +449,6 @@ def test_a_parameter_is_not_both_offered_and_excused():
         "offered": offered,
         "engine, not offered": _READ_BY_THE_ENGINE_BUT_NOT_OFFERED,
         "another layer": _READ_BY_ANOTHER_LAYER,
-        "nothing": _READ_BY_NOTHING,
     }
     names = list(groups)
     for i, left in enumerate(names):
