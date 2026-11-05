@@ -46,6 +46,9 @@ MODE_FAST = "fast"
 MODE_NORMAL = "normal"
 MODE_AUDIT = "audit"
 
+#: ``audit_actions.action_type`` of something a person did to the live run.
+ACTION_INTERVENTION = "intervention"
+
 
 class FastSink(NullSink):
     """Writes nothing, ever, and builds nothing that could be written.
@@ -321,6 +324,17 @@ class AuditSink(TraceRecordingSink):
     def on_run_created(self, ctx: EngineContext) -> None:
         super().on_run_created(ctx)
         self._start_capture = capture_run_state(ctx)
+
+    def on_intervention(self, ctx: EngineContext, method: str, args: dict) -> None:
+        """A person did something to the live run (``RunService``), between two codelets.
+
+        Not an engine event: the service calls it after a clamp, an Undo, a threshold change
+        and the like succeeded.  It is recorded with the codelet count it happened at, so
+        the Audit inspector can apply it again, through the same ``RunService`` method, at
+        the same codelet.  Only Audit defines this; Fast and Normal runs record nothing and
+        pay nothing.
+        """
+        self._record(ctx, ACTION_INTERVENTION, {"method": method, "args": args})
 
     def on_codelet(
         self, ctx: EngineContext, codelet: Any, result: StepResult

@@ -72,3 +72,23 @@ def test_inverse_ops_undo_a_batch():
     assert after != start
     jv.apply_ops(after, jv.inverse_ops([entry]))
     assert after == start
+
+
+def test_an_update_and_its_undo_keep_the_rows_place_in_the_table():
+    """A table that declares no order is read in insertion order and the hash covers it, so
+    editing a row and undoing the edit must not move it to the end (round 2, stage R)."""
+    a, b, c = (("a",), {"name": "a", "value": 1, "sort_order": 1}), (
+        ("b",), {"name": "b", "value": 2, "sort_order": 2}), (
+        ("c",), {"name": "c", "value": 3, "sort_order": 3})
+    state = {"urgency_levels": dict([a, b, c])}
+    update = {"op": "update", "table": "urgency_levels", "key": {"name": "a"}, "set": {"value": 9}}
+    rename = {"op": "update", "table": "urgency_levels", "key": {"name": "a"}, "set": {"name": "z"}}
+    before = [dict(a[1])]
+    for op in (update, rename):
+        edited = copy.deepcopy(state)
+        jv.apply_ops(edited, [op])
+        assert [k for k in edited["urgency_levels"]][1:] == [("b",), ("c",)]
+        assert len(edited["urgency_levels"]) == 3
+        jv.unapply_entry(edited, [op], before)
+        assert list(edited["urgency_levels"]) == list(state["urgency_levels"])
+        assert edited == state

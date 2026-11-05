@@ -14,7 +14,7 @@
 
 import { useEffect, useState } from 'react';
 import { describeApiError, getCapture, getRunComparison } from '@/api/client';
-import type { RecordedRun, RecordedState, RunComparison } from '@/types';
+import type { RecordedRun, RecordedState, ReviewConfiguration, RunComparison } from '@/types';
 import { RecordedStatePanels } from './RecordedStateViews';
 
 type Boundary = 'start' | 'end';
@@ -78,6 +78,7 @@ export function NormalRunReview({ run }: { run: RecordedRun }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {comparison?.configuration && <ConfigurationNote configuration={comparison.configuration} />}
       {comparison && <ComparisonSummary comparison={comparison} />}
 
       <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -109,6 +110,33 @@ export function NormalRunReview({ run }: { run: RecordedRun }) {
       </div>
 
       {shown && <RecordedStatePanels state={shown} />}
+    </div>
+  );
+}
+
+/**
+ * Which configuration the labels and the coderack probabilities were computed under.  Shown
+ * only when it matters: the Run's own configuration could not be rebuilt (so today's is used
+ * to label), or the global configuration has been edited since the Run.
+ */
+export function ConfigurationNote({ configuration }: { configuration: ReviewConfiguration }) {
+  if (configuration.faithful && !configuration.edited_since) return null;
+  const faithful = configuration.faithful;
+  return (
+    <div
+      role={faithful ? 'note' : 'alert'}
+      data-testid="configuration-note"
+      className="text-xs"
+      style={{
+        border: `1px solid ${faithful ? 'var(--border)' : 'var(--error)'}`,
+        color: faithful ? 'var(--text-secondary)' : 'var(--error)',
+        borderRadius: 4,
+        padding: '4px 8px',
+      }}
+    >
+      {faithful
+        ? `Shown under the configuration this Run used (global revision ${configuration.revision}); the global configuration has been edited since (now revision ${configuration.current_revision}).`
+        : `The configuration this Run used cannot be rebuilt, so names and probabilities below are labelled with today's configuration, which may differ. ${configuration.reason ?? ''}`}
     </div>
   );
 }

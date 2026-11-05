@@ -29,7 +29,13 @@ import {
   listAuditActions,
   openInspector,
 } from '@/api/client';
-import type { AuditAction, AuditActionSummary, InspectorState, RecordedRun } from '@/types';
+import type {
+  AuditAction,
+  AuditActionSummary,
+  InspectorState,
+  RecordedRun,
+  ReplayInfo,
+} from '@/types';
 import { Pager } from '@/components/Pager';
 import { RecordedStatePanels } from './RecordedStateViews';
 
@@ -45,6 +51,7 @@ const ACTION_COLORS: Record<string, string> = {
   structure_built: '#4caf50',
   structure_broken: '#f44336',
   answer: 'var(--success)',
+  intervention: '#ff9800',
 };
 
 export function AuditRunReview({ run }: { run: RecordedRun }) {
@@ -91,7 +98,13 @@ export function AuditRunReview({ run }: { run: RecordedRun }) {
       .catch(
         (e) =>
           !cancelled &&
-          setError(describeApiError(e, `open the inspector for run #${run.run_id}`)),
+          setError(
+            // The server refuses (422) when the Run's configuration cannot be rebuilt: it
+            // says so plainly rather than replaying under today's configuration.
+            e instanceof ApiError && e.status === 422
+              ? `This Run cannot be replayed faithfully. ${e.detail ?? ''}`
+              : describeApiError(e, `open the inspector for run #${run.run_id}`),
+          ),
       )
       .finally(() => !cancelled && setBusy(false));
 
@@ -178,7 +191,7 @@ export function AuditRunReview({ run }: { run: RecordedRun }) {
     return (
       <div style={{ padding: 12, fontSize: 12 }}>
         {error ? (
-          <span role="alert" style={{ color: 'var(--error)' }}>{error}</span>
+          <span role="alert" data-testid="replay-refused" style={{ color: 'var(--error)' }}>{error}</span>
         ) : (
           <span className="text-muted">Restoring the Run-start capture…</span>
         )}
@@ -192,6 +205,8 @@ export function AuditRunReview({ run }: { run: RecordedRun }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <ReplayBanner replay={state.replay} />
+
       {/* ---- Transport ---- */}
       <div
         style={{
@@ -389,6 +404,50 @@ export function AuditRunReview({ run }: { run: RecordedRun }) {
   );
 }
 
+/**
+ * Says whether what is on screen is the Run.  Green: the replay runs under the Run's own
+ * configuration, applies the person's recorded actions and has matched the record so far.
+ * Red: it no longer matches, and nothing below it from that tick on is what the Run did.
+ */
+export function ReplayBanner({ replay }: { replay: ReplayInfo }) {
+  const c = replay.configuration;
+  if (!replay.faithful && replay.first_difference) {
+    const d = replay.first_difference;
+    return (
+      <div
+        role="alert"
+        data-testid="replay-banner"
+        style={{ ...bannerBase, borderColor: 'var(--error)', color: 'var(--error)' }}
+      >
+        <strong>This replay no longer matches the Run.</strong> From tick {d.tick} on, what is
+        shown below is not what the Run did: {d.what}. The recorded action log is still the
+        record.
+      </div>
+    );
+  }
+  return (
+    <div
+      data-testid="replay-banner"
+      className="text-xs"
+      style={{ ...bannerBase, borderColor: '#4caf50' }}
+    >
+      Replayed under the configuration this Run used (global revision {c.revision}
+      {c.edited_since ? `, since edited: today's is revision ${c.current_revision}` : ''}),
+      with the {replay.interventions_total} action
+      {replay.interventions_total === 1 ? '' : 's'} of the person during the Run applied again at
+      the same codelets. Checked against the recorded log: {replay.checked_actions} actions agree.
+    </div>
+  );
+}
+
+const bannerBase: React.CSSProperties = {
+  border: '1px solid',
+  borderRadius: 4,
+  padding: '6px 8px',
+  fontSize: 12,
+  background: 'var(--bg-card)',
+};
+
 /** One line of what an action says, per action type. */
 function describe(a: AuditAction): string {
   const p = a.payload ?? {};
@@ -402,6 +461,9 @@ function describe(a: AuditAction): string {
       return `${p.structure} #${p.id} strength ${p.strength}`;
     case 'answer':
       return `${p.answer} (quality ${Math.round(p.quality ?? 0)})`;
+    case 'intervention':
+      // What a person did to the live Run; the replay does it again at this codelet.
+      return `the person: ${p.method} ${JSON.stringify(p.args ?? {})}`;
     default:
       return JSON.stringify(p);
   }

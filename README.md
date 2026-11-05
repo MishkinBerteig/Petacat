@@ -28,7 +28,7 @@ license change was authorised by Dr. Marshall directly (see
 > end-to-end. Episodic Memory (Metacat-Mode learning) shapes the runs that inherit it: a run
 > declines an answer already held for the same problem and rules, so repeating a
 > problem across Metacat Mode's [episodic runs](#persistence-modes-and-episodic-runs)
-> (which are Metacat Mode and not Training Mode) explores a different answer each time. It ships with 5,489 test cases covering the engine, the API, and the
+> (which are Metacat Mode and not Training Mode) explores a different answer each time. It ships with 5,527 test cases covering the engine, the API, and the
 > help/config system, run on both the CPU and the GPU numeric backends. Underneath the seven components sits an execution
 > substrate — three [persistence modes](#persistence-modes-and-episodic-runs),
 > a [GPU numeric substrate](#the-numeric-substrate), and
@@ -455,8 +455,8 @@ Petacat has two test suites:
   plugin against the serial runs it claims to equal), `lockstep` (Petacat's decision
   traces against Metacat's), and `e2e` (full HTTP
   stack against a running database). All eight run in a single command against
-  the local Postgres — 5,489 cases, which includes the numeric matrix's second
-  pass over the 910 backend-sensitive tests. See
+  the local Postgres — 5,527 cases, which includes the numeric matrix's second
+  pass over the 911 backend-sensitive tests. See
   [TESTING.md](TESTING.md) for the layer breakdown, the numeric backend matrix,
   the session ceiling, the unit-test rules, determinism requirements, test-double
   conventions, how to run the suite under the free-threaded interpreter, and what
@@ -671,7 +671,23 @@ with the writers. Open the **Review** view from the hamburger menu (or
   activation and temperature at that instant. **Forward only** in this release.
   The inspector works by restoring the Run-start capture and walking a real
   engine forward, which is only legitimate if the reconstruction really is the
-  recorded run — so it is checked against the recorded action log.
+  recorded run. So the replay runs under **the configuration the Run used**
+  (a Run records the global configuration's revision when it is created; the
+  journal rebuilds the configuration at that revision and the Run's
+  `config_hash` proves the rebuild), applies **what the person did to the live
+  Run** (temperature, node, theme and codelet clamps, Undo, Self-watching, the
+  spreading threshold, displaying a past event, answer or snag) at the same
+  codelets through the same `RunService` methods, and **checks every action it
+  produces against the recorded log**. The state carries a `replay` block
+  (`faithful`, `first_difference`, the configuration used) and the client shows
+  it as a banner, red from the first tick the replay stops matching. When the
+  configuration cannot be rebuilt the inspector answers 422 and refuses; it
+  never replays under today's configuration. The Normal-run captures and
+  comparison are labelled under the same recorded configuration and carry a
+  `configuration` block. A person's actions are recorded only for Audit Runs, as
+  `intervention` rows of `audit_actions`; Fast and Normal Runs record nothing
+  extra. What a replay cannot reproduce is a change made to the shared Episodic
+  Memory while the Run was live; the check reports it as a difference.
 
 The review surfaces render through the same `WorkspaceView`, `SlipnetView`,
 `ThemespaceView` and `TraceView` components as the live dashboard, pointed at

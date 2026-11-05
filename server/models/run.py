@@ -134,6 +134,14 @@ class Run(Base):
     workers = Column(Integer, nullable=True)
     #: Hash of the MetadataProvider this Run executed under (WP3.5).
     config_hash = Column(String(64), nullable=True)
+    #: The revision of the global configuration the Run was created under
+    #: (``configurations.revision``, read in the same breath as the provider the Run took).
+    #: With ``config_hash`` it names the Run's configuration exactly: the journal
+    #: reconstructs the configuration at this revision, and the hash proves the
+    #: reconstruction is the one the Run used.  The Audit inspector replays under it
+    #: (``review_service``).  Null on a row written before it was recorded; such a Run
+    #: cannot be replayed faithfully, and the inspector says so.
+    configuration_revision = Column(Integer, nullable=True)
     #: Identifies the Episodic Memory state the Run executed against (WP3.5). Two runs
     #: with the same seed and different memory hashes are distinguishable in the record,
     #: which matters once Phase 1 puts the concept vocabulary in episodic memory.

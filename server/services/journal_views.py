@@ -69,6 +69,22 @@ def _kt(table: str, key: Mapping[str, Any]) -> tuple:
     return LAYER_REGISTRY[table].key_tuple(key)
 
 
+def _put(rows: dict, old_kt: tuple, new_kt: tuple, row: dict) -> None:
+    """Replace the row at ``old_kt`` by ``row`` at ``new_kt``, keeping its place in the table.
+
+    A table with no declared order is read in the order its rows were inserted (the engine's
+    loader orders such a table by ``id``), and the configuration hash covers that order.  An
+    update that removed the row and added it back would move it to the end, so undoing an
+    edit would not give back the configuration that was edited.
+    """
+    if old_kt == new_kt:
+        rows[old_kt] = row
+        return
+    items = [(new_kt, row) if kt == old_kt else (kt, r) for kt, r in rows.items()]
+    rows.clear()
+    rows.update(items)
+
+
 def apply_ops(state: State, ops: Sequence[Mapping[str, Any]]) -> None:
     """Replay resolved ops onto ``state``, in order, in place."""
     for op in ops:
@@ -84,8 +100,8 @@ def apply_ops(state: State, ops: Sequence[Mapping[str, Any]]) -> None:
             kt = _kt(table, op["key"])
             if kt not in rows:
                 raise ReplayError(f"{table}: update of {kt!r}, which does not exist")
-            new = {**rows.pop(kt), **copy.deepcopy(dict(op["set"]))}
-            rows[spec.key_tuple(spec.key_of(new))] = new
+            new = {**rows[kt], **copy.deepcopy(dict(op["set"]))}
+            _put(rows, kt, spec.key_tuple(spec.key_of(new)), new)
         elif op["op"] == "delete":
             kt = _kt(table, op["key"])
             if rows.pop(kt, None) is None:
@@ -105,9 +121,10 @@ def unapply_entry(state: State, ops: Sequence[Mapping[str, Any]], before: Sequen
                 raise ReplayError(f"{table}: the inserted row {op['key']!r} is not there to remove")
         elif op["op"] == "update":
             current = {**old, **op["set"]}
-            if rows.pop(spec.key_tuple(spec.key_of(current)), None) is None:
+            current_kt = spec.key_tuple(spec.key_of(current))
+            if current_kt not in rows:
                 raise ReplayError(f"{table}: the updated row {op['key']!r} is not there")
-            rows[spec.key_tuple(spec.key_of(old))] = copy.deepcopy(dict(old))
+            _put(rows, current_kt, spec.key_tuple(spec.key_of(old)), copy.deepcopy(dict(old)))
         elif op["op"] == "delete":
             rows[spec.key_tuple(spec.key_of(old))] = copy.deepcopy(dict(old))
         else:
@@ -169,7 +186,12 @@ async def current_state(session: AsyncSession) -> State:
     state = empty_state()
     for name, spec in LAYER_REGISTRY.items():
         columns = [spec.table.c[c] for c in spec.stored_columns]
-        for row in (await session.execute(select(*columns))).mappings():
+        query = select(*columns)
+        if "id" in spec.table.c:
+            # Rows in the order they were inserted, which is the order the loader reads a
+            # table that declares none.
+            query = query.order_by(spec.table.c.id)
+        for row in (await session.execute(query)).mappings():
             row = dict(row)
             state[name][spec.key_tuple(spec.key_of(row))] = row
     return state

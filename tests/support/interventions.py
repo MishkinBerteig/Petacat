@@ -18,7 +18,6 @@ the next one starts (Metacat: the break at ``*break-time*`` N).  ``schedule`` wr
 
 from __future__ import annotations
 
-from types import SimpleNamespace
 from typing import Any
 
 PATTERNS = ("top_down", "bottom_up", "group", "bridge", "rule")
@@ -36,7 +35,7 @@ def apply(runner: Any, intervention: dict[str, Any]) -> None:
 
     service = RunService.__new__(RunService)
     service._runners = {0: runner}
-    service._store = SimpleNamespace(current=lambda: runner.meta)
+    service._sinks = {}
     op = intervention["op"]
     if op == "clamp_codelet_pattern":
         service.clamp_codelet_pattern(0, intervention["pattern"])

@@ -1006,6 +1006,15 @@ forward — the reconstruction mechanism WP3.8 names. That is only legitimate if
 reconstruction *is* the recorded run, so it is checked: the first 25 recorded actions
 must match the reconstruction's codelet type and temperature at every tick.
 
+*As built after round 2, stage R:* the first version replayed under today's configuration
+and left out a person's clamps and threshold changes, so it could show something that never
+happened. A Run now records the global configuration's revision (`runs.configuration_revision`)
+beside its `config_hash`; the inspector rebuilds the configuration at that revision from the
+journal, proves it by the hash (or refuses with a 422), applies the person's recorded
+actions (`audit_actions.action_type = 'intervention'`) at the same codelets through the same
+`RunService` methods, and checks every action it produces against the whole log, not 25 of
+them, reporting the first difference in `replay`.
+
 **Two defects in WP3.4 that this package found**, both now fixed with tests that would
 have caught them:
 

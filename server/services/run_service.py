@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import functools
 import inspect
+import json
 from dataclasses import dataclass
 from typing import Any
 
@@ -254,6 +255,25 @@ class RunService:
         """
         return self._store.current()
 
+    def _record_intervention(self, run_id: int, method: str, args: dict) -> None:
+        """Tell an Audit run's sink what a person just did, so a replay can do it again.
+
+        Only an Audit sink has ``on_intervention``; for Fast and Normal this is one dict
+        lookup per human action.  A recorder must not fail the action it records, so an
+        argument that cannot be written as JSON is recorded as unrecordable and the
+        inspector then says the replay cannot be trusted.
+        """
+        sink = self._sinks.get(run_id)
+        record = getattr(sink, "on_intervention", None)
+        runner = self._runners.get(run_id)
+        if record is None or runner is None or runner.ctx is None:
+            return
+        try:
+            args = json.loads(json.dumps(args))
+        except (TypeError, ValueError):
+            args = {"unrecordable": repr(args)}
+        record(runner.ctx, method, args)
+
     # ------------------------------------------------------------------
     # Existing methods
     # ------------------------------------------------------------------
@@ -300,6 +320,9 @@ class RunService:
         # half-built Run behind. Raises ValueError, which the API turns into a 400.
         overrides = validate_overrides(parameters)
         base_meta = self.meta  # read once: this Run holds it for life
+        # Read in the same breath (no await between): the revision names the configuration
+        # ``base_meta`` is, so the journal can reconstruct it for a replay.
+        base_revision = self._store.revision
         run_meta = base_meta.with_overrides(overrides)
         # The run-start check comes first, before any parameter is read below: a
         # configuration that lacks a name gives the check's one message, not a KeyError.
@@ -350,6 +373,7 @@ class RunService:
             # Hashed over the Run's *own* metadata, so two Runs that differ only in a
             # parameter override are distinguishable by their config hash alone.
             config_hash=config_hash(run_meta),
+            configuration_revision=base_revision,
             parameters=resolved_parameters(run_meta),
             # Hashed *before* the run executes: it identifies the memory the run
             # inherited, not the one it leaves behind.
@@ -858,6 +882,9 @@ class RunService:
         # The Run has stopped, so the engine emits its closing event and the sink is
         # written once for the whole run.
         runner.finish()
+        # ``finish`` hands the sink the trace events not yet seen, so where a pause falls
+        # changes when they are recorded; the replay finishes at the same codelet.
+        self._record_intervention(run_id, "finish", {})
 
         status_str = runner.status
         if fast:
@@ -961,6 +988,10 @@ class RunService:
         self._sinks[run_id] = sink
         if threshold is not None:
             runner.ctx.spreading_activation_threshold = threshold
+            # The start capture was taken inside ``init_mcat``, before this line, so a
+            # threshold a person had chosen is not in it: the replay applies it as an
+            # action at codelet 0.
+            self._record_intervention(run_id, "apply_spreading_threshold", {"threshold": threshold})
 
         # Delete old trace events
         # The tables Phase 0 added. Without these a deleted run left its boundary
@@ -2033,8 +2064,7 @@ class RunService:
         runner = self._runners.get(run_id)
         if runner is None or runner.ctx is None:
             raise ValueError(f"Run {run_id} not found or not loaded")
-        threshold = max(0, min(100, threshold))
-        runner.ctx.spreading_activation_threshold = threshold
+        threshold = self.apply_spreading_threshold(run_id, threshold)
         await session.execute(
             update(Run).where(Run.id == run_id).values(spreading_threshold=threshold)
         )
@@ -2043,6 +2073,19 @@ class RunService:
             "run_id": run_id,
             "spreading_activation_threshold": threshold,
         }
+
+    def apply_spreading_threshold(self, run_id: int, threshold: int) -> int:
+        """The engine half of :meth:`set_spreading_threshold`: clip it and set it on the run.
+
+        Split out so the Audit inspector can apply a recorded threshold change to its
+        replay without writing the run's row.  Returns the clipped value.
+        """
+        runner = self._runners.get(run_id)
+        if runner is None or runner.ctx is None:
+            raise ValueError(f"Run {run_id} not found or not loaded")
+        threshold = max(0, min(100, threshold))
+        runner.ctx.spreading_activation_threshold = threshold
+        return threshold
 
     def get_spreading_threshold(self, run_id: int) -> dict:
         """Get the current spreading activation threshold for the given run."""
@@ -2091,16 +2134,16 @@ class RunService:
             raise ValueError(f"Run {run_id} not found or not loaded")
 
         ctx = runner.ctx
-        entries = pattern_entries(self.meta, pattern)  # KeyError names an unknown pattern
+        entries = pattern_entries(ctx.meta, pattern)  # KeyError names an unknown pattern
         clamped = []
         resolved = []
         for codelet_type, level in entries:
-            urgency = int(self.meta.get_urgency(level))
+            urgency = int(ctx.meta.get_urgency(level))
             resolved.append((codelet_type, urgency))
             clamped.append({"codelet_type": codelet_type, "urgency": urgency})
         if pattern in ("group", "bridge", "rule"):
             resolved = ctx.coderack.against_background(
-                int(self.meta.get_urgency("very_low")), resolved
+                int(ctx.meta.get_urgency("very_low")), resolved
             )
         event = ClampEvent(
             codelet_count=ctx.codelet_count,
@@ -2138,7 +2181,7 @@ class RunService:
             raise ValueError(f"Run {run_id} not found or not loaded")
 
         ctx = runner.ctx
-        entries = pattern_entries(self.meta, pattern)
+        entries = pattern_entries(ctx.meta, pattern)
         last = ctx.trace.get_last_event("clamp_start")
         if (
             ctx.trace.within_clamp_period
@@ -2229,4 +2272,64 @@ def _in_run_scope(cls: type) -> type:
     return cls
 
 
+#: Every method that changes a live run because a person asked: what an Audit run records
+#: (``AuditSink.on_intervention``) and the Audit inspector applies again at the same codelet.
+#: ``_display_over_themespace`` is what ``impose_trace_event``, ``impose_answer`` and
+#: ``impose_snag`` all go through, with the patterns already resolved (an answer or a snag
+#: comes from the Episodic Memory as it is now, which a later clear would change).
+#: ``set_spreading_threshold`` is recorded as its engine half, ``apply_spreading_threshold``.
+RECORDED_INTERVENTIONS = (
+    "clamp_temperature", "unclamp_temperature",
+    "clamp_node", "unclamp_node",
+    "clamp_themes", "clamp_theme_pattern", "unclamp_themes",
+    "undo_last_clamp", "set_self_watching",
+    "set_spreading_threshold",
+    "clamp_codelets", "clamp_codelet_pattern", "unclamp_codelet_pattern", "unclamp_codelets",
+    "_display_over_themespace", "restore_themespace",
+)
+#: Changes nothing a run computes, and is not recorded: breakpoints and Verbose mode.
+
+
+def _recording_interventions(cls: type) -> type:
+    """Wrap the methods in :data:`RECORDED_INTERVENTIONS` so a success is recorded."""
+
+    def wrap(name: str, fn):
+        names = [n for n in inspect.signature(fn).parameters if n != "self"]
+        recorded_as = "apply_spreading_threshold" if name == "set_spreading_threshold" else name
+
+        def args_of(args, kwargs):
+            bound = dict(zip(names, args))
+            bound.update(kwargs)
+            run_id = bound.pop("run_id")
+            bound.pop("session", None)
+            if "key" in bound:  # _display_over_themespace: a tuple, replayed as one
+                bound["key"] = list(bound["key"])
+            return run_id, bound
+
+        if inspect.iscoroutinefunction(fn):
+
+            @functools.wraps(fn)
+            async def run_async(self, *args, **kwargs):
+                result = await fn(self, *args, **kwargs)
+                run_id, bound = args_of(args, kwargs)
+                self._record_intervention(run_id, recorded_as, bound)
+                return result
+
+            return run_async
+
+        @functools.wraps(fn)
+        def run_sync(self, *args, **kwargs):
+            result = fn(self, *args, **kwargs)
+            run_id, bound = args_of(args, kwargs)
+            self._record_intervention(run_id, recorded_as, bound)
+            return result
+
+        return run_sync
+
+    for name in RECORDED_INTERVENTIONS:
+        setattr(cls, name, wrap(name, vars(cls)[name]))
+    return cls
+
+
 _in_run_scope(RunService)
+_recording_interventions(RunService)

@@ -747,6 +747,8 @@ export interface RecordedRun {
   spreading_threshold: number;
   /** Which configuration and which Episodic Memory the Run executed against. */
   config_hash: string | null;
+  /** The global configuration's revision when the Run was created; with `config_hash` it names the configuration a replay runs under. Null on a Run recorded before it was kept. */
+  configuration_revision: number | null;
   memory_hash: string | null;
   created_at: string | null;
   /** How much record the Run left. Zero and zero is a Fast Run, by design. */
@@ -762,7 +764,25 @@ export interface CaptureSummary {
 }
 
 /** One recorded capture, in the shapes the live views already read. */
+/**
+ * Which configuration a review surface read a Run under. `faithful` is true when it was
+ * reconstructed at the Run's revision and proved by the Run's hash; otherwise `source` is
+ * `current`, today's configuration was used only to label what is shown, and `reason` says why.
+ */
+export interface ReviewConfiguration {
+  source: 'recorded' | 'current';
+  faithful: boolean;
+  revision: number | null;
+  config_hash: string | null;
+  current_revision: number;
+  /** The global configuration has changed since the Run. Null when that is not known. */
+  edited_since: boolean | null;
+  reason: string | null;
+}
+
 export interface RecordedState {
+  /** Present on a capture the server projected (`GET /review/runs/{id}/captures/{boundary}`). */
+  configuration?: ReviewConfiguration;
   run_id: number;
   boundary: string;
   problem: { initial: string; modified: string; target: string; answer: string | null };
@@ -796,6 +816,7 @@ export interface ThemeMovement {
 /** What changed between a Normal Run's two captures — not both blobs. */
 export interface RunComparison {
   run_id: number;
+  configuration?: ReviewConfiguration;
   problem: { initial: string; modified: string; target: string; answer: string | null };
   codelets: { start: number; end: number; executed: number };
   temperature: { start: number; end: number; delta: number };
@@ -859,8 +880,29 @@ export interface AuditActionSummary {
   total: number;
 }
 
+/**
+ * Whether the inspector's replay is the Run. The replay runs under the Run's own
+ * configuration and applies what a person did to the live Run at the same codelets, and every
+ * action it produces is checked against the recorded log; `faithful` turns false at the first
+ * disagreement and stays false.
+ */
+export interface ReplayInfo {
+  faithful: boolean;
+  first_difference: {
+    tick: number;
+    what: string;
+    recorded: unknown;
+    replayed: unknown;
+  } | null;
+  checked_actions: number;
+  interventions_applied: number;
+  interventions_total: number;
+  configuration: ReviewConfiguration;
+}
+
 /** The inspector's position and everything visible from it. Forward-only. */
 export interface InspectorState {
+  replay: ReplayInfo;
   run_id: number;
   codelet_count: number;
   final_codelet_count: number;

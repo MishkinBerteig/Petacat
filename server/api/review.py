@@ -29,6 +29,7 @@ from server.services.capture_projection import CaptureFormatError
 from server.services.review_service import (
     BackwardsNotSupported,
     NotRecorded,
+    ReplayUnavailable,
     ReviewError,
 )
 
@@ -79,6 +80,10 @@ class RunSummary(BaseModel):
     #: Part of the Run's identity: two Runs with one seed and different hashes are not
     #: the same experiment.
     config_hash: str | None = None
+    #: The global configuration's revision when the Run was created: with ``config_hash``
+    #: it names the configuration the Audit inspector replays under.  Null on a Run
+    #: recorded before it was kept.
+    configuration_revision: int | None = None
     memory_hash: str | None = None
     created_at: datetime | None
     #: How much record the Run actually left.  Zero and zero is a Fast Run, which is a
@@ -143,7 +148,7 @@ def _fail(exc: Exception) -> HTTPException:
         return HTTPException(404, str(exc))
     if isinstance(exc, BackwardsNotSupported):
         return HTTPException(409, str(exc))
-    if isinstance(exc, CaptureFormatError):
+    if isinstance(exc, (CaptureFormatError, ReplayUnavailable)):
         return HTTPException(422, str(exc))
     return HTTPException(400, str(exc))
 
@@ -229,6 +234,7 @@ async def get_recorded_run(
             100 if row.spreading_threshold is None else int(row.spreading_threshold)
         ),
         config_hash=row.config_hash,
+        configuration_revision=row.configuration_revision,
         memory_hash=row.memory_hash,
         created_at=row.created_at,
         capture_count=captures,

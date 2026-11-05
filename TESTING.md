@@ -141,18 +141,18 @@ outside the matrix take it too and the run is entirely what it says it is.
 
 ```
 ============================= petacat test matrix ==============================
-  cpu  numpy    float64    910 tests
-  gpu  mlx      float32    910 tests
+  cpu  numpy    float64    911 tests
+  gpu  mlx      float32    911 tests
   whole suite requested: the full matrix is required of this run
 
-  unit          1806 collected   1806 run   1806 passed      0 failed      0 skipped  complete
+  unit          1809 collected   1809 run   1809 passed      0 failed      0 skipped  complete
   seed_unit     1076 collected   1076 run   1076 passed      0 failed      0 skipped  complete
   module        1049 collected   1049 run   1049 passed      0 failed      0 skipped  complete
   architecture    92 collected     92 run     92 passed      0 failed      0 skipped  complete
   integration    358 collected    358 run    358 passed      0 failed      0 skipped  complete
   parallel       304 collected    304 run    304 passed      0 failed      0 skipped  complete
   lockstep       247 collected    247 run    247 passed      0 failed      0 skipped  complete
-  e2e            557 collected    557 run    557 passed      0 failed      0 skipped  complete
+  e2e            592 collected    592 run    592 passed      0 failed      0 skipped  complete
 
   run complete in 13.9 min against a 60 min ceiling
 ```
@@ -224,17 +224,17 @@ that allowance.
 
 | Layer | Directory | Scope | May depend on | Cases |
 |-------|-----------|-------|---------------|-------|
-| **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 1806 |
+| **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 1809 |
 | **seed unit** | `tests/seed_unit/` | One class or function, measured against the values Petacat ships with | Real `seed_data/*.json`, and the machine the process is running on | 1076 |
 | **module** | `tests/module/` | Several real components assembled and driven | Real engine objects and `seed_data/*.json`; no DB, no HTTP | 1049 |
 | **architecture** | `tests/architecture/` | How the source tree is allowed to depend on itself | The repository's source, `seed_data/*.json`, child interpreters | 92 |
 | **integration** | `tests/integration/` | Agreement between the repository's artifacts, and the harness's own rules | Real `seed_data/*.json`, the ORM declarations, the generated client files, the documentation, a real pytest session | 358 |
 | **parallel** | `tests/parallel/` | The detachable multi-core plugin (`server/parallel/`): each executor against the serial run it claims to equal | Real engine objects and `seed_data/*.json`, worker processes and threads; each test pins the backend it compares on | 304 |
 | **lockstep** | `tests/lockstep/` | Petacat's decision traces against Metacat's: naming, helper conformance, tracing/replay RNGs, determinism guards, the comparer | Real engine in faithful mode (numeric backend off, or a named backend); recorded Metacat traces | 247 |
-| **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 557 |
+| **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 592 |
 
 Those counts are cases, so they include the second pass the numeric matrix makes
-over the 910 backend-sensitive tests.
+over the 911 backend-sensitive tests.
 
 One line decides each layer. Read them as a question about what a new test's
 subject is, and write the test where the answer lands:
@@ -266,7 +266,7 @@ first**, then move up toward the API and GUI.
 
 All eight layers run in one command — the
 [required command](#the-required-command) — and, since Petacat runs natively, all
-eight actually run: **5,489 cases**, every one of them executed. A layer that is
+eight actually run: **5,527 cases**, every one of them executed. A layer that is
 normally skipped is not a layer that is normally green, and none of these is.
 
 Wall-clock time depends heavily on the machine and on what else it is doing. The
@@ -439,7 +439,7 @@ changing what it records.
 | `test_rationals.py` | 13 | The rational value kind: `n/m` parsed exactly, refused unless it is two integers over a positive denominator, and stored in lowest terms; the configuration hash follows it. The Metacat Standard Configuration holds `enclosed_group_importance_factor`, `edge_object_bond_factor` and `interior_object_bond_factor` as `2/3`, `1/3` and `1/6`, on the declared read list; under them importance and intra-string unhappiness are the old arithmetic, and a non-standard rational changes them as it implies |
 | `test_config_document.py` | 26 | S0: the pure `ConfigDocument` (`server/services/config_document.py`): identity with the files' provider and the engine's `config_hash`, order, structure sharing between versions, errors, codecs (int, float and rational typing), replay against a naive reference model, the incremental hash against the whole hash, and `diff` followed by `apply_resolved` |
 | `test_config_registry.py` | 5 | C6: the configuration table registry (`server/services/config_registry.py`): natural keys, order columns, code and JSON columns, a NULL link label read as `''`, the frozen spec |
-| `test_journal_replay.py` | 4 | C6: pure journal replay, reconstruction from before-images and inverse ops |
+| `test_journal_replay.py` | 5 | C6: pure journal replay, reconstruction from before-images and inverse ops; an update and its undo keep the row's place |
 | `test_session_episodic_memory_always.py` | 4 | S11: a Training Mode Session always has an Episodic Memory: no memory, status or `closed_at` columns and non-null episode columns; no shared or independent branch and no `close`; no route clears the memory; the create request forbids extra fields |
 | `test_no_training_entity_name.py` | 2 | S12: the grep guard: the old entity name is used nowhere outside Training Mode, Training episode and `training_memory_merges`, in code, UI strings and current docs; and the old modules, routes and component folder are gone |
 | `test_problem_text.py` | 11 | Any Unicode text is a valid problem string (`server/services/problem_text.py`): the shared check accepts a broad corpus (scripts, emoji, combining and invisible characters, whitespace, line breaks, 1,000 characters) exactly, keeps NFC and NFD distinct, and refuses only U+0000 and a lone surrogate with clear messages; every request model (session problems, runs, the Swarm, demo problems) uses it, and the session, run and Swarm requests keep the structural rule (non-empty initial, modified and target; an answer absent or non-empty); `check_deep` checks every string and key of a nested value and names the path of a bad one |
@@ -482,7 +482,7 @@ changing what it records.
 | `test_rule_bond_facet_change.py` | 1 | A GroupCtgy self change's BondFacet change is found wherever it sits (KNOWN-FAILURES, G-Q1) |
 | `test_rule_types.py` | 9 | `Rule` and `RuleClause` predicates and translation |
 | `test_rules_lockstep_ordering.py` | 12 | Rule construction in Metacat's order: subobject gate, common change schemas, `sort-templates`, swaps, list order (DISCREPANCIES5 C-1…C-4, D-1…D-5) |
-| `test_run_service_ids.py` | 1 | A clamp or Undo on a live run takes its trace-event number from the run's own id allocator |
+| `test_run_service_ids.py` | 2 | A clamp or Undo on a live run takes its trace-event number from the run's own id allocator |
 | `test_runner_status.py` | 1 | The runner's status constants |
 | `test_scout_counts.py` | 14 | The scout-count aggregates that decide how many codelets a cycle posts |
 | `test_eeg.py` | 5 | The EEG recorder: ring buffer, the average that excludes the current reading |
@@ -683,6 +683,7 @@ changing what it records.
 | `test_persistence_modes.py` | 33 | The three persistence modes: Fast, Normal, Audit; a parallel Run is the same at any worker count |
 | `test_run_parameters.py` | 13 | Run parameters are settable per Run, stored, and readable back |
 | `test_run_to_answer.py` | 8 | The Run-to-Answer feature over HTTP |
+| `test_review_replay.py` | 17 | Review replays what the Run did (round 2, stage R): the Audit inspector's views equal the live Run's at every codelet, over HTTP, for each kind of action a person takes on a live Run (clamps of temperature, node, theme and codelet, Undo, Self-watching, the threshold, displaying a past event or answer, a reset, a pause with Run), several in one Run, each kind of configuration edit after the Run (coefficient, node, links, codelet body, posting rules, theme dimension, reset to standard, an Admin import that edited and restored a row), runs under different configurations and a server restart; an unrebuildable configuration is refused with 422, a replay that disagrees with the log says so, captures are projected under the Run's configuration, and only Audit records a person's actions |
 | `test_two_runs_over_http.py` | 5 | Two live runs held by one server (round 2, stage 2): run A, driven as the client does (step batches, view polls between them), is codelet-for-codelet and view-for-view the run it is alone when run B is created before A is stepped, with the same configuration (normal and fast) or one edited in between through the Admin API, and when the two are stepped alternately; an open Audit inspector, stepped between A's batches, changes nothing; and no run is bound around an e2e test (the unit/module fixture's ambient run must not hide a server path that forgot its scope) |
 | `test_memory_order.py` | 2 | A restart puts stored answers back newest first by the memory's own identifier, both projections list them oldest first, and forgetting one keeps the rest in order |
 | `test_snag_identity.py` | 5 | A snag is the same snag whichever endpoint served it, and is written once |

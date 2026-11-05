@@ -9,10 +9,12 @@ the process had run and could collide with the run's own numbers; that fallback 
 
 from __future__ import annotations
 
+import dataclasses
 from types import SimpleNamespace
 
 import pytest
 
+from server.engine.codelet_patterns import pattern_entries
 from server.engine.ids import KIND_TRACE_EVENT
 from server.engine.memory import EpisodicMemory
 from server.engine.numeric.backend import use_backend
@@ -33,8 +35,25 @@ def _service_with_a_run(steps: int = 60):
         runner.run_mcat(max_steps=steps)
     service = RunService.__new__(RunService)
     service._runners = {7: runner}
-    service._store = SimpleNamespace(current=lambda: meta)
+    service._sinks = {}
     return service, runner
+
+
+def test_a_codelet_pattern_clamp_reads_the_configuration_the_run_holds() -> None:
+    """A run holds its configuration for life, so an Admin edit since it began must not reach a
+    person's clamp of that run, and an Audit replay under the run's own configuration must agree."""
+    service, runner = _service_with_a_run()
+    held = runner.ctx.meta
+    edited = dataclasses.replace(held, urgency_levels={k: v + 1 for k, v in held.urgency_levels.items()})
+    service._store = SimpleNamespace(current=lambda: edited)
+
+    clamped = service.clamp_codelet_pattern(7, "bottom_up")["clamped"]
+
+    assert clamped == [
+        {"codelet_type": codelet_type, "urgency": int(held.get_urgency(level))}
+        for codelet_type, level in pattern_entries(held, "bottom_up")
+    ]
+    service.unclamp_codelet_pattern(7, "bottom_up")
 
 
 def _event_numbers(runner) -> list[int]:

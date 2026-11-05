@@ -779,3 +779,154 @@ describe('AuditRunReview — paging the recorded action log', () => {
     await waitFor(() => expect(screen.getByText('1–1 of 430 actions from tick 13')).toBeTruthy())
   })
 })
+
+// ---------------------------------------------------------------------------
+// Review replays what the Run actually did (round 2, stage R)
+// ---------------------------------------------------------------------------
+
+describe('AuditRunReview — the replay says whether it is the Run', () => {
+  async function openAudit(state = inspectorState({ run_id: 9 })) {
+    withRuns([recordedRun({ run_id: 9, mode: 'audit', action_count: 1200, capture_count: 2 })])
+    mocked.openInspector.mockResolvedValue(state)
+    mocked.getAuditSummary.mockResolvedValue({
+      run_id: 9, by_type: {}, first_codelet: 1, last_codelet: 400, total: 430,
+    })
+    render(<ReviewPanel />)
+    await waitFor(() => expect(screen.getByText('#9')).toBeTruthy())
+    await act(async () => {
+      screen.getByText('#9').closest('tr')!.click()
+    })
+  }
+
+  it('states the configuration it replays under and the person\'s actions it applied', async () => {
+    const base = inspectorState({ run_id: 9 })
+    await openAudit({
+      ...base,
+      replay: {
+        ...base.replay,
+        checked_actions: 120,
+        interventions_applied: 2,
+        interventions_total: 2,
+        configuration: { ...base.replay.configuration, edited_since: true, current_revision: 8 },
+      },
+    })
+    const banner = await screen.findByTestId('replay-banner')
+    expect(banner.textContent).toContain('configuration this Run used (global revision 3')
+    expect(banner.textContent).toContain("today's is revision 8")
+    expect(banner.textContent).toContain('2 actions of the person')
+    expect(banner.textContent).toContain('120 actions agree')
+    expect(screen.queryByText(/no longer matches/)).toBeNull()
+  })
+
+  it('says plainly, in red, when the replay no longer matches the Run', async () => {
+    const base = inspectorState({ run_id: 9 })
+    await openAudit({
+      ...base,
+      replay: {
+        ...base.replay,
+        faithful: false,
+        first_difference: {
+          tick: 64,
+          what: 'the replayed codelet differs from the recorded codelet',
+          recorded: 'description-evaluator',
+          replayed: 'bottom-up-bond-scout',
+        },
+      },
+    })
+    const banner = await screen.findByRole('alert')
+    expect(banner.textContent).toContain('This replay no longer matches the Run.')
+    expect(banner.textContent).toContain('From tick 64 on')
+    expect(banner.textContent).toContain('is not what the Run did')
+  })
+
+  it('shows a refusal, not a replay, when the configuration cannot be rebuilt', async () => {
+    withRuns([recordedRun({ run_id: 9, mode: 'audit', action_count: 1200, capture_count: 2 })])
+    mocked.openInspector.mockRejectedValue(
+      apiError(
+        422,
+        'Unprocessable Entity',
+        'run 9 cannot be replayed faithfully: the Run was recorded before the configuration revision was kept.',
+      ),
+    )
+    mocked.getAuditSummary.mockResolvedValue({
+      run_id: 9, by_type: {}, first_codelet: 1, last_codelet: 400, total: 430,
+    })
+    render(<ReviewPanel />)
+    await waitFor(() => expect(screen.getByText('#9')).toBeTruthy())
+    await act(async () => {
+      screen.getByText('#9').closest('tr')!.click()
+    })
+    const refused = await screen.findByTestId('replay-refused')
+    expect(refused.textContent).toContain('This Run cannot be replayed faithfully.')
+    expect(refused.textContent).toContain('before the configuration revision was kept')
+    // No stepping controls: there is nothing to step.
+    expect(screen.queryByRole('progressbar')).toBeNull()
+  })
+
+  it('lists what the person did in the recorded log', async () => {
+    withRuns([recordedRun({ run_id: 9, mode: 'audit', action_count: 1200, capture_count: 2 })])
+    mocked.openInspector.mockResolvedValue(inspectorState({ run_id: 9 }))
+    mocked.getAuditSummary.mockResolvedValue({
+      run_id: 9, by_type: {}, first_codelet: 1, last_codelet: 400, total: 430,
+    })
+    mocked.listAuditActions.mockResolvedValue({
+      run_id: 9, total: 1, limit: 60, offset: 0,
+      actions: [{
+        sequence: 5, codelet_count: 60, action_type: 'intervention', temperature: 70,
+        payload: { method: 'clamp_temperature', args: { value: 30, cycles: 40 } }, before: null,
+      }],
+    })
+    render(<ReviewPanel />)
+    await waitFor(() => expect(screen.getByText('#9')).toBeTruthy())
+    await act(async () => {
+      screen.getByText('#9').closest('tr')!.click()
+    })
+    await waitFor(() =>
+      expect(
+        screen.getByText('the person: clamp_temperature {"value":30,"cycles":40}'),
+      ).toBeTruthy(),
+    )
+  })
+})
+
+describe('NormalRunReview — the configuration the labels were computed under', () => {
+  async function openNormal(configuration: any) {
+    withRuns([recordedRun({ run_id: 7, mode: 'normal' })])
+    mocked.getCapture.mockResolvedValue(recordedState())
+    mocked.getRunComparison.mockResolvedValue({ ...runComparison(), configuration })
+    render(<ReviewPanel />)
+    await waitFor(() => expect(screen.getByText('#7')).toBeTruthy())
+    await act(async () => {
+      screen.getByText('#7').closest('tr')!.click()
+    })
+  }
+
+  it('says nothing when the Run\'s own configuration is the one in use', async () => {
+    await openNormal({
+      source: 'recorded', faithful: true, revision: 3, config_hash: 'x', current_revision: 3,
+      edited_since: false, reason: null,
+    })
+    await waitFor(() => expect(mocked.getRunComparison).toHaveBeenCalled())
+    expect(screen.queryByTestId('configuration-note')).toBeNull()
+  })
+
+  it('notes that the global configuration has been edited since the Run', async () => {
+    await openNormal({
+      source: 'recorded', faithful: true, revision: 3, config_hash: 'x', current_revision: 9,
+      edited_since: true, reason: null,
+    })
+    const note = await screen.findByTestId('configuration-note')
+    expect(note.textContent).toContain('under the configuration this Run used (global revision 3)')
+    expect(note.textContent).toContain('now revision 9')
+  })
+
+  it('warns, in red, when only today\'s configuration was available to label with', async () => {
+    await openNormal({
+      source: 'current', faithful: false, revision: 3, config_hash: 'x', current_revision: 9,
+      edited_since: null, reason: 'the journal does not hold it',
+    })
+    const note = await screen.findByRole('alert')
+    expect(note.textContent).toContain('cannot be rebuilt')
+    expect(note.textContent).toContain('the journal does not hold it')
+  })
+})

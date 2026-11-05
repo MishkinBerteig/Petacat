@@ -36,6 +36,7 @@ not need the inverse machinery.
 
 from __future__ import annotations
 
+import json
 import time
 from dataclasses import dataclass, field
 from typing import Any
@@ -43,6 +44,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from server.engine.hashing import config_hash
 from server.engine.runner import EngineRunner
 from server.engine.state_graph import StateGraphError, restore_run_state
 from server.models.run import (
@@ -52,6 +54,8 @@ from server.models.run import (
     EpisodicMemoryClear,
 )
 from server.services.capture_projection import project_capture
+from server.services.configuration_store import ConfigurationStore
+from server.services.sinks import ACTION_INTERVENTION, AuditSink
 
 #: Boundaries a Run capture can be taken at.  Two, by definition of Normal mode.
 BOUNDARIES = ("start", "end")
@@ -67,6 +71,14 @@ class NotRecorded(ReviewError):
     Distinguished from "no such run" because they call for different words on screen:
     a Fast Run is not missing, it is a run that promised not to leave a record, and a
     review surface that reported it as an error would be reporting the design.
+    """
+
+
+class ReplayUnavailable(ReviewError):
+    """The Run's configuration cannot be reconstructed, so no faithful replay exists.
+
+    The inspector refuses with this rather than replaying under today's configuration and
+    presenting the result as the Run.
     """
 
 
@@ -92,11 +104,78 @@ class _Inspector:
     runner: EngineRunner
     #: Codelet count of the recorded Run's end, so the inspector knows where it stops.
     final_codelet_count: int
+    #: What the replay was built from: ``_ConfigurationUse.as_dict()``.
+    configuration: dict = field(default_factory=dict)
+    #: A ``RunService`` holding only the replay, so a person's recorded action is applied
+    #: by the same product method that applied it to the live run.
+    host: Any = None
+    #: What a person did, in order: ``(codelet_count, method, args)``; ``applied`` of them
+    #: have been applied.
+    interventions: list = field(default_factory=list)
+    applied: int = 0
+    #: The replay's own Audit record, built in memory only and never written.  It is compared,
+    #: action for action, with the log the Run wrote; ``compared`` actions agree so far.
+    sink: Any = None
+    compared: int = 0
+    #: The first place the replay and the record disagree, or ``None``.  Sticky.
+    first_difference: dict | None = None
     last_used: float = field(default_factory=time.monotonic)
 
     @property
     def position(self) -> int:
         return self.runner.ctx.codelet_count if self.runner.ctx else 0
+
+
+@dataclass
+class _ConfigurationUse:
+    """Which configuration a review surface is reading a Run under, and how it knows."""
+
+    #: ``recorded`` (reconstructed at the Run's revision and proved by its hash) or
+    #: ``current`` (it could not be, so today's is used and the surface says so).
+    source: str
+    provider: Any
+    revision: int | None
+    config_hash: str | None
+    current_revision: int
+    #: The global configuration has changed since the Run: it is not what is in use now.
+    edited_since: bool | None
+    reason: str | None = None
+
+    def as_dict(self) -> dict:
+        return {
+            "source": self.source,
+            "faithful": self.source == "recorded",
+            "revision": self.revision,
+            "config_hash": self.config_hash,
+            "current_revision": self.current_revision,
+            "edited_since": self.edited_since,
+            "reason": self.reason,
+        }
+
+
+def _overrides_of(base: Any, captured: dict | None) -> dict:
+    """The parameters a Run overrode: those of its start capture that differ from *base*.
+
+    The capture holds every parameter the Run resolved, but as JSONB, which reorders the
+    keys of a dictionary-valued parameter, and a dictionary's order is behaviour (it is
+    part of the configuration hash).  Laying the whole capture over the configuration
+    would replace the right order with a scrambled one, so only a value that really differs
+    (by value and by number type) is taken from it.
+    """
+    out = {}
+    for name, value in (captured or {}).items():
+        have = base.params.get(name, _MISSING)
+        if have is _MISSING or type(have) is not type(value) or have != value:
+            out[name] = value
+    return out
+
+
+_MISSING = object()
+
+
+def _json_normal(value: Any) -> Any:
+    """What a value reads back as from the JSON column (tuples become lists, and so on)."""
+    return json.loads(json.dumps(value))
 
 
 def clear_summary(clear: EpisodicMemoryClear) -> dict:
@@ -127,10 +206,75 @@ class ReviewService:
         self._store = store
         self._inspectors: dict[int, _Inspector] = {}
 
-    @property
-    def meta(self) -> Any:
-        """The configuration store's current provider (read when an inspection opens)."""
-        return self._store.current()
+    # ------------------------------------------------------------------
+    # The configuration a Run used
+    # ------------------------------------------------------------------
+
+    async def run_configuration(
+        self, session: AsyncSession, run_id: int, state: dict | None
+    ) -> _ConfigurationUse:
+        """The configuration Run ``run_id`` executed under, reconstructed and proved.
+
+        A Run names its configuration with ``configuration_revision`` (the global
+        configuration's revision when it was created) and ``config_hash``.  The journal
+        reconstructs the configuration at that revision; the Run's own parameters (the
+        whole set it resolved, in its start capture) are laid over it as the Run laid its
+        overrides; and the result must hash to the Run's ``config_hash``.  When any step
+        fails the answer says ``source = "current"`` with the reason, and today's
+        configuration is returned only so that record-based displays have something to
+        label with.  A caller that replays must refuse in that case.
+        """
+        row = (
+            await session.execute(select(Run).where(Run.id == run_id))
+        ).scalars().first()
+        current = self._store.current()
+        current_revision = self._store.revision
+
+        def fallback(reason: str) -> _ConfigurationUse:
+            return _ConfigurationUse(
+                "current", current,
+                row.configuration_revision if row is not None else None,
+                row.config_hash if row is not None else None,
+                current_revision, None, reason,
+            )
+
+        if row is None:
+            return fallback(f"run {run_id} has no recorded row")
+        if row.configuration_revision is None:
+            return fallback(
+                "the Run was recorded before the configuration revision was kept, so the "
+                "configuration it used cannot be named"
+            )
+        if row.config_hash is None:
+            return fallback("the Run recorded no configuration hash to check a reconstruction against")
+        try:
+            view = await self._store.provider(session, revision=row.configuration_revision)
+        except Exception as exc:  # the journal cannot reach that revision
+            return fallback(
+                f"the global configuration at revision {row.configuration_revision} could "
+                f"not be reconstructed from the journal: {exc}"
+            )
+        provider = view.provider.with_overrides(
+            _overrides_of(view.provider, (state or {}).get("parameters"))
+        )
+        rebuilt = config_hash(provider)
+        if rebuilt != row.config_hash:
+            return fallback(
+                f"the configuration reconstructed at revision {row.configuration_revision} "
+                f"hashes to {rebuilt}, not to the {row.config_hash} the Run recorded; the "
+                f"global configuration was changed in a way the journal does not hold"
+            )
+        return _ConfigurationUse(
+            "recorded", provider, row.configuration_revision, row.config_hash,
+            current_revision, view.config_hash != config_hash(current),
+        )
+
+    async def _projection_meta(
+        self, session: AsyncSession, run_id: int, state: dict
+    ) -> tuple[Any, dict]:
+        """What to project a capture with: the Run's own configuration where it can be proved."""
+        use = await self.run_configuration(session, run_id, state)
+        return use.provider, use.as_dict()
 
     # ------------------------------------------------------------------
     # The episodic-run timeline
@@ -250,6 +394,7 @@ class ReviewService:
                             else int(run.spreading_threshold)
                         ),
                         "config_hash": run.config_hash,
+                        "configuration_revision": run.configuration_revision,
                         "memory_hash": run.memory_hash,
                         "created_at": run.created_at,
                         "capture_count": capture_counts.get(run.id, 0),
@@ -327,7 +472,9 @@ class ReviewService:
     ) -> dict:
         """One recorded capture, in the shapes the live views already render."""
         state = await self._capture_state(session, run_id, boundary)
-        projected = project_capture(state, self.meta)
+        meta, used = await self._projection_meta(session, run_id, state)
+        projected = project_capture(state, meta)
+        projected["configuration"] = used
         projected["run_id"] = run_id
         projected["boundary"] = boundary
         return projected
@@ -364,11 +511,13 @@ class ReviewService:
         start = await self._capture_state(session, run_id, "start")
         end = await self._capture_state(session, run_id, "end")
 
-        start_view = project_capture(start, self.meta)
-        end_view = project_capture(end, self.meta)
+        meta, used = await self._projection_meta(session, run_id, end)
+        start_view = project_capture(start, meta)
+        end_view = project_capture(end, meta)
 
         return {
             "run_id": run_id,
+            "configuration": used,
             "problem": end_view["problem"],
             "codelets": {
                 "start": start_view["codelet_count"],
@@ -495,11 +644,20 @@ class ReviewService:
     # ------------------------------------------------------------------
 
     async def open_inspector(self, session: AsyncSession, run_id: int) -> dict:
-        """Restore the Run-start capture and sit at tick 0.
+        """Restore the Run-start capture and sit at tick 0, under the Run's own configuration.
 
         Opening an inspector on a Run that already has one restarts it, which is the
         only backwards movement offered: it is re-opening an inspection rather than
         scrubbing, and needs none of the action-inversion machinery WP3.8 deferred.
+
+        The replay is the Run, not a new run of the same problem.  It executes under the
+        configuration the Run used (reconstructed from the journal at the Run's recorded
+        revision, and proved by ``config_hash``), and applies what a person did to the live
+        Run (clamps, Undo, threshold changes, ...), at the codelet each happened at, through
+        the same ``RunService`` methods.  When the configuration cannot be reconstructed it
+        raises :class:`ReplayUnavailable`; it never replays under today's configuration.
+        While stepping it checks every action it produces against the log the Run wrote and
+        reports the first disagreement (``replay`` in the state).
         """
         actions = await self.action_summary(session, run_id)
         if actions["total"] == 0:
@@ -508,9 +666,20 @@ class ReviewService:
                 f"mode can be stepped through"
             )
         state = await self._capture_state(session, run_id, "start")
+        use = await self.run_configuration(session, run_id, state)
+        if use.source != "recorded":
+            raise ReplayUnavailable(
+                f"run {run_id} cannot be replayed faithfully: {use.reason}. Its recorded "
+                f"actions and captures are still available."
+            )
 
-        runner = EngineRunner(self.meta)
+        from server.services.run_service import RunService
+
+        # ``use.provider`` is the Run's own: its configuration at its revision with its
+        # parameter overrides laid over it.
+        runner = EngineRunner(use.provider)
         problem = state["problem"]
+        sink = AuditSink()  # in memory only: never flushed, it is what the replay is checked with
         # The inspector's runner binds its own run (its provider, constants and
         # Themespace) whenever it executes, so opening or stepping it cannot touch a live
         # run; nothing here swaps a process-wide binding.
@@ -520,11 +689,7 @@ class ReviewService:
             problem["target"],
             problem["answer"],
             seed=state["rng"]["seed"],
-            # Re-execute under the Run's own parameters, not the process's current
-            # globals.  Without this the inspector walked the engine forward with
-            # whatever the Admin panel holds today, and reported a Themespace that
-            # the recorded Run never produced.
-            parameters=state.get("parameters"),
+            sink=sink,
         )
         try:
             restore_run_state(runner, state)
@@ -533,13 +698,123 @@ class ReviewService:
                 f"the Run-start capture for run {run_id} could not be restored: {exc}"
             ) from None
 
+        # The host's configuration is the Run's, so a method that reads the service's
+        # configuration (the codelet-pattern clamps) reads the Run's.
+        host = RunService(ConfigurationStore(use.provider, use.revision or 0))
+        host._runners[run_id] = runner
+        rows = (
+            await session.execute(
+                select(AuditAction)
+                .where(
+                    AuditAction.run_id == run_id,
+                    AuditAction.action_type == ACTION_INTERVENTION,
+                )
+                .order_by(AuditAction.sequence)
+            )
+        ).scalars().all()
+
         self._evict_if_needed()
-        self._inspectors[run_id] = _Inspector(
+        inspector = _Inspector(
             run_id=run_id,
             runner=runner,
             final_codelet_count=actions["last_codelet"],
+            configuration=use.as_dict(),
+            host=host,
+            interventions=[
+                (r.codelet_count, r.payload["method"], r.payload.get("args", {})) for r in rows
+            ],
+            sink=sink,
         )
+        self._inspectors[run_id] = inspector
+        self._apply_due(inspector)
+        await self._compare(session, inspector)
         return await self.inspector_state(session, run_id)
+
+    def _apply_due(self, inspector: _Inspector) -> None:
+        """Apply every recorded action of a person that happened at or before this codelet."""
+        count = inspector.position
+        while inspector.applied < len(inspector.interventions):
+            at, method, args = inspector.interventions[inspector.applied]
+            if at > count:
+                break
+            inspector.applied += 1
+            try:
+                if "unrecordable" in args:
+                    raise ValueError("the action's arguments could not be recorded")
+                if method == "finish":
+                    inspector.runner.finish()
+                else:
+                    if method == "_display_over_themespace":
+                        args = {**args, "key": tuple(args["key"])}
+                    getattr(inspector.host, method)(inspector.run_id, **args)
+            except Exception as exc:
+                self._note_difference(
+                    inspector, at, "an action of the person could not be applied again",
+                    f"{method}({args})", f"{type(exc).__name__}: {exc}",
+                )
+
+    @staticmethod
+    def _note_difference(inspector: _Inspector, tick: int, what: str, recorded: Any, replayed: Any):
+        if inspector.first_difference is None:
+            inspector.first_difference = {
+                "tick": tick, "what": what, "recorded": recorded, "replayed": replayed,
+            }
+
+    async def _compare(self, session: AsyncSession, inspector: _Inspector) -> None:
+        """Check what the replay did since the last check against the log the Run wrote.
+
+        Every codelet, structure change, trace event and answer: its type, codelet count,
+        temperature and payload.  The first disagreement is kept; nothing after it is
+        trusted, so comparison stops there.
+        """
+        if inspector.first_difference is not None:
+            return
+        replayed = inspector.sink._actions[inspector.compared:]
+        recorded = (
+            await session.execute(
+                select(AuditAction)
+                .where(
+                    AuditAction.run_id == inspector.run_id,
+                    AuditAction.action_type != ACTION_INTERVENTION,
+                    AuditAction.codelet_count <= inspector.position,
+                )
+                .order_by(AuditAction.sequence)
+                .offset(inspector.compared)
+            )
+        ).scalars().all()
+        for rec, rep in zip(recorded, replayed):
+            a = (rec.action_type, rec.codelet_count, rec.temperature, rec.payload)
+            b = (rep.action_type, rep.codelet_count, rep.temperature, _json_normal(rep.payload))
+            if a != b:
+                self._note_difference(
+                    inspector, rec.codelet_count,
+                    f"the replayed {rep.action_type} differs from the recorded {rec.action_type}",
+                    {"action_type": rec.action_type, "temperature": rec.temperature, "payload": rec.payload},
+                    {"action_type": rep.action_type, "temperature": rep.temperature, "payload": b[3]},
+                )
+                return
+            inspector.compared += 1
+        matched = min(len(recorded), len(replayed))
+        if len(replayed) > len(recorded):
+            self._note_difference(
+                inspector, inspector.position,
+                "the replay produced an action the Run did not record",
+                inspector.compared - matched + len(recorded),
+                inspector.compared - matched + len(replayed),
+            )
+            return
+        # The engine hands the sink some events (a structure built by the codelet just run)
+        # at the start of the next step, stamped with this codelet's count.  So the log can
+        # hold actions of this very codelet that the replay emits one step later; anything
+        # from an earlier codelet must already be there.
+        lagging = recorded[len(replayed):]
+        if any(a.codelet_count < inspector.position for a in lagging):
+            self._note_difference(
+                inspector, min(a.codelet_count for a in lagging),
+                "the Run recorded an action the replay did not produce",
+                {"action_type": lagging[0].action_type, "payload": lagging[0].payload},
+                None,
+            )
 
     async def advance_inspector(
         self, session: AsyncSession, run_id: int, to_codelet: int
@@ -547,10 +822,10 @@ class ReviewService:
         """Step forward to ``to_codelet`` and report the state there.
 
         Re-execution rather than replay of the log: the log records what happened, and
-        an Audit Run is serial and seeded, so running the restored engine forward
-        *reproduces* it.  ``inspector_state`` then reports the recorded actions for the
-        tick alongside the reconstructed state, which is what lets a reader see the two
-        agree.
+        an Audit Run is serial and seeded, so running the restored engine forward under the
+        Run's own configuration, applying what a person did at the codelets they did it,
+        *reproduces* it.  Each step is then checked against the log (``_compare``), and
+        ``inspector_state`` reports the result, so a reader sees whether the two agree.
         """
         inspector = self._inspectors.get(run_id)
         if inspector is None:
@@ -574,6 +849,8 @@ class ReviewService:
                 # recorded Run cannot be followed further, so stop rather than
                 # spin.
                 break
+            self._apply_due(inspector)
+        await self._compare(session, inspector)
         inspector.last_used = time.monotonic()
         return await self.inspector_state(session, run_id)
 
@@ -628,6 +905,17 @@ class ReviewService:
             "recorded_temperature": (
                 actions[0].temperature if actions else None
             ),
+            # Whether this is the Run: the configuration it was rebuilt under, how many of the
+            # person's actions have been applied again, and the first place (if any) the
+            # replay and the record disagree.  ``faithful`` is false from that place on.
+            "replay": {
+                "faithful": inspector.first_difference is None,
+                "first_difference": inspector.first_difference,
+                "checked_actions": inspector.compared,
+                "interventions_applied": inspector.applied,
+                "interventions_total": len(inspector.interventions),
+                "configuration": inspector.configuration,
+            },
             **live,
         }
 

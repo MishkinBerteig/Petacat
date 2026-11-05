@@ -33,6 +33,7 @@ export function recordedRun(overrides: Partial<RecordedRun> = {}): RecordedRun {
     temperature: 57,
     spreading_threshold: 100,
     config_hash: 'c0nf1gh45h00000000000000000000aa',
+    configuration_revision: 3,
     memory_hash: 'm3m0ryh45h00000000000000000000bb',
     created_at: '2026-07-29T09:00:00',
     capture_count: 2,
@@ -202,6 +203,22 @@ export function inspectorState(overrides: Partial<InspectorState> = {}): Inspect
   const base = recordedState()
   return {
     run_id: 9,
+    replay: {
+      faithful: true,
+      first_difference: null,
+      checked_actions: 0,
+      interventions_applied: 0,
+      interventions_total: 0,
+      configuration: {
+        source: 'recorded',
+        faithful: true,
+        revision: 3,
+        config_hash: 'c0nf1gh45h00000000000000000000aa',
+        current_revision: 3,
+        edited_since: false,
+        reason: null,
+      },
+    },
     codelet_count: 0,
     final_codelet_count: 400,
     at_end: false,

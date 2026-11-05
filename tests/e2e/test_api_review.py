@@ -18,6 +18,8 @@ from __future__ import annotations
 
 import pytest
 
+from server.services.configuration_store import get_configuration_store
+from server.services.review_service import ReviewService
 from server.services.sinks import MODE_AUDIT, MODE_FAST, MODE_NORMAL
 
 from tests.e2e.conftest import E2E_SEED as SEED
@@ -26,7 +28,7 @@ PROBLEM = {"initial": "abc", "modified": "abd", "target": "mrrjjj"}
 
 
 @pytest.fixture
-async def review_client(app_client):
+async def review_client(app_client, test_engine):
     """``app_client`` with the review service wired in.
 
     The e2e client drives the app through ASGI, which does not run the lifespan that
@@ -37,12 +39,39 @@ async def review_client(app_client):
     """
     from server.api import review as review_module
     from server.api.runs import get_run_service
-    from server.services.configuration_store import get_configuration_store
-    from server.services.review_service import ReviewService
 
+    await make_the_store_agree_with_the_database(app_client, test_engine)
     review_module._review_service = ReviewService(get_configuration_store())
     yield app_client
     review_module._review_service = None
+
+
+async def make_the_store_agree_with_the_database(client, test_engine) -> None:
+    """Make the configuration store hold what the database holds.
+
+    ``app_client`` builds the store from the seed files, while the database is shared by the
+    whole e2e session and an earlier test may have edited it.  A server never has that
+    disagreement: it builds its store from the database.  The Audit inspector reconstructs
+    a Run's configuration from the database by the Run's recorded revision and checks the
+    result against the Run's hash, so the two have to be one thing.  If they differ the
+    database is reset to the Metacat Standard Configuration, which reloads the store.
+    """
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+    from server.api.configurations import RESET_CONFIRMATION
+    from server.engine.hashing import config_hash
+    from server.services.metadata_service import load_metadata_from_db
+
+    store = get_configuration_store()
+    factory = async_sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
+    async with factory() as session:
+        stored = await load_metadata_from_db(session)
+    if config_hash(stored) != config_hash(store.current()):
+        resp = await client.post(
+            "/api/configurations/1/reset-to-standard",
+            json={"confirm": RESET_CONFIRMATION, "note": "tests: store and database agree"},
+        )
+        assert resp.status_code == 200, resp.text
 
 
 async def _run(client, mode: str, max_steps: int = 900, **kw):
