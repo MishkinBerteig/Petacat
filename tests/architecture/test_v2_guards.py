@@ -1,6 +1,6 @@
 """C10: the v2.0 guards that are not about who writes the journal.
 
-* ``server/engine/**`` is the engine tree of a named baseline commit: no C or S package edited it.
+* ``server/engine/**`` is the engine tree of a named baseline commit, re-based on purpose by engine work.
 * The words: no "innate" (the term is Starting Conceptual State), no "core names", and
   "protected" only where it means a Training Mode Session's Episodic Memory.
 * The schema: no table named for the old session entity and no ``session_id`` column on ``runs``
@@ -22,15 +22,18 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 
-#: The engine tree this work must leave as it is: the commit of "Exact rationals in the
-#: configuration", the last of the engine packages (EN0-EN11, codelet bodies by role, exact
-#: rationals).  Every later package (C1 on, and all of the S packages) leaves the tree alone.
-ENGINE_BASELINE = "f41b0d9"
+#: The engine tree nothing may change without re-basing this: the last engine commit of the final
+#: Metacat cleanup, which removed the code nothing used and read in what the database held.  The
+#: C and S packages left the tree alone; engine work moves this commit on purpose.
+ENGINE_BASELINE = "8c51790"
 #: The only commits that touched the engine between EN11's close-out (``0ce7f5d``) and the
-#: baseline; both are allowed engine work.
+#: baseline; all are allowed engine work.
 ENGINE_COMMITS_AFTER_EN11 = {
     "Codelet bodies and descriptor predicates name no node",
     "Exact rationals in the configuration",
+    "Engine code that only tests held in place is removed",
+    "Configuration nothing reads is deleted from the seed files and the database",
+    "Everything the engine uses that the database holds is read from the database",
 }
 
 
@@ -59,8 +62,8 @@ def test_the_engine_tree_is_the_baseline_trees():
         line for line in untracked.splitlines() if "__pycache__" not in line and not line.endswith(".pyc")
     )
     assert not changed and not untracked, (
-        f"server/engine/** differs from commit {ENGINE_BASELINE}; no C or S package edits the "
-        f"engine:\n{changed}\n{untracked}"
+        f"server/engine/** differs from commit {ENGINE_BASELINE}; engine work re-bases this guard "
+        f"on purpose:\n{changed}\n{untracked}"
     )
 
 
