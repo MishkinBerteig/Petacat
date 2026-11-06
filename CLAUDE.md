@@ -66,6 +66,22 @@ Metacat means patched Metacat as opposed to Petacat.
 - A trace recorded from patched Metacat has a `revision` header ending `+known-failure-fixes`.
 - Every agent brief that records from or compares against Metacat must state this rule.
 
+## What each test is measured against — MANDATORY
+
+While the database and engine refactoring continues, and while the work is basic letter-string
+analogy problems, even with unrecognized symbols, patched Metacat is the reference for both the
+ratchets and the golden baselines.
+
+- **Every problem in a golden baseline is also in a ratchet.** For anything in a ratchet, fidelity to
+  patched Metacat is the only concern.
+- **A golden baseline holds Petacat's own runs.** It is re-captured when a fix closes a gap between
+  patched Metacat and Metacat Mode, and the commit says so.
+- **There are no held-out runs,** except in Training Mode Session work.
+- **Single-threaded Metacat Mode behaves identically on every numeric backend.** Multi-threaded
+  Metacat Mode is held to low statistical variation.
+- **The user reviews any problem outside the ratchets where cognitive validity matters,** before that
+  problem counts. An agent is not a judge of the solution space for letter-analogy problems.
+
 ## Modes and terminology — MANDATORY
 
 Petacat has two modes, always written as proper names: **Metacat Mode** and **Training Mode**.
