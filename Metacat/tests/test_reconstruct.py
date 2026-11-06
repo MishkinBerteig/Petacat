@@ -109,7 +109,7 @@ class ReconstructionTests(unittest.TestCase):
         for name, info in manifest['fixed_files'].items():
             self.assertNotEqual(info['sha256'], manifest['reconstructed_files'][name]['sha256'])
 
-    def test_apply_and_remove_fixes_round_trip(self):
+    def test_apply_fixes(self):
         bundle = self.root / 'bundle'
         (bundle / 'patches/fixes').mkdir(parents=True)
         patch = bundle / 'patches/fixes/0001-example.patch'
@@ -127,9 +127,19 @@ class ReconstructionTests(unittest.TestCase):
         self.assertEqual(reconstruct.describe(self.source, manifest), 'fixes')
         with self.assertRaisesRegex(ValueError, 'SHA-256 mismatch'):
             reconstruct.verify(self.source, manifest['reconstructed_files'])
-        reconstruct.remove_fixes(self.source, manifest, bundle=bundle)
-        self.assertEqual(reconstruct.describe(self.source, manifest), 'reference')
-        self.assertEqual((self.source / 'example.ss').read_text(), '(exit)\n')
+        self.assertEqual((self.source / 'example.ss').read_text(), '(exit 0)\n')
+
+    def test_the_tool_cannot_take_the_fixes_off(self):
+        import subprocess
+        import sys
+        self.assertFalse(hasattr(reconstruct, 'remove_fixes'))
+        self.assertNotIn('reverse', reconstruct._run_patches.__code__.co_varnames)
+        self.assertNotIn('remove', (BUNDLE / 'tools/reconstruct.py').read_text().lower().replace('removed', ''))
+        for option in ('--remove-fixes', '--fixes'):
+            done = subprocess.run([sys.executable, str(BUNDLE / 'tools/reconstruct.py'), option, str(self.root)],
+                                  capture_output=True, text=True)
+            self.assertNotEqual(done.returncode, 0)
+            self.assertIn('unrecognized arguments', done.stderr)
 
     def test_fixes_are_refused_on_a_tree_that_is_not_the_reference(self):
         manifest = {'reconstructed_files': self.files, 'fix_patches': [], 'fixed_files': {}}
@@ -138,7 +148,7 @@ class ReconstructionTests(unittest.TestCase):
             reconstruct.apply_fixes(self.source, manifest)
 
     @unittest.skipUnless((BUNDLE / 'build/source').is_dir(), 'no reconstruction in build/source')
-    def test_the_real_fix_group_round_trips_on_a_copy_of_the_reconstruction(self):
+    def test_the_real_fix_group_applies_to_a_copy_of_the_reconstruction(self):
         import shutil
         manifest = json.loads((BUNDLE / 'manifest.json').read_text())
         copy = self.root / 'reconstruction'
@@ -147,10 +157,6 @@ class ReconstructionTests(unittest.TestCase):
         self.assertIn(state, ('reference', 'fixes'))
         if state == 'reference':
             reconstruct.apply_fixes(copy, manifest)
-            self.assertEqual(reconstruct.describe(copy, manifest), 'fixes')
-        reconstruct.remove_fixes(copy, manifest)
-        self.assertEqual(reconstruct.describe(copy, manifest), 'reference')
-        reconstruct.apply_fixes(copy, manifest)
         self.assertEqual(reconstruct.describe(copy, manifest), 'fixes')
 
     def test_gui_patch_uses_portable_directories(self):

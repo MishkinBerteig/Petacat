@@ -644,12 +644,33 @@
         "groups.ss",
         "rules.ss"
       ]
+    },
+    {
+      "path": "patches/fixes/0002-length-group-of-six-or-more.patch",
+      "sha256": "bd95bc570c773339fda0b3ccdc98aefd6e39e20916f029d668a3bb82899b66b1",
+      "files": [
+        "CODE-FIXES.md",
+        "bridges.ss"
+      ]
+    },
+    {
+      "path": "patches/fixes/0003-non-english-letter-invalid-input.patch",
+      "sha256": "28ee47f69349098257c98b6a4f377dc78f2ad6e5ea89cb291939b96f4605d2bf",
+      "files": [
+        "CODE-FIXES.md",
+        "syntactic-sugar.ss"
+      ]
     }
   ],
   "fixed_files": {
     "CODE-FIXES.md": {
-      "sha256": "206211701fa6691fc1e968d5f828525d8eab28b8257f66757ce4ec7f6c36c8c1",
-      "bytes": 8795,
+      "sha256": "3e884669b7228c25cc4f056b55a068b2b159c1adec861e548be4025fb2a04aeb",
+      "bytes": 11543,
+      "executable": false
+    },
+    "bridges.ss": {
+      "sha256": "2d4818d33d0b1d6ce212086ae6b21a41dc07f9b711a607795566b6a3de834106",
+      "bytes": 69131,
       "executable": false
     },
     "groups.ss": {
@@ -661,9 +682,14 @@
       "sha256": "c9da79c8d2c6681234c332e72f09f81c21ce59d3cc3c011b7f7836a2481c0eaf",
       "bytes": 84147,
       "executable": false
+    },
+    "syntactic-sugar.ss": {
+      "sha256": "f5988112310017836a0b676c28f269e20498553f0911d3c5cbeb072d86c5b3e7",
+      "bytes": 10356,
+      "executable": false
     }
   },
-  "fix_note": "Second, optional patch group: fixes for the three reference crashes in KNOWN-FAILURES.md. Not part of the reference reconstruction behind the published studies; apply with tools/reconstruct.py --fixes or --apply-fixes. fixed_files lists the files whose hashes change when it is applied.",
+  "fix_note": "Second patch group, always applied: fixes for the crashes in KNOWN-FAILURES.md (the three study crashes, the group of six or more, and a letter outside a to z). Not part of the reference reconstruction behind the published studies; tools/reconstruct.py --output applies it, and --apply-fixes brings an old reference tree up. fixed_files lists the files whose hashes change when it is applied.",
   "excluded_files": {
     "CLAUDE.md": "Repository-specific agent instructions.",
     "oracle/derived/convergence-p50.json": "Measured data are not part of this source reconstruction bundle.",

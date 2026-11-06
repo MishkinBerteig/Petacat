@@ -46,6 +46,11 @@ nothing runs and that documents the crashes the fixes remove.
 reconstruction without the fixes, to show what the fixes remove (`metacat/README.md`, "Metacat's known failures").
 Nothing records on that build any more.
 
+`tests/lockstep/data/parser_metacat.json.gz` is not a trace: it is how Metacat's own input parser (`tokenize-string`
+and `valid-token-list?`, the command line of the control panel) reads every Unicode scalar value and 200 whole lines, recorded
+by `metacat/record_parser.py` on the patched Metacat (its format is stated at the top of the script). With patch 0003 a letter
+outside a to z makes a token list invalid ("Invalid input!") instead of a crash.
+
 The uncommitted corpora regenerate with `metacat/record.py`. Recording all 190 seeds 1–10 traces takes about
 three minutes with `--jobs 12`.
 
@@ -327,10 +332,16 @@ python3 tests/lockstep/metacat/record.py --problem abc abd xyz --seeds 1 --cap 3
 - **Stage W's wide check** (4,384 runs against Metacat, `DISCREPANCIES5.md` F-N1, F-N2, F-N4, F-C, R1): the order
   `check-for-conflicts` and `apply-transforms` take (Chez's `pairwise-map` and merge sort), a consolidated group built over
   a slot a stale bond holds (`build-bond` overwrites the pointers), and the recording limit behind stage W's "cluster C"
-  and its long N3 run, which re-recorded replay with no difference. The one thing left is not a defect to fix: Metacat itself
-  crashes on a `bridge-builder` of a group of six or more objects (`slipnet.ss:495`, `bridges.ss:1404-1407`,
-  `concept-mappings.ss:40`; 83 of the 4,384 runs). Petacat's guard at `builtins.py` stays, and `known_divergences.toml`
-  registers the crash by its shape (`REF:crash-bridge-builder-group-of-6-or-more`), not by seed.
+  and its long N3 run, which re-recorded replay with no difference. The one thing left was a crash of patched Metacat itself,
+  on a `bridge-builder` of a group of six or more objects (`slipnet.ss:495`, `bridges.ss:1404-1407`,
+  `concept-mappings.ss:40`; 83 of the 4,384 runs, crash R1). A crash of patched Metacat means the patch is incomplete, so
+  `Metacat/patches/fixes/0002-length-group-of-six-or-more.patch` makes the Length concept mapping only when both lengths
+  exist (as `attach-length-description` already checks), and the registry entry for the shape
+  (`REF:crash-bridge-builder-group-of-6-or-more`) is gone. All 83 runs, recorded again, are identical to their old
+  recordings up to the old crash point; Petacat's guard at `builtins.py` now matches what Metacat does, and the 83 replay to
+  their new ends (88 traces, with the later runs of the episodes) with agreement 1.0, no error and no differing snapshot.
+  `data/aaa-aaaaaa-aaa.seed1.metacat.jsonl.gz`, the smallest case (`aaa → aaaaaa; aaa`, 1,614 codelets, answer `aaaaaa`),
+  is replayed by `test_comparer.py`.
 - **A description's time stamp** was not an engine fault. `aazzz → azzza; aye`, seed 3: two top-down description scouts
   proposed `desc(m.2,alphabetic-position-category,alphabetic-last)` at 1670 and 1676, both builders agreed on every
   field the recorder logged, and replay took the later one (`DISCREPANCIES5.md` G-T3). Fixed in the recorder

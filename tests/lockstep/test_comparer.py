@@ -335,7 +335,9 @@ def test_reference_crash_needs_a_matching_trace():
     assert rep.counts == {"end": 1}
 
 
-# -- Metacat's crash on a group of six or more objects (DISCREPANCIES5.md R1) ---------------------
+# -- Metacat's old crash on a group of six or more objects (DISCREPANCIES5.md R1) -----------------
+# Patched Metacat no longer crashes there (Metacat/patches/fixes/0002-length-group-of-six-or-more.patch),
+# so a crash of that shape is an error like any other and is registered by nothing.
 
 _LONG = "bridge-builder(bridge(top,group(i.0-2,samegrp,-,letter-category),group(m.0-5,samegrp,-,letter-category)))"
 _SHORT = "bridge-builder(bridge(top,group(i.0-2,samegrp,-,letter-category),group(m.0-4,samegrp,-,letter-category)))"
@@ -355,11 +357,19 @@ def _crash_trace(picked, error=_NOT_PROCEDURE, problem=("aaa", "aaaaaa", "aaa"),
     return ct.compare_traces(meta, pet, _SHIPPED)
 
 
-def test_a_metacat_crash_of_the_group_of_six_shape_is_registered_by_its_shape_not_by_seed():
+def test_a_metacat_crash_of_the_group_of_six_shape_is_an_error_whatever_the_problem_and_seed():
+    # It was once registered by its shape (REF:crash-bridge-builder-group-of-6-or-more).  Patched
+    # Metacat cannot crash there now, so such a crash would be a new bug and must show.
     for problem, seed in ((("aaa", "aaaaaa", "aaa"), 1), (("lll", "llllll", "lll"), 7), (("qhqsss", "qqhhqqssssss", "qhqsss"), 99)):
         rep = _crash_trace(_LONG, problem=problem, seed=seed)
-        assert rep.unregistered_error_count == 0, (problem, seed, rep.counts)
-        assert "REF:crash-bridge-builder-group-of-6-or-more" in rep.registered_counts
+        assert rep.unregistered_error_count > 0, (problem, seed, rep.counts)
+        assert not rep.registered_counts, (problem, seed, rep.registered_counts)
+
+
+def test_the_registry_no_longer_holds_the_group_of_six_crash():
+    ids = {e.id for e in _SHIPPED.entries}
+    assert "REF:crash-bridge-builder-group-of-6-or-more" not in ids
+    assert not any("shape" in e.match for e in _SHIPPED.entries)
 
 
 def test_any_other_metacat_crash_is_still_an_error():
@@ -368,15 +378,19 @@ def test_any_other_metacat_crash_is_still_an_error():
     assert _crash_trace(_LONG, error="Exception: unrecognized object message").unregistered_error_count > 0
 
 
-def test_the_smallest_group_of_six_crash_replays_to_its_end_with_the_crash_registered(tmp_path):
-    """``aaa -> aaaaaa; aaa`` seed 1, recorded in Metacat 1.2: it crashes in codelet 609 (608 run), a
-    ``bridge-builder`` of a bridge to the six-letter group.  Petacat agrees with it on every decision up to
-    that codelet, and goes on; the findings from there are registered as DISC5:R1."""
+def test_the_smallest_group_of_six_run_replays_to_its_end_with_nothing_registered(tmp_path):
+    """``aaa -> aaaaaa; aaa`` seed 1, recorded in the patched Metacat.  Before the patch it crashed in codelet 609
+    (608 run), a ``bridge-builder`` of a bridge to the six-letter group, and Petacat's guard carried on past it.
+    Now Metacat builds that bridge without a Length concept mapping and answers ``aaaaaa`` after 1,614 codelets;
+    Petacat agrees on every decision to the end, with no error, no registered finding and no differing snapshot."""
     from tests.lockstep.run_trace import replay_trace
 
-    metacat = Path(__file__).parent / "data" / "crash-aaa-aaaaaa-aaa.seed1.metacat.jsonl.gz"
+    metacat = Path(__file__).parent / "data" / "aaa-aaaaaa-aaa.seed1.metacat.jsonl.gz"
+    meta = ct.Trace.load(str(metacat))
+    assert meta.header["revision"].endswith("+known-failure-fixes")
+    assert meta.end["reason"] == "answer" and meta.end["answer"] == "aaaaaa" and meta.end["codelets"] == 1614
     petacat, _outcome, _ = replay_trace(str(metacat), str(tmp_path))
-    rep = ct.compare_traces(ct.Trace.load(str(metacat)), ct.Trace.load(str(petacat)), _SHIPPED)
+    rep = ct.compare_traces(meta, ct.Trace.load(str(petacat)), _SHIPPED)
     assert rep.unregistered_error_count == 0 and rep.agreement == 1.0
-    assert rep.registered_counts.get("REF:crash-bridge-builder-group-of-6-or-more", 0) > 0
+    assert not rep.registered_counts
     assert rep.state_snapshots_differing == 0

@@ -1,12 +1,16 @@
 # Three Reproducible Study Failures
 
 Recorded 2026-09-06. **Unfixed in the reference reconstruction; fixed by the
-bundle's optional second patch group** (2026-10-28,
+bundle's second patch group, which is always applied** (2026-10-28,
 [`patches/fixes/0001-known-failures.patch`](patches/fixes/0001-known-failures.patch);
 see [Status](#status-lockstep-pass) below). These are three failing executions
 with two exception signatures. The diagnosis found two bugs, not three. The
 reference reconstruction's patches are unchanged, so the published study keeps
 its exact reference.
+
+Two more crashes, found later by Petacat's lockstep checks and not by the study, have their own
+sections at the end ([A fourth crash: a group of six or more](#a-fourth-crash-a-group-of-six-or-more) and
+[A letter outside a to z](#a-letter-outside-a-to-z)).
 
 All three inputs and seeds are in the intended domain. The failures occurred
 in reference Metacat, not the Python port, during the held-out validation phase
@@ -37,6 +41,10 @@ independent observations in the 969,000-run campaign.
 
 ## Reproduce One Failure
 
+*Historical.* These commands reproduced the crash on the reference reconstruction, which the
+bundle no longer builds or verifies. On the patched tree each one ends with an answer (see
+below), and the helper exits with status 2.
+
 Follow [README.md](README.md) to install the dependencies and reconstruct
 Metacat. Run the following from the **Metacat folder containing this note**,
 not from `build/source`. Docker must be running. No full study or GPU is needed.
@@ -58,14 +66,13 @@ new process and fresh memory. A nonzero exit with the expected exception is the
 reproduced bug, not successful application behavior. Exit status 2 from the
 helper means an invalid case key or an unexpected ordinary/capped return.
 
-The reproducer needs the **reference reconstruction**. On a tree with the
-known-failure fixes applied, the first command above fails and says the fixes
-are applied. The reproducer then prints `REPRODUCER returned suspended at N
-codelets; expected an exception` and exits with status 2: each run now ends with
-an answer, after the same number of codelets as the crash. To reproduce the
-crashes on such a copy, first run
-`python3 tools/reconstruct.py --remove-fixes build/source`, and afterwards
-`--apply-fixes build/source` to restore the fixes.
+The reproducer needed the **reference reconstruction**, which the bundle no
+longer builds or verifies (nothing takes the fixes off). On the patched tree the
+reproducer prints `REPRODUCER returned suspended at N codelets; expected an
+exception` and exits with status 2: each run now ends with an answer, after the
+same number of codelets as the crash. The three crashes are kept as recorded
+data (`tests/lockstep/traces-known-failures/reference/`) and in the study data
+named below.
 
 The helper is [tests/reproduce-failures.ss](tests/reproduce-failures.ss). It
 contains only our small test driver, not upstream Metacat source. It leaves
@@ -220,22 +227,90 @@ the reference reconstruction does not apply it).
 - The patch also adds §1.3 to the reconstructed `CODE-FIXES.md`.
 
 Apply it with `python3 tools/reconstruct.py --apply-fixes build/source` and check it
-with `--verify build/source --fixes` (README, "Optional: the known-failure fixes").
+with `--verify build/source` (README, "The known-failure fixes").
 
 Verified on 2026-10-28:
 - The three seeds run to an answer: `rrjjjm` after 2835 and 1981 codelets, `kji`
   after 2152.
 - The headless smoke test passes on the fixed tree.
-- The bundle's 19 packaging tests pass, including a real apply/remove round trip.
+- The bundle's 19 packaging tests passed, including an apply/remove round trip (the removal has since been taken out of the tool).
 - Decision traces of every other recorded run are byte-identical with and without
   the patch: see [VALIDATION.md](VALIDATION.md).
 
 Any use of it still counts as a changed engine in the sense of item 4 above.
 
-**Petacat.** Petacat's lockstep harness records both variants (`tests/lockstep/metacat/
-record.py --reference` and `--known-failures-patch`), in
-`tests/lockstep/traces-known-failures/reference/` and `.../fixes/`. Petacat replays the
+**Petacat.** Petacat's lockstep harness once recorded both variants (two options of
+`tests/lockstep/metacat/record.py`, since removed: only the patched Metacat is ever run now). The recordings are
+stored data in `tests/lockstep/traces-known-failures/reference/` and `.../fixes/`. Petacat replays the
 reference recordings in lockstep up to each crash point; it does not crash, and it
 carries on as the fixed Metacat does. It replays the fixed recordings to the end with
 no differences. Investigating these seeds found two Petacat port bugs on the same path
 (`DISCREPANCIES5.md` G-Q1, G-Q2), which are fixed.
+
+## A fourth crash: a group of six or more
+
+Added 2026-11-06. The three study failures above are two bugs. This one is a third, found by Petacat's
+wide lockstep check of 4,384 recorded runs: 83 of them (1.9%) ended with the Scheme exception
+`attempt to apply non-procedure #f`. All 83 crash inside a `bridge-builder`, and the bridge it was
+building joins a group of six or more objects (checked on all 83 by parsing the picked codelet's
+name). The smallest is `aaa -> aaaaaa; aaa`, seed 1, which crashed at codelet 608.
+
+**Cause.** The Slipnet has number nodes for 1 to 5 only (`*slipnet-numbers*`). For a group of six or
+more objects `number->platonic-number` (`slipnet.ss:495-499`) returns `#f`, so the group's
+`platonic-length` is `#f` (`groups.ss:86`). The engine already knows this: `attach-length-description`
+(`groups.ss:836-844`) says "Check for groups longer than five objects" and gives such a group no Length
+description. But `build-bridge` (`bridges.ss:1396-1411`), for a horizontal bridge, made a Length
+concept-mapping whenever the two objects' platonic lengths differ, without the same check. A letter
+or a shorter group on one side and a group of six or more on the other gave
+`(make-concept-mapping object1 plato-length length1 object2 plato-length #f)`, and
+`concept-mappings.ss:40` sent `get-CM-short-name` to `#f`.
+
+**The fix: the second patch group's `patches/fixes/0002-length-group-of-six-or-more.patch`.** The
+Length concept-mapping is made only when both lengths exist, as the Length description is
+(`(and (exists? length1) (exists? length2) ...)`). Nothing else changes: when both objects are groups
+of six or more their lengths are equal (both `#f`) and no mapping was made before or after. Adding
+number nodes would have been a larger change, because it changes every run. Every other use of a
+platonic length either compares it with `eq?` (`bridges.ss:1121`, `groups.ss:753`) or is already
+guarded by `exists?` (`groups.ss:836-844`); none of them sends to it. The patch also adds §1.4 to the
+reconstructed `CODE-FIXES.md`.
+
+**Verified on 2026-11-06.**
+- All 83 recorded runs, recorded again with the patch, are identical to the same runs recorded without
+  the 0002 patch (but with the 0001 fixes) up to the codelet where they used to crash, and then run on:
+  56 reach their cap (3,000 to 5,000 codelets), 23 end with an answer and 9 give up.
+- 266 recorded runs that never crashed (the stage W sample and `abc -> abd; xyz` seeds 1 to 10), recorded
+  with and without the 0002 patch, are identical record for record, apart from the header's `revision`.
+- Petacat's Metacat Mode replays all 83 (88 traces with the later runs of the episodes) to their ends
+  with agreement 1.0, no error and no differing snapshot.
+
+## A letter outside a to z
+
+Added 2026-11-06. Metacat's input parser (the control panel's command line, `gui.ss:147`) calls
+`tokenize-string` (`gui.ss:95`), which lowers its input, takes punctuation, spaces, emoji and combining
+marks as separators, and lets any *alphabetic* character into a symbol, and then asks `valid-token-list?`
+(`syntactic-sugar.ss:51`). A letter outside a to z (`é`, `日本`, a Greek letter, `Ⅳ`) therefore became a valid
+symbol, and `init-mcat` then stopped on the uncaught error `variable plato-é is not bound`
+(`symbol->letter-categories`, `utilities.ss:303-310`, evaluates `plato-<letter>`), before the run began.
+The `(mcat ...)` form, which uses the same `valid-token-list?` as a fender, passed it on too.
+
+**The fix: the second patch group's `patches/fixes/0003-non-english-letter-invalid-input.patch`.**
+`valid-token-list?` now requires each symbol token (the three strings and the answer) to be made only of
+letters the Slipnet has a node for, by the nodes' lowercase names (`valid-letter-symbol?`). Nothing else in
+the parser changes: `tokenize-string`, the lowering, the separators, the digit rule ("Invalid input!" for a digit
+inside a string, a number that is not a valid seed) and the seed range are as they were. Metacat models
+perception, and the way it reads its input is part of that, so the patch changes only what crashed.
+
+- **The command line** answers "Invalid input!" to such a letter, as it does to any other invalid token list.
+- **The `(mcat ...)` form** is refused before any run starts: `(mcat abc abd xyé)` prints
+  `Exception in mcat: invalid syntax (mcat abc abd xyé)`, the same error as `(mcat abc abd 5)`, which was already
+  invalid. A capital such as `(mcat abc abd Xyz)` is refused the same way (it also crashed in `init-mcat` before).
+  Output: `P-patch/logs/mcat_form_after.txt`.
+
+**Verified on 2026-11-06.** `tests/lockstep/metacat/record_parser.py` runs the real `tokenize-string`,
+`char-noise?`, `valid-token-list?`, `valid-number?` and `symbol-or-valid-number?` over every Unicode scalar value
+in three lines (`abc abd x{c}z`, `abc abd {c}`, `{c}bc abd xyz`) and 200 whole lines, on the tree with
+0001 and 0002 and on the tree with 0003 (`tests/lockstep/data/parser_metacat.json.gz`). The character classes
+(`char-downcase`, `char-alphabetic?`, `char-numeric?`, `char-noise?`) and every token list are identical. The only
+change is the validity of a token list, from valid to invalid, and only where a symbol holds a letter outside
+a to z: 104,023 of the 1,112,064 scalar values in each of the three lines, and 48 of the 200 whole lines. 266 recorded runs, recorded with
+and without 0003, are identical apart from the header's `revision`.

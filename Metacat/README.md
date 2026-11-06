@@ -13,6 +13,10 @@ interface below.** Docker runs the older software on your computer, and your
 normal web browser displays its desktop. You do not need to learn Scheme or
 install the old graphics libraries yourself.
 
+> These patches are a contribution back to Metacat. They preserve its intent fully. They fix legitimate crashes and bugs, and they
+> do not change perception or cognition unless those are broken because of a crash or a bug. Metacat models perception and
+> cognition, and that includes how it reads its input, so its input parser is treated the same way.
+
 Only patches, documentation, checksums, and reconstruction/test tools are
 included here, **not the original source or its archive**. A helper downloads
 the [original Metacat-1.2.tgz](https://science.slc.edu/jmarshall/metacat/Metacat-1.2.tgz)
@@ -47,10 +51,11 @@ Mac, Windows, and Linux installations. See [VALIDATION.md](VALIDATION.md) for
 what was actually tested.
 
 Three reproducible reference-engine failures were subsequently found during
-the versioned support study. The two patches that make the **reference
-reconstruction** do not fix them, so the published studies keep their exact
-reference. A **second, optional patch group** fixes them (see
-[the known-failure fixes](#optional-the-known-failure-fixes)). See
+the versioned support study, and more crashes were found later by Petacat's
+lockstep checks. The two patches that make the **reference
+reconstruction** do not fix them. A **second patch group** does (see
+[the known-failure fixes](#the-known-failure-fixes)); it is always applied, and it keeps
+growing whenever the patched Metacat is found to crash. See
 [KNOWN-FAILURES.md](KNOWN-FAILURES.md) for the exact inputs and seeds, recorded
 exceptions, the diagnosis, and a small standalone reproducer. The [full study data](../studies/support-v1a/data/README.md) is
 published separately from this source-reconstruction bundle.
@@ -240,11 +245,11 @@ python3 tools/reconstruct.py --verify build/source
 ```
 
 The first command downloads the author's original archive, checks that it is
-the expected version, applies our two patches, and writes the result into
-`build/source`. Both commands should finish with:
+the expected version, applies our two patches and then the known-failure fixes,
+and writes the result into `build/source`. Both commands should finish with:
 
 ```text
-Verified 69 files: build/source
+Verified 69 files with the known-failure fixes: build/source
 ```
 
 You now have the complete runnable source on your computer. The original
@@ -256,39 +261,30 @@ overwrite an existing `build/source`; if you already reconstructed it, use
 the verification command and continue. Do not manually unpack the original
 archive into this repository or apply the patches yourself.
 
-### Optional: the known-failure fixes
+### The known-failure fixes
 
-What you have now is the **reference reconstruction**: Metacat 1.2 plus the
-bundle's two patches, exactly as used by Petacat's published studies. It still
-crashes on the three rare inputs in [KNOWN-FAILURES.md](KNOWN-FAILURES.md),
-3 of the 969,000 runs in the support study. A second patch group,
-[`patches/fixes/0001-known-failures.patch`](patches/fixes/0001-known-failures.patch),
-fixes both underlying bugs. Apply it to your reconstruction with:
+`--output` builds the **patched Metacat**: Metacat 1.2, the bundle's two patches, and then the
+second patch group in `patches/fixes/` ([`0001-known-failures.patch`](patches/fixes/0001-known-failures.patch),
+[`0002-length-group-of-six-or-more.patch`](patches/fixes/0002-length-group-of-six-or-more.patch),
+[`0003-non-english-letter-invalid-input.patch`](patches/fixes/0003-non-english-letter-invalid-input.patch)
+and any later file). The tree without the second group, the reference
+reconstruction behind Petacat's published studies, still crashes on the three rare inputs in
+[KNOWN-FAILURES.md](KNOWN-FAILURES.md) on a bridge to a group of six or more objects, and on a letter outside a to z. It exists
+only inside the temporary directory of the build and is never left as a usable tree. The patched
+Metacat is the only Metacat: the GUI, Petacat's lockstep harness (`tests/lockstep/`) and every
+comparison use it. The fixes change no run except those that would have crashed. A crash of the
+patched Metacat is a bug in the patch group, and another file is added.
+
+Nothing takes the fixes off. A tree left over from an older copy of this bundle, built without
+them, is brought up with:
 
 ```sh
 python3 tools/reconstruct.py --apply-fixes build/source
-python3 tools/reconstruct.py --verify build/source --fixes
+python3 tools/reconstruct.py --verify build/source
 ```
 
 Both commands should finish with `Verified 69 files with the known-failure
-fixes`. To build a new copy with the fixes in one step, use
-`python3 tools/reconstruct.py --output DIR --fixes`.
-
-Which one to use:
-
-- **With the fixes** for everyday use, the graphical interface, and Petacat's
-  lockstep harness (`tests/lockstep/`). The fixes change no run except those
-  that would have crashed.
-- **The reference** to reproduce or extend the published studies. Their
-  collectors run `reconstruct.py --verify Metacat/build/source` and refuse a tree
-  with the fixes applied. Take the fixes off again with:
-
-  ```sh
-  python3 tools/reconstruct.py --remove-fixes build/source
-  ```
-
-Plain `--verify` always means the reference. On a tree with the fixes, it fails
-and says so.
+fixes`. `--verify` accepts only the patched tree; on an old reference tree it fails and says so.
 
 ## 4. Start the Graphical Interface
 
@@ -412,7 +408,7 @@ generated `build/source/README.md`.
 | A virtualization or unsupported-platform error | Check Docker's OS requirements. On Windows, verify WSL version 2 and enable hardware virtualization as directed by Microsoft's guide. ARM systems need `linux/amd64` emulation; do not change the project to `arm64`. |
 | Download/build fails with a connection or certificate error | Check internet connectivity and any required proxy settings. Retry after fixing the connection. Do not disable certificate checks or bypass the archive checksum. The archive needs to come from the linked upstream site. |
 | `Refusing to replace existing destination` | Reconstruction already created that folder. Verify it and continue, or choose a different `--output` path for a separate reconstruction. Do not delete work just to rerun setup. |
-| Verification fails on `CODE-FIXES.md`, `groups.ss` or `rules.ss` and says the tree has the known-failure fixes | Not damage: the optional fixes are applied. Use `--verify build/source --fixes`, or take them off with `--remove-fixes build/source` if you need the reference reconstruction. |
+| Verification fails on `CODE-FIXES.md`, `bridges.ss`, `groups.ss` or `rules.ss` and says the tree is an old reference reconstruction | Not damage: this is an old reference tree, without the known-failure fixes. Bring it up with `--apply-fixes build/source`, or reconstruct a fresh copy. |
 | SHA-256 or file-inventory mismatch | Stop and inspect the reported file. The verifier expects untouched reconstructed files, with no extra reports, saved commentary, or bytecode. Keep your working copy; reconstruct into a new directory to compare. Do not edit the manifest just to make a mismatch pass. |
 | Port 6080/5901 is already allocated, or container name `metacat` is in use | Inspect `docker ps -a` or Docker Desktop's Containers view. Stop a conflicting container only if you recognize it and no longer need it. Do not remove someone else's container or service. This default setup runs one GUI at a time. |
 | Docker reports a denied bind mount or file-sharing error | Keep the project in a normal local folder. On Mac/Linux Docker Desktop, check Settings > Resources > File sharing if available. On Windows, clone inside Ubuntu's home folder rather than `/mnt/c`. |
@@ -547,13 +543,13 @@ Python bytecode.
 The manifest describes two patch groups:
 
 - `patches` and `reconstructed_files`: the reference reconstruction.
-- `fix_patches` and `fixed_files`: the optional known-failure fixes, and the
-  hashes of the three files they change (`CODE-FIXES.md`, `groups.ss`,
-  `rules.ss`).
+- `fix_patches` and `fixed_files`: the known-failure fixes, always applied, and the
+  hashes of the four files they change (`CODE-FIXES.md`, `bridges.ss`,
+  `groups.ss`, `rules.ss`).
 
-`--apply-fixes` and `--remove-fixes` work in place. Each first verifies the
-tree, dry-runs the patch, applies it with zero fuzz, and verifies the result,
-so a mismatched tree is never half-patched.
+`--apply-fixes` works in place. It first verifies the tree, dry-runs each patch, applies
+it with zero fuzz, and verifies the result, so a mismatched tree is never half-patched.
+`--output` does the same on its temporary tree before it writes `build/source`.
 
 For an offline reconstruction, download
 [Metacat-1.2.tgz](https://science.slc.edu/jmarshall/metacat/Metacat-1.2.tgz) beforehand
@@ -579,9 +575,11 @@ Apply [0001-engine.patch](patches/0001-engine.patch) before
 [0002-harnesses-and-notes.patch](patches/0002-harnesses-and-notes.patch).
 Both are standard unified diffs relative to the extracted source directory;
 the reconstruction helper handles their application and permissions. Together
-they make the reference reconstruction. The optional second patch group,
+they make the reference reconstruction. The second patch group, always applied on top,
 [patches/fixes/0001-known-failures.patch](patches/fixes/0001-known-failures.patch),
-goes on top of them; it is described [below](#second-patch-group-the-known-failure-fixes).
+[patches/fixes/0002-length-group-of-six-or-more.patch](patches/fixes/0002-length-group-of-six-or-more.patch)
+and [patches/fixes/0003-non-english-letter-invalid-input.patch](patches/fixes/0003-non-english-letter-invalid-input.patch),
+go on top of them in that order; they are described [below](#second-patch-group-the-known-failure-fixes).
 
 The engine patch changes six upstream Scheme files and adds `headless.ss` and
 `metacat-headless.ss`. The other 42 upstream files remain unchanged. The second
@@ -633,8 +631,9 @@ settings; the engine algorithms and headless loader are otherwise unchanged.
 ### Second patch group: the known-failure fixes
 
 Two bugs in the original engine crashed three runs of the 969,000 in the
-support study. The second patch group fixes both, in the spirit of the code
-around them, and adds an entry to the reconstructed `CODE-FIXES.md`.
+support study, a third crashes a run whose bridge reaches a group of six or
+more objects, and a fourth crashes on a letter outside a to z. The second patch group fixes all four, in the spirit of the code
+around them, and adds an entry to the reconstructed `CODE-FIXES.md` for each patch.
 
 - **A letter-based group with no letter** (`groups.ss`, `make-group`). While
   building an answer, a translated rule that swaps a one-letter group with a
@@ -650,11 +649,29 @@ around them, and adds an entry to the reconstructed `CODE-FIXES.md`.
   new rule goes through then took `(3rd #f)` (`abc → aabbcc; kkjjii`). The first
   such companion found among all the change descriptions is now used.
 
-Neither fix changes a run that did not crash. The second bug always crashed
+- **A Length mapping for a group of six or more** (`bridges.ss`, `build-bridge`;
+  `0002-length-group-of-six-or-more.patch`). Found later by Petacat's lockstep
+  checks, not by the study. The Slipnet has Length nodes for 1 to 5 only, so a
+  group of six or more objects has no platonic length (`#f`), and gets no Length
+  description (`attach-length-description`). A horizontal bridge between it and a
+  letter or a shorter group still made a Length concept-mapping, and
+  `make-concept-mapping` sent a message to `#f`. The mapping is now made only
+  when both lengths exist. Of 4,384 recorded runs, 83 crashed this way.
+- **A letter outside a to z** (`syntactic-sugar.ss`, `valid-token-list?`; `0003-non-english-letter-invalid-input.patch`).
+  The command line lets any alphabetic character into a symbol, so `é` or `日本` reached `init-mcat`, which
+  stopped with "variable plato-é is not bound" before the run began. `valid-token-list?`, the one check the command
+  line and the `(mcat ...)` form share, now requires each symbol to be made only of letters the Slipnet has a node
+  for. The command line answers "Invalid input!", as it does for a digit inside a string, and `(mcat abc abd xyé)` is
+  refused with "invalid syntax", as any other invalid token list is. Nothing else in the parser changes: lowering,
+  separators, the digit rule and the seed rule are as they were.
+
+None of the fixes changes a run that did not crash. The second bug always crashed
 when it arose. The first crashed for a sameness group; for a successor or
 predecessor group it would instead have attached a letter description with no
 letter, a branch no recorded run reaches. Recordings of every demo problem are
-byte-identical with and without the fixes ([VALIDATION.md](VALIDATION.md)).
+byte-identical with and without the first two fixes, and 266 recorded runs that
+never crashed are byte-identical with and without the third and the fourth
+([VALIDATION.md](VALIDATION.md)).
 
 ### Supporting tools
 

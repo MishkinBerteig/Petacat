@@ -1,0 +1,45 @@
+--- a/CODE-FIXES.md
++++ b/CODE-FIXES.md
+@@ -109,6 +109,27 @@
+ description with no letter, a branch no recorded run reaches. Recorded runs of
+ all 19 demo problems are byte-identical with and without the group.
+ 
++### 1.4 A Length mapping for a group of six or more — `patches/fixes/0002-length-group-of-six-or-more.patch`
++
++Also in the second patch group, and also a send to `#f`. The Slipnet has Length
++nodes for 1 to 5 only (`*slipnet-numbers*`), so `number->platonic-number`
++(`slipnet.ss:495`) returns `#f` for a group of six or more objects, and that
++group's `platonic-length` is `#f` (`groups.ss:86`). `attach-length-description`
++(`groups.ss:836-844`) already allows for it ("Check for groups longer than five
++objects"): such a group gets no Length description.
++
++- **`build-bridge`** (`bridges.ss:1396-1411`), for a horizontal bridge, made a Length
++  concept-mapping whenever the two objects' platonic lengths differ. With a letter
++  or a shorter group on one side and a group of six or more on the other, the
++  `#f` reached `make-concept-mapping`, whose `get-CM-short-name` was sent to it
++  (`concept-mappings.ss:40`): "attempt to apply non-procedure #f". The mapping is
++  now made only when both lengths exist, as the Length description is.
++
++**Effect on behaviour: none where it does not fire.** The send always crashed
++when it arose (`aaa -> aaaaaa; aaa`, seed 1, at codelet 608). When both objects
++are groups of six or more the lengths are equal (both `#f`), no mapping was made
++before and none is now.
++
+ ---
+ 
+ ## 2. Headless mode — new files, GUI untouched
+--- a/bridges.ss
++++ b/bridges.ss
+@@ -1403,7 +1403,11 @@
+ 	;; group category and direction as the corresponding group.
+ 	(let ((length1 (tell object1 'get-platonic-length))
+ 	      (length2 (tell object2 'get-platonic-length)))
+-	  (if* (and (not (eq? length1 length2))
++	  ;; A group of more than five objects has no Length node to describe it
++	  ;; (number->platonic-number gives #f, as attach-length-description checks),
++	  ;; so there is no Length concept-mapping to make for it.
++	  (if* (and (exists? length1) (exists? length2)
++		    (not (eq? length1 length2))
+ 		    (not (tell bridge 'CM-type-present? plato-length)))
+ 	      (tell bridge 'add-concept-mapping
+ 		(make-concept-mapping

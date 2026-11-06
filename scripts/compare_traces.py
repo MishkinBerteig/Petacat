@@ -197,19 +197,14 @@ class Registry:
             info["function"] = best[1]
         return info
 
-    def lookup_reference_crash(self, header: dict, end: dict | None,
-                               crashing_codelet: str | None = None) -> Divergence | None:
+    def lookup_reference_crash(self, header: dict, end: dict | None) -> Divergence | None:
         """A registered Metacat crash (``match.class = "reference-crash"``).
 
-        Matches a trace whose Metacat ``end`` record is reason ``error`` and either
-
-        * whose header has the entry's ``problem`` (list of three strings) and ``seed``; or
-        * (an entry with ``match.shape``) whose crash has the entry's SHAPE, whatever the problem
-          and seed: the ``end`` record's error text contains ``match.error`` and the codelet that
-          was running (``crashing_codelet``, the name Metacat picked at the crashing codelet) has
-          the shape.  The one shape so far is ``bridge-builder-group-of-6-or-more``: a
-          ``bridge-builder`` whose bridge joins a group of six or more objects (``DISC5:R1``).
-          A crash of any other error text or any other codelet matches nothing, and is an error.
+        Matches a trace whose Metacat ``end`` record is reason ``error`` and whose header has the
+        entry's ``problem`` (list of three strings) and ``seed``.  Patched Metacat does not crash on
+        any registered input: the entries are the three runs of ``Metacat/KNOWN-FAILURES.md``,
+        recorded on the reference reconstruction that the patch group fixes.  Any other crash of
+        patched Metacat is an error, and means the patch group must grow.
 
         Everything the replay does from the crashing codelet on is then the consequence of the
         reference bug."""
@@ -218,12 +213,6 @@ class Registry:
         for e in self.entries:
             m = e.match
             if m.get("class") != "reference-crash":
-                continue
-            if "shape" in m:
-                if m["shape"] == "bridge-builder-group-of-6-or-more" \
-                        and m.get("error", "") in str(end.get("error", "")) \
-                        and _is_bridge_builder_of_long_group(crashing_codelet):
-                    return e
                 continue
             if list(m.get("problem", [])) == list(header.get("problem", [])) \
                     and m.get("seed") == header.get("seed"):
@@ -255,19 +244,6 @@ class Registry:
 
 
 # --------------------------------------------------------------------------- checks
-
-
-_GROUP_SPAN = re.compile(r"group\([a-z]+\.(\d+)-(\d+),")
-
-
-def _is_bridge_builder_of_long_group(name: str | None) -> bool:
-    """Is *name* (a codelet as Metacat's recorder names it) a ``bridge-builder`` whose bridge has a
-    group of six or more objects at either end?  Metacat's Slipnet has number nodes for 1 to 5 only
-    (``slipnet.ss:495``), so the length concept mapping of such a bridge sends to ``#f``
-    (``bridges.ss:1404-1407``, ``concept-mappings.ss:40``)."""
-    if not name or not name.startswith("bridge-builder("):
-        return False
-    return any(int(hi) - int(lo) + 1 >= 6 for lo, hi in _GROUP_SPAN.findall(name))
 
 
 @dataclass
@@ -752,10 +728,7 @@ def compare_traces(meta: Trace, pet: Trace, registry: Registry, rel_tol: float =
 
     # a registered reference crash: what the replay does from the crashing codelet on
     # (the codelet's remaining decisions, later codelets, the end record) is not an error
-    crash_c = (meta.end or {}).get("c")
-    picked = next((d.get("picked") for d in reversed(meta.decisions)
-                   if d.get("ctx") == "choose" and d.get("c") == crash_c), None)
-    crash = registry.lookup_reference_crash(meta.header, meta.end, picked)
+    crash = registry.lookup_reference_crash(meta.header, meta.end)
     if crash is not None:
         crash_c = (meta.end or {}).get("c")
         for _, f in findings:

@@ -1,0 +1,79 @@
+--- a/CODE-FIXES.md
++++ b/CODE-FIXES.md
+@@ -83,8 +83,8 @@
+ ### 1.3 Two crashes, fixed by the second patch group — `patches/fixes/0001-known-failures.patch`
+ 
+ These two fixes are **not** in the reference reconstruction behind Petacat's
+-published studies. They are the bundle's second, optional patch group
+-(`tools/reconstruct.py --fixes`). Each is a send to `#f`, found when the support
++published studies. They are the bundle's second patch group, always applied
++(`tools/reconstruct.py --output`). Each is a send to `#f`, found when the support
+ study sampled 969,000 runs and recorded three `*ERROR*` observations (the
+ bundle's `KNOWN-FAILURES.md`).
+ 
+@@ -130,6 +130,26 @@
+ are groups of six or more the lengths are equal (both `#f`), no mapping was made
+ before and none is now.
+ 
++### 1.5 A letter outside a to z is invalid input — `patches/fixes/0003-non-english-letter-invalid-input.patch`
++
++Also in the second patch group. The command line (`tokenize-string`, `gui.ss:95`) lowers its
++input, takes punctuation and spaces as separators, and lets any *alphabetic* character into a
++symbol token, so a letter outside a to z (`é`, `日本`, a Greek letter) became a symbol that
++`valid-token-list?` (`syntactic-sugar.ss:51`) accepted. `init-mcat` then called
++`symbol->letter-categories` (`utilities.ss:303-310`), which evaluates `plato-<letter>`, and the
++run stopped on the uncaught error "variable plato-é is not bound" before it began.
++
++- **`valid-token-list?`**, the one check the command line and the `(mcat ...)` form share, now
++  requires each symbol token (the three strings and the answer) to be made only of letters the
++  Slipnet has a node for (`valid-letter-symbol?`, by the nodes' lowercase names). The command line
++  then answers "Invalid input!", as it does for a digit inside a string. The `(mcat ...)` form is
++  refused with its usual "invalid syntax" error, as for any other invalid token list.
++- Nothing else in the parser changes: `tokenize-string`, the lowering, the separators, the digit
++  rule and the seed rule are as they were.
++
++**Effect on behaviour: none where it does not fire.** The only inputs that change are those with a
++letter outside a to z that reached `init-mcat`, which used to crash.
++
+ ---
+ 
+ ## 2. Headless mode — new files, GUI untouched
+--- a/syntactic-sugar.ss
++++ b/syntactic-sugar.ss
+@@ -52,15 +52,31 @@
+   (lambda (tokens)
+     (and (list? tokens)
+ 	 (>= (length tokens) 3)
+-	 (symbol? (1st tokens))
+-	 (symbol? (2nd tokens))
+-	 (symbol? (3rd tokens))
++	 (valid-letter-symbol? (1st tokens))
++	 (valid-letter-symbol? (2nd tokens))
++	 (valid-letter-symbol? (3rd tokens))
+ 	 (or (= (length tokens) 3)
+ 	     (and (= (length tokens) 4)
+-		  (symbol-or-valid-number? (4th tokens)))
++		  (or (valid-letter-symbol? (4th tokens))
++		      (valid-number? (4th tokens))))
+ 	     (and (= (length tokens) 5)
+-		  (symbol? (4th tokens))
++		  (valid-letter-symbol? (4th tokens))
+ 		  (valid-number? (5th tokens)))))))
++
++;; A symbol token is a string of letters Metacat has concepts for.  The command
++;; line (tokenize-string) lets any alphabetic character through, and a letter
++;; outside a to z (an accented letter, a Greek or Chinese character) has no
++;; Slipnet node: symbol->letter-categories would then fail on an unbound
++;; plato-<letter> in init-mcat.  Such input is invalid, like a digit inside a
++;; string.
++(define valid-letter-symbol?
++  (lambda (token)
++    (and (symbol? token)
++	 ;; (tell is a macro defined later, in utilities.ss; this is what it expands to.)
++	 (let ((names (map (lambda (node) (node node 'get-lowercase-name))
++			   *slipnet-letters*)))
++	   (andmap (lambda (char) (member (string char) names))
++		   (string->list (symbol->string token)))))))
+ 
+ (define valid-number?
+   (lambda (num)

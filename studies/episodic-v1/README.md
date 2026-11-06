@@ -139,10 +139,11 @@ Metacat directory. Use a new checkout to leave previous frozen studies alone.
    python3 Metacat/tools/reconstruct.py --verify Metacat/build/source
    ```
 
-   The study needs the reference reconstruction. If the optional known-failure
-   fixes are applied to `Metacat/build/source`, verification fails; take them
-   off with `python3 Metacat/tools/reconstruct.py --remove-fixes
-   Metacat/build/source` ([Metacat/README.md](../../Metacat/README.md#optional-the-known-failure-fixes)).
+   The study was run on the reference reconstruction, without the known-failure
+   fixes. The bundle no longer builds or verifies that tree: `reconstruct.py`
+   builds and accepts only the patched Metacat, and nothing takes the fixes off
+   ([Metacat/README.md](../../Metacat/README.md#the-known-failure-fixes)). Running this
+   collector again would sample the patched Metacat, a different engine.
 
 3. Use a Python environment with NumPy and SciPy. An existing study environment
    can be reused without modifying it, or create one:

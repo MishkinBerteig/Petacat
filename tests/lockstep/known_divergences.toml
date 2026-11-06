@@ -26,6 +26,10 @@
 # match.problem (the three strings) and match.seed.  When that trace's Metacat `end` record
 # has reason "error", every finding of the replay at or after the crashing codelet (Petacat
 # carries on where Metacat died) and the end-record mismatch are registered, not counted.
+# Only the traces recorded on the reference reconstruction are registered.  A crash of the
+# patched Metacat that the lockstep corpus records is never registered: it is an error, and the
+# patch group (Metacat/patches/fixes/) grows to fix it.  Crash R1, a Length concept mapping for
+# a group of six or more objects, was closed that way (0002-length-group-of-six-or-more.patch).
 
 
 # The three Metacat crashes of Metacat/KNOWN-FAILURES.md (cause "reference").  Two reference
@@ -64,22 +68,3 @@ note = "A rule whose GroupCtgy self change is not the first change description o
 class = "reference-crash"
 problem = ["abc", "aabbcc", "kkjjii"]
 seed = 20226148
-
-
-# A Metacat crash recognised by its SHAPE, not by a list of seeds (DISCREPANCIES5.md R1).
-# Metacat's Slipnet has number nodes for 1 to 5 only, so `number->platonic-number` (slipnet.ss:495)
-# is #f for a group of six or more objects; `bridge-builder` hands that to `make-concept-mapping`
-# (bridges.ss:1404-1407) and `get-CM-short-name` is sent to #f (concept-mappings.ss:40).
-# Petacat's guard (builtins.py, the length mapping skipped when a length is None) is deliberate: a crash
-# is not worth reproducing and there is nothing to be faithful to after it.  83 of the 4,384 runs of the
-# round-2 wide check end this way, and the three runs of KNOWN-FAILURES.md are different bugs.
-[[divergence]]
-id = "REF:crash-bridge-builder-group-of-6-or-more"
-cause = "reference"
-effect = "skip"
-name = "make-concept-mapping: no number node for a length above 5 (bridge-builder of a group of six or more objects)"
-note = "Metacat crashes with 'attempt to apply non-procedure #f' in a bridge-builder whose bridge has a group of 6 or more objects. Petacat skips the length concept mapping and runs on."
-[divergence.match]
-class = "reference-crash"
-shape = "bridge-builder-group-of-6-or-more"
-error = "attempt to apply non-procedure #f"

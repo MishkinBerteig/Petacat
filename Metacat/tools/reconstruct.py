@@ -2,11 +2,11 @@
 """Download Metacat 1.2, apply the bundled diffs, and verify the result.
 
 The bundle has two patch groups.  The first (``patches/*.patch``) gives the reference
-reconstruction behind Petacat's published studies, and is what ``--output`` builds and
-``--verify`` accepts.  The second (``patches/fixes/*.patch``) fixes the three reference
-crashes in KNOWN-FAILURES.md; it is applied only when asked for, with ``--fixes`` at
-reconstruction or ``--apply-fixes`` on an existing reference tree, verified with
-``--verify DIR --fixes``, and taken off again with ``--remove-fixes``.
+reconstruction, which is only the intermediate step of building the tree: it is never left
+behind as a usable tree.  The second (``patches/fixes/*.patch``) fixes the crashes listed in
+KNOWN-FAILURES.md, and the group keeps growing.  ``--output`` builds the patched tree, which
+is the only Metacat there is, and ``--verify`` accepts only that tree.  ``--apply-fixes`` brings
+a tree left over from before to the patched state.  Nothing takes the fixes off.
 """
 
 import argparse
@@ -83,34 +83,26 @@ def fixed_inventory(manifest):
     return files
 
 
-def _run_patches(root, patches, reverse=False, bundle=BUNDLE):
-    """Apply (or reverse) patches without fuzz, each after a dry run of itself, so a
-    patch that does not fit leaves the tree untouched."""
+def _run_patches(root, patches, bundle=BUNDLE):
+    """Apply patches without fuzz, each after a dry run of itself, so a patch that does not
+    fit leaves the tree untouched."""
     for patch in patches:
         check_digest(safe_path(bundle, patch['path']), patch['sha256'])
-    for patch in (reversed(patches) if reverse else patches):
-        command = ['patch', '-p1', '-f', '-F', '0', '-s'] + (['-R'] if reverse else [])
+    for patch in patches:
+        command = ['patch', '-p1', '-f', '-F', '0', '-s']
         source = ['-i', str(safe_path(bundle, patch['path']))]
         subprocess.run(command + ['--dry-run'] + source, cwd=root, check=True)
         subprocess.run(command + source, cwd=root, check=True)
 
 
 def apply_fixes(root, manifest, bundle=BUNDLE):
-    """Apply the second patch group to a verified reference tree, in place."""
+    """Apply the second patch group to a verified reference tree, in place.  This is the last
+    step of building the patched tree, and the way to bring an older reference tree up."""
     verify(root, manifest['reconstructed_files'])
     _run_patches(root, manifest['fix_patches'], bundle=bundle)
     for name, info in manifest['fixed_files'].items():
         safe_path(root, name).chmod(0o755 if info['executable'] else 0o644)
     verify(root, fixed_inventory(manifest))
-
-
-def remove_fixes(root, manifest, bundle=BUNDLE):
-    """Take the second patch group off a verified fixed tree, in place."""
-    verify(root, fixed_inventory(manifest))
-    _run_patches(root, manifest['fix_patches'], reverse=True, bundle=bundle)
-    for name, info in manifest['reconstructed_files'].items():
-        safe_path(root, name).chmod(0o755 if info['executable'] else 0o644)
-    verify(root, manifest['reconstructed_files'])
 
 
 def describe(root, manifest):
@@ -125,11 +117,13 @@ def describe(root, manifest):
     return None
 
 
-def reconstruct(archive, output, manifest, fixes=False):
+def reconstruct(archive, output, manifest):
+    """Build the patched tree: upstream, the first patch group, then the second.  The
+    reference reconstruction exists only inside the temporary directory."""
     if output.exists() or output.is_symlink():
         raise ValueError(f"Refusing to replace existing destination: {output}")
     check_digest(archive, manifest['upstream']['sha256'])
-    for patch in manifest['patches'] + (manifest['fix_patches'] if fixes else []):
+    for patch in manifest['patches'] + manifest['fix_patches']:
         check_digest(safe_path(BUNDLE, patch['path']), patch['sha256'])
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='.metacat-', dir=output.parent) as temp:
@@ -142,8 +136,7 @@ def reconstruct(archive, output, manifest, fixes=False):
         for name, info in manifest['reconstructed_files'].items():
             safe_path(root, name).chmod(0o755 if info['executable'] else 0o644)
         verify(root, manifest['reconstructed_files'])
-        if fixes:
-            apply_fixes(root, manifest)
+        apply_fixes(root, manifest)
         root.rename(output)
 
 
@@ -152,22 +145,18 @@ def main():
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--archive', type=Path, help='Previously downloaded Metacat-1.2.tgz')
     parser.add_argument('--output', type=Path, help='New directory for reconstructed source')
-    parser.add_argument('--verify', type=Path, help='Verify an existing pristine reconstruction')
-    parser.add_argument('--fixes', action='store_true',
-                        help='With --output: also apply the second patch group (the '
-                             'known-failure fixes).  With --verify: expect it applied.')
+    parser.add_argument('--verify', type=Path, help='Verify an existing patched reconstruction')
     parser.add_argument('--apply-fixes', type=Path, metavar='DIR',
-                        help='Apply the second patch group to a verified reference tree')
-    parser.add_argument('--remove-fixes', type=Path, metavar='DIR',
-                        help='Take the second patch group off a verified fixed tree')
+                        help='Bring a leftover reference tree (without the second patch '
+                             'group) to the patched state')
     args = parser.parse_args()
     manifest = json.loads((BUNDLE / 'manifest.json').read_text())
     count = len(manifest['reconstructed_files'])
-    modes = [m for m in (args.verify, args.output, args.apply_fixes, args.remove_fixes) if m]
+    modes = [m for m in (args.verify, args.output, args.apply_fixes) if m]
     if len(modes) > 1:
-        parser.error('choose one of --output, --verify, --apply-fixes, --remove-fixes')
-    if (args.apply_fixes or args.remove_fixes) and (args.archive or args.fixes):
-        parser.error('--apply-fixes and --remove-fixes take no other options')
+        parser.error('choose one of --output, --verify, --apply-fixes')
+    if args.apply_fixes and args.archive:
+        parser.error('--apply-fixes takes no other options')
     if args.apply_fixes:
         root = args.apply_fixes.resolve()
         if describe(root, manifest) == 'fixes':
@@ -175,38 +164,22 @@ def main():
         apply_fixes(root, manifest)
         print(f"Applied the known-failure fixes; verified {count} files: {args.apply_fixes}")
         return
-    if args.remove_fixes:
-        root = args.remove_fixes.resolve()
-        if describe(root, manifest) == 'reference':
-            raise ValueError(f"{args.remove_fixes} is already the reference reconstruction")
-        remove_fixes(root, manifest)
-        print(f"Removed the known-failure fixes; verified {count} files: {args.remove_fixes}")
-        return
     if args.verify:
         if args.archive:
             parser.error('--verify cannot be combined with --archive or --output')
         root = args.verify.resolve()
-        expected = fixed_inventory(manifest) if args.fixes else manifest['reconstructed_files']
         try:
-            verify(root, expected)
+            verify(root, fixed_inventory(manifest))
         except ValueError as exc:
-            state = describe(root, manifest)
-            if state == 'fixes':
-                raise ValueError(f"{exc}\n{args.verify} has the known-failure fixes (the second "
-                                 "patch group) applied: it is not the reference reconstruction. "
-                                 "Verify it with --verify DIR --fixes, or take the fixes off "
-                                 "with --remove-fixes DIR.") from exc
-            if state == 'reference':
-                raise ValueError(f"{exc}\n{args.verify} is the reference reconstruction, without "
-                                 "the known-failure fixes; apply them with --apply-fixes DIR.") from exc
+            if describe(root, manifest) == 'reference':
+                raise ValueError(f"{exc}\n{args.verify} is an old reference reconstruction, "
+                                 "without the known-failure fixes.  It is not Metacat: bring it "
+                                 "up with --apply-fixes DIR.") from exc
             raise
-        if args.fixes:
-            print(f"Verified {count} files with the known-failure fixes: {args.verify}")
-        else:
-            print(f"Verified {count} files: {args.verify}")
+        print(f"Verified {count} files with the known-failure fixes: {args.verify}")
         return
     if not args.output:
-        parser.error('--output is required unless using --verify, --apply-fixes or --remove-fixes')
+        parser.error('--output is required unless using --verify or --apply-fixes')
     # Keep downloads explicit and checksummed; --archive permits offline rebuilds.
     with tempfile.TemporaryDirectory(prefix='metacat-download-') as temp:
         archive = args.archive
@@ -214,11 +187,8 @@ def main():
             archive = Path(temp) / 'Metacat-1.2.tgz'
             subprocess.run(['curl', '-fL', '--connect-timeout', '20', '--max-time', '180',
                             manifest['upstream']['url'], '-o', str(archive)], check=True)
-        reconstruct(archive.resolve(), args.output.absolute(), manifest, fixes=args.fixes)
-    if args.fixes:
-        print(f"Verified {count} files with the known-failure fixes: {args.output}")
-    else:
-        print(f"Verified {count} files: {args.output}")
+        reconstruct(archive.resolve(), args.output.absolute(), manifest)
+    print(f"Verified {count} files with the known-failure fixes: {args.output}")
 
 
 if __name__ == '__main__':

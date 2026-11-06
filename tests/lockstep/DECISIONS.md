@@ -13,8 +13,9 @@ spec differ, this file wins.
    from `Metacat/build/source/docker`.  The recorder patch is applied to a *copy*
    (`Metacat/build/recorder-source-kf`), never to `build/source`.  Since 2026-10-28 the
    bundle also has a second patch group, the known-failure fixes
-   (`Metacat/patches/fixes/`).  It changes no recorded run except the three crash
-   seeds.  Since 2026-11-06 (ruling 70) the harness records and runs only the build
+   (`Metacat/patches/fixes/`).  It changes no recorded run except the runs that crash
+   without it (the three crash seeds, and the 2026-11-06 fix for a bridge to a group of six
+   or more objects).  Since 2026-11-06 (ruling 70) the harness records and runs only the build
    with that group, the patched Metacat, and refuses any other; every stored trace's
    `revision` ends in `+known-failure-fixes` (`metacat/README.md`, "Which Metacat").
 2. **`~`.** Petacat changes.  Metacat redefines `round` to return exact integers
@@ -131,11 +132,17 @@ naming table in its `README.md`):
   changed, and plain `reconstruct.py --verify` still means it; this harness does not run it.
   The three crashes are diagnosed.  Their fix is the bundle's second patch group
   (`Metacat/patches/fixes/0001-known-failures.patch`, checksummed in
-  `Metacat/manifest.json`), applied with `reconstruct.py --apply-fixes` or `--fixes`.  It
-  is applied to the local `Metacat/build/source`.  Every other recorded run (655 across
+  `Metacat/manifest.json`), built into `Metacat/build/source` by `reconstruct.py --output` (an older reference tree is brought up
+  with `--apply-fixes`; nothing takes the fixes off).  It
+  is always applied.  Every other recorded run (655 across
   the development, seeds 11-30 and justify corpora, checked before the unfixed build was
   removed from the tools) gave a byte-identical trace with and without it.  Petacat follows Metacat to each crash point and behaves as the fixed
-  Metacat past it.  The registry marks the three as reference crashes.
+  Metacat past it.  The registry marks the three as reference crashes.  The group is not
+  closed: a crash of patched Metacat means another file is added to it (ruling of 2026-11-06).
+  The second, `0002-length-group-of-six-or-more.patch`, fixes the crash of a Length concept mapping
+  for a group of six or more objects (`Metacat/KNOWN-FAILURES.md`, "A fourth crash"); nothing is
+  registered for it.  The third, `0003-non-english-letter-invalid-input.patch`, makes a letter outside
+  a to z "Invalid input!" rather than a crash in `init-mcat` (`THE-THREE-SYSTEMS.md`).
 * **Seam test pins.** `test_seam.py`'s four ordinary runs were measured before and after
   the seam was added and matched exactly. Since then they have been re-pinned with each
   port fix, so they now guard the seam against later change.

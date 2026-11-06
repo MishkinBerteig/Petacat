@@ -83,13 +83,13 @@ Validated on 2026-10-28 for
 ([KNOWN-FAILURES.md](KNOWN-FAILURES.md)).
 
 - **Patching.** The patch applies to the verified reference reconstruction with
-  zero fuzz and reverses exactly. `--apply-fixes` then `--remove-fixes` returns
-  a tree byte-identical to the reference. All 69 files of the fixed tree match
+  zero fuzz. (When validated it also reversed exactly; the removal has since been taken out of
+  the tool, because nothing may take the fixes off.) All 69 files of the fixed tree match
   `reconstructed_files`, overridden by `fixed_files`, in
   [manifest.json](manifest.json).
-- **Packaging tests.** The bundle's 19 tests pass
-  (`python3 -m unittest discover -s tests -p 'test_*.py'`). They include an
-  apply/remove round trip on a copy of `build/source`.
+- **Packaging tests.** The bundle's 20 tests pass
+  (`python3 -m unittest discover -s tests -p 'test_*.py'`). They include applying
+  the fixes to a copy of `build/source`; none takes the fixes off.
 - **Smoke test.** The headless smoke test passes on the fixed tree.
 - **The three failures.** On the fixed tree,
   [tests/reproduce-failures.ss](tests/reproduce-failures.ss) reports an ordinary
@@ -103,9 +103,37 @@ Validated on 2026-10-28 for
   (570 runs), and justify mode for the 17 demo answers at seeds 1–5 (85 runs).
   All 655 pairs are byte-identical apart from the header's revision string.
 
-The fixes are not part of the reference reconstruction; plain `--verify` still
-checks the reference. Results gathered with them are from a changed engine
-(KNOWN-FAILURES.md, "When Returning to This Work").
+### 0002-length-group-of-six-or-more.patch
+
+Validated on 2026-11-06 (see [KNOWN-FAILURES.md](KNOWN-FAILURES.md), "A fourth crash").
+
+- **Patching.** On a copy of the tree with the 0001 fixes it applies with zero fuzz.
+  The result verifies as the fixed tree (`--verify build/source`, 69 files).
+  The bundle's tests pass, including applying the whole group to a copy of `build/source`.
+- **The 83 crashes.** All 83 runs that crashed in the stage W sample, recorded again,
+  are identical record for record to the same runs recorded without this patch, up to
+  the codelet where they crashed, and then run on without a crash.
+- **No other run changes.** 266 recorded traces that never crashed (a sample of stage W's
+  other runs, covering plain, justify, episode, person-action, Self-watching-off and
+  long runs, and `abc -> abd; xyz` seeds 1 to 10) were recorded with and without the patch,
+  with the same recorder: all 266 pairs are identical apart from the header's `revision`.
+
+### 0003-non-english-letter-invalid-input.patch
+
+Validated on 2026-11-06 (see [KNOWN-FAILURES.md](KNOWN-FAILURES.md), "A letter outside a to z").
+
+- **Patching.** On a copy of the tree with 0001 and 0002 it applies with zero fuzz; the result verifies as the
+  fixed tree (`--verify build/source`, 69 files). The bundle's tests pass.
+- **The parser.** The recording of `tokenize-string`, `valid-token-list?` and the others over every Unicode
+  scalar value (`tests/lockstep/metacat/record_parser.py`) is identical before and after except for the
+  validity of token lists with a letter outside a to z, which go from valid to invalid.
+- **No run changes.** 266 recorded traces (the stage W sample and `abc -> abd; xyz` seeds 1 to 10) recorded with and
+  without the patch are identical apart from the header's `revision`.
+- **The `(mcat ...)` form** refuses a symbol with such a letter ("invalid syntax") and accepts the plain forms.
+
+The fixes are not part of the reference reconstruction behind the published studies, which
+the bundle no longer builds or verifies: `--verify` accepts only the patched tree. Results gathered
+with the fixes are from a changed engine (KNOWN-FAILURES.md, "When Returning to This Work").
 
 ## Limits
 

@@ -12,6 +12,7 @@ number of its own and changes nothing Metacat computes.
 | `record.py` | CLI (plain `python3`, stdlib only): builds the patched source, writes a driver per problem and seed, runs Docker, gzips the trace |
 | `recorder.patch` | Unified diff against `Metacat/build/source` (8 files, about 50 added lines) |
 | `decision-trace.ss` | Run-time wrappers, JSON writer, canonical names, `trace-open`, `trace-run`, snapshots, `dump-opening-names` |
+| `record_parser.py` | CLI: how Metacat's own input parser (`tokenize-string`, `valid-token-list?`, ...) reads every Unicode scalar value and 200 whole lines, written to `tests/lockstep/data/parser_metacat.json.gz` (format at the top of the script); read by Petacat's parser differential test |
 | `record_verbose.py` | CLI: the console output of runs with Metacat's Verbose mode (`%verbose%`) on, one `@@RUN` ... `@@END` block per run; compared with Petacat's narration by `scripts/compare_verbose.py` (`python3 tests/lockstep/metacat/record_verbose.py abc abd xyz 1-5 [--answer A] [--episode N]`) |
 | `random-audit.ss` | Debug only: shadows `random` to find raw draws attributed to no decision |
 | `opening-names.abc-abd-xyz.json` | Canonical names of every letter, description and slipnet node of the opening state (95 names, sorted) |
@@ -31,7 +32,7 @@ start at 1.  The gzip header has mtime 0, so equal traces are equal bytes.  `--k
 also keeps the `.jsonl`.
 
 **Which Metacat.** This project runs the **patched Metacat** and nothing else: `Metacat/build/source` with the
-bundle's second patch group, the known-failure fixes (`Metacat/README.md`, "Optional: the known-failure fixes").
+bundle's second patch group, the known-failure fixes (`Metacat/README.md`, "The known-failure fixes").
 Every container start goes through `record.run_container`, which calls `record.require_patched()` first; that
 verifies `build/source` with `Metacat/tools/reconstruct.py` and exits with an error, starting nothing, unless it is
 the patched build. `record.py`, `--baseline` and `--names` included, and every other recorder (`record_verbose.py`,
@@ -40,8 +41,8 @@ the patched build. `record.py`, `--baseline` and `--names` included, and every o
 that picks a build or takes the fixes off. The recorder's copy of the tree, with `recorder.patch` applied, is
 `Metacat/build/recorder-source-kf`; it is rebuilt when `recorder.patch` or `Metacat/manifest.json` changes. The trace
 header's `revision` names the manifest's hash and always ends in `+known-failure-fixes`. `test_patched_only.py`
-holds all of this: the refusal of a tree that fails verification, of the reference tree made with Metacat's own
-tool (never run), and of a copy not marked patched, and the header of every stored trace.
+holds all of this: the refusal of a tree that fails verification, of a tree that verifies as the reference (with
+`describe` stubbed, so that no fix is taken off), and of a copy not marked patched, and the header of every stored trace.
 The copy is git-ignored.  To change the recorder patch: edit `recorder-source-kf`, then regenerate with
 `diff -u` against `build/source` using `a/` and `b/` path prefixes (applied with `patch -p1`).
 
@@ -227,7 +228,10 @@ byte-identical traces.
   to a run that reaches the 100,000-codelet cap: about 1 GB raw, 30 MB gzipped, a few minutes.
 
 
-## The three crash seeds
+## The three crash seeds, and a fourth
+
+The fourth, a Length concept mapping for a group of six or more objects, is at the end of this
+section.
 
 `Metacat/KNOWN-FAILURES.md` lists three seeds on which Metacat itself crashes:
 `abc cba mrrjjj` seeds 20713988 and 20716342, and `abc aabbcc kkjjii` seed 20226148.
@@ -259,6 +263,15 @@ Those three files are stored data that nothing runs, and no tool can record on t
 Every other run, across the plain, justify and episode corpora, gave a byte-identical trace with and without the
 fixes, apart from the header's `revision` (`Metacat/VALIDATION.md`; stage T2 re-checked 1,191 traces against their
 old recordings).
+
+**The fourth crash (crash R1 of stage W).**  The wide check of 4,384 runs found 83 on which patched
+Metacat itself crashed: `bridge-builder` made a Length concept mapping for a group of six or more
+objects, whose platonic length is `#f` (`slipnet.ss:495`, `bridges.ss:1404-1407`,
+`concept-mappings.ss:40`).  A crash of patched Metacat means the patch is incomplete, so the patch group
+gained `Metacat/patches/fixes/0002-length-group-of-six-or-more.patch`
+(`Metacat/KNOWN-FAILURES.md`, "A fourth crash").  Nothing is registered for it: the 83 runs
+recorded again run past the old crash point, and `data/aaa-aaaaaa-aaa.seed1.metacat.jsonl.gz`
+(the smallest, 1,614 codelets) is replayed to its end by `test_comparer.py`.
 
 ## Translation logs: `record_translation.py`
 
