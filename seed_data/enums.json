@@ -39,107 +39,51 @@
   ],
   "event_types": [
     {
-      "name": "bond_built",
-      "display_label": "Bond Built",
-      "sort_order": 0,
-      "description": "A bond was built between adjacent objects",
-      "role": "event_type.bond_built"
-    },
-    {
-      "name": "bond_broken",
-      "display_label": "Bond Broken",
-      "sort_order": 1,
-      "description": "A bond was broken",
-      "role": "event_type.bond_broken"
-    },
-    {
       "name": "group_built",
       "display_label": "Group Built",
-      "sort_order": 2,
+      "sort_order": 0,
       "description": "A group was formed",
       "role": "event_type.group_built"
     },
     {
-      "name": "group_broken",
-      "display_label": "Group Broken",
-      "sort_order": 3,
-      "description": "A group was broken",
-      "role": "event_type.group_broken"
-    },
-    {
-      "name": "bridge_built",
-      "display_label": "Bridge Built",
-      "sort_order": 4,
-      "description": "A bridge was established between strings",
-      "role": "event_type.bridge_built"
-    },
-    {
-      "name": "bridge_broken",
-      "display_label": "Bridge Broken",
-      "sort_order": 5,
-      "description": "A bridge was broken",
-      "role": "event_type.bridge_broken"
-    },
-    {
       "name": "rule_built",
       "display_label": "Rule Built",
-      "sort_order": 6,
+      "sort_order": 1,
       "description": "A transformation rule was discovered",
       "role": "event_type.rule_built"
     },
     {
-      "name": "rule_broken",
-      "display_label": "Rule Broken",
-      "sort_order": 7,
-      "description": "A rule was broken",
-      "role": "event_type.rule_broken"
-    },
-    {
-      "name": "description_built",
-      "display_label": "Description Built",
-      "sort_order": 8,
-      "description": "A description was attached to an object",
-      "role": "event_type.description_built"
-    },
-    {
       "name": "answer_found",
       "display_label": "Answer Found",
-      "sort_order": 9,
+      "sort_order": 2,
       "description": "An answer was discovered",
       "role": "event_type.answer_found"
     },
     {
       "name": "snag",
       "display_label": "Snag",
-      "sort_order": 10,
+      "sort_order": 3,
       "description": "A progress stall was detected",
       "role": "event_type.snag"
     },
     {
       "name": "clamp_start",
       "display_label": "Clamp Start",
-      "sort_order": 11,
+      "sort_order": 4,
       "description": "A clamp period began",
       "role": "event_type.clamp_start"
     },
     {
-      "name": "clamp_end",
-      "display_label": "Clamp End",
-      "sort_order": 12,
-      "description": "A clamp period ended",
-      "role": "event_type.clamp_end"
-    },
-    {
       "name": "concept_mapping_built",
       "display_label": "Concept Mapping Built",
-      "sort_order": 15,
+      "sort_order": 5,
       "description": "A concept mapping was established",
       "role": "event_type.concept_mapping_built"
     },
     {
       "name": "concept_activation",
       "display_label": "Concept activation",
-      "sort_order": 16,
+      "sort_order": 6,
       "description": "A deep Slipnet concept's activation changed substantially. One of the seven Temporal Trace event types (S4.4); its importance is a function of the node's conceptual depth and the size of the activation change.",
       "role": "event_type.concept_activation"
     }

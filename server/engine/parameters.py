@@ -308,11 +308,13 @@ class UnknownParameter(ValueError):
     """An override named something that is not a run parameter."""
 
 
-def validate_overrides(overrides: dict[str, Any] | None, meta: Any = None) -> dict[str, Any]:
+def validate_overrides(overrides: dict[str, Any] | None, meta: Any) -> dict[str, Any]:
     """Check a set of overrides, returning the coerced values.
 
-    *meta* (the configuration the Run will execute under) supplies each reference
-    parameter's ``refers_to``, which fixes the shape of its value.
+    *meta* is required: the configuration the Run will execute under (a Training Mode
+    Session's own, never the global one).  It supplies each reference parameter's
+    ``refers_to``, which fixes the shape of its value, so a check without it would test
+    a reference parameter against nothing.
 
     Rejects unknown names rather than ignoring them.  Ignoring is the tempting choice —
     it keeps old clients working — but a typo in a parameter name would then silently
@@ -327,8 +329,7 @@ def validate_overrides(overrides: dict[str, Any] | None, meta: Any = None) -> di
             f"Settable parameters are: {', '.join(sorted(PARAMETERS_BY_NAME))}"
         )
     return {
-        name: PARAMETERS_BY_NAME[name].validate(
-            value, None if meta is None else meta.param_refers_to.get(name))
+        name: PARAMETERS_BY_NAME[name].validate(value, meta.param_refers_to.get(name))
         for name, value in overrides.items()
     }
 

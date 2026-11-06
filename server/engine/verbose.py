@@ -404,7 +404,7 @@ def narrate_event_display(log: "VerboseLog", event: Any) -> None:
     """
     v = run_vocab()
     kind = getattr(event, "event_type", None)
-    if kind in (v.event_type_clamp_start, v.event_type_clamp_end):
+    if kind == v.event_type_clamp_start:
         log.say("progress-achieved-by-clamp", exact(getattr(event, "progress_achieved", 0)))
     elif kind == v.event_type_snag:
         log.say("progress-achieved-by-snag", exact(getattr(event, "progress_achieved", 0)))

@@ -33,6 +33,7 @@ from server.services.problem_text import check_problem
 from server.engine import hardware
 from server.engine.numeric import available_backends
 from server.engine.parameters import UnknownParameter, validate_overrides
+from server.engine.runner import STATUS_ANSWER_FOUND
 
 try:
     from server import parallel as _parallel
@@ -200,8 +201,10 @@ async def run_swarm(req: SwarmRequest) -> SwarmResponse:
     """Run the problem over the seeds on every core; persist nothing."""
     swarm_module = _require_plugin()
     seeds = _seeds(req)
+    # The run service's current metadata: what a Run created now would execute under.
+    meta = get_run_service().meta
     try:
-        overrides = validate_overrides(req.parameters)
+        overrides = validate_overrides(req.parameters, meta)
     except (UnknownParameter, ValueError) as exc:
         raise HTTPException(400, str(exc)) from exc
     backend = req.backend
@@ -212,8 +215,6 @@ async def run_swarm(req: SwarmRequest) -> SwarmResponse:
             f"choose from {[*available_backends(), 'off']}",
         )
 
-    # The run service's current metadata: what a Run created now would execute under.
-    meta = get_run_service().meta
     max_steps = req.max_steps if req.max_steps is not None else meta.get_param("default_max_codelets")
     swarm = swarm_module.default_swarm()
     tasks = [
@@ -231,7 +232,7 @@ async def run_swarm(req: SwarmRequest) -> SwarmResponse:
     by_answer: Counter[str] = Counter()
     quality: dict[str, list[float]] = {}
     for o in outcomes:
-        key = o.answer if o.status == "answer_found" and o.answer else "*NONE*"
+        key = o.answer if o.status == STATUS_ANSWER_FOUND and o.answer else "*NONE*"
         by_answer[key] += 1
         if o.answer_quality is not None and key != "*NONE*":
             quality.setdefault(key, []).append(o.answer_quality)

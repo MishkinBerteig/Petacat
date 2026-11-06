@@ -67,14 +67,14 @@ class Bridge(WorkspaceStructure):
 
     @property
     def orientation(self) -> str:
-        v = constants().vocab
+        v = self._voc  # the run's own vocabulary, held by the structure (WorkspaceStructure)
         if self.bridge_type == v.bridge_type_top or self.bridge_type == v.bridge_type_bottom:
             return v.bridge_orientation_horizontal
         return v.bridge_orientation_vertical
 
     @property
     def is_horizontal(self) -> bool:
-        return self.orientation == constants().vocab.bridge_orientation_horizontal
+        return self.orientation == self._voc.bridge_orientation_horizontal
 
     # ------------------------------------------------------------------
     # The three concept-mapping lists  (Scheme: bridges.ss:150-238)
@@ -376,12 +376,15 @@ class Bridge(WorkspaceStructure):
     @property
     def theme_type(self) -> str:
         """The Themespace theme type this bridge feeds."""
-        v = constants().vocab
-        return {
-            v.bridge_type_top: v.theme_type_top_bridge,
-            v.bridge_type_bottom: v.theme_type_bottom_bridge,
-            v.bridge_type_vertical: v.theme_type_vertical_bridge,
-        }[self.bridge_type]
+        v = self._voc
+        bridge_type = self.bridge_type
+        if bridge_type == v.bridge_type_top:
+            return v.theme_type_top_bridge
+        if bridge_type == v.bridge_type_bottom:
+            return v.theme_type_bottom_bridge
+        if bridge_type == v.bridge_type_vertical:
+            return v.theme_type_vertical_bridge
+        raise KeyError(bridge_type)
 
     @property
     def is_spanning_bridge(self) -> bool:
@@ -413,6 +416,7 @@ class Bridge(WorkspaceStructure):
         patterns, in answer indexing, and in the theme pattern a snag clamps.
         """
         relations: list[tuple[str, str]] = []
+        identity, diff = self._voc.theme_relation_identity, self._voc.theme_relation_diff
         for d1 in _plain_descriptions(self.object1):
             for d2 in _plain_descriptions(self.object2):
                 if not descriptions_affect_themespace(d1, d2):
@@ -421,7 +425,7 @@ class Bridge(WorkspaceStructure):
                 if dimension is None:
                     continue
                 relation = relation_name_for_label(
-                    _label_node(d1.descriptor, d2.descriptor)
+                    _label_node(d1.descriptor, d2.descriptor, identity), diff
                 )
                 relations.append((dimension, relation))
         return relations
@@ -718,7 +722,7 @@ def _relevant_descriptions(obj: Any) -> list[Any]:
     return [d for d in _plain_descriptions(obj) if d.is_relevant()]
 
 
-def _label_node(descriptor1: Any, descriptor2: Any) -> Any:
+def _label_node(descriptor1: Any, descriptor2: Any, identity: str | None = None) -> Any:
     """Scheme: ``get-label`` (slipnet.ss).
 
     Identical descriptors relate by identity; linked descriptors relate by the
@@ -727,9 +731,14 @@ def _label_node(descriptor1: Any, descriptor2: Any) -> Any:
     by every node), so no Slipnet handle is needed.  With no identity relation in the
     configuration the same descriptor has no label either (``None``): nothing is labelled
     "same, no slippage" (ABSENCE-BEHAVIOUR.md 2.3).
+
+    *identity* is the run's name for the identity relation (``vocabulary.theme_relation_identity``);
+    a caller labelling many pairs passes it once, and without it the bound run's is read.
     """
     if descriptor1 is descriptor2:
-        return getattr(descriptor1, "relations", {}).get(constants().vocab.theme_relation_identity)
+        if identity is None:
+            identity = constants().vocab.theme_relation_identity
+        return getattr(descriptor1, "relations", {}).get(identity)
     for link in getattr(descriptor1, "outgoing_links", []):
         if link.to_node is descriptor2:
             return link.label_node
@@ -1063,15 +1072,21 @@ def make_concept_mappings(
     # (workspace-objects.ss:294).  ``cross-product-filter-map`` (utilities.ss:689-701)
     # emits in list order, and that order decides which schema the rule abstraction's
     # draws fall on (rules.ss:709-722).
+    vocab = constants().vocab
+    vertical = bridge_type == vocab.bridge_type_vertical  # what ``mappable_descriptions`` decides
+    identity = vocab.theme_relation_identity
     for d1 in descriptions1:
         for d2 in descriptions2:
-            if not mappable_descriptions(d1, d2, object1, object2, bridge_type):
+            if vertical:
+                if not vertical_mappable_descriptions(d1, d2):
+                    continue
+            elif not horizontal_mappable_descriptions(d1, d2, object1, object2):
                 continue
             key = (id(d1.description_type), id(d1.descriptor), id(d2.descriptor))
             if key in seen:
                 continue
             seen.add(key)
-            label = _label_node(d1.descriptor, d2.descriptor)
+            label = _label_node(d1.descriptor, d2.descriptor, identity)
             cms.append(
                 ConceptMapping(
                     d1.description_type,
@@ -1478,7 +1493,7 @@ def _incompatible_bridges(b1: Bridge, b2: Bridge, orientation: str) -> bool:
 
     b1_cms = b1.concept_mappings
     b2_cms = b2.concept_mappings
-    if orientation == constants().vocab.bridge_orientation_horizontal:
+    if orientation == b1._voc.bridge_orientation_horizontal:
         b1_cms = [cm for cm in b1_cms if not _letter_category_or_length_slippage(cm)]
         b2_cms = [cm for cm in b2_cms if not _letter_category_or_length_slippage(cm)]
 

@@ -308,7 +308,8 @@ class ParamUpdateRequest(BaseModel):
     #: Sent when the type is being changed alongside the value.
     value_type: str | None = None
     #: What the value's names refer to (``node_list``, ``trigger_node_list``, ``node_map``,
-    #: ``codelet_type_list``, ``urgency_level``); omitted, the parameter keeps its own.
+    #: ``codelet_type_list``, ``urgency_level``, ``clampable_pattern_map``,
+    #: ``clampable_pattern_list``); omitted, the parameter keeps its own.
     refers_to: str | None = None
 
 

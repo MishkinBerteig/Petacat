@@ -141,18 +141,18 @@ outside the matrix take it too and the run is entirely what it says it is.
 
 ```
 ============================= petacat test matrix ==============================
-  cpu  numpy    float64    1005 tests
-  gpu  mlx      float32    1005 tests
+  cpu  numpy    float64    1007 tests
+  gpu  mlx      float32    1007 tests
   whole suite requested: the full matrix is required of this run
 
   unit          1936 collected   1936 run   1936 passed      0 failed      0 skipped  complete
   seed_unit     1465 collected   1465 run   1465 passed      0 failed      0 skipped  complete
-  module        1049 collected   1049 run   1049 passed      0 failed      0 skipped  complete
+  module        1051 collected   1051 run   1051 passed      0 failed      0 skipped  complete
   architecture    97 collected     97 run     97 passed      0 failed      0 skipped  complete
   integration    366 collected    366 run    366 passed      0 failed      0 skipped  complete
   parallel       304 collected    304 run    304 passed      0 failed      0 skipped  complete
   lockstep       247 collected    247 run    247 passed      0 failed      0 skipped  complete
-  e2e            643 collected    643 run    643 passed      0 failed      0 skipped  complete
+  e2e            644 collected    644 run    644 passed      0 failed      0 skipped  complete
 
   run complete in 13.9 min against a 60 min ceiling
 ```
@@ -170,8 +170,8 @@ single file or node id. Such a run names what narrowed it, names the roles it
 exercised, and exits on whether its tests passed:
 
 ```
-  cpu  numpy    float64      1005 tests
-  gpu  mlx      float32     1005 tests
+  cpu  numpy    float64      1007 tests
+  gpu  mlx      float32     1007 tests
   cpu  numpy: no selected test ran on it
   narrowed by -k 'mlx': this run reports the roles it exercised and is not held to the full matrix
 ```
@@ -200,7 +200,7 @@ A truncated run reports itself as truncated, and the difference from a clean run
 visible three ways:
 
 ```
-  module         1049 collected    198 run    198 passed      0 failed      0 skipped  INCOMPLETE
+  module         1051 collected    198 run    198 passed      0 failed      0 skipped  INCOMPLETE
 
   RUN TRUNCATED: the 60 min ceiling was reached after 60.4 min. Everything above is
   what the run produced before it stopped; the tests it had not reached never ran.
@@ -226,15 +226,15 @@ that allowance.
 |-------|-----------|-------|---------------|-------|
 | **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 1936 |
 | **seed unit** | `tests/seed_unit/` | One class or function, measured against the values Petacat ships with | Real `seed_data/*.json`, and the machine the process is running on | 1465 |
-| **module** | `tests/module/` | Several real components assembled and driven | Real engine objects and `seed_data/*.json`; no DB, no HTTP | 1049 |
+| **module** | `tests/module/` | Several real components assembled and driven | Real engine objects and `seed_data/*.json`; no DB, no HTTP | 1051 |
 | **architecture** | `tests/architecture/` | How the source tree is allowed to depend on itself | The repository's source, `seed_data/*.json`, child interpreters | 97 |
 | **integration** | `tests/integration/` | Agreement between the repository's artifacts, and the harness's own rules | Real `seed_data/*.json`, the ORM declarations, the generated client files, the documentation, a real pytest session | 366 |
 | **parallel** | `tests/parallel/` | The detachable multi-core plugin (`server/parallel/`): each executor against the serial run it claims to equal | Real engine objects and `seed_data/*.json`, worker processes and threads; each test pins the backend it compares on | 304 |
 | **lockstep** | `tests/lockstep/` | Petacat's decision traces against Metacat's: naming, helper conformance, tracing/replay RNGs, determinism guards, the comparer | Real engine in faithful mode (numeric backend off, or a named backend); recorded Metacat traces | 247 |
-| **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 643 |
+| **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 644 |
 
 Those counts are cases, so they include the second pass the numeric matrix makes
-over the 1005 backend-sensitive tests.
+over the 1007 backend-sensitive tests.
 
 One line decides each layer. Read them as a question about what a new test's
 subject is, and write the test where the answer lands:
@@ -266,7 +266,7 @@ first**, then move up toward the API and GUI.
 
 All eight layers run in one command — the
 [required command](#the-required-command) — and, since Petacat runs natively, all
-eight actually run: **6,107 cases**, every one of them executed. A layer that is
+eight actually run: **6,110 cases**, every one of them executed. A layer that is
 normally skipped is not a layer that is normally green, and none of these is.
 
 Wall-clock time depends heavily on the machine and on what else it is doing. The
@@ -451,7 +451,7 @@ changing what it records.
 | `test_change_resolve_convenience.py` | 36 | C14a: every convenience op equals its expansion into generic ops; cascades, rename, merge, relative ops without clamping, role and trigger ops, and a posting rule naming a tier of the urgency levels (rename rewrites it, removal is reported as a run-start gap and refused at the run, an unknown tier is an unknown reference) |
 | `test_change_resolve_property.py` | 6 | C14a: random op sequences keep the document well-formed (no dangling reference, no duplicate key, deterministic, replays); single ops equal one batch; memory-named nodes can be removed, renamed and merged from every source |
 | `test_change_resolve_patch_schema.py` | 9 | C14a: the JSON Patch subset, `schema()`, and the refusal type with its status map |
-| `test_change_resolve_vocabulary.py` | 25 | Stage 4: `rename_enum_value` over every enum table and `theme_relations` (every referencing column rewritten, the role and the place kept, the keyed commentary sections renamed, what still spells the old name listed as dangling, the refusals); the vocabulary rules (a role is a name of the table's vocabulary and held by one row, a bound row is not deleted); Episodic Memory's names (accepted, from every source); `engine_params.refers_to` (the lists derived from it, the trigger-node parameter found by the column) |
+| `test_change_resolve_vocabulary.py` | 28 | Stage 4: `rename_enum_value` over every enum table and `theme_relations` (every referencing column rewritten, the role and the place kept, the keyed commentary sections renamed, what still spells the old name listed as dangling, the refusals); the vocabulary rules (a role is a name of the table's vocabulary and held by one row, a bound row is not deleted); Episodic Memory's names (accepted, from every source); `engine_params.refers_to` (the lists derived from it, the trigger-node parameter found by the column); the manual clamp's background level and its list of clampable pattern names (declared by what they name, a renamed level or an edited menu reaching them as `dangling`) |
 | `test_configuration_admin_order.py` | 2 | Stage 4: the order a reset or restore writes its ops in: an enum row's inserts first, its deletes last, the role handed over last; other deletes still children before parents |
 | `test_configuration_writer.py` | 7 | C5: `ChangeService`'s envelope check, the `ChangeError` type and its HTTP mapping, and the translation of journal errors |
 | `test_bonds.py` | 22 | `Bond`: direction, facet, strength, flipping |
@@ -502,12 +502,13 @@ changing what it records.
 | `test_themespace.py` | 24 | Themespace self-watching dynamics: cluster spreading, dominance |
 | `test_trace_event.py` | 3 | `TemporalTrace` event recording |
 | `test_trace_display.py` | 16 | A Trace event's print name and display header against `trace.ss`: every event type, the three group directions, the bridge prefixes, flipped groups, the answer headers; a picture that cannot be taken never stops the trace |
+| `test_validate_overrides.py` | 3 | `validate_overrides` needs the configuration a run executes under (`meta` is required), and checks a reference parameter's shape against that configuration's `engine_params.refers_to`: the same override is accepted under one and refused under another |
 | `test_verbose.py` | 16 | Scheme's display of values, the bounded narration log (capture and replay, dropped lines), the message-catalogue overlay, and that the narration builtins exist in a codelet's namespace only when Verbose mode is on |
 | `test_workspace_object.py` | 35 | `WorkspaceObject` and `Letter`: geometry, importance, unhappiness |
 | `test_workspace_string.py` | 25 | `WorkspaceString`: bond and group management, spanning, relevance |
 | `test_workspace_structure.py` | 10 | The base structure class and its proposal levels |
 | `test_vocabulary_reduced.py` | 3 | Stage 4: every vocabulary role that is not required, unbound in turn, still runs every demo problem; unbinding a required role gives `RunStartError` at the start |
-| `test_vocabulary_rename.py` | 6 | Stage 4 (the vocabulary comes from the database): every bound row of the enum tables, each link type and each theme relation renamed to an opaque name (`v_17`) changes nothing a run does: six cases, a justification run, a three-run episode, Self-watching off and three intervention schedules match the Standard Configuration in status, answer, codelet count, RNG draws, codelet types and English, with the trace's names mapped back; renaming urgency tiers (probes M11, M24) changes nothing either |
+| `test_vocabulary_rename.py` | 7 | Stage 4 (the vocabulary comes from the database): every bound row of the enum tables, each link type and each theme relation renamed to an opaque name (`v_17`) changes nothing a run does: six cases, a justification run, a three-run episode, Self-watching off and three intervention schedules match the Standard Configuration in status, answer, codelet count, RNG draws, codelet types and English, with the trace's names mapped back; renaming urgency tiers (probes M11, M24) changes nothing either; with two runs alive in one thread, each run's structures answer in that run's own names |
 
 **`tests/seed_unit/` — one class or function against the shipped values**
 
@@ -587,7 +588,7 @@ changing what it records.
 | `test_swaps_and_translation.py` | 14 | Extrinsic (swap) rules end to end, the conflict battery, the per-dimension slippage ignore, and the ways a translation fails |
 | `test_thematic_bridge_scout.py` | 9 | The thematic-bridge-scout inside an assembled engine |
 | `test_themespace.py` | 14 | Themespace driven by a real run's bridges |
-| `test_trace_persistence.py` | 7 | Trace event persistence logic |
+| `test_trace_persistence.py` | 8 | Trace event persistence logic; the Trace records only the seven cognitive event types, and one discovery run records every event type row there is |
 | `test_trace_pictures.py` | 8 | What a real run keeps for redisplay: print names and pictures on every event, the Workspace as it was, answer and snag description pictures, and that taking a picture changes nothing the run does |
 | `test_verbose_mode.py` | 11 | Verbose mode on a real run: every codelet's banner, a run identical with the mode on or off, the mode switched mid-run, step mode, the bounded buffer, and the message catalogue agreeing with the call sites |
 | `test_workspace.py` | 19 | Workspace aggregation across its four strings |
@@ -602,7 +603,7 @@ changing what it records.
 | `test_no_node_literals_in_engine.py` | 5 | The EN0 lint: no line of `server/engine/**` names a node or codelet type of the Metacat Standard Configuration (`plato-` literals and compositions, `name[6:]`, node names, codelet types), and none reads the seed files outside the one door (`MetadataProvider.from_standard_configuration`); a read anywhere else, even in `metadata.py`, is caught. The allow-list `no_node_literals_allowlist.txt` is empty and may only shrink: an entry that no longer matches fails, and a new violation cannot be added to it |
 | `test_parallel_detachable.py` | 4 | Nothing under `server/engine/**` imports the parallel plugin, and a serial run and the service layer work in an interpreter where `server.parallel` cannot be imported; a Training Mode Session run there chooses the serial executor and produces the plugin's runs, run for run |
 | `test_v2_guards.py` | 8 | C10: the engine tree is the baseline commit's, touched after EN11 only by the allowed packages; the retired term for the Starting Conceptual State is used nowhere, and the word for a session's Episodic Memory class means nothing else (with the checker seen catching planted words); no table named for the old session entity and no `session_id` column on `runs`; the worker-side code never imports the journal layer |
-| `test_vocabulary_literals.py` | 4 | Stage 4: no string literal in `server/engine/` or `server/parallel/` equals a name the vocabulary binds (outside a short allow-list, each entry with its reason); the Standard Configuration's codelet bodies, descriptor predicates and posting formulas write `role('...')`; every role is bound once to the row Metacat names |
+| `test_vocabulary_literals.py` | 4 | Stage 4: no string literal in `server/engine/`, `server/parallel/`, `server/services/` or `server/api/` equals a name the vocabulary binds (outside an allow-list, each entry with its reason: the engine's own formats and, in the services and the API, the keys of the problem JSON and of the payloads the client reads); the Standard Configuration's codelet bodies, descriptor predicates and posting formulas write `role('...')`; every role is bound once to the row Metacat names |
 
 **`tests/integration/` — the repository's artifacts agree**
 
@@ -670,7 +671,7 @@ changing what it records.
 | `test_database_tab.py` | 24 | C7: the Database tab: table classes, paging and filters, a configuration edit as a journal entry, refusals per class (journal, session-managed, session Episodic Memory and its run columns, deleting a session row), `help_topics` writes, runtime expert mode and active rows, and the read-only SQL box |
 | `test_configuration_compare_api.py` | 6 | C9a: compare any two configurations or one with the Metacat Standard Configuration (diff by table and natural key), and apply-from (a dry-run preview, then add, remove and update rows through the change API as a `restore`), with their refusals |
 | `test_journal_api.py` | 6 | C13: `/api/journal` (list, filters, one entry, errors), as-of by revision and time, where-did-name-go and check-names, the restore and undo round trip, bad restore requests, and a session configuration's history with a live source |
-| `test_session_configuration.py` | 20 | S3: a Training Mode Session runs its own configuration: creation from each base with parameters folded, the WP-S3 equivalence, one worker equal to the serial episode with a learner, a live batch reaching the next dispatched run and not one in flight, a Stopped session's edit written at once, Starting and Stopping busy, M1, and the hand-off of held entries to the Stop write |
+| `test_session_configuration.py` | 21 | S3: a Training Mode Session runs its own configuration: creation from each base with parameters folded, the WP-S3 equivalence, one worker equal to the serial episode with a learner, a live batch reaching the next dispatched run and not one in flight, a Stopped session's edit written at once, Starting and Stopping busy, M1, and the hand-off of held entries to the Stop write; creation overrides checked against the configuration the session starts from (a reference parameter accepted for one base and refused for another) |
 | `test_session_stop_start.py` | 8 | S5: Stop then Start round-trips a session exactly with zero journal or merge statements at Start; many Stop/Start cycles; a failed Stop writes nothing and a retry writes everything; a tampered stored state refuses the Start while a Stopped edit does not; graceful shutdown stores every live configuration; a never-stopped session writes nothing while live |
 | `test_configuration_edits_api.py` | 8 | C12: edit-all over HTTP: the matrix of global, running, paused, Stopped, frozen and differing targets with M3 and undo by group; a missing row and a removed node with apply-the-rest; no_change, overwrite and a frozen target chosen by id; a session changing state; a stale preview re-previewed; all-or-nothing across stored and live targets |
 | `test_session_routes.py` | 13 | S6: the session routes that carry its configuration: the external route (a Stopped session writes at once, a live one holds the batch, 409 while starting or stopping, every learning source recorded, refusals in the change API's shape, dry runs); the journal timeline with live pending entries; the configuration, diff and Slipnet at a version, stored and live; export of the configuration and the journal |
@@ -731,7 +732,7 @@ changing what it records.
 | `tests/unit/_fakes.py` | The shared hand-rolled doubles |
 | `tests/support/expected_range.py` | A sampling pool over the demo problems, pointable at a modified engine through a `run_one` callable |
 | `tests/support/standard_configuration.py` | The Metacat Standard Configuration as one cached `MetadataProvider` and its `ActivationParams`, and builders (`make_node`, `bare_slipnet`, `synthetic`) for the objects tests construct by hand, so no engine object carries a code default for a number the configuration holds |
-| `tests/support/standard_names.py` | The Metacat Standard Configuration's vocabulary names as plain strings (`BRIDGE_TOP = "top"`, `BOND_BUILT = "bond_built"`, `PROPOSED`/`EVALUATED`/`BUILT`, the failure kinds ...), for tests that build structures by hand against the Standard Configuration. The engine spells none of them (it reads the run's vocabulary); a test that runs under a renamed vocabulary reads the vocabulary instead |
+| `tests/support/standard_names.py` | The Metacat Standard Configuration's vocabulary names as plain strings (`BRIDGE_TOP = "top"`, `GROUP_BUILT = "group_built"`, `PROPOSED`/`EVALUATED`/`BUILT`, the failure kinds ...), for tests that build structures by hand against the Standard Configuration. The engine spells none of them (it reads the run's vocabulary); a test that runs under a renamed vocabulary reads the vocabulary instead |
 
 Almost every file in `tests/module/` is in the
 [numeric backend matrix](#the-numeric-backend-matrix), because driving the engine

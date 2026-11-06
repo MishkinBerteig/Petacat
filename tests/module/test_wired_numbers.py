@@ -215,6 +215,12 @@ def test_a_derived_concept_pattern_is_pinned_at_the_slipnets_ceiling() -> None:
     assert [e["activation"] for e in entries] == [50.0]
 
 
+class _RuleOfNoClauses:
+    """A rule only in so far as ``rule_signature`` reads it: a snag always has its translated rule."""
+
+    clauses: list = []
+
+
 def _snag_probability(scale: int) -> float:
     from server.engine.jootsing import attempt_jootsing
     from server.engine.trace import SnagEvent, TemporalTrace
@@ -240,6 +246,7 @@ def _snag_probability(scale: int) -> float:
     for count in range(6):
         trace.record_event(SnagEvent(
             codelet_count=100 * (count + 1), temperature=100.0,
+            translated_rule=_RuleOfNoClauses(),
             snag_theme_pattern={"type": "vertical_bridge",
                                 "entries": [{"dimension": "plato-direction-category", "relation": "identity"}]},
         ))

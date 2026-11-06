@@ -77,9 +77,15 @@ def test_every_row_of_a_vocabulary_table_is_bound_to_a_role(enums_data, bindings
 
 def test_every_event_type_row_is_an_event_type_the_engine_records(enums_data, bindings):
     """A role bound to no row would leave the engine recording events under no configured name, so
-    each of the 15 roles has a row."""
+    each of the 7 roles has a row.  The 7 are the Scheme's Trace kinds (``make-generic-event`` in
+    ``trace.ss``: answer, clamp, concept-activation, concept-mapping, group, rule, snag), and each
+    is recorded by the engine and read back by it."""
     roles = {b.role for b in bindings if b.table == "event_types"}
-    assert len(roles) == 15 == len(_names(enums_data, "event_types"))
+    assert len(roles) == 7 == len(_names(enums_data, "event_types"))
+    assert set(_names(enums_data, "event_types")) == {
+        "group_built", "rule_built", "answer_found", "snag", "clamp_start",
+        "concept_mapping_built", "concept_activation",
+    }
 
 
 def test_theme_relations_are_bound(bindings):

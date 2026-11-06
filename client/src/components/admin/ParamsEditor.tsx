@@ -12,7 +12,10 @@ interface Param {
 }
 
 /** What a parameter's names can refer to (`engine_params.refers_to`); none for most. */
-const REFERS_TO = ['node_list', 'trigger_node_list', 'node_map', 'codelet_type_list', 'urgency_level']
+const REFERS_TO = [
+  'node_list', 'trigger_node_list', 'node_map', 'codelet_type_list', 'urgency_level',
+  'clampable_pattern_map', 'clampable_pattern_list',
+]
 
 const COLUMNS: ColumnDef[] = [
   { key: 'name', label: 'Name', type: 'text', width: '38%' },

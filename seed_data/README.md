@@ -34,7 +34,7 @@ and inert except that it becomes a valid value of the columns that name its tabl
 
 | Table | Role names (`<prefix>.<name>`) |
 |---|---|
-| `event_types` | `event_type.` + `bond_built`, `bond_broken`, `group_built`, `group_broken`, `bridge_built`, `bridge_broken`, `rule_built`, `rule_broken`, `description_built`, `answer_found`, `snag`, `clamp_start`, `clamp_end`, `concept_mapping_built`, `concept_activation` |
+| `event_types` | `event_type.` + `group_built`, `rule_built`, `answer_found`, `snag`, `clamp_start`, `concept_mapping_built`, `concept_activation` |
 | `bridge_types` | `bridge_type.` + `top`, `bottom`, `vertical` |
 | `bridge_orientations` | `bridge_orientation.` + `horizontal`, `vertical` |
 | `clause_types` | `clause_type.` + `intrinsic`, `extrinsic`, `verbatim` |
@@ -47,6 +47,17 @@ and inert except that it becomes a valid value of the columns that name its tabl
 | `rule_scopes` | `rule_scope.` + `self`, `subobjects` |
 | `failure_kinds` | `failure_kind.` + `swap`, `conflict`, `change` |
 | `clamp_types` | `clamp_type.` + `rule_codelet`, `snag_response`, `justify`, `manual` |
+
+`event_types` holds exactly the seven kinds of event the Trace records (`make-generic-event` in the
+Scheme's `trace.ss`: answer, clamp, concept-activation, concept-mapping, group, rule and snag), and every
+one is recorded and read back by the engine.
+
+The engine still spells the names that are its own and not a configuration's: a run's status
+(`run_statuses`), a link type's behaviour, the keys of the problem JSON (`initial`, `modified`, `target`,
+`answer`) and of the payloads the client reads, and the keys of the rule-English template table.
+`tests/architecture/test_vocabulary_literals.py` scans `server/engine/`, `server/parallel/`,
+`server/services/` and `server/api/` and lists each such literal with its reason; any other literal equal
+to a bound name fails it.
 
 Tables whose rows the engine does not name have no `role`: `run_statuses` (the lifecycle of a run and the
 API protocol, which the client compares), `codelet_phases` (a grouping label) and `param_value_types`
@@ -83,7 +94,7 @@ rather than the name, so that a rename needs no edit to it.
 
 `engine_params.refers_to` says what a parameter's value names, so a change that renames or removes the
 thing updates the parameter with it. It is declared in `engine_param_refs.json` (a map from parameter name
-to one of the five values; a parameter not in the file refers to nothing, and the column is null):
+to one of the seven values; a parameter not in the file refers to nothing, and the column is null):
 
 | `refers_to` | The value is | Standard Configuration |
 |---|---|---|
@@ -92,9 +103,15 @@ to one of the five values; a parameter not in the file refers to nothing, and th
 | `node_map` | a JSON map keyed by node name | `intrinsic_link_lengths`, `theme_dimension_labels`, `rule_english_dimension_phrases` |
 | `codelet_type_list` | a JSON list of codelet type names | `initial_codelet_types` |
 | `urgency_level` | the name of an urgency level, which a run needs to exist | `initial_codelet_urgency`, `bridge_recruit_urgency_level`, `default_urgency_level`, `manual_clamp_background_level` |
+| `clampable_pattern_map` | a JSON map keyed by the name of a clampable codelet pattern (the Options menu: `top_down`, `bottom_up`, `rule`, `bridge`, `group`), to its label | `clampable_codelet_patterns` |
+| `clampable_pattern_list` | a JSON list of names of clampable codelet patterns, each a key of the `clampable_pattern_map` parameter | `manual_clamp_background_patterns` |
 
 The change API reads the column of the configuration it resolves against; no parameter name is written in
 code. A rule-trigger edit (`add_trigger`, `remove_trigger`) also changes the `trigger_node_list` parameter.
+No operation renames a clampable pattern (its name is a key of the menu parameter, and `<name>-codelet-pattern`
+is its row in `codelet_pattern_defs`), so a batch that edits the menu and leaves a `clampable_pattern_list`
+entry that the menu no longer offers reports that parameter as `dangling`, as an urgency level rename does for
+an `urgency_level` parameter.
 
 The engine names no urgency tier. A run needs the tiers the configuration itself names: every tier a
 codelet body reads (`meta.get_urgency('low')`, found by parsing the bodies in force), every parameter above,

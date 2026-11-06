@@ -1274,11 +1274,8 @@ class EngineRunner:
 
     def bottom_up_posting_rules(self) -> list[PostingRuleSpec]:
         """The bottom-up rules themselves, in posting order."""
-        return [
-            rule
-            for rule in self.meta.posting_rules
-            if rule.direction == self.meta.vocabulary.posting_direction_bottom_up
-        ]
+        bottom_up = self.meta.vocabulary.posting_direction_bottom_up
+        return [rule for rule in self.meta.posting_rules if rule.direction == bottom_up]
 
     def posting_rule_for(self, codelet_type: str) -> PostingRuleSpec | None:
         """The rule governing *codelet_type*, or `None` if the data names none."""

@@ -168,7 +168,7 @@ def print_name(event: Any) -> str:
         return f"[Answer {getattr(event, 'answer_string', '') or ''}]"
     if kind == v.event_type_snag:
         return "[Snag]"
-    if kind in (v.event_type_clamp_start, v.event_type_clamp_end):
+    if kind == v.event_type_clamp_start:
         return "[Clamp]"
     return event.description or kind
 
@@ -212,7 +212,7 @@ def header(event: Any, justify_mode: bool = False) -> str:
         return answer_header(justify_mode, unjustified)
     if kind == v.event_type_snag:
         return "Snag"
-    if kind in (v.event_type_clamp_start, v.event_type_clamp_end):
+    if kind == v.event_type_clamp_start:
         manual = getattr(event, "clamp_type", "") == v.clamp_type_manual
         return "Manually clamped patterns" if manual else "Clamped patterns"
     return event.description or kind
@@ -568,7 +568,7 @@ def build_event_picture(ctx: Any, event: Any) -> dict:
         slipnet = _slipnet_block("Snag Object Descriptors", [event.snag_concept_pattern])
         temperature = 100.0
 
-    elif kind in (v.event_type_clamp_start, v.event_type_clamp_end):
+    elif kind == v.event_type_clamp_start:
         for rule in getattr(event, "rules", []) or []:
             rules.append((rule, ROLE_FADED))
         themes = list(getattr(event, "clamped_theme_patterns", []) or [])

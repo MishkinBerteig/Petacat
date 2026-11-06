@@ -301,9 +301,8 @@ def resolve_roles(
 #: (role names are ``<singular>.<suffix>``).
 _VOCABULARY_TABLES: tuple[tuple[str, str, str, tuple[str, ...]], ...] = (
     ("event_types", "role", "event_type", (
-        "bond_built", "bond_broken", "group_built", "group_broken", "bridge_built",
-        "bridge_broken", "rule_built", "rule_broken", "description_built", "answer_found",
-        "snag", "clamp_start", "clamp_end", "concept_mapping_built", "concept_activation",
+        "group_built", "rule_built", "answer_found", "snag", "clamp_start",
+        "concept_mapping_built", "concept_activation",
     )),
     ("bridge_types", "role", "bridge_type", ("top", "bottom", "vertical")),
     ("bridge_orientations", "role", "bridge_orientation", ("horizontal", "vertical")),

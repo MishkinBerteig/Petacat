@@ -54,7 +54,10 @@ written in this module.  **A rule-trigger edit (``add_trigger``, ``remove_trigge
 changes the parameter whose ``refers_to`` is ``trigger_node_list``** (``top_down_slipnodes`` in
 the Metacat Standard Configuration): a node added as a trigger is added to its list, and one
 removed from a rule is removed from it only when no rule still triggers it.  A configuration
-that declares no such parameter leaves every parameter alone.
+that declares no such parameter leaves every parameter alone.  The clampable codelet patterns are
+named by the keys of the ``clampable_pattern_map`` parameter, and no operation renames one: a batch
+that edits the menu so that a ``clampable_pattern_list`` parameter still names a pattern it no longer
+offers lists that parameter as ``dangling``.
 
 The report
 ----------
@@ -515,6 +518,42 @@ class _Run:
         declaration of which parameters hold node names, codelet type names or an urgency level."""
         rows = (self.doc if doc is None else doc).tables[PARAMS].values()
         return tuple(r["name"] for r in rows if r.get("refers_to") in kinds)
+
+    def stale_pattern_entries(self, doc: ConfigDocument) -> set[tuple[str, str]]:
+        """``(parameter, name)`` for each entry of a ``clampable_pattern_list`` parameter that no
+        ``clampable_pattern_map`` parameter offers as a key.  Nothing is stale when the
+        configuration declares no menu at all."""
+        menus = self.params_referring("clampable_pattern_map", doc=doc)
+        if not menus:
+            return set()
+        offered: set[str] = set()
+        for p in menus:
+            ok, value = parse_param_value(doc.tables[PARAMS][(p,)]["value"], "json")
+            if ok and isinstance(value, dict):
+                offered |= set(value)
+        stale: set[tuple[str, str]] = set()
+        for p in self.params_referring("clampable_pattern_list", doc=doc):
+            ok, value = parse_param_value(doc.tables[PARAMS][(p,)]["value"], "json")
+            if ok and isinstance(value, list):
+                stale |= {(p, n) for n in value if n not in offered}
+        return stale
+
+    def mark_stale_patterns(self) -> None:
+        """A batch that leaves a clampable pattern named in a ``clampable_pattern_list``
+        parameter while the menu no longer offers it lists that parameter as dangling (a menu
+        name is a key of the map, so no op renames it: the list is reported, never rewritten)."""
+        cause = min(
+            (i for (table, key), i in self.written.items()
+             if table == PARAMS and key[0] in self.params_referring("clampable_pattern_map")),
+            default=None,
+        )
+        if cause is None:
+            return
+        for p, name in sorted(self.stale_pattern_entries(self.doc) - self.stale_pattern_entries(self.cfg)):
+            self.dangling.append(
+                {"cause_op": cause, "table": PARAMS, "key": {"name": p}, "column": "value",
+                 "reason": f"names clampable pattern {name!r}, which the menu no longer offers"}
+            )
 
     def edit_node_params(self, i, fn_list, fn_map, reason: str, names_list=None,
                          names_map=None) -> None:
@@ -1532,6 +1571,7 @@ def resolve(cfg: ConfigDocument, batch: Any) -> tuple[list[dict], dict]:
             raise ChangeRefused(bad)
         for p in bad:
             excluded.setdefault(p.op_index, p)
+    run.mark_stale_patterns()
     skipped = {**run.failed, **{i: p for i, p in excluded.items()}}
     report = {
         "ok": True,

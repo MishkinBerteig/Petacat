@@ -127,6 +127,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from server.engine.memory import EpisodicMemory
 from server.engine.metadata import MetadataProvider
 from server.engine.parameters import UnknownParameter, validate_overrides
+from server.engine.runner import STATUS_ANSWER_FOUND
 from server.engine.start_check import RunStartError, require_run_start
 from server.models.journal import (
     Configuration, ConfigurationSnapshot, JournalEntry, KIND_SESSION,
@@ -230,7 +231,7 @@ def run_key(o: Any, max_codelets: int) -> str:
     """The outcome key: the answer, else ``*ERROR*`` / ``*CAP*`` / ``*NONE*``."""
     if o.error:
         return ERROR_KEY
-    if o.status == "answer_found" and o.answer:
+    if o.status == STATUS_ANSWER_FOUND and o.answer:
         return o.answer
     if o.codelets >= max_codelets:
         return CAP_KEY
@@ -1744,11 +1745,19 @@ class TrainingModeSessionService:
         if (not isinstance(max_codelets, int) or isinstance(max_codelets, bool)
                 or not 1 <= max_codelets <= MAX_CODELETS_LIMIT):
             raise SessionError(422, f"settings.max_codelets must be 1..{MAX_CODELETS_LIMIT}")
+        base = self._check_configuration_base(settings.get("configuration_base", "global"))
+        # The overrides are checked against the configuration the session will start from (its
+        # base), because a reference parameter's shape comes from that configuration's
+        # ``engine_params.refers_to``, not from the global configuration's.
+        async with self._factory() as s:
+            try:
+                base_document, _id, _revision = await configurations.base_document_for(s, base)
+            except configurations.ConfigurationError as exc:
+                raise SessionError(422, f"settings.configuration_base: {exc}") from exc
         try:
-            overrides = validate_overrides(settings.get("parameters"))
+            overrides = validate_overrides(settings.get("parameters"), cd.provider(base_document))
         except (UnknownParameter, ValueError) as exc:
             raise SessionError(400, str(exc)) from exc
-        base = self._check_configuration_base(settings.get("configuration_base", "global"))
         full_policy = normalize_policy(policy)
         requested_backend = settings.get("backend")
         # A requested backend is checked now; the default depends on the configuration the

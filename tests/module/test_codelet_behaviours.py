@@ -42,7 +42,6 @@ from server.engine.slipnet import Slipnet
 from server.engine.temperature import Temperature
 from server.engine.themes import Themespace
 from server.engine.trace import TemporalTrace
-from tests.support.standard_names import BOND_BROKEN, BOND_BUILT
 from server.engine.workspace import Workspace, WorkspaceString
 from server.engine.workspace_objects import Letter
 from tests.support import standard_names
@@ -436,13 +435,14 @@ class TestBondBuilder:
         )
         bond.proposal_level = standard_names.EVALUATED
 
+        trace_before = len(ctx.trace.events)
         result = build_structure(ctx, bond)
         assert result is True
         assert bond.is_built
         assert bond in init.bonds
 
         # Bond building is subcognitive: it must not reach the Trace (§4.4).
-        assert ctx.trace.get_events_by_type(BOND_BUILT) == []
+        assert len(ctx.trace.events) == trace_before
 
     def test_a_duplicate_reactivates_the_category_and_direction(
         self, ctx_abc_abd_xyz, meta
@@ -1545,9 +1545,8 @@ class TestBreaker:
         trace_before = len(ctx.trace.events)
         interp.execute(compiled, ctx)
         trace_after = len(ctx.trace.events)
-        # No break event recorded
-        broken = [e for e in ctx.trace.events[trace_before:] if e.event_type == BOND_BROKEN]
-        assert len(broken) == 0
+        # Breaking is subcognitive and nothing was broken: no event recorded
+        assert trace_after == trace_before
 
 
 class TestProgressWatcher:

@@ -17,7 +17,7 @@ from tests.support.standard_names import CLAUSE_INTRINSIC
 from server.engine.run_binding import vocab
 from server.engine.temperature import Temperature
 from server.engine.trace import ClampEvent, SnagEvent, TemporalTrace, TraceEvent
-from tests.support.standard_names import BOND_BUILT
+from tests.support.standard_names import GROUP_BUILT
 
 
 class _FakeMeta:
@@ -135,7 +135,7 @@ def test_jootsing_from_a_justify_clamp_is_barred_while_the_clamp_is_producing_ev
     clamps = [_justify_clamp([_FakeRule("r")], count) for count in (100, 200, 300)]
     for clamp in clamps:
         trace.record_event(clamp)
-    trace.record_event(TraceEvent(BOND_BUILT, codelet_count=350, temperature=50.0))
+    trace.record_event(TraceEvent(GROUP_BUILT, codelet_count=350, temperature=50.0))
 
     assert get_clamp_jootsing_probability(clamps, 400, trace, meta=_FakeMeta()) == 0.0
 
@@ -167,6 +167,7 @@ def test_choosing_no_pattern_entries_fizzles_however_many_snags_there_were():
             SnagEvent(
                 codelet_count=100 * (count + 1),
                 temperature=100.0,
+                translated_rule=_FakeRule("r"),
                 snag_theme_pattern={
                     "type": "vertical_bridge",
                     "entries": [

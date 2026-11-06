@@ -391,7 +391,11 @@ def constants() -> RunConstants:
 
 def vocab() -> Any:
     """The bound run's :class:`~server.engine.roles.Vocabulary` (names by role)."""
-    return constants().vocab
+    try:
+        return _RUN.get().constants.vocab
+    except LookupError:
+        current()  # raises NoRunBound with its message
+        raise  # pragma: no cover
 
 
 def set_clock(codelet_count: int) -> None:

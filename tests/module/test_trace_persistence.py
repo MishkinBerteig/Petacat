@@ -12,7 +12,7 @@ import pytest
 from server.engine.metadata import MetadataProvider
 from server.engine.runner import EngineRunner
 from server.engine.trace import TraceEvent, TemporalTrace
-from tests.support.standard_names import BOND_BUILT, BOND_BROKEN, SNAG, ANSWER_FOUND
+from tests.support.standard_names import GROUP_BUILT, SNAG, ANSWER_FOUND
 
 # Every test here executes arithmetic the numeric substrate owns, so each one runs
 # once per backend in the matrix. See tests/conftest.py.
@@ -30,11 +30,11 @@ def meta():
 def test_trace_events_have_string_types():
     """All event types should be plain strings, suitable for DB storage."""
     trace = TemporalTrace()
-    event = TraceEvent(BOND_BUILT, codelet_count=10, temperature=80.0)
+    event = TraceEvent(GROUP_BUILT, codelet_count=10, temperature=80.0)
     trace.record_event(event)
 
     assert isinstance(event.event_type, str)
-    assert event.event_type == "bond_built"
+    assert event.event_type == "group_built"
 
 
 def test_trace_event_serializable_shape():
@@ -102,9 +102,23 @@ def test_trace_records_only_cognitive_level_events(meta):
         f"non-cognitive events leaked into the Trace: "
         f"{event_types - _COGNITIVE_EVENT_TYPES}"
     )
-    assert "bond_built" not in event_types
-    assert "description_built" not in event_types
 
+
+def test_every_event_type_row_is_recorded_by_a_run(meta):
+    """``REQUIRED_VOCABULARY_ROLES`` gives "the Trace records events of this type" as the reason an
+    event type is required, so every event type row must be one a run records: one discovery run
+    (``abc -> abd; xyz -> ?``, seed 2) records all seven kinds (the Scheme's answer, clamp,
+    concept-activation, concept-mapping, group, rule and snag), and no row is left over."""
+    from server.engine.memory import EpisodicMemory
+    from server.engine.rng import RNG
+
+    runner = EngineRunner(meta)
+    runner.init_mcat("abc", "abd", "xyz", seed=2, memory=EpisodicMemory(), rng=RNG(2))
+    runner.run_mcat(max_steps=20000)
+    recorded = {e.event_type for e in runner.ctx.trace.events}
+    rows = {b.name for b in meta.vocabulary_bindings if b.role.startswith("event_type.")}
+    assert len(rows) == 7
+    assert recorded == rows
 
 def test_snag_events_have_theme_pattern():
     """Snag events recorded via record_snag should include theme_pattern."""

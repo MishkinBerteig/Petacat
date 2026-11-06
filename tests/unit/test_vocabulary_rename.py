@@ -154,3 +154,39 @@ def test_renaming_an_urgency_tier_changes_nothing(meta, tiers) -> None:
     with use_backend(gb.BACKEND):
         for problem, seed in RENAME_CASES[:3]:
             assert _observe(provider, problem, seed) == _observe(meta, problem, seed), (problem, seed)
+
+
+@pytest.mark.numeric_matrix
+def test_a_structure_reads_the_vocabulary_of_the_run_it_was_made_in(meta, renamed_pair):
+    """A structure holds its run's vocabulary (``WorkspaceStructure._voc``) so its own predicates
+    read an attribute and not the run binding: with two runs alive in one thread, each run's
+    bridges, clauses and rules answer in that run's names, whichever run is bound at the time."""
+    from server.engine.memory import EpisodicMemory
+    from server.engine.rng import RNG
+    from server.engine.runner import EngineRunner
+
+    other, _back = renamed_pair
+
+    def made(m):
+        with use_backend("off"):
+            runner = EngineRunner(m)
+            runner.init_mcat("abc", "abd", "xyz", seed=1, memory=EpisodicMemory(), rng=RNG(1))
+            runner.run_mcat(max_steps=900)
+        return runner
+
+    plain, odd = made(meta), made(other)
+    for runner, m in ((plain, meta), (odd, other)):
+        v = m.vocabulary
+        bridges = runner.ctx.workspace.top_bridges
+        assert bridges, "the run should have built a top bridge"
+        for bridge in bridges:
+            assert bridge.bridge_type == v.bridge_type_top
+            assert bridge.orientation == v.bridge_orientation_horizontal
+            assert bridge.is_horizontal and bridge.theme_type == v.theme_type_top_bridge
+        rules = runner.ctx.workspace.top_rules
+        assert rules, "the run should have built a top rule"
+        for rule in rules:
+            assert rule.is_top_rule and rule.rule_type == v.rule_type_top
+            for clause in rule.clauses:
+                assert clause.is_intrinsic != clause.is_extrinsic or clause.is_verbatim
+    assert meta.vocabulary.bridge_type_top != other.vocabulary.bridge_type_top

@@ -46,10 +46,11 @@ class AnswerDescription:
     # cannot be written.  ``server/engine/rules.py:rule_signature`` produces them in a
     # form that survives being persisted and read back.
     #: Every answer the engine makes carries both signatures (ruling 35: the probe
-    #: ``agents-workspace/metacat-cleanup/round2/S4-vocabulary/finish/probe_none_signature.py``
-    #: runs every case of the golden baselines and finds no run path that makes a ``None`` one),
-    #: so they are required, here and in the ``answer_descriptions`` columns, and
-    #: :func:`answers_equal` has no "never recorded" case.
+    #: ``agents-workspace/metacat-cleanup/round2/S4G-followup/work/probe_none_signature.py`` ran every
+    #: case of the original and the extended golden baselines and saw no ``None`` rule reach
+    #: ``rules.rule_signature`` and no ``None`` signature reach an ``AnswerDescription``), so they are
+    #: required, here and in the ``answer_descriptions`` columns, :func:`answers_equal` has no
+    #: "never recorded" case, and ``rule_signature`` takes a rule.
     top_rule_signature: list = field(kw_only=True)
     bottom_rule_signature: list = field(kw_only=True)
 
@@ -255,7 +256,7 @@ class EpisodicMemory:
         self.snags.insert(0, desc)
 
     def snag_present(
-        self, problem: tuple[str, str, str], rule: Any = None
+        self, problem: tuple[str, str, str], rule: Any
     ) -> bool:
         """Has this rule already run aground on this problem?
 
@@ -272,8 +273,8 @@ class EpisodicMemory:
     def answer_present(
         self,
         problem: tuple[str, str, str, str],
-        top_rule: Any = None,
-        bottom_rule: Any = None,
+        top_rule: Any,
+        bottom_rule: Any,
     ) -> bool:
         """Has this exact answer, reached this exact way, already been found?
 

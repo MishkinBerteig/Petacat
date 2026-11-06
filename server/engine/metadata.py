@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import dataclass, field
+from functools import cached_property
 from fractions import Fraction
 from typing import Any
 
@@ -233,23 +234,21 @@ class MetadataProvider:
     #: The codelet families whose codelets run alone under the free-running executor.
     serialised_families: tuple[str, ...] = ()
     #: Parameter name -> what its value's names refer to (``engine_params.refers_to``:
-    #: ``node_list``, ``trigger_node_list``, ``node_map``, ``codelet_type_list`` or
-    #: ``urgency_level``); a parameter whose value names nothing is absent.
+    #: ``node_list``, ``trigger_node_list``, ``node_map``, ``codelet_type_list``,
+    #: ``urgency_level``, ``clampable_pattern_map`` or ``clampable_pattern_list``); a parameter
+    #: whose value names nothing is absent.
     param_refers_to: dict[str, str] = field(default_factory=dict)
 
-    @property
+    @cached_property
     def vocabulary(self) -> Vocabulary:
-        """The resolved vocabulary of this configuration (built once, on first use).
+        """The resolved vocabulary of this configuration (built once, on first use; after that
+        an ordinary attribute of the instance).
 
         ``vocabulary.bridge_type_top`` is the name of the row bound to ``bridge_type.top``
         or an ``AbsentName``.  A run reads it through its binding
         (``run_binding.constants().vocab`` on a hot path).
         """
-        cached = self.__dict__.get("_vocabulary")
-        if cached is None:
-            cached = Vocabulary({b.role: b.name for b in self.vocabulary_bindings})
-            self.__dict__["_vocabulary"] = cached
-        return cached
+        return Vocabulary({b.role: b.name for b in self.vocabulary_bindings})
 
     def params_referring_to(self, *kinds: str) -> tuple[str, ...]:
         """The names of the parameters whose ``refers_to`` is one of *kinds*, in the table's order."""

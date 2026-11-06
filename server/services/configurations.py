@@ -199,7 +199,7 @@ async def config_at(
 # ──────────────────────────────────────────────────────────────────
 
 
-async def _base_document_for(
+async def base_document_for(
     session: AsyncSession, base: Any
 ) -> tuple[cd.ConfigDocument, int | None, int | None]:
     """``(document, created_from_configuration_id, created_from_revision)``."""
@@ -242,7 +242,7 @@ async def create_session_configuration(
     """
     from server.models.training_mode_session import TrainingModeSession
 
-    document, from_id, from_revision = await _base_document_for(session, base)
+    document, from_id, from_revision = await base_document_for(session, base)
     if name is None:
         name = (
             await session.execute(

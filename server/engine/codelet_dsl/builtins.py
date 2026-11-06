@@ -2373,6 +2373,11 @@ def get_node(ctx: EngineContext, name: str) -> Any:
     return node if node is not None else absent(name)
 
 
+#: The attribute of ``Vocabulary`` that answers each vocabulary role (``role()`` is on the hot path of
+#: the scouts, so the lookup is a dict and not a spec).
+_VOCABULARY_ATTR = {name: spec.attr for name, spec in VOCABULARY_BY_NAME.items()}
+
+
 def role(ctx: EngineContext, name: str) -> Any:
     """What the configuration binds to the role *name* (``"direction.left"``).
 
@@ -2384,12 +2389,12 @@ def role(ctx: EngineContext, name: str) -> Any:
     """
     spec = ROLE_BY_NAME.get(name)
     if spec is None:
-        vocabulary_spec = VOCABULARY_BY_NAME.get(name)
-        if vocabulary_spec is None:
+        attr = _VOCABULARY_ATTR.get(name)
+        if attr is None:
             raise ValueError(f"role({name!r}): not a name of the role vocabulary")
         # A role bound to a row of an enum table answers with the row's name (or the
         # role's AbsentName), so a body compares against it and never spells the name.
-        return getattr(ctx.meta.vocabulary, vocabulary_spec.attr)
+        return getattr(ctx.meta.vocabulary, attr)
     return getattr(ctx.slipnet.roles, spec.attr)
 
 
@@ -2935,8 +2940,8 @@ def give_up(ctx: EngineContext) -> None:
 def answer_present(
     ctx: EngineContext,
     answer_string: str,
-    top_rule: Any = None,
-    bottom_rule: Any = None,
+    top_rule: Any,
+    bottom_rule: Any,
 ) -> bool:
     """Is this answer, reached by these rules, already in Episodic Memory?
 

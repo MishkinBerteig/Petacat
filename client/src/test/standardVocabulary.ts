@@ -7,9 +7,8 @@ import type { VocabularyPayload } from '@/store/vocabulary';
 
 const ROLES: Record<string, string[]> = {
   event_type: [
-    'bond_built', 'bond_broken', 'group_built', 'group_broken', 'bridge_built', 'bridge_broken',
-    'rule_built', 'rule_broken', 'description_built', 'answer_found', 'snag', 'clamp_start',
-    'clamp_end', 'concept_mapping_built', 'concept_activation',
+    'group_built', 'rule_built', 'answer_found', 'snag', 'clamp_start',
+    'concept_mapping_built', 'concept_activation',
   ],
   bridge_type: ['top', 'bottom', 'vertical'],
   bridge_orientation: ['horizontal', 'vertical'],

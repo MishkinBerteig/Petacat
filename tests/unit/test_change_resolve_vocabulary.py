@@ -402,3 +402,47 @@ def test_an_unbound_row_is_inert_but_becomes_a_valid_value_of_the_columns_that_n
     assert ops
     # and it changes nothing the engine reads: the provider is the same
     assert cd.config_hash(with_family) == cd.config_hash(cfg)
+
+
+# --- the manual clamp's background: a level and a list of clampable pattern names -----------------------
+
+
+def test_the_manual_clamps_background_names_are_declared_by_what_they_name(cfg):
+    """``manual_clamp_background_level`` names an urgency level; ``manual_clamp_background_patterns``
+    names clampable codelet patterns (``rule``, ``bridge``, ``group``), which are keys of the menu
+    ``clampable_codelet_patterns`` -- not progress focuses (``bridge`` is not one)."""
+    params = cfg.tables["engine_params"]
+    assert params[("manual_clamp_background_level",)]["refers_to"] == "urgency_level"
+    assert params[("manual_clamp_background_patterns",)]["refers_to"] == "clampable_pattern_list"
+    assert params[("clampable_codelet_patterns",)]["refers_to"] == "clampable_pattern_map"
+    menu = json.loads(params[("clampable_codelet_patterns",)]["value"])
+    listed = json.loads(params[("manual_clamp_background_patterns",)]["value"])
+    focuses = {r["name"] for r in cfg.tables["progress_focuses"].values()}
+    assert listed and set(listed) <= set(menu)
+    assert not set(listed) <= focuses
+
+
+def test_a_renamed_urgency_level_reaches_the_manual_clamps_background_level(cfg):
+    level = cfg.tables["engine_params"][("manual_clamp_background_level",)]["value"]
+    _, report = run(cfg, {"op": "update", "table": "urgency_levels", "key": {"name": level},
+                          "fields": {"name": "lv-renamed"}})
+    assert any(d["table"] == "engine_params" and d["key"] == {"name": "manual_clamp_background_level"}
+               for d in report["dangling"])
+
+
+def test_a_menu_that_stops_offering_a_pattern_lists_the_background_patterns_that_name_it(cfg):
+    menu = json.loads(cfg.tables["engine_params"][("clampable_codelet_patterns",)]["value"])
+    renamed = {("grp" if k == "group" else k): v for k, v in menu.items()}
+    _, report = run(cfg, {"op": "set_param", "name": "clampable_codelet_patterns", "to": renamed})
+    stale = [d for d in report["dangling"] if d["key"] == {"name": "manual_clamp_background_patterns"}]
+    assert len(stale) == 1 and "'group'" in stale[0]["reason"]
+    # a menu edit that leaves every listed pattern offered reports nothing
+    kept = {**menu, "extra": "Extra codelet pattern"}
+    _, report = run(cfg, {"op": "set_param", "name": "clampable_codelet_patterns", "to": kept})
+    assert not [d for d in report["dangling"] if d["key"] == {"name": "manual_clamp_background_patterns"}]
+    # a configuration that declares no menu has nothing to compare with
+    undeclared = cd.apply_resolved(cfg, [{"op": "update", "table": "engine_params",
+                                          "key": {"name": "clampable_codelet_patterns"},
+                                          "set": {"refers_to": None}}])
+    _, report = run(undeclared, {"op": "set_param", "name": "clampable_codelet_patterns", "to": renamed})
+    assert not [d for d in report["dangling"] if d["key"] == {"name": "manual_clamp_background_patterns"}]

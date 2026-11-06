@@ -91,6 +91,7 @@ UNIQUE_EXTRA: dict[str, list[tuple[str, ...]]] = {
 #: codelet type or an urgency level is named in; no list of parameter names lives in code.
 REFERS_TO_KINDS = (
     "node_list", "trigger_node_list", "node_map", "codelet_type_list", "urgency_level",
+    "clampable_pattern_map", "clampable_pattern_list",
 )
 
 

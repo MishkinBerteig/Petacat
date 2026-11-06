@@ -5,7 +5,7 @@ Scheme source: workspace-structures.ss
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from server.engine.ids import KIND_STRUCTURE, next_id
 from server.engine.run_binding import constants, current, set_clock
@@ -47,12 +47,17 @@ class WorkspaceStructure:
     # state graph captures ``vars(structure)`` and this is configuration, not run state: the
     # same name for every structure of a run.  Subclasses have no ``__slots__`` and keep their
     # ``__dict__``.
-    __slots__ = ("_built_level",)
+    __slots__ = ("_built_level", "_voc")
 
     def __init__(self) -> None:
         self.id = next_id(KIND_STRUCTURE)
         run = current()
         voc = run.constants.vocab
+        #: The vocabulary of the run the structure belongs to (the run's own, frozen), held so
+        #: a structure's own predicates (``Bridge.orientation``, ``Rule.is_top_rule`` ...) read
+        #: an attribute and not the run binding.  A slot, for the same reason as ``_built_level``;
+        #: a structure the state graph restores is given it there (``state_graph._Reader``).
+        self._voc = voc
         #: The level name the structure was made with, and the one that means "built", both
         #: from the run's vocabulary; ``is_built`` is an equality test between them.
         self.proposal_level = voc.proposal_level_proposed

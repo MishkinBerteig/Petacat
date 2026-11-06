@@ -336,8 +336,8 @@ class RunService:
         check_problem(initial, modified, target, answer, require_nonempty=True)
         # Validated before anything is created, so a bad override cannot leave a
         # half-built Run behind. Raises ValueError, which the API turns into a 400.
-        overrides = validate_overrides(parameters)
         base_meta = self.meta  # read once: this Run holds it for life
+        overrides = validate_overrides(parameters, base_meta)
         # Read in the same breath (no await between): the revision names the configuration
         # ``base_meta`` is, so the journal can reconstruct it for a replay.
         base_revision = self._store.revision
@@ -1353,7 +1353,7 @@ class RunService:
             snags_result.scalars().all(), key=lambda r: _memory_row_order(r, "snag_id")
         ):
             key = (
-                ("snag", s.snag_id)
+                (KIND_SNAG, s.snag_id)
                 if s.snag_id is not None
                 else ("row", tuple(s.problem), s.codelet_count, s.description)
             )
@@ -1797,7 +1797,7 @@ class RunService:
                 (v.theme_type_bottom_bridge, answer.bottom_themes),
             )
         ]
-        shown = self._shown(run_id, ("answer", answer_id), patterns)
+        shown = self._shown(run_id, (KIND_ANSWER, answer_id), patterns)
         return {
             "run_id": run_id,
             "displaying": shown,
@@ -1826,7 +1826,7 @@ class RunService:
             if pattern
             else []
         )
-        shown = self._shown(run_id, ("snag", snag_id), patterns)
+        shown = self._shown(run_id, (KIND_SNAG, snag_id), patterns)
         return {
             "run_id": run_id,
             "displaying": shown,
@@ -2381,7 +2381,7 @@ def _recording_interventions(cls: type) -> type:
     """Wrap the methods in :data:`RECORDED_INTERVENTIONS` so a success is recorded."""
 
     def wrap(name: str, fn):
-        names = [n for n in inspect.signature(fn).parameters if n != "self"]
+        names = list(inspect.signature(fn).parameters)[1:]  # every wrapped function is a method: drop its receiver
         recorded_as = "apply_spreading_threshold" if name == "set_spreading_threshold" else name
 
         def args_of(args, kwargs):

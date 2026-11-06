@@ -28,7 +28,7 @@ license change was authorised by Dr. Marshall directly (see
 > end-to-end. Episodic Memory (Metacat-Mode learning) shapes the runs that inherit it: a run
 > declines an answer already held for the same problem and rules, so repeating a
 > problem across Metacat Mode's [episodic runs](#persistence-modes-and-episodic-runs)
-> (which are Metacat Mode and not Training Mode) explores a different answer each time. It ships with 6,107 test cases covering the engine, the API, and the
+> (which are Metacat Mode and not Training Mode) explores a different answer each time. It ships with 6,110 test cases covering the engine, the API, and the
 > help/config system, run on both the CPU and the GPU numeric backends. Underneath the seven components sits an execution
 > substrate — three [persistence modes](#persistence-modes-and-episodic-runs),
 > a [GPU numeric substrate](#the-numeric-substrate), and
@@ -455,8 +455,8 @@ Petacat has two test suites:
   plugin against the serial runs it claims to equal), `lockstep` (Petacat's decision
   traces against Metacat's), and `e2e` (full HTTP
   stack against a running database). All eight run in a single command against
-  the local Postgres — 6,107 cases, which includes the numeric matrix's second
-  pass over the 1005 backend-sensitive tests. See
+  the local Postgres — 6,110 cases, which includes the numeric matrix's second
+  pass over the 1007 backend-sensitive tests. See
   [TESTING.md](TESTING.md) for the layer breakdown, the numeric backend matrix,
   the session ceiling, the unit-test rules, determinism requirements, test-double
   conventions, how to run the suite under the free-threaded interpreter, and what
@@ -1139,7 +1139,8 @@ operation.
   stored, and the journal tells what became of an old name (`where-did-name-go`, the "names that no longer
   resolve" panel).
 - **Parameters that name things.** `engine_params.refers_to` says what a parameter's value names
-  (`node_list`, `trigger_node_list`, `node_map`, `codelet_type_list`, `urgency_level`), and the cascades
+  (`node_list`, `trigger_node_list`, `node_map`, `codelet_type_list`, `urgency_level`,
+  `clampable_pattern_map`, `clampable_pattern_list`), and the cascades
   read it from the configuration they resolve against. **A rule-trigger edit (`add_trigger`,
   `remove_trigger`) also changes the parameter whose `refers_to` is `trigger_node_list`** (`top_down_slipnodes`
   in the Metacat Standard Configuration): the node is added to it, or removed from it only when no rule still
@@ -1753,7 +1754,7 @@ files are not read again (see [`seed_data/README.md`](seed_data/README.md) and
 | `slipnet_links.json` | 202 links (category, instance, property, lateral, sliplink) |
 | `codelet_types.json` | 27 codelet types with Python execute bodies |
 | `engine_params.json` | Runtime parameters and thresholds |
-| `engine_param_refs.json` | What a parameter's names refer to (`engine_params.refers_to`: node list, trigger node list, node map, codelet type list, urgency level) |
+| `engine_param_refs.json` | What a parameter's names refer to (`engine_params.refers_to`: node list, trigger node list, node map, codelet type list, urgency level, clampable pattern map, clampable pattern list) |
 | `urgency_levels.json` | 7 urgency bin values |
 | `formula_coefficients.json` | 188 formula weights |
 | `theme_dimensions.json` | 9 conceptual dimensions |

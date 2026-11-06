@@ -83,6 +83,7 @@ from server.engine.rules import (
 from server.engine.trace import AnswerEvent, ClampEvent, SnagEvent, TraceEvent
 from server.engine.workspace import WorkspaceString
 from server.engine.workspace_objects import Letter
+from server.engine.workspace_structures import WorkspaceStructure
 
 FORMAT_VERSION = 1
 
@@ -222,7 +223,9 @@ class _Writer:
 class _Reader:
     """Rebuilds the object graph in two passes: shells, then wiring."""
 
-    def __init__(self, records: list[dict], slipnet: Any, strings: dict[str, Any]) -> None:
+    def __init__(
+        self, records: list[dict], slipnet: Any, strings: dict[str, Any], vocab: Any = None
+    ) -> None:
         self._records = records
         self._slipnet = slipnet
         self._strings = strings
@@ -237,7 +240,13 @@ class _Reader:
                     f"unknown graph type {record['type']!r}; the capture was written "
                     f"by a version of this module that knows a type this one does not"
                 )
-            self._objects.append(cls.__new__(cls))
+            obj = cls.__new__(cls)
+            if vocab is not None and isinstance(obj, WorkspaceStructure):
+                # What ``WorkspaceStructure.__init__`` holds for the structure's own predicates:
+                # the run's vocabulary (a restored structure never ran ``__init__``).
+                obj._voc = vocab
+                obj._built_level = vocab.proposal_level_built
+            self._objects.append(obj)
 
     def build(self) -> list[Any]:
         """Pass two: fill in every field, resolving references."""
@@ -526,7 +535,7 @@ def _restore_run_state(runner: Any, state: dict) -> None:
 
     strings = {key: getattr(ws, attr) for key, attr in _string_slots(v)
                if getattr(ws, attr, None) is not None}
-    reader = _Reader(state["graph"], ctx.slipnet, strings)
+    reader = _Reader(state["graph"], ctx.slipnet, strings, v)
     rebuilt = reader.build()
 
     # Re-link the environment the capture omitted.  A rule's strength is its quality

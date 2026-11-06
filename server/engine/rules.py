@@ -1034,6 +1034,19 @@ def rule_quality(uniformity: Any, abstractness: Any, succinctness: Any,
 class RuleClause:
     """One clause of a rule — describes one aspect of the transformation."""
 
+    # The run's vocabulary, held on first use so that the three clause-type predicates read an
+    # attribute and not the run binding.  A slot, not an entry of ``__dict__``, because the state
+    # graph captures ``vars(clause)`` and this is configuration, not run state.
+    __slots__ = ("_voc", "__dict__")
+
+    def __getattr__(self, name: str) -> Any:
+        # Reached only for an attribute that is missing: the first predicate asked of a clause
+        # (and of one the state graph rebuilt with ``__new__``) takes the bound run's vocabulary.
+        if name == "_voc":
+            voc = self._voc = constants().vocab
+            return voc
+        raise AttributeError(name)
+
     def __init__(
         self,
         clause_type: str,
@@ -1074,15 +1087,15 @@ class RuleClause:
 
     @property
     def is_intrinsic(self) -> bool:
-        return self.clause_type == constants().vocab.clause_type_intrinsic
+        return self.clause_type == self._voc.clause_type_intrinsic
 
     @property
     def is_extrinsic(self) -> bool:
-        return self.clause_type == constants().vocab.clause_type_extrinsic
+        return self.clause_type == self._voc.clause_type_extrinsic
 
     @property
     def is_verbatim(self) -> bool:
-        return self.clause_type == constants().vocab.clause_type_verbatim
+        return self.clause_type == self._voc.clause_type_verbatim
 
     def __repr__(self) -> str:
         return f"RuleClause({self.clause_type}, {len(self.changes)} changes)"
@@ -1132,7 +1145,7 @@ class Rule(WorkspaceStructure):
 
     @property
     def is_top_rule(self) -> bool:
-        return self.rule_type == constants().vocab.rule_type_top
+        return self.rule_type == self._voc.rule_type_top
 
     @property
     def intrinsic_clauses(self) -> list[RuleClause]:
@@ -1932,7 +1945,7 @@ def _is_group_or_string(descriptor: Any) -> bool:
     return _holds(descriptor, _OBJECT_GROUP)
 
 
-def rule_signature(rule: Rule | None) -> list | None:
+def rule_signature(rule: Rule) -> list:
     """A canonical, JSON-serialisable structural key for a rule.
 
     ``rules_equal`` compares clauses by *identity* of their slipnodes, which is fine
@@ -1945,9 +1958,11 @@ def rule_signature(rule: Rule | None) -> list | None:
 
     The signature honours the same equivalences ``_clauses_equal`` does, including
     group/string interchangeability.
+
+    *rule* is always a rule: every answer and every snag a run makes has both of its rules
+    (ruling 35; ``agents-workspace/metacat-cleanup/round2/S4G-followup/work/probe_none_signature.py``
+    ran every case of the original and the extended golden baselines and saw no ``None``).
     """
-    if rule is None:
-        return None
     token = group_or_string_token()
     return [_clause_signature(clause, token) for clause in rule.clauses]
 
@@ -3437,7 +3452,7 @@ def _get_equivalent_bridge(workspace: Workspace, bridge: Bridge) -> Any:
 
     existing = (
         equivalent1.vertical_bridge
-        if bridge.bridge_type == constants().vocab.bridge_type_vertical
+        if bridge.bridge_type == bridge._voc.bridge_type_vertical
         else equivalent1.horizontal_bridge
     )
     if existing is not None and existing.object2 is equivalent2:

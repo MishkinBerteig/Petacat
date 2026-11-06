@@ -18,6 +18,7 @@ checked here, against the service and a scratch database:
 from __future__ import annotations
 
 import asyncio
+import json
 from concurrent.futures import Future
 
 import pytest
@@ -226,6 +227,40 @@ async def test_a_bad_configuration_base_is_refused(app_client, sessions):
         "name": "x", "settings": {"configuration_base": {"session_id": 999999}}})
     assert resp.status_code == 422 and "configuration_base" in resp.json()["detail"]
     assert (await app_client.get("/api/training-mode/sessions")).json()["sessions"] == []
+
+
+@pytest.mark.asyncio
+async def test_creation_overrides_are_checked_against_the_configuration_the_session_starts_from(
+        app_client, sessions, test_engine):
+    """A reference parameter's shape comes from ``engine_params.refers_to`` of the configuration the
+    run executes under, and a session's own configuration is not the global one.
+
+    A session whose ``top_down_slipnodes`` is declared a map of names to numbers is the base of a
+    second session: a map is accepted for it and a list is refused, the reverse of the global
+    configuration (a list is accepted and a map refused).  Under the global configuration a check
+    that ignored the base would answer the other way round.
+    """
+    name = "top_down_slipnodes"
+    node = "plato-opposite"
+    as_list, as_map = [node], {node: 3}
+    base = await create_with(app_client)
+    # the same body, against the global configuration: a list, not a map
+    assert (await create_with(app_client, parameters={name: as_list}))["settings"]["parameters"] == {name: as_list}
+    refused = await app_client.post("/api/training-mode/sessions", json={
+        "name": "x", "settings": {"parameters": {name: as_map}}})
+    assert refused.status_code == 400 and name in refused.json()["detail"], refused.text
+    # change the base session's own configuration: the parameter now names nodes with numbers
+    document = await stored_document(test_engine, base["id"])
+    assert document.tables["engine_params"][(name,)]["refers_to"] == "trigger_node_list"
+    await sessions.submit_changes(base["id"], external(
+        {"op": "update", "table": "engine_params", "key": {"name": name},
+         "fields": {"value": json.dumps(as_map), "value_type": "json", "refers_to": "node_map"}}))
+    base_of = {"session_id": base["id"]}
+    child = await create_with(app_client, configuration_base=base_of, parameters={name: as_map})
+    assert child["settings"]["parameters"] == {name: as_map}
+    refused = await app_client.post("/api/training-mode/sessions", json={
+        "name": "x", "settings": {"configuration_base": base_of, "parameters": {name: as_list}}})
+    assert refused.status_code == 400 and name in refused.json()["detail"], refused.text
 
 
 def _two_overrides() -> dict:

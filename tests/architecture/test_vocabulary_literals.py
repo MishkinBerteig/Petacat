@@ -5,14 +5,16 @@ section 4.3).  The engine owns *concepts* (a bridge joins the top strings, a cla
 rack against a background); the configuration owns the *names* it gives them.  Every enum
 table row the engine names carries a ``role`` (``server/engine/roles.py``, ``VOCABULARY``), and
 the engine reads the name bound to the role once per run (``meta.vocabulary``).  So no line of
-``server/engine/`` or ``server/parallel/`` may spell a bound name, and no codelet body,
+``server/engine/``, ``server/parallel/``, ``server/services/`` or ``server/api/`` may spell a bound
+name, and no codelet body,
 descriptor predicate or posting formula of the Metacat Standard Configuration may either: they
 write ``role('bridge_type.top')``.
 
-Test 1 is an AST walk of every module under ``server/engine/`` and ``server/parallel/`` (docstrings
+Test 1 is an AST walk of every module under those four trees (docstrings
 and bare string statements are exempt) for a string literal equal to the name of a row of a
 vocabulary table (``seed_data/enums.json`` and ``theme_relations.json``), to a link type, or to an
-urgency level.  A hit is allowed only if it is in ``ALLOWED`` below, with its reason.  The list is
+urgency level.  (``run_statuses`` is not scanned: ruling 13 keeps a run's lifecycle names as the
+engine's own, and the services compare through ``runner.STATUS_*``.)  A hit is allowed only if it is in ``ALLOWED`` below, with its reason.  The list is
 strict in both directions: a literal that is not listed fails, and an entry that is no longer hit
 fails too (delete it).
 
@@ -34,7 +36,10 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SEED_DIR = REPO_ROOT / "seed_data"
-TREES = (REPO_ROOT / "server" / "engine", REPO_ROOT / "server" / "parallel")
+TREES = (
+    REPO_ROOT / "server" / "engine", REPO_ROOT / "server" / "parallel",
+    REPO_ROOT / "server" / "services", REPO_ROOT / "server" / "api",
+)
 
 #: Files that are exempt as a whole, with the reason.  ``roles.py`` declares the engine's roles:
 #: the suffix of a role (``bridge_type.top``) is the engine's own name for a concept, which the
@@ -112,6 +117,72 @@ ALLOWED: dict[tuple[str, str], tuple[int, str]] = {
     ("server/engine/slipnet.py", "property"): (
         1, "an engine-owned link behaviour (link_types.behaviour), which a link type's row refers to"),
 }
+
+
+def _group(reason: str, entries: dict[str, dict[str, int]]) -> dict[tuple[str, str], tuple[int, str]]:
+    """``{file: {literal: count}}`` of one reason, as ``ALLOWED`` entries."""
+    return {(f, lit): (n, reason) for f, lits in entries.items() for lit, n in lits.items()}
+
+
+#: ``server/services/`` and ``server/api/``.  The hits there are the words of data formats that
+#: happen to be vocabulary names: the four problem fields, a payload key, a column.  Each group
+#: states the format; none is compared with a name the configuration binds.  A vocabulary name
+#: the services compare against (a proposal level, a string kind, a rule type, a run's story) is
+#: read from ``meta.vocabulary`` and is not listed.
+ALLOWED.update(_group(
+    "a field of the problem JSON the API takes and returns (initial, modified, target, answer), "
+    "or a column of demo_problems and of a Training Mode Session's problems: a key of that "
+    "format, not the string kind's name",
+    {
+        "server/api/admin.py": {"answer": 1, "initial": 1, "modified": 1, "target": 1},
+        "server/api/training_mode_sessions.py": {"answer": 4, "initial": 5, "modified": 5, "target": 5},
+        "server/services/change_resolve/core.py": {"answer": 1, "initial": 1, "modified": 1, "target": 1},
+        "server/services/config_document.py": {"answer": 2, "initial": 2, "modified": 2, "target": 2},
+        "server/services/metadata_service.py": {"answer": 1, "initial": 1, "modified": 1, "target": 1},
+        "server/services/problem_text.py": {"answer": 2, "initial": 2, "modified": 2, "target": 2},
+        "server/services/review_service.py": {"answer": 1, "initial": 1, "modified": 1, "target": 1},
+        "server/services/training_mode_session_service.py": {
+            "answer": 11, "initial": 8, "modified": 8, "target": 8},
+    }))
+ALLOWED.update(_group(
+    "a key of the Workspace-state payload the client reads: the problem fields (state.problem), "
+    "and the boolean field `built`, `verbatim` and the `category` of a bond or group; the value "
+    "behind each key is read from the vocabulary",
+    {
+        "server/services/capture_projection.py": {
+            "answer": 2, "built": 4, "category": 2, "initial": 2, "modified": 2, "target": 2,
+            "verbatim": 1},
+    }))
+ALLOWED.update(_group(
+    "a key of the Review payload the client reads: `rules.top` and `rules.bottom`, and the "
+    "`built` counts of the structure summary",
+    {"server/services/review_service.py": {"bottom": 1, "built": 4, "top": 1}}))
+ALLOWED.update(_group(
+    "the key `top` of a Training Mode Session's top-answers list (the most frequent answers), "
+    "which is not the rule type or bridge type `top`",
+    {
+        "server/api/training_mode_sessions.py": {"top": 2},
+        "server/services/training_mode_session_service.py": {"top": 3},
+    }))
+ALLOWED.update(_group(
+    "the key `change` of a configuration comparison row (added, removed or changed): a field of "
+    "that payload, not the failure kind `change`",
+    {
+        "server/services/configuration_admin.py": {"change": 7},
+        "server/services/configuration_compare.py": {"change": 7},
+        "server/services/session_configuration_views.py": {"change": 5},
+    }))
+ALLOWED.update(_group(
+    "the `proposed` column of a journal entry (the ops as submitted): a database column, not the "
+    "proposal level `proposed`",
+    {"server/services/journal_views.py": {"proposed": 2}}))
+ALLOWED.update(_group(
+    "the key `target` of the change schema's `reference` object (the table a column points to)",
+    {"server/services/change_resolve/spec.py": {"target": 1}}))
+ALLOWED.update(_group(
+    "the audit action type `answer` and its payload key: the private format of the Audit action "
+    "log (the id counters' `answer` kind is `ids.KIND_ANSWER`)",
+    {"server/services/sinks.py": {"answer": 2}}))
 
 
 def vocabulary_names() -> dict[str, set[str]]:

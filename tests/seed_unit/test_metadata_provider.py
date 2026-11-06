@@ -137,7 +137,7 @@ def test_loads_the_vocabulary_bindings(meta):
 
     bound = {b.role: (b.table, b.name) for b in meta.vocabulary_bindings}
     assert set(bound) == {s.name for s in VOCABULARY}
-    assert bound["event_type.bond_built"] == ("event_types", "bond_built")
+    assert bound["event_type.group_built"] == ("event_types", "group_built")
     assert bound["bridge_type.top"] == ("bridge_types", "top")
     assert bound["proposal_level.proposed"] == ("proposal_levels", "proposed")
     assert meta.vocabulary.bridge_type_top == "top"
@@ -159,10 +159,9 @@ def test_enum_tables_have_the_expected_counts():
         enums = json.load(f)
     assert set(enums) == set(ENUM_REGISTRY) and len(enums) == 18
     assert len(enums["run_statuses"]) == 6
-    # 15: the 14 types the engine records plus concept_activation, one of the seven
-    # Temporal Trace event types of §4.4 (jootsing and theme_activated were never recorded
-    # and were removed).
-    assert len(enums["event_types"]) == 15
+    # 7: the seven Temporal Trace event types of §4.4, which are all the Trace records
+    # (bond, bridge, description and clamp-end types were never recorded and were removed).
+    assert len(enums["event_types"]) == 7
     assert len(enums["bridge_types"]) == 3
     assert len(enums["bridge_orientations"]) == 2
     assert len(enums["clause_types"]) == 3

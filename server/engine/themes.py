@@ -96,16 +96,21 @@ def dominant_index(activations: Sequence[float], margin: float) -> int | None:
     return None
 
 
-def relation_name_for_label(label_node: Any) -> str:
+def relation_name_for_label(label_node: Any, diff: str | None = None) -> str:
     """Map a Slipnet label node (or ``None``) to a bare theme relation name.
 
     The node knows the relation it stands for (``SlipnetNode.relation``, from the
     ``theme_relations`` table).  ``None`` -- an unlabelled link, no link at all, or a
     label that is no relation -- maps to ``diff``, matching the Scheme's ``#f`` relation.
+
+    *diff* is the run's name for that relation (``vocabulary.theme_relation_diff``); a caller
+    naming the relations of many pairs passes it once, and without it the bound run's is read.
     """
     relation = getattr(label_node, "relation", None)
     if relation is not None:
         return relation
+    if diff is not None:
+        return diff
     from server.engine.run_binding import vocab
 
     return vocab().theme_relation_diff

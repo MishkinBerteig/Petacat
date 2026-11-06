@@ -39,6 +39,7 @@ describe('ParamsEditor — what a parameter refers to', () => {
     const pick = (await screen.findByLabelText('Refers to')) as HTMLSelectElement
     expect([...pick.options].map(o => o.value)).toEqual([
       '', 'node_list', 'trigger_node_list', 'node_map', 'codelet_type_list', 'urgency_level',
+      'clampable_pattern_map', 'clampable_pattern_list',
     ])
     fireEvent.change(pick, { target: { value: 'node_list' } })
 

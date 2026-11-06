@@ -341,8 +341,9 @@ class EngineParam(Base):
     #: updates the parameter with it: ``node_list`` (a list of Slipnet node names),
     #: ``trigger_node_list`` (a node list that is also the union of the posting rules'
     #: triggering nodes), ``node_map`` (a map keyed by node name), ``codelet_type_list`` (a list
-    #: of codelet type names), ``urgency_level`` (the name of an urgency level) or NULL (the
-    #: value names nothing).  Declared in ``seed_data/engine_param_refs.json``.
+    #: of codelet type names), ``urgency_level`` (the name of an urgency level),
+    #: ``clampable_pattern_map`` (a map keyed by the names of the clampable codelet patterns, the
+    #: menu), ``clampable_pattern_list`` (a list of those names) or NULL (the value names nothing).  Declared in ``seed_data/engine_param_refs.json``.
     refers_to = Column(Text, nullable=True)
 
 

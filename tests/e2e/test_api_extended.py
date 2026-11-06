@@ -980,12 +980,12 @@ async def test_admin_enum_values_event_types(app_client):
     resp = await app_client.get("/api/admin/enums/event_types")
     assert resp.status_code == 200
     data = resp.json()
-    # 15: the 14 types the engine records plus concept_activation, one of the seven
-    # Temporal Trace event types of §4.4.  Every type the engine emits has a role, and
-    # a row here.
-    assert len(data) == 15
+    # 7: the seven Temporal Trace event types of §4.4 (the Scheme's answer, clamp,
+    # concept-activation, concept-mapping, group, rule and snag).  Every type the engine
+    # emits has a role, and a row here.
+    assert len(data) == 7
     names = {v["name"] for v in data}
-    assert "bond_built" in names
+    assert "group_built" in names
     assert "snag" in names
     assert "concept_activation" in names
 
