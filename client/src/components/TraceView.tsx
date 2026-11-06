@@ -249,7 +249,10 @@ export function TraceView() {
 
   const handleSelect = useCallback(
     async (event: TraceEvent) => {
-      if (runId == null) return;
+      // Metacat ignores the click while the run executes or the Clamp Themes dialog is open
+      // (`trace-graphics.ss:66-70`); the server refuses it as well.
+      const { status, themeEdit } = useRunStore.getState();
+      if (runId == null || status === 'running' || themeEdit !== null) return;
       const res = await displayTraceEvent(runId, event.event_number);
       // The picture goes to the Workspace, Slipnet, Coderack and Temperature windows,
       // which read it from the moment store; the Themespace is the server's to impose.

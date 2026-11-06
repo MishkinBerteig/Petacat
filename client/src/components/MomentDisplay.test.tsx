@@ -449,3 +449,55 @@ describe('clicking a snag in the Memory window', () => {
     await waitFor(() => expect(useMomentStore.getState().displayed).toBeNull())
   })
 })
+
+// ---------------------------------------------------------------------------
+// The live state comes back when the run is driven or Clamp Themes opens
+// ---------------------------------------------------------------------------
+
+describe('what is on show when the live state matters again', () => {
+  const show = () =>
+    useMomentStore.getState().show('event', 3, { displaying: 3, picture: picture() }, 3)
+
+  it('is forgotten when the run is driven', () => {
+    useRunStore.setState({ runId: 7, driveCount: 0 })
+    show()
+    act(() => useRunStore.setState({ driveCount: 1 }))
+    expect(useMomentStore.getState().displayed).toBeNull()
+    expect(useMomentStore.getState().onShow).toBeNull()
+  })
+
+  it('is forgotten, and the server asked for the live Themespace, when Clamp Themes opens', async () => {
+    useRunStore.setState({ runId: 7, themeEdit: null })
+    const calls: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        calls.push(String(url))
+        return new Response(JSON.stringify({ run_id: 7, restored: true }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }),
+    )
+    show()
+    act(() => useRunStore.setState({ themeEdit: { edited: [], selected: [] } }))
+    expect(useMomentStore.getState().onShow).toBeNull()
+    expect(useMomentStore.getState().displayed).toBeNull()
+    await waitFor(() => expect(calls.some((c) => c.endsWith('/runs/7/themespace/restore'))).toBe(true))
+  })
+
+  it('asks the server for nothing when nothing was on show', () => {
+    useRunStore.setState({ runId: 7, themeEdit: null })
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    act(() => useRunStore.setState({ themeEdit: { edited: [], selected: [] } }))
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('is forgotten when the clamp is applied or cancelled', () => {
+    useRunStore.setState({ runId: 7, themeEdit: { edited: [], selected: [] } })
+    show()
+    act(() => useRunStore.setState({ themeEdit: null }))
+    expect(useMomentStore.getState().onShow).toBeNull()
+  })
+})

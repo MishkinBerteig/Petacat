@@ -28,7 +28,7 @@ license change was authorised by Dr. Marshall directly (see
 > end-to-end. Episodic Memory (Metacat-Mode learning) shapes the runs that inherit it: a run
 > declines an answer already held for the same problem and rules, so repeating a
 > problem across Metacat Mode's [episodic runs](#persistence-modes-and-episodic-runs)
-> (which are Metacat Mode and not Training Mode) explores a different answer each time. It ships with 5,926 test cases covering the engine, the API, and the
+> (which are Metacat Mode and not Training Mode) explores a different answer each time. It ships with 5,954 test cases covering the engine, the API, and the
 > help/config system, run on both the CPU and the GPU numeric backends. Underneath the seven components sits an execution
 > substrate — three [persistence modes](#persistence-modes-and-episodic-runs),
 > a [GPU numeric substrate](#the-numeric-substrate), and
@@ -455,7 +455,7 @@ Petacat has two test suites:
   plugin against the serial runs it claims to equal), `lockstep` (Petacat's decision
   traces against Metacat's), and `e2e` (full HTTP
   stack against a running database). All eight run in a single command against
-  the local Postgres — 5,926 cases, which includes the numeric matrix's second
+  the local Postgres — 5,954 cases, which includes the numeric matrix's second
   pass over the 1005 backend-sensitive tests. See
   [TESTING.md](TESTING.md) for the layer breakdown, the numeric backend matrix,
   the session ceiling, the unit-test rules, determinism requirements, test-double
@@ -1497,8 +1497,9 @@ The tables below cover the routes a user drives.
 | GET | `/api/runs/{id}/temperature` | Temperature value |
 | GET | `/api/runs/{id}/trace` | Event log: each event with Metacat's print name (`(Id)`, `>a-b-c>`, `T:a=>b`, `[Top Rule]`, `[Answer ijl]`) |
 | GET | `/api/runs/{id}/trace/{n}` | One event in full, with the picture that redisplays it (from the stored row once the run is unloaded) |
-| POST | `/api/runs/{id}/trace/{n}/display` | Display that event over the live windows, or restore them; the reply carries the picture |
-| POST | `/api/memory/answers/{id}/display`, `/api/memory/snags/{id}/display` | Display a stored answer or snag (its description picture and theme patterns); again to restore |
+| POST | `/api/runs/{id}/trace/{n}/display` | Display that event over the live windows, or restore them; the reply carries the picture. Step, Run, Clamp Themes and Clamp theme pattern restore the live state first, and a run that is executing is not touched |
+| POST | `/api/memory/answers/{id}/display`, `/api/memory/snags/{id}/display` | Display a stored answer or snag (its description picture and theme patterns); again to restore, as does the next Step or Run; refused (picture only) while the run executes |
+| POST | `/api/runs/{id}/themespace/restore` | Put the live Themespace back if a past moment is over it (`restored` is false when none was) |
 | GET | `/api/runs/{id}/commentary` | Natural-language summary |
 | GET | `/api/runs/{id}/verbose?since=N` | Verbose mode's narration (Metacat's `vprintf`/`say` output: what each codelet chose, tried and gave up on), from line `N`; the buffer is bounded |
 | PUT | `/api/runs/{id}/verbose` | Switch Verbose mode on or off mid-run (`{"enabled": true}`); with it off the engine builds none of the text |

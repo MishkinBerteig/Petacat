@@ -213,6 +213,12 @@ export interface RunStore {
   runWorkers: number;
   isProcessing: boolean; // true while run-to-answer is active
   /**
+   * How many times the run has been asked to move (a Step, a Run, a Run to answer). The
+   * server puts the live Themespace back before it does any of them, so whatever past
+   * moment the windows were showing is over; the moment store watches this to know.
+   */
+  driveCount: number;
+  /**
    * The one error channel: why the last thing the user asked for did not happen.
    *
    * One actionable sentence from `describeApiError`, rendered once in the header.
@@ -391,6 +397,14 @@ function beginAction(): void {
 }
 
 /**
+ * Note that the run is being asked to move. The server restores the live Themespace first
+ * (Metacat: `go`, `run.ss:132`; `resume-current-problem`, `gui.ss:779`).
+ */
+function beginDrive(): void {
+  useRunStore.setState((s) => ({ driveCount: s.driveCount + 1 }));
+}
+
+/**
  * Say why a user-initiated action did not happen, in one sentence the reader can
  * act on. `action` names the attempt in the reader's own terms: it completes
  * "Could not ...".
@@ -437,6 +451,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
   workers: 1,
   runWorkers: 1,
   isProcessing: false,
+  driveCount: 0,
   lastError: null,
   formInputs: {
     initial: '',
@@ -552,6 +567,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
 
     const count = n ?? 1;
     beginAction();
+    beginDrive();
 
     // A step the engine refuses is a request that produced nothing, so it is said
     // out loud and the remaining steps are abandoned: the run stands where it was.
@@ -611,6 +627,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
 
     _stopRequested = false;
     beginAction();
+    beginDrive();
     set({ status: 'running' });
 
     if (liveUpdate) {
@@ -713,6 +730,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
 
     _stopRequested = false;
     beginAction();
+    beginDrive();
     set({ status: 'running', isProcessing: true });
 
     try {

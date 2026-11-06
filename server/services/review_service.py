@@ -728,12 +728,19 @@ class ReviewService:
         await self._compare(session, inspector)
         return await self.inspector_state(session, run_id)
 
-    def _apply_due(self, inspector: _Inspector) -> None:
-        """Apply every recorded action of a person that happened at or before this codelet."""
+    def _apply_due(self, inspector: _Inspector, before_a_step: bool = False) -> None:
+        """Apply every recorded action of a person that happened at or before this codelet.
+
+        A restore that a Step or a Run made as it started (``before_a_drive``) belongs to the
+        moment before the run's next codelet, so it waits for that: the person saw the moment
+        still on show at the codelet where it was put away.
+        """
         count = inspector.position
         while inspector.applied < len(inspector.interventions):
             at, method, args = inspector.interventions[inspector.applied]
             if at > count:
+                break
+            if args.get("before_a_drive") and not before_a_step:
                 break
             inspector.applied += 1
             try:
@@ -841,6 +848,7 @@ class ReviewService:
         runner = inspector.runner
         while runner.ctx.codelet_count < target:
             before = runner.ctx.codelet_count
+            self._apply_due(inspector, before_a_step=True)
             runner.step_mcat()
             if runner.ctx.codelet_count == before:
                 # The coderack emptied and reposting produced nothing — the

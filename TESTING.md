@@ -152,7 +152,7 @@ outside the matrix take it too and the run is entirely what it says it is.
   integration    358 collected    358 run    358 passed      0 failed      0 skipped  complete
   parallel       304 collected    304 run    304 passed      0 failed      0 skipped  complete
   lockstep       247 collected    247 run    247 passed      0 failed      0 skipped  complete
-  e2e            602 collected    602 run    602 passed      0 failed      0 skipped  complete
+  e2e            630 collected    630 run    630 passed      0 failed      0 skipped  complete
 
   run complete in 13.9 min against a 60 min ceiling
 ```
@@ -231,7 +231,7 @@ that allowance.
 | **integration** | `tests/integration/` | Agreement between the repository's artifacts, and the harness's own rules | Real `seed_data/*.json`, the ORM declarations, the generated client files, the documentation, a real pytest session | 358 |
 | **parallel** | `tests/parallel/` | The detachable multi-core plugin (`server/parallel/`): each executor against the serial run it claims to equal | Real engine objects and `seed_data/*.json`, worker processes and threads; each test pins the backend it compares on | 304 |
 | **lockstep** | `tests/lockstep/` | Petacat's decision traces against Metacat's: naming, helper conformance, tracing/replay RNGs, determinism guards, the comparer | Real engine in faithful mode (numeric backend off, or a named backend); recorded Metacat traces | 247 |
-| **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 602 |
+| **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 630 |
 
 Those counts are cases, so they include the second pass the numeric matrix makes
 over the 1005 backend-sensitive tests.
@@ -266,7 +266,7 @@ first**, then move up toward the API and GUI.
 
 All eight layers run in one command — the
 [required command](#the-required-command) — and, since Petacat runs natively, all
-eight actually run: **5,926 cases**, every one of them executed. A layer that is
+eight actually run: **5,954 cases**, every one of them executed. A layer that is
 normally skipped is not a layer that is normally green, and none of these is.
 
 Wall-clock time depends heavily on the machine and on what else it is doing. The
@@ -685,11 +685,12 @@ changing what it records.
 | `test_persistence_modes.py` | 33 | The three persistence modes: Fast, Normal, Audit; a parallel Run is the same at any worker count |
 | `test_run_parameters.py` | 13 | Run parameters are settable per Run, stored, and readable back |
 | `test_run_to_answer.py` | 8 | The Run-to-Answer feature over HTTP |
-| `test_review_replay.py` | 17 | Review replays what the Run did (round 2, stage R): the Audit inspector's views equal the live Run's at every codelet, over HTTP, for each kind of action a person takes on a live Run (clamps of temperature, node, theme and codelet, Undo, Self-watching, the threshold, displaying a past event or answer, a reset, a pause with Run), several in one Run, each kind of configuration edit after the Run (coefficient, node, links, codelet body, posting rules, theme dimension, reset to standard, an Admin import that edited and restored a row), runs under different configurations and a server restart; an unrebuildable configuration is refused with 422, a replay that disagrees with the log says so, captures are projected under the Run's configuration, and only Audit records a person's actions |
+| `test_review_replay.py` | 18 | Review replays what the Run did (round 2, stage R): the Audit inspector's views equal the live Run's at every codelet, over HTTP, for each kind of action a person takes on a live Run (clamps of temperature, node, theme and codelet, Undo, Self-watching, the threshold, displaying a past event or answer, a reset, a pause with Run), several in one Run, each kind of configuration edit after the Run (coefficient, node, links, codelet body, posting rules, theme dimension, reset to standard, an Admin import that edited and restored a row), runs under different configurations and a server restart; an unrebuildable configuration is refused with 422, a replay that disagrees with the log says so, captures are projected under the Run's configuration, and only Audit records a person's actions |
 | `test_two_runs_over_http.py` | 5 | Two live runs held by one server (round 2, stage 2): run A, driven as the client does (step batches, view polls between them), is codelet-for-codelet and view-for-view the run it is alone when run B is created before A is stepped, with the same configuration (normal and fast) or one edited in between through the Admin API, and when the two are stepped alternately; an open Audit inspector, stepped between A's batches, changes nothing; and no run is bound around an e2e test (the unit/module fixture's ambient run must not hide a server path that forgot its scope) |
 | `test_s5b_values_from_the_database.py` | 8 | Round 2, stage 5 (group B): the spreading-threshold clip is `max_activation`, a run made with no threshold takes the configuration's, a theme clamp that states no activation takes `max_theme_activation`, the run-parameter catalogue serves both ceilings, the Swarm and a Training Mode Session take `default_max_codelets` (and the Swarm's status serves it), and a slipnet link or posting rule that leaves out `fixed_length`, `posting_formula`, `count_formula` or `condition` is refused (422) |
 | `test_memory_order.py` | 2 | A restart puts stored answers back newest first by the memory's own identifier, both projections list them oldest first, and forgetting one keeps the rest in order |
 | `test_snag_identity.py` | 5 | A snag is the same snag whichever endpoint served it, and is written once |
+| `test_display_does_not_touch_run.py` | 9 | A displayed moment never touches the run (round 2, stage D): on `off` and `numpy`, with one worker and with two, a Step or a Run after the display of an event, an answer or a snag (also under thematic pressure and with Self-watching off) is the run undisturbed in every field (steps, answer, draws, Trace, whole engine state); Clamp Themes and Clamp theme pattern act on the live state; a display met by a serial run at its yield, or by a parallel run before and while its workers execute, is refused and leaves the run identical; a reset or a delete forgets what was on show |
 | `test_moment_display.py` | 6 | Event, answer and snag redisplay over the API: print names in the listing, the picture served live and from the stored row, the toggle and the switch, rows with no picture |
 | `test_swarm_api.py` | 5 | `POST /api/swarm` equals the serial runs, persists nothing, and rejects bad requests; `GET /api/swarm` reports the pool |
 | `test_training_mode_sessions_api.py` | 49 | Training Mode Sessions over HTTP: every stored run is the serial run; the 25 + 5 workflow (problems added while it runs); the finished long-poll; pause, resume, close, cancel, delete; the database written only when a problem finishes; a restart redoes what was cut off to the identical result and rebuilds the shared memory exactly; one worker is a serial episode and many replay from the merge log; fair sharing of the cores; every error policy; worker-failure retries, charged only to the run that broke the pool; a policy pause survives a concurrent status change; live counts never step backwards; a summary's finished cursor comes from the same snapshot as its counts; seed ranges fit the database; configuration change stalls or is adopted; validation, export, defaults and fixed settings |
@@ -843,7 +844,7 @@ editors and the review surfaces. Run it with `cd client && npx vitest run`, and
 | `components/LastErrorBanner.test.tsx` | 3 | The error channel is rendered where it can be seen |
 | `components/MemoryView.test.tsx` | 19 | The Memory panel shows the memory the run is thinking against, labelled as Metacat Mode's Episodic Memory |
 | `components/ModeSwitch.test.tsx` | 16 | The header's switch between Metacat Mode and Training Mode: which mode each view belongs to, moving between them, the help link, and staying put while a run is processing |
-| `components/MomentDisplay.test.tsx` | 21 | Clicking a Trace event, answer or snag redisplays the moment: the Workspace header and highlights, the Slipnet pattern, the Coderack, the Temperature, the Trace window's print-name labels |
+| `components/MomentDisplay.test.tsx` | 25 | When the run is driven or Clamp Themes opens or closes, what is on show is forgotten and the server is asked for the live Themespace; clicking a Trace event, answer or snag redisplays the moment: the Workspace header and highlights, the Slipnet pattern, the Coderack, the Temperature, the Trace window's print-name labels |
 | `components/ProblemInputPanel.test.tsx` | 13 | The problem panel owns the problem's identity; its four fields keep any text exactly, line breaks included |
 | `components/RunControlsPanel.test.tsx` | 56 | A run starts on the problem the form actually shows, and the Workers control is labelled as the run mode |
 | `components/RunHistory.test.tsx` | 34 | Run History stays current as runs finish |

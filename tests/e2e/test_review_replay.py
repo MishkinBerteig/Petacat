@@ -250,7 +250,26 @@ async def test_a_replay_applies_what_the_person_did_at_the_same_codelet(review_c
     applied = result["state"]["replay"]["interventions_applied"]
     # Verbose mode changes only what is narrated; it is not recorded, and the replay still matches.
     expected = 0 if case == "verbose_is_neutral" else len(ACTIONS[case])
+    # The Step after the display puts the moment away itself and that is recorded too
+    # (round 2, stage D), so the explicit restore at 110 is the third action.
+    expected += 1 if case == "impose_event" else 0
     assert applied == expected, (applied, expected)
+
+
+@pytest.mark.asyncio
+async def test_a_displayed_event_that_a_step_puts_away_replays_at_every_tick(review_client):
+    """A moment on show, then a Step with no click to put it back (round 2, stage D).
+
+    The Step restores the live Themespace itself (Metacat's ``go``, ``run.ss:132``), through the
+    recorded ``restore_themespace``, so the replay, which steps the engine and not the service,
+    puts it back at the same codelet; a replay without that would show the displayed pattern
+    where the run had the live one.
+    """
+    recorded = await record_run(review_client, {80: impose_an_event})
+    result = await replay_differences(review_client, recorded)
+    _assert_the_replay_is_the_run(result, recorded)
+    # The display, and the restore the next Step made: two actions at codelet 80.
+    assert result["state"]["replay"]["interventions_applied"] == 2
 
 
 @pytest.mark.asyncio

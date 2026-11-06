@@ -704,7 +704,13 @@ async def display_trace_event(
     event's temperature -- for the other windows to draw.
 
     A run that is not loaded has no Themespace to impose anything over, but its
-    recorded events can still be shown: the picture is served from the stored row.
+    recorded events can still be shown: the picture is served from the stored row.  So is a
+    run that is executing a Step or a Run: Metacat ignores the click then
+    (``trace-graphics.ss:70``), so the picture is served and the Themespace is not touched.
+
+    Whatever is on show is put away again by the next Step, Run, Clamp Themes or
+    Clamp theme pattern (Metacat's ``go``, ``resume-current-problem`` and
+    ``theme-edit-mode-on``), or by ``POST /themespace/restore``.
     """
     svc = get_run_service()
     try:
@@ -724,7 +730,11 @@ async def display_trace_event(
 
 @router.post("/{run_id}/themespace/restore")
 async def restore_themespace(run_id: int):
-    """Stop displaying a past episode (Scheme: ``restore-current-state``)."""
+    """Stop displaying a past episode (Scheme: ``restore-current-state``).
+
+    Step, Run, Clamp Themes and Clamp theme pattern do this themselves first; ``restored``
+    is false when nothing was on show.
+    """
     svc = get_run_service()
     try:
         return svc.restore_themespace(run_id)

@@ -245,6 +245,25 @@ class RunService:
         #: the live Themespace only if the current state is displayed,
         #: ``trace.ss:411-413``).
         self._displaying: dict[int, tuple[str, int]] = {}
+        #: How many requests per live run are driving it right now (``step`` and
+        #: ``run_to_completion``, from their first line to their last).  While there is
+        #: one, a display is refused: Metacat ignores the click while ``*running?*``
+        #: (``trace-graphics.ss:70``, ``memory-graphics.ss:47``).
+        self._driving: dict[int, int] = {}
+
+    #: Methods that put the live Themespace back before they do anything, because the run is
+    #: about to move or the Themespace is about to be edited.  Metacat restores first
+    #: wherever it does either: ``go`` (``run.ss:132``), ``resume-current-problem``
+    #: (``gui.ss:779``) and ``theme-edit-mode-on`` (``gui.ss:857``, Clamp Themes).  Declared
+    #: here, once, and applied to the class by ``_in_run_scope``, so a method listed here
+    #: cannot forget and a new driver has one place to be added.  Every other method that
+    #: names a run is left alone on purpose: Metacat's ``undo-last-clamp``, the Self-watching
+    #: check item, the codelet, node and temperature clamps and the breakpoint do not restore.
+    _RESTORES_THE_LIVE_STATE = frozenset(
+        {"step", "run_to_completion", "clamp_themes", "clamp_theme_pattern"}
+    )
+    #: Methods that drive the run, for as long as they take.
+    _DRIVES_THE_RUN = frozenset({"step", "run_to_completion"})
 
     @property
     def meta(self) -> MetadataProvider:
@@ -980,6 +999,8 @@ class RunService:
             sink=sink,
         )
         self._sinks[run_id] = sink
+        # ``init-mcat`` clears ``*display-mode?*`` (``run.ss:190``); the new engine has a new Themespace.
+        self._displaying.pop(run_id, None)
         if threshold is not None:
             runner.ctx.spreading_activation_threshold = threshold
             # The start capture was taken inside ``init_mcat``, before this line, so a
@@ -1048,6 +1069,7 @@ class RunService:
         self._runners.pop(run_id, None)
         self._breakpoints.pop(run_id, None)
         self._stop_flags.pop(run_id, None)
+        self._displaying.pop(run_id, None)
 
         if fast:
             # A Fast Run lives entirely in these dictionaries, so emptying them of it is
@@ -1652,6 +1674,11 @@ class RunService:
         episode's pattern(s).  Clicking the one on show again puts the live state back;
         clicking another switches to it without saving over the first.  Returns the id
         now on show, or ``None`` once restored.
+
+        A run that is not loaded has nothing to impose a pattern over: the picture is still
+        served (it changes nothing) and the id returned.  A run being driven right now is the
+        same, but is decided before this method, in :meth:`_shown`, so a refused click is
+        never recorded as one that was made.
         """
         runner = self._runners.get(run_id)
         if runner is None or runner.ctx is None:
@@ -1669,6 +1696,35 @@ class RunService:
             self._impose_pattern(themespace, pattern)
         self._displaying[run_id] = key
         return key[1]
+
+    def _shown(self, run_id: int, key: tuple[str, int], patterns: list[Any]) -> int | None:
+        """:meth:`_display_over_themespace`, unless the run is executing.
+
+        Metacat ignores the click then (``(if* (not *running?*)``, ``trace-graphics.ss:70``,
+        ``memory-graphics.ss:47``).  Here the picture is still served, which changes nothing,
+        and the Themespace is left alone; a second click is the same refusal and not a
+        restore.
+        """
+        if self._is_driven(run_id):
+            return key[1]
+        return self._display_over_themespace(run_id, key, patterns)
+
+    def _is_driven(self, run_id: int) -> bool:
+        """Is a Step or a Run executing this run at this moment?"""
+        return self._driving.get(run_id, 0) > 0
+
+    def _end_display(self, run_id: int) -> bool:
+        """Put the run's live Themespace back if a past moment is over it.
+
+        Scheme: ``restore-current-state`` (``workspace-graphics.ss:80-88``), which also ends
+        display mode.  Does nothing, and says so, when nothing is on show.
+        """
+        runner = self._runners.get(run_id)
+        if runner is None or runner.ctx is None:
+            return False
+        restored = runner.ctx.themespace.restore_current_state()
+        self._displaying.pop(run_id, None)
+        return restored
 
     def impose_trace_event(self, run_id: int, event_number: int) -> dict:
         """Display a past event: impose its theme-pattern over the live Themespace.
@@ -1695,8 +1751,8 @@ class RunService:
             if picture is not None
             else ([detail["theme_pattern"]] if detail["theme_pattern"] else [])
         )
-        shown = self._display_over_themespace(run_id, ("event", event_number), patterns)
-        if shown is not None and runner.ctx.verbose:
+        shown = self._shown(run_id, ("event", event_number), patterns)
+        if shown is not None and runner.ctx.verbose and not self._is_driven(run_id):
             # Verbose mode: what the event's ``display`` prints (``trace.ss``).
             for event in runner.ctx.trace.events:
                 if event.event_number == event_number:
@@ -1737,7 +1793,7 @@ class RunService:
                 ("bottom_bridge", answer.bottom_themes),
             )
         ]
-        shown = self._display_over_themespace(run_id, ("answer", answer_id), patterns)
+        shown = self._shown(run_id, ("answer", answer_id), patterns)
         return {
             "run_id": run_id,
             "displaying": shown,
@@ -1764,7 +1820,7 @@ class RunService:
         patterns = (
             [{"type": "vertical_bridge", "entries": pattern}] if pattern else []
         )
-        shown = self._display_over_themespace(run_id, ("snag", snag_id), patterns)
+        shown = self._shown(run_id, ("snag", snag_id), patterns)
         return {
             "run_id": run_id,
             "displaying": shown,
@@ -1799,14 +1855,18 @@ class RunService:
         for dimension, relation in pairs:
             themespace.set_theme_activation(theme_type, dimension, relation, full)
 
-    def restore_themespace(self, run_id: int) -> dict:
-        """Stop displaying a past episode and put the live Themespace back."""
+    def restore_themespace(self, run_id: int, before_a_drive: bool = False) -> dict:
+        """Stop displaying a past episode and put the live Themespace back.
+
+        ``before_a_drive`` says that a Step or a Run is making this restore on its own, as it
+        starts (Metacat's ``go``, ``run.ss:132``), rather than a person: the Audit replay
+        then does it just before the run's next codelet and not at the end of the last one,
+        which is where the person last saw the moment still on show.
+        """
         runner = self._runners.get(run_id)
         if runner is None or runner.ctx is None:
             raise ValueError(f"Run {run_id} not found or not loaded")
-        restored = runner.ctx.themespace.restore_current_state()
-        self._displaying.pop(run_id, None)
-        return {"run_id": run_id, "restored": restored}
+        return {"run_id": run_id, "restored": self._end_display(run_id)}
 
     def clamp_themes(self, run_id: int, themes: list[dict]) -> dict:
         """Clamp one or more themes in the Themespace for the given run.
@@ -2230,28 +2290,51 @@ def _in_run_scope(cls: type) -> type:
         if "run_id" not in names:
             return fn
         position = names.index("run_id") - 1  # ``self`` is not among ``args``
+        restores = fn.__name__ in cls._RESTORES_THE_LIVE_STATE
+        drives = fn.__name__ in cls._DRIVES_THE_RUN
 
-        def scope_of(self, args, kwargs):
+        def entry(self, args, kwargs):
+            """The run's scope, with the live state already put back where the method needs it."""
             run_id = args[position] if len(args) > position else kwargs.get("run_id")
             runner = self._runners.get(run_id)
             ctx = runner.ctx if runner is not None else None
-            return ctx.scope() if ctx is not None else None
+            if ctx is None:
+                return None, run_id
+            scope = ctx.scope()
+            if restores and ctx.themespace.displaying_past_state:
+                # The public method, so that whatever records a person's actions at a
+                # codelet (the Audit replay) sees this restore as it sees a click.
+                if drives:
+                    self.restore_themespace(run_id, before_a_drive=True)
+                else:
+                    self.restore_themespace(run_id)
+            return scope, run_id
 
         if inspect.iscoroutinefunction(fn):
 
             @functools.wraps(fn)
             async def run_async(self, *args, **kwargs):
-                scope = scope_of(self, args, kwargs)
+                scope, run_id = entry(self, args, kwargs)
                 if scope is None:
                     return await fn(self, *args, **kwargs)
-                with scope:
-                    return await fn(self, *args, **kwargs)
+                if drives:
+                    self._driving[run_id] = self._driving.get(run_id, 0) + 1
+                try:
+                    with scope:
+                        return await fn(self, *args, **kwargs)
+                finally:
+                    if drives:
+                        left = self._driving.get(run_id, 1) - 1
+                        if left > 0:
+                            self._driving[run_id] = left
+                        else:
+                            self._driving.pop(run_id, None)
 
             return run_async
 
         @functools.wraps(fn)
         def run_sync(self, *args, **kwargs):
-            scope = scope_of(self, args, kwargs)
+            scope, _run_id = entry(self, args, kwargs)
             if scope is None:
                 return fn(self, *args, **kwargs)
             with scope:

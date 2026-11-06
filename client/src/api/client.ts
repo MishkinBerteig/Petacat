@@ -604,6 +604,17 @@ export async function displaySnag(
   );
 }
 
+/**
+ * Put the live Themespace back if a past moment is over it (`restore-current-state`,
+ * `workspace-graphics.ss:80-88`). `restored` is false when nothing was on show.
+ */
+export async function restoreThemespace(runId: number): Promise<{ run_id: number; restored: boolean }> {
+  return request<{ run_id: number; restored: boolean }>(
+    `/runs/${runId}/themespace/restore`,
+    { method: 'POST' },
+  );
+}
+
 /** Forget one answer (`memory.ss:42-54`); §5.2.3's experiment needs it. */
 export async function forgetAnswer(answerId: number): Promise<void> {
   return request<void>(`/memory/answers/${answerId}`, { method: 'DELETE' });

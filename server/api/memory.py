@@ -153,8 +153,9 @@ async def display_answer(answer_id: int, run_id: int):
 
     Scheme: ``memory.ss:268-283`` — clicking an answer icon re-enters that episode:
     its Workspace is redrawn and its vertical, top and bottom theme-patterns are
-    imposed (``trace.ss:415-420``). Calling again restores the live state, as clicking
-    a second time does in MetaCat.
+    imposed (``trace.ss:415-420``). Calling again restores the live state, and so does the next Step or Run.  A run
+    that is executing is not touched (the picture is still served), as Metacat ignores the
+    click then.
 
     ``run_id`` says whose Themespace to display it over: an answer outlives the Run
     that found it, so it does not know one of its own.
@@ -172,7 +173,8 @@ async def display_snag(snag_id: int, run_id: int):
 
     Scheme: the snag description's ``display`` (``memory.ss:380-395``) -- draw the snag
     description (``trace.ss:1212``), impose the snag's theme-pattern, blank the Slipnet
-    and Coderack and show a temperature of 100.  Calling again restores the live state.
+    and Coderack and show a temperature of 100.  Calling again restores the live state, and so does the next Step or Run.  A run
+    that is executing is not touched (the picture is still served).
     """
     svc = get_run_service()
     try:

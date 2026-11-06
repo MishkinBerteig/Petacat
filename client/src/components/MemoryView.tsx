@@ -129,7 +129,10 @@ export function MemoryView() {
    */
   const onDisplay = useCallback(
     async (answerId: number) => {
-      if (runId == null) return;
+      // Ignored while the run executes or the Clamp Themes dialog is open
+      // (`memory-graphics.ss:44-47`); the server refuses it as well.
+      const { status, themeEdit } = useRunStore.getState();
+      if (runId == null || status === 'running' || themeEdit !== null) return;
       try {
         const res = await displayAnswer(runId, answerId);
         setActionError(null);
@@ -150,7 +153,8 @@ export function MemoryView() {
    */
   const onDisplaySnag = useCallback(
     async (snagId: number) => {
-      if (runId == null) return;
+      const { status, themeEdit } = useRunStore.getState();
+      if (runId == null || status === 'running' || themeEdit !== null) return;
       try {
         const res = await displaySnag(runId, snagId);
         setActionError(null);
