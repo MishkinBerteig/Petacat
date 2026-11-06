@@ -51,6 +51,21 @@ This is a development environment with no production data.
   `pgrep -f "<pattern>"` loop matches its own command line and never ends, so wait on a PID or a
   file instead.
 
+## Which Metacat — MANDATORY, NO EXCEPTIONS
+
+"Metacat" always means **patched Metacat**: the Scheme program with the fixes in
+`Metacat/patches/fixes/` applied, which is what `Metacat/build/source` holds. All work in this
+project, in every session and by every agent, is done against patched Metacat. "Original" or "real"
+Metacat means patched Metacat as opposed to Petacat.
+
+- **The unpatched build is never used, under any circumstance.** Never run it, record from it,
+  compare against it or use it as a side check, and never take the fixes off a source tree.
+- **A crash in patched Metacat means the patch is incomplete.** Add a fix to
+  `Metacat/patches/fixes/`, rebuild, and bring Metacat Mode into line with the result. Such a crash is
+  never a deliberate difference. The patch keeps evolving as crashes are found.
+- A trace recorded from patched Metacat has a `revision` header ending `+known-failure-fixes`.
+- Every agent brief that records from or compares against Metacat must state this rule.
+
 ## Modes and terminology — MANDATORY
 
 Petacat has two modes, always written as proper names: **Metacat Mode** and **Training Mode**.
