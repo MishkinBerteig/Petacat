@@ -69,7 +69,8 @@ class SwarmRequest(BaseModel):
     seeds: list[int] | None = None
     count: int | None = Field(default=None, ge=1)
     seed_start: int = 1
-    max_steps: int = Field(default=20_000, ge=1, le=MAX_STEPS_LIMIT)
+    #: Omitted takes ``engine_params.default_max_codelets``, the one default of bulk work.
+    max_steps: int | None = Field(default=None, ge=1, le=MAX_STEPS_LIMIT)
     #: Per-run parameter overrides, validated like ``POST /api/runs``'s.
     parameters: dict[str, Any] | None = None
     #: Numeric backend for the runs.  Omitted takes the swarm's default (a float64 CPU
@@ -174,6 +175,7 @@ async def swarm_status() -> SwarmStatusResponse:
         limits={
             "max_runs_per_request": MAX_RUNS_PER_REQUEST,
             "max_steps": MAX_STEPS_LIMIT,
+            "default_max_codelets": get_run_service().meta.get_param("default_max_codelets"),
             "population_workers": hardware.population_worker_count(),
         },
     )
@@ -212,10 +214,11 @@ async def run_swarm(req: SwarmRequest) -> SwarmResponse:
 
     # The run service's current metadata: what a Run created now would execute under.
     meta = get_run_service().meta
+    max_steps = req.max_steps if req.max_steps is not None else meta.get_param("default_max_codelets")
     swarm = swarm_module.default_swarm()
     tasks = [
         swarm_module.RunTask(
-            req.initial, req.modified, req.target, req.answer, seed, req.max_steps,
+            req.initial, req.modified, req.target, req.answer, seed, max_steps,
             parameters=overrides or None, backend=backend,
         )
         for seed in seeds

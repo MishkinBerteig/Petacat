@@ -47,7 +47,7 @@ from server.engine.trace import (
     make_concept_activation_monitor,
 )
 from server.engine.workspace import Workspace
-from server.engine.run_binding import RunBinding, RunConstants, use_run
+from server.engine.run_binding import RunBinding, RunConstants, constants, use_run
 
 # Run status string constants (values live in DB run_statuses table)
 @contextmanager
@@ -1251,7 +1251,7 @@ class EngineRunner:
 
         Scheme: ``boost-themes`` (bridges.ss:296-313), driven from
         ``spread-activation-to-themespace`` (workspace.ss:495-498).  Spanning
-        bridges boost twice as hard, since they characterise whole strings.
+        bridges boost ``spanning_bridge_theme_boost_factor`` times as hard (2 in the Metacat Standard Configuration), since they characterise whole strings.
         """
         ctx = self.ctx
         if ctx is None:
@@ -1262,10 +1262,11 @@ class EngineRunner:
             + ctx.workspace.bottom_bridges
             + ctx.workspace.vertical_bridges
         )
+        boost = constants().spanning_bridge_theme_boost_factor
         for bridge in all_bridges:
             if not bridge.is_built:
                 continue
-            factor = bridge.strength * (2 if bridge.is_spanning_bridge else 1)
+            factor = bridge.strength * (boost if bridge.is_spanning_bridge else 1)
             for dimension, relation in bridge.get_associated_thematic_relations():
                 ctx.themespace.boost_theme(
                     bridge.theme_type, dimension, relation, factor
@@ -1414,9 +1415,6 @@ class EngineRunner:
         clamped = ctx.coderack.clamped_posting_probability(rule.codelet_type)
         if clamped is not None:
             return clamped
-
-        if not rule.posting_formula:
-            return 0.5  # Default, for a rule that states no formula at all.
 
         return evaluate_posting_formula(
             rule.posting_formula, rule.codelet_type, PostingContext(ctx)

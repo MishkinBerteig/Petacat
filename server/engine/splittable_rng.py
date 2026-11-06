@@ -39,11 +39,11 @@ well-defined independent streams rather than from a race.
 from __future__ import annotations
 
 import hashlib
-import math
 import struct
 from typing import Any, Callable, Sequence
 
-from server.engine.rng import TraceSeam
+from server.engine.rng import RNG, TraceSeam
+from server.engine.run_binding import constants
 
 #: Streams are addressed by a pair of 64-bit words, which is ample: the first
 #: identifies the drawing site (worker, codelet slot, or a derived substream) and the
@@ -184,8 +184,10 @@ class SplittableRNG(TraceSeam):
     def perturb(self, n: float) -> float:
         if n <= 0:
             return n
-        delta = self.randint(1 + round(math.sqrt(abs(n))))
-        return n + delta if self.prob(0.5) else n - delta
+        delta = self.randint(self.perturb_bound(n))
+        return n + delta if self.prob(constants().perturb_up_probability) else n - delta
+
+    perturb_bound = staticmethod(RNG.perturb_bound)
 
     def stochastic_filter(
         self, items: Sequence[Any], prob_fn: Callable[[Any], float]

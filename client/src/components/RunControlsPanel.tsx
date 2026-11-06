@@ -63,6 +63,7 @@ import { SwarmPanel } from '@/components/SwarmPanel';
 import { CollapsibleGroup } from '@/components/CollapsibleGroup';
 import { useMachine } from '@/hooks/useMachine';
 import {
+  catalogueNumber,
   parameterErrors,
   useParameterCatalogue,
 } from '@/hooks/useParameterCatalogue';
@@ -201,7 +202,15 @@ export function RunControlsPanel() {
    * own bounds — so a value out of range disables Run and says so, instead of
    * producing a 400 after the click with nothing on screen to explain it.
    */
-  const { specs } = useParameterCatalogue();
+  const { specs, load: loadCatalogue } = useParameterCatalogue();
+  useEffect(() => {
+    loadCatalogue();
+  }, [loadCatalogue]);
+  // The slider's ceiling, and the value a run starts with when nobody has stated one,
+  // are the configuration's: `max_activation` and `spreading_activation_threshold`.
+  const thresholdCeiling = catalogueNumber(specs, 'max_activation');
+  const configuredThreshold = catalogueNumber(specs, 'spreading_activation_threshold');
+  const shownThreshold = store.spreadingThreshold ?? configuredThreshold;
   const paramErrors = useMemo(
     () => parameterErrors(specs, store.parameterOverrides),
     [specs, store.parameterOverrides],
@@ -723,21 +732,23 @@ export function RunControlsPanel() {
 
         <div style={fieldGroupStyle}>
           <label style={labelStyle} htmlFor="spreading-threshold">
-            Spreading threshold: {store.spreadingThreshold}
-            {store.spreadingThreshold === 100 ? ' (original)' : ''}
+            Spreading threshold: {shownThreshold ?? '…'}
+            {thresholdCeiling !== null && shownThreshold === thresholdCeiling ? ' (original)' : ''}
           </label>
           <input
             id="spreading-threshold"
             type="range"
             min={0}
-            max={100}
+            max={thresholdCeiling ?? 0}
             step={1}
-            value={store.spreadingThreshold}
+            value={shownThreshold ?? 0}
+            disabled={thresholdCeiling === null || shownThreshold === null}
             onChange={(e) => store.setSpreadingThreshold(parseInt(e.target.value, 10))}
             style={{ width: '100%' }}
           />
           <span className="text-xs text-muted">
-            0 = all active nodes spread; 100 = the original. Moving it changes the run on screen.
+            0 = all active nodes spread; {thresholdCeiling ?? 'the maximum activation'} = the
+            original. Moving it changes the run on screen.
           </span>
         </div>
 

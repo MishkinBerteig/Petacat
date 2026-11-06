@@ -388,11 +388,7 @@ class ReviewService:
                         "seed": run.seed,
                         "codelet_count": run.codelet_count or 0,
                         "temperature": run.temperature or 0.0,
-                        "spreading_threshold": (
-                            100
-                            if run.spreading_threshold is None
-                            else int(run.spreading_threshold)
-                        ),
+                        "spreading_threshold": int(run.spreading_threshold),
                         "config_hash": run.config_hash,
                         "configuration_revision": run.configuration_revision,
                         "memory_hash": run.memory_hash,
@@ -536,7 +532,9 @@ class ReviewService:
                 "top": end_view["workspace"]["top_rules"],
                 "bottom": end_view["workspace"]["bottom_rules"],
             },
-            "slipnet": _activation_movement(start_view["slipnet"], end_view["slipnet"]),
+            "slipnet": _activation_movement(
+                start_view["slipnet"], end_view["slipnet"], meta.get_param("max_activation")
+            ),
             "themes": _theme_movement(start_view["themespace"], end_view["themespace"]),
             "trace": {
                 "events_at_start": len(start_view["trace"]),
@@ -1062,8 +1060,9 @@ def _structure_change(start: dict, end: dict) -> dict:
 _MOVEMENT_LIMIT = 15
 
 
-def _activation_movement(start: dict, end: dict) -> dict:
-    """Which concepts the Run recruited, biggest movers first."""
+def _activation_movement(start: dict, end: dict, full: float) -> dict:
+    """Which concepts the Run recruited, biggest movers first.  *full* is the activation
+    ceiling (``max_activation``): a concept at it is fully active."""
     moved = []
     for name, node in end.items():
         before = start.get(name, {}).get("activation", 0.0)
@@ -1081,10 +1080,10 @@ def _activation_movement(start: dict, end: dict) -> dict:
         "moved": moved[:_MOVEMENT_LIMIT],
         "moved_count": len(moved),
         "fully_active_at_start": sorted(
-            n for n, v in start.items() if v["activation"] >= 100
+            n for n, v in start.items() if v["activation"] >= full
         ),
         "fully_active_at_end": sorted(
-            n for n, v in end.items() if v["activation"] >= 100
+            n for n, v in end.items() if v["activation"] >= full
         ),
     }
 

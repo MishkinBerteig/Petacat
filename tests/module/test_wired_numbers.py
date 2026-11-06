@@ -230,7 +230,9 @@ def _snag_probability(scale: int) -> float:
 
         def get_param(self, name):
             return {"settling_period": 250, "max_clamp_period": 750, "grace_period": 100,
-                    "satisfactory_rule_quality": 80, "jootsing_count_scale": scale}[name]
+                    "satisfactory_rule_quality": 80, "jootsing_count_scale": scale,
+                    "jootsing_recurring_clamps_min": 3, "jootsing_recurring_snags_min": 3,
+                    "jootsing_elapsed_weight_at_start": 100.0}[name]
 
     trace = TemporalTrace()
     for count in range(6):

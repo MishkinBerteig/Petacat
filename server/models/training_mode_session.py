@@ -60,7 +60,7 @@ class TrainingModeSession(Base):
     # Settings: fixed at creation, because they shape what a run is.
     seeds_per_problem = Column(Integer, nullable=False, default=100)
     seed_start = Column(Integer, nullable=False, default=1)
-    max_codelets = Column(Integer, nullable=False, default=20000)
+    max_codelets = Column(Integer, nullable=False)
     parameters = Column(JSONB, nullable=True)
     backend = Column(String(32), nullable=False)
     #: Where the session's configuration came from, fixed at creation: ``"global"``,

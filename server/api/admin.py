@@ -10,7 +10,7 @@ from types import SimpleNamespace
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import func, inspect as sa_inspect, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -274,7 +274,7 @@ class SlipnetLinkRequest(BaseModel):
     link_type: str
     label_node: str | None = None
     link_length: int | None = None
-    fixed_length: bool = True
+    fixed_length: bool
 
 
 class SlipnetLinkResponse(BaseModel):
@@ -474,7 +474,7 @@ async def list_slipnet_links(session: AsyncSession = Depends(get_session)):
             link_type=r.link_type,
             label_node=r.label_node,
             link_length=r.link_length,
-            fixed_length=r.fixed_length if r.fixed_length is not None else True,
+            fixed_length=r.fixed_length,
         )
         for r in rows
     ]
@@ -501,7 +501,7 @@ async def create_slipnet_link(
         link_type=link.link_type,
         label_node=link.label_node,
         link_length=link.link_length,
-        fixed_length=link.fixed_length if link.fixed_length is not None else True,
+        fixed_length=link.fixed_length,
     )
 
 
@@ -528,7 +528,7 @@ async def update_slipnet_link(
         link_type=link.link_type,
         label_node=link.label_node,
         link_length=link.link_length,
-        fixed_length=link.fixed_length if link.fixed_length is not None else True,
+        fixed_length=link.fixed_length,
     )
 
 
@@ -1010,10 +1010,11 @@ class PostingRuleRequest(BaseModel):
     direction: str
     urgency_level: str | None = None
     urgency_formula: str | None = None
-    posting_formula: str = ""
-    count_formula: str = ""
+    #: A rule states what it posts with: no default, and not blank (ruling 27).
+    posting_formula: str = Field(min_length=1)
+    count_formula: str = Field(min_length=1)
     count_values: dict | None = None
-    condition: str = "always"
+    condition: str = Field(min_length=1)
     triggering_slipnodes: list[str] | None = None
 
 
@@ -1038,8 +1039,8 @@ async def list_posting_rules(session: AsyncSession = Depends(get_session)):
         PostingRuleResponse(
             id=r.id, rule_key=r.rule_key, codelet_type=r.codelet_type, direction=r.direction,
             urgency_level=r.urgency_level, urgency_formula=r.urgency_formula,
-            posting_formula=r.posting_formula or "", count_formula=r.count_formula or "",
-            count_values=r.count_values, condition=r.condition or "always",
+            posting_formula=r.posting_formula, count_formula=r.count_formula,
+            count_values=r.count_values, condition=r.condition,
             triggering_slipnodes=r.triggering_slipnodes,
         )
         for r in result.scalars().all()
@@ -1074,8 +1075,8 @@ async def create_posting_rule(
     return PostingRuleResponse(
         id=row.id, rule_key=row.rule_key, codelet_type=row.codelet_type, direction=row.direction,
         urgency_level=row.urgency_level, urgency_formula=row.urgency_formula,
-        posting_formula=row.posting_formula or "", count_formula=row.count_formula or "",
-        count_values=row.count_values, condition=row.condition or "always",
+        posting_formula=row.posting_formula, count_formula=row.count_formula,
+        count_values=row.count_values, condition=row.condition,
         triggering_slipnodes=row.triggering_slipnodes,
     )
 
@@ -1099,8 +1100,8 @@ async def update_posting_rule(
     return PostingRuleResponse(
         id=row.id, rule_key=row.rule_key, codelet_type=row.codelet_type, direction=row.direction,
         urgency_level=row.urgency_level, urgency_formula=row.urgency_formula,
-        posting_formula=row.posting_formula or "", count_formula=row.count_formula or "",
-        count_values=row.count_values, condition=row.condition or "always",
+        posting_formula=row.posting_formula, count_formula=row.count_formula,
+        count_values=row.count_values, condition=row.condition,
         triggering_slipnodes=row.triggering_slipnodes,
     )
 
@@ -1397,9 +1398,7 @@ async def export_metadata(session: AsyncSession = Depends(get_session)):
                 "link_type": r.link_type,
                 "label_node": r.label_node,
                 "link_length": r.link_length,
-                "fixed_length": r.fixed_length
-                if r.fixed_length is not None
-                else True,
+                "fixed_length": r.fixed_length,
             }
             for r in links_result.scalars().all()
         ],
@@ -1454,8 +1453,8 @@ async def export_metadata(session: AsyncSession = Depends(get_session)):
                 "id": r.id, "rule_key": r.rule_key, "codelet_type": r.codelet_type,
                 "direction": r.direction,
                 "urgency_level": r.urgency_level, "urgency_formula": r.urgency_formula,
-                "posting_formula": r.posting_formula or "", "count_formula": r.count_formula or "",
-                "count_values": r.count_values, "condition": r.condition or "always",
+                "posting_formula": r.posting_formula, "count_formula": r.count_formula,
+                "count_values": r.count_values, "condition": r.condition,
                 "triggering_slipnodes": r.triggering_slipnodes,
             }
             for r in posting_result.scalars().all()

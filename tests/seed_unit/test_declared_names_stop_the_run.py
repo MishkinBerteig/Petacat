@@ -123,7 +123,7 @@ def test_a_metacat_mode_run_lacking_the_spreading_threshold_gives_the_check_mess
 def _task():
     from server.parallel.swarm import RunTask
 
-    return RunTask("abc", "abd", "xyz", seed=1, max_steps=50)
+    return RunTask("abc", "abd", "xyz", None, seed=1, max_steps=50)
 
 
 @pytest.mark.parametrize("kind,name", _SAMPLE)

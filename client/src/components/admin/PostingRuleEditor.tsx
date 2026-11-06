@@ -45,7 +45,8 @@ function merged(rows: PostingRule[], id: number, patch: Partial<PostingRule>) {
     count_formula: pick('count_formula', ''),
     count_values: patch.count_values !== undefined
       ? patch.count_values : (c?.count_values ?? null),
-    condition: pick('condition', 'always'),
+    // No default stands in for a condition left blank: the server refuses it and says so.
+    condition: pick('condition', ''),
     triggering_slipnodes: patch.triggering_slipnodes !== undefined
       ? patch.triggering_slipnodes : (c?.triggering_slipnodes ?? null),
   }

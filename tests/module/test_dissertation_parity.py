@@ -977,7 +977,7 @@ class TestUiSurface:
                 assert isinstance(answer.vertical_themes, dict)
                 assert isinstance(answer.bottom_themes, dict)
                 assert isinstance(answer.unjustified_themes, dict)
-                assert isinstance(answer.is_coherent, bool)
+                assert isinstance(answer.is_coherent(meta), bool)
                 return
         pytest.fail("no answer stored in 6 runs")
 

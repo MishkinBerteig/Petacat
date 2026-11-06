@@ -295,7 +295,7 @@ def petacat_worker(task_path, output):
             justified = snag_justified_themes(a, memory)
             summaries.append({"answer": a.problem[3], "quality": float(a.quality),
                 "temperature": float(a.temperature), "rule_abstractness": float(a.top_rule_abstractness),
-                "theme_abstractness": float(a.theme_abstractness), "coherent": a.is_coherent,
+                "theme_abstractness": float(a.theme_abstractness), "coherent": a.is_coherent(meta),
                 "theme_count": len(all_themes),
                 "unjustified_count": len([x for x in unjustified_of(a) if x not in justified]),
                 "themes": sorted(f"{d}={r if r == 'diff' or r.startswith('plato-') else 'plato-' + r}"

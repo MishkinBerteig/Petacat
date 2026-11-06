@@ -248,7 +248,7 @@ async def test_session_managed_tables_refuse_even_in_expert_mode(app_client, op)
 
 @pytest.mark.asyncio
 async def test_deleting_a_session_row_names_the_service_route(app_client, db_session):
-    session_row = TrainingModeSession(name="c7 database tab", backend="serial", policy={})
+    session_row = TrainingModeSession(name="c7 database tab", backend="serial", policy={}, max_codelets=20000)
     db_session.add(session_row)
     await db_session.commit()
     try:
@@ -318,8 +318,8 @@ async def test_help_topics_are_content_written_directly(app_client):
 
 @pytest.fixture
 async def two_runs(db_session):
-    active = Run(initial_string="abc", modified_string="abd", target_string="ijk", seed=1, status="running")
-    done = Run(initial_string="abc", modified_string="abd", target_string="ijk", seed=2, status="answer_found")
+    active = Run(initial_string="abc", modified_string="abd", target_string="ijk", seed=1, status="running", spreading_threshold=100)
+    done = Run(initial_string="abc", modified_string="abd", target_string="ijk", seed=2, status="answer_found", spreading_threshold=100)
     db_session.add_all([active, done])
     await db_session.commit()
     ids = (active.id, done.id)
@@ -454,7 +454,7 @@ async def test_a_slow_statement_times_out(app_client, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_the_sql_box_shows_the_database_including_session_tables(app_client, db_session):
-    session_row = TrainingModeSession(name="c7 sql box", backend="serial", policy={})
+    session_row = TrainingModeSession(name="c7 sql box", backend="serial", policy={}, max_codelets=20000)
     db_session.add(session_row)
     await db_session.commit()
     try:

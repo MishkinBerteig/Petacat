@@ -297,5 +297,5 @@ def test_metacat_mode_calls_still_bind_by_hash_and_share_a_pool_with_session_tas
 
 
 def test_a_run_task_has_no_configuration_unless_a_session_gives_it_one():
-    assert RunTask("a", "b", "c").config is None
+    assert RunTask("a", "b", "c", None, 0, 1).config is None
     assert SessionTask("a", "b", "c", None, 1, 10, None, "off").config is None

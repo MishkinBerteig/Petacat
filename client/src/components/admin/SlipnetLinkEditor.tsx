@@ -41,6 +41,9 @@ const COLUMNS: ColumnDef[] = [
   { key: 'label_node', label: 'Label', type: 'text', width: '18%' },
   // A link may carry no fixed length, so an empty box means absent rather than zero.
   { key: 'link_length', label: 'Length', type: 'number', width: '8%', nullable: true },
+  // `true` or `false`, stated: the server holds no default for it (a new link that leaves it
+  // blank is refused and the message says which field).
+  { key: 'fixed_length', label: 'Fixed', type: 'json', width: '6%' },
 ]
 
 export function SlipnetLinkEditor({ configuration = GLOBAL_CONFIGURATION_ID }: ConfigurationProp) {
@@ -102,7 +105,7 @@ export function SlipnetLinkEditor({ configuration = GLOBAL_CONFIGURATION_ID }: C
               from_node: row.from_node, to_node: row.to_node,
               link_type: row.link_type, label_node: row.label_node || null,
               link_length: row.link_length == null ? null : Number(row.link_length),
-              fixed_length: true,
+              fixed_length: row.fixed_length,
             }),
           },
         )}
@@ -118,7 +121,7 @@ export function SlipnetLinkEditor({ configuration = GLOBAL_CONFIGURATION_ID }: C
                 from_node: merged.from_node, to_node: merged.to_node,
                 link_type: merged.link_type, label_node: merged.label_node || null,
                 link_length: merged.link_length == null ? null : Number(merged.link_length),
-                fixed_length: merged.fixed_length ?? true,
+                fixed_length: merged.fixed_length,
               }),
             },
           )

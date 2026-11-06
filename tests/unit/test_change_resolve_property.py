@@ -107,7 +107,7 @@ class Gen:
         if kind == "add_node":
             new = self.name("n")
             op = {"op": "add_node", "name": new, "fields": {"short_name": "q", "conceptual_depth": r.randint(0, 100)},
-                  "links": [{"to": self.pick(doc, "slipnet_node_defs"), "type": "lateral",
+                  "links": [{"to": self.pick(doc, "slipnet_node_defs"), "type": "lateral", "fixed": False,
                              **({"label": self.pick(doc, "slipnet_node_defs")} if r.random() < 0.3 else {})}
                             for _ in range(r.randint(0, 3))],
                   "params": {}}
@@ -138,13 +138,14 @@ class Gen:
             return {"op": "remove_link", "key": dict(zip(("from_node", "to_node", "link_type", "label_node"), k))}
         if kind == "add_link":
             return {"op": "add_link", "from": self.pick(doc, "slipnet_node_defs"), "to": self.pick(doc, "slipnet_node_defs"),
-                    "type": "lateral"}
+                    "type": "lateral", "fixed": False}
         if kind == "remove_posting_rule":
             return {"op": "remove_posting_rule", "rule_key": self.pick(doc, "posting_rules")}
         if kind == "add_posting_rule":
             direction = next(iter(t["posting_directions"]))[0]
             return {"op": "add_posting_rule", "rule_key": self.name("rule"),
                     "fields": {"codelet_type": self.pick(doc, "codelet_type_defs"), "direction": direction,
+                               "posting_formula": "temperature / 100", "count_formula": "fixed", "condition": "always",
                                "triggering_slipnodes": [self.pick(doc, "slipnet_node_defs") for _ in range(2)]}}
         if kind in ("add_trigger", "remove_trigger"):
             return {"op": kind, "rule_key": self.pick(doc, "posting_rules"), "node": self.pick(doc, "slipnet_node_defs")}

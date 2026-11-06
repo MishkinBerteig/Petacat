@@ -16,6 +16,7 @@
 // copy in the client would drift into offering values the API refuses.
 // ---------------------------------------------------------------------------
 
+import { useEffect } from 'react';
 import { create } from 'zustand';
 import { getParameterCatalogue, describeApiError } from '@/api/client';
 import type { RunParameterSpec, RunParameterValue } from '@/types';
@@ -57,6 +58,29 @@ export function useParameterCatalogue(): CatalogueState {
   const error = useParameterCatalogueStore((s) => s.error);
   const load = useParameterCatalogueStore((s) => s.load);
   return { specs, isLoading, error, load };
+}
+
+/**
+ * The configuration's value of a numeric run parameter, from the catalogue, or `null`
+ * while the catalogue has not arrived (or does not offer that parameter).
+ *
+ * The client holds no copy of a configuration value: the activation ceiling, the
+ * Themespace's ceiling and the spreading threshold the next run will start with are all
+ * read from here, so a configuration that changes them is followed by the screen.
+ */
+export function catalogueNumber(specs: RunParameterSpec[], name: string): number | null {
+  const value = specs.find((s) => s.name === name)?.default;
+  return typeof value === 'number' ? value : null;
+}
+
+/** :func:`catalogueNumber` for a component: fetches the catalogue once and follows it. */
+export function useCatalogueNumber(name: string): number | null {
+  const specs = useParameterCatalogueStore((s) => s.specs);
+  const load = useParameterCatalogueStore((s) => s.load);
+  useEffect(() => {
+    load();
+  }, [load]);
+  return catalogueNumber(specs, name);
 }
 
 // ---------------------------------------------------------------------------

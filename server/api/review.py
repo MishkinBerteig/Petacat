@@ -75,7 +75,7 @@ class RunSummary(BaseModel):
     seed: int
     codelet_count: int
     temperature: float
-    spreading_threshold: int = 100
+    spreading_threshold: int
     #: Which configuration and which Episodic Memory the Run executed against (WP3.5).
     #: Part of the Run's identity: two Runs with one seed and different hashes are not
     #: the same experiment.
@@ -230,9 +230,7 @@ async def get_recorded_run(
         seed=row.seed,
         codelet_count=row.codelet_count or 0,
         temperature=row.temperature or 0.0,
-        spreading_threshold=(
-            100 if row.spreading_threshold is None else int(row.spreading_threshold)
-        ),
+        spreading_threshold=int(row.spreading_threshold),
         config_hash=row.config_hash,
         configuration_revision=row.configuration_revision,
         memory_hash=row.memory_hash,

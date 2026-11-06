@@ -111,7 +111,8 @@ async def _insert_runs(db_session, n: int) -> list[int]:
     from server.models.run import Run
 
     rows = [
-        Run(initial_string="abc", modified_string="abd", target_string="xyz", seed=i)
+        Run(initial_string="abc", modified_string="abd", target_string="xyz", seed=i,
+            spreading_threshold=100)
         for i in range(n)
     ]
     db_session.add_all(rows)

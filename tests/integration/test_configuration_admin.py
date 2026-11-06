@@ -206,7 +206,8 @@ async def test_reset_leaves_runs_and_episodic_memory_alone(loaded):
 
     await _edit(loaded)
     async with _s(loaded) as session:
-        session.add(Run(initial_string="abc", modified_string="abd", target_string="ijk", seed=1))
+        session.add(Run(initial_string="abc", modified_string="abd", target_string="ijk", seed=1,
+                        spreading_threshold=100))
         await session.commit()
     before = await _runtime_counts(loaded)
     assert before["runs"] == 1

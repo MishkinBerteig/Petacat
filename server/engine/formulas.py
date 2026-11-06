@@ -15,6 +15,19 @@ if TYPE_CHECKING:
     from server.engine.metadata import MetadataProvider
 
 
+def pow_exact(x: Any, exponent: Any) -> Any:
+    """``x ** exponent``, with a square root taken by ``math.sqrt``.
+
+    ``pow(x, 0.5)`` and ``sqrt(x)`` differ in the last bit for some ``x`` (1,439 of 1.1
+    million samples), and the Scheme's ``sqrt`` is the correctly rounded one.  An exponent
+    that is exactly 0.5 is therefore the square root, taken as the Scheme takes it; any
+    other exponent is a power.  This is arithmetic exactness, not a mode test.
+    """
+    if exponent == 0.5:
+        return math.sqrt(x)
+    return x**exponent
+
+
 def temp_adjusted_probability(
     prob: float, temperature: float, meta: MetadataProvider
 ) -> float:

@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Any
 from server.engine.images import ImageFailure
 from server.engine.metadata import require_meta
 from server.engine.roles import Absent
+from server.engine.run_binding import constants
 from server.engine.rules import (
     RULE_TOP, Rule, RuleClause, RuleChange, _TranslationFailure, rules_equal,
 )
@@ -764,17 +765,23 @@ def _retention_probability(
     """Compute the retention probability for a single pattern entry.
 
     Scheme: justify.ss ``retention-probability``.
-    StrPos entries always retained (probability 1).
-    Others: cd(dimension) * (``justify_retention_identity_percent`` if identity else 100) / 100.
+    StrPos entries are retained with ``justify_retention_string_position`` (1 in the Metacat
+    Standard Configuration).  Others: cd(dimension) * (``justify_retention_identity_percent``
+    if identity else ``justify_retention_non_identity_percent``) / 100.
     """
+    k = constants()
     dim = entry[0] if isinstance(entry, tuple) else None
     rel = entry[1] if isinstance(entry, tuple) and len(entry) > 1 else None
 
     if dim is not None and _plays(dim, "dimension.string_position", slipnet):
-        return 1.0
+        return k.justify_retention_string_position
 
     cd = _get_conceptual_depth(dim, slipnet)
-    identity_factor = float(identity_percent) if _is_identity_label(rel) else 100.0
+    identity_factor = (
+        float(identity_percent)
+        if _is_identity_label(rel)
+        else k.justify_retention_non_identity_percent
+    )
     return (cd / 100.0) * (identity_factor / 100.0)
 
 
@@ -980,7 +987,11 @@ def _monitor_new_rule(
     if trace is None:
         return
     relative_quality = rule.get_relative_quality(workspace)
-    importance = 100.0 if rule.uniformity == 100 else float(relative_quality)
+    importance = (
+        meta.get_param("uniform_rule_importance")
+        if rule.uniformity == meta.get_param("perfect_rule_uniformity")
+        else float(relative_quality)
+    )
     if importance < meta.get_param("rule_importance_threshold"):
         return
     trace.record_event(

@@ -34,11 +34,15 @@ this directory into the empty one.
 not an external program, not the in-worker learner, and not any Training Mode Session. Those all go
 through the change API and change the database, and the journal records them.
 
-The files change only through a **committed development change**, and only in three cases:
+The files change only through a **committed development change**, and only in four cases:
 
 1. to fix a fidelity bug in Petacat (a place where Petacat differs from Metacat);
 2. to remove a row or field that nothing reads (proven unread by reading the code and by running);
-3. to make a row that held a copy of a stored value name it instead. A posting rule's
+3. to move a value the engine held as a literal into the configuration (round 2, stage 5: every
+   number that determines Metacat Mode's cognition is a row, read from the database), which adds
+   the row to `engine_params.json` or `formula_coefficients.json` with today's value in its
+   exact form (an int stays an int, a float a float) and the name of the literal it replaces.
+4. to make a row that held a copy of a stored value name it instead. A posting rule's
    `urgency_level` holds the *name* of a tier of `urgency_levels` (`low`, `medium`,
    `extremely_low`), where it used to hold that tier's number (35, 49, 7), so a tier is stored
    once and editing it moves every rule that names it. Nothing else about a row changes.

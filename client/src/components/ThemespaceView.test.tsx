@@ -14,10 +14,38 @@
  */
 
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ThemespaceGrid } from './ThemespaceView';
-import type { ClusterState, ThemespaceState, ThemeState } from '@/types';
+import { useParameterCatalogueStore } from '@/hooks/useParameterCatalogue';
+import type { ClusterState, RunParameterSpec, ThemespaceState, ThemeState } from '@/types';
+
+/**
+ * The value a clamp pins a theme to is the configuration's `max_theme_activation`, served by
+ * the run-parameter catalogue; the grid holds no number of its own.  These tests serve the
+ * Metacat Standard Configuration's 100 unless they say otherwise.
+ */
+function serveCatalogue(ceiling: number | null) {
+  const specs: RunParameterSpec[] =
+    ceiling === null
+      ? []
+      : [
+          {
+            name: 'max_theme_activation',
+            kind: 'int',
+            group: 'themes',
+            label: 'Theme ceiling',
+            description: '',
+            minimum: null,
+            maximum: null,
+            departs_from_original: true,
+            default: ceiling,
+          },
+        ];
+  useParameterCatalogueStore.setState({ specs, isLoading: false, error: null });
+}
+
+beforeEach(() => serveCatalogue(100));
 
 function theme(relation: string, activation: number): ThemeState {
   return {
@@ -51,6 +79,25 @@ function themespace(clusters: ClusterState[] = [CLUSTER]): ThemespaceState {
 function buttons(label: string): HTMLButtonElement[] {
   return screen.getAllByRole('button', { name: label }) as HTMLButtonElement[];
 }
+
+describe('ThemespaceGrid — the clamp value is the configuration\'s', () => {
+  it('pins a theme to the ceiling the catalogue serves, whatever it is', () => {
+    serveCatalogue(250);
+    const onClamp = vi.fn();
+    render(<ThemespaceGrid themespace={themespace()} onClamp={onClamp} />);
+
+    fireEvent.click(buttons('Clamp +250')[1]);
+    expect(onClamp.mock.calls[0][2]).toBe(250);
+    fireEvent.click(buttons('Clamp -250')[0]);
+    expect(onClamp.mock.calls[1][2]).toBe(-250);
+  });
+
+  it('offers no clamp before the catalogue has said what the ceiling is', () => {
+    serveCatalogue(null);
+    render(<ThemespaceGrid themespace={themespace()} onClamp={vi.fn()} />);
+    expect(screen.queryAllByRole('button', { name: /^Clamp [+-]/ })).toHaveLength(0);
+  });
+});
 
 describe('ThemespaceGrid — clamping a theme', () => {
   it('clamps to +100 from a labelled button', () => {

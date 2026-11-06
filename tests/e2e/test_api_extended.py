@@ -637,8 +637,8 @@ _WRITABLE_COLLECTIONS = [
         {
             "codelet_type": "e2e-scout", "direction": "bottom_up",
             "urgency_level": "low", "urgency_formula": None,
-            "posting_formula": "", "count_formula": "", "count_values": None,
-            "condition": "always", "triggering_slipnodes": None,
+            "posting_formula": "temperature / 100", "count_formula": "fixed",
+            "count_values": {"fixed": 1}, "condition": "always", "triggering_slipnodes": None,
         },
         "condition", "never",
     ),

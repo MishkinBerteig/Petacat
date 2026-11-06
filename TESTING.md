@@ -146,13 +146,13 @@ outside the matrix take it too and the run is entirely what it says it is.
   whole suite requested: the full matrix is required of this run
 
   unit          1809 collected   1809 run   1809 passed      0 failed      0 skipped  complete
-  seed_unit     1076 collected   1076 run   1076 passed      0 failed      0 skipped  complete
+  seed_unit     1127 collected   1127 run   1127 passed      0 failed      0 skipped  complete
   module        1049 collected   1049 run   1049 passed      0 failed      0 skipped  complete
   architecture    92 collected     92 run     92 passed      0 failed      0 skipped  complete
   integration    358 collected    358 run    358 passed      0 failed      0 skipped  complete
   parallel       304 collected    304 run    304 passed      0 failed      0 skipped  complete
   lockstep       247 collected    247 run    247 passed      0 failed      0 skipped  complete
-  e2e            592 collected    592 run    592 passed      0 failed      0 skipped  complete
+  e2e            602 collected    602 run    602 passed      0 failed      0 skipped  complete
 
   run complete in 13.9 min against a 60 min ceiling
 ```
@@ -170,8 +170,8 @@ single file or node id. Such a run names what narrowed it, names the roles it
 exercised, and exits on whether its tests passed:
 
 ```
-  cpu  numpy    float64      0 tests
-  gpu  mlx      float32     14 tests
+  cpu  numpy    float64      911 tests
+  gpu  mlx      float32     911 tests
   cpu  numpy: no selected test ran on it
   narrowed by -k 'mlx': this run reports the roles it exercised and is not held to the full matrix
 ```
@@ -225,13 +225,13 @@ that allowance.
 | Layer | Directory | Scope | May depend on | Cases |
 |-------|-----------|-------|---------------|-------|
 | **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 1809 |
-| **seed unit** | `tests/seed_unit/` | One class or function, measured against the values Petacat ships with | Real `seed_data/*.json`, and the machine the process is running on | 1076 |
+| **seed unit** | `tests/seed_unit/` | One class or function, measured against the values Petacat ships with | Real `seed_data/*.json`, and the machine the process is running on | 1127 |
 | **module** | `tests/module/` | Several real components assembled and driven | Real engine objects and `seed_data/*.json`; no DB, no HTTP | 1049 |
 | **architecture** | `tests/architecture/` | How the source tree is allowed to depend on itself | The repository's source, `seed_data/*.json`, child interpreters | 92 |
 | **integration** | `tests/integration/` | Agreement between the repository's artifacts, and the harness's own rules | Real `seed_data/*.json`, the ORM declarations, the generated client files, the documentation, a real pytest session | 358 |
 | **parallel** | `tests/parallel/` | The detachable multi-core plugin (`server/parallel/`): each executor against the serial run it claims to equal | Real engine objects and `seed_data/*.json`, worker processes and threads; each test pins the backend it compares on | 304 |
 | **lockstep** | `tests/lockstep/` | Petacat's decision traces against Metacat's: naming, helper conformance, tracing/replay RNGs, determinism guards, the comparer | Real engine in faithful mode (numeric backend off, or a named backend); recorded Metacat traces | 247 |
-| **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 592 |
+| **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 602 |
 
 Those counts are cases, so they include the second pass the numeric matrix makes
 over the 911 backend-sensitive tests.
@@ -266,7 +266,7 @@ first**, then move up toward the API and GUI.
 
 All eight layers run in one command — the
 [required command](#the-required-command) — and, since Petacat runs natively, all
-eight actually run: **5,527 cases**, every one of them executed. A layer that is
+eight actually run: **5,588 cases**, every one of them executed. A layer that is
 normally skipped is not a layer that is normally green, and none of these is.
 
 Wall-clock time depends heavily on the machine and on what else it is doing. The
@@ -518,6 +518,7 @@ changing what it records.
 | `test_commentary.py` | 7 | The emit helpers that render from the seeded commentary templates |
 
 | `test_episodic_memory.py` | 21 | Reminding, comparison and the reminding distance, which resolve the seeded templates and the seeded conceptual depths |
+| `test_every_moved_value_reaches_its_site_b.py` | 11 | Round 2, stage 5 (group B): every value moved into the database from the run, the codelet bodies' builtins, self-watching, memory, justify and the random stream reaches a run: one key changed, a run that reaches its site differs (40 rows, a chain of runs for the answer distance, direct tests for the five sites no run reaches in reasonable time and for the two generators' `~`), today's value is the old literal in its old form, and each key is on the declared read list |
 | `test_fallback_instrumentation.py` | 4 | The silent-fallback observer (EN0, `tests/support/fallback_instrumentation.py`) sees the three blanket `except Exception` blocks of `justify.py` and a lookup of an absent Slipnet node, and changes nothing else; `scripts/count_silent_fallbacks.py` makes the count over the whole baseline set |
 | `test_formulas.py` | 10 | The temperature-dependent formulas against the seeded coefficients |
 | `test_hardware.py` | 20 | The machine description and the sizes derived from it: real probes, faked probes, environment overrides |
@@ -685,6 +686,7 @@ changing what it records.
 | `test_run_to_answer.py` | 8 | The Run-to-Answer feature over HTTP |
 | `test_review_replay.py` | 17 | Review replays what the Run did (round 2, stage R): the Audit inspector's views equal the live Run's at every codelet, over HTTP, for each kind of action a person takes on a live Run (clamps of temperature, node, theme and codelet, Undo, Self-watching, the threshold, displaying a past event or answer, a reset, a pause with Run), several in one Run, each kind of configuration edit after the Run (coefficient, node, links, codelet body, posting rules, theme dimension, reset to standard, an Admin import that edited and restored a row), runs under different configurations and a server restart; an unrebuildable configuration is refused with 422, a replay that disagrees with the log says so, captures are projected under the Run's configuration, and only Audit records a person's actions |
 | `test_two_runs_over_http.py` | 5 | Two live runs held by one server (round 2, stage 2): run A, driven as the client does (step batches, view polls between them), is codelet-for-codelet and view-for-view the run it is alone when run B is created before A is stepped, with the same configuration (normal and fast) or one edited in between through the Admin API, and when the two are stepped alternately; an open Audit inspector, stepped between A's batches, changes nothing; and no run is bound around an e2e test (the unit/module fixture's ambient run must not hide a server path that forgot its scope) |
+| `test_s5b_values_from_the_database.py` | 8 | Round 2, stage 5 (group B): the spreading-threshold clip is `max_activation`, a run made with no threshold takes the configuration's, a theme clamp that states no activation takes `max_theme_activation`, the run-parameter catalogue serves both ceilings, the Swarm and a Training Mode Session take `default_max_codelets` (and the Swarm's status serves it), and a slipnet link or posting rule that leaves out `fixed_length`, `posting_formula`, `count_formula` or `condition` is refused (422) |
 | `test_memory_order.py` | 2 | A restart puts stored answers back newest first by the memory's own identifier, both projections list them oldest first, and forgetting one keeps the rest in order |
 | `test_snag_identity.py` | 5 | A snag is the same snag whichever endpoint served it, and is written once |
 | `test_moment_display.py` | 6 | Event, answer and snag redisplay over the API: print names in the listing, the picture served live and from the stored row, the toggle and the switch, rows with no picture |

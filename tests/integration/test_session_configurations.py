@@ -89,7 +89,7 @@ async def new_session_row(engine, name: str = "S") -> int:
     from server.models.training_mode_session import TrainingModeSession
 
     async with _s(engine) as session:
-        row = TrainingModeSession(name=name, backend="single", policy={})
+        row = TrainingModeSession(name=name, backend="single", policy={}, max_codelets=20000)
         session.add(row)
         await session.commit()
         return row.id

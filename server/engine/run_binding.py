@@ -208,6 +208,56 @@ class RunConstants:
     #: they had been rebuilt for every object twice per update.
     salience: Any = derived(_salience_weights)
 
+    # -- The run, the random stream and the Trace's importances ------------------------
+    #: The ``~`` operator (``rng.perturb``): the chance the delta is added, and the exponent
+    #: of the delta's bound, ``1 + round(|n| ** perturb_delta_exponent)``.
+    perturb_up_probability: Any = param()
+    perturb_delta_exponent: Any = formula()
+    #: Bond scanning: a scan of ``i`` bonds is drawn with weight ``i ** bond_scan_exponent``.
+    bond_scan_exponent: Any = formula()
+    #: A spanning bridge boosts its themes this many times as hard.
+    spanning_bridge_theme_boost_factor: Any = formula()
+    #: Slippage importance (``trace.ss:1365-1385``).
+    slippage_importance_unlabelled_depth: Any = formula()
+    slippage_importance_spanning_term: Any = formula()
+    slippage_importance_weight_dimension_depth: Any = formula()
+    slippage_importance_weight_spanning: Any = formula()
+    slippage_importance_weight_descriptor_depth: Any = formula()
+    slippage_importance_weight_label_depth: Any = formula()
+    #: The importance a Trace event takes when it is special, and what makes a rule perfect.
+    group_special_importance: Any = param()
+    thematic_slippage_importance: Any = param()
+    uniform_rule_importance: Any = param()
+    perfect_rule_uniformity: Any = param()
+    #: Justify's retention of a theme-pattern entry.
+    justify_retention_string_position: Any = param()
+    justify_retention_non_identity_percent: Any = param()
+
+    #: The two blends a scout draws its target from: a bond facet by local support and
+    #: activation, and a string by relevance and unhappiness.
+    bond_facet_choice_local_support_weight: Any = formula()
+    bond_facet_choice_activation_weight: Any = formula()
+    scout_string_choice_relevance_weight: Any = formula()
+    scout_string_choice_unhappiness_weight: Any = formula()
+
+    # -- The weights of a fight (``wins-fight?``), proposer against opponent -----------
+    fight_bond_vs_bond_proposer_weight: Any = formula()
+    fight_bond_vs_bond_opponent_weight: Any = formula()
+    fight_bond_vs_group_proposer_weight: Any = formula()
+    fight_bond_vs_bridge_proposer_weight: Any = formula()
+    fight_bond_vs_bridge_opponent_weight: Any = formula()
+    fight_group_vs_flipped_bond_opponent_weight: Any = formula()
+    fight_group_vs_group_proposer_weight: Any = formula()
+    fight_group_vs_group_opponent_weight: Any = formula()
+    fight_group_vs_bridge_proposer_weight: Any = formula()
+    fight_group_vs_bridge_opponent_weight: Any = formula()
+    fight_bridge_vs_bond_proposer_weight: Any = formula()
+    fight_bridge_vs_bond_opponent_weight: Any = formula()
+    fight_bridge_vs_enclosing_group_proposer_weight: Any = formula()
+    fight_bridge_vs_enclosing_group_opponent_weight: Any = formula()
+    fight_bridge_vs_flipped_group_proposer_weight: Any = formula()
+    fight_bridge_vs_flipped_group_opponent_weight: Any = formula()
+
     @classmethod
     def from_metadata(cls, meta: Any) -> RunConstants:
         """Resolve every declared field from *meta*.  Raises ``KeyError`` for a missing

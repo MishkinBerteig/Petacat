@@ -160,7 +160,8 @@ def test_a_row_added_without_an_ordinal_goes_last_and_a_rule_key_defaults_to_its
     from server.models.metadata import EngineParam, PostingRule, SlipnetLinkDef
 
     async def body(session):
-        rule = PostingRule(codelet_type="a-new-codelet-type", direction="bottom_up")
+        rule = PostingRule(codelet_type="a-new-codelet-type", direction="bottom_up",
+                           posting_formula="temperature / 100", count_formula="fixed", condition="always")
         session.add(rule)
         link = SlipnetLinkDef(from_node="plato-a", to_node="plato-c", link_type="lateral",
                               label_node="plato-successor", link_length=None, fixed_length=False)
@@ -184,7 +185,8 @@ def test_a_create_without_an_explicit_id_succeeds_after_the_first_load():
 
     async def body(session):
         rows = [
-            PostingRule(codelet_type="another-new-type", direction="bottom_up"),
+            PostingRule(codelet_type="another-new-type", direction="bottom_up",
+                        posting_formula="temperature / 100", count_formula="fixed", condition="always"),
             SlipnetLinkDef(from_node="plato-a", to_node="plato-c", link_type="lateral",
                            label_node="plato-successor", link_length=None, fixed_length=False),
             DemoProblem(name="a new demo", initial="abc", modified="abd", target="ijk",

@@ -360,7 +360,6 @@ _READ_BY_THE_ENGINE_BUT_NOT_OFFERED = {
     # Numbers that could be offered and are not yet.
     "expiration_period",
     "num_youngest_structures",
-    "max_theme_activation",
     "distance_threshold",
     "slippage_ignore_probability",
     # Rule abstraction, justify's retention and the bridge-recruit urgency level.
@@ -389,6 +388,25 @@ _READ_BY_THE_ENGINE_BUT_NOT_OFFERED = {
     # ``rules.ss:1723``): the wrap width, and ``get-dimension-phrase``'s name table.
     "maximum_rule_line_length",
     "rule_english_dimension_phrases",
+    # Stage 5 group B moved these out of the engine: the ``~`` operator's coin, the number of
+    # equivalent clamps and snags the jootser needs before it notices a pattern, what a clamp
+    # made before the first codelet weighs, justify's retention of a String-Position entry and
+    # of a non-identity entry, the two cut-offs of an incoherent answer, the activation a new
+    # answer starts with, and the importance a group, a slippage and a perfectly uniform rule
+    # take when they are special (and what makes a rule perfectly uniform).
+    "perturb_up_probability",
+    "jootsing_recurring_clamps_min",
+    "jootsing_recurring_snags_min",
+    "jootsing_elapsed_weight_at_start",
+    "justify_retention_string_position",
+    "justify_retention_non_identity_percent",
+    "answer_incoherent_theme_abstractness_min",
+    "answer_incoherent_abstractness_gap_min",
+    "new_answer_activation",
+    "group_special_importance",
+    "thematic_slippage_importance",
+    "uniform_rule_importance",
+    "perfect_rule_uniformity",
 }
 
 #: Read by the control API, never by a run.
@@ -397,6 +415,9 @@ _READ_BY_ANOTHER_LAYER = {
     # Display names served with the Themespace state (serialization.py).
     "theme_dimension_labels",
     "theme_relation_labels",
+    # The one default run length of bulk work (the Swarm, a Training Mode Session's creation and
+    # both client forms); a single run has no limit.
+    "default_max_codelets",
 }
 
 def test_every_engine_parameter_is_classified():

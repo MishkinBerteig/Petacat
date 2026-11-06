@@ -118,10 +118,9 @@ class Run(Base):
     #: Which Slipnet nodes were allowed to spread during this run (0-100).
     #: Recorded per run because it changes what the run does — 100 is the
     #: original's behaviour, and a run at any other value is not comparable with
-    #: the dissertation's. ``server_default`` so pre-existing rows read as 100.
-    spreading_threshold = Column(
-        Integer, nullable=False, default=100, server_default="100",
-    )
+    #: the dissertation's.  Always stated: ``create_run`` resolves it from the run's
+    #: ``spreading_activation_threshold`` before the row is written, so no default stands here.
+    spreading_threshold = Column(Integer, nullable=False)
     #: Persistence mode — a property of the Run, chosen at creation, never a global
     #: setting: later phases want a Fast corpus-training population and a Normal live
     #: dialogue in the same process.

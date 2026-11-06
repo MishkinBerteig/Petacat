@@ -117,7 +117,7 @@ async def make_session_config(engine, name="S", base="standard") -> tuple[int, i
     from server.services.configurations import create_session_configuration
 
     async with _s(engine) as session:
-        row = TrainingModeSession(name=name, backend="single", policy={})
+        row = TrainingModeSession(name=name, backend="single", policy={}, max_codelets=20000)
         session.add(row)
         await session.commit()
         sid = row.id

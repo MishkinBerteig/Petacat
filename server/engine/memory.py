@@ -71,9 +71,12 @@ class AnswerDescription:
         if not self.vertical_themes:
             self.vertical_themes = dict(self.themes)
 
-    @property
-    def is_coherent(self) -> bool:
+    def is_coherent(self, meta: Any) -> bool:
         """Do the rule and the themes sit at the same level of abstraction?
+
+        *meta* is the configuration the answer is judged under: the two cut-offs below are
+        ``answer_incoherent_theme_abstractness_min`` and
+        ``answer_incoherent_abstractness_gap_min``.
 
         §4.7.3: dyz "involves themes based on the abstract concept of opposite,
         but depends on a literal-minded interpretation of abc => abd.  This
@@ -98,9 +101,10 @@ class AnswerDescription:
         if theme_abstractness <= 0.0:
             return True
         incoherent = (
-            theme_abstractness > 50.0
+            theme_abstractness > meta.get_param("answer_incoherent_theme_abstractness_min")
             and rule_abstractness < theme_abstractness
-            and (theme_abstractness - rule_abstractness) > 25.0
+            and (theme_abstractness - rule_abstractness)
+            > meta.get_param("answer_incoherent_abstractness_gap_min")
         )
         return not incoherent
 
@@ -300,7 +304,7 @@ class EpisodicMemory:
             # ``memory.ss:214`` reports a reminding only for a non-zero activation.
             if past.activation > 0:
                 remindings.append(past)
-        new_desc.activation = 100.0
+        new_desc.activation = meta.get_param("new_answer_activation")
         return remindings
 
     def distance(
@@ -361,7 +365,7 @@ class EpisodicMemory:
 
         self.unresolved_names |= comparison.unresolved_names
 
-        distance = 1.0
+        distance = meta.get_formula_coeff("answer_distance_base")
         unique_theme_weight = meta.get_formula_coeff("answer_distance_unique_theme_weight")
         rule_difference_weight = meta.get_formula_coeff(
             "answer_distance_rule_difference_weight"
@@ -369,7 +373,8 @@ class EpisodicMemory:
 
         # 1. Differing themes count once; themes unique to one side count double.
         distance += float(
-            len(comparison.differing_dimensions)
+            meta.get_formula_coeff("answer_distance_differing_theme_weight")
+            * len(comparison.differing_dimensions)
             + unique_theme_weight * len(comparison.unique1)
             + unique_theme_weight * len(comparison.unique2)
         )
@@ -391,14 +396,14 @@ class EpisodicMemory:
             distance += rule_difference_weight * comparison.num_rule_differences
 
         # 4. Ideas common to both answers that only one of them could justify.
-        distance += float(
+        distance += meta.get_formula_coeff("answer_distance_justification_weight") * float(
             len(comparison.common_a_only_unjustified)
             + len(comparison.common_b_only_unjustified)
         )
 
         # 5. Coherence mismatch.
-        if a.is_coherent != b.is_coherent:
-            distance += 1.0
+        if a.is_coherent(meta) != b.is_coherent(meta):
+            distance += meta.get_formula_coeff("answer_distance_coherence_weight")
 
         return distance
 
@@ -496,8 +501,8 @@ class EpisodicMemory:
             "b_unique_themes": dict(comparison.unique2),
             "a_unjustified_themes": self._classify_unjustified(a),
             "b_unjustified_themes": self._classify_unjustified(b),
-            "a_coherent": a.is_coherent,
-            "b_coherent": b.is_coherent,
+            "a_coherent": a.is_coherent(meta),
+            "b_coherent": b.is_coherent(meta),
             "a_quality": a.quality,
             "b_quality": b.quality,
             "a_rule": a.top_rule_description,

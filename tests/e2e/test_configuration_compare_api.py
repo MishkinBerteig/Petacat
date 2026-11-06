@@ -25,7 +25,7 @@ async def pair(db_session):
         ("C9a A", [{"op": "insert", "table": "slipnet_node_defs", "row": NODE}]),
         ("C9a B", []),
     ):
-        row = TrainingModeSession(name=name, backend="single", policy={})
+        row = TrainingModeSession(name=name, backend="single", policy={}, max_codelets=20000)
         db_session.add(row)
         await db_session.flush()
         ids.append(row.id)

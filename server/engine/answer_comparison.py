@@ -736,7 +736,7 @@ def explain_answer(
         "explanation": explanation,
         "quality_phrase": phrase,
         "coherence_phrase": coherence_phrase(coherence_score(answer), templates),
-        "is_coherent": answer.is_coherent,
+        "is_coherent": answer.is_coherent(meta),
         "warnings": sorted(warnings),
     }
 
@@ -1384,8 +1384,8 @@ class AnswerComparison:
     # -- assembly -----------------------------------------------------------
 
     def render(self) -> dict[str, Any]:
-        a_incoherent = not self.a.is_coherent
-        b_incoherent = not self.b.is_coherent
+        a_incoherent = not self.a.is_coherent(self.meta)
+        b_incoherent = not self.b.is_coherent(self.meta)
         verdict = self.verdict()
 
         segments = [
@@ -1447,7 +1447,7 @@ def _criterion_both_incoherent(
 ) -> dict[str, Any] | None:
     """``answers.ss:825-841``: when neither answer hangs together, prefer the one that
     hangs together *less badly* — fewer abstract themes stranded above a literal rule."""
-    if ctx.a.is_coherent or ctx.b.is_coherent:
+    if ctx.a.is_coherent(ctx.meta) or ctx.b.is_coherent(ctx.meta):
         return None
     abstractness1 = ctx.a.theme_abstractness
     abstractness2 = ctx.b.theme_abstractness
@@ -1481,9 +1481,9 @@ def _criterion_one_incoherent(
     more coherent"."""
     intro = section.get("intro_all_in_all", "")
     reason = section.get("reason_more_coherent", "")
-    if ctx.a.is_coherent and not ctx.b.is_coherent:
+    if ctx.a.is_coherent(ctx.meta) and not ctx.b.is_coherent(ctx.meta):
         return ctx._better(section, True, intro, reason)
-    if ctx.b.is_coherent and not ctx.a.is_coherent:
+    if ctx.b.is_coherent(ctx.meta) and not ctx.a.is_coherent(ctx.meta):
         return ctx._better(section, False, intro, reason)
     return None
 

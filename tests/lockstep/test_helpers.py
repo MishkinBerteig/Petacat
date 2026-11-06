@@ -15,6 +15,23 @@ from server.engine.rng import RNG
 pytestmark = pytest.mark.lockstep
 
 
+@pytest.fixture(autouse=True)
+def _a_run_to_draw_for():
+    """``~`` (``RNG.perturb``) reads ``perturb_up_probability`` and ``perturb_delta_exponent``
+    from the run it draws for, so the lockstep layer, which has no ambient run, binds one: the
+    Metacat Standard Configuration."""
+    from server.engine.ids import IdAllocator
+    from server.engine.metadata import MetadataProvider
+    from server.engine.run_binding import RunBinding, use_run
+    from tests.conftest import SEED_DATA_DIR
+
+    with use_run(
+        RunBinding.for_meta(MetadataProvider.from_standard_configuration(SEED_DATA_DIR)),
+        IdAllocator(),
+    ):
+        yield
+
+
 class _Script:
     """Stands in for ``random.Random``: hands out scripted draws in order."""
 

@@ -73,7 +73,7 @@ def _memory_row_order(row: Any, identifier: str) -> tuple:
 
 
 def _live_answer_fields(
-    problem: Any, top_rule_description: str, answer_id: int | None = None
+    meta: Any, problem: Any, top_rule_description: str, answer_id: int | None = None
 ) -> dict:
     """The parts of an answer description that live only in memory.
 
@@ -105,7 +105,7 @@ def _live_answer_fields(
                 # §4.7.3 weighs answers by how abstract their themes are, so the
                 # verdict travels with the answer wherever it is read from.
                 "theme_abstractness": a.theme_abstractness,
-                "is_coherent": a.is_coherent,
+                "is_coherent": a.is_coherent(meta),
             }
     return {}
 
@@ -172,14 +172,14 @@ class RunInfo:
     modified: str
     target: str
     answer: str | None
+    #: Which Slipnet nodes were allowed to spread (0..``max_activation``; the maximum is
+    #: the original).  Part of the run's identity: a run at any other value is not
+    #: comparable with the dissertation's results.  Always stated: the run row holds it.
+    spreading_threshold: int
     #: True when the answer was *given* at creation for the engine to justify,
     #: rather than discovered by it. Both arrive in ``answer``, so without this
     #: a display cannot tell "it found xyd" from "it was asked about xyd".
     justify_mode: bool = False
-    #: Which Slipnet nodes were allowed to spread (0-100; 100 = the original).
-    #: Part of the run's identity: a run at any other value is not comparable
-    #: with the dissertation's results.
-    spreading_threshold: int = 100
     #: The persistence mode this run was created with.
     mode: str = "normal"
     #: Workers the run executes with: 1 is the serial loop, more is the exact speculative executor.  None when
@@ -347,7 +347,7 @@ class RunService:
         threshold = (
             run_meta.get_param("spreading_activation_threshold")
             if spreading_threshold is None
-            else max(0, min(100, spreading_threshold))
+            else max(0, min(run_meta.get_param("max_activation"), spreading_threshold))
         )
         # The explicit argument and the parameter are the same setting reached two ways,
         # so the stored parameter set has to agree with what the Run actually used.
@@ -643,9 +643,7 @@ class RunService:
             target=run.target_string,
             answer=run.answer_string,
             justify_mode=bool(run.justify_mode),
-            spreading_threshold=(
-                100 if run.spreading_threshold is None else int(run.spreading_threshold)
-            ),
+            spreading_threshold=int(run.spreading_threshold),
             mode=run.mode or MODE_NORMAL,
             workers=run.workers,
         )
@@ -736,11 +734,7 @@ class RunService:
                 target=r.target_string,
                 answer=r.answer_string,
                 justify_mode=bool(r.justify_mode),
-                # Explicit None check: 0 is a real, meaningful value here and `or`
-                # would silently turn it into the default.
-                spreading_threshold=(
-                    100 if r.spreading_threshold is None else int(r.spreading_threshold)
-                ),
+                spreading_threshold=int(r.spreading_threshold),
                 workers=r.workers,
             )
             for r in rows
@@ -1249,7 +1243,7 @@ class RunService:
                     "temperature": a.temperature,
                     "themes": a.themes,
                     "unjustified_slippages": a.unjustified_slippages,
-                    **_live_answer_fields(a.problem, a.top_rule_description, a.answer_id),
+                    **_live_answer_fields(self.meta, a.problem, a.top_rule_description, a.answer_id),
                     "has_picture": a.picture is not None,
                 }
                 for a in sorted(
@@ -1442,7 +1436,7 @@ class RunService:
                     "top_rule_abstractness": a.top_rule_abstractness,
                     "bottom_rule_abstractness": a.bottom_rule_abstractness,
                     "theme_abstractness": a.theme_abstractness,
-                    "is_coherent": a.is_coherent,
+                    "is_coherent": a.is_coherent(self.meta),
                     # §4.7.5: how strongly the program is currently reminded of it.
                     "activation": a.activation,
                     "has_picture": a.picture is not None,
@@ -2083,7 +2077,7 @@ class RunService:
         runner = self._runners.get(run_id)
         if runner is None or runner.ctx is None:
             raise ValueError(f"Run {run_id} not found or not loaded")
-        threshold = max(0, min(100, threshold))
+        threshold = max(0, min(runner.ctx.meta.get_param("max_activation"), threshold))
         runner.ctx.spreading_activation_threshold = threshold
         return threshold
 

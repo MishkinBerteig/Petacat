@@ -127,6 +127,7 @@ def test_a_refusal_from_resolve_carries_every_dangling_reference():
     with pytest.raises(ChangeRefused) as info:
         resolve(cfg, {"ops": [
             {"op": "insert", "table": "slipnet_link_defs",
-             "row": {"from_node": "nope-1", "to_node": "nope-2", "link_type": "lateral"}}]})
+             "row": {"from_node": "nope-1", "to_node": "nope-2", "link_type": "lateral",
+                     "link_length": None, "fixed_length": False}}]})
     assert [p.field for p in info.value.problems] == ["from_node", "to_node"]
     assert info.value.as_dict()["problems"][1]["field"] == "to_node"

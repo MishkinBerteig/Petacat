@@ -13,11 +13,12 @@
 // whatever had just been typed.
 // ---------------------------------------------------------------------------
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 
 import { RunControlsPanel } from './RunControlsPanel'
 import { useRunStore } from '@/store/runStore'
+import { useParameterCatalogueStore } from '@/hooks/useParameterCatalogue'
 import { ApiError, getRunIdentity, setBreakpoint } from '@/api/client'
 import type { WorkspaceState } from '@/types'
 
@@ -386,7 +387,54 @@ describe('RunControlsPanel — execution strategy selector', () => {
 // no run loaded it shows the value the next run will be created with, so the
 // setting is adjustable from the moment the page opens.
 
+// The slider's ceiling and the value a run starts with are the configuration's
+// (`max_activation`, `spreading_activation_threshold`), served by the run-parameter
+// catalogue; the panel holds no number of its own.  These tests serve the Metacat
+// Standard Configuration's values, and say so when they serve others.
+function serveThresholds(ceiling: number | null, configured: number | null) {
+  const spec = (name: string, value: number) => ({
+    name, kind: 'int' as const, group: 'Slipnet', label: name, description: '',
+    minimum: 0, maximum: 1000, departs_from_original: true, default: value,
+  })
+  useParameterCatalogueStore.setState({
+    specs: [
+      ...(ceiling === null ? [] : [spec('max_activation', ceiling)]),
+      ...(configured === null ? [] : [spec('spreading_activation_threshold', configured)]),
+    ],
+    isLoading: false,
+    error: null,
+  })
+}
+
 describe('RunControlsPanel — spreading threshold reflects the loaded run', () => {
+  beforeEach(() => serveThresholds(100, 100))
+  // Left empty, so the tests below that fetch the catalogue see it load as they always did.
+  afterEach(() => useParameterCatalogueStore.setState({ specs: [], isLoading: false, error: null }))
+
+  it('shows the configuration\'s threshold before any run exists and nobody has stated one', () => {
+    serveThresholds(100, 60)
+    setup({ runId: null, spreadingThreshold: null, defaultSpreadingThreshold: null })
+    render(<RunControlsPanel />)
+    expect(screen.getByText(/Spreading threshold: 60/)).toBeTruthy()
+    expect((screen.getByLabelText(/spreading threshold/i) as HTMLInputElement).value).toBe('60')
+  })
+
+  it('runs the slider up to the configuration\'s ceiling, whatever it is', () => {
+    serveThresholds(150, 150)
+    setup({ runId: null, spreadingThreshold: null, defaultSpreadingThreshold: null })
+    render(<RunControlsPanel />)
+    const slider = screen.getByLabelText(/spreading threshold/i) as HTMLInputElement
+    expect(slider.max).toBe('150')
+    expect(screen.getByText(/Spreading threshold: 150 \(original\)/)).toBeTruthy()
+  })
+
+  it('offers no slider until the catalogue has said what the ceiling is', () => {
+    serveThresholds(null, null)
+    setup({ runId: null, spreadingThreshold: null, defaultSpreadingThreshold: null })
+    render(<RunControlsPanel />)
+    expect((screen.getByLabelText(/spreading threshold/i) as HTMLInputElement).disabled).toBe(true)
+  })
+
   it('is adjustable before any run exists', () => {
     const setSpreadingThreshold = vi.fn()
     setup({

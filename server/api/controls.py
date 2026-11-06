@@ -28,7 +28,8 @@ class ThemeClampItem(BaseModel):
     type: str
     dimension: str
     relation: str | None = None
-    activation: float = 100.0
+    #: Omitted takes the Themespace ceiling, ``engine_params.max_theme_activation``.
+    activation: float | None = None
 
 
 class ClampThemesRequest(BaseModel):
@@ -38,7 +39,8 @@ class ClampThemesRequest(BaseModel):
 class PatternThemeItem(BaseModel):
     dimension: str
     relation: str | None = None
-    activation: float = 100.0
+    #: Omitted takes the Themespace ceiling, ``engine_params.max_theme_activation``.
+    activation: float | None = None
 
 
 class ThemePatternItem(BaseModel):
@@ -103,10 +105,11 @@ async def set_spreading_threshold(
     req: SetSpreadingThresholdRequest,
     session: AsyncSession = Depends(get_session),
 ):
-    """Set the spreading activation threshold (0–100).
+    """Set the spreading activation threshold (0 to the run's ``max_activation``).
 
-    At 100 (default), only fully-active nodes spread — matching the original
-    Scheme implementation. At 0, all active nodes spread.
+    At ``max_activation`` (100 in the Metacat Standard Configuration), only fully-active
+    nodes spread — matching the original Scheme implementation. At 0, all active nodes
+    spread.  A value above ``max_activation`` is clipped to it.
     """
     svc = get_run_service()
     try:
@@ -166,7 +169,7 @@ async def clamp_themes(run_id: int, req: ClampThemesRequest):
     try:
         result = svc.clamp_themes(
             run_id,
-            [t.model_dump() for t in req.themes],
+            [t.model_dump(exclude_none=True) for t in req.themes],
         )
     except ValueError as e:
         raise HTTPException(404, str(e))
@@ -187,7 +190,7 @@ async def clamp_theme_pattern(run_id: int, req: ClampThemePatternRequest):
             [
                 {
                     "type": p.type,
-                    "themes": [t.model_dump() for t in p.themes],
+                    "themes": [t.model_dump(exclude_none=True) for t in p.themes],
                 }
                 for p in req.patterns
             ],

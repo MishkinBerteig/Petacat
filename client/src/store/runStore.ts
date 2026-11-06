@@ -49,6 +49,7 @@ import {
   clearMemory as apiClearMemory,
   describeApiError,
 } from '@/api/client';
+import { catalogueNumber, useParameterCatalogueStore } from '@/hooks/useParameterCatalogue';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -160,14 +161,17 @@ export interface RunStore {
    * With no run loaded it shows `defaultSpreadingThreshold`, which is what the next
    * run will be created with.
    */
-  spreadingThreshold: number;
+  spreadingThreshold: number | null;
   /**
    * The threshold a *newly created* run is given, remembered across page loads.
    *
    * This is the standing preference: it travels with each create request, and the
-   * slider records the chosen value here and in local storage.
+   * slider records the chosen value here and in local storage.  `null` until a person
+   * states one: the request then omits the field and the server uses the
+   * configuration's `spreading_activation_threshold`, which the slider shows (from the
+   * run-parameter catalogue) while `spreadingThreshold` is `null`.
    */
-  defaultSpreadingThreshold: number;
+  defaultSpreadingThreshold: number | null;
   /**
    * What the *next* run will write down: `fast`, `normal` or `audit`.
    *
@@ -347,14 +351,15 @@ const INITIAL_MEMORY = freshMemory();
  */
 const THRESHOLD_KEY = 'petacat.spreadingThreshold';
 
-function loadSpreadingThreshold(): number {
+/** The remembered preference, or `null`: nothing stated, so the configuration's value stands. */
+function loadSpreadingThreshold(): number | null {
   try {
     const raw = window.localStorage.getItem(THRESHOLD_KEY);
-    if (raw === null) return 100;
+    if (raw === null) return null;
     const value = Number.parseInt(raw, 10);
-    return Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 100;
+    return Number.isFinite(value) ? Math.max(0, value) : null;
   } catch {
-    return 100; // storage unavailable (private mode, SSR)
+    return null; // storage unavailable (private mode, SSR)
   }
 }
 
@@ -462,7 +467,9 @@ export const useRunStore = create<RunStore>((set, get) => ({
       info = await apiCreateRun({
         // The standing preference, so a new run starts at the value the user chose
         // and a run loaded in between hands on nothing of its own.
-        spreading_threshold: get().defaultSpreadingThreshold,
+        ...(get().defaultSpreadingThreshold !== null
+          ? { spreading_threshold: get().defaultSpreadingThreshold as number }
+          : {}),
         mode: get().persistenceMode,
         workers,
         // Omitted entirely when empty, so a run with no overrides sends the same
@@ -496,7 +503,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
       temperatureClamped: false,
       // Taken from the response, which reports the threshold the engine was
       // initialised with — including when the caller asked for one of its own.
-      spreadingThreshold: info.spreading_threshold ?? get().defaultSpreadingThreshold,
+      spreadingThreshold: info.spreading_threshold,
       workspace: null,
       slipnet: null,
       coderack: null,
@@ -530,9 +537,8 @@ export const useRunStore = create<RunStore>((set, get) => ({
       codeletCount: info.codelet_count,
       temperature: info.temperature,
       // The threshold belongs to the run, so the slider shows what this run is
-      // executing with. A record that carries no threshold reads as 100, which is
-      // the value such a run used and the original's behaviour.
-      spreadingThreshold: info.spreading_threshold ?? 100,
+      // executing with.  Every run record states it.
+      spreadingThreshold: info.spreading_threshold,
       // Fixed for the run like the mode, so the controls can tell whether pressing
       // Run would continue it. A record from before the count was stored carries
       // none, and reads as the serial loop the controls assumed before.
@@ -611,8 +617,9 @@ export const useRunStore = create<RunStore>((set, get) => ({
       // Step one codelet at a time, refreshing UI after each tick.
       // The loop is controlled by _stopRequested (set by stop()),
       // NOT by store.status (which gets overwritten by server responses).
-      const limit = maxSteps ?? 100000;
-      for (let i = 0; i < limit; i++) {
+      // No limit unless the caller states one: a display setting must not change how a
+      // run ends (the batch branch below sends 0, "no limit", the same way).
+      for (let i = 0; maxSteps === undefined || i < maxSteps; i++) {
         if (_stopRequested || get().runId === null) break;
 
         let results: StepResult[];
@@ -814,7 +821,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
       temperatureClamped: false,
       // A reset is the same run again, threshold included, so the display keeps
       // reporting what the engine is executing with.
-      spreadingThreshold: info.spreading_threshold ?? get().spreadingThreshold,
+      spreadingThreshold: info.spreading_threshold,
       workspace: null,
       slipnet: null,
       coderack: null,
@@ -1100,7 +1107,11 @@ export const useRunStore = create<RunStore>((set, get) => ({
   },
 
   setSpreadingThreshold: async (value: number): Promise<void> => {
-    const clamped = Math.max(0, Math.min(100, Math.round(value)));
+    // The ceiling is the configuration's `max_activation`, from the catalogue; before the
+    // catalogue arrives only the floor applies and the server clips a value above it.
+    const ceiling = catalogueNumber(useParameterCatalogueStore.getState().specs, 'max_activation');
+    const rounded = Math.max(0, Math.round(value));
+    const clamped = ceiling === null ? rounded : Math.min(ceiling, rounded);
     // Moving the slider states a preference as well as changing the run in front of
     // the user, so it sets both: what this run is executing with, and what the next
     // one will be created with.

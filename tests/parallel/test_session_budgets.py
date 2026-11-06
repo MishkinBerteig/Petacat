@@ -101,7 +101,7 @@ def structure_batch(doc: cd.ConfigDocument, links: int = 2) -> dict:
     targets = [row["name"] for row in doc.tables["slipnet_node_defs"].values()][:links]
     ops = [{"op": "add_node", "name": "budget-node", "fields": {"short_name": "bn", "conceptual_depth": 50}}]
     ops += [{"op": "add_link", "from": "budget-node", "to": targets[k], "type": "lateral",
-             "length": 40 + k} for k in range(links)]
+             "length": 40 + k, "fixed": True} for k in range(links)]
     return {"source": "external", "actor": "budget", "base_version": "head", "ops": ops,
             "configuration_id": CONFIGURATION_ID}
 

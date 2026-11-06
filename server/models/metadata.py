@@ -188,7 +188,7 @@ class SlipnetLinkDef(Base):
     link_type = Column(Text, ForeignKey("link_types.name"), nullable=False)
     label_node = Column(Text, nullable=True)
     link_length = Column(Integer, nullable=True)  # None = dynamic (from label node)
-    fixed_length = Column(Boolean, default=True)
+    fixed_length = Column(Boolean, nullable=False)
 
 
 Index(
@@ -277,11 +277,11 @@ class PostingRule(Base):
     #: with a formula (or neither).  A name, not the tier's number, so the tier is stored once.
     urgency_level = Column(Text, nullable=True)
     urgency_formula = Column(Text, nullable=True)
-    posting_formula = Column(Text, default="")
-    count_formula = Column(Text, default="")
+    posting_formula = Column(Text, nullable=False)
+    count_formula = Column(Text, nullable=False)
     #: ``json``, not ``jsonb``: JSONB reorders object keys, and key order is read back.
     count_values = Column(JSON, nullable=True)
-    condition = Column(Text, default="always")
+    condition = Column(Text, nullable=False)
     triggering_slipnodes = Column(JSONB, nullable=True)
 
 

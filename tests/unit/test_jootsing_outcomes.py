@@ -23,7 +23,7 @@ from server.engine.trace import (
 
 
 class _FakeMeta:
-    """The three parameters ``jootsing.py`` reads, and nothing else."""
+    """The parameters ``jootsing.py`` reads, and nothing else."""
 
     codelet_patterns: dict = {}
 
@@ -34,6 +34,9 @@ class _FakeMeta:
             "grace_period": 100,
             "satisfactory_rule_quality": 80,
             "jootsing_count_scale": 10,
+            "jootsing_recurring_clamps_min": 3,
+            "jootsing_recurring_snags_min": 3,
+            "jootsing_elapsed_weight_at_start": 100.0,
             "max_activation": 100,
         }.get(name, default)
 

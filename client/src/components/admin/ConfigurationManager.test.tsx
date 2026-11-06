@@ -238,6 +238,13 @@ describe('the manager list', () => {
     expect(window.location.hash).toBe('#/training-mode/new?base=global')
   })
 
+  // What GET /api/training-mode/sessions/defaults says: the form holds no run length of its own,
+  // so it cannot create a session until the server has said one.
+  const SERVER_DEFAULTS = {
+    settings: { seeds_per_problem: 100, seed_start: 1, max_codelets: 20000, parameters: null, backend: 'numpy' },
+    policy: { on_run_error: 'record', max_errors_per_problem: null, max_errors_total: null, on_worker_failure: 'retry', max_retries: 3 },
+  } as any
+
   it('opens the creation form with configuration_base set', async () => {
     const posted: any[] = []
     vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
@@ -250,7 +257,7 @@ describe('the manager list', () => {
     const onCreated = vi.fn()
     render(
       <NewSessionForm
-        limits={null} defaults={null} onCreated={onCreated} onCancel={() => {}}
+        limits={null} defaults={SERVER_DEFAULTS} onCreated={onCreated} onCancel={() => {}}
         configurationBase={{ value: { session_id: 7 }, label: "Training Mode Session 'Alpha' configuration" }}
       />,
     )

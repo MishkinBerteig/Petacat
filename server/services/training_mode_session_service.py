@@ -1181,7 +1181,7 @@ class TrainingModeSessionService:
         return {
             "settings": {
                 "seeds_per_problem": 100, "seed_start": 1,
-                "max_codelets": 20_000, "parameters": None,
+                "max_codelets": meta.get_param("default_max_codelets"), "parameters": None,
                 "backend": default_session_backend(meta),
             },
             "policy": dict(DEFAULT_POLICY),
@@ -1738,7 +1738,9 @@ class TrainingModeSessionService:
         if not isinstance(seed_start, int) or isinstance(seed_start, bool) or not 0 <= seed_start <= INT32_MAX:
             raise SessionError(422, f"settings.seed_start must be an integer 0..{INT32_MAX}")
         self._check_seed_range(seed_start, [spp] + [p.get("seeds") or 0 for p in problems])
-        max_codelets = settings.get("max_codelets", 20_000)
+        max_codelets = settings.get(
+            "max_codelets", self._meta_provider().get_param("default_max_codelets")
+        )
         if (not isinstance(max_codelets, int) or isinstance(max_codelets, bool)
                 or not 1 <= max_codelets <= MAX_CODELETS_LIMIT):
             raise SessionError(422, f"settings.max_codelets must be 1..{MAX_CODELETS_LIMIT}")

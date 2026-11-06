@@ -10,11 +10,12 @@
 // the real outcome all along.
 // ---------------------------------------------------------------------------
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 
 import { RunHistory } from './RunHistory'
 import { useRunStore } from '@/store/runStore'
+import { useParameterCatalogueStore } from '@/hooks/useParameterCatalogue'
 import type { RunInfo } from '@/types'
 import { ApiError, listRuns, getRun, deleteRun } from '@/api/client'
 
@@ -220,7 +221,25 @@ describe('RunHistory — showing the answer', () => {
 // different number of codelets -- so a run at anything other than 100 is not
 // comparable with the others, and the list has to say so.
 
+// "The original behaviour" is the activation ceiling, `max_activation`, which the
+// configuration holds and the run-parameter catalogue serves; the list holds no 100.
+function serveCeiling(ceiling: number) {
+  useParameterCatalogueStore.setState({
+    specs: [
+      {
+        name: 'max_activation', kind: 'int', group: 'Slipnet', label: 'Maximum activation',
+        description: '', minimum: 1, maximum: 1000, departs_from_original: true, default: ceiling,
+      },
+    ],
+    isLoading: false,
+    error: null,
+  })
+}
+
 describe('RunHistory — spreading threshold per run', () => {
+  beforeEach(() => serveCeiling(100))
+  afterEach(() => useParameterCatalogueStore.setState({ specs: [], isLoading: false, error: null }))
+
   it('shows the threshold each run used', async () => {
     mockedListRuns.mockResolvedValue({
       runs: [
@@ -240,14 +259,23 @@ describe('RunHistory — spreading threshold per run', () => {
     ).toBeTruthy()
   })
 
-  it('treats a run with no recorded threshold as the original 100', async () => {
-    const { spreading_threshold: _omitted, ...withoutThreshold } = runInfo({ run_id: 7 })
-    mockedListRuns.mockResolvedValue({ runs: [withoutThreshold as any], total: 1 })
+  it('calls a run original when its threshold is the configuration\'s ceiling, not when it is 100', async () => {
+    serveCeiling(150)
+    mockedListRuns.mockResolvedValue({
+      runs: [
+        runInfo({ run_id: 7, status: 'answer_found', spreading_threshold: 150 }),
+        runInfo({ run_id: 6, status: 'answer_found', spreading_threshold: 100 }),
+      ],
+      total: 2,
+    })
 
     render(<RunHistory />)
     await waitFor(() =>
-      expect(screen.getByTitle(/Spreading threshold 100 — the original/)).toBeTruthy(),
+      expect(screen.getByTitle(/Spreading threshold 150 — the original/)).toBeTruthy(),
     )
+    expect(
+      screen.getByTitle(/Spreading threshold 100 — not the original behaviour/),
+    ).toBeTruthy()
   })
 
   // Opening a run means watching that run, threshold included: it decides which

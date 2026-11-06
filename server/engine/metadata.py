@@ -255,9 +255,7 @@ class MetadataProvider:
                 link_type=lk["link_type"],
                 label_node=lk.get("label_node"),
                 link_length=lk.get("link_length"),
-                fixed_length=lk.get("fixed_length", True)
-                if "fixed_length" in lk
-                else lk.get("link_length") is not None,
+                fixed_length=lk["fixed_length"],
             )
             for lk in links_data
         ]
@@ -297,10 +295,10 @@ class MetadataProvider:
                 direction=pr["direction"],
                 urgency_level=pr.get("urgency_level"),
                 urgency_formula=pr.get("urgency_formula"),
-                posting_formula=pr.get("posting_formula", ""),
-                count_formula=pr.get("count_formula", ""),
+                posting_formula=pr["posting_formula"],
+                count_formula=pr["count_formula"],
                 count_values=pr.get("count_values"),
-                condition=pr.get("condition", "always"),
+                condition=pr["condition"],
                 triggering_slipnodes=pr.get("triggering_slipnodes"),
                 rule_key=pr.get("rule_key", pr["codelet_type"]),
             )

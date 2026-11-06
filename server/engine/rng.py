@@ -17,9 +17,11 @@ draws exactly what it drew before the seam existed.
 
 from __future__ import annotations
 
-import math
 import random
 from typing import Any, Callable, Sequence
+
+from server.engine.formulas import pow_exact
+from server.engine.run_binding import constants
 
 
 class TraceSeam:
@@ -154,12 +156,15 @@ class RNG(TraceSeam):
         if n <= 0:
             return n
         delta = self.randint(self.perturb_bound(n))
-        return n + delta if self.prob(0.5) else n - delta
+        return n + delta if self.prob(constants().perturb_up_probability) else n - delta
 
     @staticmethod
     def perturb_bound(n: float) -> int:
-        """The exclusive bound ``~`` draws its delta below: ``1 + round(sqrt n)``."""
-        return 1 + round(math.sqrt(abs(n)))
+        """The exclusive bound ``~`` draws its delta below: ``1 + round(sqrt n)``.
+
+        The square root is ``|n| ** perturb_delta_exponent`` (0.5 in the Metacat Standard
+        Configuration), taken by ``math.sqrt`` for that exponent (``pow_exact``)."""
+        return 1 + round(pow_exact(abs(n), constants().perturb_delta_exponent))
 
     def stochastic_filter(
         self, items: Sequence[Any], prob_fn: Callable[[Any], float]

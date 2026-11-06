@@ -130,193 +130,24 @@ async def seed_metadata_from_json(session: AsyncSession, seed_dir: str) -> None:
 def standard_load_ops(seed_dir: str) -> list[dict]:
     """The Metacat Standard Configuration as resolved insert ops, in load order.
 
-    The enum lookup tables come first (the foreign keys below require them).  Every
-    order column (``sort_order``, ``ordinal``) is written explicitly, because the order of
-    the nodes, links, codelet types, parameters and posting rules is behaviour: it fixes
-    the float accumulation order of the spread and which node each ``rng.prob`` draw is
-    spent on.  The integer ``id`` of the tables that have one comes from the table's
-    sequence, in insertion order.
+    The rows come from :func:`server.services.config_document.rows_from_standard_files`, the
+    one place the checked-in JSON becomes configuration rows (the document built from the
+    files and this load therefore cannot differ).  The enum lookup tables come first (the
+    foreign keys below require them).  Every order column (``sort_order``, ``ordinal``) is
+    written explicitly, because the order of the nodes, links, codelet types, parameters and
+    posting rules is behaviour: it fixes the float accumulation order of the spread and which
+    node each ``rng.prob`` draw is spent on.  The integer ``id`` of the tables that have one
+    comes from the table's sequence, in insertion order.
     """
+    from server.services.config_document import rows_from_standard_files
     from server.services.config_registry import LAYER_REGISTRY
 
     ops: list[dict] = []
-
-    def _load(filename: str) -> Any:
-        with open(os.path.join(seed_dir, filename)) as f:
-            return json.load(f)
-
-    def add(table: str, row: dict) -> None:
-        ops.append(
-            {"op": "insert", "table": table, "key": LAYER_REGISTRY[table].key_of(row), "row": row}
-        )
-
-    enums_data = _load("enums.json")
-    for table_name in ENUM_MODELS:
-        for row in enums_data.get(table_name, []):
-            add(
-                table_name,
-                {
-                    "name": row["name"],
-                    "display_label": row["display_label"],
-                    "sort_order": row["sort_order"],
-                    "description": row.get("description", ""),
-                },
+    for table, rows in rows_from_standard_files(seed_dir).items():
+        for row in rows:
+            ops.append(
+                {"op": "insert", "table": table, "key": LAYER_REGISTRY[table].key_of(row), "row": row}
             )
-
-    # ``sort_order`` carries the Scheme's node order, which the file reproduces.
-    for position, n in enumerate(_load("slipnet_nodes.json")):
-        add(
-            "slipnet_node_defs",
-            {
-                "sort_order": position,
-                "name": n["name"],
-                "short_name": n["short_name"],
-                "conceptual_depth": n["conceptual_depth"],
-                "description": n.get("description", ""),
-                "descriptor_predicate": n.get("descriptor_predicate"),
-                "plain_name": n.get("plain_name"),
-                "glyph": n.get("glyph"),
-                "numeric_value": n.get("numeric_value"),
-                "full_name": n.get("full_name"),
-                "cm_short_name": n.get("cm_short_name"),
-                "article_an": n.get("article_an"),
-            },
-        )
-
-    for position, lk in enumerate(_load("slipnet_links.json")):
-        add(
-            "slipnet_link_defs",
-            {
-                "sort_order": position,
-                "from_node": lk["from_node"],
-                "to_node": lk["to_node"],
-                "link_type": lk["link_type"],
-                "label_node": lk.get("label_node"),
-                "link_length": lk.get("link_length"),
-                "fixed_length": lk["fixed_length"]
-                if "fixed_length" in lk
-                else lk.get("link_length") is not None,
-            },
-        )
-
-    for position, c in enumerate(_load("codelet_types.json")):
-        add(
-            "codelet_type_defs",
-            {
-                "sort_order": position,
-                "name": c["name"],
-                "family": c["family"],
-                "phase": c["phase"],
-                "description": c.get("description", ""),
-                "source_file": c.get("source_file", ""),
-                "source_line": c.get("source_line", 0),
-                "execute_body": c.get("execute_body", ""),
-            },
-        )
-
-    # ``sort_order`` keeps each file's key order, which a table keyed by name would lose.
-    for position, (k, v) in enumerate(_load("engine_params.json").items()):
-        add("engine_params", {"name": k, "sort_order": position, **_param_columns(v)})
-
-    for position, (k, v) in enumerate(_load("urgency_levels.json").items()):
-        add("urgency_levels", {"name": k, "value": v, "sort_order": position})
-
-    # ``value_type`` keeps the JSON kind of the value (``5`` against ``5.0`` against ``"2/3"``).
-    for position, (k, v) in enumerate(_load("formula_coefficients.json").items()):
-        add("formula_coefficients", {"name": k, "sort_order": position, **_coefficient_columns(v)})
-
-    for d in _load("demo_problems.json"):
-        add(
-            "demo_problems",
-            {
-                "name": d["name"],
-                "section": d.get("section", ""),
-                "initial": d["initial"],
-                "modified": d["modified"],
-                "target": d["target"],
-                "answer": d.get("answer"),
-                "seed": d["seed"],
-                "description": d.get("description", ""),
-            },
-        )
-
-    # Posting rules.  The order the engine consults these rules in decides how many draws
-    # it takes from the run's random stream, so the file's order is part of the value.
-    posting_data = _load("posting_rules.json")
-    for position, pr in enumerate(posting_data.get("posting_rules", [])):
-        add(
-            "posting_rules",
-            {
-                "rule_key": pr.get("rule_key", pr["codelet_type"]),
-                "sort_order": position,
-                "codelet_type": pr["codelet_type"],
-                "direction": pr["direction"],
-                "urgency_level": pr.get("urgency_level"),
-                "urgency_formula": pr.get("urgency_formula"),
-                "posting_formula": pr.get("posting_formula", ""),
-                "count_formula": pr.get("count_formula", ""),
-                "count_values": pr.get("count_values"),
-                "condition": pr.get("condition", "always"),
-                "triggering_slipnodes": pr.get("triggering_slipnodes"),
-            },
-        )
-
-    # The nine named codelet patterns, which live in the same file as the rules.  The
-    # ordinal runs across all patterns, so both the order of the patterns and the order
-    # within each one survive the round trip.
-    ordinal = 0
-    for pattern_name, entries in posting_data.get("codelet_patterns", {}).items():
-        for codelet_type, urgency_level in entries:
-            add(
-                "codelet_pattern_defs",
-                {
-                    "ordinal": ordinal,
-                    "pattern_name": pattern_name,
-                    "codelet_type": codelet_type,
-                    "urgency_level": urgency_level,
-                },
-            )
-            ordinal += 1
-
-    for td in _load("theme_dimensions.json").get("dimensions", []):
-        add(
-            "theme_dimension_defs",
-            {"slipnet_node": td["slipnet_node"], "valid_relations": td["valid_relations"]},
-        )
-
-    for position, (name, pos) in enumerate(
-        _load("slipnet_layout.json").get("node_positions", {}).items()
-    ):
-        add(
-            "slipnet_layout",
-            {"node_name": name, "grid_row": pos[0], "grid_col": pos[1], "sort_order": position},
-        )
-
-    # Role bindings and theme relations reference nodes and codelet types by name.
-    roles = _load("roles.json")
-    for r in roles.get("node_roles", []):
-        add(
-            "slipnet_node_roles",
-            {"role": r["role"], "ordinal": r["ordinal"], "node_name": r["node_name"]},
-        )
-    for r in roles.get("codelet_roles", []):
-        add(
-            "codelet_type_roles",
-            {"role": r["role"], "ordinal": r["ordinal"], "codelet_type": r["codelet_type"]},
-        )
-    for r in _load("theme_relations.json"):
-        add(
-            "theme_relations",
-            {
-                "name": r["name"],
-                "ordinal": r["ordinal"],
-                "node_name": r.get("node_name"),
-                "abstractness": r.get("abstractness"),
-                "description": r.get("description", ""),
-            },
-        )
-
-    add("commentary_templates", {"template_key": "all", "template_data": _load("commentary_templates.json")})
     return ops
 
 

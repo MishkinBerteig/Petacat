@@ -352,9 +352,10 @@ def attempt_jootsing(
         if isinstance(c, ClampEvent) and c.clamp_type != "manual_clamp"
     ]
 
-    if len(clamps) < 3 and vlog is not None:
+    recurring_clamps_min = meta.get_param("jootsing_recurring_clamps_min")
+    if len(clamps) < recurring_clamps_min and vlog is not None:
         vlog.say("no-recurring-clamps")
-    if len(clamps) >= 3:
+    if len(clamps) >= recurring_clamps_min:
         clamp_type = clamps[0].clamp_type if isinstance(clamps[0], ClampEvent) else ""
         jootsing_prob = get_clamp_jootsing_probability(
             clamps, codelet_count, trace, vlog=vlog, meta=meta
@@ -396,7 +397,7 @@ def attempt_jootsing(
         vlog.say("checking-recurring-snags")
     snags = get_most_recent_event_set(trace, "snag")
 
-    if len(snags) < 3:
+    if len(snags) < meta.get_param("jootsing_recurring_snags_min"):
         if vlog is not None:
             vlog.say("no-recurring-snags")
         return JootserResult(pattern_detected=False)
@@ -627,7 +628,7 @@ def get_clamp_jootsing_probability(
             # 100* rounds (jootsing.ss:127-129, utilities.ss:544).
             elapsed_time_weights.append(float(round_ratio(100 * t, codelet_count)))
         else:
-            elapsed_time_weights.append(100.0)
+            elapsed_time_weights.append(meta.get_param("jootsing_elapsed_weight_at_start"))
 
     # Progress achieved by each clamp
     progress_values: list[float] = []

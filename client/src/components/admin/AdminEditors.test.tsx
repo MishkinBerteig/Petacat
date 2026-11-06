@@ -447,6 +447,29 @@ describe('SlipnetLinkEditor — a length of zero and a length left unsaid', () =
     expect(calls[0].body.link_length).toBeNull()
   })
 
+  it('sends the Fixed value the person typed, and none when they typed none (no default)', async () => {
+    serve([link])
+    render(<SlipnetLinkEditor />)
+
+    fireEvent.click(await screen.findByRole('button', { name: /\+ Add/ }))
+    fillNewLink()
+    fireEvent.change(screen.getByLabelText('Fixed'), { target: { value: 'false' } })
+    fireEvent.click(screen.getByRole('button', { name: /^Save$/ }))
+    await waitFor(() => expect(calls).toHaveLength(1))
+    expect(calls[0].body.fixed_length).toBe(false)
+  })
+
+  it('does not invent a Fixed value for a link that states none', async () => {
+    serve([link])
+    render(<SlipnetLinkEditor />)
+
+    fireEvent.click(await screen.findByRole('button', { name: /\+ Add/ }))
+    fillNewLink()
+    fireEvent.click(screen.getByRole('button', { name: /^Save$/ }))
+    await waitFor(() => expect(calls).toHaveLength(1))
+    expect(calls[0].body.fixed_length).toBeNull()
+  })
+
   it('sets an existing length to zero', async () => {
     serve([link])
     render(<SlipnetLinkEditor />)

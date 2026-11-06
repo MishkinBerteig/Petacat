@@ -490,7 +490,7 @@ def rows_from_standard_files(seed_dir: str) -> dict[str, list[dict[str, Any]]]:
             "link_type": lk["link_type"],
             "label_node": lk.get("label_node"),
             "link_length": lk.get("link_length"),
-            "fixed_length": lk["fixed_length"] if "fixed_length" in lk else lk.get("link_length") is not None,
+            "fixed_length": lk["fixed_length"],
         }
         for pos, lk in enumerate(load("slipnet_links.json"))
     ]
@@ -540,10 +540,10 @@ def rows_from_standard_files(seed_dir: str) -> dict[str, list[dict[str, Any]]]:
             "direction": pr["direction"],
             "urgency_level": pr.get("urgency_level"),
             "urgency_formula": pr.get("urgency_formula"),
-            "posting_formula": pr.get("posting_formula", ""),
-            "count_formula": pr.get("count_formula", ""),
+            "posting_formula": pr["posting_formula"],
+            "count_formula": pr["count_formula"],
             "count_values": pr.get("count_values"),
-            "condition": pr.get("condition", "always"),
+            "condition": pr["condition"],
             "triggering_slipnodes": pr.get("triggering_slipnodes"),
         }
         for pos, pr in enumerate(posting.get("posting_rules", []))

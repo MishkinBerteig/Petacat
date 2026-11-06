@@ -120,7 +120,7 @@ BATCHES = {
                         {"op": "merge_nodes", "keep": "plato-a", "drop": "plato-b"}],
     "add a node with everything": [
         {"op": "add_node", "name": "x1", "fields": {"short_name": "x", "conceptual_depth": 5},
-         "links": [{"to": "plato-a", "type": "lateral"}], "roles": ["rule.dimension_order"],
+         "links": [{"to": "plato-a", "type": "lateral", "fixed": False}], "roles": ["rule.dimension_order"],
          "layout": {"grid_row": 8, "grid_col": 8}, "theme_dimension": {"valid_relations": ["identity"]},
          "params": {"top_down_slipnodes": True, "intrinsic_link_lengths": 40}},
         {"op": "add_trigger", "rule_key": "top-down-bond-scout:category", "node": "x1"},

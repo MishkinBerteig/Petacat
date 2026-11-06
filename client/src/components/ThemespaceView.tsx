@@ -6,6 +6,7 @@ import { useCallback, useMemo } from 'react';
 
 import { clampThemes } from '@/api/client';
 import { useSelfWatchingDisabled } from '@/components/SelfWatchingWarning';
+import { useCatalogueNumber } from '@/hooks/useParameterCatalogue';
 import { useRunStore, type ThemeEditState } from '@/store/runStore';
 import type { ClusterState, ThemespaceState, ThemeState } from '@/types';
 
@@ -46,7 +47,7 @@ function ActivationBar({
   dominant: boolean;
   /**
    * Theme-edit mode: the bar itself takes the click (`theme-graphics.ss:35-63`), a
-   * plain click selecting +100 and a shift- or right-click selecting -100.
+   * plain click selecting the ceiling (+100 in the Metacat Standard Configuration) and a shift- or right-click its negative.
    */
   clickSelect?: boolean;
   /** Metacat's relation names ("iden", "opp", ...), served with the state. */
@@ -54,8 +55,12 @@ function ActivationBar({
   /** Absent in the review surfaces, which show a recorded state and cannot steer it. */
   onClamp?: (activation: number) => void;
 }) {
+  // The value a clamp pins a theme to is the Themespace's ceiling, `max_theme_activation`,
+  // which the configuration holds and the run-parameter catalogue serves.  Until it has
+  // arrived no clamp is offered: nothing here guesses it.
+  const ceiling = useCatalogueNumber('max_theme_activation');
   const absAct = Math.abs(theme.activation);
-  const barWidth = Math.min(absAct, 100);
+  const barWidth = ceiling === null ? 0 : Math.min((absAct / ceiling) * 100, 100);
   const isPositive = theme.activation >= 0;
 
   // theme-graphics.ss:35-63 — a clamp pins one theme in its dimension and zeroes the
@@ -72,14 +77,14 @@ function ActivationBar({
       title={`${theme.relation ?? 'base'}: ${theme.activation.toFixed(1)}`}
       onClick={
         clickSelect && onClamp
-          ? (e) => clampTo(e.shiftKey ? -100 : 100)
+          ? (e) => ceiling !== null && clampTo(e.shiftKey ? -ceiling : ceiling)
           : undefined
       }
       onContextMenu={
         clickSelect && onClamp
           ? (e) => {
               e.preventDefault();
-              clampTo(-100);
+              if (ceiling !== null) clampTo(-ceiling);
             }
           : undefined
       }
@@ -160,37 +165,37 @@ function ActivationBar({
       {/* Clamping.  Buttons rather than left/right click: a right-click that means
           something is undiscoverable, and clamping a theme negatively is the whole
           point of the affordance (§2.4.2) rather than a secondary gesture. */}
-      {onClamp && (
+      {onClamp && ceiling !== null && (
         <div
           style={{ display: 'flex', gap: 3, flexShrink: 0 }}
           onClick={(e) => e.stopPropagation()}
         >
           <ClampButton
-            label="Clamp +100"
-            active={held(100)}
+            label={`Clamp +${ceiling}`}
+            active={held(ceiling)}
             colour="#4caf50"
             title={
-              held(100)
+              held(ceiling)
                 ? `Clear the clamp on ${theme.relation ?? 'this theme'}.`
-                : `Clamp ${theme.relation ?? 'this theme'} to +100 — positive thematic ` +
+                : `Clamp ${theme.relation ?? 'this theme'} to +${ceiling} — positive thematic ` +
                   `pressure. The program will favour structures compatible with this ` +
                   `idea, and the rest of this dimension is zeroed first.`
             }
-            onClick={() => clampTo(100)}
+            onClick={() => clampTo(ceiling)}
           />
           <ClampButton
-            label="Clamp -100"
-            active={held(-100)}
+            label={`Clamp -${ceiling}`}
+            active={held(-ceiling)}
             colour="#f44336"
             title={
-              held(-100)
+              held(-ceiling)
                 ? `Clear the clamp on ${theme.relation ?? 'this theme'}.`
-                : `Clamp ${theme.relation ?? 'this theme'} to -100 — negative thematic ` +
+                : `Clamp ${theme.relation ?? 'this theme'} to -${ceiling} — negative thematic ` +
                   `pressure. The program will avoid structures compatible with this ` +
                   `idea and prefer ones incompatible with it (S2.4.2). This is the ` +
                   `manual counterpart of jootsing.`
             }
-            onClick={() => clampTo(-100)}
+            onClick={() => clampTo(-ceiling)}
           />
         </div>
       )}
@@ -493,6 +498,7 @@ export function ThemespaceView() {
   const undoLastClamp = useRunStore((s) => s.undoLastClamp);
   const editThemeType = useRunStore((s) => s.editThemeType);
   const selectTheme = useRunStore((s) => s.selectTheme);
+  const ceiling = useCatalogueNumber('max_theme_activation');
   const selfWatchingOff = useSelfWatchingDisabled('loaded');
 
   const handleClamp = useCallback(
@@ -523,11 +529,12 @@ export function ThemespaceView() {
       if (!(themespace?.possible_theme_types ?? []).includes(cluster.theme_type)) return;
       editThemeType(cluster.theme_type);
       // `activation` is what the grid would set (0 when toggling the same value off);
-      // selectTheme does its own toggling from the +100 / -100 the gesture means.
-      const value = activation === 0 ? (theme.activation === 100 ? 100 : -100) : activation;
+      // selectTheme does its own toggling from the +ceiling / -ceiling the gesture means.
+      if (ceiling === null) return;
+      const value = activation === 0 ? (theme.activation === ceiling ? ceiling : -ceiling) : activation;
       selectTheme(cluster.theme_type, cluster.dimension, theme.relation ?? null, value);
     },
-    [editThemeType, selectTheme, themespace],
+    [editThemeType, selectTheme, themespace, ceiling],
   );
 
   const displayed = useMemo(

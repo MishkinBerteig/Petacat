@@ -139,9 +139,7 @@ def _field_slipnet_link_specs(tables: Mapping[str, Any]) -> list[SlipnetLinkSpec
             link_type=r["link_type"],
             label_node=r.get("label_node"),
             link_length=r.get("link_length"),
-            fixed_length=r["fixed_length"]
-            if r.get("fixed_length") is not None
-            else (r.get("link_length") is not None),
+            fixed_length=r["fixed_length"],
         )
         for r in _rows(tables["slipnet_link_defs"])
     ]
@@ -162,6 +160,22 @@ def _field_codelet_specs(tables: Mapping[str, Any]) -> dict[str, CodeletSpec]:
     }
 
 
+def _stated(row: Mapping[str, Any], column: str) -> str:
+    """A posting rule's formula or condition, which the rule must state.
+
+    No default stands in for an unstated one: an empty ``posting_formula`` was answered
+    with a probability of 0.5, an empty ``count_formula`` with a count of 1 and an empty
+    ``condition`` with ``always``, all invented by the code.  The row states them, or the
+    configuration does not load."""
+    value = row[column]
+    if not value:
+        raise ValueError(
+            f"posting rule '{row['rule_key']}' states no {column}; "
+            "a posting rule must state its posting_formula, count_formula and condition"
+        )
+    return value
+
+
 def _field_posting_rules(tables: Mapping[str, Any]) -> list[PostingRuleSpec]:
     posting_rules = [
         PostingRuleSpec(
@@ -169,10 +183,10 @@ def _field_posting_rules(tables: Mapping[str, Any]) -> list[PostingRuleSpec]:
             direction=r["direction"],
             urgency_level=r.get("urgency_level"),
             urgency_formula=r.get("urgency_formula"),
-            posting_formula=r.get("posting_formula") or "",
-            count_formula=r.get("count_formula") or "",
+            posting_formula=_stated(r, "posting_formula"),
+            count_formula=_stated(r, "count_formula"),
             count_values=r.get("count_values"),
-            condition=r.get("condition") or "always",
+            condition=_stated(r, "condition"),
             triggering_slipnodes=r.get("triggering_slipnodes"),
             rule_key=r["rule_key"],
         )

@@ -25,7 +25,6 @@ import type { ComponentHelpKey } from '@/constants/helpTopics';
 const DEFAULT_COUNT = 200;
 const MIN_COUNT = 1;
 const FALLBACK_MAX_COUNT = 10_000;
-const DEFAULT_MAX_STEPS = 20_000;
 
 /** A small "?" that opens the control's own help topic. */
 function ControlHelp({ topic, label }: { topic: ComponentHelpKey; label: string }) {
@@ -55,7 +54,9 @@ export function SwarmPanel() {
   const [statusError, setStatusError] = useState<string | null>(null);
   const [count, setCount] = useState(String(DEFAULT_COUNT));
   const [seedStart, setSeedStart] = useState('1');
-  const [maxSteps, setMaxSteps] = useState(String(DEFAULT_MAX_STEPS));
+  // Blank takes the server's default, `engine_params.default_max_codelets`, which the
+  // field shows as its placeholder; this panel holds no number of its own.
+  const [maxSteps, setMaxSteps] = useState('');
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<SwarmResult | null>(null);
@@ -81,7 +82,8 @@ export function SwarmPanel() {
   const stepsN = Number(maxSteps);
   const countOk = Number.isInteger(countN) && countN >= MIN_COUNT && countN <= upperCount;
   const seedOk = Number.isInteger(seedN) && seedStart.trim() !== '';
-  const stepsOk = Number.isInteger(stepsN) && stepsN >= 1;
+  const stepsStated = maxSteps.trim() !== '';
+  const stepsOk = !stepsStated || (Number.isInteger(stepsN) && stepsN >= 1);
   const hasProblem =
     formInputs.initial !== '' && formInputs.modified !== '' && formInputs.target !== '';
 
@@ -113,7 +115,7 @@ export function SwarmPanel() {
         answer: formInputs.answer !== '' ? formInputs.answer : null,
         count: countN,
         seed_start: seedN,
-        max_steps: stepsN,
+        ...(stepsStated ? { max_steps: stepsN } : {}),
         include_runs: false,
         ...(hasOverrides ? { parameters: overrides } : {}),
       });
@@ -197,6 +199,7 @@ export function SwarmPanel() {
             type="number"
             min={1}
             value={maxSteps}
+            placeholder={String(status?.limits?.default_max_codelets ?? '')}
             onChange={(e) => setMaxSteps(e.target.value)}
             style={{ width: 90 }}
             disabled={running || unavailable}

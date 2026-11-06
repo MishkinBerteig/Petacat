@@ -120,9 +120,17 @@ afterEach(() => {
 })
 
 describe('runStore — spreading threshold persistence', () => {
-  it('defaults to 100, the original behaviour', async () => {
+  it('holds no threshold of its own until a person states one', async () => {
     const useRunStore = await freshStore()
-    expect(useRunStore.getState().spreadingThreshold).toBe(100)
+    expect(useRunStore.getState().spreadingThreshold).toBeNull()
+    expect(useRunStore.getState().defaultSpreadingThreshold).toBeNull()
+
+    // A run created now leaves the field out, so the server uses the configuration's
+    // `spreading_activation_threshold` (the slider shows it from the catalogue).
+    await useRunStore.getState().createRun({
+      initial: 'abc', modified: 'abd', target: 'xyz', seed: 7,
+    })
+    expect(createRun.mock.calls[createRun.mock.calls.length - 1][0]).not.toHaveProperty('spreading_threshold')
   })
 
   it('writes the chosen value to storage', async () => {
@@ -138,12 +146,24 @@ describe('runStore — spreading threshold persistence', () => {
     expect(useRunStore.getState().spreadingThreshold).toBe(20)
   })
 
-  it('clamps to 0-100 and ignores junk in storage', async () => {
+  it('clamps to 0 and the configuration\'s ceiling, and ignores junk in storage', async () => {
     window.localStorage.setItem(STORAGE_KEY, 'not-a-number')
     let useRunStore = await freshStore()
-    expect(useRunStore.getState().spreadingThreshold).toBe(100)
+    expect(useRunStore.getState().spreadingThreshold).toBeNull()
 
     useRunStore = await freshStore()
+    // The ceiling is `max_activation`, from the catalogue the store reads; the test serves 100.
+    const { useParameterCatalogueStore } = await import('@/hooks/useParameterCatalogue')
+    useParameterCatalogueStore.setState({
+      specs: [
+        {
+          name: 'max_activation', kind: 'int', group: 'Slipnet', label: 'Maximum activation',
+          description: '', minimum: 1, maximum: 1000, departs_from_original: true, default: 100,
+        },
+      ],
+      isLoading: false,
+      error: null,
+    })
     await useRunStore.getState().setSpreadingThreshold(999)
     expect(useRunStore.getState().spreadingThreshold).toBe(100)
     await useRunStore.getState().setSpreadingThreshold(-5)
@@ -226,14 +246,13 @@ describe('runStore — the threshold belongs to the run on screen', () => {
     expect(store.getState().runWorkers).toBe(1)
   })
 
-  it('reads a run with no recorded threshold as the 100 such a run used', async () => {
+  it('takes the loaded run\'s value exactly, zero included', async () => {
     window.localStorage.setItem(STORAGE_KEY, '80')
     const store = await freshStore()
-    const { spreading_threshold: _omitted, ...withoutThreshold } = runInfo()
 
-    store.getState().adoptRun(withoutThreshold as RunInfo)
+    store.getState().adoptRun(runInfo({ spreading_threshold: 0 }))
 
-    expect(store.getState().spreadingThreshold).toBe(100)
+    expect(store.getState().spreadingThreshold).toBe(0)
   })
 
   it('leaves the remembered default as the user set it', async () => {

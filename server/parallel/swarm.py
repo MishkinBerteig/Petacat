@@ -100,9 +100,11 @@ class RunTask:
     initial: str
     modified: str
     target: str
-    answer: str | None = None
-    seed: int = 0
-    max_steps: int = 20_000
+    answer: str | None
+    seed: int
+    #: The codelet count that halts the run.  The caller states it: the bulk default is
+    #: ``engine_params.default_max_codelets``, read by the caller from its configuration.
+    max_steps: int
     #: Per-run parameter overrides, applied exactly as ``EngineRunner.init_mcat`` does.
     parameters: dict[str, Any] | None = None
     #: Numeric backend name (``numpy``, ``off``, ``python``, ``mlx``...).  ``None`` takes
@@ -140,10 +142,10 @@ class EpisodeTask:
     initial: str
     modified: str
     target: str
-    first_seed: int = 0
-    runs: int = 8
-    answer: str | None = None
-    max_steps: int = 20_000
+    first_seed: int
+    runs: int
+    answer: str | None
+    max_steps: int
     parameters: dict[str, Any] | None = None
     backend: str | None = None
     executor: str | None = "serial"
@@ -531,7 +533,7 @@ def _worker_run_here(batch: list, cfg_hash: str, payload: bytes | None) -> list:
 
 def _warm_batch() -> list:
     """A short run so the engine's lazy imports and first-call costs are paid at start-up."""
-    task = RunTask("abc", "abd", "ijk", seed=1, max_steps=60, backend="off")
+    task = RunTask("abc", "abd", "ijk", None, 1, 60, backend="off")
     return [(0, task)]
 
 

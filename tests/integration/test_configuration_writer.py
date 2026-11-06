@@ -306,7 +306,8 @@ async def test_an_update_or_delete_of_a_missing_key_is_unknown_reference(loaded)
 @needs_resolve
 async def test_a_link_to_a_node_that_does_not_exist_is_unknown_reference(loaded):
     link = {"op": "insert", "table": "slipnet_link_defs",
-            "row": {"from_node": "plato-a", "to_node": "ghost", "link_type": "lateral", "label_node": None}}
+            "row": {"from_node": "plato-a", "to_node": "ghost", "link_type": "lateral", "label_node": None,
+                    "link_length": None, "fixed_length": False}}
     error = await refused(loaded, batch(link))
     assert error.code == "unknown_reference"
     assert error.problems[0]["op_index"] == 0
@@ -315,7 +316,8 @@ async def test_a_link_to_a_node_that_does_not_exist_is_unknown_reference(loaded)
 @needs_resolve
 async def test_a_node_and_its_link_may_arrive_in_either_order(loaded):
     link = {"op": "insert", "table": "slipnet_link_defs",
-            "row": {"from_node": "plato-a", "to_node": "c5-late", "link_type": "lateral", "label_node": None}}
+            "row": {"from_node": "plato-a", "to_node": "c5-late", "link_type": "lateral", "label_node": None,
+                    "link_length": None, "fixed_length": False}}
     report = await apply(loaded, batch(link, node("c5-late")))
     assert report["persisted"] is True
 

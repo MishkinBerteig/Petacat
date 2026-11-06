@@ -96,8 +96,8 @@ class RunResponse(BaseModel):
     answer: str | None
     #: The answer was supplied for the engine to justify, not discovered by it.
     justify_mode: bool = False
-    #: Which Slipnet nodes were allowed to spread; 100 is the original.
-    spreading_threshold: int = 100
+    #: Which Slipnet nodes were allowed to spread; the run row always states it.
+    spreading_threshold: int
     #: Workers the run executes with: 1 is the serial loop, more is the exact speculative
     #: executor, which a seed reproduces identically for any count of 2 or more.  Null when nothing records it, as
     #: for runs created before the count was stored.
@@ -143,7 +143,7 @@ class RunIdentityResponse(BaseModel):
     #: keeping its promise, not a lookup failure, and the client says so.
     recorded: bool
     seed: int | None = None
-    spreading_threshold: int = 100
+    spreading_threshold: int
     config_hash: str | None = None
     memory_hash: str | None = None
     created_at: datetime | None = None
@@ -401,9 +401,7 @@ async def get_run_identity(
         mode=row.mode or "normal",
         recorded=True,
         seed=row.seed,
-        spreading_threshold=(
-            100 if row.spreading_threshold is None else int(row.spreading_threshold)
-        ),
+        spreading_threshold=int(row.spreading_threshold),
         config_hash=row.config_hash,
         memory_hash=row.memory_hash,
         created_at=row.created_at,
@@ -494,7 +492,7 @@ async def get_run_parameters(
         from server.engine.numeric.backend import select_backend
 
         backend = select_backend(
-            len(runner.ctx.slipnet.nodes) if runner and runner.ctx else 59
+            len(runner.ctx.slipnet.nodes) if runner and runner.ctx else len(svc.meta.slipnet_node_specs)
         )
         derived["numeric_backend"] = getattr(backend, "name", None) if backend else None
         derived["numeric_device"] = (
@@ -746,7 +744,8 @@ def _project_memory(memory) -> dict:
 
     # The fallback wording for a snag with no stored explanation is a template, so it
     # comes from whatever the service currently holds (the database in a served run).
-    _templates = getattr(getattr(get_run_service(), "meta", None), "commentary_templates", None)
+    _meta = get_run_service().meta
+    _templates = getattr(_meta, "commentary_templates", None)
     return {
         "answers": [
             {
@@ -769,7 +768,7 @@ def _project_memory(memory) -> dict:
                 "top_rule_abstractness": a.top_rule_abstractness,
                 "bottom_rule_abstractness": a.bottom_rule_abstractness,
                 "theme_abstractness": a.theme_abstractness,
-                "is_coherent": a.is_coherent,
+                "is_coherent": a.is_coherent(_meta),
                 "has_picture": a.picture is not None,
             }
             for a in memory.answers_oldest_first

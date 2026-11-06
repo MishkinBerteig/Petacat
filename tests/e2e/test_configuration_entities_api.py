@@ -16,7 +16,7 @@ from server.services.configurations import create_session_configuration
 @pytest.fixture
 async def made(db_session):
     """``(session_id, configuration_id)`` of a new session configuration; deleted afterwards."""
-    row = TrainingModeSession(name="E2E session", backend="single", policy={})
+    row = TrainingModeSession(name="E2E session", backend="single", policy={}, max_codelets=20000)
     db_session.add(row)
     await db_session.flush()
     overrides = [{"op": "insert", "table": "slipnet_node_defs",

@@ -151,7 +151,7 @@ async def test_restore_refuses_bad_requests(clean):
 
 @pytest.fixture
 async def made(db_session):
-    row = TrainingModeSession(name="C13 session", backend="single", policy={})
+    row = TrainingModeSession(name="C13 session", backend="single", policy={}, max_codelets=20000)
     db_session.add(row)
     await db_session.flush()
     cid = await create_session_configuration(db_session, row.id, "standard", None)

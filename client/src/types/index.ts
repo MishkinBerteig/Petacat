@@ -1005,7 +1005,8 @@ export interface SwarmRequest {
   answer?: string | null;
   count: number;
   seed_start: number;
-  max_steps: number;
+  /** Omitted takes the server's `default_max_codelets`. */
+  max_steps?: number;
   include_runs: boolean;
   /** Engine-parameter overrides, as for POST /api/runs. */
   parameters?: Record<string, unknown>;

@@ -76,12 +76,12 @@ def pairs(cfg):
     return [
         ("add_node",
          [{"op": "add_node", "name": "x1", "fields": NEW,
-           "links": [{"to": "plato-a", "type": "lateral"}],
+           "links": [{"to": "plato-a", "type": "lateral", "fixed": False}],
            "layout": {"grid_row": 7, "grid_col": 8},
            "theme_dimension": {"valid_relations": ["identity"]},
            "params": {"top_down_slipnodes": True}}],
          [ins("slipnet_node_defs", name="x1", **NEW),
-          ins("slipnet_link_defs", from_node="x1", to_node="plato-a", link_type="lateral"),
+          ins("slipnet_link_defs", from_node="x1", to_node="plato-a", link_type="lateral", fixed_length=False),
           ins("slipnet_layout", node_name="x1", grid_row=7, grid_col=8),
           ins("theme_dimension_defs", slipnet_node="x1", valid_relations=["identity"]),
           upd("engine_params", {"name": "top_down_slipnodes"}, value=json.dumps(top_down + ["x1"]))]),
@@ -158,8 +158,11 @@ def pairs(cfg):
         ("set_template", [{"op": "set_template", "key": "all", "path": "/" + member, "text": "hello"}],
          [{"op": "update", "table": "commentary_templates", "key": {"template_key": "all"}, "fields": {},
            "patch": {"template_data": [{"op": "replace", "path": "/" + member, "value": "hello"}]}}]),
-        ("add_posting_rule", [{"op": "add_posting_rule", "rule_key": "r1", "fields": {"codelet_type": "rule-scout", "direction": direction}}],
-         [ins("posting_rules", rule_key="r1", codelet_type="rule-scout", direction=direction)]),
+        ("add_posting_rule", [{"op": "add_posting_rule", "rule_key": "r1", "fields": {"codelet_type": "rule-scout", "direction": direction,
+                                                                  "posting_formula": "temperature / 100", "count_formula": "fixed",
+                                                                  "condition": "always"}}],
+         [ins("posting_rules", rule_key="r1", codelet_type="rule-scout", direction=direction,
+              posting_formula="temperature / 100", count_formula="fixed", condition="always")]),
         ("remove_posting_rule", [{"op": "remove_posting_rule", "rule_key": "rule-scout"}],
          [dele("posting_rules", {"rule_key": "rule-scout"})]),
         ("add_demo_problem", [{"op": "add_demo_problem", "name": "d1", "fields": {
@@ -520,7 +523,7 @@ def test_add_node_roles_params_and_layout(cfg):
     assert doc.tables["slipnet_layout"][("x1",)]["sort_order"] == len(cfg.tables["slipnet_layout"])
     assert refused(cfg, {"op": "add_node", "name": "x1", "fields": {**NEW, "name": "other"}}).kind == "malformed"
     assert refused(cfg, {"op": "add_node", "name": "x1", "fields": NEW, "params": {"nope": 1}}).kind == "unknown_reference"
-    assert refused(cfg, {"op": "add_node", "name": "x1", "fields": NEW, "links": [{"to": "nope", "type": "lateral"}]}).kind == "unknown_reference"
+    assert refused(cfg, {"op": "add_node", "name": "x1", "fields": NEW, "links": [{"to": "nope", "type": "lateral", "fixed": False}]}).kind == "unknown_reference"
 
 
 # --- a posting rule names a tier of the urgency levels (stage W) -----------------------------------
@@ -595,5 +598,6 @@ def test_removing_a_tier_no_rule_names_is_allowed_and_a_run_starts(cfg):
 def test_a_rule_naming_an_unknown_tier_is_refused_by_the_reference_check(cfg):
     err = refused(cfg, upd("posting_rules", {"rule_key": "breaker"}, urgency_level="no-such-tier"))
     assert err.kind == "unknown_reference"
-    err = refused(cfg, ins("posting_rules", rule_key="new-rule", codelet_type="rule-scout", direction="bottom_up", urgency_level="no-such-tier"))
+    err = refused(cfg, ins("posting_rules", rule_key="new-rule", codelet_type="rule-scout", direction="bottom_up", urgency_level="no-such-tier",
+                       posting_formula="temperature / 100", count_formula="fixed", condition="always"))
     assert err.kind == "unknown_reference"

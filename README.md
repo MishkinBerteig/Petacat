@@ -28,7 +28,7 @@ license change was authorised by Dr. Marshall directly (see
 > end-to-end. Episodic Memory (Metacat-Mode learning) shapes the runs that inherit it: a run
 > declines an answer already held for the same problem and rules, so repeating a
 > problem across Metacat Mode's [episodic runs](#persistence-modes-and-episodic-runs)
-> (which are Metacat Mode and not Training Mode) explores a different answer each time. It ships with 5,527 test cases covering the engine, the API, and the
+> (which are Metacat Mode and not Training Mode) explores a different answer each time. It ships with 5,588 test cases covering the engine, the API, and the
 > help/config system, run on both the CPU and the GPU numeric backends. Underneath the seven components sits an execution
 > substrate — three [persistence modes](#persistence-modes-and-episodic-runs),
 > a [GPU numeric substrate](#the-numeric-substrate), and
@@ -455,7 +455,7 @@ Petacat has two test suites:
   plugin against the serial runs it claims to equal), `lockstep` (Petacat's decision
   traces against Metacat's), and `e2e` (full HTTP
   stack against a running database). All eight run in a single command against
-  the local Postgres — 5,527 cases, which includes the numeric matrix's second
+  the local Postgres — 5,588 cases, which includes the numeric matrix's second
   pass over the 911 backend-sensitive tests. See
   [TESTING.md](TESTING.md) for the layer breakdown, the numeric backend matrix,
   the session ceiling, the unit-test rules, determinism requirements, test-double
@@ -1119,7 +1119,10 @@ operation.
 - **Operations.** Generic operations (`insert`, `update`, `delete` on a row, addressed by its natural
   key) and 29 convenience operations that expand into them (`add_node`, `remove_node`, `rename_node`,
   `merge_nodes`, `add_link`, `set_param`, `adjust_param`, `set_coefficient`, `set_codelet_body`,
-  `move_layout`, `rebind_role` and others).
+  `move_layout`, `rebind_role` and others). A row states every column the configuration holds no default
+  for: a slipnet link states `fixed_length` (`fixed` in `add_link` and in `add_node`'s `links`), and a
+  posting rule states `posting_formula`, `count_formula` and `condition`. Nothing fills them in, and the
+  Admin routes and the model refuse a row that leaves one out.
 - **Checked whole, first.** A batch that leaves a name pointing at nothing, a value the engine cannot read or code that does
   not compile is refused with the operation, table, key and (for code) line and column, and nothing is written.
   `expect` guards an update; `base_version` (required, an integer revision or `"head"`, on the external route `POST /api/training-mode/sessions/{id}/changes`, which answers 400 without it) with `base_mode` `strict` or `rebase` handles a configuration that moved on;
@@ -1321,7 +1324,7 @@ Every Training Mode Session has its own configuration, from its Starting Concept
 |---|---|---|
 | `seeds_per_problem` | 100 (1 to 100,000) | Seeds each problem runs; a problem may override |
 | `seed_start` | 1 | First seed |
-| `max_codelets` | 20,000 (1 to 200,000) | A run that reaches it gives up (`*CAP*`) |
+| `max_codelets` | `engine_params.default_max_codelets` (20,000 in the Metacat Standard Configuration; 1 to 200,000) | A run that reaches it gives up (`*CAP*`). Bulk work has this one default: the Swarm's `max_steps` takes it too |
 | `parameters` | none | Engine parameter overrides, validated like `POST /api/runs`; folded once into the Starting Conceptual State as a creation entry |
 | `configuration_base` | `"global"` | The base the Starting Conceptual State is copied from: `"global"`, `"standard"` (the Metacat Standard Configuration) or `{"session_id": n}` |
 | `backend` | resolved at creation | The numeric backend |
@@ -1512,8 +1515,8 @@ The tables below cover the routes a user drives.
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| POST | `/api/swarm` | Run one problem (an `answer` makes it justification mode) over many seeds — `seeds`, or `count` and `seed_start` — on every core; returns the answer distribution, status counts, per-run outcomes and throughput. Persists nothing |
-| GET | `/api/swarm` | The pool: whether the plugin is installed, worker count, core tiers, backends and executors, limits |
+| POST | `/api/swarm` | Run one problem (an `answer` makes it justification mode) over many seeds — `seeds`, or `count` and `seed_start` — on every core, each stopped at `max_steps` (omitted: `engine_params.default_max_codelets`); returns the answer distribution, status counts, per-run outcomes and throughput. Persists nothing |
+| GET | `/api/swarm` | The pool: whether the plugin is installed, worker count, core tiers, backends and executors, limits (including `default_max_codelets`) |
 
 ### Training Mode Sessions
 
@@ -1635,16 +1638,22 @@ part of a run's identity rather than a transient preference:
 
 - The **chosen** value is remembered across runs *and across page reloads*, and
   is sent with each new run so the engine is initialised with it. It survives
-  Reset.
+  Reset. Until a person chooses one the client states nothing: a new run takes the
+  configuration's own `spreading_activation_threshold`, the slider shows it, and the
+  slider runs up to the configuration's `max_activation` (both come from the
+  run-parameter catalogue, `GET /api/runs/parameters/catalogue`). The server clips a
+  threshold above `max_activation` to it.
 - The value each run **used** is stored on the run (`runs.spreading_threshold`)
   and reported by the API, so it outlives a restart and shows in the Run History
-  **Spr** column. A run at anything other than 100 is not comparable with the
-  dissertation's results, and the list says which is which.
+  **Spr** column. A run at anything other than `max_activation` (100 in the Metacat
+  Standard Configuration) is not comparable with the dissertation's results, and the
+  list says which is which.
 
 `POST /api/runs/{id}/spreading-threshold` still changes it mid-run, and
 `POST /api/runs` accepts `spreading_threshold` at creation.
 
-**The default is 100, which reproduces the original Metacat exactly.** Leave it
+**The default is the configuration's `spreading_activation_threshold`, 100 in the Metacat
+Standard Configuration, which reproduces the original Metacat exactly.** Leave it
 there when comparing against the dissertation.
 
 ### What it controls

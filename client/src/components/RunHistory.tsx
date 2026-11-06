@@ -7,6 +7,7 @@ import { useRunStore } from '@/store/runStore';
 import { listRuns, deleteRun, getRun, describeApiError } from '@/api/client';
 import { ModeBadge } from '@/components/ModeBadge';
 import { Pager } from '@/components/Pager';
+import { useCatalogueNumber } from '@/hooks/useParameterCatalogue';
 import type { RunInfo } from '@/types';
 
 /** How many runs one window of the list holds. */
@@ -78,6 +79,8 @@ export function RunHistory() {
   const liveWorkspace = useRunStore((s) => s.workspace);
   const liveParams = useRunStore((s) => s.runParams);
   const liveThreshold = useRunStore((s) => s.spreadingThreshold);
+  // The original's threshold is the activation ceiling, which the configuration holds.
+  const thresholdCeiling = useCatalogueNumber('max_activation');
   const liveWorkers = useRunStore((s) => s.runWorkers);
   const store = useRunStore();
 
@@ -237,7 +240,7 @@ export function RunHistory() {
           target: liveWorkspace?.target ?? liveParams?.target ?? '',
           answer: liveAnswer,
           mode: currentRunMode ?? undefined,
-          spreading_threshold: liveThreshold,
+          spreading_threshold: liveThreshold ?? undefined,
           workers: liveWorkers,
         }
       : null;
@@ -488,17 +491,17 @@ export function RunHistory() {
                 flexShrink: 0,
                 textAlign: 'right',
                 color:
-                  (run.spreading_threshold ?? 100) === 100
+                  run.spreading_threshold === thresholdCeiling
                     ? 'var(--text-secondary)'
                     : 'var(--warning)',
               }}
               title={
-                (run.spreading_threshold ?? 100) === 100
-                  ? 'Spreading threshold 100 — the original behaviour'
+                run.spreading_threshold === thresholdCeiling
+                  ? `Spreading threshold ${run.spreading_threshold} — the original behaviour`
                   : `Spreading threshold ${run.spreading_threshold} — not the original behaviour`
               }
             >
-              {run.spreading_threshold ?? 100}
+              {run.spreading_threshold}
             </span>
             {/* Every row here has a database row behind it — a Fast run cannot be
                 listed — so every one of them has something to review. */}

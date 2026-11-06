@@ -32,6 +32,7 @@ from server.engine.descriptions import Description
 from server.engine.formulas import round_ratio, temp_adjusted_probability, temp_adjusted_values
 from server.engine.groups import Group
 from server.engine.roles import ROLE_BY_NAME, absent
+from server.engine.run_binding import constants
 from server.engine.rules import Rule
 from server.engine.sink import STRUCTURE_BROKEN, STRUCTURE_BUILT
 from server.engine.trace import (
@@ -321,6 +322,9 @@ def choose_bond_facet(ctx: EngineContext, object1: Any, object2: Any) -> Any:
     string = getattr(object1, "string", None)
     string_objects = list(getattr(string, "objects", ())) if string is not None else []
     weights = []
+    k = constants()
+    support_weight = k.bond_facet_choice_local_support_weight
+    activation_weight = k.bond_facet_choice_activation_weight
     for facet in facets:
         described = sum(
             1
@@ -330,7 +334,12 @@ def choose_bond_facet(ctx: EngineContext, object1: Any, object2: Any) -> Any:
         # ``100*`` (utilities.ss:502) rounds, so the local-support term is a whole
         # number before it is averaged with the activation.
         local_support = round(100.0 * described / len(string_objects)) if string_objects else 0
-        weights.append(round((local_support + facet.activation) / 2.0))
+        weights.append(
+            round(
+                (local_support * support_weight + facet.activation * activation_weight)
+                / (support_weight + activation_weight)
+            )
+        )
     return ctx.rng.weighted_pick(facets, weights)
 
 
@@ -407,8 +416,15 @@ def choose_string_for(ctx: EngineContext, node: Any) -> Any:
         if getattr(node, "name", "") in (roles.direction_left.name, roles.direction_right.name)
         else "get_bond_category_relevance"
     )
+    k = constants()
+    relevance_weight = k.scout_string_choice_relevance_weight
+    unhappiness_weight = k.scout_string_choice_unhappiness_weight
     weights = [
-        (getattr(s, relevance)(node) + s.get_average_intra_string_unhappiness()) / 2.0
+        (
+            getattr(s, relevance)(node) * relevance_weight
+            + s.get_average_intra_string_unhappiness() * unhappiness_weight
+        )
+        / (relevance_weight + unhappiness_weight)
         for s in strings
     ]
     return ctx.rng.weighted_pick(strings, weights)
@@ -554,7 +570,8 @@ def num_bonds_to_scan(ctx: EngineContext, string: Any) -> int:
 
     Scheme: ``bond-scan-distribution`` (workspace-strings.ss:56-59) — the values
     are ``ascending-index-list`` of the string's letter count, i.e. ``0..n-1``,
-    weighted by ``i^2``.  Zero carries weight zero, so the draw is effectively
+    weighted by ``i^bond_scan_exponent`` (``i^2`` in the Metacat Standard Configuration).
+    Zero carries weight zero, so the draw is effectively
     over ``1..n-1`` with **long scans strongly favoured**: in a six-letter string
     5 is 25 times as likely as 1.  A uniform draw over ``1..n`` — which is what
     the ported scouts used — both flattens that preference and offers a length the
@@ -564,7 +581,8 @@ def num_bonds_to_scan(ctx: EngineContext, string: Any) -> int:
     if n < 2:
         return 0
     values = list(range(n))
-    return ctx.rng.weighted_pick(values, [float(i * i) for i in values])
+    exponent = constants().bond_scan_exponent
+    return ctx.rng.weighted_pick(values, [float(i**exponent) for i in values])
 
 
 def choose_leftmost_object(ctx: EngineContext, string: Any) -> Any:
@@ -1642,7 +1660,7 @@ def _record_group_event(
     threshold = ctx.meta.get_param("group_importance_threshold")
     singleton_with_length = group.length == 1 and _has_length_description(ctx, group)
     if flipped or group.spans_whole_string() or singleton_with_length:
-        importance = 100.0
+        importance = constants().group_special_importance
     else:
         importance = float(group.strength)
     if importance >= threshold:
@@ -1672,7 +1690,9 @@ def _slippage_importance(ctx: EngineContext, bridge: Bridge, cm: Any) -> float:
 
     A weighted average over four terms — the mapping's own dimension, whether the
     bridge spans a whole string, the depth of the two descriptors, and the depth of
-    the label (50 when unlabelled) — at weights 4, 2, 2, 3.
+    the label (``slippage_importance_unlabelled_depth`` when unlabelled, 50 in the Metacat
+    Standard Configuration) — at the weights ``slippage_importance_weight_*`` (4, 2, 2, 3);
+    a spanning bridge scores ``slippage_importance_spanning_term`` (100).
 
     Bond-category slippages score **0** outright: they say something about how two
     strings are bonded, not about how their objects correspond, and §4.4 is about the
@@ -1688,14 +1708,20 @@ def _slippage_importance(ctx: EngineContext, bridge: Bridge, cm: Any) -> float:
         return float(getattr(node, "conceptual_depth", 0) or 0)
 
     label = getattr(cm, "label", None)
-    spanning = 100.0 if _bridge_is_spanning(bridge) else 0.0
+    k = constants()
+    spanning = k.slippage_importance_spanning_term if _bridge_is_spanning(bridge) else 0.0
     values = [
         depth(cm_type),
         spanning,
         (depth(getattr(cm, "descriptor1", None)) + depth(getattr(cm, "descriptor2", None))) / 2.0,
-        depth(label) if label is not None else 50.0,
+        depth(label) if label is not None else k.slippage_importance_unlabelled_depth,
     ]
-    weights = [4.0, 2.0, 2.0, 3.0]
+    weights = [
+        k.slippage_importance_weight_dimension_depth,
+        k.slippage_importance_weight_spanning,
+        k.slippage_importance_weight_descriptor_depth,
+        k.slippage_importance_weight_label_depth,
+    ]
     return round(sum(v * w for v, w in zip(values, weights)) / sum(weights))
 
 
@@ -1727,7 +1753,8 @@ def _boost_themespace_activations(ctx: EngineContext, bridge: Bridge) -> None:
     (``Themespace.get_dominant_themes``) rather than caching it.
     """
     strength = bridge.strength
-    factor = strength * (2 if bridge.is_spanning_bridge else 1)
+    boost = constants().spanning_bridge_theme_boost_factor
+    factor = strength * (boost if bridge.is_spanning_bridge else 1)
     for dimension, relation in bridge.get_associated_thematic_relations():
         ctx.themespace.boost_theme(bridge.theme_type, dimension, relation, factor)
 
@@ -1777,7 +1804,7 @@ def _record_slippage_events(
             continue
         importance = _slippage_importance(ctx, bridge, cm)
         if under_pressure and _slippage_matches_active_theme(ctx, bridge, cm):
-            importance = 100.0
+            importance = constants().thematic_slippage_importance
         if importance >= threshold:
             record_event(
                 ctx,
@@ -1829,7 +1856,12 @@ def _record_rule_event(ctx: EngineContext, rule: Rule) -> None:
     # ``trace.ss:1359-1363``: a perfectly uniform rule is maximally important whatever
     # its relative quality — uniformity is what makes a rule say one thing about the
     # whole string rather than several things about its parts.
-    importance = 100.0 if rule.uniformity == 100 else float(relative_quality)
+    k = constants()
+    importance = (
+        k.uniform_rule_importance
+        if rule.uniformity == k.perfect_rule_uniformity
+        else float(relative_quality)
+    )
     if importance >= threshold:
         record_event(
             ctx,
@@ -1883,7 +1915,8 @@ def _get_incompatible_structures(
     Returns list of (opponent, proposer_weight, opponent_weight).
 
     The weights are the Scheme builders' own, and they are not all 1-vs-1; each
-    one is cited at its site below.  A weight multiplies a party's *strength*
+    one is cited at its site below and is a formula coefficient, ``fight_<proposer>_vs_<opponent>_*``
+    (the Metacat Standard Configuration holds the Scheme's numbers).  A weight multiplies a party's *strength*
     inside ``wins-fight?`` (``workspace-structures.ss:70-78``), so it says how
     much a structure of that kind is worth relative to its opponent regardless
     of how strong either happens to be.
@@ -1893,6 +1926,7 @@ def _get_incompatible_structures(
     (bridges.ss:1241-1313).
     """
     incompatibles: list[tuple[Any, float, float]] = []
+    k = constants()
 
     if isinstance(structure, Bond):
         # bonds.ss:370-376 — 1 vs 1 against each bond occupying either of the two
@@ -1905,7 +1939,8 @@ def _get_incompatible_structures(
         # conflict at all.  ``add_bond`` then overwrote the displaced bond's
         # pointers and left it in ``string.bonds`` with dangling slots.
         incompatibles.extend(
-            (bond, 1.0, 1.0) for bond in structure.get_incompatible_bonds()
+            (bond, k.fight_bond_vs_bond_proposer_weight, k.fight_bond_vs_bond_opponent_weight)
+            for bond in structure.get_incompatible_bonds()
         )
 
         # bonds.ss:377-384 — every group nesting *both* objects at any depth
@@ -1922,7 +1957,8 @@ def _get_incompatible_structures(
         if conflicting_groups:
             shared_weight = float(max(g.span for g in conflicting_groups))
             incompatibles.extend(
-                (group, 1.0, shared_weight) for group in conflicting_groups
+                (group, k.fight_bond_vs_group_proposer_weight, shared_weight)
+                for group in conflicting_groups
             )
 
         # bonds.ss:385-398 — a *directed* bond at either edge of its string implies
@@ -1936,7 +1972,13 @@ def _get_incompatible_structures(
             for orientation in ("horizontal", "vertical"):
                 for bridge in structure.get_incompatible_bridges(orientation):
                     if bridge.is_built:
-                        incompatibles.append((bridge, 2.0, 3.0))
+                        incompatibles.append(
+                            (
+                                bridge,
+                                k.fight_bond_vs_bridge_proposer_weight,
+                                k.fight_bond_vs_bridge_opponent_weight,
+                            )
+                        )
 
     elif isinstance(structure, Group):
         # groups.ss:652-664 — constituent bonds that exist in the string only as
@@ -1949,7 +1991,7 @@ def _get_incompatible_structures(
             for bond in structure.group_bonds:
                 flipped = structure.string.get_equivalent_flipped_bond(bond)
                 if flipped is not None:
-                    incompatibles.append((flipped, span, 1.0))
+                    incompatibles.append((flipped, span, k.fight_group_vs_flipped_bond_opponent_weight))
 
         # groups.ss:665-682 — the incompatible groups are exactly the **enclosing
         # groups of the constituents** (``get-incompatible-groups``,
@@ -1974,7 +2016,13 @@ def _get_incompatible_structures(
                     (group, float(structure.length), float(group.length))
                 )
             else:
-                incompatibles.append((group, 1.0, 1.0))
+                incompatibles.append(
+                    (
+                        group,
+                        k.fight_group_vs_group_proposer_weight,
+                        k.fight_group_vs_group_opponent_weight,
+                    )
+                )
 
         # groups.ss:685-695 — a directed group whose implied direction mapping
         # contradicts an existing bridge's string-position mapping has to beat it,
@@ -1983,7 +2031,13 @@ def _get_incompatible_structures(
         for orientation in ("vertical", "horizontal"):
             for bridge in structure.get_incompatible_bridges(orientation):
                 if bridge.is_built:
-                    incompatibles.append((bridge, 1.0, 1.0))
+                    incompatibles.append(
+                        (
+                            bridge,
+                            k.fight_group_vs_bridge_proposer_weight,
+                            k.fight_group_vs_bridge_opponent_weight,
+                        )
+                    )
 
     elif isinstance(structure, Bridge):
         # Two bridges are incompatible if they share an object, carry
@@ -2016,17 +2070,35 @@ def _get_incompatible_structures(
         if _at_string_edge(structure.object1) and _at_string_edge(structure.object2):
             incompatible_bond = structure.get_incompatible_bond()
             if incompatible_bond is not None and incompatible_bond.is_built:
-                incompatibles.append((incompatible_bond, 3.0, 2.0))
+                incompatibles.append(
+                    (
+                        incompatible_bond,
+                        k.fight_bridge_vs_bond_proposer_weight,
+                        k.fight_bridge_vs_bond_opponent_weight,
+                    )
+                )
                 enclosing = getattr(incompatible_bond, "enclosing_group", None)
                 if enclosing is not None and getattr(enclosing, "is_built", False):
-                    incompatibles.append((enclosing, 1.0, 1.0))
+                    incompatibles.append(
+                        (
+                            enclosing,
+                            k.fight_bridge_vs_enclosing_group_proposer_weight,
+                            k.fight_bridge_vs_enclosing_group_opponent_weight,
+                        )
+                    )
 
         # A bridge proposed against a reversed reading of a spanning group has to
         # beat the group it would replace, at even odds (bridges.ss:1292-1312).
         # The group is doing no wrong: the bridge is asking to reinterpret it.
         for original in (structure.flipped_group1, structure.flipped_group2):
             if original is not None and original.is_built:
-                incompatibles.append((original, 1.0, 1.0))
+                incompatibles.append(
+                    (
+                        original,
+                        k.fight_bridge_vs_flipped_group_proposer_weight,
+                        k.fight_bridge_vs_flipped_group_opponent_weight,
+                    )
+                )
 
     return incompatibles
 

@@ -173,8 +173,8 @@ def _episode_by_hand(meta, task: EpisodeTask) -> list[str]:
 
 def test_episode_in_swarm_equals_episode_in_process(swarm, meta):
     tasks = [
-        EpisodeTask("abc", "abd", "ijk", first_seed=100, runs=4, max_steps=MAX_STEPS, backend="numpy"),
-        EpisodeTask("abc", "abd", "mrrjjj", first_seed=7, runs=3, max_steps=MAX_STEPS, backend="numpy"),
+        EpisodeTask("abc", "abd", "ijk", first_seed=100, runs=4, answer=None, max_steps=MAX_STEPS, backend="numpy"),
+        EpisodeTask("abc", "abd", "mrrjjj", first_seed=7, runs=3, answer=None, max_steps=MAX_STEPS, backend="numpy"),
     ]
     got = swarm.map(tasks, meta=meta)
     for task, episode in zip(tasks, got):
@@ -186,7 +186,7 @@ def test_episode_in_swarm_equals_episode_in_process(swarm, meta):
 
 def test_episode_memory_really_is_shared_between_its_runs(swarm, meta):
     """Runs of an episode differ from the same seeds run with fresh memory."""
-    ep = EpisodeTask("abc", "abd", "ijk", first_seed=1, runs=4, max_steps=MAX_STEPS, backend="numpy")
+    ep = EpisodeTask("abc", "abd", "ijk", first_seed=1, runs=4, answer=None, max_steps=MAX_STEPS, backend="numpy")
     shared = swarm.run(ep, meta=meta)
     fresh = swarm.map(
         [RunTask("abc", "abd", "ijk", None, 1 + i, MAX_STEPS, backend="numpy") for i in range(4)],
@@ -301,14 +301,14 @@ def test_a_swarm_with_no_metadata_refuses_rather_than_read_the_seed_files() -> N
     swarm = Swarm(workers=2)
     try:
         with pytest.raises(ConfigurationRequired):
-            swarm.map([RunTask("abc", "abd", "xyz", seed=7, max_steps=3000)])
+            swarm.map([RunTask("abc", "abd", "xyz", None, seed=7, max_steps=3000)])
         with pytest.raises(ConfigurationRequired):
             swarm.start()
         assert swarm._executor is None
     finally:
         swarm.shutdown()
     with pytest.raises(ConfigurationRequired):
-        run_inprocess(RunTask("abc", "abd", "xyz", seed=7, max_steps=10), None)
+        run_inprocess(RunTask("abc", "abd", "xyz", None, seed=7, max_steps=10), None)
 
 
 # ---------------------------------------------------------------------------

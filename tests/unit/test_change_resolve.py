@@ -73,7 +73,8 @@ def test_posting_rule_key_defaults_to_the_codelet_type(cfg):
     free = next(k[0] for k in cfg.tables["codelet_type_defs"] if k[0] not in with_rule)
     _, resolved, _ = after(
         cfg,
-        ins("posting_rules", codelet_type=free, direction=next(iter(cfg.tables["posting_rules"].values()))["direction"]),
+        ins("posting_rules", codelet_type=free, direction=next(iter(cfg.tables["posting_rules"].values()))["direction"],
+            posting_formula="temperature / 100", count_formula="fixed", condition="always"),
     )
     assert resolved[0]["row"]["rule_key"] == free
     assert resolved[0]["key"] == {"rule_key": free}
@@ -205,15 +206,16 @@ def test_unknown_reference_is_422_and_names_the_op(cfg):
         ({"op": "update", "table": "slipnet_node_defs", "key": {"name": "no-such"}, "fields": {"short_name": "q"}}, 0),
         ({"op": "delete", "table": "posting_rules", "key": {"rule_key": "no-such"}}, 0),
         (ins("slipnet_layout", node_name="no-such", grid_row=0, grid_col=0), 0),
-        (ins("slipnet_link_defs", from_node="plato-a", to_node="no-such", link_type="lateral"), 0),
-        (ins("slipnet_link_defs", from_node="plato-a", to_node="plato-b", link_type="no-such-kind"), 0),
-        (ins("slipnet_link_defs", from_node="plato-a", to_node="plato-b", link_type="lateral", label_node="no-such"), 0),
+        (ins("slipnet_link_defs", from_node="plato-a", to_node="no-such", link_type="lateral", link_length=None, fixed_length=False), 0),
+        (ins("slipnet_link_defs", from_node="plato-a", to_node="plato-b", link_type="no-such-kind", link_length=None, fixed_length=False), 0),
+        (ins("slipnet_link_defs", from_node="plato-a", to_node="plato-b", link_type="lateral", label_node="no-such", link_length=None, fixed_length=False), 0),
         (ins("slipnet_node_roles", role="no.such.role", ordinal=0, node_name="plato-a"), 0),
         (ins("slipnet_node_roles", role="evaluator.bond", ordinal=0, node_name="plato-a"), 0),
         (ins("codelet_type_roles", role="dimension.length", ordinal=0, codelet_type="rule-scout"), 0),
-        (ins("posting_rules", codelet_type="no-such", direction="bottom_up"), 0),
+        (ins("posting_rules", codelet_type="no-such", direction="bottom_up", posting_formula="temperature / 100", count_formula="fixed", condition="always"), 0),
         (ins("codelet_pattern_defs", pattern_name="p", codelet_type="rule-scout", urgency_level="no-such"), 0),
-        (ins("posting_rules", codelet_type="rule-scout", direction="bottom_up", triggering_slipnodes=["plato-a", "no-such"]), 0),
+        (ins("posting_rules", codelet_type="rule-scout", direction="bottom_up", posting_formula="temperature / 100", count_formula="fixed", condition="always",
+             triggering_slipnodes=["plato-a", "no-such"]), 0),
         ({"op": "rename_node", "old": "no-such", "new": "other"}, 0),
         ({"op": "set_param", "name": "no-such", "to": 1}, 0),
     ]
@@ -233,7 +235,7 @@ def test_unknown_reference_is_422_and_names_the_op(cfg):
 
 def test_a_reference_is_checked_once_on_the_resulting_state(cfg):
     # The node and its link in either order.
-    link = ins("slipnet_link_defs", from_node="x1", to_node="plato-a", link_type="lateral")
+    link = ins("slipnet_link_defs", from_node="x1", to_node="plato-a", link_type="lateral", link_length=None, fixed_length=False)
     for ops in ([ins("slipnet_node_defs", **node()), link], [link, ins("slipnet_node_defs", **node())]):
         doc, _, _ = after(cfg, *ops)
         assert ("x1", "plato-a", "lateral", "") in doc.tables["slipnet_link_defs"]
@@ -244,7 +246,7 @@ def test_a_reference_is_checked_once_on_the_resulting_state(cfg):
 def test_a_reference_the_cascade_removed_is_not_dangling(cfg):
     doc, _, report = after(
         cfg, ins("slipnet_node_defs", **node()),
-        ins("slipnet_link_defs", from_node="x1", to_node="plato-a", link_type="lateral"),
+        ins("slipnet_link_defs", from_node="x1", to_node="plato-a", link_type="lateral", link_length=None, fixed_length=False),
         {"op": "remove_node", "name": "x1"})
     assert ("x1",) not in doc.tables["slipnet_node_defs"] and doc.tables["slipnet_link_defs"] == cfg.tables["slipnet_link_defs"]
 
@@ -289,7 +291,7 @@ def test_stale_and_key_exists_are_409(cfg):
     numbered = next(r for r in cfg.tables["slipnet_node_defs"].values() if r.get("numeric_value") is not None)
     assert refused(cfg, ins("slipnet_node_defs", **node(numeric_value=numbered["numeric_value"]))).kind == "key_exists"
     assert refused(cfg, {"op": "add_link", "from": "plato-a", "to": "plato-b", "type": "lateral",
-                         "label": "plato-successor"}).kind == "key_exists"
+                         "label": "plato-successor", "fixed": False}).kind == "key_exists"
     assert refused(cfg, {"op": "update", "table": "slipnet_node_defs", "key": {"name": "plato-a"},
                          "fields": {"name": "plato-b"}}).kind == "key_exists"
     bound = next(iter(cfg.tables["slipnet_node_roles"].values()))
@@ -358,7 +360,8 @@ def test_a_depth_outside_the_range_is_an_advisory_not_a_refusal(cfg):
 
 def test_a_label_with_no_intrinsic_length_is_an_advisory(cfg):
     _, report = run(cfg, {"op": "add_node", "name": "x1", "fields": {"short_name": "x", "conceptual_depth": 5}},
-                    {"op": "add_link", "from": "plato-a", "to": "plato-b", "type": "lateral", "label": "x1"})
+                    {"op": "add_link", "from": "plato-a", "to": "plato-b", "type": "lateral", "label": "x1",
+                     "fixed": False})
     assert any(a["field"] == "label_node" for a in report["advisories"])
 
 
@@ -387,7 +390,8 @@ def test_skip_rolls_back_a_convenience_op_that_fails_halfway(cfg):
     doc, resolved, report = after(
         cfg,
         {"op": "add_node", "name": "x1", "fields": {"short_name": "x", "conceptual_depth": 5},
-         "links": [{"to": "plato-a", "type": "lateral"}, {"to": "no-such", "type": "lateral"}]},
+         "links": [{"to": "plato-a", "type": "lateral", "fixed": False},
+                   {"to": "no-such", "type": "lateral", "fixed": False}]},
         {"op": "set_param", "name": "initial_temperature", "to": 90},
         on_op_failure="skip")
     assert ("x1",) not in doc.tables["slipnet_node_defs"]
@@ -399,7 +403,7 @@ def test_skip_rolls_back_a_convenience_op_that_fails_halfway(cfg):
 def test_skip_skips_the_op_that_wrote_a_dangling_reference_and_reruns(cfg):
     doc, resolved, report = after(
         cfg,
-        ins("slipnet_link_defs", from_node="plato-a", to_node="no-such", link_type="lateral"),
+        ins("slipnet_link_defs", from_node="plato-a", to_node="no-such", link_type="lateral", link_length=None, fixed_length=False),
         {"op": "set_param", "name": "initial_temperature", "to": 90},
         on_op_failure="skip")
     assert [s["op"] for s in report["skipped"]] == [0]
@@ -411,7 +415,7 @@ def test_skip_of_a_node_then_its_link_skips_both(cfg):
     doc, _, report = after(
         cfg,
         ins("slipnet_node_defs", **node(**{"name": "plato-a"})),
-        ins("slipnet_link_defs", from_node="plato-a", to_node="plato-b", link_type="lateral", label_node="plato-successor"),
+        ins("slipnet_link_defs", from_node="plato-a", to_node="plato-b", link_type="lateral", label_node="plato-successor", link_length=None, fixed_length=False),
         on_op_failure="skip")
     assert [s["op"] for s in report["skipped"]] == [0, 1]
 

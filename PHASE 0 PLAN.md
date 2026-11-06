@@ -33,7 +33,7 @@ count every engine-size figure in this document uses. Seed data: 59 slipnet node
 integration + 8 module files run locally; 9 e2e files currently require Docker, which
 WP2.1 removes).
 
-> **As built.** `server/engine/` holds 53 modules and 37,925 lines. The multi-core machinery
+> **As built.** `server/engine/` holds 53 modules and 38,131 lines. The multi-core machinery
 > (`free_running.py`, `coderack_shards.py`, `population.py`) moved out to the detachable
 > plugin package `server/parallel/`, which is not counted here. Later: `population.py`,
 > the sharded coderack candidates (`coderack_shards.py` keeps only the locked rack),
@@ -1105,7 +1105,7 @@ introduce the delta-and-commit split the commit protocol needs.
 *Files:* `engine/codelet_dsl/builtins.py`, `engine/workspace_structures.py`.
 *Verify:* serial behaviour unchanged; read/write sets recorded and inspectable.
 
-> **As built.** `builtins.py` holds 3,260 lines across 109 top-level functions.
+> **As built.** `builtins.py` holds 3,332 lines across 109 top-level functions.
 
 **Done**, as `server/engine/access.py`. Ten of the 33 public builtins mutate state; each
 now records what it read and what it wrote, and each codelet is validated at its own

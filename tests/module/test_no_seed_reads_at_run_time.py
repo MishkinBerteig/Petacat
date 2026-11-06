@@ -102,7 +102,7 @@ def test_an_episode_and_the_answers_it_leaves_read_no_seed_file(meta, seed_reads
         runner.run_mcat(max_steps=6000)
     assert seed_reads_forbidden == []
     outcome = run_inprocess(
-        EpisodeTask("abc", "abd", "ijk", first_seed=1, runs=2, max_steps=2000), meta
+        EpisodeTask("abc", "abd", "ijk", first_seed=1, runs=2, answer=None, max_steps=2000), meta
     )
     assert outcome is not None
     answers = memory.answers

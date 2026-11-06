@@ -24,7 +24,6 @@ import {
 } from './shared';
 
 const DEFAULT_SEEDS = 100;
-const DEFAULT_MAX_CODELETS = 20_000;
 const FALLBACK_REQUEST_SIZE = 500;
 
 /** The configuration a new session starts from, when the manager chose one (not the default). */
@@ -54,7 +53,8 @@ export function NewSessionForm({ configurationBase = null, limits, defaults, onC
   const [seeds, setSeeds] = useState(String(defaults?.settings.seeds_per_problem ?? DEFAULT_SEEDS));
   const [seedStart, setSeedStart] = useState(String(defaults?.settings.seed_start ?? 1));
   const [maxCodelets, setMaxCodelets] = useState(
-    String(defaults?.settings.max_codelets ?? DEFAULT_MAX_CODELETS),
+    // Blank until the server's defaults arrive: the number is `default_max_codelets`.
+    String(defaults?.settings.max_codelets ?? ''),
   );
   const [useOverrides, setUseOverrides] = useState(false);
   const [backend, setBackend] = useState('');

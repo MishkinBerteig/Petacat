@@ -332,7 +332,7 @@ async def made(db_session):
     from server.models.training_mode_session import TrainingModeSession
     from server.services.configurations import create_session_configuration
 
-    row = TrainingModeSession(name="C14b session", backend="single", policy={})
+    row = TrainingModeSession(name="C14b session", backend="single", policy={}, max_codelets=20000)
     db_session.add(row)
     await db_session.flush()
     session_id = row.id

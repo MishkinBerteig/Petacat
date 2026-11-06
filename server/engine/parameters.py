@@ -33,7 +33,7 @@ the difference matters more than the count:
 * **Read by the engine, but not a number in a range.**  ``initial_codelet_types``,
   ``initial_codelet_urgency`` and ``initial_codelet_rounds`` name codelet types, an
   urgency tier and a formula; ``expiration_period``, ``num_youngest_structures``,
-  ``max_theme_activation``, ``distance_threshold`` and
+  ``distance_threshold`` and
   ``slippage_ignore_probability`` are numbers and could be offered — they are simply
   not yet.  All of them are wired.
 * **Read by another layer.**  ``clampable_codelet_patterns`` is consulted by the
@@ -228,6 +228,11 @@ RUN_PARAMETERS: tuple[RunParameter, ...] = (
     _p("theme_spread_amount", KIND_INT, GROUP_THEMES, "Theme spread",
        "How much activation flows between themes within a cluster — the excitation "
        "between compatible themes and the inhibition between opposing ones.", 0, 100),
+    _p("max_theme_activation", KIND_INT, GROUP_THEMES, "Theme activation ceiling",
+       "The strongest a theme can be, in either direction: the value a clamp pins a theme "
+       "to (positive for thematic pressure, negative for the manual counterpart of "
+       "jootsing), and the limit its activation is clipped to. The Themespace window "
+       "reads it from here, so the clamp buttons and the bars follow it.", 1, 1000),
     _p("dominant_theme_margin", KIND_INT, GROUP_THEMES, "Dominance margin",
        "How far a theme must exceed its rivals before it counts as dominant and starts "
        "exerting thematic pressure on what gets built.", 0, 200),
