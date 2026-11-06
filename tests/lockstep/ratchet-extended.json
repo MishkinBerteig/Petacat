@@ -5,6 +5,12 @@
   "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
+ "discovery/aaa-aaaaaa-aaa/s1-cap5000|aaa-aaaaaa-aaa/1": {
+  "agreement": 1.0,
+  "reach": 1615,
+  "state_snapshots_differing": 0,
+  "unregistered_errors": 0
+ },
  "discovery/aab-zzb-aab/s2-cap3000|aab-zzb-aab/2": {
   "agreement": 1.0,
   "reach": 1293,
@@ -101,9 +107,21 @@
   "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },
+ "discovery/eee-eeeeee-eee/s3-cap5000|eee-eeeeee-eee/3": {
+  "agreement": 1.0,
+  "reach": 804,
+  "state_snapshots_differing": 0,
+  "unregistered_errors": 0
+ },
  "discovery/gfe-gfef-gfe/s1-cap3000|gfe-gfef-gfe/1": {
   "agreement": 1.0,
   "reach": 3000,
+  "state_snapshots_differing": 0,
+  "unregistered_errors": 0
+ },
+ "discovery/hijklmnopqr-hijklmnopqs-rqponmlkjih/s1-cap5000|hijklmnopqr-hijklmnopqs-rqponmlkjih/1": {
+  "agreement": 1.0,
+  "reach": 1900,
   "state_snapshots_differing": 0,
   "unregistered_errors": 0
  },

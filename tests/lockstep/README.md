@@ -36,7 +36,7 @@ nothing runs and that documents the crashes the fixes remove.
 | Plain: 19 demo problems × seeds 1–30 (seeds 11–30 were once a separate "held-out" corpus; there is none now) | `traces/<slug>/<seed>.metacat.jsonl.gz` | 570 traces, ~450 MB | Only `abc-abd-xyz` seeds 1–10 |
 | Episodes: 8 runs per episode, memory carried | `traces/episodes/<slug>/<S>.r<k>.metacat.jsonl.gz` | 67 episodes over all 19 problems (536 runs, 6.5 M codelets, ~1.6 GB) | No |
 | Justify mode: the demo answers × seeds 1–5 | `traces/justify/<i-m-t-a>/<seed>…` | 85 traces | No |
-| Extended golden baseline: every case of `golden/extended_cases.json`, recorded with the case's own cap, answer, memory clears, interventions and Self-watching setting | `traces-extended/<case id>/` (laid out like the corpora above) | 73 cases, 114 runs | No |
+| Extended golden baseline: every case of `golden/extended_cases.json`, recorded with the case's own cap, answer, memory clears, interventions and Self-watching setting | `traces-extended/<case id>/` (laid out like the corpora above) | 76 cases, 117 runs | No |
 | Metacat's known failures: with the bundle's known-failure fixes (the patched build), and as the unpatched reference reconstruction crashed | `traces-known-failures/{fixes,reference}/` | 6 traces | Yes |
 | Translation logs: the six runs behind `translation_log_metacat.tsv` | `traces-translation/<slug>/<seed>.metacat.jsonl.gz` | 6 traces | Yes |
 | Snag explanations: seven runs beyond the corpus that between them hit every shape of failure (CHANGE, SWAP, CONFLICT, group-category reversal), with Metacat's logged explanations and comment lines | `traces-snags/<slug>/<seed>.metacat.jsonl.gz`, `snag_explanations_metacat.tsv` | 7 traces, 1.5 MB | Yes |
@@ -250,7 +250,7 @@ runs the default configuration on NumPy. One caveat: the replay follows Metacat'
 runs Petacat's own random stream on the same inputs, so the check says that the situations Metacat reaches
 are handled as Metacat handles them, not that the baseline's own trajectory is Metacat's.
 
-**Every case is in a ratchet.** All 114 runs are in `ratchet-extended.json` (key `<case id>|<layout slug>/<seed>`, for
+**Every case is in a ratchet.** All 117 runs are in `ratchet-extended.json` (key `<case id>|<layout slug>/<seed>`, for
 example `episode/a-aa-b/s1x6-cap4000|episodes/a-aa-b/1.r1`), and all 188 runs of the original baseline are in
 `ratchet.json`, `ratchet-justify.json` and `ratchet-episodes.json`. `test_ratchet_covers_golden.py` fails for any run of
 either golden baseline that has no entry. The extended traces are recorded from the patched Metacat, one folder per
@@ -261,8 +261,8 @@ them `python`, is replayed with that backend whatever `--numeric-backend` says) 
 entry is full reach, agreement 1.0, 0 errors and 0 differing snapshots. The 8 episode answer reports stay checked
 by `scripts/compare_episode_answers.py`, which is not a ratchet.
 
-**What is in it** (73 cases, 114 runs, 8 episode answer reports; about 30 s in one process, the whole file
-recomputed in 6-12 s over a process pool): 42 discovery cases, 19 justify cases, 8 episodes; four with a
+**What is in it** (76 cases, 117 runs, 8 episode answer reports; about 30 s in one process, the whole file
+recomputed in 6-12 s over a process pool): 45 discovery cases, 19 justify cases, 8 episodes; four with a
 person's actions (the Options menu's group and rule codelet clamps, Clamp Themes with two themes, Undo last
 clamp, the Self-watching check item off and on again), one episode with Clear Memory before run 4, 15 runs
 that the codelet cap ends, and the first appearance of `conflict` snags, `manual-clamp` events and cap-ended
@@ -282,6 +282,16 @@ alphabetic position (first <-> last of the alphabet). Dropping the binding of `p
 `rule.letter_or_alphabetic_dimension` or from `image_operation.new_alpha_position_category` changes these runs and none of
 the 41 demo problems at seeds 1-3. Each was recorded with `record.py` (seeds 1-4, cap 3000) and replayed in faithful mode:
 agreement 1.0, no errors, no differing snapshot, in all 16 runs. The coverage table below was measured before stage 6.
+
+Stage T4 added three cases that run past a group of six objects, which patched Metacat reaches only since patch 0002
+(`build-bridge` is guarded the way `attach-length-description` already is): `aaa -> aaaaaa; aaa` seed 1 (answers
+`aaaaaa` at 1,614 codelets), `eee -> eeeeee; eee` seed 3 (`eeeeee` at 803) and `hijklmnopqr -> hijklmnopqs;
+rqponmlkjih` seed 1 (`sqponmlkjih` at 1,899, with an 11-object group). Each was recorded from the final patched Metacat
+(cap 5000) and replayed with agreement 1.0, no error and no differing snapshot, then appended to the case file, so
+every earlier line of `extended_baseline.jsonl` is unchanged (only the header's case count and `cases_file_sha` moved).
+They add no Petacat engine line or branch (measured with `scripts/golden_coverage.py`: 12,711 of 14,824 lines and 4,559
+of 5,894 branches with and without them); they are in because no run of either golden baseline goes there and
+Metacat could not run them before, and their ratchet entries hold the fidelity.
 
 | | Original baseline | Original + extended |
 | --- | --- | --- |

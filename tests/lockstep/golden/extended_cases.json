@@ -3135,6 +3135,111 @@
      }
     ]
    }
+  },
+  {
+   "id": "discovery/aaa-aaaaaa-aaa/s1-cap5000",
+   "kind": "discovery",
+   "problem": [
+    "aaa",
+    "aaaaaa",
+    "aaa"
+   ],
+   "seeds": [
+    1
+   ],
+   "cap": 5000,
+   "why": {
+    "engine_lines": 0,
+    "engine_arcs": 0,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [
+     "stage T4: a run past a group of six objects, which patched Metacat reaches only since patch 0002 (the guard in build-bridge for a group of six or more objects); aaaaaa at 1,614 codelets"
+    ],
+    "most_new_in": []
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 1615,
+      "run_length": 1615,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "discovery/eee-eeeeee-eee/s3-cap5000",
+   "kind": "discovery",
+   "problem": [
+    "eee",
+    "eeeeee",
+    "eee"
+   ],
+   "seeds": [
+    3
+   ],
+   "cap": 5000,
+   "why": {
+    "engine_lines": 0,
+    "engine_arcs": 0,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [
+     "stage T4: a run past a group of six objects, which patched Metacat reaches only since patch 0002 (the guard in build-bridge for a group of six or more objects); eeeeee at 803 codelets"
+    ],
+    "most_new_in": []
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 804,
+      "run_length": 804,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "discovery/hijklmnopqr-hijklmnopqs-rqponmlkjih/s1-cap5000",
+   "kind": "discovery",
+   "problem": [
+    "hijklmnopqr",
+    "hijklmnopqs",
+    "rqponmlkjih"
+   ],
+   "seeds": [
+    1
+   ],
+   "cap": 5000,
+   "why": {
+    "engine_lines": 0,
+    "engine_arcs": 0,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [
+     "stage T4: a run past a group of six objects, which patched Metacat reaches only since patch 0002 (the guard in build-bridge for a group of six or more objects); sqponmlkjih at 1,899 codelets, with an 11-object group"
+    ],
+    "most_new_in": []
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 1900,
+      "run_length": 1900,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
   }
  ]
 }
