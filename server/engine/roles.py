@@ -143,7 +143,6 @@ class Absent:
     max_activation = 0.0
     activation_buffer = 0.0
     frozen = False
-    clamp_cycles_remaining = 0
     category_links: tuple = ()
     instance_links: tuple = ()
     property_links: tuple = ()
@@ -208,13 +207,10 @@ class Absent:
     def decay(self) -> None:
         return None
 
-    def clamp(self, cycles: int = 0, activation: float | None = None) -> None:
+    def clamp(self, activation: float | None = None) -> None:
         return None
 
     def unclamp(self) -> None:
-        return None
-
-    def tick_clamp(self) -> None:
         return None
 
 

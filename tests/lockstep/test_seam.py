@@ -86,26 +86,15 @@ def _initial_nodes(runner):
             ("plato-letter-category", "plato-string-position-category")]
 
 
-def test_the_default_clamp_lapses_on_an_update_cycle_countdown():
+def test_the_initial_clamp_holds_until_metacats_fixed_unclamp_time():
     from server.engine.runner import EngineRunner
 
     runner = EngineRunner(_metadata())
     with use_backend("off"):
         runner.init_mcat("abc", "abd", "xyz", seed=2)
-    assert all(n.frozen and n.clamp_cycles_remaining == 50 for n in _initial_nodes(runner))
-    assert runner._initial_unclamp_time == 0
-
-
-def test_faithful_clamp_holds_until_metacats_fixed_unclamp_time():
-    from server.engine.runner import EngineRunner
-    from tests.lockstep.faithful import FAITHFUL_PARAMETERS
-
-    runner = EngineRunner(_metadata())
-    with use_backend("off"):
-        runner.init_mcat("abc", "abd", "xyz", seed=2, parameters=dict(FAITHFUL_PARAMETERS))
-        # no countdown: the nodes are frozen until the codelet count reaches 50 x 15
-        assert runner._initial_unclamp_time == 750
-        assert all(n.frozen and n.clamp_cycles_remaining == 0 for n in _initial_nodes(runner))
+        # the nodes are frozen until the codelet count reaches 50 x 15
+        assert runner.ctx.initial_unclamp_time == 750
+        assert all(n.frozen for n in _initial_nodes(runner))
         _step_to(runner, 749)
         assert all(n.frozen for n in _initial_nodes(runner))
         runner.step_mcat()

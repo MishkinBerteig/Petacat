@@ -831,7 +831,7 @@ def clamp_concept_pattern(
         if node is None:
             continue
         before = node.activation
-        node.clamp(0, activation)
+        node.clamp(activation)
         if monitor is not None and before != node.activation:
             monitor(node, before, node.activation)
 

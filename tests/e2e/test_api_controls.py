@@ -94,7 +94,7 @@ async def test_clamp_and_unclamp_node(app_client):
 
     # Clamp a slipnet node
     resp = await app_client.post(f"/api/runs/{run_id}/clamp-node", json={
-        "node_name": "plato-successor", "cycles": 20,
+        "node_name": "plato-successor",
     })
     assert resp.status_code == 200
     data = resp.json()
@@ -117,7 +117,7 @@ async def test_clamp_invalid_node(app_client):
     run_id = resp.json()["run_id"]
 
     resp = await app_client.post(f"/api/runs/{run_id}/clamp-node", json={
-        "node_name": "nonexistent-node", "cycles": 10,
+        "node_name": "nonexistent-node",
     })
     assert resp.status_code in (400, 404, 422, 500)
 

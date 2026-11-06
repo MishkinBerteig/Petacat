@@ -57,7 +57,7 @@ class NumpySlipnetSession(SlipnetSession):
     """Node state and the CSR graph as float64/int32 arrays."""
 
     __slots__ = (
-        "topology", "n", "activation", "buffer", "frozen", "clamp_remaining",
+        "topology", "n", "activation", "buffer", "frozen",
         "decay_percent", "src", "dst", "weight", "_scaled_weight", "_scaled_for",
         "_max_activation", "_full_activation_threshold", "_probabilistic_exponent",
     )
@@ -74,7 +74,6 @@ class NumpySlipnetSession(SlipnetSession):
         self.activation = np.zeros(n, dtype=np.float64)
         self.buffer = np.zeros(n, dtype=np.float64)
         self.frozen = np.zeros(n, dtype=bool)
-        self.clamp_remaining = np.zeros(n, dtype=np.int32)
         self.decay_percent = np.asarray(topology.decay_percent, dtype=np.float64)
         # int32 rather than the platform default: at 10⁵ nodes and 3.4 links per
         # node the index arrays are the largest thing in the layout, and halving
@@ -90,14 +89,12 @@ class NumpySlipnetSession(SlipnetSession):
         self.activation = np.asarray(state.activation, dtype=np.float64)
         self.buffer = np.asarray(state.buffer, dtype=np.float64)
         self.frozen = np.asarray(state.frozen, dtype=bool)
-        self.clamp_remaining = np.asarray(state.clamp_remaining, dtype=np.int32)
 
     def store(self) -> SlipnetState:
         return SlipnetState(
             activation=self.activation.tolist(),
             buffer=self.buffer.tolist(),
             frozen=self.frozen.tolist(),
-            clamp_remaining=self.clamp_remaining.tolist(),
         )
 
     def _weights(self, scale: float) -> "np.ndarray":

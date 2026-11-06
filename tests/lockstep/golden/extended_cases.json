@@ -1,9 +1,6 @@
 {
  "format": "petacat-golden-extended-cases/1",
  "about": "Cases of the extended golden baseline (tests/support/golden_extended.py), in selection order. Every case was recorded in Metacat 1.2 and replayed in Petacat without divergence (metacat); why is what it added over the original baseline and the cases before it.",
- "parameters": {
-  "initial_clamp_fixed_time": true
- },
  "backend": "off",
  "cases": [
   {

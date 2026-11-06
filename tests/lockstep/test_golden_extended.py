@@ -60,7 +60,7 @@ def test_the_extended_files_are_consistent() -> None:
     assert header["numeric_backend"] == spec["backend"] == "off" and header["precision"] == "float64"
     assert header["cases_file_sha"] == gb.sha(ge.CASES_PATH.read_text())
     assert header["cases"] == len(spec["cases"])
-    assert header["parameters"] == spec["parameters"]
+    assert "parameters" not in header and "parameters" not in spec
 
     # every case is in the file exactly as the case list says, and nothing else is
     expected_ids: list[str] = []
@@ -85,7 +85,7 @@ def test_the_extended_files_are_consistent() -> None:
         assert set(r["english"]) == {"rule_english", "commentary", "verbose", "trace_display", "snag"}
         case_of = next(c for c in spec["cases"]
                        if r["id"] == c["id"] or r["id"].startswith(c["id"] + "/") or r["id"].startswith(c["id"] + ".r"))
-        assert r["parameters"] == {**spec["parameters"], **case_of.get("parameters", {})}
+        assert r.get("parameters", {}) == case_of.get("parameters", {})
         assert r["numeric_backend"] == next(
             c.get("backend", spec["backend"]) for c in spec["cases"] if r["id"].startswith(c["id"]))
     for r in records:
@@ -132,7 +132,7 @@ def test_a_sample_of_extended_runs_reproduces() -> None:
             picked[kind] = (total, case)
     assert set(picked) == {"discovery", "justify", "episode"}
     for _, case in picked.values():
-        for record, _detail in ge.capture_case(meta, case, spec["parameters"], case.get("backend") or spec["backend"]):
+        for record, _detail in ge.capture_case(meta, case, case.get("backend") or spec["backend"]):
             assert record == by_id[record["id"]], gb.first_difference(
                 json.dumps(by_id[record["id"]], sort_keys=True), json.dumps(record, sort_keys=True))
 
@@ -220,6 +220,6 @@ def test_the_extended_baseline_notices_a_change_in_behaviour() -> None:
     spec = _spec()
     case = next(c for c in spec["cases"] if c["kind"] == "discovery")
     meta = gb.load_meta().with_overrides({"update_cycle_length": 14})
-    record, _ = ge.capture_case(meta, case, spec["parameters"], spec["backend"])[0]
+    record, _ = ge.capture_case(meta, case, spec["backend"])[0]
     committed = by_id[record["id"]]
     assert record["rng_per_codelet"] != committed["rng_per_codelet"] or record["state"] != committed["state"]

@@ -141,17 +141,17 @@ outside the matrix take it too and the run is entirely what it says it is.
 
 ```
 ============================= petacat test matrix ==============================
-  cpu  numpy    float64    1142 tests
-  gpu  mlx      float32    1142 tests
+  cpu  numpy    float64    1149 tests
+  gpu  mlx      float32    1149 tests
   whole suite requested: the full matrix is required of this run
 
   unit          1977 collected   1977 run   1977 passed      0 failed      0 skipped  complete
   seed_unit     1790 collected   1790 run   1790 passed      0 failed      0 skipped  complete
-  module        1051 collected   1051 run   1051 passed      0 failed      0 skipped  complete
+  module        1065 collected   1065 run   1065 passed      0 failed      0 skipped  complete
   architecture   104 collected    104 run    104 passed      0 failed      0 skipped  complete
   integration    366 collected    366 run    366 passed      0 failed      0 skipped  complete
   parallel       304 collected    304 run    304 passed      0 failed      0 skipped  complete
-  lockstep       258 collected    258 run    258 passed      0 failed      0 skipped  complete
+  lockstep       257 collected    257 run    257 passed      0 failed      0 skipped  complete
   e2e            644 collected    644 run    644 passed      0 failed      0 skipped  complete
 
   run complete in 13.9 min against a 60 min ceiling
@@ -170,8 +170,8 @@ single file or node id. Such a run names what narrowed it, names the roles it
 exercised, and exits on whether its tests passed:
 
 ```
-  cpu  numpy    float64      1142 tests
-  gpu  mlx      float32     1142 tests
+  cpu  numpy    float64      1149 tests
+  gpu  mlx      float32     1149 tests
   cpu  numpy: no selected test ran on it
   narrowed by -k 'mlx': this run reports the roles it exercised and is not held to the full matrix
 ```
@@ -200,7 +200,7 @@ A truncated run reports itself as truncated, and the difference from a clean run
 visible three ways:
 
 ```
-  module         1051 collected    198 run    198 passed      0 failed      0 skipped  INCOMPLETE
+  module         1065 collected    198 run    198 passed      0 failed      0 skipped  INCOMPLETE
 
   RUN TRUNCATED: the 60 min ceiling was reached after 60.4 min. Everything above is
   what the run produced before it stopped; the tests it had not reached never ran.
@@ -226,15 +226,15 @@ that allowance.
 |-------|-----------|-------|---------------|-------|
 | **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 1977 |
 | **seed unit** | `tests/seed_unit/` | One class or function, measured against the values Petacat ships with | Real `seed_data/*.json`, and the machine the process is running on | 1790 |
-| **module** | `tests/module/` | Several real components assembled and driven | Real engine objects and `seed_data/*.json`; no DB, no HTTP | 1051 |
+| **module** | `tests/module/` | Several real components assembled and driven | Real engine objects and `seed_data/*.json`; no DB, no HTTP | 1065 |
 | **architecture** | `tests/architecture/` | How the source tree is allowed to depend on itself | The repository's source, `seed_data/*.json`, child interpreters | 104 |
 | **integration** | `tests/integration/` | Agreement between the repository's artifacts, and the harness's own rules | Real `seed_data/*.json`, the ORM declarations, the generated client files, the documentation, a real pytest session | 366 |
 | **parallel** | `tests/parallel/` | The detachable multi-core plugin (`server/parallel/`): each executor against the serial run it claims to equal | Real engine objects and `seed_data/*.json`, worker processes and threads; each test pins the backend it compares on | 304 |
-| **lockstep** | `tests/lockstep/` | Petacat's decision traces against Metacat's: naming, helper conformance, tracing/replay RNGs, determinism guards, the comparer | Real engine in faithful mode (numeric backend off, or a named backend); recorded Metacat traces | 258 |
+| **lockstep** | `tests/lockstep/` | Petacat's decision traces against Metacat's: naming, helper conformance, tracing/replay RNGs, determinism guards, the comparer | Real engine in faithful mode (numeric backend off, or a named backend); recorded Metacat traces | 257 |
 | **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 644 |
 
 Those counts are cases, so they include the second pass the numeric matrix makes
-over the 1142 backend-sensitive tests.
+over the 1149 backend-sensitive tests.
 
 One line decides each layer. Read them as a question about what a new test's
 subject is, and write the test where the answer lands:
@@ -267,7 +267,7 @@ first**, then move up toward the API and GUI.
 
 All eight layers run in one command — the
 [required command](#the-required-command) — and, since Petacat runs natively, all
-eight actually run: **6,483 cases**, every one of them executed. A layer that is
+eight actually run: **6,507 cases**, every one of them executed. A layer that is
 normally skipped is not a layer that is normally green, and none of these is.
 
 Wall-clock time depends heavily on the machine and on what else it is doing. The
@@ -574,6 +574,7 @@ changing what it records.
 | `test_free_running.py` | 23 | Free-running execution across worker threads, and the loop matching the serial one (codelet count, structure clock, initial unclamp, per-codelet answer hand-off) |
 | `test_group_image_direction.py` | 6 | A group's image is built in the group's own direction |
 | `test_image_relations.py` | 4 | The relations a group's image is built with, and what happens when they are wrong |
+| `test_initial_clamp.py` | 5 | The initial Slipnet clamp is Metacat's in every run mode: released at the fixed codelet count, re-applied off an update boundary serially, free-running and speculatively with the exact release codelet, and across a capture and a restore |
 | `test_justify_and_jootsing.py` | 14 | Justify mode's verdicts and the jootser's justify outcomes |
 | `test_lockstep_structure.py` | 7 | Structure-building fidelity: bridge-proposal scout scope, bond-builder break order, answer string outside justify mode, concept-activation sampling (DISCREPANCIES5 C-5, D-6…D-10) |
 | `test_numeric_engine.py` | 7 | The engine computes the same thing with the substrate engaged |
@@ -657,7 +658,7 @@ changing what it records.
 | `test_patched_only.py` | 7 | Only the patched Metacat is ever run (ruling 70): `record.py` has no flag that chooses a build; every recorder reaches Docker only through `run_container`, which refuses a tree that fails verification, the reference tree made with Metacat's own tool (never run) and a recorder copy not marked patched; and every stored trace header in every corpus ends in `+known-failure-fixes` (`traces-known-failures/reference/` is the one exempt folder, stored data nothing runs) |
 | `test_ratchet_covers_golden.py` | 4 | Every run of the original golden baseline (188) and of the extended one (114) has a lockstep ratchet entry (`ratchet.json`, `ratchet-justify.json`, `ratchet-episodes.json`, `ratchet-extended.json`), and every ratchet entry has agreement 1.0, no error and no differing state snapshot |
 | `test_replay.py` | 15 | Tracing rules, trace shape, self-replay, Guard 1, fatal and surplus paths, Guard 2 (slow); a committed Metacat trace replayed with the numeric backend on |
-| `test_seam.py` | 6 | The engine's trace seam changes nothing for an ordinary run; the faithful clamp-expiry switch |
+| `test_seam.py` | 5 | The engine's trace seam changes nothing for an ordinary run; the initial clamp is held until Metacat's fixed unclamp time |
 | `test_translation_log.py` | 2 | The slippage log, supporting vertical bridges, reference objects and supporting groups of every answer and snag in six Metacat runs (coattail slippages, a justify-mode answer, a snag with an applied slippage), equal to what Metacat 1.2 logged |
 | `test_verbose.py` | 2 | Nine Metacat runs (six discovery, three justify) with `%verbose%` on, narrated line for line by Petacat's replay; and the replayed trace is the same with Verbose mode off |
 | `test_snag_explanations.py` | 2 | Every snag in eight Metacat runs (CHANGE, SWAP, CONFLICT, group-category reversal) explained, and its two comment lines worded, exactly as Metacat 1.2 logged them |

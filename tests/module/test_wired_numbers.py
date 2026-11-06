@@ -123,7 +123,7 @@ def test_a_clamp_without_an_activation_pins_the_node_at_its_ceiling() -> None:
     node = SlipnetNode("n", "n", 50, _params_at(50.0))
     node.clamp()
     assert node.activation == 50.0
-    node.clamp(0, 20.0)
+    node.clamp(20.0)
     assert node.activation == 20.0
 
 

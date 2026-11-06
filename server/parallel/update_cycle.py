@@ -508,8 +508,7 @@ class UpdateCycle:
                 ctx.themespace, ctx.slipnet, ctx.codelet_count, ctx.coderack,
             )
 
-        # 6. Tick clamp expirations
-        ctx.slipnet.tick_clamps()
+        # 6. Tick the Temperature's clamp expiry
         ctx.temperature.tick_clamp()
         t = self._timed("snag-clamp", t)
 

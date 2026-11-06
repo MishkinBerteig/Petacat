@@ -151,7 +151,7 @@ def extended_cases(extra: Path | None = None) -> list[dict]:
 
     spec = ge.load_cases()
     cases = list(spec["cases"]) + (json.loads(extra.read_text()) if extra is not None else [])
-    return [{"id": c["id"], "extended": c, "parameters": spec["parameters"], "backend": c.get("backend") or spec.get("backend")}
+    return [{"id": c["id"], "extended": c, "backend": c.get("backend") or spec.get("backend")}
             for c in cases]
 
 
@@ -171,7 +171,7 @@ def run_case(case: dict) -> dict:
     monitor.start()
     try:
         if "extended" in case:
-            ge.capture_case(meta, case["extended"], case["parameters"], case["backend"])
+            ge.capture_case(meta, case["extended"], case["backend"])
         else:
             from server.engine.memory import EpisodicMemory
 

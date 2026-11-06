@@ -28,7 +28,7 @@ license change was authorised by Dr. Marshall directly (see
 > end-to-end. Episodic Memory (Metacat-Mode learning) shapes the runs that inherit it: a run
 > declines an answer already held for the same problem and rules, so repeating a
 > problem across Metacat Mode's [episodic runs](#persistence-modes-and-episodic-runs)
-> (which are Metacat Mode and not Training Mode) explores a different answer each time. It ships with 6,483 test cases covering the engine, the API, and the
+> (which are Metacat Mode and not Training Mode) explores a different answer each time. It ships with 6,507 test cases covering the engine, the API, and the
 > help/config system, run on both the CPU and the GPU numeric backends. Underneath the seven components sits an execution
 > substrate — three [persistence modes](#persistence-modes-and-episodic-runs),
 > a [GPU numeric substrate](#the-numeric-substrate), and
@@ -215,11 +215,10 @@ original Scheme `run.ss:295-315`):
 3. Update object importances, unhappiness, salience
 4. Snag-period stochastic exit
 5. Clamp-period expiration check
-6. Tick clamp expirations (slipnet + temperature) — Petacat's own mechanism, so a
-   clamp lapses on the update cycle that reaches its expiry. (Metacat instead
-   unfreezes the initially clamped nodes at a fixed codelet count, `run.ss:151-154`;
-   the `initial_clamp_fixed_time` parameter, off by default, selects that, and the
-   lockstep harness's faithful mode turns it on.)
+6. Tick the temperature's clamp expiry, so a timed temperature clamp lapses on the
+   update cycle that reaches its expiry. (The initially clamped Slipnet nodes are
+   not ticked: as in Metacat, the runner unfreezes them at a fixed codelet count,
+   `run.ss:151-154`, right after the codelet that reaches it.)
 7. Spread activation: workspace → themespace
 8. Spread activation within themespace
 9. Update slipnet: theme→slipnet, then internal decay/spread/jump
@@ -470,8 +469,8 @@ Petacat has two test suites:
   plugin against the serial runs it claims to equal), `lockstep` (Petacat's decision
   traces against Metacat's), and `e2e` (full HTTP
   stack against a running database). All eight run in a single command against
-  the local Postgres — 6,483 cases, which includes the numeric matrix's second
-  pass over the 1142 backend-sensitive tests. See
+  the local Postgres — 6,507 cases, which includes the numeric matrix's second
+  pass over the 1149 backend-sensitive tests. See
   [TESTING.md](TESTING.md) for the layer breakdown, the numeric backend matrix,
   the session ceiling, the unit-test rules, determinism requirements, test-double
   conventions, how to run the suite under the free-threaded interpreter, and what
@@ -1829,14 +1828,13 @@ the static [`HELP.md`](HELP.md) reference and matching TypeScript constants.
    core, each identical to the serial run; and it can spread one run's codelets
    across threads with a result identical for every worker count. See
    [Parallelism](#parallelism-the-serverparallel-plugin).
-8. **Clamps lapse by update cycle**: Metacat unfreezes the initially clamped
-   Slipnet nodes at a fixed codelet count (`run.ss:151-154`). Petacat counts
-   every clamp down by update cycles, so it lapses on the update cycle that
-   reaches its expiry. The `initial_clamp_fixed_time` parameter, off by default,
-   restores Metacat's timing, and the lockstep harness turns it on. Against
-   20,000 Metacat runs per problem, Petacat's answer frequencies show no
-   significant difference with it on or off
-   (`measurements/vs-metacat-support-v1a-lockstep.md`).
+8. **The initial clamp is Metacat's**: Metacat unfreezes the initially clamped
+   Slipnet nodes at a fixed codelet count, the codelet count at the clamp plus
+   `initial_slipnode_clamp_cycles` x `update_cycle_length` (`run.ss:151-154`,
+   `268-273`), and Petacat does the same, at the start of a Run and whenever the
+   Coderack empties and the clamp is re-applied. Earlier versions had a second,
+   update-cycle countdown behind an `initial_clamp_fixed_time` parameter; both
+   are gone, and the golden baselines were re-captured when they went.
 
 None of 5–7 changes what Petacat perceives. The standard they are held to is
 that the *set* of stopping states each problem can reach is unchanged — not that

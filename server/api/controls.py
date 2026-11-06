@@ -83,7 +83,6 @@ class ClampTemperatureRequest(BaseModel):
 
 class ClampNodeRequest(BaseModel):
     node_name: str
-    cycles: int = 0
 
 
 class UnclampNodeRequest(BaseModel):
@@ -378,7 +377,7 @@ async def clamp_node(run_id: int, req: ClampNodeRequest):
     """Clamp a slipnet node to full activation."""
     svc = get_run_service()
     try:
-        result = svc.clamp_node(run_id, req.node_name, req.cycles)
+        result = svc.clamp_node(run_id, req.node_name)
     except ValueError as e:
         raise HTTPException(404, str(e))
     return result

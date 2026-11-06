@@ -313,7 +313,7 @@ export function SlipnetGraphView({
     try {
       await request<void>(`/runs/${runId}/clamp-node`, {
         method: 'POST',
-        body: JSON.stringify({ node_name: contextMenu.nodeName, cycles: 0 }),
+        body: JSON.stringify({ node_name: contextMenu.nodeName }),
       });
       setActionError(null);
     } catch (err) {

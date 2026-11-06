@@ -284,7 +284,7 @@ class FreeRunningEngine:
                     with self._commit_lock:
                         if ctx.coderack.is_empty:
                             runner._post_initial_codelets()
-                            ctx.slipnet.clamp_initially_relevant(ctx.meta)
+                            runner._clamp_initial_slipnodes(ctx.slipnet)
                     continue
 
                 spec = ctx.meta.codelet_specs.get(codelet.codelet_type)
@@ -370,7 +370,7 @@ class FreeRunningEngine:
         """Count a finished codelet, as ``step_mcat`` does after running it.
 
         ``run.ss:182`` — the increment is the last thing a step does — and
-        ``run.ss:151-154``, the fixed-time initial unclamp, checked right after it.
+        ``run.ss:151-154``, the initial unclamp, checked right after it.
         Returns the new count.
         """
         runner = self.runner
@@ -380,11 +380,9 @@ class FreeRunningEngine:
             step = ctx.codelet_count
             ctx.coderack.current_time = step
             set_structure_clock(step)
-        if runner._initial_unclamp_time and step == runner._initial_unclamp_time:
+        if ctx.initial_clamp_due(step):
             with self._commit_lock:
-                if ctx.verbose:
-                    ctx.verbose_log.say("unclamping-initial-slipnodes")
-                runner._unclamp_initial_slipnodes(ctx.slipnet)
+                runner._release_initial_clamp(ctx)
         return step
 
     def _collect_outcome(self) -> None:

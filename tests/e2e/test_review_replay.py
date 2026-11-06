@@ -88,7 +88,7 @@ def delete(path, body=None):
 async def clamp_a_node(client, run_id):
     names = list((await client.get(f"/api/runs/{run_id}/slipnet")).json())
     resp = await client.post(
-        f"/api/runs/{run_id}/clamp-node", json={"node_name": names[12], "cycles": 8}
+        f"/api/runs/{run_id}/clamp-node", json={"node_name": names[12]}
     )
     assert resp.status_code == 200, resp.text
 

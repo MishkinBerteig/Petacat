@@ -19,7 +19,6 @@
   "initial_temperature": 100,
   "update_cycle_length": 15,
   "initial_slipnode_clamp_cycles": 50,
-  "initial_clamp_fixed_time": false,
   "expiration_period": 500,
   "num_youngest_structures": 3,
   "max_theme_activation": 100,

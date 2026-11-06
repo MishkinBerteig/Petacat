@@ -47,16 +47,13 @@ class _FakeSlipnetNode:
         self.conceptual_depth = 50
         self.activation = 0.0
         self.frozen = False
-        self.clamp_cycles_remaining = 0
 
-    def clamp(self, cycles: int = 0, activation: float = 100.0) -> None:
+    def clamp(self, activation: float = 100.0) -> None:
         self.frozen = True
-        self.clamp_cycles_remaining = cycles
         self.activation = float(activation)
 
     def unclamp(self) -> None:
         self.frozen = False
-        self.clamp_cycles_remaining = 0
 
 
 class _FakeSlipnet:
@@ -402,7 +399,7 @@ def test_deactivating_a_clamp_only_unfreezes_its_own_nodes():
     node in the Slipnet, so ending one clamp released every other clamp in force —
     including the run's initial slipnode clamp."""
     slipnet = _FakeSlipnet("plato-direction-category", "plato-successor")
-    slipnet.nodes["plato-successor"].clamp(50)
+    slipnet.nodes["plato-successor"].clamp()
 
     event = ClampEvent(
         codelet_count=1,
@@ -499,7 +496,7 @@ def test_clamping_applies_to_a_node_that_is_already_frozen():
     from server.engine.trace import clamp_concept_pattern
 
     slipnet = _FakeSlipnet("plato-opposite")
-    slipnet.nodes["plato-opposite"].clamp(50, 100.0)
+    slipnet.nodes["plato-opposite"].clamp(100.0)
     clamp_concept_pattern(
         {"type": "concepts", "entries": [{"node": "plato-opposite", "activation": 0.0}]},
         slipnet,

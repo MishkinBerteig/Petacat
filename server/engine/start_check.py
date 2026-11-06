@@ -55,7 +55,6 @@ REQUIRED_ENGINE_PARAMETERS: tuple[tuple[str, str], ...] = (
     ("full_activation_threshold", "numeric/layout.py"),
     ("grace_period", "jootsing.py, justify.py"),
     ("group_importance_threshold", "builtins.py"),
-    ("initial_clamp_fixed_time", "runner.py"),
     ("initial_codelet_rounds", "runner.py"),
     ("initial_codelet_types", "runner.py"),
     ("initial_codelet_urgency", "runner.py"),

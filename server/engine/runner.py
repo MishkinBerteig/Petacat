@@ -171,6 +171,12 @@ class EngineContext:
         #: is attached (``server/engine/sink.py``).
         self.sink: RunSink = sink if sink is not None else NullSink()
         self.codelet_count: int = 0
+        #: ``*initial-slipnode-unclamp-time*`` (``run.ss:272``): the codelet count at which
+        #: the initially clamped Slipnet nodes are released.  Set by the runner's
+        #: ``_clamp_initial_slipnodes``; part of the run's state, so a captured and
+        #: restored Run releases at the same codelet (``state_graph.py``).  0 until the
+        #: first clamp, which no codelet count ever equals.
+        self.initial_unclamp_time: int = 0
         #: The type of the codelet most recently started -- ``set-last-codelet-type``
         #: (``coderack.ss:222``), which the coderack window marks.  ``None`` at the
         #: start of a run (``clear``, ``coderack-graphics.ss:230``).
@@ -244,6 +250,13 @@ class EngineContext:
         #: A codelet is a long read-and-decide followed by a short mutation, so
         #: serialising only the mutation leaves the expensive part parallel.
         self.commit_lock: Any = None
+
+    def initial_clamp_due(self, count: int) -> bool:
+        """Is *count*, a codelet count just reached, the initial unclamp time (``run.ss:151``)?
+
+        Equality, as in the reference: the count passes the time exactly once.
+        """
+        return count == self.initial_unclamp_time
 
     def scope(self) -> use_run:
         """``with ctx.scope():`` binds this run's identifier allocator and run binding.
@@ -348,9 +361,6 @@ class EngineRunner:
         #: update cycles have started — the ``u`` that numbers them.
         self._in_codelet: bool = False
         self._update_cycle: int = 0
-        #: ``*initial-slipnode-unclamp-time*`` (``run.ss:272``); only used when the
-        #: ``initial_clamp_fixed_time`` parameter is on.
-        self._initial_unclamp_time: int = 0
 
         # Build the codelet interpreter and registry
         self._interpreter = CodeletInterpreter(builtins=get_builtins())
@@ -433,7 +443,6 @@ class EngineRunner:
             rng = RNG(seed)
         self._update_cycle = 0
         self._in_codelet = False
-        self._initial_unclamp_time = 0
         # Lockstep trace seam: everything drawn while the run is built belongs to the
         # ``init`` unit (a no-op on an ordinary RNG).
         rng.trace_unit(1, "init", "init-mcat")
@@ -587,14 +596,12 @@ class EngineRunner:
     def _clamp_initial_slipnodes(self, slipnet: Slipnet) -> None:
         """``clamp-initial-slipnodes`` (``run.ss:268-273``).
 
-        By default the clamp is Petacat's own mechanism: a counter of update cycles
-        that ``tick_clamps`` runs down, so the clamp lapses on the update cycle that
-        reaches its expiry.  With ``initial_clamp_fixed_time`` on it is Metacat's:
-        the nodes stay frozen until the codelet count reaches a fixed unclamp time,
-        ``now + initial_slipnode_clamp_cycles x update_cycle_length``, and are then
-        unfrozen by ``_step_mcat`` (``run.ss:151-154``).  The two agree for the
-        opening clamp and part ways when the rack empties and the clamp is re-applied
-        off an update boundary.
+        The nodes are clamped and stay frozen until the codelet count reaches the
+        unclamp time, ``now + initial_slipnode_clamp_cycles x update_cycle_length``
+        (``*initial-slipnode-unclamp-time*``, kept on the context as
+        ``initial_unclamp_time``), when :meth:`_release_initial_clamp` unfreezes them
+        (``run.ss:151-154``).  This holds at the start of a Run and whenever the Coderack
+        empties and the clamp is re-applied, off an update boundary or on one.
         """
         monitor = None
         if self.ctx is not None:
@@ -604,15 +611,21 @@ class EngineRunner:
                 self.ctx.temperature.value,
                 self.meta.get_param("concept_activation_importance_threshold"),
             )
-        if not self.meta.get_param("initial_clamp_fixed_time"):
-            slipnet.clamp_initially_relevant(self.meta, monitor=monitor)
-            return
         cycles = self.meta.get_param("initial_slipnode_clamp_cycles")
         ucl = self.meta.get_param("update_cycle_length")
-        slipnet.clamp_initially_relevant(self.meta, cycles=0, monitor=monitor)
-        self._initial_unclamp_time = (
-            (self.ctx.codelet_count if self.ctx is not None else 0) + cycles * ucl
-        )
+        slipnet.clamp_initially_relevant(self.meta, monitor=monitor)
+        if self.ctx is not None:
+            self.ctx.initial_unclamp_time = self.ctx.codelet_count + cycles * ucl
+
+    def _release_initial_clamp(self, ctx: EngineContext) -> None:
+        """``run.ss:151-154``: say so and unfreeze the initially clamped nodes.
+
+        The caller has asked :meth:`EngineContext.initial_clamp_due`; the serial loop and
+        every worker that counts codelets (``free_running.py``) do.
+        """
+        if ctx.verbose:
+            ctx.verbose_log.say("unclamping-initial-slipnodes")
+        self._unclamp_initial_slipnodes(ctx.slipnet)
 
     def _unclamp_initial_slipnodes(self, slipnet: Slipnet) -> None:
         """``(tell node 'unfreeze)`` for each initially clamped node (``run.ss:152-153``)."""
@@ -802,12 +815,10 @@ class EngineRunner:
         ctx.coderack.current_time = ctx.codelet_count
         set_structure_clock(ctx.codelet_count)
 
-        # ``run.ss:151-154``: the fixed-time initial unclamp, checked right after the
-        # codelet and before the rack-empty test below.  Off by default.
-        if self._initial_unclamp_time and ctx.codelet_count == self._initial_unclamp_time:
-            if ctx.verbose:
-                ctx.verbose_log.say("unclamping-initial-slipnodes")
-            self._unclamp_initial_slipnodes(ctx.slipnet)
+        # ``run.ss:151-154``: the initial unclamp, checked right after the codelet and
+        # before the rack-empty test below.
+        if ctx.initial_clamp_due(ctx.codelet_count):
+            self._release_initial_clamp(ctx)
 
         self._emit_new_trace_events(ctx)
         ctx.sink.on_codelet(ctx, codelet, result)
@@ -1026,8 +1037,7 @@ class EngineRunner:
                 ctx.themespace, ctx.slipnet, ctx.codelet_count, ctx.coderack,
             )
 
-        # 6. Tick clamp expirations (Python mechanism for initial slipnode clamps)
-        ctx.slipnet.tick_clamps()
+        # 6. Tick the Temperature's clamp expiry
         ctx.temperature.tick_clamp()
 
         # 7. Spread activation from workspace to themespace

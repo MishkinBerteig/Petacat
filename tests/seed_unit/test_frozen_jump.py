@@ -19,7 +19,7 @@ def test_a_frozen_node_in_the_jump_window_does_not_jump(backend_name, ceiling):
         conceptual_depth=(50.0,) * n, in_indptr=(0,) * (n + 1), in_source=(), in_weight=(), in_dest=(),
         activation=dataclasses.replace(standard_activation(), max_activation=ceiling))
     session = get_backend(backend_name).open_slipnet(topology)
-    session.load(SlipnetState(activation=list(acts), buffer=[0.0] * n, frozen=list(frozen), clamp_remaining=[0] * n))
+    session.load(SlipnetState(activation=list(acts), buffer=[0.0] * n, frozen=list(frozen)))
     indices, _ = session.jump_candidates()
     # frozen candidates are still offered: the reference draws their coin before the refusal
     assert indices == [1, 2, 3, 4, 7]

@@ -424,6 +424,10 @@ def capture_run_state(ctx: Any) -> dict:
         },
         "runner": {
             "codelet_count": ctx.codelet_count,
+            # ``*initial-slipnode-unclamp-time*`` (``run.ss:272``): without it a Run
+            # captured between the opening clamp and its release would keep the nodes
+            # frozen for good.
+            "initial_unclamp_time": ctx.initial_unclamp_time,
             "justify_mode": ctx.justify_mode,
             "self_watching_enabled": ctx.self_watching_enabled,
             "spreading_activation_threshold": ctx.spreading_activation_threshold,
@@ -449,7 +453,6 @@ def capture_run_state(ctx: Any) -> dict:
                 node.activation,
                 node.activation_buffer,
                 node.frozen,
-                node.clamp_cycles_remaining,
             ]
             for name, node in ctx.slipnet.nodes.items()
         },
@@ -630,8 +633,7 @@ def _restore_run_state(runner: Any, state: dict) -> None:
         node = ctx.slipnet.nodes.get(name)
         if node is None:
             continue
-        (node.activation, node.activation_buffer,
-         node.frozen, node.clamp_cycles_remaining) = values
+        node.activation, node.activation_buffer, node.frozen = values
 
     # -- Themespace ---------------------------------------------------
     # A list, not a set: ``Themespace.thematic_pressure_on`` appends to it, and
@@ -684,6 +686,7 @@ def _restore_run_state(runner: Any, state: dict) -> None:
 
     runner_state = state["runner"]
     ctx.codelet_count = runner_state["codelet_count"]
+    ctx.initial_unclamp_time = runner_state["initial_unclamp_time"]
     ctx.justify_mode = runner_state["justify_mode"]
     ctx.self_watching_enabled = runner_state["self_watching_enabled"]
     ctx.spreading_activation_threshold = runner_state["spreading_activation_threshold"]

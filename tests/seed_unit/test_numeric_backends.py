@@ -115,7 +115,6 @@ def _seeded_state(slipnet: Slipnet, seed: int = 5) -> SlipnetState:
         activation=activation,
         buffer=buffer,
         frozen=[rng.random() < 0.05 for _ in names],
-        clamp_remaining=[0] * len(names),
     )
 
 
@@ -196,7 +195,6 @@ def _integral_state(topology: SlipnetTopology, seed: int = 17) -> SlipnetState:
         activation=[float(rng.randrange(0, 101)) for _ in range(n)],
         buffer=[0.0] * n,
         frozen=[False] * n,
-        clamp_remaining=[0] * n,
     )
 
 
@@ -255,7 +253,6 @@ def test_every_backend_reaches_the_same_decay_plateaus(
         activation=[100.0] * n,
         buffer=[0.0] * n,
         frozen=[False] * n,
-        clamp_remaining=[0] * n,
     )
 
     session = get_backend(backend_name).open_slipnet(topology)
@@ -269,7 +266,6 @@ def test_every_backend_reaches_the_same_decay_plateaus(
                 activation=session.store().activation,
                 buffer=[0.0] * n,
                 frozen=[False] * n,
-                clamp_remaining=[0] * n,
             )
         )
     final = session.store().activation
@@ -308,7 +304,6 @@ def test_every_backend_rounds_spreading_halfway_cases_to_even(backend_name: str)
             activation=[45.0, 85.0, 0.0, 0.0],
             buffer=[0.0] * 4,
             frozen=[False] * 4,
-            clamp_remaining=[0] * 4,
         )
     )
     session.update(0.0, 1.0)
@@ -1021,8 +1016,7 @@ def test_changing_the_probabilistic_exponent_changes_the_jump_probabilities(back
             ),
         )
         session = get_backend(backend_name).open_slipnet(topology)
-        session.load(SlipnetState(activation=list(acts), buffer=[0.0] * n, frozen=[False] * n,
-                                  clamp_remaining=[0] * n))
+        session.load(SlipnetState(activation=list(acts), buffer=[0.0] * n, frozen=[False] * n))
         indices, probs = session.jump_candidates()
         return dict(zip(indices, probs))
 
@@ -1060,8 +1054,7 @@ def test_every_backend_defines_the_jump_probability_at_a_zero_share_and_at_overf
             ),
         )
         session = get_backend(backend_name).open_slipnet(topology)
-        session.load(SlipnetState(activation=list(acts), buffer=[0.0] * n, frozen=[False] * n,
-                                  clamp_remaining=[0] * n))
+        session.load(SlipnetState(activation=list(acts), buffer=[0.0] * n, frozen=[False] * n))
         return session.jump_candidates()
 
     reference = candidates("python")

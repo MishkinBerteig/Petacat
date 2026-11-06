@@ -9,12 +9,10 @@ leave unreached, or a feature (a kind of event, snag or clamp) they never show.
 
 It reuses the original baseline's run record, hashes and English corpus unchanged
 (``golden_baseline.capture_run``); only the set of cases differs, and the case list is data:
-``tests/lockstep/golden/extended_cases.json``.  Every case runs under the file's
-``parameters``, which are the faithful-mode parameters the lockstep harness replays Metacat
-under (``initial_clamp_fixed_time``: the initial Slipnet clamp lapses at Metacat's fixed
-codelet count, ``run.ss:151-154``).  So a case here is the configuration the Metacat
-recordings were checked against, whereas the original baseline runs the Metacat Standard
-Configuration's default (the update-cycle countdown).  Each case was recorded in Metacat
+``tests/lockstep/golden/extended_cases.json``.  Every case runs under the Metacat Standard
+Configuration, as the original baseline does, plus the case's own ``parameters`` if it names
+any.  Both baselines therefore run Metacat's initial Slipnet clamp (``run.ss:268-273``,
+``151-154``): the engine has no other.  Each case was recorded in Metacat
 1.2 and replayed in Petacat with no divergence before it was admitted (the case file says so
 per case); a case that did not match is a fidelity defect and is not here.
 
@@ -33,7 +31,7 @@ A case is ``{"id", "kind", "problem", "seeds", "answer", "cap", "clear_before", 
   two-voice explanation of every answer in memory and the comparison text of every ordered
   pair (``answers.ss`` ``get-snag-explanation``, ``explain``, ``get-answer-comparison-text``;
   the lockstep tool ``scripts/compare_episode_answers.py`` checks them against Metacat);
-* ``parameters`` (optional) are the case's own faithful-mode parameters, laid over the file's: the cases
+* ``parameters`` (optional) are the case's own run-level parameter overrides: the cases
   that run with Self-watching mode off from the start say ``{"self_watching_enabled_default": false}``;
 * ``cap`` is the case's codelet cap (the original baseline's ``CAP`` when absent);
 * ``interventions`` are a person's actions at given codelet counts (``tests/support/interventions.py``):
@@ -92,14 +90,14 @@ def answers_report(meta: Any, memory: Any) -> dict[str, list[str]]:
     return {"answer": ans, "explanation": expl, "comparison": cmp_}
 
 
-def capture_case(meta: Any, case: dict[str, Any], parameters: dict[str, Any],
+def capture_case(meta: Any, case: dict[str, Any],
                  backend: str | None = None,
                  ) -> list[tuple[dict[str, Any], dict[str, Any]]]:
     """Every record of one case, as ``(record, detail)`` pairs."""
     from server.engine.hashing import memory_hash
     from server.engine.memory import EpisodicMemory
 
-    parameters = {**parameters, **case.get("parameters", {})}
+    parameters = dict(case.get("parameters", {}))
     problem = tuple(case["problem"])
     answer = case.get("answer")
     cap = case.get("cap")
@@ -134,12 +132,12 @@ def capture_case(meta: Any, case: dict[str, Any], parameters: dict[str, Any],
 _META: Any = None
 
 
-def _worker(args: tuple[dict[str, Any], dict[str, Any], str | None]) -> list[tuple[dict[str, Any], dict[str, Any]]]:
+def _worker(args: tuple[dict[str, Any], str | None]) -> list[tuple[dict[str, Any], dict[str, Any]]]:
     global _META
     if _META is None:
         _META = gb.load_meta()
-    case, parameters, backend = args
-    return capture_case(_META, case, parameters, case.get("backend") or backend)
+    case, backend = args
+    return capture_case(_META, case, case.get("backend") or backend)
 
 
 def iter_cases(jobs: int = 1, progress: Callable[[str], None] | None = None,
@@ -148,16 +146,15 @@ def iter_cases(jobs: int = 1, progress: Callable[[str], None] | None = None,
     """Every record of the baseline in the case file's order.  ``jobs`` > 1 runs the cases in
     a process pool; the result is the same, since a case depends on nothing outside itself."""
     spec = cases or load_cases()
-    parameters = spec["parameters"]
     backend = spec.get("backend")
-    work = [(c, parameters, backend) for c in spec["cases"]]
+    work = [(c, backend) for c in spec["cases"]]
     results: list[Any] = []
     if jobs <= 1:
         meta = gb.load_meta()
-        for c, p, b in work:
+        for c, b in work:
             if progress:
                 progress(c["id"])
-            results.append(capture_case(meta, c, p, c.get("backend") or b))
+            results.append(capture_case(meta, c, c.get("backend") or b))
     else:
         with ProcessPoolExecutor(jobs) as pool:
             for c, res in zip(spec["cases"], pool.map(_worker, work, chunksize=1)):
@@ -185,7 +182,7 @@ def normalised(x: Any) -> Any:
     return x
 
 
-def capture_case_normalised(meta: Any, case: dict[str, Any], parameters: dict[str, Any],
+def capture_case_normalised(meta: Any, case: dict[str, Any],
                             backend: str | None) -> tuple[list[dict[str, Any]], list[str]]:
     """One case's records and the digest of each run's final state with numbers normalised.
 
@@ -207,26 +204,26 @@ def capture_case_normalised(meta: Any, case: dict[str, Any], parameters: dict[st
 
     gb.state_digest = spy
     try:
-        records = [r for r, _ in capture_case(meta, case, parameters, backend)]
+        records = [r for r, _ in capture_case(meta, case, backend)]
     finally:
         gb.state_digest = original
     return records, digests
 
 
-def _normalised_worker(args: tuple[dict[str, Any], dict[str, Any], str | None],
+def _normalised_worker(args: tuple[dict[str, Any], str | None],
                        ) -> tuple[list[dict[str, Any]], list[str]]:
     global _META
     if _META is None:
         _META = gb.load_meta()
-    case, parameters, backend = args
-    return capture_case_normalised(_META, case, parameters, backend)
+    case, backend = args
+    return capture_case_normalised(_META, case, backend)
 
 
 def capture_all_normalised(backend: str | None, jobs: int,
                            ) -> list[tuple[list[dict[str, Any]], list[str]]]:
     """Every case on *backend* (``None``: the case's own, as committed), cases in a process pool."""
     spec = load_cases()
-    work = [(c, spec["parameters"], backend or c.get("backend") or spec["backend"]) for c in spec["cases"]]
+    work = [(c, backend or c.get("backend") or spec["backend"]) for c in spec["cases"]]
     with ProcessPoolExecutor(jobs) as pool:
         return list(pool.map(_normalised_worker, work, chunksize=1))
 
@@ -234,8 +231,7 @@ def capture_all_normalised(backend: str | None, jobs: int,
 def header_record(spec: dict[str, Any], cases_text: str) -> dict[str, Any]:
     return {
         "format": FORMAT,
-        "configuration": "Metacat Standard Configuration (seed_data/*.json) + the case file's parameters",
-        "parameters": spec["parameters"],
+        "configuration": "Metacat Standard Configuration (seed_data/*.json) + each case's own parameters",
         "numeric_backend": spec.get("backend") or gb.BACKEND,
         "precision": "float64",
         "verbose_mode": "on (a verbose-off pass is checked equal for every run)",

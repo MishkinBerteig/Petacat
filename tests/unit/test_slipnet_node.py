@@ -353,7 +353,7 @@ def test_a_frozen_node_receives_no_spreading():
         SlipnetLink(source, target, "lateral", fixed_link_length=0)
     )
     source.activation = 100.0
-    target.clamp(0, activation=0.0)
+    target.clamp(activation=0.0)
 
     source.spread_activation_to_neighbors(15)
 
@@ -383,7 +383,7 @@ def test_clamping_discards_whatever_the_node_was_about_to_receive():
     node.activate_from_workspace()
     assert node.activation_buffer == 100.0
 
-    node.clamp(0, activation=0.0)
+    node.clamp(activation=0.0)
 
     assert node.activation_buffer == 0.0
     assert node.activation == 0.0

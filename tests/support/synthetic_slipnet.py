@@ -205,5 +205,4 @@ def synthetic_state(
         activation=activation,
         buffer=[0.0] * n,
         frozen=[False] * n,
-        clamp_remaining=[0] * n,
     )

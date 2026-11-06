@@ -1544,7 +1544,7 @@ class RunService:
     # Slipnet node clamping
     # ------------------------------------------------------------------
 
-    def clamp_node(self, run_id: int, node_name: str, cycles: int = 0) -> dict:
+    def clamp_node(self, run_id: int, node_name: str) -> dict:
         """Clamp a slipnet node for the given run."""
         runner = self._runners.get(run_id)
         if runner is None or runner.ctx is None:
@@ -1552,13 +1552,12 @@ class RunService:
         node = runner.ctx.slipnet.nodes.get(node_name)
         if node is None:
             raise ValueError(f"Slipnet node '{node_name}' not found")
-        node.clamp(cycles)
+        node.clamp()
         return {
             "run_id": run_id,
             "node_name": node_name,
             "clamped": True,
             "activation": node.activation,
-            "clamp_cycles": cycles,
         }
 
     def unclamp_node(self, run_id: int, node_name: str) -> dict:

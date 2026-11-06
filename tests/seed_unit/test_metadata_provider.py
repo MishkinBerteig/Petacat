@@ -400,11 +400,6 @@ _READ_BY_THE_ENGINE_BUT_NOT_OFFERED = {
     "flip_first_probability_equal_spanning",
     "rough_count_few_threshold",
     "rough_count_some_threshold",
-    # A faithful-mode switch for the lockstep harness (``tests/lockstep/``), set by
-    # ``tests/lockstep/faithful.py`` and not offered as a Run control: the default
-    # (``false``) is Petacat's own update-cycle countdown, ``true`` is Metacat's fixed
-    # unclamp time (``run.ss:151-154``).
-    "initial_clamp_fixed_time",
     # Read when a rule is described in English (``server/engine/rule_english.py``;
     # ``rules.ss:1723``): the wrap width, and ``get-dimension-phrase``'s name table.
     "maximum_rule_line_length",

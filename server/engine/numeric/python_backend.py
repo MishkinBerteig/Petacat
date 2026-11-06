@@ -48,7 +48,6 @@ class PythonSlipnetSession(SlipnetSession):
             activation=[0.0] * topology.n_nodes,
             buffer=[0.0] * topology.n_nodes,
             frozen=[False] * topology.n_nodes,
-            clamp_remaining=[0] * topology.n_nodes,
         )
         self._scaled_weight: list[float] = list(topology.in_weight)
         self._scaled_for = 1.0
@@ -63,7 +62,6 @@ class PythonSlipnetSession(SlipnetSession):
             activation=list(state.activation),
             buffer=list(state.buffer),
             frozen=list(state.frozen),
-            clamp_remaining=list(state.clamp_remaining),
         )
 
     def store(self) -> SlipnetState:
@@ -72,7 +70,6 @@ class PythonSlipnetSession(SlipnetSession):
             activation=list(s.activation),
             buffer=list(s.buffer),
             frozen=list(s.frozen),
-            clamp_remaining=list(s.clamp_remaining),
         )
 
     def _weights(self, scale: float) -> list[float]:

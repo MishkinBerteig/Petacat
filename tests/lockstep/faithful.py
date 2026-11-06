@@ -26,11 +26,6 @@ SEED_DIR = REPO_ROOT / "seed_data"
 #: Metacat's cap (``run.ss:28``: none by default; the driver sets 100,000).
 DEFAULT_CAP = 100_000
 
-#: Parameter overrides faithful mode applies.  ``initial_clamp_fixed_time`` makes the
-#: initial slipnode clamp lapse at Metacat's fixed codelet count (``run.ss:151-154``)
-#: instead of on an update-cycle countdown.
-FAITHFUL_PARAMETERS: dict[str, Any] = {"initial_clamp_fixed_time": True}
-
 #: Names the numeric backend a faithful run uses instead of ``off`` (``python``,
 #: ``numpy``, ``mlx``, ``mlx-cpu``).  ``scripts/lockstep_corpus.py --numeric-backend``
 #: sets it, so the substrate Petacat runs by default is replayed against Metacat too.
@@ -59,7 +54,6 @@ def faithful_settings() -> dict[str, Any]:
         "rng": "RNG",
         "numeric_backend": numeric_backend(),
         "memory": "fresh",  # an episode carries one memory across its runs
-        "parameters": dict(FAITHFUL_PARAMETERS),
         "spreading_activation_threshold": 100,
         "access_tracking": False,
         "self_watching": True,
@@ -130,7 +124,7 @@ def run_faithful(problem: tuple[str, str, str], seed: int, cap: int, rng: Any,
     ``answer`` selects justify mode (``init_mcat``'s fourth argument); ``memory`` is
     the episode's ``EpisodicMemory`` carried over from earlier runs (fresh when None).
 
-    ``parameters`` are run-level configuration overrides added to ``FAITHFUL_PARAMETERS``
+    ``parameters`` are run-level configuration overrides
     (``self_watching_enabled_default: False`` is Metacat's ``%self-watching-enabled%`` set
     off, ``record.py --self-watching off``).
 
@@ -153,7 +147,7 @@ def run_faithful(problem: tuple[str, str, str], seed: int, cap: int, rng: Any,
             runner.init_mcat(
                 *problem, answer=answer, seed=seed,
                 memory=memory if memory is not None else EpisodicMemory(),
-                parameters={**FAITHFUL_PARAMETERS, **(parameters or {})}, rng=rng,
+                parameters=parameters, rng=rng,
             )
             if interventions:
                 from tests.support.interventions import schedule

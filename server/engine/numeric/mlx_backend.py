@@ -105,7 +105,7 @@ class MlxSlipnetSession(SlipnetSession):
 
     __slots__ = (
         "topology", "device", "dtype", "use_kernel", "n", "lanes",
-        "activation", "buffer", "frozen", "clamp_remaining",
+        "activation", "buffer", "frozen",
         "decay_percent", "indptr", "source", "dest", "weight", "_zero",
         "_max_activation", "_full_activation_threshold", "_probabilistic_exponent",
     )
@@ -138,7 +138,6 @@ class MlxSlipnetSession(SlipnetSession):
             self.activation = mx.zeros((n,), dtype=dtype)
             self.buffer = mx.zeros((n,), dtype=dtype)
             self.frozen = mx.zeros((n,), dtype=mx.uint8)
-            self.clamp_remaining = mx.zeros((n,), dtype=mx.int32)
             self.decay_percent = mx.array(list(topology.decay_percent), dtype=dtype)
             self.indptr = mx.array(list(topology.in_indptr), dtype=mx.int32)
             self.source = mx.array(list(topology.in_source), dtype=mx.int32)
@@ -157,7 +156,6 @@ class MlxSlipnetSession(SlipnetSession):
             self.activation = mx.array(state.activation, dtype=self.dtype)
             self.buffer = mx.array(state.buffer, dtype=self.dtype)
             self.frozen = mx.array(state.frozen).astype(mx.uint8)
-            self.clamp_remaining = mx.array(state.clamp_remaining, dtype=mx.int32)
 
     def store(self) -> SlipnetState:
         # ``np.array(..., copy=False)`` on an evaluated MLX array is a view into
@@ -170,7 +168,6 @@ class MlxSlipnetSession(SlipnetSession):
             activation=np.array(self.activation, copy=False).tolist(),
             buffer=np.array(self.buffer, copy=False).tolist(),
             frozen=np.array(self.frozen, copy=False).astype(bool).tolist(),
-            clamp_remaining=np.array(self.clamp_remaining, copy=False).tolist(),
         )
 
     # -- the update cycle ---------------------------------------------------

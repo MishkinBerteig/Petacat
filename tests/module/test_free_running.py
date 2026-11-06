@@ -571,11 +571,11 @@ def test_structures_built_by_workers_are_stamped_with_the_clock(meta):
 
 
 def test_the_initial_unclamp_time_is_honoured(meta):
-    """``run.ss:151-154``: the fixed-time release of the initial clamp, off by default."""
+    """``run.ss:151-154``: the release of the initial clamp at its fixed codelet count."""
     runner = _prepared(meta, seed=7)
     ctx = runner.ctx
     released: list[int] = []
-    runner._initial_unclamp_time = 20
+    ctx.initial_unclamp_time = 20
     runner._unclamp_initial_slipnodes = lambda slipnet: released.append(ctx.codelet_count)
 
     run_free(runner, workers=1, max_steps=80)

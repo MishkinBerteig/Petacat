@@ -71,19 +71,17 @@ def test_opposite_sliplinks(slipnet):
 
 def test_clamp_freezes_node_at_full_activation(slipnet):
     node = slipnet.nodes["plato-a"]
-    node.clamp(5)
+    node.clamp()
     assert node.frozen
     assert node.activation == 100.0
-    assert node.clamp_cycles_remaining == 5
 
 
-def test_clamp_expires_after_its_cycles(slipnet):
+def test_a_clamp_lasts_until_it_is_lifted(slipnet):
     node = slipnet.nodes["plato-a"]
-    node.clamp(5)
-    for _ in range(5):
-        node.tick_clamp()
+    node.clamp()
+    assert node.frozen
+    node.unclamp()
     assert not node.frozen
-    assert node.clamp_cycles_remaining == 0
 
 
 def test_spread_activation(slipnet):

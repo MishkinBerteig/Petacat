@@ -272,7 +272,6 @@ class SlipnetState:
     activation: list[float]
     buffer: list[float]
     frozen: list[bool]
-    clamp_remaining: list[int]
 
     @classmethod
     def from_slipnet(cls, slipnet: Slipnet) -> SlipnetState:
@@ -281,28 +280,22 @@ class SlipnetState:
             activation=[n.activation for n in nodes],
             buffer=[n.activation_buffer for n in nodes],
             frozen=[n.frozen for n in nodes],
-            clamp_remaining=[n.clamp_cycles_remaining for n in nodes],
         )
 
     def apply_to_slipnet(self, slipnet: Slipnet) -> None:
         """Write this state back onto the object graph.
 
-        ``activation`` and ``activation_buffer`` are always written; ``frozen``
-        and ``clamp_cycles_remaining`` are written too, because ``tick_clamps`` is
-        part of the substrate and a clamp that expired on the backend has to
-        expire on the node as well.
+        ``activation``, ``activation_buffer`` and ``frozen`` are all written back.
         """
-        for node, act, buf, frz, rem in zip(
+        for node, act, buf, frz in zip(
             slipnet.nodes.values(),
             self.activation,
             self.buffer,
             self.frozen,
-            self.clamp_remaining,
         ):
             node.activation = act
             node.activation_buffer = buf
             node.frozen = frz
-            node.clamp_cycles_remaining = rem
 
 
 # ---------------------------------------------------------------------------

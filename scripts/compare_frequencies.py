@@ -15,8 +15,7 @@ confirmation, in two forms.
 
 Metacat's side is ``tests/lockstep/metacat/record_frequencies.py`` (Docker, ``metacat:1.2``);
 Petacat's is the default shipped configuration, one worker, fresh memory per run
-(``--faithful`` adds the lockstep parameters; ``--workers N`` runs the free-running engine
-with N threads, the multi-worker study).  Prints both frequency tables, the
+(``--workers N`` runs the free-running engine with N threads, the multi-worker study).  Prints both frequency tables, the
 total-variation distance and a two-sample chi-square (rare answers pooled to expected
 count >= 5), plus the z score of every answer that either side gave in >= 5% of runs.
 No pass/fail: the exit status is 0 unless a run failed.
@@ -25,7 +24,7 @@ No pass/fail: the exit status is 0 unless a run failed.
 problems (``studies/support-v1a/data/main.tar.gz``, construction phase, admitted attempts,
 duplicate seeds dropped, 100,000 codelets, fresh memory; 20,000 runs per problem)::
 
-    scripts/compare_frequencies.py support-v1a --runs 200 --jobs 10 [--faithful] [--only copy1,run4]
+    scripts/compare_frequencies.py support-v1a --runs 200 --jobs 10 [--only copy1,run4]
         --json measurements/vs-metacat-support-v1a-lockstep.json
 
 Petacat runs seeds 5000001.. (clear of the lockstep corpus).  For each problem it reports
@@ -253,13 +252,9 @@ def table(label_a: str, a: dict, label_b: str, b: dict, top: int = 10) -> str:
 _CONTEXT: dict = {}
 
 
-def _init(faithful: bool) -> None:
+def _init() -> None:
     from server.engine.metadata import MetadataProvider
     _CONTEXT["meta"] = MetadataProvider.from_standard_configuration(str(ROOT / "seed_data"))
-    _CONTEXT["parameters"] = None
-    if faithful:
-        from tests.lockstep.faithful import FAITHFUL_PARAMETERS
-        _CONTEXT["parameters"] = dict(FAITHFUL_PARAMETERS)
 
 
 def petacat_run(task: tuple) -> tuple:
@@ -274,8 +269,7 @@ def petacat_run(task: tuple) -> tuple:
     workers = task[3] if len(task) > 3 else 1
     try:
         runner = EngineRunner(_CONTEXT["meta"])
-        params = _CONTEXT["parameters"]
-        runner.init_mcat(*problem, seed=seed, **({"parameters": dict(params)} if params else {}))
+        runner.init_mcat(*problem, seed=seed)
         if workers > 1:
             from server.parallel.free_running import FreeRunningEngine
             FreeRunningEngine(runner, workers=workers).run(cap)
@@ -293,7 +287,7 @@ def petacat_run(task: tuple) -> tuple:
         return seed, "*ERROR*", 0, math.nan
 
 
-def run_petacat(problem: list[str], seeds: list[int], cap: int, jobs: int, faithful: bool,
+def run_petacat(problem: list[str], seeds: list[int], cap: int, jobs: int,
                 workers: int = 1) -> dict[int, dict]:
     """Run every seed; ``workers`` > 1 uses the free-running engine (the multi-worker study)."""
     tasks = [(tuple(problem), s, cap, workers) for s in seeds]
@@ -302,7 +296,7 @@ def run_petacat(problem: list[str], seeds: list[int], cap: int, jobs: int, faith
         from server.engine import hardware
 
         jobs = max(1, hardware.population_worker_count() // max(1, workers))
-    with Pool(max(1, jobs), initializer=_init, initargs=(faithful,)) as pool:
+    with Pool(max(1, jobs), initializer=_init) as pool:
         out = pool.map(petacat_run, tasks, chunksize=4)
     return {s: {"answer": a, "codelets": c, "temperature": t} for s, a, c, t in out}
 
@@ -328,13 +322,13 @@ def cmd_study(args: argparse.Namespace) -> int:
         subprocess.run([sys.executable, str(ROOT / "tests/lockstep/metacat/record_frequencies.py"),
                         *problem, args.seeds, "--cap", str(args.cap), "--jobs", str(args.metacat_jobs),
                         "--out", str(args.out)], check=True)
-    ppath = Path(args.petacat) if args.petacat else out / f"{stem}.petacat{'-faithful' if args.faithful else ''}.tsv"
+    ppath = Path(args.petacat) if args.petacat else out / f"{stem}.petacat.tsv"
     if args.petacat:
         pet = read_rows(ppath)
     else:
-        pet = run_petacat(problem, seeds, args.cap, args.jobs, args.faithful, args.workers)
+        pet = run_petacat(problem, seeds, args.cap, args.jobs, args.workers)
         write_rows(ppath, f"Petacat answers: problem {' '.join(problem)}, seeds {lo}-{hi}, cap {args.cap}"
-                          f"{', faithful' if args.faithful else ''} (scripts/compare_frequencies.py)", pet)
+                          " (scripts/compare_frequencies.py)", pet)
     meta = read_rows(mpath)
     common = sorted(set(meta) & set(pet))
     ma = answer_counts({s: meta[s] for s in common})
@@ -395,12 +389,11 @@ def cmd_support(args: argparse.Namespace) -> int:
                                   "(complete.json), deduplicated by seed; fresh memory, 100,000-codelet cap; "
                                   "termination capped -> *CAP*"},
            "petacat": {"seeds": f"{FIRST_PETACAT_SEED}..{FIRST_PETACAT_SEED + args.runs - 1}",
-                       "cap": args.cap, "n_per_problem": args.runs,
-                       "mode": "faithful" if args.faithful else "default"},
+                       "cap": args.cap, "n_per_problem": args.runs},
            "problems": {}}
     for name in names:
         seeds = list(range(FIRST_PETACAT_SEED, FIRST_PETACAT_SEED + args.runs))
-        rows = run_petacat(strings[name], seeds, args.cap, args.jobs, args.faithful)
+        rows = run_petacat(strings[name], seeds, args.cap, args.jobs)
         sample = [r["answer"] for r in rows.values()]
         total = sum(ref[name].values())
         res = compare_to_reference(ref[name], sample)
@@ -430,7 +423,6 @@ def main() -> int:
     st.add_argument("--metacat-jobs", type=int, default=1, help="Metacat containers at once (default 1)")
     st.add_argument("--metacat", help="use this Metacat recording instead of recording")
     st.add_argument("--petacat", help="use this Petacat recording instead of running")
-    st.add_argument("--faithful", action="store_true", help="Petacat with the lockstep parameters")
     st.add_argument("--workers", type=int, default=1,
                     help="Petacat worker threads: 1 = the serial engine (default), more = free-running "
                          "(set BACKEND=numpy; lower --jobs, each run then uses several cores)")
@@ -442,7 +434,6 @@ def main() -> int:
     sv.add_argument("--cap", type=int, default=100000)
     sv.add_argument("--jobs", type=int, default=0,
                     help="Petacat processes (default: every logical core but one)")
-    sv.add_argument("--faithful", action="store_true")
     sv.add_argument("--only", help="comma-separated problem names (default all 19)")
     sv.add_argument("--json", help="write the results here")
     sv.set_defaults(func=cmd_support)

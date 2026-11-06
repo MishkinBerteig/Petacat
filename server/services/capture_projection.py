@@ -351,7 +351,7 @@ def project_slipnet(state: dict, meta: Any) -> dict:
     read from the metadata, as it is there.
     """
     out = {}
-    for name, (activation, _buffer, frozen, _clamp) in state["slipnet"].items():
+    for name, (activation, _buffer, frozen) in state["slipnet"].items():
         spec = meta.slipnet_node_specs.get(name)
         out[name] = {
             "activation": activation,

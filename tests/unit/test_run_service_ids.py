@@ -30,8 +30,7 @@ def _service_with_a_run(steps: int = 60):
     meta = gb.load_meta()
     runner = EngineRunner(meta)
     with use_backend("off"):
-        runner.init_mcat("abc", "abd", "xyz", seed=1, memory=EpisodicMemory(), rng=RNG(1),
-                         parameters={"initial_clamp_fixed_time": True})
+        runner.init_mcat("abc", "abd", "xyz", seed=1, memory=EpisodicMemory(), rng=RNG(1))
         runner.run_mcat(max_steps=steps)
     service = RunService.__new__(RunService)
     service._runners = {7: runner}

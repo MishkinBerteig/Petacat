@@ -142,7 +142,7 @@ def test_reference_counts_equal_the_committed_measurement():
 
 
 def test_one_small_petacat_run_is_classified():
-    cf._init(False)
+    cf._init()
     seed, answer, codelets, temperature = cf.petacat_run((("abc", "abd", "xyz"), 1, 5000))
     assert seed == 1 and 0 < codelets <= 5000 and math.isfinite(temperature)
     assert answer == "*CAP*" or answer == "*NONE*" or answer.isalpha()

@@ -174,7 +174,6 @@ class SlipnetNode:
         "activation",
         "activation_buffer",
         "frozen",
-        "clamp_cycles_remaining",
         "category_links",
         "instance_links",
         "property_links",
@@ -214,7 +213,6 @@ class SlipnetNode:
         self.activation: float = 0.0
         self.activation_buffer: float = 0.0
         self.frozen: bool = False
-        self.clamp_cycles_remaining: int = 0
         self.category_links: list[SlipnetLink] = []
         self.instance_links: list[SlipnetLink] = []
         self.property_links: list[SlipnetLink] = []
@@ -555,7 +553,7 @@ class SlipnetNode:
         """Is this node an instance of some category?  Scheme: slipnet.ss:94."""
         return bool(self.category_links)
 
-    def clamp(self, cycles: int = 0, activation: float | None = None) -> None:
+    def clamp(self, activation: float | None = None) -> None:
         """Freeze this node at *activation* — ``slipnet.ss:138-145``.  ``None`` is the node's
         own ceiling (``max_activation``), the ``%max-activation%`` of the Scheme.
 
@@ -565,29 +563,20 @@ class SlipnetNode:
         the concept rather than pinning it high.  Hard-coding 100 made that entry
         pin the very concept it was meant to shut down.
 
-        ``cycles`` is Petacat's own mechanism for the timed initial clamp; 0 means
-        the clamp lasts until something lifts it explicitly, which is how every
-        concept-pattern clamp behaves in the reference.
+        A clamp lasts until something lifts it explicitly (:meth:`unclamp`), as in the
+        reference.  The initial clamp's release is the runner's, at a fixed codelet
+        count (``run.ss:151-154``).
 
         The buffer is discarded, as ``slipnet.ss:142`` discards it: whatever the node
         was about to receive is superseded by the clamped value, and leaving it there
         let the very next flush add it on top of a value that was supposed to be held.
         """
         self.frozen = True
-        self.clamp_cycles_remaining = cycles
         self.activation = float(self._max_activation if activation is None else activation)
         self.activation_buffer = 0.0
 
     def unclamp(self) -> None:
         self.frozen = False
-        self.clamp_cycles_remaining = 0
-
-    def tick_clamp(self) -> None:
-        """Decrement clamp counter and unclamp if expired."""
-        if self.frozen and self.clamp_cycles_remaining > 0:
-            self.clamp_cycles_remaining -= 1
-            if self.clamp_cycles_remaining == 0:
-                self.unclamp()
 
     def probabilistic_jump_to_full(self, rng: RNG) -> None:
         """Stochastic jump to full activation, for a *partially active* node.
@@ -1253,35 +1242,25 @@ class Slipnet:
         session.store().apply_to_slipnet(self)
 
     def clamp_initially_relevant(
-        self, meta: MetadataProvider, cycles: int | None = None,
-        monitor: Any = None,
+        self, meta: MetadataProvider, monitor: Any = None,
     ) -> None:
         """Clamp initially-relevant slipnet nodes.
 
-        Scheme: run.ss init-mcat.  *cycles* overrides the update-cycle countdown;
-        0 clamps until something unfreezes the nodes (the runner's fixed-time mode).
+        Scheme: ``clamp-initial-slipnodes`` (``run.ss:268-273``).  The nodes stay
+        frozen until the runner unfreezes them (``run.ss:151-154``).
         *monitor*, if given, is called as ``monitor(node, before, after)`` for each
         clamp, because ``clamp`` calls ``monitor-slipnode-activation-change``
         (``slipnet.ss:139-140``) and the opening clamp of a deep concept is a
         concept-activation event in the reference's Trace.
         """
         initially_clamped = meta.get_param("initially_clamped_slipnodes")
-        clamp_cycles = (
-            cycles if cycles is not None
-            else meta.get_param("initial_slipnode_clamp_cycles")
-        )
         for node_name in initially_clamped:
             if node_name in self.nodes:
                 node = self.nodes[node_name]
                 before = node.activation
-                node.clamp(clamp_cycles)
+                node.clamp()
                 if monitor is not None:
                     monitor(node, before, node.activation)
-
-    def tick_clamps(self) -> None:
-        """Decrement all clamp counters."""
-        for node in self.nodes.values():
-            node.tick_clamp()
 
     # ------------------------------------------------------------------
     # Query functions (Scheme: slipnet.ss ~287-365)

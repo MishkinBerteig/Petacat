@@ -90,8 +90,7 @@ def test_interventions_call_the_products_own_clamp_methods() -> None:
     runner.step_mcat = watch  # type: ignore[method-assign]
     # schedule() wrapped the original; wrap again so the watcher sees counts first
     with use_backend("off"):
-        runner.init_mcat("abc", "abd", "xyz", seed=1, memory=EpisodicMemory(), rng=RNG(1),
-                         parameters={"initial_clamp_fixed_time": True})
+        runner.init_mcat("abc", "abd", "xyz", seed=1, memory=EpisodicMemory(), rng=RNG(1))
         runner.run_mcat(max_steps=200)
     kinds = [getattr(e, "clamp_type", None) for e in runner.ctx.trace.events]
     assert "manual_clamp" in kinds
