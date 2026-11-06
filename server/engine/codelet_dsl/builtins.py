@@ -562,7 +562,7 @@ def num_bonds_to_scan(ctx: EngineContext, string: Any) -> int:
     the ported scouts used — both flattens that preference and offers a length the
     string cannot supply.
     """
-    n = getattr(string, "length", 0)
+    n = string.length
     if n < 2:
         return 0
     values = list(range(n))
@@ -1684,7 +1684,7 @@ def _slippage_importance(ctx: EngineContext, bridge: Bridge, cm: Any) -> float:
         return 0.0
 
     def depth(node: Any) -> float:
-        return float(getattr(node, "conceptual_depth", 0) or 0)
+        return 0.0 if node is None else float(node.conceptual_depth)
 
     label = getattr(cm, "label", None)
     k = constants()

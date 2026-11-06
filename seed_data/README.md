@@ -60,6 +60,20 @@ The engine still spells the names that are its own and not a configuration's: a 
 `server/services/` and `server/api/` and lists each such literal with its reason; any other literal equal
 to a bound name fails it.
 
+Numbers have the same guard. `tests/architecture/test_numeric_literals.py` walks every `int` and `float`
+literal in `server/engine/` and `server/parallel/`: apart from a constant list index and a constant slice
+bound, each one is listed by file, enclosing function and literal, as `UNIT` (an arithmetic fact whose other
+values would be meaningless: a position, an arity, the origin or top of the fixed 0-100 percent scale, a
+probability's bounds) or `NONCOG-KEEP` (a display, logging, hardware or executor setting that affects no
+cognition), with its reason. A number that could change what a Metacat Mode run does is a row here. The
+walk found ten that stage 5 had missed, now rows: the nine `commentary_*` bands in `engine_params.json`
+(the quality, progress and strength values that choose which commentary template an event is reported
+with: `commentary_discovery_emphatic_below` 30, `_emphatic_from` 85, `_bad_below` 60,
+`commentary_justified_bad_below` 60, `_extreme_from` 85, `commentary_progress_little_below` 50,
+`_some_below` 80, `commentary_reminding_strong_above` 70, `_some_above` 30) and
+`local_support_number_denominator_floor` (1) in `formula_coefficients.json`, the floor of the denominator
+in a bond's and a group's local-support exponent.
+
 Tables whose rows the engine does not name have no `role`: `run_statuses` (the lifecycle of a run and the
 API protocol, which the client compares), `codelet_phases` (a grouping label) and `param_value_types`
 (how the stored text of a parameter is parsed; renaming one makes the parameters of that type unreadable,

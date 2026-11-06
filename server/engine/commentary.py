@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from typing import Any, Protocol, runtime_checkable
 
 from server.engine.answer_comparison import _fill
-from server.engine.run_binding import vocab
+from server.engine.run_binding import constants, vocab
 
 
 def _reporting(
@@ -173,12 +173,19 @@ def emit_answer_discovered(
     Scheme: answers.ss:61-75.  The exclamation mark is reserved for the two ends of the
     scale — ``(or (< quality 30) (>= quality 85))`` at ``answers.ss:68`` — so the
     program is emphatic about an answer it thinks is terrible as well as one it thinks
-    is great.
+    is great.  The three bands (30, 85 and 60 in the Metacat Standard Configuration) are the
+    run's ``commentary_discovery_*`` parameters.
     """
+    k = constants()
     section = _reporting(templates, "discovery", commentary)
     also = section.get("also", "") if prior_answer_count > 0 else ""
-    punctuation = "!" if (quality < 30 or quality >= 85) else "."
-    suffix = "quality_suffix_bad" if quality < 60 else "quality_suffix_good"
+    punctuation = (
+        "!"
+        if (quality < k.commentary_discovery_emphatic_below
+            or quality >= k.commentary_discovery_emphatic_from)
+        else "."
+    )
+    suffix = "quality_suffix_bad" if quality < k.commentary_discovery_bad_below else "quality_suffix_good"
 
     eliza = _fill(
         section.get("eliza_prefix", ""), answer=answer_string, also=also
@@ -204,12 +211,14 @@ def emit_answer_justified(
 ) -> None:
     """Emit commentary when an answer is successfully justified.
 
-    Scheme: answers.ss:47-59.
+    Scheme: answers.ss:47-59.  The two bands (60 and 85 in the Metacat Standard Configuration)
+    are the run's ``commentary_justified_*`` parameters.
     """
+    k = constants()
     section = _reporting(templates, "justify_success", commentary)
-    if quality < 60:
+    if quality < k.commentary_justified_bad_below:
         suffix = "quality_suffix_bad"
-    elif quality >= 85:
+    elif quality >= k.commentary_justified_extreme_from:
         suffix = "quality_suffix_extreme"
     else:
         suffix = "quality_suffix_normal"
@@ -322,12 +331,16 @@ def emit_clamp_activate(
 
 
 def _progress_key(progress: float) -> str:
-    """Which of Metacat's four progress bands a value falls in (``trace.ss:212-226``)."""
+    """Which of Metacat's four progress bands a value falls in (``trace.ss:212-226``).
+
+    No progress at all is its own band; the upper edges of the next two (50 and 80 in the
+    Metacat Standard Configuration) are the run's ``commentary_progress_*`` parameters."""
+    k = constants()
     if progress == 0:
         return "zero"
-    if progress < 50:
+    if progress < k.commentary_progress_little_below:
         return "little"
-    if progress < 80:
+    if progress < k.commentary_progress_some_below:
         return "some"
     return "a_lot"
 
@@ -447,10 +460,11 @@ def emit_reminding(
     ``problem_text`` is the description's ``problem-print-name``,
     ``abc -> abd, mrrjjj -> ?``.
     """
+    k = constants()
     section = _reporting(templates, "reminding", commentary)
-    if strength > 70:
+    if strength > k.commentary_reminding_strong_above:
         how = section.get("strongly", "")
-    elif strength > 30:
+    elif strength > k.commentary_reminding_some_above:
         how = section.get("somewhat", "")
     else:
         how = section.get("vaguely", "")

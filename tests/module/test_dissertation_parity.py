@@ -754,6 +754,8 @@ class TestMemory:
                 theme_pattern={"plato-string-position-category": "identity"},
                 description=rule,
                 rule_signature=signature,
+                translated_rule_signature=signature,
+                explanation="an explanation",
             )
         )
 

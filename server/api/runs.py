@@ -761,10 +761,7 @@ def _project_memory(memory) -> dict:
     """
     from server.engine.snag_explanation import snag_explanation_text
 
-    # The fallback wording for a snag with no stored explanation is a template, so it
-    # comes from whatever the service currently holds (the database in a served run).
     _meta = get_run_service().meta
-    _templates = getattr(_meta, "commentary_templates", None)
     return {
         "answers": [
             {
@@ -804,7 +801,7 @@ def _project_memory(memory) -> dict:
                 "clause_types": clause_types_of(s.rule_signature, s.translated_rule_signature),
                 "description": s.description,
                 "translated_rule_description": s.translated_rule_description,
-                "explanation": snag_explanation_text(s, _templates),
+                "explanation": snag_explanation_text(s),
                 "has_picture": s.picture is not None,
             }
             for s in memory.snags_oldest_first

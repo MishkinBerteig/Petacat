@@ -28,7 +28,7 @@ from server.engine.serialization import (
     serialize_workspace_state,
 )
 from server.engine.start_check import require_run_start
-from server.engine.snag_explanation import fallback_explanation, snag_explanation_text
+from server.engine.snag_explanation import snag_explanation_text
 from server.engine.verbose import VERBOSE_STEP_LIMIT, narrate_event_display
 from server.models.run import (
     _utcnow,
@@ -201,16 +201,6 @@ class StepBatch:
     #: The run reached its breakpoint. The run's status is ``paused`` and the
     #: breakpoint stays set, so it holds the run there until it is moved or cleared.
     breakpoint_hit: bool = False
-
-
-def _stored_snag_explanation(row: Any, templates: dict | None = None) -> str:
-    """A snag row's explanation; rows written before it was stored get the fallback."""
-    if row.explanation:
-        return row.explanation
-    problem = list(row.problem or [])
-    return fallback_explanation(
-        row.description or "", problem[2] if len(problem) > 2 else "", templates
-    )
 
 
 class RunService:
@@ -1288,7 +1278,7 @@ class RunService:
                     "clause_types": clause_types_of(s.rule_signature, s.translated_rule_signature),
                     "description": s.description or "",
                     "translated_rule_description": s.translated_rule_description or "",
-                    "explanation": _stored_snag_explanation(s, self.meta.commentary_templates),
+                    "explanation": s.explanation,
                     "has_picture": s.picture is not None,
                 }
                 for s in sorted(
@@ -1370,9 +1360,7 @@ class RunService:
                 run_id=s.run_id,
                 rule_signature=s.rule_signature,
                 translated_rule_signature=s.translated_rule_signature,
-                # NULL on rows written before these were stored; the explanation then
-                # falls back (``snag_explanation_text``).
-                explanation=s.explanation or "",
+                explanation=s.explanation,
                 translated_rule_description=s.translated_rule_description or "",
                 picture=s.picture,
             )
@@ -1478,7 +1466,7 @@ class RunService:
                     "clause_types": clause_types_of(s.rule_signature, s.translated_rule_signature),
                     "description": s.description,
                     "translated_rule_description": s.translated_rule_description,
-                    "explanation": snag_explanation_text(s, self.meta.commentary_templates),
+                    "explanation": snag_explanation_text(s),
                     "has_picture": s.picture is not None,
                 }
                 for s in memory.snags_oldest_first

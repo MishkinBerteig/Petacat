@@ -219,6 +219,7 @@ class RunConstants:
     bond_degree_of_assoc_ceiling: Any = formula()
     local_support_density_exponent: Any = formula()
     local_support_number_exponent: Any = formula()
+    local_support_number_denominator_floor: Any = formula()
     local_support_number_factor_ceiling: Any = formula()
     bond_local_support_unsupported: Any = formula()
     bond_local_density_no_string: Any = formula()
@@ -300,6 +301,18 @@ class RunConstants:
     #: Justify's retention of a theme-pattern entry.
     justify_retention_string_position: Any = param()
     justify_retention_non_identity_percent: Any = param()
+    #: The quality and strength bands that choose which commentary template a Trace event is
+    #: reported with (``answers.ss:47-75``, ``trace.ss:212-226``, ``memory.ss:214-229``).  They
+    #: select text only, and sit beside the templates they select.
+    commentary_discovery_emphatic_below: Any = param()
+    commentary_discovery_emphatic_from: Any = param()
+    commentary_discovery_bad_below: Any = param()
+    commentary_justified_bad_below: Any = param()
+    commentary_justified_extreme_from: Any = param()
+    commentary_progress_little_below: Any = param()
+    commentary_progress_some_below: Any = param()
+    commentary_reminding_strong_above: Any = param()
+    commentary_reminding_some_above: Any = param()
 
     #: The two blends a scout draws its target from: a bond facet by local support and
     #: activation, and a string by relevance and unhappiness.

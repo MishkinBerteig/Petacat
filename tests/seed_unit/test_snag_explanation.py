@@ -336,6 +336,9 @@ def test_the_explanation_words_come_from_the_templates(nodes, slipnet):
 
 
 def _snag(**kwargs):
+    kwargs.setdefault("explanation", EXPLANATION)
+    kwargs.setdefault("rule_signature", [])
+    kwargs.setdefault("translated_rule_signature", [])
     return SnagDescription(
         problem=("abc", "abd", "xyz"), codelet_count=1, temperature=50.0,
         theme_pattern={}, description="Replace letter category of rightmost letter by successor",
@@ -348,16 +351,15 @@ def test_a_snag_description_keeps_the_explanation_and_the_translated_rule():
         explanation=EXPLANATION,
         translated_rule_description="Change letter-category of letter `z' to its successor",
     )
-    assert snag_explanation_text(snag, T) == EXPLANATION
+    assert snag_explanation_text(snag) == EXPLANATION
     assert snag.translated_rule_description.startswith("Change letter-category")
 
 
-def test_a_snag_with_no_stored_explanation_falls_back_to_the_old_sentence():
-    """Rows written before the explanation was stored rehydrate with ``explanation=""``;
-    the fallback template (``caveat_templates.snag_explanation``) serves them."""
+def test_the_old_sentence_is_built_from_the_rule_and_the_target():
+    """The engine writes ``fallback_explanation`` (``caveat_templates.snag_explanation``) as the
+    snag's explanation when a failure has no Metacat sentence; nothing rebuilds it at read time."""
     snag = _snag()
-    assert snag.explanation == ""
-    assert snag_explanation_text(snag, T) == (
+    assert fallback_explanation(snag.description, snag.problem[2], T) == (
         'the rule "Replace letter category of rightmost letter by successor" '
         "cannot be applied to xyz"
     )
@@ -376,14 +378,11 @@ def test_the_answer_caveat_quotes_the_stored_explanation():
         problem=("abc", "abd", "xyz", "xyd"), top_rule_signature=["sig"]
     )
     memory.get_equivalent_snag = lambda a: snag  # the lookup is tested elsewhere
-    assert snag_explanation_for(answer, memory, default_commentary_templates()) == EXPLANATION
+    assert snag_explanation_for(answer, memory) == EXPLANATION
 
 
 def test_explaining_without_templates_raises_rather_than_reading_the_files():
     from server.engine.metadata import ConfigurationRequired
 
-    snag = _snag()
-    with pytest.raises(ConfigurationRequired):
-        snag_explanation_text(snag)
     with pytest.raises(ConfigurationRequired):
         fallback_explanation("a", "xyz")

@@ -148,6 +148,9 @@ async def test_rehydrating_the_memory_keeps_one_row_per_snag(db_session):
             temperature=100.0,
             theme_pattern={},
             description="change LetterCtgy by succ",
+            rule_signature=[],
+            translated_rule_signature=[],
+            explanation="a sentence",
         )
 
     db_session.add_all([
@@ -171,10 +174,10 @@ async def test_rehydrating_the_memory_keeps_one_row_per_snag(db_session):
 
 
 @pytest.mark.asyncio
-async def test_rehydrating_keeps_the_explanation_and_falls_back_for_old_rows(db_session):
+async def test_rehydrating_keeps_the_explanation_of_each_row(db_session):
     """Rows carry Metacat's explanation (``memory.ss:332``) and the translated rule's
-    English (``memory.ss:331``); a row written before they were stored has NULL for
-    both and rehydrates with the older sentence, not an error."""
+    English (``memory.ss:331``); the explanation is required, and a snag whose failure had no Metacat
+    sentence stores the older sentence (``fallback_explanation``), which rehydrates as stored."""
     import os
 
     from server.engine.answer_comparison import snag_explanation_for  # noqa: F401
@@ -188,16 +191,20 @@ async def test_rehydrating_keeps_the_explanation_and_falls_back_for_old_rows(db_
         "changing the letter-category of the letter z to its successor "
         "is not possible in xyz"
     )
+    old_sentence = 'the rule "change LetterCtgy by pred" cannot be applied to xyz'
     db_session.add_all([
         SnagDescriptionRow(
             snag_id=1, run_id=1, problem=list(SNAGGING_PROBLEM.values()), codelet_count=273,
             temperature=100.0, theme_pattern={}, description="change LetterCtgy by succ",
+            rule_signature=[], translated_rule_signature=[],
             explanation=explanation,
             translated_rule_description="Change letter-category of letter `z' to its successor",
         ),
         SnagDescriptionRow(
             snag_id=2, run_id=1, problem=list(SNAGGING_PROBLEM.values()), codelet_count=421,
             temperature=100.0, theme_pattern={}, description="change LetterCtgy by pred",
+            rule_signature=[], translated_rule_signature=[],
+            explanation=old_sentence,
         ),
     ])
     await db_session.commit()
@@ -210,8 +217,8 @@ async def test_rehydrating_keeps_the_explanation_and_falls_back_for_old_rows(db_
     assert new.explanation == explanation
     assert new.translated_rule_description.startswith("Change letter-category")
     assert snag_explanation_text(new) == explanation
-    assert old.explanation == ""
-    assert snag_explanation_text(old, service.meta.commentary_templates).startswith('the rule "change LetterCtgy by pred" cannot be applied to ')
+    assert old.explanation == old_sentence
+    assert snag_explanation_text(old).startswith('the rule "change LetterCtgy by pred" cannot be applied to ')
 
     served = service.get_memory_state()["snags"]
     assert [s["explanation"] for s in served][0] == explanation

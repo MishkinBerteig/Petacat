@@ -47,6 +47,9 @@ def _snag(theme_pattern):
         codelet_count=100,
         temperature=70.0,
         theme_pattern=theme_pattern,
+        rule_signature=[],
+        translated_rule_signature=[],
+        explanation="an explanation",
     )
 
 

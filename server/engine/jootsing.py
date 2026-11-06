@@ -635,7 +635,7 @@ def get_clamp_jootsing_probability(
     # Progress achieved by each clamp
     progress_values: list[float] = []
     for clamp in clamps:
-        p = getattr(clamp, "progress_achieved", 0.0)
+        p = clamp.progress_achieved
         progress_values.append(float(p))
 
     # Weighted average of progress
@@ -861,7 +861,7 @@ def joots_from_justify_clamps(
         bottom_rule=bottom_rule,
         unjustified_slippages=unjustified,
         # ``trace.ss:392-396`` — an answer's quality rests on the top rule's quality.
-        answer_quality=float(getattr(top_rule, "quality", 0.0)),
+        answer_quality=float(top_rule.quality),
         # ``jootsing.ss:229-231``: the bottom rule's reference objects are looked up afresh
         # in the target string; the top side's are the translation's.
         translation=replace(

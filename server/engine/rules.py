@@ -969,8 +969,8 @@ def _nesting_level(obj: Any) -> int:
 def _disjoint_objects(o1: Any, o2: Any) -> bool:
     """True if o1 and o2 don't overlap in string position."""
     return (
-        getattr(o1, "right_string_pos", -1) < getattr(o2, "left_string_pos", 0)
-        or getattr(o2, "right_string_pos", -1) < getattr(o1, "left_string_pos", 0)
+        o1.right_string_pos < o2.left_string_pos
+        or o2.right_string_pos < o1.left_string_pos
     )
 
 
@@ -1366,7 +1366,7 @@ class Rule(WorkspaceStructure):
             return
 
         def depth(node: Any) -> float:
-            return float(getattr(node, "conceptual_depth", 0) or 0)
+            return 0.0 if node is None else float(node.conceptual_depth)
 
         attribute_depths = [
             depth(_object_description_node(od))
@@ -2321,7 +2321,7 @@ def change_descriptions_to_rule_clause_template(
         else:
             ref_objects = sorted(
                 first.reference_objects,
-                key=lambda o: getattr(o, "left_string_pos", 0),
+                key=lambda o: o.left_string_pos,
             )
         dimensions = [cd.dimension for cd in change_descriptions]
         return (constants().vocab.clause_type_extrinsic, ref_objects, dimensions)
@@ -2347,7 +2347,7 @@ def _template_less(t1: tuple, t2: tuple) -> bool:
         if _nested_member(o2, o1):
             return True
         return _disjoint_objects(o1, o2) and (
-            getattr(o1, "left_string_pos", 0) < getattr(o2, "left_string_pos", 0))
+            o1.left_string_pos < o2.left_string_pos)
     return False
 
 
@@ -2578,7 +2578,7 @@ def instantiate_rule_clause_template(
         # Extrinsic
         ref_objects = template[1]
         dimensions = template[2]
-        sorted_refs = sorted(ref_objects, key=lambda o: getattr(o, "left_string_pos", 0))
+        sorted_refs = sorted(ref_objects, key=lambda o: o.left_string_pos)
         obj_descs = _chez_map(
             lambda r: reference_object_to_object_description(
                 r, slipnet, rng, temperature, meta),

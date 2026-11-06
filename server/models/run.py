@@ -228,7 +228,7 @@ class AnswerDescriptionRow(Base):
     top_rule_signature = Column(JSONB, nullable=False)
     bottom_rule_signature = Column(JSONB, nullable=False)
     # The picture clicking the answer redraws (``set-answer-description-pexp``,
-    # ``memory.ss:438``).  NULL for a row written before pictures were kept.
+    # ``memory.ss:438``).  NULL for a snag built without a picture.
     picture = Column(JSONB, nullable=True)
     created_at = Column(DateTime, default=_utcnow)
 
@@ -255,18 +255,15 @@ class SnagDescriptionRow(Base):
     theme_pattern = Column(JSONB, default=dict)
     description = Column(Text, default="")
     # The structural clause keys ``snag_present`` and ``get_equivalent_snag`` compare
-    # (``memory.ss:289-291, 336-340``).  Without them a rehydrated snag could only be
-    # matched on its English prose, which is what the structural comparison replaced.
-    rule_signature = Column(JSONB, nullable=True)
-    translated_rule_signature = Column(JSONB, nullable=True)
+    # (``memory.ss:289-291, 336-340``).  Both are required, like an answer's two.
+    rule_signature = Column(JSONB, nullable=False)
+    translated_rule_signature = Column(JSONB, nullable=False)
     # ``get-explanation`` and ``get-translated-rule-phrases`` of Metacat's snag
     # description (``memory.ss:331-332``): the sentence for what went wrong and the
-    # English of the rule that failed.  Added after the table existed, so the startup
-    # reconcile adds them nullable; NULL means a row written before they were stored,
-    # and the explanation then falls back (``snag_explanation_text``).
-    explanation = Column(Text, nullable=True)
+    # English of the rule that failed.  The engine always writes the explanation, so it is required.
+    explanation = Column(Text, nullable=False)
     translated_rule_description = Column(Text, nullable=True)
     # The picture clicking the snag redraws (``set-snag-description-pexp``,
-    # ``memory.ss:477``).  NULL for a row written before pictures were kept.
+    # ``memory.ss:477``).  NULL for a snag built without a picture.
     picture = Column(JSONB, nullable=True)
     created_at = Column(DateTime, default=_utcnow)

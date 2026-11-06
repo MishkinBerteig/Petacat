@@ -405,9 +405,9 @@ def narrate_event_display(log: "VerboseLog", event: Any) -> None:
     v = run_vocab()
     kind = getattr(event, "event_type", None)
     if kind == v.event_type_clamp_start:
-        log.say("progress-achieved-by-clamp", exact(getattr(event, "progress_achieved", 0)))
+        log.say("progress-achieved-by-clamp", exact(event.progress_achieved))
     elif kind == v.event_type_snag:
-        log.say("progress-achieved-by-snag", exact(getattr(event, "progress_achieved", 0)))
+        log.say("progress-achieved-by-snag", exact(event.progress_achieved))
     elif kind == v.event_type_answer_found:
         # ``display`` of an answer (``trace.ss:427-454``): the unjustified slippages
         # first (only an unjustified answer has any), then ``(print slippage-log)``.
@@ -439,7 +439,7 @@ def _narrate_rule_display(log: "VerboseLog", event: Any) -> None:
     text += print_text(rule, slipnet=log.slipnet)
     text += "".join(rule_clause_text(clause) for clause in rule.clauses) + "\n"
     text += f"Quality = {display(exact(rule.quality))}\n"
-    text += f"Relative quality at creation = {display(exact(getattr(event, 'strength', 0)))}\n"
+    text += f"Relative quality at creation = {display(exact(event.strength))}\n"
     text += f"Relative quality now = {display(exact(_relative_quality(rule)))}"
     text += f"\n{_RULE_DISPLAY_RULE}\n"
     log.emit(text)

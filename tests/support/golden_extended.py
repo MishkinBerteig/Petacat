@@ -81,7 +81,7 @@ def answers_report(meta: Any, memory: Any) -> dict[str, list[str]]:
     expl: list[str] = []
     cmp_: list[str] = []
     for a in memory.answers:
-        ans.append("%s\t%s" % (key(a), snag_explanation_for(a, memory, templates)))
+        ans.append("%s\t%s" % (key(a), snag_explanation_for(a, memory)))
         e = explain_answer(a, memory, templates, meta=meta)
         expl.append("%s\t%s\t%s" % (key(a), e["eliza_text"], e["technical_text"]))
     for a in memory.answers:

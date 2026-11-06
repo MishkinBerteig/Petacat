@@ -1519,7 +1519,7 @@ class Workspace:
 
         # Sort by age ascending (youngest first)
         ages = sorted(
-            max(0, codelet_count - getattr(s, "time_stamp", 0))
+            max(0, codelet_count - s.time_stamp)
             for s in structures
         )
         n = min(len(ages), num_youngest)

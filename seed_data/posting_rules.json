@@ -8,7 +8,9 @@
       "posting_formula": "average_intra_string_unhappiness / 100",
       "count_formula": "num_unrelated_objects_based",
       "count_values": {"few": 2, "some": 4, "many": 6},
-      "condition": "always"
+      "condition": "always",
+      "urgency_formula": null,
+      "triggering_slipnodes": null
     },
     {
       "rule_key": "top-down-bond-scout:category",
@@ -66,7 +68,9 @@
       "posting_formula": "average_intra_string_unhappiness / 100",
       "count_formula": "num_ungrouped_objects_based",
       "count_values": {"none": 0, "few": 1, "some": 2, "many": 3},
-      "condition": "always"
+      "condition": "always",
+      "urgency_formula": null,
+      "triggering_slipnodes": null
     },
     {
       "rule_key": "bottom-up-bridge-scout",
@@ -76,7 +80,9 @@
       "posting_formula": "(100 - min_mapping_strength) / 100",
       "count_formula": "num_unmapped_objects_based",
       "count_values": {"few": 2, "some": 5, "many": 6},
-      "condition": "always"
+      "condition": "always",
+      "urgency_formula": null,
+      "triggering_slipnodes": null
     },
     {
       "rule_key": "important-object-bridge-scout",
@@ -86,7 +92,9 @@
       "posting_formula": "(100 - min_mapping_strength) / 100",
       "count_formula": "num_unmapped_objects_based",
       "count_values": {"few": 2, "some": 5, "many": 6},
-      "condition": "always"
+      "condition": "always",
+      "urgency_formula": null,
+      "triggering_slipnodes": null
     },
     {
       "rule_key": "bottom-up-description-scout",
@@ -96,7 +104,9 @@
       "posting_formula": "average_unhappiness / 100",
       "count_formula": "fixed",
       "count_values": {"fixed": 2},
-      "condition": "always"
+      "condition": "always",
+      "urgency_formula": null,
+      "triggering_slipnodes": null
     },
     {
       "rule_key": "top-down-description-scout",
@@ -117,7 +127,10 @@
       "urgency_level": "low",
       "posting_formula": "1.0 if possible_rule_types else 0.5",
       "count_formula": "max(1, 2 * num_possible_rule_types)",
-      "condition": "always"
+      "condition": "always",
+      "urgency_formula": null,
+      "count_values": null,
+      "triggering_slipnodes": null
     },
     {
       "rule_key": "answer-finder",
@@ -128,7 +141,8 @@
       "posting_formula": "(100 - temperature) / 100 if supported_top_rule_exists else 0.0",
       "count_formula": "fixed",
       "count_values": {"fixed": 1},
-      "condition": "not justify_mode"
+      "condition": "not justify_mode",
+      "triggering_slipnodes": null
     },
     {
       "rule_key": "answer-justifier",
@@ -139,7 +153,8 @@
       "posting_formula": "(100 - temperature) / 100 if supported_rule_exists else 0.0",
       "count_formula": "fixed",
       "count_values": {"fixed": 1},
-      "condition": "justify_mode"
+      "condition": "justify_mode",
+      "triggering_slipnodes": null
     },
     {
       "rule_key": "thematic-bridge-scout",
@@ -149,7 +164,9 @@
       "urgency_formula": "max_positive_theme_activation",
       "posting_formula": "max_positive_theme_activation / 100",
       "count_formula": "round(10 * max_inter_string_unhappiness / 100)",
-      "condition": "self_watching_enabled"
+      "condition": "self_watching_enabled",
+      "count_values": null,
+      "triggering_slipnodes": null
     },
     {
       "rule_key": "progress-watcher",
@@ -159,7 +176,9 @@
       "posting_formula": "1.0 if thematic_pressure else 0.25",
       "count_formula": "fixed",
       "count_values": {"fixed": 2},
-      "condition": "self_watching_enabled"
+      "condition": "self_watching_enabled",
+      "urgency_formula": null,
+      "triggering_slipnodes": null
     },
     {
       "rule_key": "jootser",
@@ -169,7 +188,9 @@
       "posting_formula": "0.4 if within_snag_or_clamp_period else 0.1",
       "count_formula": "fixed",
       "count_values": {"fixed": 2, "justify_mode": 1},
-      "condition": "self_watching_enabled"
+      "condition": "self_watching_enabled",
+      "urgency_formula": null,
+      "triggering_slipnodes": null
     },
     {
       "rule_key": "breaker",
@@ -179,7 +200,9 @@
       "posting_formula": "temperature / 100",
       "count_formula": "fixed",
       "count_values": {"fixed": 1},
-      "condition": "always"
+      "condition": "always",
+      "urgency_formula": null,
+      "triggering_slipnodes": null
     }
   ],
   "codelet_patterns": {

@@ -61,6 +61,9 @@ def _inherited_memory() -> tuple[EpisodicMemory, SnagDescription]:
         theme_pattern={},
         description="an earlier run's snag",
         run_id=EARLIER_RUN_ID,
+        rule_signature=[],
+        translated_rule_signature=[],
+        explanation="an explanation",
     )
     memory.store_snag(earlier)
     return memory, earlier

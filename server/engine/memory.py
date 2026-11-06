@@ -123,48 +123,39 @@ class SnagDescription:
     codelet_count: int
     temperature: float
     theme_pattern: dict[str, Any]
-    description: str = ""
-    run_id: int | None = None
-    snag_id: int = 0
-
-    #: ``get-explanation`` (``memory.ss:332``): Metacat's sentence for what went wrong,
-    #: written from the failure-result when the snag happened (``trace.ss:1097``) --
-    #: "changing the letter-category of the letter a to its predecessor is not possible
-    #: in abcd".  Empty for a snag rehydrated from a row written before it was stored;
-    #: ``snag_explanation_text`` is the one place that case is handled.
-    explanation: str = ""
-    #: ``get-translated-rule-phrases`` (``memory.ss:331``): the English of the
-    #: translated rule, the one that failed.  ``description`` is the rule's own.
-    translated_rule_description: str = ""
-
     # ``memory.ss:289-291`` stores the snag's **rule clause lists**, and ``equal?``
     # (``memory.ss:336-340``) compares them with ``rule-clause-lists-equal?`` — the
     # three problem strings plus a *structural* comparison of the rule.  Petacat
     # compared the rule's English transcription, which collides two ways: two
     # structurally different rules can transcribe to the same prose.
     # ``rules.py:rule_signature`` documents exactly that hazard for answers; the snag
-    # path had it open.
-    rule_signature: list | None = None
-    translated_rule_signature: list | None = None
+    # path had it open.  Both are required: ``record_snag`` dereferences both rules before
+    # it asks for a signature, so no snag is ever made without them (ruling 64), exactly as
+    # an answer is never made without its two (ruling 35).
+    rule_signature: list
+    translated_rule_signature: list
+    #: ``get-explanation`` (``memory.ss:332``): Metacat's sentence for what went wrong,
+    #: written from the failure-result when the snag happened (``trace.ss:1097``) --
+    #: "changing the letter-category of the letter a to its predecessor is not possible
+    #: in abcd".  The engine always writes one, so it is required.
+    explanation: str
+    description: str = ""
+    run_id: int | None = None
+    snag_id: int = 0
+
+    #: ``get-translated-rule-phrases`` (``memory.ss:331``): the English of the
+    #: translated rule, the one that failed.  ``description`` is the rule's own.
+    translated_rule_description: str = ""
 
     #: ``set-snag-description-pexp`` (``memory.ss:477``): the picture of the snag
-    #: (``trace.ss:1212``).  ``None`` for a snag stored before pictures were kept.
+    #: (``trace.ss:1212``).  ``None`` for a snag built without one.
     picture: dict | None = None
 
-    def equal(
-        self, problem: tuple[str, str, str], signature: list | None
-    ) -> bool:
-        """Scheme: ``equal?`` on a snag description (``memory.ss:336-340``).
-
-        A ``None`` signature means the clause list was never recorded rather than that
-        the rule was empty, and two unrecorded rules are not thereby the same rule.  (An
-        answer has no such case: its signatures are always present, see :func:`answers_equal`.)
-        """
-        if tuple(self.problem) != tuple(problem):
-            return False
-        if self.rule_signature is None or signature is None:
-            return False
-        return self.rule_signature == signature
+    def equal(self, problem: tuple[str, str, str], signature: list) -> bool:
+        """Scheme: ``equal?`` on a snag description (``memory.ss:336-340``): the three
+        problem strings and the rule's clause list, compared structurally.  Both
+        signatures are always present (ruling 64), as for an answer (:func:`answers_equal`)."""
+        return tuple(self.problem) == tuple(problem) and self.rule_signature == signature
 
 
 def clause_types_of(*signatures: list | None) -> list[str]:

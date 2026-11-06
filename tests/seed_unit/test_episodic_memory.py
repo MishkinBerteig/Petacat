@@ -490,6 +490,8 @@ def test_a_snag_justified_theme_leaves_the_justification_component():
             # *clause list*, not its prose, so the snag has to carry the same
             # signature the answer does for the episodes to be the same episode.
             rule_signature=_rule(),
+            translated_rule_signature=_rule(),
+            explanation="an explanation",
         )
     )
 
@@ -654,6 +656,8 @@ def _snag_for(rule, problem=("abc", "abd", "xyz")):
         theme_pattern={},
         description=rule.transcribe_to_english(_META),
         rule_signature=rule_signature(rule),
+        translated_rule_signature=rule_signature(rule),
+        explanation="an explanation",
     )
 
 
@@ -697,9 +701,9 @@ def test_two_rules_with_nothing_to_say_do_not_collide(nodes):
     assert memory.snag_present(("abc", "abd", "xyz"), first) is True
 
 
-def test_a_snag_with_no_recorded_clause_list_matches_nothing(nodes):
-    """A null signature means the clause list was never captured, not that the rule was
-    empty — the same reservation ``_answers_equal`` makes for an answer."""
+def test_a_snag_whose_clause_list_is_empty_matches_no_real_rule(nodes):
+    """A snag's clause list is always present (ruling 64), as an answer's is (ruling 35).  An
+    empty one is a rule with no clauses, and the real rule is not that rule."""
     memory = EpisodicMemory()
     memory.store_snag(
         SnagDescription(
@@ -708,6 +712,9 @@ def test_a_snag_with_no_recorded_clause_list_matches_nothing(nodes):
             temperature=100.0,
             theme_pattern={},
             description="change LettCtgy by succ",
+            rule_signature=[],
+            translated_rule_signature=[],
+            explanation="an explanation",
         )
     )
     assert memory.snag_present(("abc", "abd", "xyz"), _real_rule(nodes)) is False

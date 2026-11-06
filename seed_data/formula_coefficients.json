@@ -122,6 +122,7 @@
   "bond_degree_of_assoc_ceiling": 100.0,
   "local_support_density_exponent": 0.5,
   "local_support_number_exponent": 3,
+  "local_support_number_denominator_floor": 1,
   "local_support_number_factor_ceiling": 1.0,
   "bond_local_support_unsupported": 0.0,
   "bond_local_density_no_string": 100.0,

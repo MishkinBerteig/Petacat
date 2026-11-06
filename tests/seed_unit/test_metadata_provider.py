@@ -428,6 +428,17 @@ _READ_BY_THE_ENGINE_BUT_NOT_OFFERED = {
     "thematic_slippage_importance",
     "uniform_rule_importance",
     "perfect_rule_uniformity",
+    # Round 2, stage N: the quality, progress and strength bands that choose which commentary
+    # template an event is reported with (commentary.py).
+    "commentary_discovery_emphatic_below",
+    "commentary_discovery_emphatic_from",
+    "commentary_discovery_bad_below",
+    "commentary_justified_bad_below",
+    "commentary_justified_extreme_from",
+    "commentary_progress_little_below",
+    "commentary_progress_some_below",
+    "commentary_reminding_strong_above",
+    "commentary_reminding_some_above",
 }
 
 #: Read by the control API, never by a run.

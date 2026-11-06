@@ -130,9 +130,7 @@ class Bridge(WorkspaceStructure):
         The weight both sides carry into a bridge-vs-bridge fight, so a spanning
         bridge over ``abc`` meets a letter bridge at 6 to 2.
         """
-        return int(getattr(self.object1, "span", 1)) + int(
-            getattr(self.object2, "span", 1)
-        )
+        return int(self.object1.span) + int(self.object2.span)
 
     def add_concept_mappings(self, cms: list[ConceptMapping]) -> None:
         """``add-concept-mappings`` (bridges.ss:210-213) -- new mappings go on the
@@ -1536,10 +1534,10 @@ def direction_incompatible_bridges(
         return []
 
     def compatible(b1: Bridge, b2: Bridge) -> bool:
-        p1a = getattr(b1.object1, "left_string_pos", 0)
-        p1b = getattr(b1.object2, "left_string_pos", 0)
-        p2a = getattr(b2.object1, "left_string_pos", 0)
-        p2b = getattr(b2.object2, "left_string_pos", 0)
+        p1a = b1.object1.left_string_pos
+        p1b = b1.object2.left_string_pos
+        p2a = b2.object1.left_string_pos
+        p2b = b2.object2.left_string_pos
         if p1a < p2a:
             return pred1(p1b, p2b)
         if p1a > p2a:
@@ -1639,7 +1637,7 @@ def _get_edge_bond(obj: Any) -> Any:
     Scheme: bridges.ss:340-345.
     If leftmost, get right bond; if rightmost (or default), get left bond.
     """
-    if getattr(obj, "left_string_pos", -1) == 0:
+    if obj.left_string_pos == 0:
         return getattr(obj, "right_bond", None)
     return getattr(obj, "left_bond", None)
 

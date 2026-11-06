@@ -146,9 +146,9 @@ outside the matrix take it too and the run is entirely what it says it is.
   whole suite requested: the full matrix is required of this run
 
   unit          1977 collected   1977 run   1977 passed      0 failed      0 skipped  complete
-  seed_unit     1759 collected   1759 run   1759 passed      0 failed      0 skipped  complete
+  seed_unit     1790 collected   1790 run   1790 passed      0 failed      0 skipped  complete
   module        1051 collected   1051 run   1051 passed      0 failed      0 skipped  complete
-  architecture   101 collected    101 run    101 passed      0 failed      0 skipped  complete
+  architecture   104 collected    104 run    104 passed      0 failed      0 skipped  complete
   integration    366 collected    366 run    366 passed      0 failed      0 skipped  complete
   parallel       304 collected    304 run    304 passed      0 failed      0 skipped  complete
   lockstep       247 collected    247 run    247 passed      0 failed      0 skipped  complete
@@ -225,9 +225,9 @@ that allowance.
 | Layer | Directory | Scope | May depend on | Cases |
 |-------|-----------|-------|---------------|-------|
 | **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 1977 |
-| **seed unit** | `tests/seed_unit/` | One class or function, measured against the values Petacat ships with | Real `seed_data/*.json`, and the machine the process is running on | 1759 |
+| **seed unit** | `tests/seed_unit/` | One class or function, measured against the values Petacat ships with | Real `seed_data/*.json`, and the machine the process is running on | 1790 |
 | **module** | `tests/module/` | Several real components assembled and driven | Real engine objects and `seed_data/*.json`; no DB, no HTTP | 1051 |
-| **architecture** | `tests/architecture/` | How the source tree is allowed to depend on itself | The repository's source, `seed_data/*.json`, child interpreters | 101 |
+| **architecture** | `tests/architecture/` | How the source tree is allowed to depend on itself | The repository's source, `seed_data/*.json`, child interpreters | 104 |
 | **integration** | `tests/integration/` | Agreement between the repository's artifacts, and the harness's own rules | Real `seed_data/*.json`, the ORM declarations, the generated client files, the documentation, a real pytest session | 366 |
 | **parallel** | `tests/parallel/` | The detachable multi-core plugin (`server/parallel/`): each executor against the serial run it claims to equal | Real engine objects and `seed_data/*.json`, worker processes and threads; each test pins the backend it compares on | 304 |
 | **lockstep** | `tests/lockstep/` | Petacat's decision traces against Metacat's: naming, helper conformance, tracing/replay RNGs, determinism guards, the comparer | Real engine in faithful mode (numeric backend off, or a named backend); recorded Metacat traces | 247 |
@@ -266,7 +266,7 @@ first**, then move up toward the API and GUI.
 
 All eight layers run in one command — the
 [required command](#the-required-command) — and, since Petacat runs natively, all
-eight actually run: **6,449 cases**, every one of them executed. A layer that is
+eight actually run: **6,483 cases**, every one of them executed. A layer that is
 normally skipped is not a layer that is normally green, and none of these is.
 
 Wall-clock time depends heavily on the machine and on what else it is doing. The
@@ -524,6 +524,7 @@ changing what it records.
 | `test_commentary.py` | 7 | The emit helpers that render from the seeded commentary templates |
 
 | `test_episodic_memory.py` | 21 | Reminding, comparison and the reminding distance, which resolve the seeded templates and the seeded conceptual depths |
+| `test_every_moved_value_reaches_its_site_n.py` | 4 | Round 2, stage N: the ten values the numeric literal guard found and moved (the nine commentary bands in `engine_params`, and `local_support_number_denominator_floor`) reach their sites: today's value is the old literal in its old form, a missing key stops the run at its start, and the site called with the key changed gives another result |
 | `test_every_moved_value_reaches_its_site_b.py` | 11 | Round 2, stage 5 (group B): every value moved into the database from the run, the codelet bodies' builtins, self-watching, memory, justify and the random stream reaches a run: one key changed, a run that reaches its site differs (40 rows, a chain of runs for the answer distance, direct tests for the five sites no run reaches in reasonable time and for the two generators' `~`), today's value is the old literal in its old form, and each key is on the declared read list |
 | `test_every_moved_policy_reaches_its_site.py` | 7 | Stage 6: for every member of every policy role that moved into `roles.json` (the ten sets of dimensions, `descriptor.generic`, the six `image_operation.*` roles), dropping the binding changes a run (or, for the four sites no demo problem reaches, the site called directly); the dispatch follows a rebinding, not a node name |
 | `test_fallback_instrumentation.py` | 4 | The silent-fallback observer (EN0, `tests/support/fallback_instrumentation.py`) sees the three blanket `except Exception` blocks of `justify.py` and a lookup of an absent Slipnet node, and changes nothing else; `scripts/count_silent_fallbacks.py` makes the count over the whole baseline set |
@@ -547,7 +548,7 @@ changing what it records.
 | `test_role_identity.py` | 13 | Role identity (gate G5): the role-to-literal table against the Metacat Standard Configuration, the engine's ordered constants and `role_identity_today.json`; and, since EN3, every role resolved through `slipnet.roles` is the node (or codelet type) the old literal finds, the ordered roles equal the old tuples, and the ladder and alphabet (the nodes with a `numeric_value` or a `glyph`) equal the old lists |
 | `test_roles.py` | 20 | The role mechanism (EN3): the vocabulary against the role table and `roles.json`; the `Absent` token (falsy, frozen, one per role, identical only to itself, node-shaped); `Roles` never holds `None`; resolution skips unknown role names and missing targets; the run-start check (I-1, I-2) and its declared read list; and the G9 skeleton, building the Slipnet and resolving roles on every reduced configuration |
 | `test_rule_english.py` | 10 | A rule's English against Metacat 1.2's own `transcribe-to-english` output: 463 recorded rule shapes, each string state, wrapping, articles, and the text kept from the moment the rule was made |
-| `test_snag_explanation.py` | 20 | A snag's explanation against Metacat 1.2's `get-explanation` (`trace.ss:1097-1125`): every branch of the failure-result, the object phrases, the commentary lines, the template-driven wording, and the fallback for a snag with no stored explanation |
+| `test_snag_explanation.py` | 20 | A snag's explanation against Metacat 1.2's `get-explanation` (`trace.ss:1097-1125`): every branch of the failure-result, the object phrases, the commentary lines, the template-driven wording, and the old sentence built when a failure has no Metacat sentence |
 | `test_rule_quality.py` | 13 | Rule uniformity, abstractness and succinctness against the Scheme's formulas, hand-computed from the seeded depths |
 | `test_every_moved_value_reaches_its_site_a.py` | 8 | Stage 5, group A: each of the 76 formula coefficients that replaced a literal in the structure, formula, perception, rule, Themespace, trace and numeric files carries the old literal in its old type, is on the declared read list, and is read by its site: a real run (`moved_values_runs_a.json`) differs when the key changes, or the site is called directly where no run reaches it (a guard for an input a run never builds); the numeric backends read `clamped_salience`, the thematic pull targets and `average_unhappiness_empty` from the configuration |
 | `test_slipnet_link_lengths.py` | 6 | The Slipnet's link lengths against the reference Scheme |
@@ -604,6 +605,7 @@ changing what it records.
 | `test_declared_read_list.py` | 9 | EN10: every literal name passed to `get_param`, `get_formula_coeff` or `get_urgency` in `server/` is on the declared read list, and every declared name exists in the Metacat Standard Configuration; and the converse (stage W): every name stored in `engine_params`, `formula_coefficients` and `urgency_levels` is read, by an accessor, a codelet body, or (for a tier) a posting rule, a codelet pattern, a level-naming parameter or the clamp background, with no list of exceptions |
 | `test_journal_only_writer.py` | 10 | C6: only the journal layer writes a configuration or journal table (an AST check over the table list from model introspection), the checker on planted snippets, the two doors `write_immediate` and `write_deferred`, and nothing in `engine/` or `parallel/` imports the journal |
 | `test_no_node_literals_in_engine.py` | 5 | The EN0 lint: no line of `server/engine/**` names a node or codelet type of the Metacat Standard Configuration (`plato-` literals and compositions, `name[6:]`, node names, codelet types), and none reads the seed files outside the one door (`MetadataProvider.from_standard_configuration`); a read anywhere else, even in `metadata.py`, is caught. The allow-list `no_node_literals_allowlist.txt` is empty and may only shrink: an entry that no longer matches fails, and a new violation cannot be added to it |
+| `test_numeric_literals.py` | 3 | Round 2, stage N (ruling 53): no `int` or `float` literal in `server/engine/` or `server/parallel/` outside an allow-list (keyed by file, enclosing function and literal, with a count, a class `UNIT` or `NONCOG-KEEP`, and a reason); the only exempt shapes are a constant index and a constant slice bound; the table is strict in both directions and every reason is defined and used |
 | `test_no_policy_in_engine.py` | 3 | Stage 6: the engine does not decide by concept where the configuration can say: no set of dimensions spelled as an `or` of role questions, no table keyed by two or more bridge types, string kinds, theme types or rule types, no comparison against one bridge type or string kind (outside the formats that write them), no initial description built outside `initial_program.py` (a group's only other is the probabilistic Length description) |
 | `test_parallel_detachable.py` | 5 | Nothing under `server/engine/**` imports the parallel plugin, and a serial run and the service layer work in an interpreter where `server.parallel` cannot be imported; a Training Mode Session run there chooses the serial executor and produces the plugin's runs, run for run. The session test uses a database of its own, `petacat_detached`, created on demand (drop it with `dropdb --if-exists petacat_detached`; `DETACHED_DATABASE_NAME` renames it for a second session); it cannot be pointed at `petacat_test` or at `TEST_DATABASE_URL`'s database, and a guard test holds that |
 | `test_v2_guards.py` | 8 | C10: the engine tree is the baseline commit's, touched after EN11 only by the allowed packages; the retired term for the Starting Conceptual State is used nowhere, and the word for a session's Episodic Memory class means nothing else (with the checker seen catching planted words); no table named for the old session entity and no `session_id` column on `runs`; the worker-side code never imports the journal layer |

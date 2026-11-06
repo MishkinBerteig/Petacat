@@ -372,7 +372,7 @@ class WorkspaceObject:
         string = self.string
         if string is None:
             return False
-        return self.right_string_pos - self.left_string_pos + 1 == getattr(string, "length", 0)
+        return self.right_string_pos - self.left_string_pos + 1 == string.length
 
     def string_spanning_group(self) -> bool:
         """Scheme: ``string-spanning-group?`` (workspace-objects.ss:353-354)."""
@@ -416,7 +416,7 @@ class WorkspaceObject:
         string = self.string
         if string is None:
             return False
-        return self.right_string_pos == getattr(string, "length", 1) - 1
+        return self.right_string_pos == string.length - 1
 
     def get_nesting_level(self) -> int:
         """For groups, recursive nesting depth.
@@ -467,7 +467,7 @@ class WorkspaceObject:
         """
         total = Fraction(0)
         for d in self.get_relevant_descriptions():
-            total = total + exact_fraction(getattr(d, "descriptor_activation", 0))
+            total = total + exact_fraction(d.descriptor_activation)
         rc = constants()
         cap = rc.max_raw_importance_exact
         # ``min(cap, total)``: *cap* unless *total* is strictly smaller.  Compared by
@@ -496,7 +496,7 @@ class WorkspaceObject:
         for d in self.descriptions:
             if not _description_is_relevant(d):
                 continue
-            value = getattr(d, "descriptor_activation", 0)
+            value = d.descriptor_activation
             kind = type(value)
             if kind is float:
                 n, m = value.as_integer_ratio()
@@ -528,7 +528,7 @@ class WorkspaceObject:
         a caller that supplies its own.
         """
         total = sum(
-            getattr(d, "descriptor_activation", 0) for d in self.get_relevant_descriptions()
+            d.descriptor_activation for d in self.get_relevant_descriptions()
         )
         rc = constants()
         raw = min(rc.max_raw_importance, total)
@@ -545,9 +545,7 @@ class WorkspaceObject:
             self.intra_string_unhappiness = rc.intra_unhappiness_spanning
             return
         if self.enclosing_group is not None:
-            self.intra_string_unhappiness = 100.0 - getattr(
-                self.enclosing_group, "strength", 0
-            )
+            self.intra_string_unhappiness = 100.0 - self.enclosing_group.strength
             return
 
         bonds = self.get_incident_bonds()
@@ -557,11 +555,11 @@ class WorkspaceObject:
             # ``x * numerator / denominator``: with a numerator of 1 this is ``x / 3``.
             factor = constants().edge_object_bond_factor_exact
             self.intra_string_unhappiness = 100.0 - round(
-                getattr(bonds[0], "strength", 0) * factor.numerator / factor.denominator
+                bonds[0].strength * factor.numerator / factor.denominator
             )
         else:
             factor = constants().interior_object_bond_factor_exact
-            total = sum(getattr(b, "strength", 0) for b in bonds)
+            total = sum(b.strength for b in bonds)
             self.intra_string_unhappiness = 100.0 - round(
                 total * factor.numerator / factor.denominator
             )
@@ -730,16 +728,14 @@ class WorkspaceObject:
         """
         bridge = self.horizontal_bridge if horizontal else self.vertical_bridge
         if bridge is not None:
-            return 100.0 - getattr(bridge, "strength", 0)
+            return 100.0 - bridge.strength
         # Check enclosing group's bridge
         if self.enclosing_group is not None:
             eg_bridge = (getattr(self.enclosing_group, "horizontal_bridge", None)
                          if horizontal
                          else getattr(self.enclosing_group, "vertical_bridge", None))
             if eg_bridge is not None:
-                return 100.0 - constants().enclosed_group_bridge_factor * getattr(
-                    eg_bridge, "strength", 0
-                )
+                return 100.0 - constants().enclosed_group_bridge_factor * eg_bridge.strength
         return constants().inter_unhappiness_unbridged
 
     def __repr__(self) -> str:

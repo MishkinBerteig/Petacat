@@ -110,5 +110,14 @@
   "perfect_rule_uniformity": 100,
   "default_max_codelets": 20000,
   "rough_count_few_threshold": 2,
-  "rough_count_some_threshold": 4
+  "rough_count_some_threshold": 4,
+  "commentary_discovery_emphatic_below": 30,
+  "commentary_discovery_emphatic_from": 85,
+  "commentary_discovery_bad_below": 60,
+  "commentary_justified_bad_below": 60,
+  "commentary_justified_extreme_from": 85,
+  "commentary_progress_little_below": 50,
+  "commentary_progress_some_below": 80,
+  "commentary_reminding_strong_above": 70,
+  "commentary_reminding_some_above": 30
 }

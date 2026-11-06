@@ -112,6 +112,15 @@ REQUIRED_ENGINE_PARAMETERS: tuple[tuple[str, str], ...] = (
     ("uniform_rule_importance", "run_binding.py (RunConstants); read in builtins.py, justify.py"),
     ("perfect_rule_uniformity", "run_binding.py (RunConstants); read in builtins.py, justify.py"),
     ("default_max_codelets", "run_service.py, swarm.py, training_mode_session_service.py, the client's run forms"),
+    ("commentary_discovery_emphatic_below", "run_binding.py (RunConstants); read in commentary.py"),
+    ("commentary_discovery_emphatic_from", "run_binding.py (RunConstants); read in commentary.py"),
+    ("commentary_discovery_bad_below", "run_binding.py (RunConstants); read in commentary.py"),
+    ("commentary_justified_bad_below", "run_binding.py (RunConstants); read in commentary.py"),
+    ("commentary_justified_extreme_from", "run_binding.py (RunConstants); read in commentary.py"),
+    ("commentary_progress_little_below", "run_binding.py (RunConstants); read in commentary.py"),
+    ("commentary_progress_some_below", "run_binding.py (RunConstants); read in commentary.py"),
+    ("commentary_reminding_strong_above", "run_binding.py (RunConstants); read in commentary.py"),
+    ("commentary_reminding_some_above", "run_binding.py (RunConstants); read in commentary.py"),
 )
 
 #: Engine parameters whose absence is defined, so a configuration without them still runs:
@@ -248,6 +257,7 @@ REQUIRED_FORMULA_COEFFICIENTS: tuple[tuple[str, str], ...] = (
     ("bond_degree_of_assoc_ceiling", "run_binding.py (RunConstants); read in bonds.py"),
     ("local_support_density_exponent", "run_binding.py (RunConstants); read in bonds.py, groups.py"),
     ("local_support_number_exponent", "run_binding.py (RunConstants); read in bonds.py, groups.py"),
+    ("local_support_number_denominator_floor", "run_binding.py (RunConstants); read in bonds.py, groups.py"),
     ("local_support_number_factor_ceiling", "run_binding.py (RunConstants); read in bonds.py, groups.py"),
     ("bond_local_support_unsupported", "run_binding.py (RunConstants); read in bonds.py"),
     ("bond_local_density_no_string", "run_binding.py (RunConstants); read in bonds.py"),

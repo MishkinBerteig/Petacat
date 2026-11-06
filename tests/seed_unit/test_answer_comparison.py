@@ -310,6 +310,8 @@ def test_only_themes_the_snag_lacked_count_as_snag_justified():
             theme_pattern={STRING_POSITION: "identity"},
             description=rule,
             rule_signature=signature,
+            translated_rule_signature=signature,
+            explanation="an explanation",
         )
     )
     assert snag_justified_themes(answer, memory) == [(BOND_FACET, "diff")]
@@ -336,6 +338,8 @@ def test_a_theme_the_snag_also_held_stays_unjustified():
             theme_pattern={BOND_FACET: "diff"},
             description=rule,
             rule_signature=signature,
+            translated_rule_signature=signature,
+            explanation="an explanation",
         )
     )
     assert snag_justified_themes(answer, memory) == []

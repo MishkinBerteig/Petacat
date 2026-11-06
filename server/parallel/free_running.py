@@ -273,7 +273,7 @@ class FreeRunningEngine:
                 # emptied just before the choice can make a freshly posted codelet look
                 # deleted too, which drops one opening codelet; the other order would
                 # run a deleted one.
-                generation = getattr(ctx.coderack, "generation", 0)
+                generation = ctx.coderack.generation
                 codelet = ctx.coderack.choose_and_remove(
                     ctx.temperature.value, ctx.rng, worker=index
                 )
@@ -296,7 +296,7 @@ class FreeRunningEngine:
                     # serialised families, so an answer-finder waiting on a snag's
                     # restart sees it; for the rest it narrows the window rather than
                     # closing it, since a codelet already executing cannot be recalled.
-                    if getattr(ctx.coderack, "generation", 0) != generation:
+                    if ctx.coderack.generation != generation:
                         with self._count_lock:
                             self._discarded += 1
                         continue
@@ -428,7 +428,7 @@ class FreeRunningEngine:
                 runner._answers.append(pending)
                 runner.status = STATUS_ANSWER_FOUND
                 ctx.run_ended = True
-                quality = float(getattr(ctx, "_pending_answer_quality", 0) or 0)
+                quality = float(ctx._pending_answer_quality)
             elif gave_up:
                 runner.status = STATUS_GAVE_UP
                 ctx.run_ended = True

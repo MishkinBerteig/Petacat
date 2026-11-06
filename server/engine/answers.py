@@ -346,7 +346,9 @@ def _whole_string_identity_concept_mapping(
 def _conceptual_depth(node_name: str, meta: Any) -> float:
     specs = getattr(meta, "slipnet_node_specs", None) or {}
     spec = specs.get(node_name)
-    return float(getattr(spec, "conceptual_depth", 0) or 0)
+    if spec is None:  # a configuration without the concept: it is not perceived, so it has no depth
+        return 0.0
+    return float(spec.conceptual_depth)
 
 
 def _relation_abstractness(relation: str, meta: Any) -> float:

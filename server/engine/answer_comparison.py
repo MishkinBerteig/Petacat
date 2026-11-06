@@ -224,22 +224,19 @@ def _lookup(dimension: str, themes: list[Theme]) -> Theme | None:
 def snag_explanation_for(
     answer: AnswerDescription,
     memory: EpisodicMemory | None,
-    templates: dict[str, Any],
 ) -> str:
     """Scheme: ``get-snag-explanation`` (``answers.ss:302-307``).
 
     Returns the explanation the snag description stored when the snag happened
     (``SnagDescription.explanation``, Metacat's sentence from ``trace.ss:1097``) -- the
-    very wording the commentary showed.  A snag with none recorded (a row written before
-    it was stored) falls back to ``caveat_templates.snag_explanation``; see
-    ``snag_explanation.snag_explanation_text``.
+    very wording the commentary showed.
     """
     from server.engine.snag_explanation import snag_explanation_text
 
     snag = memory.get_equivalent_snag(answer) if memory is not None else None
     if snag is None:
         return ""
-    return snag_explanation_text(snag, templates)
+    return snag_explanation_text(snag)
 
 
 def snag_justified_themes(
@@ -640,7 +637,7 @@ def conceptual_depth_lookup(meta: Any):
         spec = specs.get(group_name if name == group_token else name)
         if spec is None:
             return None
-        return float(getattr(spec, "conceptual_depth", 0) or 0)
+        return float(spec.conceptual_depth)
 
     return lookup
 
@@ -721,7 +718,7 @@ def explain_answer(
         unjustified_themes=unjustified,
         initial=initial,
         target=target,
-        snag_explanation=snag_explanation_for(answer, memory, templates),
+        snag_explanation=snag_explanation_for(answer, memory),
         add_caveats=True,
         the_strings=False,
         meta=meta,
@@ -909,8 +906,8 @@ class AnswerComparison:
         self.all_unjustified += [
             t for t in self.unjustified2 if t not in self.all_unjustified
         ]
-        self.snag_explanation1 = snag_explanation_for(self_answer, memory, templates)
-        self.snag_explanation2 = snag_explanation_for(other_answer, memory, templates)
+        self.snag_explanation1 = snag_explanation_for(self_answer, memory)
+        self.snag_explanation2 = snag_explanation_for(other_answer, memory)
 
         self.common_themes = [t for t in self.all_themes1 if t in self.all_themes2]
         common_dimensions = {d for d, _ in self.common_themes}

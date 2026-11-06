@@ -178,24 +178,20 @@ def explain_failure(
 def fallback_explanation(
     rule_english: str, target: str, templates: dict[str, Any] | None = None
 ) -> str:
-    """The pre-Metacat sentence, kept only for snags with no recorded explanation.
+    """The pre-Metacat sentence, used when a failure carries no Metacat sentence.
 
-    Used for rows written before the explanation was stored, and for the one failure
-    Petacat can raise that Metacat's rule application cannot (no image for a
-    reference object).  A rule's English is a list of lines, so run them on.
+    That is the one failure Petacat can raise that Metacat's rule application cannot (no
+    image for a reference object).  A rule's English is a list of lines, so run them on.
     """
     rule = "; ".join(line.strip() for line in rule_english.split("\n"))
     caveats = resolve_templates(templates).get("caveat_templates") or {}
     return _fill(caveats.get("snag_explanation", ""), rule=rule, target=target)
 
 
-def snag_explanation_text(snag: Any, templates: dict[str, Any] | None = None) -> str:
-    """Scheme ``(tell snag 'get-explanation)`` (``memory.ss:332``).
+def snag_explanation_text(snag: Any) -> str:
+    """Scheme ``(tell snag 'get-explanation)`` (``memory.ss:332``): the stored sentence.
 
-    The stored sentence; for a snag with none recorded, the fallback built from its
-    rule and target string.
-    """
-    if snag.explanation:
-        return snag.explanation
-    target = snag.problem[2] if len(snag.problem) > 2 else ""
-    return fallback_explanation(snag.description, target, templates)
+    The engine writes it when the snag happens (``builtins.py``, from the failure-result, or
+    from :func:`fallback_explanation` for the one failure Metacat's rule application cannot
+    raise), so every snag has one and nothing is rebuilt at read time."""
+    return snag.explanation

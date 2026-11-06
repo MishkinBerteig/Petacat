@@ -392,10 +392,11 @@ class MetadataProvider:
                 name=n["name"],
                 short_name=n["short_name"],
                 conceptual_depth=n["conceptual_depth"],
-                descriptor_predicate=n.get("descriptor_predicate"),
-                plain_name=n.get("plain_name"),
+                descriptor_predicate=n["descriptor_predicate"],
+                plain_name=n["plain_name"],
+                # Display and prose names: a node without one has none, and no run reads them.
                 glyph=n.get("glyph"),
-                numeric_value=n.get("numeric_value"),
+                numeric_value=n["numeric_value"],
                 full_name=n.get("full_name"),
                 cm_short_name=n.get("cm_short_name"),
                 article_an=n.get("article_an"),
@@ -410,8 +411,8 @@ class MetadataProvider:
                 from_node=lk["from_node"],
                 to_node=lk["to_node"],
                 link_type=lk["link_type"],
-                label_node=lk.get("label_node"),
-                link_length=lk.get("link_length"),
+                label_node=lk["label_node"],
+                link_length=lk["link_length"],
                 fixed_length=lk["fixed_length"],
             )
             for lk in links_data
@@ -439,10 +440,10 @@ class MetadataProvider:
                 name=c["name"],
                 family=c["family"],
                 phase=c["phase"],
-                description=c.get("description", ""),
-                source_file=c.get("source_file", ""),
-                source_line=c.get("source_line", 0),
-                execute_body=c.get("execute_body", ""),
+                description=c["description"],
+                source_file=c["source_file"],
+                source_line=c["source_line"],
+                execute_body=c["execute_body"],
             )
             for c in codelets_data
         }
@@ -453,14 +454,14 @@ class MetadataProvider:
             PostingRuleSpec(
                 codelet_type=pr["codelet_type"],
                 direction=pr["direction"],
-                urgency_level=pr.get("urgency_level"),
-                urgency_formula=pr.get("urgency_formula"),
+                urgency_level=pr["urgency_level"],
+                urgency_formula=pr["urgency_formula"],
                 posting_formula=pr["posting_formula"],
                 count_formula=pr["count_formula"],
-                count_values=pr.get("count_values"),
+                count_values=pr["count_values"],
                 condition=pr["condition"],
-                triggering_slipnodes=pr.get("triggering_slipnodes"),
-                rule_key=pr.get("rule_key", pr["codelet_type"]),
+                triggering_slipnodes=pr["triggering_slipnodes"],
+                rule_key=pr["rule_key"],
             )
             for pr in posting_data.get("posting_rules", [])
         ]
@@ -485,13 +486,13 @@ class MetadataProvider:
         demo_problems = [
             DemoProblem(
                 name=d["name"],
-                section=d.get("section", ""),
+                section=d["section"],
                 initial=d["initial"],
                 modified=d["modified"],
                 target=d["target"],
-                answer=d.get("answer"),
+                answer=d["answer"],
                 seed=d["seed"],
-                description=d.get("description", ""),
+                description=d["description"],
             )
             for d in demos_data
         ]
@@ -537,7 +538,7 @@ class MetadataProvider:
                 ordinal=r["ordinal"],
                 dimension_role=r["dimension_role"],
                 descriptor_source=r["descriptor_source"],
-                descriptor_role=r.get("descriptor_role"),
+                descriptor_role=r["descriptor_role"],
                 condition=r["condition"],
                 activate_descriptor=r["activate_descriptor"],
                 subject=r["subject"],
@@ -565,10 +566,10 @@ class MetadataProvider:
             ThemeRelationSpec(
                 name=r["name"],
                 ordinal=r["ordinal"],
-                node_name=r.get("node_name"),
-                abstractness=r.get("abstractness"),
-                description=r.get("description", ""),
-                role=r.get("role"),
+                node_name=r["node_name"],
+                abstractness=r["abstractness"],
+                description=r["description"],
+                role=r["role"],
             )
             for r in sorted(_load("theme_relations.json"), key=lambda r: r["ordinal"])
         )
@@ -583,39 +584,39 @@ class MetadataProvider:
             {"name": r.name, "role": r.role} for r in theme_relations
         ]
         link_types = tuple(
-            LinkTypeSpec(name=r["name"], behaviour=r.get("behaviour"))
+            LinkTypeSpec(name=r["name"], behaviour=r["behaviour"])
             for r in enum_rows.get("link_types", [])
         )
         string_kinds = tuple(
             StringKindSpec(
-                name=r["name"], role=r.get("role"), exists_at_start=bool(r.get("exists_at_start", True)),
+                name=r["name"], role=r["role"], exists_at_start=bool(r["exists_at_start"]),
             )
             for r in enum_rows.get("string_kinds", [])
         )
         bridge_types = tuple(
             BridgeTypeSpec(
                 name=r["name"],
-                role=r.get("role"),
-                from_string_kind=r.get("from_string_kind"),
-                to_string_kind=r.get("to_string_kind"),
-                orientation=r.get("orientation"),
-                theme_type=r.get("theme_type"),
+                role=r["role"],
+                from_string_kind=r["from_string_kind"],
+                to_string_kind=r["to_string_kind"],
+                orientation=r["orientation"],
+                theme_type=r["theme_type"],
             )
             for r in enum_rows.get("bridge_types", [])
         )
         rule_types = tuple(
-            RuleTypeSpec(name=r["name"], role=r.get("role"), bridge_type=r.get("bridge_type"))
+            RuleTypeSpec(name=r["name"], role=r["role"], bridge_type=r["bridge_type"])
             for r in enum_rows.get("rule_types", [])
         )
         clamp_types = tuple(
             ClampTypeSpec(
                 name=r["name"],
-                role=r.get("role"),
-                codelet_background_level=r.get("codelet_background_level"),
-                jootsing_factor=r.get("jootsing_factor"),
-                jootsing_only_when_latest=bool(r.get("jootsing_only_when_latest", False)),
-                progress_focus=r.get("progress_focus"),
-                codelet_patterns=tuple(r.get("codelet_patterns") or ()),
+                role=r["role"],
+                codelet_background_level=r["codelet_background_level"],
+                jootsing_factor=r["jootsing_factor"],
+                jootsing_only_when_latest=bool(r["jootsing_only_when_latest"]),
+                progress_focus=r["progress_focus"],
+                codelet_patterns=tuple(r["codelet_patterns"]),
             )
             for r in enum_rows.get("clamp_types", [])
         )
@@ -624,7 +625,7 @@ class MetadataProvider:
             for r in enum_rows.get("progress_focuses", [])
         )
         serialised_families = tuple(
-            r["name"] for r in enum_rows.get("codelet_families", []) if r.get("serialised")
+            r["name"] for r in enum_rows.get("codelet_families", []) if r["serialised"]
         )
 
         return cls(

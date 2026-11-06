@@ -840,9 +840,9 @@ class EngineRunner:
             self._answers.append(pending)
             ctx._pending_answer = None  # type: ignore[attr-defined]
             logger.info(">>> ANSWER FOUND: '%s' (quality=%.0f)", pending,
-                        getattr(ctx, "_pending_answer_quality", 0))
+                        ctx._pending_answer_quality)
             ctx.sink.on_answer(
-                ctx, pending, float(getattr(ctx, "_pending_answer_quality", 0) or 0)
+                ctx, pending, float(ctx._pending_answer_quality)
             )
             self.finish()
             # ``answers.ss:~84`` ends the run with ``(suspend)`` from *inside* the
@@ -1304,7 +1304,7 @@ class EngineRunner:
         spec = self.meta.slipnet_node_specs.get(node_name)
         return (spec.plain_name if spec is not None and spec.plain_name else node_name)
 
-    def _compute_posting_probability(self, rule: PostingRuleSpec | None) -> float:
+    def _compute_posting_probability(self, rule: PostingRuleSpec) -> float:
         """The probability of posting a codelet under *rule*.
 
         Scheme: coderack.ss:465-515.
@@ -1318,8 +1318,6 @@ class EngineRunner:
         formulas they duplicated are read.
         """
         ctx = self.ctx
-        if ctx is None or rule is None:
-            return 0.0
 
         # ``post-codelet-probability`` (``coderack.ss:470-473``) consults the codelet
         # type's clamp *before* any workspace-driven computation: a clamped type posts
@@ -1340,7 +1338,7 @@ class EngineRunner:
             rule.posting_formula, rule.codelet_type, PostingContext(ctx)
         )
 
-    def _compute_num_to_post(self, rule: PostingRuleSpec | None) -> int:
+    def _compute_num_to_post(self, rule: PostingRuleSpec) -> int:
         """How many codelets *rule* posts.
 
         Scheme: ``num-of-codelets-to-post`` (``coderack.ss:517-550``).
@@ -1355,11 +1353,9 @@ class EngineRunner:
         reference's ``stochastic-if*`` orders it, so the blurred draws land in the same
         place in the random stream.
         """
-        if self.ctx is None or rule is None:
-            return 1
         return evaluate_count_formula(rule, PostingContext(self.ctx))
 
-    def _compute_bottom_up_urgency(self, rule: PostingRuleSpec | None) -> int:
+    def _compute_bottom_up_urgency(self, rule: PostingRuleSpec) -> int:
         """The urgency *rule* posts at.
 
         Scheme: coderack.ss:575-590.
@@ -1369,10 +1365,7 @@ class EngineRunner:
         ``%low-urgency%``, ``%medium-urgency%`` and ``%extremely-low-urgency%``, so the tier is
         stored once, in ``urgency_levels``.
         """
-        ctx = self.ctx
-        if ctx is None:
-            return self.meta.get_urgency(self.meta.get_param("default_urgency_level"))
-        return evaluate_urgency(rule, PostingContext(ctx))
+        return evaluate_urgency(rule, PostingContext(self.ctx))
 
     def _post_top_down_codelets(self, batch: list[Codelet] | None = None) -> None:
         """Collect the cycle's top-down codelets into *batch*.

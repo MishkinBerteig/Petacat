@@ -141,7 +141,7 @@ class Bond(WorkspaceStructure):
         number_factor = min(
             rc.local_support_number_factor_ceiling,
             rc.local_support_number_factor_base
-            ** (1.0 / max(1, num_supporting ** rc.local_support_number_exponent)),
+            ** (1.0 / max(rc.local_support_number_denominator_floor, num_supporting ** rc.local_support_number_exponent)),
         )
         return round(adjusted_density * number_factor)
 
@@ -256,7 +256,7 @@ class Bond(WorkspaceStructure):
         string = self.string
         if string is None:
             return False
-        return self.right_object.right_string_pos == getattr(string, "length", 1) - 1
+        return self.right_object.right_string_pos == string.length - 1
 
     def get_incompatible_bridges(self, bridge_orientation: str) -> list[Any]:
         """Bridges this bond would contradict, on one orientation.

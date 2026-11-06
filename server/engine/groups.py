@@ -245,7 +245,7 @@ class Group(WorkspaceObject, WorkspaceStructure):
         number_factor = min(
             rc.local_support_number_factor_ceiling,
             rc.local_support_number_factor_base
-            ** (1.0 / max(1, num_supporting ** rc.local_support_number_exponent)),
+            ** (1.0 / max(rc.local_support_number_denominator_floor, num_supporting ** rc.local_support_number_exponent)),
         )
         return round(adjusted_density * number_factor)
 
@@ -521,7 +521,7 @@ def attach_length_description(group: Group) -> bool:
     # The node whose ``numeric_value`` is the group's length; none (a gapped ladder, or a
     # group longer than the ladder) means no Length description.
     descriptor = (
-        slipnet.alphabet.number_for(getattr(group, "length", 1)) if slipnet is not None else None
+        slipnet.alphabet.number_for(group.length) if slipnet is not None else None
     )
     if not length_type or descriptor is None:
         return False
