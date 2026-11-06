@@ -37,6 +37,20 @@ license change was authorised by Dr. Marshall directly (see
 > [Acknowledgements & License](#acknowledgements) below for credits and
 > licensing.
 
+## Three systems
+
+This project holds three systems, defined in [THE-THREE-SYSTEMS.md](THE-THREE-SYSTEMS.md):
+
+- **Metacat (Scheme, patched)** is our contribution back to Metacat. It preserves the original's intent
+  fully, fixes legitimate crashes and bugs, and does not change perception or cognition unless they are
+  broken because of a crash or a bug.
+- **Petacat (Metacat Mode)** is a 100% faithful port of patched Metacat, with a new GUI, a database and a
+  Python engine. The Metacat Standard Configuration manages all the perceptual and cognitive parameters,
+  so that you can "play with" scenarios on Metacat without changing code.
+- **Petacat (Training Mode)** uses the general architecture of Metacat as a starting point. It is the
+  foundation for a true machine learning system that can learn from, for example, LLM training text
+  corpora, with analogy-making as the foundation of the generation and learning loop.
+
 ## Two modes
 
 Petacat works in two modes, written as proper names, and the line between them is a

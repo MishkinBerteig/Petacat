@@ -66,6 +66,24 @@ Metacat means patched Metacat as opposed to Petacat.
 - A trace recorded from patched Metacat has a `revision` header ending `+known-failure-fixes`.
 - Every agent brief that records from or compares against Metacat must state this rule.
 
+## The three systems — MANDATORY
+
+[`THE-THREE-SYSTEMS.md`](THE-THREE-SYSTEMS.md) defines the project, and every document, plan and brief
+follows it. In short:
+
+- **Metacat (Scheme, patched)** is our contribution back to Metacat. It preserves the original's intent
+  fully, fixes legitimate crashes and bugs, and does not change perception or cognition unless they are
+  broken because of a crash or a bug.
+- **Petacat (Metacat Mode)** is a 100% faithful port of patched Metacat, with a new GUI, a database and a
+  Python engine. The Metacat Standard Configuration manages all the perceptual and cognitive parameters, so
+  that we can "play with" scenarios on Metacat without changing code.
+- **Petacat (Training Mode)** uses the general architecture of Metacat as a starting point. It is the
+  foundation for a true machine learning system that can learn from, for example, LLM training text
+  corpora, with analogy-making as the foundation of the generation and learning loop.
+
+Metacat models perception and cognition, and **its input parser is part of perception**. Metacat Mode
+applies the same parser, with its rules in the Metacat Standard Configuration. Training Mode does not use it.
+
 ## What each test is measured against — MANDATORY
 
 While the database and engine refactoring continues, and while the work is basic letter-string
@@ -81,6 +99,8 @@ ratchets and the golden baselines.
   Metacat Mode is held to low statistical variation.
 - **The user reviews any problem outside the ratchets where cognitive validity matters,** before that
   problem counts. An agent is not a judge of the solution space for letter-analogy problems.
+- **Metacat's input parser is a reference too.** Metacat Mode's parser is measured against patched
+  Metacat's, on every Unicode character.
 
 ## Modes and terminology — MANDATORY
 
@@ -96,6 +116,9 @@ Every doc, UI string, help topic, plan and decision must keep the distinction pe
     misnomer, not a Metacat concept, and is removed for v2.0 (UX, API, names and schema).
     It is unrelated to Training Mode Sessions, below.
 
+  Metacat Mode reads every problem through Metacat's input parser: uppercase is lowered, punctuation
+  separates strings, and a digit inside a string or a non-English letter gets "Invalid input!".
+
   Metacat Mode is permanently faithful to Metacat, and nothing in Training Mode affects it in
   any way.
 - **Training Mode** is every new extension since v1.2 that makes Petacat a novel
@@ -106,6 +129,7 @@ Every doc, UI string, help topic, plan and decision must keep the distinction pe
   - Each session has its own Episodic Memory and its own evolving configuration, starting
     from its Starting Conceptual State.
   - A session never reads or writes Metacat Mode's Episodic Memory, Slipnet or configuration.
+  - A session takes any UTF-8 text exactly as given. Metacat's input parser does not apply.
 
   The code, API, UI and docs all say Training Mode Session (`/api/training-mode/sessions`, the
   `training_mode_sessions` tables). The one table with an older prefix is
