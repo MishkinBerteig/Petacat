@@ -1460,7 +1460,7 @@ def _augment_bridge_at_build(ctx: EngineContext, bridge: Bridge) -> None:
         make_concept_mappings,
         platonic_length,
     )
-    horizontal = bridge.bridge_type != ctx.meta.vocabulary.bridge_type_vertical
+    horizontal = bridge.bridge_type not in ctx.meta.frame.vertical_names
 
     if horizontal:
         object_category = _bound(ctx.slipnet.roles.dimension_object_category)

@@ -46,7 +46,9 @@ async def test_the_list_endpoint_returns_the_available_roles_per_table(app_clien
     assert roles["bridge_types"]["roles"] == ["bridge_type.top", "bridge_type.bottom", "bridge_type.vertical"]
     assert "run_statuses" not in roles  # the engine names none of its rows
     extra = {t: [c["name"] for c in cols] for t, cols in data["columns"].items()}
-    assert extra["bridge_types"] == ["role"]
+    assert extra["bridge_types"] == ["role", "from_string_kind", "to_string_kind", "orientation", "theme_type"]
+    assert extra["string_kinds"] == ["role", "exists_at_start"]
+    assert extra["rule_types"] == ["role", "bridge_type"]
     assert extra["link_types"] == ["behaviour"]
     assert extra["codelet_families"] == ["serialised"]
     assert extra["progress_focuses"] == ["event_types"]
@@ -105,10 +107,15 @@ async def test_a_bound_row_is_not_deleted_until_it_is_unbound(clean):
     resp = await clean.delete("/api/admin/enums/link_types/lateral")
     assert resp.status_code == 422 and "role_bound" in resp.json()["detail"]
     # unbind (role to null), then it is an ordinary row: the foreign keys still guard it
-    resp = await clean.put("/api/admin/enums/bridge_types/top", json={"display_label": "Top", "role": None})
+    resp = await clean.put("/api/admin/enums/bridge_types/vertical", json={"display_label": "Vertical", "role": None})
     assert resp.status_code == 200 and resp.json()["role"] is None
-    assert (await clean.delete("/api/admin/enums/bridge_types/top")).status_code == 200
-    assert "top" not in await _rows(clean, "bridge_types")
+    assert (await clean.delete("/api/admin/enums/bridge_types/vertical")).status_code == 200
+    assert "vertical" not in await _rows(clean, "bridge_types")
+    # a bridge type a rule type describes is guarded even once unbound (the frame's rows name each other)
+    resp = await clean.put("/api/admin/enums/bridge_types/top", json={"display_label": "Top", "role": None})
+    assert resp.status_code == 200
+    resp = await clean.delete("/api/admin/enums/bridge_types/top")
+    assert resp.status_code == 409 and "rule_types" in resp.json()["detail"]
 
 
 @pytest.mark.asyncio

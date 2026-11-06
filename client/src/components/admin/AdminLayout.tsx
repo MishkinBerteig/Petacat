@@ -6,6 +6,7 @@ import { CodeletEditor } from './CodeletEditor'
 import { ParamsEditor } from './ParamsEditor'
 import { DemoEditor } from './DemoEditor'
 import { EnumEditor } from './EnumEditor'
+import { InitialProgramEditor } from './InitialProgramEditor'
 import { ThemeDimensionEditor } from './ThemeDimensionEditor'
 import { PostingRuleEditor } from './PostingRuleEditor'
 import { CommentaryTemplateEditor } from './CommentaryTemplateEditor'
@@ -36,6 +37,7 @@ const TABS = [
   { key: 'enums', label: 'Enum Tables' },
   { key: 'theme-dims', label: 'Theme Dimensions' },
   { key: 'posting', label: 'Posting Rules' },
+  { key: 'initial-program', label: 'Initial Descriptions' },
   { key: 'commentary', label: 'Commentary Templates' },
   { key: 'layout', label: 'Slipnet Layout' },
   { key: 'help', label: 'Help Topics' },
@@ -290,6 +292,7 @@ export function AdminLayout({ editNodeName, onClearEditNode }: AdminLayoutProps)
               {activeTab === 'enums' && <EnumEditor />}
               {activeTab === 'theme-dims' && <ThemeDimensionEditor configuration={openId} />}
               {activeTab === 'posting' && <PostingRuleEditor configuration={openId} />}
+              {activeTab === 'initial-program' && <InitialProgramEditor configuration={openId} />}
               {activeTab === 'commentary' && <CommentaryTemplateEditor configuration={openId} />}
               {activeTab === 'layout' && <SlipnetLayoutEditor configuration={openId} />}
               {activeTab === 'help' && <HelpTopicEditor />}

@@ -72,8 +72,57 @@ sys.meta_path.insert(0, _Detached())
 """
 
 
+#: A database of this module's own, created on demand like ``petacat_step0`` (ruling 62).  The test
+#: drops and re-creates its schema, so it must never be pointed at ``petacat_test`` or at whatever
+#: ``TEST_DATABASE_URL`` names: the e2e layer holds those under an advisory lock.
+#: ``DETACHED_DATABASE_NAME`` may rename it (it must still start ``petacat_detached``), so two sessions
+#: run side by side can each have one.
+DETACHED_DB_NAME = os.environ.get("DETACHED_DATABASE_NAME", "petacat_detached")
+assert DETACHED_DB_NAME.startswith("petacat_detached"), DETACHED_DB_NAME
+_SHARED_DEFAULT = "postgresql+asyncpg://petacat:dev@localhost:5432/petacat_test"
+
+
+def _server_url() -> str:
+    """The Postgres server the tests use, without a database name."""
+    return os.environ.get("TEST_DATABASE_URL", _SHARED_DEFAULT).rsplit("/", 1)[0]
+
+
+def _detached_database_url() -> str | None:
+    """The URL of ``petacat_detached``, creating the database if it is not there; ``None`` when the
+    server is not reachable.  Refuses a name that is the shared test database."""
+    import asyncio
+
+    shared = os.environ.get("TEST_DATABASE_URL", _SHARED_DEFAULT).rsplit("/", 1)[1]
+    assert DETACHED_DB_NAME not in (shared, "petacat_test"), (
+        "this test's database must not be the shared test database")
+    from sqlalchemy import text
+    from sqlalchemy.ext.asyncio import create_async_engine
+    from sqlalchemy.pool import NullPool
+
+    async def create() -> bool:
+        engine = create_async_engine(_server_url() + "/postgres", isolation_level="AUTOCOMMIT", poolclass=NullPool)
+        try:
+            async with engine.connect() as conn:
+                found = await conn.execute(
+                    text("SELECT 1 FROM pg_database WHERE datname = :n"), {"n": DETACHED_DB_NAME})
+                if found.fetchone() is None:
+                    await conn.execute(text(f'CREATE DATABASE "{DETACHED_DB_NAME}"'))
+            return True
+        except Exception:
+            return False
+        finally:
+            await engine.dispose()
+
+    return _server_url() + "/" + DETACHED_DB_NAME if asyncio.run(create()) else None
+
+
 def _run_detached(body: str) -> subprocess.CompletedProcess:
     env = dict(os.environ)
+    url = _detached_database_url()
+    if url is not None:
+        env["DETACHED_DATABASE_URL"] = url
+    else:
+        env.pop("DETACHED_DATABASE_URL", None)
     env["PYTHONPATH"] = REPO_ROOT + os.pathsep + env.get("PYTHONPATH", "")
     env.setdefault("PETACAT_NUMERIC_BACKEND", "off")
     return subprocess.run(
@@ -145,10 +194,16 @@ for task in tasks:
     out[f"exec/{task.target}/{task.seed}"] = [o.status, o.answer, o.codelets]
 executor.close()
 
-# The whole service, when the test database is reachable.
+# The whole service, when this module's own database is reachable.
 async def service():
     import socket
-    url = os.environ.get("TEST_DATABASE_URL", "postgresql+asyncpg://petacat:dev@localhost:5432/petacat_test")
+    url = os.environ.get("DETACHED_DATABASE_URL")
+    if not url:
+        return
+    # the schema is dropped below: refuse the shared test database, whatever the environment says
+    name = url.rsplit("/", 1)[1]
+    shared = os.environ.get("TEST_DATABASE_URL", "").rsplit("/", 1)[-1]
+    assert name.startswith("petacat_detached") and name not in ("petacat_test", shared), name
     try:
         host_port = url.split("@")[1].split("/")[0]
         host, _, port = host_port.partition(":")
@@ -241,3 +296,17 @@ print("RESULT", json.dumps(out))
     assert reference.returncode == 0, reference.stderr[-3000:]
     want = json.loads(reference.stdout.split("RESULT ", 1)[1])
     assert out == want
+
+
+def test_this_module_never_names_the_shared_test_database() -> None:
+    """A guard (ruling 62): the only database this file passes to its child is ``petacat_detached``,
+    and nothing here reads ``TEST_DATABASE_URL`` for the database to wipe."""
+    import re
+
+    source = open(__file__).read()
+    assert DETACHED_DB_NAME.startswith("petacat_detached")
+    # the child reads DETACHED_DATABASE_URL only; the shared URL appears only to be refused
+    child = source.split('async def service():', 1)[1].split('asyncio.run(service())', 1)[0]
+    assert 'os.environ.get("DETACHED_DATABASE_URL")' in child
+    assert not re.search(r'os\.environ\.get\("TEST_DATABASE_URL"\s*,\s*"postgresql', child)
+    assert "drop_all" in child and 'name.startswith("petacat_detached")' in child

@@ -370,6 +370,11 @@ REQUIRED_VOCABULARY_ROLES: tuple[tuple[str, str], ...] = (
         ("posting_direction.top_down", "the top-down posting loop"),
         ("posting_direction.thematic", "the thematic posting loop"),
     )
+    + tuple(
+        (spec.name, "the four-string frame is derived from this row (server/engine/frame.py)")
+        for spec in VOCABULARY
+        if spec.name.startswith(("string_kind.", "bridge_type.", "bridge_orientation.", "rule_type."))
+    )
 )
 
 
@@ -449,6 +454,30 @@ def check_run_start(meta: Any) -> tuple[StartProblem, ...]:
     for role_name, where in REQUIRED_VOCABULARY_ROLES:
         if role_name not in bound:
             problems.append(StartProblem("I-1", "vocabulary role", role_name, where))
+
+    # The four-string frame is derived from the rows of three tables: each bridge type joins two
+    # kinds of string that exist, and each rule type describes a bridge type that exists.
+    kinds = {k.name for k in meta.string_kinds}
+    bridges = {b.name for b in meta.bridge_types}
+    for b in meta.bridge_types:
+        for column, value in (("from_string_kind", b.from_string_kind), ("to_string_kind", b.to_string_kind)):
+            if value not in kinds:
+                problems.append(StartProblem(
+                    "I-1", "frame row", b.name, f"bridge_types.{column} {value!r} is no string kind"))
+        for column, value in (("orientation", b.orientation), ("theme_type", b.theme_type)):
+            if not value:
+                problems.append(StartProblem("I-1", "frame row", b.name, f"bridge_types.{column} is empty"))
+    for r in meta.rule_types:
+        if r.bridge_type not in bridges:
+            problems.append(StartProblem(
+                "I-1", "frame row", r.name, f"rule_types.bridge_type {r.bridge_type!r} is no bridge type"))
+
+    # The initial-description program names conditions from the engine's closed set
+    # (``initial_program.py``); a name outside it cannot be run.
+    from server.engine.initial_program import problems as initial_program_problems
+
+    for table, rule_key, what in initial_program_problems(meta):
+        problems.append(StartProblem("I-1", "initial-program rule", rule_key, f"{table}: {what}"))
 
     opening_types = meta.get_param("initial_codelet_types") or []
     if not any(t in meta.codelet_specs for t in opening_types) and not meta.posting_rules:

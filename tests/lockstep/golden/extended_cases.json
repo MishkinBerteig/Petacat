@@ -2990,6 +2990,154 @@
      }
     ]
    }
+  },
+  {
+   "id": "discovery/a-z-abc/s2-cap3000",
+   "kind": "discovery",
+   "problem": [
+    "a",
+    "z",
+    "abc"
+   ],
+   "seeds": [
+    2
+   ],
+   "cap": 3000,
+   "why": {
+    "engine_lines": 0,
+    "engine_arcs": 0,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [
+     "stage 6: a rule with an alphabetic-position change (first <-> last of the alphabet), so rule.letter_or_alphabetic_dimension and image_operation.new_alpha_position_category are read by a run; found by dropping each binding and comparing runs"
+    ],
+    "most_new_in": []
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 242,
+      "run_length": 242,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "discovery/abc-zbc-xyz/s4-cap3000",
+   "kind": "discovery",
+   "problem": [
+    "abc",
+    "zbc",
+    "xyz"
+   ],
+   "seeds": [
+    4
+   ],
+   "cap": 3000,
+   "why": {
+    "engine_lines": 0,
+    "engine_arcs": 0,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [
+     "stage 6: a rule with an alphabetic-position change (first <-> last of the alphabet), so rule.letter_or_alphabetic_dimension and image_operation.new_alpha_position_category are read by a run; found by dropping each binding and comparing runs"
+    ],
+    "most_new_in": []
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 511,
+      "run_length": 511,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "discovery/xyz-xya-zzz/s2-3-cap3000",
+   "kind": "discovery",
+   "problem": [
+    "xyz",
+    "xya",
+    "zzz"
+   ],
+   "seeds": [
+    2,
+    3
+   ],
+   "cap": 3000,
+   "why": {
+    "engine_lines": 0,
+    "engine_arcs": 0,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [
+     "stage 6: a rule with an alphabetic-position change (first <-> last of the alphabet), so rule.letter_or_alphabetic_dimension and image_operation.new_alpha_position_category are read by a run; found by dropping each binding and comparing runs"
+    ],
+    "most_new_in": []
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 2629,
+      "run_length": 2629,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     },
+     {
+      "reach": 652,
+      "run_length": 652,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "discovery/aab-zzb-aab/s2-cap3000",
+   "kind": "discovery",
+   "problem": [
+    "aab",
+    "zzb",
+    "aab"
+   ],
+   "seeds": [
+    2
+   ],
+   "cap": 3000,
+   "why": {
+    "engine_lines": 0,
+    "engine_arcs": 0,
+    "database_lines": 0,
+    "database_branch_arcs": 0,
+    "features": [
+     "stage 6: a rule with an alphabetic-position change (first <-> last of the alphabet), so rule.letter_or_alphabetic_dimension and image_operation.new_alpha_position_category are read by a run; found by dropping each binding and comparing runs"
+    ],
+    "most_new_in": []
+   },
+   "metacat": {
+    "match": true,
+    "replays": [
+     {
+      "reach": 1293,
+      "run_length": 1293,
+      "agreement": 1.0,
+      "errors": 0,
+      "differing_snapshots": 0
+     }
+    ]
+   }
   }
  ]
 }

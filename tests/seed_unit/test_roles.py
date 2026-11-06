@@ -52,7 +52,7 @@ def test_vocabulary_agrees_with_the_role_table_and_the_standard_configuration() 
     expected.update({r: (R.NODE, R.ORDERED) for r in ORDERED_ROLES})
     expected.update({r: (R.CODELET_TYPE, R.ONE) for r in CODELET_ROLES})
     assert ours == expected
-    assert len(R.ROLES) == 31
+    assert len(R.ROLES) == 49
     data = json.loads((SEED_DIR / "roles.json").read_text())
     bound = {b["role"] for b in data["node_roles"]} | {b["role"] for b in data["codelet_roles"]}
     assert bound == set(ours)
@@ -136,7 +136,9 @@ def test_every_node_of_the_standard_configuration_is_truthy(slipnet) -> None:
 def test_node_roles_are_the_role_names_the_node_holds(slipnet) -> None:
     held = slipnet.nodes[SINGLE_ROLES["dimension.direction"]].roles
     assert isinstance(held, frozenset)
-    assert held == {"dimension.direction", "rule.dimension_order", "answer.description_dimension"}
+    assert held == {"dimension.direction", "rule.dimension_order", "answer.description_dimension",
+                    "dimension.reverses_together", "rule.relation_only_dimension",
+                    "image_operation.reverse_direction"}
     assert slipnet.nodes[SINGLE_ROLES["dimension.direction"]].has_role("rule.dimension_order")
     assert slipnet.nodes["plato-a"].roles == frozenset()  # a letter holds no role
 

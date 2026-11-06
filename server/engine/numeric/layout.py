@@ -437,33 +437,45 @@ class ThemeParams:
 # Workspace object values
 # ---------------------------------------------------------------------------
 
-#: ``_string_type()`` returns one of these; the arithmetic that combines
-#: unhappiness and salience branches on it, so it travels as a small integer
-#: code rather than a string.  Anything unrecognised maps to ``OTHER``, which
-#: reproduces the reference's ``else`` branch.
+#: ``_string_type()`` names a kind of string; the arithmetic that combines unhappiness and
+#: salience branches on the *class* of kind, so it travels as a small integer code rather than
+#: a string.  The classes are what the frame says a kind maps (``Frame.facts``): both ways
+#: (``STRING_INITIAL``: the initial string), horizontally only (``STRING_MODIFIED``: the
+#: modified and the answer strings), vertically and, only when the run justifies, horizontally
+#: too (``STRING_TARGET``: the target string).  ``STRING_ANSWER`` is the code the backends
+#: also read as horizontal-only, kept so their branches stay as they are.  A kind of any other
+#: pattern, or a name that is none of the kinds, maps to ``OTHER``, which reproduces the
+#: reference's ``else`` branch.
 STRING_INITIAL = 0
 STRING_MODIFIED = 1
 STRING_TARGET = 2
 STRING_ANSWER = 3
 STRING_OTHER = 4
 
-def string_type_codes(vocab: Any) -> dict[str, int]:
-    """The code of each string kind of *vocab* (the run's vocabulary), by the kind's name."""
-    return {
-        vocab.string_kind_initial: STRING_INITIAL,
-        vocab.string_kind_modified: STRING_MODIFIED,
-        vocab.string_kind_target: STRING_TARGET,
-        vocab.string_kind_answer: STRING_ANSWER,
-    }
+
+def string_type_codes(frame: Any) -> dict[str, int]:
+    """The code of each string kind of *frame* (the run's), by the kind's name."""
+    codes: dict[str, int] = {}
+    for name in frame.kind_names:
+        maps_h, maps_v, needs = frame.facts(name)
+        if maps_h and maps_v and not needs:
+            codes[name] = STRING_INITIAL
+        elif maps_h and not maps_v and not needs:
+            codes[name] = STRING_MODIFIED
+        elif maps_v and needs and not maps_h:
+            codes[name] = STRING_TARGET
+        else:
+            codes[name] = STRING_OTHER
+    return codes
 
 
-def string_type_code(name: str | None, vocab: Any = None) -> int:
-    """The code of the string kind *name*; *vocab* defaults to the bound run's vocabulary."""
-    if vocab is None:
-        from server.engine.run_binding import vocab as run_vocab
+def string_type_code(name: str | None, frame: Any = None) -> int:
+    """The code of the string kind *name*; *frame* defaults to the bound run's."""
+    if frame is None:
+        from server.engine.run_binding import constants
 
-        vocab = run_vocab()
-    return string_type_codes(vocab).get(name or "", STRING_OTHER)
+        frame = constants().frame
+    return string_type_codes(frame).get(name or "", STRING_OTHER)
 
 
 @dataclass(frozen=True)
@@ -646,7 +658,7 @@ def gather_object_values(objects: Sequence[Any]) -> ObjectValueBatch:
     from server.engine.run_binding import constants
 
     k = constants()
-    codes = string_type_codes(k.vocab)
+    codes = k.string_codes
     horizontal = k.vocab.bridge_orientation_horizontal
     vertical = k.vocab.bridge_orientation_vertical
     return ObjectValueBatch(

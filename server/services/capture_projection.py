@@ -472,7 +472,7 @@ def project_themespace(state: dict, meta: Any) -> dict:
         **theme_display_labels(meta),
         # ``Themespace.possible_theme_types`` is a function of justify mode, which the
         # capture records under ``runner``.
-        "possible_theme_types": theme_types_for_mode(meta.vocabulary, justify_mode),
+        "possible_theme_types": theme_types_for_mode(meta.frame, justify_mode),
         "active_theme_types": active,
         "thematic_pressure": bool(active),
         "dominant_theme_margin": margin,

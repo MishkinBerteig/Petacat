@@ -256,4 +256,4 @@ def test_the_other_three_string_roles_do_not_depend_on_the_mode():
         rebind(themespace=_ModeThemespace(justify=justify))
         for role, expected in roles.items():
             d = _description(obj=FakeObject(string=FakeString(string_type=role)))
-            assert d.theme_types == expected
+            assert list(d.theme_types) == expected

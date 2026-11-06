@@ -476,9 +476,7 @@ def incompatible_bond_candidates(
         # Scheme: ``directed-group?`` (groups.ss:1050-1055).
         if not isinstance(obj, Group):
             return False
-        return holds_role(obj.group_category, "group_category.successor") or holds_role(
-            obj.group_category, "group_category.predecessor"
-        )
+        return holds_role(obj.group_category, "group_category.directed")
 
     d1, d2 = directed(object1), directed(object2)
 

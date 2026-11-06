@@ -54,6 +54,8 @@ const SPECS: Record<string, Spec> = {
   '/admin/demos': { table: 'demo_problems', surrogate: true },
   '/admin/theme-dimensions': { table: 'theme_dimension_defs', surrogate: true },
   '/admin/posting-rules': { table: 'posting_rules', surrogate: true },
+  '/admin/initial-description-rules': { table: 'initial_description_rules', surrogate: true },
+  '/admin/initial-activation-rules': { table: 'initial_activation_rules', surrogate: true },
   '/admin/commentary-templates': { table: 'commentary_templates', surrogate: true },
   '/admin/slipnet-layout': { table: 'slipnet_layout' },
 }

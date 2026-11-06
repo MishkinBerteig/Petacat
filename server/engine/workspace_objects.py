@@ -18,12 +18,12 @@ if TYPE_CHECKING:
 
 def _is_generic_descriptor(descriptor: Any) -> bool:
     """A node that never distinguishes anything: a number (a node with a ``numeric_value``), or
-    the holder of the ``object.letter`` or ``object.group`` role.  Matches ``*slipnet-numbers*``
-    plus ``plato-letter`` and ``plato-group`` in the Scheme source."""
+    a node bound to ``descriptor.generic`` (``plato-letter`` and ``plato-group`` in the Metacat
+    Standard Configuration).  Matches ``*slipnet-numbers*`` plus those two in the Scheme source."""
     if getattr(descriptor, "numeric_value", None) is not None:
         return True
     has_role = getattr(descriptor, "has_role", None)
-    return callable(has_role) and (has_role("object.letter") or has_role("object.group"))
+    return callable(has_role) and bool(has_role("descriptor.generic"))
 
 
 class WorkspaceObject:
@@ -871,10 +871,11 @@ def _description_is_relevant(d: Any) -> bool:
 
 
 def _is_sameness_bond(bond: Any) -> bool:
-    """True if the bond's category is sameness."""
+    """True if the bond's category is symmetric (``bond_category.symmetric``: sameness, which
+    ``add-bond`` files under both ends)."""
     cat = getattr(bond, "bond_category", None)
     has_role = getattr(cat, "has_role", None)
-    return bool(has_role("bond_category.sameness")) if callable(has_role) else False
+    return bool(has_role("bond_category.symmetric")) if callable(has_role) else False
 
 
 class Letter(WorkspaceObject):

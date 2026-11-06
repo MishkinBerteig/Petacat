@@ -103,38 +103,11 @@ def selection_weights(
 # numeric phases would be an odd thing to leave half-built.
 
 
-def string_kind_facts(string_type: str, voc: Any) -> tuple[bool, bool, bool, int]:
-    """What a string of kind *string_type* does, from the run's vocabulary *voc*.
-
-    Returns ``(maps_horizontal, maps_vertical, horizontal_needs_justify, slot)``:
-
-    * an initial string maps both ways (a bridge to the modified and one to the target);
-    * a modified string and an answer string map horizontally only;
-    * a target string maps vertically, and horizontally (to the answer) only when the run
-      justifies, hence ``horizontal_needs_justify``;
-    * a name that is none of the four maps nowhere.
-
-    ``slot`` is the small integer the numeric backends use for the kind: 0 initial,
-    1 modified, 2 target, 3 answer, 4 anything else.  Scheme: the four ``cond`` ladders of
-    ``workspace-objects.ss:457-587``.
-    """
-    if string_type == voc.string_kind_initial:
-        return True, True, False, 0
-    if string_type == voc.string_kind_modified:
-        return True, False, False, 1
-    if string_type == voc.string_kind_target:
-        return False, True, True, 2
-    if string_type == voc.string_kind_answer:
-        return True, False, False, 3
-    return False, False, False, 4
-
-
 _KIND_FACT_NAMES = frozenset(
     {
         "maps_horizontal",
         "maps_vertical",
         "horizontal_needs_justify",
-        "slot",
         "orientation_horizontal",
         "orientation_vertical",
     }
@@ -150,22 +123,21 @@ class WorkspaceString:
         "maps_horizontal",
         "maps_vertical",
         "horizontal_needs_justify",
-        "slot",
         "orientation_horizontal",
         "orientation_vertical",
         "__dict__",
     )
 
     def _set_kind_facts(self, voc: Any) -> None:
-        """Work out, from the run's vocabulary, what this string's kind means (see
-        :func:`string_kind_facts`) and the run's names for the two orientations, which key
-        its objects' ``inter_string_unhappiness``."""
+        """Work out, from the run's frame, what this string's kind means (``Frame.facts``: an
+        initial string maps both ways, a modified or answer string horizontally, a target string
+        vertically and, when justifying, horizontally too) and the run's names for the two
+        orientations, which key its objects' ``inter_string_unhappiness``."""
         (
             self.maps_horizontal,
             self.maps_vertical,
             self.horizontal_needs_justify,
-            self.slot,
-        ) = string_kind_facts(self.string_type, voc)
+        ) = constants().frame.facts(self.string_type)
         self.orientation_horizontal = voc.bridge_orientation_horizontal
         self.orientation_vertical = voc.bridge_orientation_vertical
 
@@ -371,7 +343,7 @@ class WorkspaceString:
         Scheme: ``get-equivalent-bond`` (workspace-strings.ss:129-137) — same
         from-object, same to-object, same category, same direction.
 
-        A **sameness** bond is additionally symmetric: ``add-bond``
+        A **symmetric** bond (``bond_category.symmetric``: sameness) is additionally symmetric: ``add-bond``
         (workspace-strings.ss:168-172) files one under both ``(from, to)`` and
         ``(to, from)``, so the reference finds it whichever way round it is asked
         for.  It has to: ``j -> j`` and ``j -> j`` say the same thing, and the two
@@ -380,7 +352,7 @@ class WorkspaceString:
         the string, find no equivalent, and try to build into an occupied slot.
         """
         has_role = getattr(bond.bond_category, "has_role", None)
-        symmetric = bool(has_role("bond_category.sameness")) if callable(has_role) else False
+        symmetric = bool(has_role("bond_category.symmetric")) if callable(has_role) else False
         for existing in self.bonds:
             if (
                 existing.bond_category is not bond.bond_category
@@ -817,36 +789,19 @@ class Workspace:
         self.vertical_bridges: list[Bridge] = []
 
         #: Which list holds a bridge type's bridges, and which two strings it joins, resolved
-        #: once for the run from its vocabulary.  The values are *attribute names*, because
-        #: ``remove_bridge`` and the state-graph restore replace the lists and ``answer_string``.
-        #: A role nothing binds is an ``AbsentName`` that equals only itself, so two absent
-        #: roles are two keys and a lookup of any real name misses them.
-        self._bridge_list_attr: dict[str, str] = {
-            voc.bridge_type_top: "top_bridges",
-            voc.bridge_type_bottom: "bottom_bridges",
-            voc.bridge_type_vertical: "vertical_bridges",
-        }
+        #: once for the run from its frame (``engine/frame.py``, derived from ``bridge_types``).
+        #: The values are *attribute names*, because ``remove_bridge`` and the state-graph
+        #: restore replace the lists and ``answer_string``.  A role nothing binds is not in the
+        #: frame, so a lookup of any real name misses it.
+        frame = constants().frame
+        self._bridge_list_attr: dict[str, str] = {b.name: b.list_attr for b in frame.bridges}
         self._bridge_string_attrs: dict[str, tuple[str, str]] = {
-            voc.bridge_type_top: ("initial_string", "modified_string"),
-            voc.bridge_type_bottom: ("target_string", "answer_string"),
-            voc.bridge_type_vertical: ("initial_string", "target_string"),
+            b.name: (b.from_attr, b.to_attr) for b in frame.bridges
         }
-        self._bridge_strings_default: tuple[str, str] = ("initial_string", "target_string")
-        self._mapping_strength_attr: dict[str, str] = {
-            voc.bridge_type_top: "top_mapping_strength",
-            voc.bridge_type_bottom: "bottom_mapping_strength",
-            voc.bridge_type_vertical: "vertical_mapping_strength",
-        }
-        #: ``get_other_string``: the bridge-type or orientation names that send a string
-        #: across to its horizontal partner.
-        self._to_horizontal_partner_initial: tuple[str, str] = (
-            voc.bridge_type_top,
-            voc.bridge_orientation_horizontal,
+        self._bridge_strings_default: tuple[str, str] = frame.vertical_pair or (
+            "initial_string", "target_string"
         )
-        self._to_horizontal_partner_target: tuple[str, str] = (
-            voc.bridge_type_bottom,
-            voc.bridge_orientation_horizontal,
-        )
+        self._mapping_strength_attr: dict[str, str] = {b.name: b.strength_attr for b in frame.bridges}
 
         self.top_rules: list[Rule] = []
         self.bottom_rules: list[Rule] = []
@@ -1153,33 +1108,15 @@ class Workspace:
         # objects built later in the cycle do not move it before the next update.
         self._average_unhappiness = None
         self.get_average_unhappiness()
-        self.average_top_inter_string_unhappiness = (
-            self._average_inter_string_unhappiness(
-                self.initial_string, self.modified_string, voc.bridge_orientation_horizontal
+        # One mapping per bridge type of the frame, in its order; a bridge type whose far end is
+        # the answer string has one only when the run justifies.
+        frame = constants().frame
+        for b in (frame.justify_bridges if self.justify_mode else frame.discovery_bridges):
+            inter = self._average_inter_string_unhappiness(
+                getattr(self, b.from_attr), getattr(self, b.to_attr), b.orientation
             )
-        )
-        self.top_mapping_strength = self._mapping_strength_from_raw(
-            voc.bridge_type_top, 100.0 - self.average_top_inter_string_unhappiness
-        )
-
-        self.average_vertical_inter_string_unhappiness = (
-            self._average_inter_string_unhappiness(
-                self.initial_string, self.target_string, voc.bridge_orientation_vertical
-            )
-        )
-        self.vertical_mapping_strength = self._mapping_strength_from_raw(
-            voc.bridge_type_vertical, 100.0 - self.average_vertical_inter_string_unhappiness
-        )
-
-        if self.justify_mode:
-            self.average_bottom_inter_string_unhappiness = (
-                self._average_inter_string_unhappiness(
-                    self.target_string, self.answer_string, voc.bridge_orientation_horizontal
-                )
-            )
-            self.bottom_mapping_strength = self._mapping_strength_from_raw(
-                voc.bridge_type_bottom, 100.0 - self.average_bottom_inter_string_unhappiness
-            )
+            setattr(self, b.inter_attr, inter)
+            setattr(self, b.strength_attr, self._mapping_strength_from_raw(b.name, 100.0 - inter))
 
     def get_max_inter_string_unhappiness(self) -> float:
         """The worst of the mappings' unhappiness.
@@ -1190,22 +1127,21 @@ class Workspace:
         (``coderack.ss:547-549``).  It can legitimately be 0, which is the point:
         with the mappings settled the reference posts no thematic scouts at all.
         """
-        values = [
-            self.average_top_inter_string_unhappiness,
-            self.average_vertical_inter_string_unhappiness,
-        ]
-        if self.justify_mode:
-            values.append(self.average_bottom_inter_string_unhappiness)
-        return max(values)
+        frame = constants().frame
+        return max(
+            [getattr(self, b.inter_attr)
+             for b in (frame.justify_bridges if self.justify_mode else frame.discovery_bridges)]
+        )
 
     def get_min_mapping_strength(self) -> float:
         """Scheme: ``workspace.ss:522-528`` — the weakest mapping, over top and
         vertical, plus bottom when justifying.  Drives the bridge-scout posting
         probability, ``(100 - min)/100``."""
-        values = [self.top_mapping_strength, self.vertical_mapping_strength]
-        if self.justify_mode:
-            values.append(self.bottom_mapping_strength)
-        return min(values)
+        frame = constants().frame
+        return min(
+            [getattr(self, b.strength_attr)
+             for b in (frame.justify_bridges if self.justify_mode else frame.discovery_bridges)]
+        )
 
     def get_average_intra_string_unhappiness(self) -> float:
         """Workspace-level average intra-string unhappiness.
@@ -1495,55 +1431,38 @@ class Workspace:
         count, and the rule-scout itself.  The dict is still returned for callers
         that want the result directly.
         """
-        voc = run_vocab()
-        rule_top = voc.rule_type_top
-        rule_bottom = voc.rule_type_bottom
-        result = {rule_top: False, rule_bottom: False}
-
-        # Top rule: check if all letters in initial + modified are covered
-        # by rule-describable top bridges
-        top_describable = [b for b in self.top_bridges if self._rule_describable_bridge(b)]
-        if top_describable:
-            covered: set[int] = set()
-            for b in top_describable:
-                for ltr in self._get_bridge_covered_letters(b):
-                    covered.add(id(ltr))
-            all_top_letters = set(
-                id(ltr)
-                for ltr in self.initial_string.letters + self.modified_string.letters
-            )
-            result[rule_top] = all_top_letters.issubset(covered)
-
-        # Bottom rule: only checked when justifying (``workspace.ss:463-471``).
-        if self.justify_mode and self.answer_string is not None:
-            bottom_describable = [
-                b for b in self.bottom_bridges if self._rule_describable_bridge(b)
-            ]
-            if bottom_describable:
-                covered_b: set[int] = set()
-                for b in bottom_describable:
-                    for ltr in self._get_bridge_covered_letters(b):
-                        covered_b.add(id(ltr))
-                all_bottom_letters = set(
-                    id(ltr)
-                    for ltr in self.target_string.letters
-                    + (self.answer_string.letters if self.answer_string else [])
-                )
-                result[rule_bottom] = all_bottom_letters.issubset(covered_b)
-
-        self.top_rule_possible = result[rule_top]
-        self.bottom_rule_possible = result[rule_bottom]
+        # One check per rule type of the frame, in its order: all the letters of the pair of
+        # strings its bridge type joins covered by rule-describable bridges of that type.  A pair
+        # with the answer string is checked only when justifying (``workspace.ss:463-471``).
+        result: dict[str, bool] = {}
+        for rule in constants().frame.rules:
+            bridge = rule.bridge
+            from_string = getattr(self, bridge.from_attr)
+            to_string = getattr(self, bridge.to_attr)
+            possible = False
+            if not rule.needs_justify or (
+                self.justify_mode and from_string is not None and to_string is not None
+            ):
+                describable = [
+                    b for b in getattr(self, bridge.list_attr) if self._rule_describable_bridge(b)
+                ]
+                if describable:
+                    covered: set[int] = set()
+                    for b in describable:
+                        for ltr in self._get_bridge_covered_letters(b):
+                            covered.add(id(ltr))
+                    letters = set(
+                        id(ltr)
+                        for ltr in from_string.letters + (to_string.letters if to_string else [])
+                    )
+                    possible = letters.issubset(covered)
+            result[rule.name] = possible
+            setattr(self, rule.possible_attr, possible)
         return result
 
     def get_possible_rule_types(self) -> list[str]:
         """Scheme: ``workspace.ss:444-449``."""
-        voc = run_vocab()
-        types: list[str] = []
-        if self.top_rule_possible:
-            types.append(voc.rule_type_top)
-        if self.bottom_rule_possible:
-            types.append(voc.rule_type_bottom)
-        return types
+        return [r.name for r in constants().frame.rules if getattr(self, r.possible_attr)]
 
     def rule_established(self) -> bool:
         """Whether the temperature's rule factor should be 0.
@@ -1638,25 +1557,20 @@ class Workspace:
     def get_other_string(
         self, string: WorkspaceString, bridge_type: str
     ) -> WorkspaceString | None:
-        """Given a string and bridge type, return the partner string.
+        """Given a string and bridge type (or orientation), return the partner string.
 
-        Scheme: workspace.ss:161-172.
+        Scheme: workspace.ss:161-172.  The partner is the string across the bridge type the key
+        names (``Frame.other_kind``), derived from ``bridge_types``.
         """
-        if string is self.initial_string:
-            if bridge_type in self._to_horizontal_partner_initial:
-                return self.modified_string
-            else:  # vertical
-                return self.target_string
-        elif string is self.modified_string:
-            return self.initial_string
-        elif string is self.target_string:
-            if bridge_type in self._to_horizontal_partner_target:
-                return self.answer_string
-            else:  # vertical
-                return self.initial_string
-        elif string is self.answer_string:
-            return self.target_string
-        return None
+        frame = constants().frame
+        kind = getattr(string, "string_type", None)
+        attr = frame.string_attr.get(kind)
+        if attr is None or getattr(self, attr) is not string:
+            return None
+        other = frame.other_kind(kind, bridge_type)
+        if other is None:
+            return None
+        return getattr(self, frame.string_attr[other])
 
     # ------------------------------------------------------------------
     # Private helpers
@@ -1860,13 +1774,12 @@ def unmapped(obj: Any, justify_mode: bool = False) -> bool:
     What counts as mapped depends on the object's *string role*, because the four
     strings sit at different corners of the analogy: an initial-string object
     needs both a horizontal and a vertical bridge, a target-string object needs a
-    vertical one — and, when justifying, a horizontal one too.
+    vertical one — and, when justifying, a horizontal one too.  Which bridges a kind needs
+    comes from the frame (``Frame.wants_mapped``).
     """
     voc = run_vocab()
     string_type = getattr(obj.string, "string_type", voc.string_kind_initial)
-    if string_type == voc.string_kind_initial:
-        return not obj.mapped("both")
-    if string_type == voc.string_kind_target:
-        return not obj.mapped("both" if justify_mode else voc.bridge_orientation_vertical)
-    # modified and answer strings map horizontally only.
-    return not obj.mapped(voc.bridge_orientation_horizontal)
+    frame = constants().frame
+    return not obj.mapped(
+        frame.mapped_tokens[bool(justify_mode)].get(string_type, frame.default_mapped_token)
+    )

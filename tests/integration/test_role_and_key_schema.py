@@ -52,8 +52,10 @@ def test_deleting_a_node_deletes_its_role_bindings_and_relation():
         await session.execute(SlipnetNodeDef.__table__.delete().where(
             SlipnetNodeDef.name == "plato-direction-category"))
         roles = (await session.execute(select(SlipnetNodeRole))).scalars().all()
-        # one single-node role, and an element of each of the two ordered roles
-        assert before - len(roles) == 3
+        # the direction category is bound to one single-node role, an element of two ordered roles
+        # (the order of the rule's dimensions and of an answer's) and of the stage 6 sets
+        # (reverses together, relation only) and image operation (reverse direction)
+        assert before - len(roles) == 3 + 3
         assert all(r.node_name != "plato-direction-category" for r in roles)
         await session.execute(SlipnetNodeDef.__table__.delete().where(
             SlipnetNodeDef.name == "plato-opposite"))

@@ -62,7 +62,7 @@ def test_patch_errors_have_a_kind(patch, kind):
 def test_schema_lists_every_addressable_table_and_no_enum_table():
     s = schema(REGISTRY)
     names = [t["name"] for t in s["tables"]]
-    assert names == sorted(REGISTRY) and len(names) == 15
+    assert names == sorted(REGISTRY) and len(names) == 17
     assert not set(names) & set(ENUM_REGISTRY)
     assert "help_topics" not in names
     assert not any("memory" in n or "run" in n or "journal" in n for n in names)

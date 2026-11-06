@@ -225,7 +225,7 @@ runs the default configuration on NumPy. One caveat: the replay follows Metacat'
 runs Petacat's own random stream on the same inputs, so the check says that the situations Metacat reaches
 are handled as Metacat handles them, not that the baseline's own trajectory is Metacat's.
 
-**What is in it** (69 cases, 109 runs, 8 episode answer reports; about 30 s in one process, the whole file
+**What is in it** (73 cases, 114 runs, 8 episode answer reports; about 30 s in one process, the whole file
 recomputed in 6-12 s over a process pool): 42 discovery cases, 19 justify cases, 8 episodes; four with a
 person's actions (the Options menu's group and rule codelet clamps, Clamp Themes with two themes, Undo last
 clamp, the Self-watching check item off and on again), one episode with Clear Memory before run 4, 15 runs
@@ -241,9 +241,15 @@ decisions too for the two justify cases), whereas the other two do not: the base
 stream, which neither defect moved in these runs, so they only show that the situation Metacat reaches is handled
 as Metacat handles it (`tests/unit/test_fidelity_fixes.py` guards the degree of support, and the recorder the time stamp).
 
+Stage 6 added four cases (`a -> z; abc`, `abc -> zbc; xyz`, `xyz -> xya; zzz`, `aab -> zzb; aab`) whose rules change a letter's
+alphabetic position (first <-> last of the alphabet). Dropping the binding of `plato-alphabetic-position-category` from
+`rule.letter_or_alphabetic_dimension` or from `image_operation.new_alpha_position_category` changes these runs and none of
+the 41 demo problems at seeds 1-3. Each was recorded with `record.py` (seeds 1-4, cap 3000) and replayed in faithful mode:
+agreement 1.0, no errors, no differing snapshot, in all 16 runs. The coverage table below was measured before stage 6.
+
 | | Original baseline | Original + extended |
 | --- | --- | --- |
-| Engine lines (`server/engine/**`, 14,259) | 11,431 (80.2 %) | 12,149 (85.2 %) |
+| Engine lines (`server/engine/**`, 14,259; measured before stage 6) | 11,431 (80.2 %) | 12,149 (85.2 %) |
 | Engine branches (5,886) | 4,139 | 4,533 |
 | Database code lines (846) | 779 | 795 |
 | Database code branch arcs (718) | 626 | 644 |

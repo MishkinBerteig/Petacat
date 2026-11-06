@@ -53,6 +53,13 @@ class EventTypeDef(Base):
     role = Column(Text, nullable=True, unique=True)
 
 class BridgeTypeDef(Base):
+    """A kind of bridge, and the part of the four-string frame it plays.
+
+    The frame (which strings a bridge joins, in which orientation, which theme type it feeds,
+    and from these what each string maps and who its partner is) is defined here and in
+    ``string_kinds`` and ``rule_types``, once; ``server/engine/frame.py`` derives everything else
+    from them, once per run.
+    """
     __tablename__ = "bridge_types"
     name = Column(Text, primary_key=True)
     display_label = Column(Text, nullable=False)
@@ -61,6 +68,15 @@ class BridgeTypeDef(Base):
     #: The engine's name for the concept this row plays (``server/engine/roles.py``,
     #: ``VOCABULARY``), or NULL for a row the engine does not name.  Unique within the table.
     role = Column(Text, nullable=True, unique=True)
+    #: The strings a bridge of this type joins: names of ``string_kinds`` (a bridge goes from the
+    #: first to the second).
+    from_string_kind = Column(Text, nullable=True)
+    to_string_kind = Column(Text, nullable=True)
+    #: The name of a ``bridge_orientations`` row: ``horizontal`` joins two strings of one
+    #: analogy, ``vertical`` joins the two analogies (the engine names both by role).
+    orientation = Column(Text, nullable=True)
+    #: The name of the ``theme_types`` row the bridges of this type feed.
+    theme_type = Column(Text, nullable=True)
 
 class BridgeOrientationDef(Base):
     __tablename__ = "bridge_orientations"
@@ -91,6 +107,9 @@ class RuleTypeDef(Base):
     #: The engine's name for the concept this row plays (``server/engine/roles.py``,
     #: ``VOCABULARY``), or NULL for a row the engine does not name.  Unique within the table.
     role = Column(Text, nullable=True, unique=True)
+    #: The name of the ``bridge_types`` row whose pair of strings a rule of this type describes
+    #: (a top rule describes the change from the initial to the modified string).
+    bridge_type = Column(Text, nullable=True)
 
 class ThemeTypeDef(Base):
     __tablename__ = "theme_types"
@@ -161,7 +180,10 @@ class ParamValueTypeDef(Base):
 
 
 class StringKindDef(Base):
-    """The kinds of string a problem has (initial, modified, target, answer)."""
+    """The kinds of string a problem has (initial, modified, target, answer).
+
+    ``sort_order`` is the kind's place in the frame (the numeric backends' code for it).
+    """
     __tablename__ = "string_kinds"
     name = Column(Text, primary_key=True)
     display_label = Column(Text, nullable=False)
@@ -170,6 +192,10 @@ class StringKindDef(Base):
     #: The engine's name for the concept this row plays (``server/engine/roles.py``,
     #: ``VOCABULARY``), or NULL for a row the engine does not name.  Unique within the table.
     role = Column(Text, nullable=True, unique=True)
+    #: Whether a string of this kind is there from the start of a run.  The answer string is
+    #: not: it exists once an answer has been found or supplied, so a bridge to it is possible
+    #: only when the run justifies.
+    exists_at_start = Column(Boolean, nullable=False, default=True)
 
 class RuleScopeDef(Base):
     """The scope a rule's clause applies to (the object itself, or its subobjects)."""
@@ -467,6 +493,69 @@ class ThemeDimensionDef(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     slipnet_node = Column(Text, nullable=False)
     valid_relations = Column(JSONB, nullable=False)  # list of strings
+
+
+class InitialDescriptionRule(Base):
+    """One rule of the initial-description program: a description every letter is given.
+
+    Before the first codelet, ``make-letter`` (Scheme ``workspace-objects.ss:21-26``) and
+    ``init-mcat`` (``run.ss:227-232``) give each letter its first descriptions.  The rows are
+    applied to every letter in ``ordinal`` order, and each description is put at the *front* of
+    the letter's description list, so the order is part of what a run does (every stochastic
+    description pick, and the bridge's theme cross-product, walk that list in order).
+
+    A rule says *which* description (``dimension_role`` names the description type by the
+    engine's node role, ``descriptor_source`` and ``descriptor_role`` the descriptor), *when*
+    (``condition``, one of the engine's closed set of arithmetic conditions: ``always``,
+    ``single``, ``leftmost``, ``rightmost``, ``middle``) and whether the descriptor is made fully
+    active.  A role nothing holds drops the rule: what has no node is not perceived.
+    """
+
+    __tablename__ = "initial_description_rules"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    #: The rule's natural key.
+    rule_key = Column(Text, nullable=False, unique=True)
+    #: The order the rules are applied in; each description goes to the front of the list.
+    ordinal = Column(Integer, nullable=False, default=_next_after_last("initial_description_rules", "ordinal"))
+    #: What the rule describes: ``letter`` (the letters of the problem, at the start of a run),
+    #: ``translated_letter`` (the letters of a string translated from a rule) or ``group`` (every
+    #: new group).  The conditions and sources a rule may name depend on its subject.
+    subject = Column(Text, nullable=False, default="letter")
+    #: A node role (``roles.json``) naming the description type.
+    dimension_role = Column(Text, nullable=False)
+    #: Where the descriptor comes from: ``role`` (the node ``descriptor_role`` names) or
+    #: ``letter_category`` (the letter's own letter-category node).
+    descriptor_source = Column(Text, nullable=False)
+    #: A node role, for ``descriptor_source = role``; NULL otherwise.
+    descriptor_role = Column(Text, nullable=True)
+    #: ``always``, ``single``, ``leftmost``, ``rightmost`` or ``middle`` (``initial_program.py``).
+    condition = Column(Text, nullable=False)
+    #: Whether the descriptor is made fully active (``run.ss:227-232``).
+    activate_descriptor = Column(Boolean, nullable=False, default=True)
+    #: Whether the description is made at the built level (a letter's and a group's are; a translated
+    #: string's letters are left at the level a new description starts at).
+    built = Column(Boolean, nullable=False, default=True)
+    #: Whether the description is put with the structure's bond descriptions (a group's bond category
+    #: and bond facet) and not with its descriptions.
+    bond_description = Column(Boolean, nullable=False, default=False)
+
+
+class InitialActivationRule(Base):
+    """One rule of the concepts a run starts with fully active (``run.ss:221-226``).
+
+    The rules are applied in ``ordinal`` order, before the initial descriptions.  ``node_role``
+    names the node (by the engine's node role); ``condition`` is one of the engine's closed set
+    (``always``, ``any_single_letter_string``: some string of the problem has one letter).
+    """
+
+    __tablename__ = "initial_activation_rules"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    rule_key = Column(Text, nullable=False, unique=True)
+    ordinal = Column(Integer, nullable=False, default=_next_after_last("initial_activation_rules", "ordinal"))
+    node_role = Column(Text, nullable=False)
+    condition = Column(Text, nullable=False)
 
 
 class SlipnetLayoutPos(Base):

@@ -224,7 +224,8 @@ class _Reader:
     """Rebuilds the object graph in two passes: shells, then wiring."""
 
     def __init__(
-        self, records: list[dict], slipnet: Any, strings: dict[str, Any], vocab: Any = None
+        self, records: list[dict], slipnet: Any, strings: dict[str, Any], vocab: Any = None,
+        frame: Any = None,
     ) -> None:
         self._records = records
         self._slipnet = slipnet
@@ -243,8 +244,9 @@ class _Reader:
             obj = cls.__new__(cls)
             if vocab is not None and isinstance(obj, WorkspaceStructure):
                 # What ``WorkspaceStructure.__init__`` holds for the structure's own predicates:
-                # the run's vocabulary (a restored structure never ran ``__init__``).
+                # the run's vocabulary and frame (a restored structure never ran ``__init__``).
                 obj._voc = vocab
+                obj._frame = frame
                 obj._built_level = vocab.proposal_level_built
             self._objects.append(obj)
 
@@ -535,7 +537,7 @@ def _restore_run_state(runner: Any, state: dict) -> None:
 
     strings = {key: getattr(ws, attr) for key, attr in _string_slots(v)
                if getattr(ws, attr, None) is not None}
-    reader = _Reader(state["graph"], ctx.slipnet, strings, v)
+    reader = _Reader(state["graph"], ctx.slipnet, strings, v, ctx.meta.frame)
     rebuilt = reader.build()
 
     # Re-link the environment the capture omitted.  A rule's strength is its quality

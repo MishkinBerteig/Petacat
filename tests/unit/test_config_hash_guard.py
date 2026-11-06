@@ -65,11 +65,18 @@ def test_a_field_added_to_the_provider_is_covered_without_editing_the_hasher(met
     f.name for f in dataclasses.fields(MetadataProvider) if f.name not in HASH_EXCLUDED_FIELDS))
 def test_changing_a_hashed_field_changes_its_digest_and_the_hash(meta, name):
     value = getattr(meta, name)
-    assert len(value) >= 2, name
-    if isinstance(value, dict):
-        changed = dict(reversed(list(value.items())))
+    if len(value) == 1 and dataclasses.is_dataclass(value[0]):
+        # one row (the Standard Configuration has one initial activation rule): there is no order
+        # to reverse, so a value of the row changes
+        row = value[0]
+        field = next(f.name for f in dataclasses.fields(row) if isinstance(getattr(row, f.name), str))
+        changed = type(value)([dataclasses.replace(row, **{field: getattr(row, field) + "!"})])
     else:
-        changed = type(value)(reversed(list(value)))
+        assert len(value) >= 2, name
+        if isinstance(value, dict):
+            changed = dict(reversed(list(value.items())))
+        else:
+            changed = type(value)(reversed(list(value)))
     other = dataclasses.replace(meta, **{name: changed})
     assert field_digests(other)[name] != field_digests(meta)[name]
     assert {k: v for k, v in field_digests(other).items() if k != name} == {

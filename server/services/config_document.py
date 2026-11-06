@@ -594,6 +594,31 @@ def rows_from_standard_files(seed_dir: str) -> dict[str, list[dict[str, Any]]]:
         {"role": r["role"], "ordinal": r["ordinal"], "codelet_type": r["codelet_type"]}
         for r in roles.get("codelet_roles", [])
     ]
+    program = load("initial_program.json")
+    rows["initial_description_rules"] = [
+        {
+            "rule_key": r["rule_key"],
+            "ordinal": r["ordinal"],
+            "dimension_role": r["dimension_role"],
+            "descriptor_source": r["descriptor_source"],
+            "descriptor_role": r.get("descriptor_role"),
+            "condition": r["condition"],
+            "activate_descriptor": r["activate_descriptor"],
+            "subject": r["subject"],
+            "built": r["built"],
+            "bond_description": r["bond_description"],
+        }
+        for r in program.get("description_rules", [])
+    ]
+    rows["initial_activation_rules"] = [
+        {
+            "rule_key": r["rule_key"],
+            "ordinal": r["ordinal"],
+            "node_role": r["node_role"],
+            "condition": r["condition"],
+        }
+        for r in program.get("activation_rules", [])
+    ]
     rows["theme_relations"] = [
         {
             "name": r["name"],

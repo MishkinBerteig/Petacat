@@ -74,6 +74,9 @@ from dataclasses import dataclass
 from fractions import Fraction
 from typing import Any, Callable, Mapping
 
+from server.engine.initial_program import (
+    ACTIVATION_CONDITIONS, CONDITIONS_OF, SOURCES_OF, SUBJECTS,
+)
 from server.engine.parameters import RUN_PARAMETERS
 from server.engine.start_check import (
     REQUIRED_ENGINE_PARAMETERS,
@@ -124,6 +127,8 @@ LEVELS = "urgency_levels"
 DEMOS = "demo_problems"
 TEMPLATES = "commentary_templates"
 CLAMP_TYPES = "clamp_types"
+INITIAL_DESCRIPTIONS = "initial_description_rules"
+INITIAL_ACTIVATIONS = "initial_activation_rules"
 
 _RULE_CODE_COLUMNS = ("urgency_formula", "posting_formula", "count_formula", "condition")
 _LINK_SHORT = {"from": "from_node", "to": "to_node", "type": "link_type", "label": "label_node",
@@ -644,6 +649,28 @@ class _Run:
                 gaps[("urgency_level", level)] = (
                     f"posting rule {rule['rule_key']!r} names urgency level {level!r}, which the configuration lacks; "
                     "a run will stop at its start")
+        # The initial-description program names conditions from the engine's closed sets.
+        for rule in t[INITIAL_DESCRIPTIONS].values():
+            subject = rule.get("subject")
+            if subject not in SUBJECTS:
+                gaps[("initial_program", rule["rule_key"])] = (
+                    f"initial description rule {rule['rule_key']!r} names subject {subject!r}, "
+                    f"which is not one of {', '.join(SUBJECTS)}; a run will stop at its start")
+            elif rule["condition"] not in CONDITIONS_OF[subject]:
+                gaps[("initial_program", rule["rule_key"])] = (
+                    f"initial description rule {rule['rule_key']!r} names condition {rule['condition']!r}, "
+                    f"which a {subject} rule may not (one of {', '.join(CONDITIONS_OF[subject])}); "
+                    "a run will stop at its start")
+            elif rule["descriptor_source"] not in SOURCES_OF[subject]:
+                gaps[("initial_program", rule["rule_key"])] = (
+                    f"initial description rule {rule['rule_key']!r} names descriptor source "
+                    f"{rule['descriptor_source']!r}, which a {subject} rule may not (one of "
+                    f"{', '.join(SOURCES_OF[subject])}); a run will stop at its start")
+        for rule in t[INITIAL_ACTIVATIONS].values():
+            if rule["condition"] not in ACTIVATION_CONDITIONS:
+                gaps[("initial_program", rule["rule_key"])] = (
+                    f"initial activation rule {rule['rule_key']!r} names condition {rule['condition']!r}, "
+                    f"which is not one of {', '.join(ACTIVATION_CONDITIONS)}; a run will stop at its start")
         r = t[PARAMS].get(("initial_codelet_types",))
         if r is not None:
             ok, names = parse_param_value(r["value"], "json")

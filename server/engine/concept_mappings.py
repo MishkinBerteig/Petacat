@@ -211,7 +211,7 @@ class ConceptMapping:
         # (which include successor/predecessor between adjacent letters/numbers).
         # For all other types, look at lateral sliplinks.
         dt1 = self.description_type1
-        if holds_role(dt1, "dimension.letter_category") or holds_role(dt1, "dimension.length"):
+        if holds_role(dt1, "dimension.ladder"):
             links_to_search = getattr(self.descriptor1, "lateral_links", [])
         else:
             links_to_search = getattr(self.descriptor1, "lateral_sliplinks", [])
@@ -358,15 +358,10 @@ class ConceptMapping:
     def reversible_cm_type(self) -> bool:
         """Scheme: ``reversible-CM-type?`` (concept-mappings.ss:84-87).
 
-        The three dimensions that reverse together when a group is re-read
-        backwards: direction, bond category, group category.
+        The dimensions that reverse together when a group is re-read backwards
+        (``dimension.reverses_together``: direction, bond category, group category).
         """
-        dt = self.description_type1
-        return (
-            holds_role(dt, "dimension.direction")
-            or holds_role(dt, "dimension.bond_category")
-            or holds_role(dt, "dimension.group_category")
-        )
+        return holds_role(self.description_type1, "dimension.reverses_together")
 
     @property
     def bond_concept_mapping(self) -> bool:
@@ -374,8 +369,7 @@ class ConceptMapping:
 
         Scheme: concept-mappings.ss:80-82.
         """
-        dt = self.description_type1
-        return holds_role(dt, "dimension.bond_category") or holds_role(dt, "dimension.bond_facet")
+        return holds_role(self.description_type1, "dimension.bond_description")
 
     def activate_descriptions(self) -> None:
         """Activate the description-type and descriptor nodes in the slipnet.

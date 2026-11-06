@@ -65,6 +65,8 @@ ALLOWED: dict[tuple[str, str], tuple[int, str]] = {
         1, "the id counter's key for Episodic Memory answers: a key of the allocator's own format"),
     ("server/engine/ids.py", "snag"): (
         1, "the id counter's key for Episodic Memory snags: a key of the allocator's own format"),
+    ("server/engine/metadata.py", "built"): (
+        1, "a key of the initial_program.json file format (the `built` column of an initial description rule)"),
     ("server/engine/metadata.py", "answer"): (
         1, "a key of the demo_problems.json file format (the DemoProblem columns)"),
     ("server/engine/metadata.py", "initial"): (
@@ -152,6 +154,14 @@ ALLOWED.update(_group(
         "server/services/capture_projection.py": {
             "answer": 2, "built": 4, "category": 2, "initial": 2, "modified": 2, "target": 2,
             "verbatim": 1},
+    }))
+ALLOWED.update(_group(
+    "the `built` column of an initial description rule, read from seed_data/initial_program.json "
+    "or written to the Admin payload: a key of that format, not the proposal level",
+    {
+        "server/api/admin.py": {"built": 1},
+        "server/services/config_document.py": {"built": 2},
+        "server/services/metadata_service.py": {"built": 1},
     }))
 ALLOWED.update(_group(
     "a key of the Review payload the client reads: `rules.top` and `rules.bottom`, and the "

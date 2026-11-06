@@ -47,7 +47,7 @@ class WorkspaceStructure:
     # state graph captures ``vars(structure)`` and this is configuration, not run state: the
     # same name for every structure of a run.  Subclasses have no ``__slots__`` and keep their
     # ``__dict__``.
-    __slots__ = ("_built_level", "_voc")
+    __slots__ = ("_built_level", "_voc", "_frame")
 
     def __init__(self) -> None:
         self.id = next_id(KIND_STRUCTURE)
@@ -58,6 +58,8 @@ class WorkspaceStructure:
         #: an attribute and not the run binding.  A slot, for the same reason as ``_built_level``;
         #: a structure the state graph restores is given it there (``state_graph._Reader``).
         self._voc = voc
+        #: The four-string frame of the same run, held for the same reason.
+        self._frame = run.constants.frame
         #: The level name the structure was made with, and the one that means "built", both
         #: from the run's vocabulary; ``is_built`` is an equality test between them.
         self.proposal_level = voc.proposal_level_proposed

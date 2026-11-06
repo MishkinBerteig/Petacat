@@ -32,6 +32,8 @@ from server.models.metadata import (
     EngineParam,
     FormulaCoefficient,
     HelpTopic,
+    InitialActivationRule,
+    InitialDescriptionRule,
     PostingRule,
     SlipnetLayoutPos,
     SlipnetLinkDef,
@@ -1005,6 +1007,172 @@ async def delete_theme_dimension(dim_id: int, session: AsyncSession = Depends(ge
 
 
 # ------------------------------------------------------------------
+# The initial-description program
+# ------------------------------------------------------------------
+
+
+class InitialDescriptionRuleRequest(BaseModel):
+    rule_key: str = Field(min_length=1)
+    #: Left out on create, the rule goes last.
+    ordinal: int | None = None
+    #: ``letter``, ``translated_letter`` or ``group``.
+    subject: str = "letter"
+    #: A node role naming the description type.
+    dimension_role: str = Field(min_length=1)
+    #: ``role``, ``letter_category`` or, for a group, one of its own.
+    descriptor_source: str = Field(min_length=1)
+    descriptor_role: str | None = None
+    #: One of the engine's closed set (``server/engine/initial_program.py``).
+    condition: str = Field(min_length=1)
+    activate_descriptor: bool = True
+    built: bool = True
+    bond_description: bool = False
+
+
+class InitialDescriptionRuleResponse(BaseModel):
+    id: int
+    rule_key: str
+    ordinal: int
+    subject: str
+    dimension_role: str
+    descriptor_source: str
+    descriptor_role: str | None
+    condition: str
+    activate_descriptor: bool
+    built: bool
+    bond_description: bool
+
+
+def _initial_description_rule_response(r: Any) -> InitialDescriptionRuleResponse:
+    return InitialDescriptionRuleResponse(
+        id=r.id, rule_key=r.rule_key, ordinal=r.ordinal, subject=r.subject,
+        dimension_role=r.dimension_role,
+        descriptor_source=r.descriptor_source, descriptor_role=r.descriptor_role,
+        condition=r.condition, activate_descriptor=r.activate_descriptor,
+        built=r.built, bond_description=r.bond_description,
+    )
+
+
+def _initial_description_rule_values(req: InitialDescriptionRuleRequest) -> dict:
+    values = dict(
+        subject=req.subject, dimension_role=req.dimension_role, descriptor_source=req.descriptor_source,
+        descriptor_role=req.descriptor_role, condition=req.condition,
+        activate_descriptor=req.activate_descriptor, built=req.built,
+        bond_description=req.bond_description,
+    )
+    if req.ordinal is not None:
+        values["ordinal"] = req.ordinal
+    return values
+
+
+@router.get("/initial-description-rules", response_model=list[InitialDescriptionRuleResponse])
+async def list_initial_description_rules(session: AsyncSession = Depends(get_session)):
+    result = await session.execute(
+        select(InitialDescriptionRule).order_by(
+            InitialDescriptionRule.ordinal, InitialDescriptionRule.rule_key.collate("C"))
+    )
+    return [_initial_description_rule_response(r) for r in result.scalars().all()]
+
+
+@router.post("/initial-description-rules", response_model=InitialDescriptionRuleResponse, status_code=201)
+async def create_initial_description_rule(
+    req: InitialDescriptionRuleRequest, session: AsyncSession = Depends(get_session),
+):
+    row = await _insert(
+        session, InitialDescriptionRule,
+        dict(rule_key=req.rule_key, **_initial_description_rule_values(req)),
+    )
+    return _initial_description_rule_response(row)
+
+
+@router.put("/initial-description-rules/{rule_id}", response_model=InitialDescriptionRuleResponse)
+async def update_initial_description_rule(
+    rule_id: int, req: InitialDescriptionRuleRequest, session: AsyncSession = Depends(get_session),
+):
+    key = await _existing(
+        session, InitialDescriptionRule, rule_id, f"Initial description rule {rule_id} not found")
+    row = await _update(session, InitialDescriptionRule, key, _initial_description_rule_values(req))
+    return _initial_description_rule_response(row)
+
+
+@router.delete("/initial-description-rules/{rule_id}")
+async def delete_initial_description_rule(rule_id: int, session: AsyncSession = Depends(get_session)):
+    key = await _existing(
+        session, InitialDescriptionRule, rule_id, f"Initial description rule {rule_id} not found")
+    await _delete(session, InitialDescriptionRule, key)
+    return {"deleted": rule_id}
+
+
+class InitialActivationRuleRequest(BaseModel):
+    rule_key: str = Field(min_length=1)
+    #: Left out on create, the rule goes last.
+    ordinal: int | None = None
+    #: A node role naming the node.
+    node_role: str = Field(min_length=1)
+    #: One of the engine's closed set (``server/engine/initial_program.py``).
+    condition: str = Field(min_length=1)
+
+
+class InitialActivationRuleResponse(BaseModel):
+    id: int
+    rule_key: str
+    ordinal: int
+    node_role: str
+    condition: str
+
+
+def _initial_activation_rule_response(r: Any) -> InitialActivationRuleResponse:
+    return InitialActivationRuleResponse(
+        id=r.id, rule_key=r.rule_key, ordinal=r.ordinal, node_role=r.node_role, condition=r.condition,
+    )
+
+
+def _initial_activation_rule_values(req: InitialActivationRuleRequest) -> dict:
+    values = dict(node_role=req.node_role, condition=req.condition)
+    if req.ordinal is not None:
+        values["ordinal"] = req.ordinal
+    return values
+
+
+@router.get("/initial-activation-rules", response_model=list[InitialActivationRuleResponse])
+async def list_initial_activation_rules(session: AsyncSession = Depends(get_session)):
+    result = await session.execute(
+        select(InitialActivationRule).order_by(
+            InitialActivationRule.ordinal, InitialActivationRule.rule_key.collate("C"))
+    )
+    return [_initial_activation_rule_response(r) for r in result.scalars().all()]
+
+
+@router.post("/initial-activation-rules", response_model=InitialActivationRuleResponse, status_code=201)
+async def create_initial_activation_rule(
+    req: InitialActivationRuleRequest, session: AsyncSession = Depends(get_session),
+):
+    row = await _insert(
+        session, InitialActivationRule,
+        dict(rule_key=req.rule_key, **_initial_activation_rule_values(req)),
+    )
+    return _initial_activation_rule_response(row)
+
+
+@router.put("/initial-activation-rules/{rule_id}", response_model=InitialActivationRuleResponse)
+async def update_initial_activation_rule(
+    rule_id: int, req: InitialActivationRuleRequest, session: AsyncSession = Depends(get_session),
+):
+    key = await _existing(
+        session, InitialActivationRule, rule_id, f"Initial activation rule {rule_id} not found")
+    row = await _update(session, InitialActivationRule, key, _initial_activation_rule_values(req))
+    return _initial_activation_rule_response(row)
+
+
+@router.delete("/initial-activation-rules/{rule_id}")
+async def delete_initial_activation_rule(rule_id: int, session: AsyncSession = Depends(get_session)):
+    key = await _existing(
+        session, InitialActivationRule, rule_id, f"Initial activation rule {rule_id} not found")
+    await _delete(session, InitialActivationRule, key)
+    return {"deleted": rule_id}
+
+
+# ------------------------------------------------------------------
 # Posting rules
 # ------------------------------------------------------------------
 
@@ -1360,6 +1528,14 @@ async def export_metadata(session: AsyncSession = Depends(get_session)):
     posting_result = await session.execute(
         select(PostingRule).order_by(PostingRule.sort_order, PostingRule.id)
     )
+    initial_descriptions_result = await session.execute(
+        select(InitialDescriptionRule).order_by(
+            InitialDescriptionRule.ordinal, InitialDescriptionRule.rule_key.collate("C"))
+    )
+    initial_activations_result = await session.execute(
+        select(InitialActivationRule).order_by(
+            InitialActivationRule.ordinal, InitialActivationRule.rule_key.collate("C"))
+    )
     patterns_result = await session.execute(
         select(CodeletPatternDef).order_by(CodeletPatternDef.ordinal, CodeletPatternDef.id)
     )
@@ -1467,6 +1643,23 @@ async def export_metadata(session: AsyncSession = Depends(get_session)):
             }
             for r in posting_result.scalars().all()
         ],
+        "initial_description_rules": [
+            {
+                "id": r.id, "rule_key": r.rule_key, "ordinal": r.ordinal, "subject": r.subject,
+                "dimension_role": r.dimension_role, "descriptor_source": r.descriptor_source,
+                "descriptor_role": r.descriptor_role, "condition": r.condition,
+                "activate_descriptor": r.activate_descriptor, "built": r.built,
+                "bond_description": r.bond_description,
+            }
+            for r in initial_descriptions_result.scalars().all()
+        ],
+        "initial_activation_rules": [
+            {
+                "id": r.id, "rule_key": r.rule_key, "ordinal": r.ordinal,
+                "node_role": r.node_role, "condition": r.condition,
+            }
+            for r in initial_activations_result.scalars().all()
+        ],
         "codelet_patterns": [
             {
                 "id": r.id, "pattern_name": r.pattern_name,
@@ -1513,7 +1706,7 @@ async def export_metadata(session: AsyncSession = Depends(get_session)):
 #: Every collection ``GET /export`` writes, and where it lands on the way back in:
 #: the model, the primary key a row is matched on, and any payload key whose name
 #: differs from the ORM attribute.  Export and import read this one list, so the two
-#: cover the same thirteen collections.
+#: cover the same fifteen collections.
 _IMPORTABLE: tuple[tuple[str, type, str, dict[str, str]], ...] = (
     ("slipnet_nodes", SlipnetNodeDef, "name", {}),
     ("slipnet_links", SlipnetLinkDef, "id", {}),
@@ -1524,6 +1717,8 @@ _IMPORTABLE: tuple[tuple[str, type, str, dict[str, str]], ...] = (
     ("demo_problems", DemoProblem, "id", {}),
     ("theme_dimensions", ThemeDimensionDef, "id", {}),
     ("posting_rules", PostingRule, "id", {}),
+    ("initial_description_rules", InitialDescriptionRule, "id", {}),
+    ("initial_activation_rules", InitialActivationRule, "id", {}),
     ("codelet_patterns", CodeletPatternDef, "id", {}),
     ("commentary_templates", CommentaryTemplate, "id", {}),
     ("slipnet_layout", SlipnetLayoutPos, "node_name", {}),
@@ -1605,7 +1800,7 @@ async def import_metadata(
     data: dict,
     session: AsyncSession = Depends(get_session),
 ):
-    """Import metadata from a JSON object — the same thirteen collections ``/export`` writes.
+    """Import metadata from a JSON object — the same fifteen collections ``/export`` writes.
 
     Every collection present in the payload is applied; the response names each one and
     how many rows it carried, so what was written is legible from the reply. Configuration

@@ -55,6 +55,8 @@ _NATURAL_KEYS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "urgency_levels": (("name",), ("sort_order",)),
     "demo_problems": (("name",), ()),
     "commentary_templates": (("template_key",), ()),
+    "initial_description_rules": (("rule_key",), ("ordinal",)),
+    "initial_activation_rules": (("rule_key",), ("ordinal",)),
 }
 
 def total_order(key: tuple[str, ...], order: tuple[str, ...]) -> tuple[str, ...]:

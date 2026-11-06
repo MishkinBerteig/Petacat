@@ -67,14 +67,14 @@ class Bridge(WorkspaceStructure):
 
     @property
     def orientation(self) -> str:
-        v = self._voc  # the run's own vocabulary, held by the structure (WorkspaceStructure)
-        if self.bridge_type == v.bridge_type_top or self.bridge_type == v.bridge_type_bottom:
-            return v.bridge_orientation_horizontal
-        return v.bridge_orientation_vertical
+        """The orientation of this bridge's type (``bridge_types.orientation``, via the frame the
+        structure holds, ``WorkspaceStructure._frame``)."""
+        frame = self._frame
+        return frame.orientation.get(self.bridge_type, frame.default_orientation)
 
     @property
     def is_horizontal(self) -> bool:
-        return self.orientation == self._voc.bridge_orientation_horizontal
+        return self._frame.orientation.get(self.bridge_type) == self._voc.bridge_orientation_horizontal
 
     # ------------------------------------------------------------------
     # The three concept-mapping lists  (Scheme: bridges.ss:150-238)
@@ -376,15 +376,7 @@ class Bridge(WorkspaceStructure):
     @property
     def theme_type(self) -> str:
         """The Themespace theme type this bridge feeds."""
-        v = self._voc
-        bridge_type = self.bridge_type
-        if bridge_type == v.bridge_type_top:
-            return v.theme_type_top_bridge
-        if bridge_type == v.bridge_type_bottom:
-            return v.theme_type_bottom_bridge
-        if bridge_type == v.bridge_type_vertical:
-            return v.theme_type_vertical_bridge
-        raise KeyError(bridge_type)
+        return self._frame.theme_type_for[self.bridge_type]
 
     @property
     def is_spanning_bridge(self) -> bool:
@@ -982,7 +974,7 @@ def horizontal_mappable_descriptions(d1: Any, d2: Any, object1: Any, object2: An
     dt = d1.description_type
     if holds_role(dt, "dimension.letter_category"):
         return _letter_category_mappable_objects(object1, object2)
-    if holds_role(dt, "dimension.string_position") or holds_role(dt, "dimension.length"):
+    if holds_role(dt, "dimension.freely_mappable"):
         return True
     return d1.descriptor is d2.descriptor or _slip_linked(d1.descriptor, d2.descriptor)
 
@@ -1032,7 +1024,7 @@ def mappable_descriptions(
     d1: Any, d2: Any, object1: Any, object2: Any, bridge_type: str
 ) -> bool:
     """Dispatch to the horizontal or vertical predicate for *bridge_type*."""
-    if bridge_type == constants().vocab.bridge_type_vertical:
+    if bridge_type in constants().frame.vertical_names:
         return vertical_mappable_descriptions(d1, d2)
     return horizontal_mappable_descriptions(d1, d2, object1, object2)
 
@@ -1072,9 +1064,9 @@ def make_concept_mappings(
     # (workspace-objects.ss:294).  ``cross-product-filter-map`` (utilities.ss:689-701)
     # emits in list order, and that order decides which schema the rule abstraction's
     # draws fall on (rules.ss:709-722).
-    vocab = constants().vocab
-    vertical = bridge_type == vocab.bridge_type_vertical  # what ``mappable_descriptions`` decides
-    identity = vocab.theme_relation_identity
+    k = constants()
+    vertical = bridge_type in k.frame.vertical_names  # what ``mappable_descriptions`` decides
+    identity = k.vocab.theme_relation_identity
     for d1 in descriptions1:
         for d2 in descriptions2:
             if vertical:
@@ -1241,11 +1233,11 @@ def propose_bridge(
 
     if ctx is not None and ctx.verbose:
         # bridges.ss:1111-1119
-        v = constants().vocab
+        k = constants()
         orientation = (
-            v.bridge_orientation_vertical
-            if bridge_type == v.bridge_type_vertical
-            else v.bridge_orientation_horizontal
+            k.vocab.bridge_orientation_vertical
+            if bridge_type in k.frame.vertical_names
+            else k.vocab.bridge_orientation_horizontal
         )
         if flip1 and flip2:
             key = "proposing-bridge-both-flipped"
@@ -1272,7 +1264,7 @@ def _propose_bridge_side_effects(
     group-scout when the two have different platonic lengths, which in practice
     is every letter/multi-letter-group pairing.
     """
-    if bridge_type == constants().vocab.bridge_type_vertical:
+    if bridge_type in constants().frame.vertical_names:
         return
     if platonic_length(object1) is platonic_length(object2):
         return
@@ -1432,10 +1424,7 @@ def _nodes_related(node1: Any, node2: Any) -> bool:
 
 def _letter_category_or_length_slippage(cm: ConceptMapping) -> bool:
     """Scheme: ``letter-category/length-slippage?`` (bridges.ss:1487-1492)."""
-    return cm.is_slippage and (
-        holds_role(cm.description_type1, "dimension.letter_category")
-        or holds_role(cm.description_type1, "dimension.length")
-    )
+    return cm.is_slippage and holds_role(cm.description_type1, "dimension.ladder")
 
 
 def _nested_member(container: Any, obj: Any) -> bool:

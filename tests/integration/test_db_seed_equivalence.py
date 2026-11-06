@@ -351,6 +351,20 @@ def _expected_tables() -> dict[str, list[dict]]:
         {"id": i, "slipnet_node": td["slipnet_node"], "valid_relations": td["valid_relations"]}
         for i, td in enumerate(_file("theme_dimensions.json").get("dimensions", []), start=1)
     ]
+    program = _file("initial_program.json")
+    out["initial_description_rules"] = [
+        {"id": i, "rule_key": r["rule_key"], "ordinal": r["ordinal"], "subject": r["subject"],
+         "built": r["built"], "bond_description": r["bond_description"],
+         "dimension_role": r["dimension_role"], "descriptor_source": r["descriptor_source"],
+         "descriptor_role": r.get("descriptor_role"), "condition": r["condition"],
+         "activate_descriptor": r["activate_descriptor"]}
+        for i, r in enumerate(program["description_rules"], start=1)
+    ]
+    out["initial_activation_rules"] = [
+        {"id": i, "rule_key": r["rule_key"], "ordinal": r["ordinal"], "node_role": r["node_role"],
+         "condition": r["condition"]}
+        for i, r in enumerate(program["activation_rules"], start=1)
+    ]
     out["slipnet_layout"] = sorted(
         (
             {"node_name": n, "grid_row": p[0], "grid_col": p[1], "sort_order": i}

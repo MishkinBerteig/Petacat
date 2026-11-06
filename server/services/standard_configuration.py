@@ -47,6 +47,7 @@ BULK_SEED_FILES = (
     "commentary_templates.json",
     "posting_rules.json",
     "roles.json",
+    "initial_program.json",
     "theme_relations.json",
 )
 

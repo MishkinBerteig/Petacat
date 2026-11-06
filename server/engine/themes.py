@@ -49,31 +49,15 @@ def _clip_negative(value: float, ceiling: float) -> float:
 #: See ``slipnet._UNRESOLVED`` — "not yet decided" is not "decided against".
 _UNRESOLVED = object()
 
-def _theme_type_table(v: Any) -> dict[str, str]:
-    """Bridge-type spellings accepted by :meth:`Themespace.theme_type_for_bridge_type`, mapped to
-    the Themespace theme type.  A hyphen is read as an underscore (``Rule.bridge_theme_type`` and
-    older data spell ``top-bridge``), so the table holds each name once.  Built from the
-    vocabulary ``v`` (``bridge_type.*`` and ``theme_type.*``)."""
-    return {
-        v.bridge_type_top: v.theme_type_top_bridge,
-        v.theme_type_top_bridge: v.theme_type_top_bridge,
-        v.bridge_type_bottom: v.theme_type_bottom_bridge,
-        v.theme_type_bottom_bridge: v.theme_type_bottom_bridge,
-        v.bridge_type_vertical: v.theme_type_vertical_bridge,
-        v.theme_type_vertical_bridge: v.theme_type_vertical_bridge,
-    }
-
-
-def theme_types_for_mode(v: Any, justify_mode: bool) -> list[str]:
-    """The theme types meaningful in a mode, from the vocabulary ``v``: all three in justification
-    mode (top, bottom, vertical, the Scheme's iteration order), else top and vertical.
+def theme_types_for_mode(frame: Any, justify_mode: bool) -> list[str]:
+    """The theme types meaningful in a mode, from the frame: those of every bridge type in
+    justification mode (top, bottom, vertical, the Scheme's iteration order), else of the bridge
+    types whose strings are all there from the start (top and vertical).
 
     Scheme: ``get-possible-theme-types`` (``themes.ss:132-135``).  The one definition: the
     Themespace reads it, and so does the review projection of a recorded capture.
     """
-    if justify_mode:
-        return [v.theme_type_top_bridge, v.theme_type_bottom_bridge, v.theme_type_vertical_bridge]
-    return [v.theme_type_top_bridge, v.theme_type_vertical_bridge]
+    return list(frame.theme_types if justify_mode else frame.discovery_theme_types)
 
 
 def dominant_index(activations: Sequence[float], margin: float) -> int | None:
@@ -401,11 +385,13 @@ class Themespace:
 
         #: The theme types of the run's vocabulary, in the Scheme's iteration order (top, bottom,
         #: vertical).  Read this instead of spelling a theme type: it follows the configuration.
-        v = meta.vocabulary
-        self.theme_types: tuple[str, ...] = tuple(theme_types_for_mode(v, True))
+        frame = meta.frame
+        self.theme_types: tuple[str, ...] = tuple(theme_types_for_mode(frame, True))
         #: The theme types that exist without a fourth (answer) string (top and vertical).
-        self.discovery_theme_types: tuple[str, ...] = tuple(theme_types_for_mode(v, False))
-        self._theme_type_of: dict[str, str] = _theme_type_table(v)
+        self.discovery_theme_types: tuple[str, ...] = tuple(theme_types_for_mode(frame, False))
+        #: Bridge-type spellings accepted by :meth:`theme_type_for_bridge_type`, mapped to the
+        #: theme type (the frame's ``theme_type_for``: a bridge type's name and a theme type's own).
+        self._theme_type_of: dict[str, str] = frame.theme_type_for
 
         # Build clusters from theme dimension specs
         for dim_spec in meta.theme_dimensions:
@@ -883,14 +869,9 @@ class Themespace:
 
 def bridge_type_for_theme_type(theme_type: str) -> str:
     """``top_bridge`` -> ``top``.  Scheme: ``theme-type->bridge-type`` (themes.ss:735-740)."""
-    from server.engine.run_binding import vocab
+    from server.engine.run_binding import constants
 
-    v = vocab()
-    return {
-        v.theme_type_top_bridge: v.bridge_type_top,
-        v.theme_type_bottom_bridge: v.bridge_type_bottom,
-        v.theme_type_vertical_bridge: v.bridge_type_vertical,
-    }[theme_type]
+    return constants().frame.bridge_for_theme_type[theme_type]
 
 
 def pick_theme_type(themespace: Themespace, workspace: Any, rng: Any) -> str | None:

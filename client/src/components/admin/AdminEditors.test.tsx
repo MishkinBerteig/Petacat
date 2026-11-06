@@ -17,6 +17,7 @@ import { DemoEditor } from './DemoEditor'
 import { SlipnetLinkEditor } from './SlipnetLinkEditor'
 import { ThemeDimensionEditor } from './ThemeDimensionEditor'
 import { PostingRuleEditor } from './PostingRuleEditor'
+import { InitialProgramEditor } from './InitialProgramEditor'
 import { SlipnetLayoutEditor } from './SlipnetLayoutEditor'
 import { CommentaryTemplateEditor } from './CommentaryTemplateEditor'
 import { HelpTopicEditor } from './HelpTopicEditor'
@@ -266,6 +267,55 @@ describe('ThemeDimensionEditor — theme dimensions', () => {
     expect(calls[0].body).toEqual({
       slipnet_node: 'plato-length', valid_relations: ['identity'],
     })
+  })
+})
+
+describe('InitialProgramEditor — the initial-description program', () => {
+  const activation = { id: 1, rule_key: 'object-category-when-a-string-has-one-letter', ordinal: 0,
+    node_role: 'dimension.object_category', condition: 'any_single_letter_string' }
+  const description = { id: 4, rule_key: 'string-position-middle', ordinal: 5, subject: 'letter',
+    built: true, bond_description: false, dimension_role: 'dimension.string_position', descriptor_source: 'role',
+    descriptor_role: 'position.middle', condition: 'middle', activate_descriptor: true }
+
+  function serveProgram() {
+    stubFetch((url, init) => {
+      if (method(init) !== 'GET') return ok(description)
+      return ok(url === '/api/admin/initial-activation-rules' ? [activation] : [description])
+    })
+  }
+
+  it('lists both tables, each from its own route', async () => {
+    serveProgram()
+    render(<InitialProgramEditor />)
+    expect(await screen.findByText('string-position-middle')).toBeTruthy()
+    expect(screen.getByText('any_single_letter_string')).toBeTruthy()
+  })
+
+  it('changes a condition of a description rule and sends the whole row', async () => {
+    serveProgram()
+    render(<InitialProgramEditor />)
+
+    await editCell('middle', 'rightmost')
+
+    await waitFor(() => expect(calls).toHaveLength(1))
+    expect(calls[0]).toMatchObject({ method: 'PUT', url: '/api/admin/initial-description-rules/4' })
+    expect(calls[0].body).toEqual({
+      rule_key: 'string-position-middle', ordinal: 5, subject: 'letter',
+      dimension_role: 'dimension.string_position',
+      descriptor_source: 'role', descriptor_role: 'position.middle', condition: 'rightmost',
+      activate_descriptor: true, built: true, bond_description: false,
+    })
+  })
+
+  it('changes the order of an activation rule', async () => {
+    serveProgram()
+    render(<InitialProgramEditor />)
+
+    await editCell('dimension.object_category', 'dimension.length')
+
+    await waitFor(() => expect(calls).toHaveLength(1))
+    expect(calls[0]).toMatchObject({ method: 'PUT', url: '/api/admin/initial-activation-rules/1' })
+    expect(calls[0].body.node_role).toBe('dimension.length')
   })
 })
 

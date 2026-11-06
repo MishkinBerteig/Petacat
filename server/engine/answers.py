@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any
 
 from server.engine.memory import AnswerDescription
 from server.engine.rules import rule_signature
-from server.engine.run_binding import vocab
+from server.engine.run_binding import constants, vocab
 
 if TYPE_CHECKING:
     from server.engine.metadata import MetadataProvider
@@ -167,8 +167,10 @@ def _distil_vertical_pattern(
     identity = v.theme_relation_identity
     events = _important_answer_description_events(workspace, trace)
     cm_entries = _slippage_event_entries(events)
-    initial_group = _spanning_group_from_events(events, v.string_kind_initial)
-    target_group = _spanning_group_from_events(events, v.string_kind_target)
+    # The two strings the vertical bridge joins: the groups spanning them speak for the pattern.
+    initial_kind, target_kind = constants().frame.vertical_kinds
+    initial_group = _spanning_group_from_events(events, initial_kind)
+    target_group = _spanning_group_from_events(events, target_kind)
 
     roles = workspace.slipnet.roles
     # An absent role's token has a name no dimension carries, so its branch never matches.
@@ -220,7 +222,7 @@ def _important_answer_description_events(workspace: Workspace, trace: Any) -> li
     for event in getattr(trace, "events", []) or []:
         if event.event_type == v.event_type_concept_mapping_built:
             bridge = getattr(event, "bridge", None)
-            if bridge is None or getattr(bridge, "bridge_type", None) != v.bridge_type_vertical:
+            if bridge is None or getattr(bridge, "bridge_type", None) not in constants().frame.vertical_names:
                 continue
             if workspace.bridge_present(bridge):
                 relevant.append(event)
@@ -484,11 +486,9 @@ def make_translated_string(
     text = "".join(
         getattr(node, "short_name", "") for node in _generate_image_letters(source, slipnet)
     )
-    v = vocab()
-    string_type = (
-        v.string_kind_modified if source.string_type == v.string_kind_initial
-        else v.string_kind_answer
-    )
+    # The string a rule is translated onto is the one across the source's horizontal bridge
+    # (the initial string becomes the modified one, the target string the answer).
+    string_type = constants().frame.horizontal_partner[source.string_type]
     translated = WorkspaceString(text, slipnet, string_type=string_type)
     if workspace is not None:
         translated.workspace = workspace
@@ -669,12 +669,7 @@ def _bridge_to_translation(
     # target string becomes the answer (a bottom pair).  Justify mode translates a
     # bottom rule into a top one, so the initial-string case is reachable, and filing
     # those bridges under ``bottom`` would have misreported the bottom mapping.
-    v = vocab()
-    bridge_type = (
-        v.bridge_type_top
-        if getattr(source, "string_type", "") == v.string_kind_initial
-        else v.bridge_type_bottom
-    )
+    bridge_type = constants().frame.horizontal_bridge_of[source.string_type]
 
     if transforms is None:
         # No transform record to scope by (a verbatim rule returns none): fall back to
@@ -740,23 +735,7 @@ def _describe_letters(string: Any, slipnet: Any) -> None:
     instantiated over it come out with no internal bonds, and the answer draws as
     unconnected letters.
     """
-    from server.engine.descriptions import Description
+    from server.engine.initial_program import describe_translated_letters
+    from server.engine.run_binding import current
 
-    letter_category = slipnet.roles.dimension_letter_category
-    object_category = slipnet.roles.dimension_object_category
-    letter_node = slipnet.roles.object_letter
-    if not letter_category:
-        return
-
-    for letter in string.letters:
-        # ``make-letter`` (``workspace-objects.ss:24-25``) describes the object
-        # category first and the letter category second.
-        if object_category and letter_node:
-            if not letter.description_type_present(object_category):
-                letter.add_description(
-                    Description(letter, object_category, letter_node)
-                )
-        if not letter.description_type_present(letter_category):
-            letter.add_description(
-                Description(letter, letter_category, letter.letter_category)
-            )
+    describe_translated_letters(string, slipnet, current().meta)

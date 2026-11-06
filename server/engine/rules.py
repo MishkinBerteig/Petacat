@@ -77,6 +77,11 @@ _DIRECTION_LEFT = "direction.left"
 _OBJECT_LETTER = "object.letter"
 _OBJECT_GROUP = "object.group"
 _GROUP_CATEGORY_SAMENESS = "group_category.sameness"
+#: The dimensions whose transforms are applied before every other (``rule.apply_first``), and
+#: those whose transform goes first or last by how the image's length changes
+#: (``rule.apply_by_length``): the order of ``apply-before?`` (``rules.ss:1395-1403``).
+_APPLY_FIRST_DIMENSION = "rule.apply_first"
+_APPLY_BY_LENGTH_DIMENSION = "rule.apply_by_length"
 
 #: The tail of the one stored token of the rule-signature format: the group node and the
 #: ``'string`` symbol collapse to ``<group node name>|string`` (``group_or_string_token``).
@@ -273,7 +278,7 @@ def _translate_object_description(
     # Either way a slippage labelled ``opposite`` survives, because opposition
     # reads the same in both directions.
     v = constants().vocab
-    going_down = getattr(from_string, "string_type", "") in (v.string_kind_initial, v.string_kind_modified)
+    going_down = getattr(from_string, "string_type", "") in constants().frame.going_down_kinds
     directional: list[Any] = []
     for bridge in vertical_bridges:
         directional.extend(
@@ -599,9 +604,7 @@ class IntrinsicChangeDescription:
         return _nested_member(self.reference_object, other.reference_object)
 
     def is_lettctgy_or_alphposctgy_dimension(self) -> bool:
-        return _holds(self.dimension, _DIM_LETTER_CATEGORY) or _holds(
-            self.dimension, _DIM_ALPHABETIC_POSITION
-        )
+        return _holds(self.dimension, "rule.letter_or_alphabetic_dimension")
 
     def is_dimension_role(self, role: str) -> bool:
         """True if this change's dimension plays *role*."""
@@ -647,9 +650,10 @@ class IntrinsicChangeDescription:
         """Scheme: make-change-template.
 
         Returns (scope, dimension, descriptors).
-        Disallows literal DirCtgy or GroupCtgy changes.
+        Disallows literal changes of the dimensions that keep the relation only
+        (``rule.relation_only_dimension``: DirCtgy and GroupCtgy).
         """
-        if _holds(self.dimension, _DIM_DIRECTION) or _holds(self.dimension, _DIM_GROUP_CATEGORY):
+        if _holds(self.dimension, "rule.relation_only_dimension"):
             # Remove descriptor2 from descriptors (keep only the relation)
             return (
                 self.scope,
@@ -1171,8 +1175,8 @@ class Rule(WorkspaceStructure):
         had.  ``themes.theme_type_for_bridge_type`` accepts it, ``top-bridge`` and ``top_bridge``
         alike, and gives the Themespace's underscore spelling (B3); the value itself is part of
         a stored theme pattern (``[bridge_theme_type]``) and so is not respelled here."""
-        v = constants().vocab
-        theme_type = v.theme_type_top_bridge if self.rule_type == v.rule_type_top else v.theme_type_bottom_bridge
+        frame = constants().frame
+        theme_type = frame.rule_theme_types.get(self.rule_type, frame.default_rule_theme_type)
         return theme_type.replace("_", "-")
 
     def get_verbatim_letter_categories(self) -> list[Any]:
@@ -1680,8 +1684,8 @@ class Rule(WorkspaceStructure):
         # ``themes.py`` names the three theme types with underscores; ``bridge_theme_type``
         # spells them with hyphens, and ``clamp_theme_pattern`` matches a cluster by an
         # exact string, so a hyphenated type clamps nothing at all.
-        v = constants().vocab
-        theme_type = v.theme_type_top_bridge if self.is_top_rule else v.theme_type_bottom_bridge
+        frame = constants().frame
+        theme_type = frame.rule_theme_types.get(self.rule_type, frame.default_rule_theme_type)
         relations: list[tuple[str, str]] = []
         for bridge in bridges:
             for relation in bridge.get_associated_thematic_relations():
@@ -2434,10 +2438,12 @@ def reference_object_to_object_description(
     return (obj_ctgy, chosen_desc.description_type, chosen_desc.descriptor)
 
 
-#: The description types (roles) a rule may name its object by, per
-#: ``get-descriptions-for-rule`` (``workspace-objects.ss:260-268``).  Letter-Category
-#: is admissible too, but conditionally — see :func:`descriptions_for_rule`.
-_RULE_OBJECT_DESCRIPTION_TYPES = (_DIM_STRING_POSITION, _DIM_ALPHABETIC_POSITION)
+#: The role of the description types a rule may name its object by, per
+#: ``get-descriptions-for-rule`` (``workspace-objects.ss:260-268``): the dimensions bound to
+#: ``rule.object_naming_dimension`` (String-Position and Alphabetic-Position in the Metacat
+#: Standard Configuration).  Letter-Category is admissible too, but conditionally — see
+#: :func:`descriptions_for_rule`.
+_RULE_OBJECT_NAMING_DIMENSION = "rule.object_naming_dimension"
 
 
 def descriptions_for_rule(obj: Any) -> list[Any]:
@@ -2473,7 +2479,7 @@ def descriptions_for_rule(obj: Any) -> list[Any]:
         if not (d.is_relevant() and d.is_distinguishing()):
             continue
         dt = d.description_type
-        if any(_holds(dt, role) for role in _RULE_OBJECT_DESCRIPTION_TYPES):
+        if _holds(dt, _RULE_OBJECT_NAMING_DIMENSION):
             out.append(d)
         elif _holds(dt, _DIM_LETTER_CATEGORY):
             if not isinstance(obj, Group):
@@ -3311,10 +3317,10 @@ def _apply_before(
     ``xyy`` where Metacat's merge sort gives ``yzz`` (``zyx -> xyy; z`` seed 1).
     """
     return bool(
-        _holds(t1[0], _DIM_GROUP_CATEGORY)
+        _holds(t1[0], _APPLY_FIRST_DIMENSION)
         or _holds(t1[1], _OBJECT_LETTER)
-        or (_holds(t1[0], _DIM_LENGTH) and change_length_first(t1[1], image_length, slipnet))
-        or (_holds(t2[0], _DIM_LENGTH) and not change_length_first(t2[1], image_length, slipnet))
+        or (_holds(t1[0], _APPLY_BY_LENGTH_DIMENSION) and change_length_first(t1[1], image_length, slipnet))
+        or (_holds(t2[0], _APPLY_BY_LENGTH_DIMENSION) and not change_length_first(t2[1], image_length, slipnet))
     )
 
 
@@ -3330,24 +3336,26 @@ def _transform_image(
     Scheme: transform-image (rules.ss:1366-1388).
     """
     # The dispatch from a dimension to the image operation is Metacat's case table
-    # (rules.ss:1366-1388), written over roles.  A dimension that plays none of these
-    # roles, or a role nothing holds, makes no change.
-    if _holds(dimension, _DIM_OBJECT_CATEGORY):
+    # (rules.ss:1366-1388): the configuration binds each dimension to the operation it performs
+    # (the ``image_operation.*`` roles).  A dimension bound to none of them, or a role nothing
+    # holds, makes no change (BondFacet "transforms" have no direct effect, and String-Position
+    # swaps are handled separately).
+    if _holds(dimension, "image_operation.letter_or_group"):
         if _holds(descriptor, _OBJECT_LETTER):
             image.letter()
         else:
             image.group()
 
-    elif _holds(dimension, _DIM_LETTER_CATEGORY):
+    elif _holds(dimension, "image_operation.new_start_letter"):
         image.new_start_letter(descriptor)
 
-    elif _holds(dimension, _DIM_LENGTH):
+    elif _holds(dimension, "image_operation.new_length"):
         image.new_length(descriptor)
 
-    elif _holds(dimension, _DIM_DIRECTION):
+    elif _holds(dimension, "image_operation.reverse_direction"):
         image.reverse_direction()
 
-    elif _holds(dimension, _DIM_GROUP_CATEGORY):
+    elif _holds(dimension, "image_operation.reverse_medium"):
         # GroupCtgy transforms need the bond-facet from a BondFacet "transform"
         medium = None
         if all_transforms:
@@ -3359,14 +3367,8 @@ def _transform_image(
         if medium is not None:
             image.reverse_medium(medium)
 
-    elif _holds(dimension, _DIM_ALPHABETIC_POSITION):
+    elif _holds(dimension, "image_operation.new_alpha_position_category"):
         image.new_alpha_position_category(descriptor)
-
-    elif _holds(dimension, _DIM_BOND_FACET):
-        pass  # BondFacet "transforms" have no direct effect
-
-    elif _holds(dimension, _DIM_STRING_POSITION):
-        pass  # StrPosCtgy swaps handled separately
 
 
 def _apply_string_position_swap(obj1: Any, obj2: Any) -> None:
@@ -3452,7 +3454,7 @@ def _get_equivalent_bridge(workspace: Workspace, bridge: Bridge) -> Any:
 
     existing = (
         equivalent1.vertical_bridge
-        if bridge.bridge_type == bridge._voc.bridge_type_vertical
+        if bridge.bridge_type in bridge._frame.vertical_names
         else equivalent1.horizontal_bridge
     )
     if existing is not None and existing.object2 is equivalent2:

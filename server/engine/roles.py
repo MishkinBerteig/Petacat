@@ -73,6 +73,47 @@ ROLES: tuple[RoleSpec, ...] = (
         RoleSpec("rule.dimension_order", NODE, ORDERED),
         RoleSpec("answer.description_dimension", NODE, ORDERED),
     )
+    # -- Policy sets: a branch of the engine reads a list of nodes, so which nodes behave a way is
+    # configuration.  Each is an ordered role (any number of nodes; the order is not read).
+    + tuple(
+        RoleSpec(n, NODE, ORDERED)
+        for n in (
+            # Dimensions whose descriptors lie on a successor / predecessor ladder: a concept
+            # mapping between two of them looks for its link among the lateral links, and a
+            # slippage on one is exempt from bridge compatibility.
+            "dimension.ladder",
+            # Dimensions that reverse together when a group is re-read backwards.
+            "dimension.reverses_together",
+            # Dimensions that describe a bond (a group's bond descriptions, a bond concept mapping).
+            "dimension.bond_description",
+            # Dimensions on which two descriptions are mappable whatever their descriptors.
+            "dimension.freely_mappable",
+            # Bond categories whose bonds are symmetric: filed under both ends.
+            "bond_category.symmetric",
+            # Group categories whose groups have a direction.
+            "group_category.directed",
+            # Dimensions a rule may name an object by.
+            "rule.object_naming_dimension",
+            # Dimensions of an intrinsic change that are alphabetic (a letter's category or its
+            # place in the alphabet).
+            "rule.letter_or_alphabetic_dimension",
+            # Dimensions whose change keeps the relation only, never a literal descriptor.
+            "rule.relation_only_dimension",
+            # Descriptors that never tell an object apart from its string (besides the numbers).
+            "descriptor.generic",
+            # Dimensions whose transform is applied before every other, and those whose transform
+            # goes first or last by how the image's length changes (``apply-before?``).
+            "rule.apply_first",
+            "rule.apply_by_length",
+        )
+    )
+    # -- The image operation a dimension performs when a rule transforms an image
+    # (``transform-image``, ``rules.ss:1366-1388``); a dimension bound to none makes no change.
+    + _one(
+        "image_operation.letter_or_group", "image_operation.new_start_letter",
+        "image_operation.new_length", "image_operation.reverse_direction",
+        "image_operation.reverse_medium", "image_operation.new_alpha_position_category",
+    )
     + _one(
         "evaluator.bond", "evaluator.group", "evaluator.description",
         "recruit.description_scout", "recruit.group_scout_category",

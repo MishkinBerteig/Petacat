@@ -153,6 +153,38 @@ class LinkTypeSpec:
 
 
 @dataclass(frozen=True)
+class StringKindSpec:
+    """A kind of string of the four-string frame, in the order of its ``sort_order``."""
+
+    name: str
+    role: str | None
+    #: Whether a string of this kind is there from the start of a run (the answer string is not).
+    exists_at_start: bool
+
+
+@dataclass(frozen=True)
+class BridgeTypeSpec:
+    """A kind of bridge: the two kinds of string it joins, its orientation and the theme type
+    it feeds (names of rows of ``string_kinds``, ``bridge_orientations`` and ``theme_types``)."""
+
+    name: str
+    role: str | None
+    from_string_kind: str | None
+    to_string_kind: str | None
+    orientation: str | None
+    theme_type: str | None
+
+
+@dataclass(frozen=True)
+class RuleTypeSpec:
+    """A kind of rule: the bridge type whose pair of strings a rule of this type describes."""
+
+    name: str
+    role: str | None
+    bridge_type: str | None
+
+
+@dataclass(frozen=True)
 class ClampTypeSpec:
     """A clamp type: what its clamp holds the rest of the Coderack against, the factor its
     clamps give the jootsing probability, and what counts as progress for it."""
@@ -191,6 +223,40 @@ class DemoProblem:
 
 
 @dataclass(frozen=True)
+class InitialDescriptionRuleSpec:
+    """One rule of the initial-description program (``initial_description_rules``): a
+    description every letter is given, in ``ordinal`` order, at the front of its list."""
+
+    rule_key: str
+    ordinal: int
+    #: A node role naming the description type.
+    dimension_role: str
+    #: ``role`` (the node ``descriptor_role`` names), ``letter_category`` (the letter's own) or, for a
+    #: group, one of the group's own (``initial_program.GROUP_SOURCES``).
+    descriptor_source: str
+    descriptor_role: str | None
+    #: One of the conditions of the rule's subject (``initial_program``).
+    condition: str
+    activate_descriptor: bool
+    #: ``letter``, ``translated_letter`` or ``group`` (``initial_program.SUBJECTS``).
+    subject: str = "letter"
+    built: bool = True
+    bond_description: bool = False
+
+
+@dataclass(frozen=True)
+class InitialActivationRuleSpec:
+    """One rule of the concepts a run starts fully active (``initial_activation_rules``)."""
+
+    rule_key: str
+    ordinal: int
+    #: A node role naming the node.
+    node_role: str
+    #: One of ``initial_program.ACTIVATION_CONDITIONS``.
+    condition: str
+
+
+@dataclass(frozen=True)
 class ThemeDimensionSpec:
     slipnet_node: str
     valid_relations: list[str]
@@ -220,11 +286,20 @@ class MetadataProvider:
     #: in the engine reads them yet (EN3 adds the mechanism).
     node_roles: tuple[NodeRoleSpec, ...] = ()
     codelet_roles: tuple[CodeletRoleSpec, ...] = ()
+    #: The initial-description program and the concepts a run starts active, each by
+    #: ``ordinal`` (``server/engine/initial_program.py``).
+    initial_description_rules: tuple[InitialDescriptionRuleSpec, ...] = ()
+    initial_activation_rules: tuple[InitialActivationRuleSpec, ...] = ()
     #: Theme relations, ordered by ``ordinal``.
     theme_relations: tuple[ThemeRelationSpec, ...] = ()
     #: The rows of the enum tables bound to a role of the vocabulary
     #: (``server/engine/roles.py``), ordered by role name.  Hashed with the rest.
     vocabulary_bindings: tuple[VocabularyBinding, ...] = ()
+    #: The four-string frame, in table order: the kinds of string, of bridge and of rule, and how
+    #: they join up.  ``server/engine/frame.py`` derives everything else from these, once per run.
+    string_kinds: tuple[StringKindSpec, ...] = ()
+    bridge_types: tuple[BridgeTypeSpec, ...] = ()
+    rule_types: tuple[RuleTypeSpec, ...] = ()
     #: The link types and their behaviours, in table order.
     link_types: tuple[LinkTypeSpec, ...] = ()
     #: The clamp types, in table order.
@@ -249,6 +324,20 @@ class MetadataProvider:
         (``run_binding.constants().vocab`` on a hot path).
         """
         return Vocabulary({b.role: b.name for b in self.vocabulary_bindings})
+
+    @property
+    def frame(self) -> Any:
+        """The four-string frame of this configuration (built once, on first use): what each
+        kind of string maps, who its partner is, which theme type a bridge type feeds
+        (``server/engine/frame.py``).  Derived from ``string_kinds``, ``bridge_types`` and
+        ``rule_types`` and from nothing else."""
+        cached = self.__dict__.get("_frame")
+        if cached is None:
+            from server.engine.frame import Frame
+
+            cached = Frame(self)
+            self.__dict__["_frame"] = cached
+        return cached
 
     def params_referring_to(self, *kinds: str) -> tuple[str, ...]:
         """The names of the parameters whose ``refers_to`` is one of *kinds*, in the table's order."""
@@ -441,6 +530,37 @@ class MetadataProvider:
                 key=lambda r: (r["role"].encode(), r["ordinal"]),
             )
         )
+        program = _load("initial_program.json")
+        initial_description_rules = tuple(
+            InitialDescriptionRuleSpec(
+                rule_key=r["rule_key"],
+                ordinal=r["ordinal"],
+                dimension_role=r["dimension_role"],
+                descriptor_source=r["descriptor_source"],
+                descriptor_role=r.get("descriptor_role"),
+                condition=r["condition"],
+                activate_descriptor=r["activate_descriptor"],
+                subject=r["subject"],
+                built=r["built"],
+                bond_description=r["bond_description"],
+            )
+            for r in sorted(
+                program.get("description_rules", []),
+                key=lambda r: (r["ordinal"], r["rule_key"].encode()),
+            )
+        )
+        initial_activation_rules = tuple(
+            InitialActivationRuleSpec(
+                rule_key=r["rule_key"],
+                ordinal=r["ordinal"],
+                node_role=r["node_role"],
+                condition=r["condition"],
+            )
+            for r in sorted(
+                program.get("activation_rules", []),
+                key=lambda r: (r["ordinal"], r["rule_key"].encode()),
+            )
+        )
         theme_relations = tuple(
             ThemeRelationSpec(
                 name=r["name"],
@@ -465,6 +585,27 @@ class MetadataProvider:
         link_types = tuple(
             LinkTypeSpec(name=r["name"], behaviour=r.get("behaviour"))
             for r in enum_rows.get("link_types", [])
+        )
+        string_kinds = tuple(
+            StringKindSpec(
+                name=r["name"], role=r.get("role"), exists_at_start=bool(r.get("exists_at_start", True)),
+            )
+            for r in enum_rows.get("string_kinds", [])
+        )
+        bridge_types = tuple(
+            BridgeTypeSpec(
+                name=r["name"],
+                role=r.get("role"),
+                from_string_kind=r.get("from_string_kind"),
+                to_string_kind=r.get("to_string_kind"),
+                orientation=r.get("orientation"),
+                theme_type=r.get("theme_type"),
+            )
+            for r in enum_rows.get("bridge_types", [])
+        )
+        rule_types = tuple(
+            RuleTypeSpec(name=r["name"], role=r.get("role"), bridge_type=r.get("bridge_type"))
+            for r in enum_rows.get("rule_types", [])
         )
         clamp_types = tuple(
             ClampTypeSpec(
@@ -501,8 +642,13 @@ class MetadataProvider:
             codelet_patterns=codelet_patterns,
             node_roles=node_roles,
             codelet_roles=codelet_roles,
+            initial_description_rules=initial_description_rules,
+            initial_activation_rules=initial_activation_rules,
             theme_relations=theme_relations,
             vocabulary_bindings=vocabulary_bindings(enum_rows),
+            string_kinds=string_kinds,
+            bridge_types=bridge_types,
+            rule_types=rule_types,
             link_types=link_types,
             clamp_types=clamp_types,
             progress_focuses=progress_focuses,

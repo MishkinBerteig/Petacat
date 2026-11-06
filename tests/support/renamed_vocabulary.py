@@ -60,6 +60,15 @@ def renamed(docs: Documents) -> tuple[Documents, dict[str, str]]:
     for table in RENAMED_TABLES:
         for row in docs["enums.json"][table]:
             row["name"] = m[table].get(row["name"], row["name"])
+    # The frame rows name rows of other tables: a bridge type its two strings, orientation and theme
+    # type, a rule type the bridge type it describes.
+    for row in docs["enums.json"]["bridge_types"]:
+        row["from_string_kind"] = m["string_kinds"].get(row["from_string_kind"], row["from_string_kind"])
+        row["to_string_kind"] = m["string_kinds"].get(row["to_string_kind"], row["to_string_kind"])
+        row["orientation"] = m["bridge_orientations"].get(row["orientation"], row["orientation"])
+        row["theme_type"] = m["theme_types"].get(row["theme_type"], row["theme_type"])
+    for row in docs["enums.json"]["rule_types"]:
+        row["bridge_type"] = m["bridge_types"].get(row["bridge_type"], row["bridge_type"])
     for row in docs["enums.json"]["progress_focuses"]:
         row["event_types"] = [m["event_types"].get(e, e) for e in row["event_types"]]
     for row in docs["theme_relations.json"]:

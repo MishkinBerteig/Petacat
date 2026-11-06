@@ -8,7 +8,7 @@ Scheme source: descriptions.ss
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Sequence
 
 from server.engine.run_binding import constants
 from server.engine.workspace_structures import WorkspaceStructure
@@ -120,13 +120,15 @@ class Description(WorkspaceStructure):
             return rc.description_local_support_4_plus
 
     @property
-    def theme_types(self) -> list[str]:
+    def theme_types(self) -> Sequence[str]:
         """Theme types this description's object participates in.
 
         Scheme: ``get-theme-types`` (``descriptions.ss:54-61``) — objects in the
         initial string speak to both top and vertical themes; modified-string
         objects to top themes; target-string objects to vertical themes **and, only
-        in justify mode, bottom ones**; answer-string objects to bottom themes.
+        in justify mode, bottom ones**; answer-string objects to bottom themes.  Derived
+        from the frame (``Frame.theme_types_of``): the theme types of the bridge types that
+        end in the object's string kind.
 
         The justify gate is the reference's own::
 
@@ -139,29 +141,15 @@ class Description(WorkspaceStructure):
         told the mode at ``init_mcat``, rather than stored: a description outlives the
         moment it was made and the mode belongs to the run.
         """
-        voc = constants().vocab
-        top, vertical, bottom = (
-            voc.theme_type_top_bridge,
-            voc.theme_type_vertical_bridge,
-            voc.theme_type_bottom_bridge,
-        )
         role = getattr(getattr(self.object, "string", None), "string_type", None)
-        if role == voc.string_kind_initial:
-            return [top, vertical]
-        if role == voc.string_kind_modified:
-            return [top]
-        if role == voc.string_kind_target:
-            themespace = WorkspaceStructure.get_themespace()
-            justify = bool(
-                themespace is not None
-                and bottom in themespace.possible_theme_types
-            )
-            if justify:
-                return [vertical, bottom]
-            return [vertical]
-        if role == voc.string_kind_answer:
-            return [bottom]
-        return [top, vertical, bottom]
+        types, conditional = constants().frame.kind_theme_types(role)
+        if not conditional:
+            return types
+        themespace = WorkspaceStructure.get_themespace()
+        if themespace is None:
+            return types
+        possible = themespace.possible_theme_types
+        return [*types, *(t for t in conditional if t in possible)]
 
     def get_thematic_compatibility(self) -> float:
         """Max support from active themes sharing this description's dimension.
@@ -201,15 +189,14 @@ class Description(WorkspaceStructure):
 
     @property
     def bond_description(self) -> bool:
-        """True if description_type is bond-category or bond-facet.
+        """True if description_type is a bond description (``dimension.bond_description``:
+        bond-category and bond-facet in the Metacat Standard Configuration).
 
         Scheme: descriptions.ss:69-71.
         """
         from server.engine.slipnet import holds_role
 
-        return holds_role(self.description_type, "dimension.bond_category") or holds_role(
-            self.description_type, "dimension.bond_facet"
-        )
+        return holds_role(self.description_type, "dimension.bond_description")
 
     def is_relevant(self) -> bool:
         """A description is relevant if its description_type is fully active."""

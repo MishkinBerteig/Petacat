@@ -18,17 +18,22 @@ from server.engine.posting import validate_posting_formulas
 from server.engine.rational import parse_rational
 from server.engine.roles import ROLE_COLUMN, vocabulary_bindings
 from server.engine.metadata import (
+    BridgeTypeSpec,
     ClampTypeSpec,
     CodeletRoleSpec,
     CodeletSpec,
     DemoProblem,
+    InitialActivationRuleSpec,
+    InitialDescriptionRuleSpec,
     LinkTypeSpec,
     MetadataProvider,
     NodeRoleSpec,
     PostingRuleSpec,
     ProgressFocusSpec,
+    RuleTypeSpec,
     SlipnetLinkSpec,
     SlipnodeSpec,
+    StringKindSpec,
     ThemeDimensionSpec,
     ThemeRelationSpec,
 )
@@ -48,6 +53,8 @@ from server.models.metadata import (
     EventTypeDef,
     FailureKindDef,
     FormulaCoefficient,
+    InitialActivationRule,
+    InitialDescriptionRule,
     LinkTypeDef,
     ParamValueTypeDef,
     PostingDirectionDef,
@@ -109,8 +116,13 @@ PROVIDER_FIELD_TABLES: dict[str, tuple[str, ...]] = {
     "codelet_patterns": ("codelet_pattern_defs",),
     "node_roles": ("slipnet_node_roles",),
     "codelet_roles": ("codelet_type_roles",),
+    "initial_description_rules": ("initial_description_rules",),
+    "initial_activation_rules": ("initial_activation_rules",),
     "theme_relations": ("theme_relations",),
     "vocabulary_bindings": tuple(ROLE_COLUMN),
+    "string_kinds": ("string_kinds",),
+    "bridge_types": ("bridge_types",),
+    "rule_types": ("rule_types",),
     "link_types": ("link_types",),
     "clamp_types": ("clamp_types",),
     "progress_focuses": ("progress_focuses",),
@@ -304,6 +316,36 @@ def _field_codelet_roles(tables: Mapping[str, Any]) -> tuple[CodeletRoleSpec, ..
     )
 
 
+def _field_initial_description_rules(tables: Mapping[str, Any]) -> tuple[InitialDescriptionRuleSpec, ...]:
+    return tuple(
+        InitialDescriptionRuleSpec(
+            rule_key=r["rule_key"],
+            ordinal=r["ordinal"],
+            dimension_role=r["dimension_role"],
+            descriptor_source=r["descriptor_source"],
+            descriptor_role=r.get("descriptor_role"),
+            condition=r["condition"],
+            activate_descriptor=bool(r["activate_descriptor"]),
+            subject=r["subject"],
+            built=bool(r["built"]),
+            bond_description=bool(r["bond_description"]),
+        )
+        for r in _rows(tables["initial_description_rules"])
+    )
+
+
+def _field_initial_activation_rules(tables: Mapping[str, Any]) -> tuple[InitialActivationRuleSpec, ...]:
+    return tuple(
+        InitialActivationRuleSpec(
+            rule_key=r["rule_key"],
+            ordinal=r["ordinal"],
+            node_role=r["node_role"],
+            condition=r["condition"],
+        )
+        for r in _rows(tables["initial_activation_rules"])
+    )
+
+
 def _field_theme_relations(tables: Mapping[str, Any]) -> tuple[ThemeRelationSpec, ...]:
     return tuple(
         ThemeRelationSpec(
@@ -320,6 +362,34 @@ def _field_theme_relations(tables: Mapping[str, Any]) -> tuple[ThemeRelationSpec
 
 def _field_vocabulary_bindings(tables: Mapping[str, Any]) -> tuple:
     return vocabulary_bindings({name: list(_rows(tables[name])) for name in ROLE_COLUMN})
+
+
+def _field_string_kinds(tables: Mapping[str, Any]) -> tuple[StringKindSpec, ...]:
+    return tuple(
+        StringKindSpec(name=r["name"], role=r.get("role"), exists_at_start=bool(r.get("exists_at_start")))
+        for r in _rows(tables["string_kinds"])
+    )
+
+
+def _field_bridge_types(tables: Mapping[str, Any]) -> tuple[BridgeTypeSpec, ...]:
+    return tuple(
+        BridgeTypeSpec(
+            name=r["name"],
+            role=r.get("role"),
+            from_string_kind=r.get("from_string_kind"),
+            to_string_kind=r.get("to_string_kind"),
+            orientation=r.get("orientation"),
+            theme_type=r.get("theme_type"),
+        )
+        for r in _rows(tables["bridge_types"])
+    )
+
+
+def _field_rule_types(tables: Mapping[str, Any]) -> tuple[RuleTypeSpec, ...]:
+    return tuple(
+        RuleTypeSpec(name=r["name"], role=r.get("role"), bridge_type=r.get("bridge_type"))
+        for r in _rows(tables["rule_types"])
+    )
 
 
 def _field_link_types(tables: Mapping[str, Any]) -> tuple[LinkTypeSpec, ...]:
@@ -370,8 +440,13 @@ _FIELD_BUILDERS = {
     "codelet_patterns": _field_codelet_patterns,
     "node_roles": _field_node_roles,
     "codelet_roles": _field_codelet_roles,
+    "initial_description_rules": _field_initial_description_rules,
+    "initial_activation_rules": _field_initial_activation_rules,
     "theme_relations": _field_theme_relations,
     "vocabulary_bindings": _field_vocabulary_bindings,
+    "string_kinds": _field_string_kinds,
+    "bridge_types": _field_bridge_types,
+    "rule_types": _field_rule_types,
     "link_types": _field_link_types,
     "clamp_types": _field_clamp_types,
     "progress_focuses": _field_progress_focuses,
@@ -430,6 +505,8 @@ async def load_rows_from_db(session: AsyncSession) -> dict[str, list[dict[str, A
         "slipnet_node_roles": SlipnetNodeRole,
         "codelet_type_roles": CodeletTypeRole,
         "theme_relations": ThemeRelation,
+        "initial_description_rules": InitialDescriptionRule,
+        "initial_activation_rules": InitialActivationRule,
         **ENUM_TABLE_MODELS,
     }
     queries = {

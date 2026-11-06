@@ -519,14 +519,16 @@ class Image:
     def reverse_medium(self, medium: SlipnetNode | None) -> None:
         """Scheme: reverse-medium.
 
-        Reverses the order of sub-images along a given medium
-        (plato-letter-category or plato-length).
+        Reverses the order of sub-images along a given medium (the dimension bound to
+        ``image_operation.new_start_letter`` or to ``image_operation.new_length``).
         """
         if self.is_letter_image:
             return
 
-        letter_category = self.slipnet.roles.dimension_letter_category
-        length_node = self.slipnet.roles.dimension_length
+        # The medium is the dimension the image operations of the same name work along
+        # (``image_operation.new_start_letter`` and ``image_operation.new_length``).
+        letter_category = self.slipnet.roles.image_operation_new_start_letter
+        length_node = self.slipnet.roles.image_operation_new_length
 
         if medium is letter_category:
             letters = [sub.get_letter() for sub in self.sub_images]
@@ -888,8 +890,10 @@ class StringImage:
 
     def reverse_medium(self, medium: SlipnetNode | None) -> None:
         """Scheme: reverse-medium on a string-image."""
-        letter_category = self.slipnet.roles.dimension_letter_category
-        length_node = self.slipnet.roles.dimension_length
+        # The medium is the dimension the image operations of the same name work along
+        # (``image_operation.new_start_letter`` and ``image_operation.new_length``).
+        letter_category = self.slipnet.roles.image_operation_new_start_letter
+        length_node = self.slipnet.roles.image_operation_new_length
 
         if medium is letter_category:
             letters = [sub.get_letter() for sub in self.get_sub_images()]

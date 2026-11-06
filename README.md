@@ -28,7 +28,7 @@ license change was authorised by Dr. Marshall directly (see
 > end-to-end. Episodic Memory (Metacat-Mode learning) shapes the runs that inherit it: a run
 > declines an answer already held for the same problem and rules, so repeating a
 > problem across Metacat Mode's [episodic runs](#persistence-modes-and-episodic-runs)
-> (which are Metacat Mode and not Training Mode) explores a different answer each time. It ships with 6,110 test cases covering the engine, the API, and the
+> (which are Metacat Mode and not Training Mode) explores a different answer each time. It ships with 6,449 test cases covering the engine, the API, and the
 > help/config system, run on both the CPU and the GPU numeric backends. Underneath the seven components sits an execution
 > substrate — three [persistence modes](#persistence-modes-and-episodic-runs),
 > a [GPU numeric substrate](#the-numeric-substrate), and
@@ -152,16 +152,17 @@ start-up. Codelet behaviour is expressed as Python source strings, compiled once
 configuration and executed via `exec()` in a sandboxed namespace.
 
 Edit a configuration through the Admin view (the hamburger menu's **Configurations (Metacat Mode and
-Training Mode)**): thirteen tables have an editor tab that creates, updates and deletes their rows
+Training Mode)**): fifteen tables have an editor tab that creates, updates and deletes their rows
 (the Slipnet nodes and links, codelet types, engine parameters, urgency levels, formula coefficients,
-demo problems, enum tables, theme dimensions, posting rules, commentary templates, Slipnet layout and
-help topics). Every save goes through the change API and the next run created picks it up. The codelet
+demo problems, enum tables, theme dimensions, posting rules, the initial-description and initial-activation
+rules, commentary templates, Slipnet layout and help topics). Every save goes through the change API and the next run created picks it up. The codelet
 patterns, the roles and the theme relations have no tab and are changed through the change API. The
 seed files change only by a committed development change; nothing the application does writes them.
 
-`GET /api/admin/export` writes sixteen collections as one JSON object, and `POST /api/admin/import`
-reads thirteen of them back: slipnet nodes and links, codelet types, engine parameters, urgency
-levels, formula coefficients, demo problems, theme dimensions, posting rules, codelet patterns,
+`GET /api/admin/export` writes eighteen collections as one JSON object, and `POST /api/admin/import`
+reads fifteen of them back: slipnet nodes and links, codelet types, engine parameters, urgency
+levels, formula coefficients, demo problems, theme dimensions, posting rules, the initial-description
+and initial-activation rules, codelet patterns,
 commentary templates, slipnet layout and help topics. (The node roles, codelet type roles and theme
 relations are exported so that the download loses nothing, but not imported.) Export orders every
 collection by primary key, so two exports of one configuration are the same bytes and a backup diffs
@@ -427,7 +428,7 @@ time (the global one, which Metacat Mode uses, unless you open a Training Mode S
 - **Status and reset**: how the open configuration differs from the Metacat Standard Configuration, with Verify journal and Reset
 - **Slipnet Nodes**, **Slipnet Links**, **Codelet Types** (Python `execute_body` source), **Engine Params**,
   **Urgency Levels**, **Formula Coefficients**, **Demo Problems**, **Enum Tables**, **Theme Dimensions**,
-  **Posting Rules**, **Commentary Templates**, **Slipnet Layout** and **Help Topics** (the in-app help
+  **Posting Rules**, **Initial Descriptions** (the initial-description program), **Commentary Templates**, **Slipnet Layout** and **Help Topics** (the in-app help
   text, backed by `seed_data/help_topics.en.json`): editable tables over the seed data's 59 nodes, 202
   links, 27 codelet types, 188 formula coefficients and the rest
 - **History**: the journal, with undo
@@ -455,8 +456,8 @@ Petacat has two test suites:
   plugin against the serial runs it claims to equal), `lockstep` (Petacat's decision
   traces against Metacat's), and `e2e` (full HTTP
   stack against a running database). All eight run in a single command against
-  the local Postgres — 6,110 cases, which includes the numeric matrix's second
-  pass over the 1007 backend-sensitive tests. See
+  the local Postgres — 6,449 cases, which includes the numeric matrix's second
+  pass over the 1142 backend-sensitive tests. See
   [TESTING.md](TESTING.md) for the layer breakdown, the numeric backend matrix,
   the session ceiling, the unit-test rules, determinism requirements, test-double
   conventions, how to run the suite under the free-threaded interpreter, and what
@@ -1761,8 +1762,9 @@ files are not read again (see [`seed_data/README.md`](seed_data/README.md) and
 | `demo_problems.json` | 41 pre-configured analogy problems |
 | `posting_rules.json` | Codelet posting rules |
 | `commentary_templates.json` | Natural-language output templates, and Verbose mode's 200-odd message texts (`verbose_messages`) |
-| `enums.json` | The 18 enum tables (bridge types, proposal levels, link types, clamp types, …), with the `role` column that binds a row to the engine's vocabulary (see `seed_data/README.md`) |
-| `roles.json` | The roles the engine looks Slipnet nodes and codelet types up by (37 node-role rows, 5 codelet-type-role rows) |
+| `enums.json` | The 18 enum tables (bridge types, proposal levels, link types, clamp types, …), with the `role` column that binds a row to the engine's vocabulary, and, in `string_kinds`, `bridge_types` and `rule_types`, the one definition of the four-string frame (which bridge joins which strings; see `seed_data/README.md`) |
+| `roles.json` | The roles the engine looks Slipnet nodes and codelet types up by (64 node-role rows, 5 codelet-type-role rows), including the sets of dimensions that behave one way and the image operation each dimension performs |
+| `initial_program.json` | The initial-description program: the descriptions every letter is given before the first codelet (18 rules: 6 for the letters, 10 for every new group, 2 for a translated string, each subject applied in order) and the concepts that start fully active (1 rule) |
 | `theme_relations.json` | The Themespace's 5 relations |
 | `slipnet_layout.json` | Grid positions for the Slipnet visualisation |
 | `help_topics.en.json` | Help popover text for every dashboard panel + glossary (English) |

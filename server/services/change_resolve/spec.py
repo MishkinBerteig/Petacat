@@ -44,6 +44,9 @@ REFERENCES: dict[tuple[str, str], tuple[str, bool]] = {
     ("theme_relations", "node_name"): ("slipnet_node_defs", False),
     ("slipnet_node_roles", "role"): ("role.node", False),
     ("slipnet_node_roles", "node_name"): ("slipnet_node_defs", False),
+    ("initial_description_rules", "dimension_role"): ("role.node", False),
+    ("initial_description_rules", "descriptor_role"): ("role.node", False),
+    ("initial_activation_rules", "node_role"): ("role.node", False),
     ("codelet_type_roles", "role"): ("role.codelet_type", False),
     ("codelet_type_roles", "codelet_type"): ("codelet_type_defs", False),
     ("codelet_type_defs", "family"): ("codelet_families", False),
@@ -61,6 +64,13 @@ REFERENCES: dict[tuple[str, str], tuple[str, bool]] = {
     # (``clamp_types.codelet_background_level`` names an urgency level and is, like a posting
     # rule's ``urgency_level``, rewritten on a level rename and reported, never deleted, when
     # the level is removed: it is in ``ENUM_COLUMN_REFERENCES``, not here.)
+    # The four-string frame: which strings a bridge type joins, its orientation, the theme type it
+    # feeds, and the bridge type a rule type describes (``server/engine/frame.py``).
+    ("bridge_types", "from_string_kind"): ("string_kinds", False),
+    ("bridge_types", "to_string_kind"): ("string_kinds", False),
+    ("bridge_types", "orientation"): ("bridge_orientations", False),
+    ("bridge_types", "theme_type"): ("theme_types", False),
+    ("rule_types", "bridge_type"): ("bridge_types", False),
     ("clamp_types", "progress_focus"): ("progress_focuses", False),
     ("progress_focuses", "event_types"): ("event_types", True),
 }

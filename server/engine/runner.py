@@ -557,96 +557,16 @@ class EngineRunner:
         self.ctx.sink.on_run_created(self.ctx)
 
     def _add_initial_descriptions(self, workspace: Workspace, slipnet: Slipnet) -> None:
-        """Add initial descriptions to all letters.
+        """Start the run with its concepts active and its letters described.
 
-        Scheme: run.ss init-mcat — adds letter-category, string-position,
-        and object-category descriptions, then sets their descriptors to
-        full activation.
+        Scheme: ``init-mcat`` (``run.ss:221-232``) and ``make-letter``.  The program is
+        configuration (``initial_activation_rules`` then ``initial_description_rules``, each in
+        ``ordinal`` order); the engine only applies it (``initial_program.py``).
         """
-        from server.engine.descriptions import Description
-        from server.engine.workspace_objects import Letter
+        from server.engine.initial_program import add_initial_descriptions, apply_initial_activations
 
-        # The description program stays in code, over roles.  A role nothing holds is an
-        # ``Absent`` token (falsy), so each guard below drops that description: what has no
-        # node is not perceived.
-        built_level = self.meta.vocabulary.proposal_level_built
-        roles = slipnet.roles
-        letter_cat_node = roles.dimension_letter_category
-        obj_cat_node = roles.dimension_object_category
-        letter_obj_node = roles.object_letter
-        str_pos_node = roles.dimension_string_position
-        leftmost_node = roles.position_leftmost
-        rightmost_node = roles.position_rightmost
-        middle_node = roles.position_middle
-        single_node = roles.position_single
-
-        # From the Slipnet the descriptors belong to, not a second read of the
-        # parameter: the node already carries the run's ceiling, and two reads of
-        # one value is how they come to disagree.
-        max_act = slipnet.activation_params.max_activation
-
-        # ``run.ss:221-226``: a problem containing any single-letter string starts
-        # with the *concept* of object-category fully active.  A one-letter string
-        # can only be mapped onto a multi-letter one by treating a letter and a
-        # group as playing the same role, so the reference puts that idea on the
-        # table before the first codelet runs rather than waiting for the run to
-        # stumble into it.  Depth 90, so it stays above threshold for about seven
-        # update cycles.
-        if obj_cat_node and any(s.length == 1 for s in workspace.all_strings):
-            obj_cat_node.activation = max_act
-
-        for ws_string in workspace.all_strings:
-            letters = [o for o in ws_string.objects if isinstance(o, Letter)]
-            for letter in letters:
-                # Object-category: letter — **first**.  ``make-letter``
-                # (``workspace-objects.ss:21-26``) attaches object-category before
-                # letter-category, and a description list is walked in order by every
-                # stochastic description pick and by the bridge's theme cross-product,
-                # so the order is part of what the run does rather than presentation.
-                if obj_cat_node and letter_obj_node:
-                    desc = Description(letter, obj_cat_node, letter_obj_node)
-                    desc.proposal_level = built_level
-                    letter.descriptions.insert(0, desc)
-                    # ``run.ss:227-232`` activates *every* descriptor of every
-                    # initial description, which includes ``plato-letter`` — the
-                    # descriptor of the object-category description.  Leaving it
-                    # at 0 skipped the brief early presence of the concept of a
-                    # letter, which is what letter⇔group concept-mappings are
-                    # weighed against.
-                    letter_obj_node.activation = max_act
-
-                # Letter-category description (e.g., letter-category: a)
-                if letter_cat_node and letter.letter_category:
-                    desc = Description(letter, letter_cat_node, letter.letter_category)
-                    desc.proposal_level = built_level
-                    letter.descriptions.insert(0, desc)
-                    # Activate the descriptor
-                    letter.letter_category.activation = max_act
-
-                # String-position descriptions
-                if str_pos_node and len(letters) == 1:
-                    # Single-letter string
-                    if single_node:
-                        desc = Description(letter, str_pos_node, single_node)
-                        desc.proposal_level = built_level
-                        letter.descriptions.insert(0, desc)
-                        single_node.activation = max_act
-                elif str_pos_node:
-                    if letter.left_string_pos == 0 and leftmost_node:
-                        desc = Description(letter, str_pos_node, leftmost_node)
-                        desc.proposal_level = built_level
-                        letter.descriptions.insert(0, desc)
-                        leftmost_node.activation = max_act
-                    if letter.right_string_pos == len(letters) - 1 and rightmost_node:
-                        desc = Description(letter, str_pos_node, rightmost_node)
-                        desc.proposal_level = built_level
-                        letter.descriptions.insert(0, desc)
-                        rightmost_node.activation = max_act
-                    if len(letters) % 2 == 1 and letter.left_string_pos == len(letters) // 2 and middle_node:
-                        desc = Description(letter, str_pos_node, middle_node)
-                        desc.proposal_level = built_level
-                        letter.descriptions.insert(0, desc)
-                        middle_node.activation = max_act
+        apply_initial_activations(workspace, slipnet, self.meta)
+        add_initial_descriptions(workspace, slipnet, self.meta)
 
     @staticmethod
     def _update_workspace_values(workspace: Workspace, rng: RNG | None = None) -> None:

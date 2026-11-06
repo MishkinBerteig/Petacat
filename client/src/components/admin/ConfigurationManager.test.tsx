@@ -23,6 +23,7 @@ import { FormulaCoefficientEditor } from './FormulaCoefficientEditor'
 import { DemoEditor } from './DemoEditor'
 import { ThemeDimensionEditor } from './ThemeDimensionEditor'
 import { PostingRuleEditor } from './PostingRuleEditor'
+import { InitialProgramEditor } from './InitialProgramEditor'
 import { CommentaryTemplateEditor } from './CommentaryTemplateEditor'
 import { SlipnetLayoutEditor } from './SlipnetLayoutEditor'
 import { NewSessionForm } from '../session/NewSessionForm'
@@ -87,7 +88,7 @@ afterEach(() => { vi.unstubAllGlobals(); window.location.hash = '' })
 const EDITOR_TABS = [
   'Slipnet Nodes', 'Slipnet Links', 'Codelet Types', 'Engine Params', 'Urgency Levels',
   'Formula Coefficients', 'Demo Problems', 'Enum Tables', 'Theme Dimensions', 'Posting Rules',
-  'Commentary Templates', 'Slipnet Layout', 'Help Topics', 'History', 'Database (all modes)', 'Status and reset',
+  'Initial Descriptions', 'Commentary Templates', 'Slipnet Layout', 'Help Topics', 'History', 'Database (all modes)', 'Status and reset',
 ]
 
 const GLOBAL_CHIP = 'Editing: Metacat Mode global configuration. This does not affect any session'
@@ -378,6 +379,7 @@ describe('every editor with a non-global configuration', () => {
     ['Demo Problems', () => <DemoEditor configuration={5} />, 'demo_problems'],
     ['Theme Dimensions', () => <ThemeDimensionEditor configuration={5} />, 'theme_dimension_defs'],
     ['Posting Rules', () => <PostingRuleEditor configuration={5} />, 'posting_rules'],
+    ['Initial Descriptions', () => <InitialProgramEditor configuration={5} />, 'initial_description_rules'],
     ['Commentary Templates', () => <CommentaryTemplateEditor configuration={5} />, 'commentary_templates'],
     ['Slipnet Layout', () => <SlipnetLayoutEditor configuration={5} />, 'slipnet_layout'],
   ]

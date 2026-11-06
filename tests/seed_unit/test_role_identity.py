@@ -33,8 +33,8 @@ from pathlib import Path
 import pytest
 
 from tests.support.role_table import (
-    CODELET_ROLES, LETTER_NODES, NUMBER_NODES, ORDERED_ROLES, RELATION_NODES, SINGLE_ROLES,
-    role_attr,
+    CODELET_ROLES, IMAGE_OPERATION_ROLES, LETTER_NODES, NUMBER_NODES, ORDERED_ROLES,
+    RELATION_NODES, SINGLE_ROLES, role_attr,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -103,11 +103,19 @@ def slipnet(meta):
 
 
 def test_the_table_has_the_planned_shape() -> None:
-    assert len(SINGLE_ROLES) == 24
+    assert len(SINGLE_ROLES) == 24 + len(IMAGE_OPERATION_ROLES) == 30
     assert {k: len(v) for k, v in ORDERED_ROLES.items()} == {
-        "rule.dimension_order": 8, "answer.description_dimension": 5}
+        "rule.dimension_order": 8, "answer.description_dimension": 5,
+        "dimension.ladder": 2, "dimension.reverses_together": 3, "dimension.bond_description": 2,
+        "dimension.freely_mappable": 2, "bond_category.symmetric": 1, "group_category.directed": 2,
+        "rule.object_naming_dimension": 2, "rule.letter_or_alphabetic_dimension": 2,
+        "rule.relation_only_dimension": 2, "descriptor.generic": 2, "rule.apply_first": 1,
+        "rule.apply_by_length": 1}
     assert len(CODELET_ROLES) == 5
-    assert len(set(SINGLE_ROLES.values())) == len(SINGLE_ROLES)  # one role, one node here
+    # one role, one node among the 24 roles that name a concept; an image operation is bound to
+    # the dimension that performs it, so it shares that dimension's node
+    named = {r: n for r, n in SINGLE_ROLES.items() if r not in IMAGE_OPERATION_ROLES}
+    assert len(set(named.values())) == len(named) == 24
 
 
 @pytest.mark.parametrize("role", sorted(SINGLE_ROLES))

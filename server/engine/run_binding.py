@@ -133,6 +133,12 @@ def derived(build: Callable[[Any], Any]) -> Any:
     return field(metadata={"source": "derived", "build": build})
 
 
+def _string_codes(frame: Any) -> Any:
+    from server.engine.numeric.layout import string_type_codes
+
+    return string_type_codes(frame)
+
+
 def _salience_weights(meta: Any) -> Any:
     from server.engine.numeric.layout import SalienceWeights
 
@@ -262,6 +268,10 @@ class RunConstants:
     #: A hot path compares against ``constants().vocab.bridge_type_top``; a path that
     #: holds the run's provider reads ``meta.vocabulary`` (the same object).
     vocab: Any = derived(lambda m: m.vocabulary)
+    #: The four-string frame (``engine/frame.py``), derived from the configuration once per run.
+    frame: Any = derived(lambda m: m.frame)
+    #: The code the numeric backends branch on for each string kind (``numeric/layout.py``).
+    string_codes: Any = derived(lambda m: _string_codes(m.frame))
     #: The two salience averages' weights (``numeric/layout.py``), resolved once, where
     #: they had been rebuilt for every object twice per update.
     salience: Any = derived(_salience_weights)

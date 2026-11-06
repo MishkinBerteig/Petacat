@@ -44,7 +44,7 @@ import threading
 from collections import deque
 from typing import TYPE_CHECKING, Any
 
-from server.engine.run_binding import vocab as run_vocab
+from server.engine.run_binding import constants, vocab as run_vocab
 from server.engine.slipnet import holds_role, lowercase_name
 
 if TYPE_CHECKING:
@@ -320,7 +320,7 @@ def _bridge_text(bridge: Any, level: str | None) -> str:
     v = run_vocab()
     orientation = (
         v.bridge_orientation_vertical
-        if getattr(bridge, "bridge_type", "") == v.bridge_type_vertical
+        if getattr(bridge, "bridge_type", "") in constants().frame.vertical_names
         else v.bridge_orientation_horizontal
     )
     head = "Spanning " if bridge.is_spanning_bridge else ""

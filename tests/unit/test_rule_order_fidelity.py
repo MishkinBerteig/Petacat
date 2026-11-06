@@ -50,8 +50,8 @@ def test_a_conflict_is_reported_for_the_first_pair_in_that_order(monkeypatch) ->
 
 def test_apply_transforms_sorts_with_chezs_merge_sort_and_scheme_apply_before(monkeypatch) -> None:
     monkeypatch.setattr(R, "_holds", lambda node, const: node == const)
-    monkeypatch.setattr(R, "_DIM_GROUP_CATEGORY", "GC")
-    monkeypatch.setattr(R, "_DIM_LENGTH", "LEN")
+    monkeypatch.setattr(R, "_APPLY_FIRST_DIMENSION", "GC")
+    monkeypatch.setattr(R, "_APPLY_BY_LENGTH_DIMENSION", "LEN")
     monkeypatch.setattr(R, "_OBJECT_LETTER", "letter")
     monkeypatch.setattr(R, "change_length_first", lambda change, length, slipnet: change == "first")
     applied: list[tuple] = []

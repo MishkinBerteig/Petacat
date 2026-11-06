@@ -94,21 +94,33 @@
       "display_label": "Top",
       "sort_order": 0,
       "description": "Horizontal bridge: initial <-> modified",
-      "role": "bridge_type.top"
+      "role": "bridge_type.top",
+      "from_string_kind": "initial",
+      "to_string_kind": "modified",
+      "orientation": "horizontal",
+      "theme_type": "top_bridge"
     },
     {
       "name": "bottom",
       "display_label": "Bottom",
       "sort_order": 1,
       "description": "Horizontal bridge: target <-> answer",
-      "role": "bridge_type.bottom"
+      "role": "bridge_type.bottom",
+      "from_string_kind": "target",
+      "to_string_kind": "answer",
+      "orientation": "horizontal",
+      "theme_type": "bottom_bridge"
     },
     {
       "name": "vertical",
       "display_label": "Vertical",
       "sort_order": 2,
-      "description": "Vertical bridge: initial <-> target, modified <-> answer",
-      "role": "bridge_type.vertical"
+      "description": "Vertical bridge: initial <-> target",
+      "role": "bridge_type.vertical",
+      "from_string_kind": "initial",
+      "to_string_kind": "target",
+      "orientation": "vertical",
+      "theme_type": "vertical_bridge"
     }
   ],
   "bridge_orientations": [
@@ -156,14 +168,16 @@
       "display_label": "Top",
       "sort_order": 0,
       "description": "Describes initial -> modified transformation",
-      "role": "rule_type.top"
+      "role": "rule_type.top",
+      "bridge_type": "top"
     },
     {
       "name": "bottom",
       "display_label": "Bottom",
       "sort_order": 1,
       "description": "Describes target -> answer transformation",
-      "role": "rule_type.bottom"
+      "role": "rule_type.bottom",
+      "bridge_type": "bottom"
     }
   ],
   "theme_types": [
@@ -400,28 +414,32 @@
       "display_label": "Initial",
       "sort_order": 0,
       "description": "The initial string of the problem (abc in abc -> abd; xyz -> ?)",
-      "role": "string_kind.initial"
+      "role": "string_kind.initial",
+      "exists_at_start": true
     },
     {
       "name": "modified",
       "display_label": "Modified",
       "sort_order": 1,
       "description": "The modified string (abd)",
-      "role": "string_kind.modified"
+      "role": "string_kind.modified",
+      "exists_at_start": true
     },
     {
       "name": "target",
       "display_label": "Target",
       "sort_order": 2,
       "description": "The target string (xyz)",
-      "role": "string_kind.target"
+      "role": "string_kind.target",
+      "exists_at_start": true
     },
     {
       "name": "answer",
       "display_label": "Answer",
       "sort_order": 3,
       "description": "The answer string, once one is found or supplied",
-      "role": "string_kind.answer"
+      "role": "string_kind.answer",
+      "exists_at_start": false
     }
   ],
   "rule_scopes": [

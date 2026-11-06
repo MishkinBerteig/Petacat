@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any
 from server.engine.formulas import pow_exact
 from server.engine.slipnet import holds_role
 from server.engine.workspace_objects import WorkspaceObject
-from server.engine.run_binding import constants
+from server.engine.run_binding import constants, current
 from server.engine.workspace_structures import WorkspaceStructure
 from server.engine.concept_mappings import ConceptMapping
 from server.engine.descriptions import Description
@@ -92,63 +92,19 @@ class Group(WorkspaceObject, WorkspaceStructure):
         slipnet = _slipnet_of(self)
         if slipnet is None:
             return
-        roles = slipnet.roles
+        # The program is configuration: the ``group`` rules of ``initial_description_rules`` (object
+        # category, group category, bond category, direction, the position cascade of
+        # ``groups.ss:34-42`` whole -> leftmost -> middle -> rightmost, bond facet, and the letter
+        # category of a letter-category facet), applied in ``ordinal`` order (``initial_program.py``).
+        #
+        # No Length description is given here.  ``make-group`` attaches none; the Scheme's single
+        # site is ``propose-group`` (groups.ss:816-818), which attaches one with probability
+        # ``length-description-probability`` (0.5^27 for a cold 3-group).  Attaching one to every
+        # group made ``plato-one/two/three`` -- and through them ``plato-length`` -- warm all run,
+        # and made every singleton clear the Trace's "singleton with a length description" bar.
+        from server.engine.initial_program import describe_group
 
-        def describe(dt, descriptor, *, bond_description: bool = False) -> None:
-            # A dimension or a descriptor nothing holds (``Absent``, falsy) describes nothing.
-            if not dt or descriptor is None or not descriptor:
-                return
-            desc = Description(self, dt, descriptor)
-            desc.proposal_level = constants().vocab.proposal_level_built
-            if bond_description:
-                self.bond_descriptions.insert(0, desc)
-            else:
-                self.descriptions.insert(0, desc)
-
-        describe(roles.dimension_object_category, roles.object_group)
-        describe(roles.dimension_group_category, self.group_category)
-        # ``groups.ss:30-31`` attaches the BondCtgy description *unconditionally*,
-        # from the category-derived bond category.  Gating it on the presence of
-        # constituent bonds left every singleton group without one, so a bridge to
-        # a singleton lost its BondCtgy concept-mapping.
-        describe(roles.dimension_bond_category, self.bond_category, bond_description=True)
-        if self.direction is not None:
-            describe(roles.dimension_direction, self.direction)
-
-        # ``make-group`` (groups.ss:34-42) orders these whole -> leftmost ->
-        # **middle** -> rightmost, using the object's own position predicates.  The
-        # middle branch was missing entirely, so no group could ever be described
-        # ``middle`` — closing one of the two avenues by which a middle-to-middle
-        # correspondence is reachable.
-        if self.spans_whole_string():
-            describe(roles.dimension_string_position, roles.position_whole)
-        elif self.leftmost_in_string():
-            describe(roles.dimension_string_position, roles.position_leftmost)
-        elif self.middle_in_string():
-            describe(roles.dimension_string_position, roles.position_middle)
-        elif self.rightmost_in_string():
-            describe(roles.dimension_string_position, roles.position_rightmost)
-
-        describe(roles.dimension_bond_facet, self.bond_facet, bond_description=True)
-
-        # No Length description here.  ``make-group`` attaches none; the Scheme's
-        # single site is ``propose-group`` (groups.ss:816-818), which attaches one
-        # with probability ``length-description-probability`` — 0.5^27 for a cold
-        # 3-group, i.e. essentially never unless Length is already active.
-        # Attaching one to every group made ``plato-one/two/three`` — and through
-        # them ``plato-length`` — warm all run, and made every singleton clear the
-        # Trace's "singleton with a length description" bar.
-
-        # A letter-category description on a successor/predecessor group is what
-        # makes horizontal bridges like [abc] -> [bcd] possible (groups.ss:44-46).
-        if holds_role(self.bond_facet, "dimension.letter_category"):
-            # ``groups.ss:47`` takes the first object in *direction* order, not the
-            # leftmost one.  The difference is the whole point of the description: a
-            # leftward group over ``ab`` is the sequence b, a, and its initial letter
-            # is ``b``.  Reading the leftmost letter instead hid every relation that
-            # runs off the end of a leftward group — including the ``b -> c`` of
-            # ``ab -> c``.
-            describe(roles.dimension_letter_category, self._get_initial_letter_category())
+        describe_group(self, slipnet, current().meta)
 
     @property
     def length(self) -> int:

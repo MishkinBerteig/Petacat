@@ -49,6 +49,10 @@ class _FakeMeta:
         })
         self._params = params or {}
         self._coeffs = coeffs or {}
+        # the four-string frame is derived from the Standard Configuration's rows
+        from server.engine.metadata import MetadataProvider
+
+        self.frame = MetadataProvider.from_standard_configuration("seed_data").frame
 
     def get_param(self, name, default=None):
         return self._params.get(name, default)

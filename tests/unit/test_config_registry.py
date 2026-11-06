@@ -15,6 +15,7 @@ def test_the_registry_has_every_addressable_table_and_no_enum_or_help_topic():
         "theme_relations", "slipnet_node_roles", "codelet_type_defs", "codelet_type_roles",
         "posting_rules", "codelet_pattern_defs", "engine_params", "formula_coefficients",
         "urgency_levels", "demo_problems", "commentary_templates",
+        "initial_description_rules", "initial_activation_rules",
     }
     # The 13 enum lookup tables of the first vocabulary, and the five stage 4 added: the
     # string kinds, rule scopes and failure kinds the engine names, and the clamp types and
