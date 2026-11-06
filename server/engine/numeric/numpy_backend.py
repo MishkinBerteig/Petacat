@@ -38,6 +38,7 @@ from typing import Sequence
 import numpy as np
 
 from server.engine.numeric.backend import Backend, SlipnetSession
+from server.engine.run_binding import constants
 from server.engine.numeric.layout import (
     STRING_ANSWER,
     STRING_INITIAL,
@@ -304,7 +305,7 @@ class NumpyBackend(Backend):
         # half-to-even as Python's ``round`` does.
         w = batch.weights
         s_intra = np.where(
-            clamped, 100.0,
+            clamped, float(w.clamped),
             np.rint((w.intra_unhappiness * intra + w.intra_importance * rel) / w.intra_total),
         )
 
@@ -316,8 +317,8 @@ class NumpyBackend(Backend):
         )
         writes_h = is_initial | is_modified | is_answer | target_justifying
         writes_v = is_initial | is_target
-        s_h = np.where(clamped, 100.0, np.where(writes_h, h_formula, prev_h))
-        s_v = np.where(clamped, 100.0, np.where(writes_v, v_formula, prev_v))
+        s_h = np.where(clamped, float(w.clamped), np.where(writes_h, h_formula, prev_h))
+        s_v = np.where(clamped, float(w.clamped), np.where(writes_v, v_formula, prev_v))
 
         sal3_hv = (s_intra + s_h + s_v) / 3.0
         sal3_vh = (s_intra + s_v + s_h) / 3.0
@@ -366,7 +367,12 @@ class NumpyBackend(Backend):
         weight = np.abs(comp)
         other = 1.0 - weight
         denominator = weight + other
-        target = np.where(comp > 0.0, 100.0, 0.0)
+        rc = constants()
+        target = np.where(
+            comp > 0.0,
+            float(rc.thematic_pull_positive_target),
+            float(rc.thematic_pull_negative_target),
+        )
         thematic = np.divide(
             target * weight + intrinsic * other,
             denominator,
@@ -380,7 +386,7 @@ class NumpyBackend(Backend):
     ) -> int:
         n = len(values)
         if n == 0:
-            return 100
+            return constants().average_unhappiness_empty
         a = np.asarray(values, dtype=np.float64)
         w = np.asarray(relative_importance, dtype=np.float64)
         total = float(w.sum())

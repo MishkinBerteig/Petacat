@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any
 
 from server.engine.formulas import temp_adjusted_values, weighted_average
 from server.engine.metadata import require_meta
+from server.engine.run_binding import constants
 from server.engine.numeric.backend import select_backend
 from server.engine.numeric.layout import (
     gather_object_values,
@@ -52,7 +53,7 @@ def _object_weight(obj: Any, weight_key: str) -> float:
     salience = getattr(obj, "salience", None)
     if isinstance(salience, dict) and weight_key in salience:
         return float(salience[weight_key])
-    return 1.0
+    return constants().selection_weight_default
 
 
 def selection_weights(
@@ -944,7 +945,7 @@ class Workspace:
         """
         objects = self.all_objects
         if not objects:
-            return 100.0
+            return float(constants().average_unhappiness_empty)
         if self._average_unhappiness is not None:
             return self._average_unhappiness
         backend = select_backend(len(objects))
@@ -976,7 +977,7 @@ class Workspace:
             "top": self.top_mapping_strength,
             "bottom": self.bottom_mapping_strength,
             "vertical": self.vertical_mapping_strength,
-        }.get(bridge_type_name, 0.0)
+        }[bridge_type_name]
 
     def _average_inter_string_unhappiness(
         self, string1: WorkspaceString, string2: WorkspaceString | None, orientation: str
@@ -998,7 +999,7 @@ class Workspace:
             return 0.0
         return round(
             sum(
-                o.inter_string_unhappiness.get(orientation, 100.0) * o.relative_importance
+                o.inter_string_unhappiness[orientation] * o.relative_importance
                 for o in objects
             )
             / total_weight
@@ -1011,6 +1012,7 @@ class Workspace:
         (``workspace.ss:594-603``).  Note there is no "no bridges built" branch: with
         no bridges every object is maximally unhappy and the arithmetic reaches 0 on
         its own, so short-circuiting only changes the zero-weight case above."""
+        rc = constants()
         string1, string2 = self._get_bridge_type_strings(bridge_type_name)
         if self.spanning_bridge_exists(bridge_type_name):
             return round(raw_strength)
@@ -1019,9 +1021,11 @@ class Workspace:
             and self._spanning_group_possible(string1)
             and self._spanning_group_possible(string2)
         ):
-            return round(0.5 * raw_strength)
+            return round(rc.mapping_strength_spanning_possible_factor * raw_strength)
         if self.maximal_mapping(bridge_type_name):
-            return round(100.0 * math.tanh(raw_strength / 40.0))
+            return round(
+                100.0 * math.tanh(raw_strength / rc.mapping_strength_maximal_tanh_divisor)
+            )
         return round(raw_strength)
 
     def update_average_unhappiness_values(self) -> None:
@@ -1121,7 +1125,7 @@ class Workspace:
     def _compute_workspace_average_intra(self) -> float:
         objects = self.all_objects
         if not objects:
-            return 100.0
+            return constants().average_intra_unhappiness_empty
         return round(
             weighted_average(
                 [o.intra_string_unhappiness for o in objects],
@@ -1467,7 +1471,8 @@ class Workspace:
         expiration = meta.get_param("expiration_period")
         youngest = meta.get_param("num_youngest_structures")
         avg_age = self._get_youngest_structures_average_age(codelet_count, youngest)
-        return round(100.0 - 100.0 * min(1.0, avg_age / expiration))
+        age_share_ceiling = meta.get_formula_coeff("activity_age_share_ceiling")  # 1.0
+        return round(100.0 - 100.0 * min(age_share_ceiling, avg_age / expiration))
 
     def _get_youngest_structures_average_age(
         self, codelet_count: int, num_youngest: int

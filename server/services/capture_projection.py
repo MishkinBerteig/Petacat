@@ -385,6 +385,7 @@ def project_coderack(state: dict, meta: Any = None) -> dict:
             meta.get_param("num_coderack_bins"),
             meta.get_formula_coeff("coderack_bin_urgency_exponent_offset"),
             meta.get_formula_coeff("coderack_bin_urgency_exponent_divisor"),
+            meta.get_formula_coeff("coderack_removal_penalty_offset"),
         )
         probabilities = type_selection_probabilities(
             per_bin, table.row(state["temperature"]["value"])

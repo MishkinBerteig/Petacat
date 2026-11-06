@@ -8,7 +8,7 @@ knowledge as Petacat ports it. It is not a mode and not a database. It is the st
 | `slipnet_nodes.json`, `slipnet_links.json`, `slipnet_layout.json` | The Slipnet's concepts and links, and the grid positions for drawing it |
 | `codelet_types.json` | The codelet types, with their Python `execute_body` source |
 | `roles.json` | The roles the engine looks nodes and codelet types up by |
-| `engine_params.json`, `urgency_levels.json`, `formula_coefficients.json` | Parameters, urgency bins and formula coefficients (stored as exact rationals such as `2/3`) |
+| `engine_params.json`, `urgency_levels.json`, `formula_coefficients.json` | Parameters, urgency bins and formula coefficients (stored as exact rationals such as `2/3`). Every fixed number that decides a strength, an unhappiness, a clip, an exponent or a rule's cost is a coefficient here, in the form (int or float) the engine used |
 | `theme_dimensions.json`, `theme_relations.json` | The Themespace's dimensions and relations |
 | `posting_rules.json` | Which codelets are posted, and when; a rule's `urgency_level` names a tier of `urgency_levels` |
 | `commentary_templates.json` | The natural-language commentary and Verbose mode's message texts |

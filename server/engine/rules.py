@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING, Any
 
 from server.engine.metadata import require_meta
 from server.engine.roles import absent
+from server.engine.run_binding import constants
 from server.engine.slipnet import holds_role as _holds
 from server.engine.workspace_structures import WorkspaceStructure
 from server.engine.formulas import (
@@ -448,10 +449,10 @@ def _object_description_attribute(od: Any) -> str:
     return getattr(node, "name", "?")
 
 
-def _homogeneity(values: list[Any]) -> float:
+def _homogeneity(values: list[Any], meta: MetadataProvider) -> float:
     """Fraction of *values* taken by the most common one, in 0..1."""
     if not values:
-        return 1.0
+        return meta.get_formula_coeff("rule_homogeneity_empty")  # 1.0
     counts: dict[Any, int] = {}
     for v in values:
         counts[v] = counts.get(v, 0) + 1
@@ -465,29 +466,33 @@ def _average(values: list[float]) -> float:
     return sum(values) / len(values)
 
 
-def _object_description_uniformity(object_descriptions: list[Any]) -> float:
+def _object_description_uniformity(
+    object_descriptions: list[Any], meta: MetadataProvider
+) -> float:
     """Scheme: ``object-description-uniformity`` (``rules.ss:1640-1644``).
 
     How far the object-descriptions agree on which *attribute* names their object —
     "leftmost", "the letter c", "length three".  1 when they all use the same one.
     """
     if not object_descriptions:
-        return 1.0
+        return meta.get_formula_coeff("rule_object_description_uniformity_empty")  # 1.0
     return _homogeneity(
-        [_object_description_attribute(od) for od in object_descriptions]
+        [_object_description_attribute(od) for od in object_descriptions], meta
     )
 
 
-def _change_abstractness_uniformity(changes: list[Any]) -> float:
+def _change_abstractness_uniformity(changes: list[Any], meta: MetadataProvider) -> float:
     """Scheme: ``change-abstractness-uniformity`` (``rules.ss:1650-1654``).
 
     ``2|p - ½|`` over one dimension's changes, where *p* is the fraction stated as
     a relation.  All-relation or all-literal scores 1; an even mix scores 0.
     """
     if not changes:
-        return 1.0
+        return meta.get_formula_coeff("rule_change_abstractness_uniformity_empty")  # 1.0
     relations = sum(1 for c in changes if c.is_relation)
-    return 2.0 * abs(relations / len(changes) - 0.5)
+    return meta.get_formula_coeff("rule_change_abstractness_scale") * abs(  # 2.0
+        relations / len(changes) - meta.get_formula_coeff("rule_change_abstractness_midpoint")  # 0.5
+    )
 
 
 def _dim_sort_key(dim: SlipnetNode, order: tuple = ()) -> int:
@@ -1225,7 +1230,7 @@ class Rule(WorkspaceStructure):
         self._compute_succinctness(meta)
 
         if self.is_identity_rule:
-            self.quality = 100.0
+            self.quality = meta.get_formula_coeff("rule_identity_quality")  # 100.0
             return
 
         # No verbatim short-circuit.  ``rules.ss:1544-1549`` runs the same formula
@@ -1262,7 +1267,7 @@ class Rule(WorkspaceStructure):
         score 100 by short-circuit: the intrinsic term still measures its changes.
         """
         if self.is_identity_rule or self.is_verbatim_rule:
-            self.uniformity = 100.0
+            self.uniformity = meta.get_formula_coeff("rule_trivial_uniformity")  # 100.0
             return
 
         intrinsic = self.intrinsic_clauses
@@ -1280,7 +1285,7 @@ class Rule(WorkspaceStructure):
         ]
 
         if not intrinsic:
-            intrinsic_uniformity = 1.0
+            intrinsic_uniformity = meta.get_formula_coeff("rule_intrinsic_uniformity_empty")  # 1.0
         else:
             by_dimension: dict[int, list[RuleChange]] = {}
             order: list[int] = []
@@ -1294,23 +1299,24 @@ class Rule(WorkspaceStructure):
             # contributes nothing rather than zeroing the term.
             product = 1.0
             for key in order:
-                product *= _change_abstractness_uniformity(by_dimension[key])
+                product *= _change_abstractness_uniformity(by_dimension[key], meta)
             intrinsic_uniformity = _average(
                 [
                     product,
                     _object_description_uniformity(
-                        [od for clause in intrinsic for od in clause.object_descriptions]
+                        [od for clause in intrinsic for od in clause.object_descriptions],
+                        meta,
                     ),
                 ]
             )
 
         exponent = meta.get_formula_coeff("rule_uniformity_extrinsic_obj_desc_exponent")  # 3
         if not extrinsic:
-            extrinsic_uniformity = 1.0
+            extrinsic_uniformity = meta.get_formula_coeff("rule_extrinsic_uniformity_empty")  # 1.0
         else:
             extrinsic_uniformity = _average(
                 [
-                    _object_description_uniformity(clause.object_descriptions) ** exponent
+                    _object_description_uniformity(clause.object_descriptions, meta) ** exponent
                     for clause in extrinsic
                 ]
             )
@@ -1326,7 +1332,8 @@ class Rule(WorkspaceStructure):
             ],
         )
         decay = meta.get_formula_coeff("rule_uniformity_adjusted_decay_constant")  # 4
-        self.uniformity = round(100.0 * math.exp(decay * (raw - 1.0)))
+        perfect = meta.get_formula_coeff("rule_uniformity_perfect")  # 1.0
+        self.uniformity = round(100.0 * math.exp(decay * (raw - perfect)))
 
     def _compute_abstractness(self, meta: MetadataProvider) -> None:
         """§3.3.5 "Abstractness" — ``compute-rule-abstractness`` (``rules.ss:1599-1625``).
@@ -1343,10 +1350,10 @@ class Rule(WorkspaceStructure):
         measure.
         """
         if self.is_identity_rule:
-            self.abstractness = 100.0
+            self.abstractness = meta.get_formula_coeff("rule_identity_abstractness")  # 100.0
             return
         if self.is_verbatim_rule:
-            self.abstractness = 0.0
+            self.abstractness = meta.get_formula_coeff("rule_verbatim_abstractness")  # 0.0
             return
 
         def depth(node: Any) -> float:
@@ -1392,17 +1399,20 @@ class Rule(WorkspaceStructure):
         Both the identity rule and verbatim rules are maximally succinct.
         """
         if self.is_identity_rule or self.is_verbatim_rule:
-            self.succinctness = 100.0
+            self.succinctness = meta.get_formula_coeff("rule_trivial_succinctness")  # 100.0
             return
 
         base_cost = meta.get_formula_coeff("rule_succinctness_base_cost")  # 3
+        swap_cost = meta.get_formula_coeff("rule_succinctness_swap_clause_cost")  # 2.0
+        clause_cost = meta.get_formula_coeff("rule_succinctness_clause_cost")  # 1.0
         total_cost = 0.0
         for clause in self.clauses:
             if clause.is_extrinsic and len(clause.object_descriptions) > 1:
-                total_cost += 2.0
+                total_cost += swap_cost
             else:
-                total_cost += 1.0
-        self.succinctness = round(100.0 * (base_cost + 1) / (base_cost + total_cost))
+                total_cost += clause_cost
+        best_cost = meta.get_formula_coeff("rule_succinctness_best_cost")  # 1
+        self.succinctness = round(100.0 * (base_cost + best_cost) / (base_cost + total_cost))
 
     def calculate_internal_strength(self) -> float:
         """Scheme: ``rules.ss:286`` — a rule's internal strength IS its *relative*
@@ -1473,9 +1483,10 @@ class Rule(WorkspaceStructure):
         :func:`server.engine.formulas.round_exact`.
         """
         strengths = []
+        missing = constants().rule_support_missing_bridge_strength  # 0
         for b in self.supporting_bridges:
             equiv = _get_equivalent_bridge(workspace, b)
-            strengths.append(equiv.strength if equiv is not None else 0)
+            strengths.append(equiv.strength if equiv is not None else missing)
         return round_exact([100, *strengths], [100] * len(strengths))
 
     def currently_works(self, workspace: Workspace, slipnet: Slipnet) -> bool:

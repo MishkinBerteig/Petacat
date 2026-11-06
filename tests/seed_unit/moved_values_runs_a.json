@@ -1,0 +1,479 @@
+{
+ "low_prob_target_offset": {
+  "problem": [
+   "abc",
+   "abd",
+   "mrrjjj"
+  ],
+  "seed": 1,
+  "answer": null
+ },
+ "low_prob_sqrt_exponent": {
+  "problem": [
+   "xqc",
+   "xqd",
+   "mrrjjj"
+  ],
+  "seed": 1,
+  "answer": null
+ },
+ "bond_degree_of_assoc_exponent": {
+  "problem": [
+   "abc",
+   "abd",
+   "mrrjjj"
+  ],
+  "seed": 1,
+  "answer": null
+ },
+ "urgency_ceiling": {
+  "problem": [
+   "abc",
+   "abd",
+   "mrrjjj"
+  ],
+  "seed": 1,
+  "answer": null
+ },
+ "bond_degree_of_assoc_ceiling": {
+  "problem": [
+   "abc",
+   "abd",
+   "mrrjjj"
+  ],
+  "seed": 1,
+  "answer": null
+ },
+ "low_prob_min_decade_factor": {
+  "problem": [
+   "rst",
+   "rsu",
+   "xyz"
+  ],
+  "seed": 1,
+  "answer": null
+ },
+ "length_description_length_exponent": {
+  "problem": [
+   "rst",
+   "rsu",
+   "xyz"
+  ],
+  "seed": 1,
+  "answer": null
+ },
+ "local_support_number_factor_ceiling": {
+  "problem": [
+   "abc",
+   "abd",
+   "mrrjjj"
+  ],
+  "seed": 1,
+  "answer": null
+ },
+ "bond_local_support_unsupported": {
+  "problem": [
+   "abc",
+   "abd",
+   "mrrjjj"
+  ],
+  "seed": 1,
+  "answer": null
+ },
+ "local_support_density_exponent": {
+  "problem": [
+   "eqe",
+   "qeq",
+   "abbbc"
+  ],
+  "seed": 1,
+  "answer": null
+ },
+ "length_description_single_probability": {
+  "problem": [
+   "eeqee",
+   "qeeq",
+   "xxixx"
+  ],
+  "seed": 1,
+  "answer": null
+ },
+ "group_spanning_external_strength": {
+  "problem": [
+   "rst",
+   "rsu",
+   "xyz"
+  ],
+  "seed": 1,
+  "answer": null
+ },
+ "group_local_support_unsupported": {
+  "problem": [
+   "abc",
+   "abd",
+   "mrrjjj"
+  ],
+  "seed": 1,
+  "answer": null
+ },
+ "local_support_number_exponent": {
+  "problem": [
+   "aabc",
+   "aabd",
+   "ijkk"
+  ],
+  "seed": 1,
+  "answer": null
+ },
+ "intra_unhappiness_spanning": {
+  "problem": [
+   "rst",
+   "rsu",
+   "xyz"
+  ],
+  "seed": 1,
+  "answer": null
+ },
+ "intra_unhappiness_unbonded": {
+  "problem": [
+   "abc",
+   "abd",
+   "mrrjjj"
+  ],
+  "seed": 1,
+  "answer": null
+ },
+ "inter_unhappiness_unbridged": {
+  "problem": [
+   "abc",
+   "abd",
+   "mrrjjj"
+  ],
+  "seed": 1,
+  "answer": null
+ },
+ "clamped_salience": {
+  "problem": [
+   "rst",
+   "rsu",
+   "xyz"
+  ],
+  "seed": 1,
+  "answer": null
+ },
+ "thematic_pull_negative_target": {
+  "problem": [
+   "rst",
+   "rsu",
+   "xyz"
+  ],
+  "seed": 1,
+  "answer": null
+ },
+ "thematic_pull_positive_target": {
+  "problem": [
+   "rst",
+   "rsu",
+   "xyz"
+  ],
+  "seed": 1,
+  "answer": null
+ },
+ "mapping_strength_spanning_possible_factor": {
+  "problem": [
+   "rst",
+   "rsu",
+   "xyz"
+  ],
+  "seed": 1,
+  "answer": null
+ },
+ "mapping_strength_maximal_tanh_divisor": {
+  "problem": [
+   "abc",
+   "abd",
+   "mrrjjj"
+  ],
+  "seed": 1,
+  "answer": null
+ },
+ "concept_mapping_depth_bonus_base": {
+  "problem": [
+   "abc",
+   "abd",
+   "mrrjjj"
+  ],
+  "seed": 1,
+  "answer": null
+ },
+ "concept_mapping_depth_penalty_base": {
+  "problem": [
+   "abc",
+   "abd",
+   "mrrjjj"
+  ],
+  "seed": 1,
+  "answer": null
+ },
+ "concept_mapping_full_association": {
+  "problem": [
+   "abc",
+   "abd",
+   "mrrjjj"
+  ],
+  "seed": 1,
+  "answer": null
+ },
+ "concept_mapping_full_association_strength": {
+  "problem": [
+   "abc",
+   "abd",
+   "mrrjjj"
+  ],
+  "seed": 1,
+  "answer": null
+ },
+ "concept_mapping_full_association_slippability": {
+  "problem": [
+   "abc",
+   "abd",
+   "mrrjjj"
+  ],
+  "seed": 1,
+  "answer": null
+ },
+ "activity_age_share_ceiling": {
+  "problem": [
+   "eeqee",
+   "qeeq",
+   "xxixx"
+  ],
+  "seed": 1,
+  "answer": null
+ },
+ "bridge_no_mapping_internal_strength": {
+  "problem": [
+   "eqe",
+   "qeq",
+   "abbba"
+  ],
+  "seed": 1,
+  "answer": null
+ },
+ "bridge_internal_strength_ceiling": {
+  "problem": [
+   "abc",
+   "abd",
+   "mrrjjj"
+  ],
+  "seed": 1,
+  "answer": null
+ },
+ "bridge_external_strength_ceiling": {
+  "problem": [
+   "abc",
+   "abd",
+   "mrrjjj"
+  ],
+  "seed": 1,
+  "answer": null
+ },
+ "concept_mapping_identity_association": {
+  "problem": [
+   "abc",
+   "abd",
+   "mrrjjj"
+  ],
+  "seed": 1,
+  "answer": null
+ },
+ "bridge_singleton_factor_unpenalised": {
+  "problem": [
+   "abc",
+   "abd",
+   "mrrjjj"
+  ],
+  "seed": 1,
+  "answer": null
+ },
+ "bridge_spanning_singleton_external_strength": {
+  "problem": [
+   "a",
+   "b",
+   "z"
+  ],
+  "seed": 1,
+  "answer": null
+ },
+ "bridge_theme_support_none": {
+  "problem": [
+   "abc",
+   "abd",
+   "mrrjjj"
+  ],
+  "seed": 1,
+  "answer": null
+ },
+ "bridge_theme_support_unrelated": {
+  "problem": [
+   "rst",
+   "rsu",
+   "xyz"
+  ],
+  "seed": 1,
+  "answer": null
+ },
+ "description_local_support_0": {
+  "problem": [
+   "rst",
+   "rsu",
+   "xyz"
+  ],
+  "seed": 1,
+  "answer": null
+ },
+ "description_theme_support_none": {
+  "problem": [
+   "abc",
+   "abd",
+   "mrrjjj"
+  ],
+  "seed": 1,
+  "answer": null
+ },
+ "description_theme_support_unrelated": {
+  "problem": [
+   "rst",
+   "rsu",
+   "xyz"
+  ],
+  "seed": 1,
+  "answer": null
+ },
+ "bridge_theme_positive_weight_multiplier": {
+  "problem": [
+   "abc",
+   "abd",
+   "mrrjjj"
+  ],
+  "seed": 1,
+  "answer": "mrrjjjj"
+ },
+ "rule_change_abstractness_scale": {
+  "problem": [
+   "abc",
+   "abd",
+   "mrrjjj"
+  ],
+  "seed": 1,
+  "answer": null
+ },
+ "rule_change_abstractness_midpoint": {
+  "problem": [
+   "abc",
+   "abd",
+   "mrrjjj"
+  ],
+  "seed": 1,
+  "answer": null
+ },
+ "rule_trivial_uniformity": {
+  "problem": [
+   "eeqee",
+   "qeeq",
+   "xxixx"
+  ],
+  "seed": 1,
+  "answer": null
+ },
+ "rule_intrinsic_uniformity_empty": {
+  "problem": [
+   "eqe",
+   "qeq",
+   "abbbc"
+  ],
+  "seed": 1,
+  "answer": null
+ },
+ "rule_extrinsic_uniformity_empty": {
+  "problem": [
+   "abc",
+   "abd",
+   "mrrjjj"
+  ],
+  "seed": 1,
+  "answer": null
+ },
+ "rule_uniformity_perfect": {
+  "problem": [
+   "abc",
+   "abd",
+   "mrrjjj"
+  ],
+  "seed": 1,
+  "answer": null
+ },
+ "rule_verbatim_abstractness": {
+  "problem": [
+   "eeqee",
+   "qeeq",
+   "xxixx"
+  ],
+  "seed": 1,
+  "answer": null
+ },
+ "rule_trivial_succinctness": {
+  "problem": [
+   "eeqee",
+   "qeeq",
+   "xxixx"
+  ],
+  "seed": 1,
+  "answer": null
+ },
+ "rule_succinctness_swap_clause_cost": {
+  "problem": [
+   "eqe",
+   "qeq",
+   "abbba"
+  ],
+  "seed": 1,
+  "answer": null
+ },
+ "rule_succinctness_clause_cost": {
+  "problem": [
+   "abc",
+   "abd",
+   "mrrjjj"
+  ],
+  "seed": 1,
+  "answer": null
+ },
+ "rule_succinctness_best_cost": {
+  "problem": [
+   "abc",
+   "abd",
+   "mrrjjj"
+  ],
+  "seed": 1,
+  "answer": null
+ },
+ "bond_event_progress": {
+  "problem": [
+   "abc",
+   "abd",
+   "xyz"
+  ],
+  "seed": 1,
+  "answer": null
+ },
+ "coderack_removal_penalty_offset": {
+  "problem": [
+   "abc",
+   "abd",
+   "mrrjjj"
+  ],
+  "seed": 1,
+  "answer": null
+ }
+}

@@ -9,9 +9,9 @@ Scheme source: groups.ss
 
 from __future__ import annotations
 
-import math
 from typing import TYPE_CHECKING, Any
 
+from server.engine.formulas import pow_exact
 from server.engine.slipnet import holds_role
 from server.engine.workspace_objects import WorkspaceObject
 from server.engine.run_binding import constants
@@ -232,9 +232,9 @@ class Group(WorkspaceObject, WorkspaceStructure):
         The length-factor table and the 0.98 self-weighting exponent are unchanged.
         """
         assoc = getattr(self.bond_category, "degree_of_assoc", None)
-        base = float(assoc()) if assoc is not None else 0.0
-        letter_facet = holds_role(self.bond_facet, "dimension.letter_category")
         rc = constants()
+        base = float(assoc()) if assoc is not None else rc.group_bond_factor_no_category
+        letter_facet = holds_role(self.bond_facet, "dimension.letter_category")
         bond_factor = (
             base if letter_facet else base * rc.group_bond_facet_other_multiplier
         )
@@ -269,7 +269,7 @@ class Group(WorkspaceObject, WorkspaceStructure):
         *rng* is the drawing codelet's; see :meth:`get_local_density`.
         """
         if self.spans_whole_string():
-            return 100.0
+            return constants().group_spanning_external_strength
         return self._local_support(rng)
 
     def _local_support(self, rng: RNG) -> float:
@@ -279,16 +279,17 @@ class Group(WorkspaceObject, WorkspaceStructure):
         First count truly disjoint supporting groups, then compute density
         and combine as density_adjustment * number_factor.
         """
+        rc = constants()
         num_supporting = self.get_num_of_local_supporting_groups()
         if num_supporting == 0:
-            return 0.0
+            return rc.group_local_support_unsupported
 
         density = self.get_local_density(rng)
-        adjusted_density = 100.0 * math.sqrt(density / 100.0)
+        adjusted_density = 100.0 * pow_exact(density / 100.0, rc.local_support_density_exponent)
         number_factor = min(
-            1.0,
-            constants().local_support_number_factor_base
-            ** (1.0 / max(1, num_supporting ** 3)),
+            rc.local_support_number_factor_ceiling,
+            rc.local_support_number_factor_base
+            ** (1.0 / max(1, num_supporting ** rc.local_support_number_exponent)),
         )
         return round(adjusted_density * number_factor)
 
@@ -329,11 +330,12 @@ class Group(WorkspaceObject, WorkspaceStructure):
         codelet's stream, threaded down from
         :meth:`WorkspaceStructure.update_strength`.
         """
+        rc = constants()
         if self.spans_whole_string():
-            return 100.0
+            return rc.group_local_density_spanning
 
         if self.string is None:
-            return 100.0
+            return rc.group_local_density_no_string
 
         # Walk neighbors in both directions
         # Trace seam: the walk's draws concern this group (lockstep spec §5.3).
@@ -345,7 +347,7 @@ class Group(WorkspaceObject, WorkspaceStructure):
         num_of_objects = len(other_objects)
 
         if num_of_objects == 0:
-            return 100.0
+            return rc.group_local_density_no_neighbours
 
         num_similar = 0
         for obj in other_objects:

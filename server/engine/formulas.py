@@ -11,6 +11,8 @@ from __future__ import annotations
 import math
 from typing import TYPE_CHECKING, Any
 
+from server.engine.run_binding import constants
+
 if TYPE_CHECKING:
     from server.engine.metadata import MetadataProvider
 
@@ -63,12 +65,15 @@ def temp_adjusted_probability(
     sqrt_base = meta.get_formula_coeff("low_prob_sqrt_base")  # 100
     scale = meta.get_formula_coeff("low_prob_scale_factor")  # 10
     threshold = meta.get_formula_coeff("low_prob_threshold")  # 0.5
+    # The run's own record (one slot read each): this is called for nearly every
+    # probabilistic decision, and the engine passes the run's own configuration as *meta*.
+    rc = constants()
 
-    adjustment = (scale - math.sqrt(sqrt_base - temperature)) / sqrt_base
+    adjustment = (scale - pow_exact(sqrt_base - temperature, rc.low_prob_sqrt_exponent)) / sqrt_base
 
     if prob <= threshold:
-        low_prob_factor = max(1.0, math.floor(abs(math.log10(prob))))
-        target = 10.0 ** (1.0 - low_prob_factor)
+        low_prob_factor = max(rc.low_prob_min_decade_factor, math.floor(abs(math.log10(prob))))
+        target = 10.0 ** (rc.low_prob_target_offset - low_prob_factor)
         return min(threshold, prob + adjustment * (target - prob))
     else:
         return max(threshold, 1.0 - ((1.0 - prob) + adjustment * prob))
@@ -121,7 +126,11 @@ def bond_degree_of_assoc(bond_category: SlipnetNode, meta: MetadataProvider) -> 
     if degree is None:
         return 0.0
     scale = meta.get_formula_coeff("bond_degree_of_assoc_scale")  # 11
-    return min(100.0, round(scale * math.sqrt(max(0.0, degree()))))
+    exponent = meta.get_formula_coeff("bond_degree_of_assoc_exponent")  # 0.5
+    return min(
+        meta.get_formula_coeff("urgency_ceiling"),  # 100.0
+        round(scale * pow_exact(max(0.0, degree()), exponent)),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -312,15 +321,16 @@ def length_description_probability(
     base = meta.get_formula_coeff("length_description_base")  # 0.5
 
     if group_length > max_length:
-        return 0.0
+        return meta.get_formula_coeff("length_description_over_max_probability")  # 0.0
     if group_length == 1:
-        return 1.0
+        return meta.get_formula_coeff("length_description_single_probability")  # 1.0
 
     # Base probability before temperature adjustment:
     #   0.5 ^ (group_length^3 * (100 - activation) / 100)
     activation = plato_length.activation
     ceiling = plato_length.max_activation
-    exponent = (group_length ** 3) * unfilled_share_of_ceiling(activation, ceiling)
+    length_exponent = meta.get_formula_coeff("length_description_length_exponent")  # 3
+    exponent = (group_length**length_exponent) * unfilled_share_of_ceiling(activation, ceiling)
     base_prob = base ** exponent
 
     return temp_adjusted_probability(base_prob, temperature, meta)

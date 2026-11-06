@@ -31,18 +31,22 @@ def _is_whole(exponent: Any) -> bool:
     return exponent >= 0 and float(exponent).is_integer()
 
 
-def _rounded_depth_product(assoc: Any, depth: Any, exponent: int, sign: int) -> int:
-    """``round(assoc * (1 + sign * (depth/100) ** exponent))``, exactly, half to even.
+def _rounded_depth_product(assoc: Any, depth: Any, exponent: int, sign: int, base: Any) -> int:
+    """``round(assoc * (base + sign * (depth/100) ** exponent))``, exactly, half to even.
+
+    *base* is ``concept_mapping_depth_bonus_base`` or ``concept_mapping_depth_penalty_base``
+    (the 1 of ``(+ 1 (^2 (% depth)))``), taken at its exact value like the rest.
 
     Metacat's ``(round (* assoc (+ 1 (^2 (% depth)))))`` (``concept-mappings.ss:131-141``) is
     a ratio of whole numbers throughout; floats do not reproduce its halves.
     """
     a_n, a_d = ratio_of(assoc)
     d_n, d_d = ratio_of(depth)
+    b_n, b_d = ratio_of(base)
     scale = 100**exponent
     return round_ratio(
-        a_n * (scale * d_d**exponent + sign * d_n**exponent),
-        a_d * d_d**exponent * scale,
+        a_n * (b_n * scale * d_d**exponent + sign * b_d * d_n**exponent),
+        a_d * b_d * d_d**exponent * scale,
     )
 
 
@@ -144,18 +148,20 @@ class ConceptMapping:
         association 100, but so does any mapping over a zero-length link, and the
         reference gives both the flat 100 rather than the product.
         """
+        rc = constants()
         assoc = self._degree_of_association()
-        if assoc == 100:
-            return 100.0
+        if assoc == rc.concept_mapping_full_association:
+            return rc.concept_mapping_full_association_strength
 
         depth = self.conceptual_depth
-        exponent = constants().concept_mapping_depth_bonus_exponent
+        exponent = rc.concept_mapping_depth_bonus_exponent
+        base = rc.concept_mapping_depth_bonus_base
         if _is_whole(exponent):
             # ``(round (* assoc (+ 1 (^2 (% depth)))))`` is exact in Metacat (concept-mappings.ss:131-135):
             # ``50 * (1 + 0.3 ** 2)`` is 54.50000000000001 in floats and exactly 54.5, which rounds to 54.
             e = int(exponent)
-            return _rounded_depth_product(assoc, depth, e, 1)
-        bonus = 1.0 + (depth / 100.0) ** exponent
+            return _rounded_depth_product(assoc, depth, e, 1, base)
+        bonus = base + (depth / 100.0) ** exponent
         return round(assoc * bonus)
 
     def slippability(self) -> float:
@@ -164,16 +170,18 @@ class ConceptMapping:
         Scheme: ``concept-mappings.ss:136-141`` — the same ``(= degree-of-assoc 100)``
         branch as :meth:`strength`, then ``degree_of_assoc * (1 - (depth/100)^2)``.
         """
+        rc = constants()
         assoc = self._degree_of_association()
-        if assoc == 100:
-            return 100.0
+        if assoc == rc.concept_mapping_full_association:
+            return rc.concept_mapping_full_association_slippability
 
         depth = self.conceptual_depth
-        exponent = constants().concept_mapping_depth_penalty_exponent
+        exponent = rc.concept_mapping_depth_penalty_exponent
+        base = rc.concept_mapping_depth_penalty_base
         if _is_whole(exponent):
             e = int(exponent)
-            return max(0.0, _rounded_depth_product(assoc, depth, e, -1))
-        penalty = 1.0 - (depth / 100.0) ** exponent
+            return max(0.0, _rounded_depth_product(assoc, depth, e, -1, base))
+        penalty = base - (depth / 100.0) ** exponent
         return max(0.0, round(assoc * penalty))
 
     @property
@@ -221,7 +229,7 @@ class ConceptMapping:
         - Unlabeled slippage (no link): ``concept_mapping_unlinked_association`` (5)
         """
         if self.is_identity:
-            return 100.0
+            return constants().concept_mapping_identity_association
         if self.slipnet_link is not None:
             return self.slipnet_link.degree_of_association()
         # Unlabeled LettCtgy/Length "slippage" such as LettCtgy:m=>j

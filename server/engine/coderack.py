@@ -59,7 +59,11 @@ class UrgencyValueTable:
     __slots__ = ("num_bins", "_values", "_penalties")
 
     def __init__(
-        self, num_bins: int, exponent_offset: float, exponent_divisor: float
+        self,
+        num_bins: int,
+        exponent_offset: float,
+        exponent_divisor: float,
+        removal_penalty_offset: int,
     ) -> None:
         self.num_bins = num_bins
         # Stored temperature-major: a whole row is what both callers want, and one
@@ -75,7 +79,8 @@ class UrgencyValueTable:
             for temperature in range(101)
         )
         self._penalties: tuple[tuple[int, ...], ...] = tuple(
-            tuple(1 + row[-1] - value for value in row) for row in self._values
+            tuple(removal_penalty_offset + row[-1] - value for value in row)
+            for row in self._values
         )
 
     @staticmethod
@@ -107,10 +112,15 @@ class UrgencyValueTable:
 
 @lru_cache(maxsize=None)
 def urgency_value_table(
-    num_bins: int, exponent_offset: float, exponent_divisor: float
+    num_bins: int,
+    exponent_offset: float,
+    exponent_divisor: float,
+    removal_penalty_offset: int,
 ) -> UrgencyValueTable:
     """The table, built once per shape — as the Scheme builds it once at load."""
-    return UrgencyValueTable(num_bins, exponent_offset, exponent_divisor)
+    return UrgencyValueTable(
+        num_bins, exponent_offset, exponent_divisor, removal_penalty_offset
+    )
 
 
 class Codelet:
@@ -294,6 +304,13 @@ class Coderack:
             self.num_bins,
             meta.get_formula_coeff("coderack_bin_urgency_exponent_offset"),  # 10
             meta.get_formula_coeff("coderack_bin_urgency_exponent_divisor"),  # 15
+            meta.get_formula_coeff("coderack_removal_penalty_offset"),  # 1
+        )
+        #: The top of the urgency scale (``urgency_ceiling``), as configured and as a whole
+        #: number (``None`` when it is not one), for :meth:`_urgency_to_bin`.
+        self._urgency_ceiling = meta.get_formula_coeff("urgency_ceiling")
+        self._urgency_ceiling_whole = (
+            int(self._urgency_ceiling) if float(self._urgency_ceiling).is_integer() else None
         )
         self._total_count = 0
         # Urgency clamping state
@@ -324,16 +341,19 @@ class Coderack:
         return self._total_count == 0
 
     def _urgency_to_bin(self, urgency: float) -> int:
-        """``get-coderack-bin`` (coderack.ss:377-382): >=100 -> last bin, <=0 -> first,
-        else ``floor((% urgency) * bins)``.  Integers stay exact; floats divide first
+        """``get-coderack-bin`` (coderack.ss:377-382): at or above the top of the urgency
+        scale (``urgency_ceiling``, 100) -> last bin, <=0 -> first, else
+        ``floor((% urgency) * bins)``.  Integers stay exact; floats divide first
         then multiply, as Chez does for flonums."""
-        if urgency >= 100:
+        ceiling = self._urgency_ceiling
+        if urgency >= ceiling:
             return self.num_bins - 1
         if urgency <= 0:
             return 0
-        if isinstance(urgency, int):
-            return urgency * self.num_bins // 100
-        return math.floor((urgency / 100) * self.num_bins)
+        whole = self._urgency_ceiling_whole
+        if whole is not None and isinstance(urgency, int):
+            return urgency * self.num_bins // whole
+        return math.floor((urgency / ceiling) * self.num_bins)
 
     def post(
         self,

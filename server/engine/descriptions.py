@@ -88,7 +88,7 @@ class Description(WorkspaceStructure):
         """
         obj = self.object
         if obj is None or obj.string is None:
-            return 0.0
+            return constants().description_local_support_0
 
         string = obj.string
         objects = getattr(string, "objects", [])
@@ -112,9 +112,9 @@ class Description(WorkspaceStructure):
                     count += 1
                     break
 
-        if count == 0:
-            return 0.0
         rc = constants()
+        if count == 0:
+            return rc.description_local_support_0
         if count == 1:
             return rc.description_local_support_1
         elif count == 2:
@@ -176,10 +176,11 @@ class Description(WorkspaceStructure):
         themespace = WorkspaceStructure.get_themespace()
         if themespace is None or not themespace.active_theme_types:
             # No theme type is under pressure: every ``get_active_themes`` is ``[]``,
-            # so ``get_theme_support_values`` would be ``[]`` and the answer 0.0.
-            return 0.0
+            # so ``get_theme_support_values`` would be ``[]`` and the answer is the
+            # no-support value.
+            return constants().description_theme_support_none
         values = self.get_theme_support_values()
-        return max(values) if values else 0.0
+        return max(values) if values else constants().description_theme_support_none
 
     def get_theme_support_values(self) -> list[float]:
         themespace = WorkspaceStructure.get_themespace()
@@ -187,13 +188,14 @@ class Description(WorkspaceStructure):
             return []
         dt_name = getattr(self.description_type, "name", "")
         values: list[float] = []
-        max_activation = constants().max_theme_activation
+        rc = constants()
+        max_activation = rc.max_theme_activation
         for theme_type in self.theme_types:
             for theme in themespace.get_active_themes(theme_type):
                 if theme.dimension == dt_name:
                     values.append(abs(theme.activation) / max_activation)
                 else:
-                    values.append(0.0)
+                    values.append(rc.description_theme_support_unrelated)
         return values
 
     @property

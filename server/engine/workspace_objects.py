@@ -204,7 +204,7 @@ class WorkspaceObject:
             return None
         if len(neighbors) == 1:
             return neighbors[0]
-        weights = [n.salience.get("intra", 1.0) for n in neighbors]
+        weights = [n.salience["intra"] for n in neighbors]
         return rng.weighted_pick(neighbors, weights)
 
     # ------------------------------------------------------------------
@@ -534,8 +534,9 @@ class WorkspaceObject:
 
     def update_intra_string_unhappiness(self) -> None:
         """Scheme: workspace-objects.ss:440-454."""
+        rc = constants()
         if self.spans_whole_string():
-            self.intra_string_unhappiness = 0.0
+            self.intra_string_unhappiness = rc.intra_unhappiness_spanning
             return
         if self.enclosing_group is not None:
             self.intra_string_unhappiness = 100.0 - getattr(
@@ -545,7 +546,7 @@ class WorkspaceObject:
 
         bonds = self.get_incident_bonds()
         if not bonds:
-            self.intra_string_unhappiness = 100.0
+            self.intra_string_unhappiness = rc.intra_unhappiness_unbonded
         elif self.leftmost_in_string() or self.rightmost_in_string():
             # ``x * numerator / denominator``: with a numerator of 1 this is ``x / 3``.
             factor = constants().edge_object_bond_factor_exact
@@ -627,7 +628,7 @@ class WorkspaceObject:
     def update_intra_string_salience(self) -> None:
         """Scheme: workspace-objects.ss:524-530."""
         if self.salience_clamped:
-            self.salience["intra"] = 100
+            self.salience["intra"] = constants().clamped_salience
         else:
             w = constants().salience
             self.salience["intra"] = round(
@@ -644,8 +645,9 @@ class WorkspaceObject:
         Scheme: workspace-objects.ss:532-559.
         """
         if self.salience_clamped:
-            self.salience["horizontal_inter"] = 100
-            self.salience["vertical_inter"] = 100
+            clamped = constants().clamped_salience
+            self.salience["horizontal_inter"] = clamped
+            self.salience["vertical_inter"] = clamped
             return
 
         h = self.inter_string_unhappiness["horizontal"]
@@ -749,7 +751,7 @@ class WorkspaceObject:
                 return 100.0 - constants().enclosed_group_bridge_factor * getattr(
                     eg_bridge, "strength", 0
                 )
-        return 100.0
+        return constants().inter_unhappiness_unbridged
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(id={self.id}, pos={self.left_string_pos}-{self.right_string_pos})"

@@ -251,7 +251,7 @@ def evaluate_count_formula(rule: Any, context: PostingContext) -> int:
     if formula == "fixed":
         if context.ctx.justify_mode and "justify_mode" in values:
             return int(values["justify_mode"])
-        return int(values.get("fixed", 1))
+        return int(values["fixed"])
 
     bucket_of = _COUNT_BUCKETS.get(formula)
     if bucket_of is not None:
@@ -263,11 +263,8 @@ def evaluate_count_formula(rule: Any, context: PostingContext) -> int:
         if formula == "num_ungrouped_objects_based" and not any(
             string.bonds for string in context.workspace.all_strings
         ):
-            return int(values.get("none", 0))
+            return int(values["none"])
         return int(values[bucket_of(context)])
-
-    if not formula:
-        return 1
 
     code = compile_posting_formula(formula, rule.codelet_type)
     try:
@@ -344,8 +341,8 @@ def evaluate_condition(rule: Any, context: PostingContext) -> bool:
     So each of the eight original labels is enforced, once, wherever the reference puts
     it — which is what makes the column a predicate rather than a comment.
     """
-    condition = getattr(rule, "condition", "") or ""
-    if condition in ("", "always"):
+    condition = rule.condition
+    if condition == "always":
         return True
     code = compile_posting_formula(condition, rule.codelet_type)
     try:

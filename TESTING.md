@@ -141,12 +141,12 @@ outside the matrix take it too and the run is entirely what it says it is.
 
 ```
 ============================= petacat test matrix ==============================
-  cpu  numpy    float64    911 tests
-  gpu  mlx      float32    911 tests
+  cpu  numpy    float64    1005 tests
+  gpu  mlx      float32    1005 tests
   whole suite requested: the full matrix is required of this run
 
   unit          1809 collected   1809 run   1809 passed      0 failed      0 skipped  complete
-  seed_unit     1127 collected   1127 run   1127 passed      0 failed      0 skipped  complete
+  seed_unit     1465 collected   1465 run   1465 passed      0 failed      0 skipped  complete
   module        1049 collected   1049 run   1049 passed      0 failed      0 skipped  complete
   architecture    92 collected     92 run     92 passed      0 failed      0 skipped  complete
   integration    358 collected    358 run    358 passed      0 failed      0 skipped  complete
@@ -170,8 +170,8 @@ single file or node id. Such a run names what narrowed it, names the roles it
 exercised, and exits on whether its tests passed:
 
 ```
-  cpu  numpy    float64      911 tests
-  gpu  mlx      float32     911 tests
+  cpu  numpy    float64      1005 tests
+  gpu  mlx      float32     1005 tests
   cpu  numpy: no selected test ran on it
   narrowed by -k 'mlx': this run reports the roles it exercised and is not held to the full matrix
 ```
@@ -225,7 +225,7 @@ that allowance.
 | Layer | Directory | Scope | May depend on | Cases |
 |-------|-----------|-------|---------------|-------|
 | **unit** | `tests/unit/` | One class or function, business logic only | Only what the test constructs: hand-rolled fakes and plain engine objects | 1809 |
-| **seed unit** | `tests/seed_unit/` | One class or function, measured against the values Petacat ships with | Real `seed_data/*.json`, and the machine the process is running on | 1127 |
+| **seed unit** | `tests/seed_unit/` | One class or function, measured against the values Petacat ships with | Real `seed_data/*.json`, and the machine the process is running on | 1465 |
 | **module** | `tests/module/` | Several real components assembled and driven | Real engine objects and `seed_data/*.json`; no DB, no HTTP | 1049 |
 | **architecture** | `tests/architecture/` | How the source tree is allowed to depend on itself | The repository's source, `seed_data/*.json`, child interpreters | 92 |
 | **integration** | `tests/integration/` | Agreement between the repository's artifacts, and the harness's own rules | Real `seed_data/*.json`, the ORM declarations, the generated client files, the documentation, a real pytest session | 358 |
@@ -234,7 +234,7 @@ that allowance.
 | **e2e** | `tests/e2e/` | Full HTTP API + persistence | Local PostgreSQL (`petacat_test`) | 602 |
 
 Those counts are cases, so they include the second pass the numeric matrix makes
-over the 911 backend-sensitive tests.
+over the 1005 backend-sensitive tests.
 
 One line decides each layer. Read them as a question about what a new test's
 subject is, and write the test where the answer lands:
@@ -266,7 +266,7 @@ first**, then move up toward the API and GUI.
 
 All eight layers run in one command — the
 [required command](#the-required-command) — and, since Petacat runs natively, all
-eight actually run: **5,588 cases**, every one of them executed. A layer that is
+eight actually run: **5,926 cases**, every one of them executed. A layer that is
 normally skipped is not a layer that is normally green, and none of these is.
 
 Wall-clock time depends heavily on the machine and on what else it is doing. The
@@ -540,6 +540,7 @@ changing what it records.
 | `test_rule_english.py` | 10 | A rule's English against Metacat 1.2's own `transcribe-to-english` output: 463 recorded rule shapes, each string state, wrapping, articles, and the text kept from the moment the rule was made |
 | `test_snag_explanation.py` | 20 | A snag's explanation against Metacat 1.2's `get-explanation` (`trace.ss:1097-1125`): every branch of the failure-result, the object phrases, the commentary lines, the template-driven wording, and the fallback for a snag with no stored explanation |
 | `test_rule_quality.py` | 13 | Rule uniformity, abstractness and succinctness against the Scheme's formulas, hand-computed from the seeded depths |
+| `test_every_moved_value_reaches_its_site_a.py` | 8 | Stage 5, group A: each of the 76 formula coefficients that replaced a literal in the structure, formula, perception, rule, Themespace, trace and numeric files carries the old literal in its old type, is on the declared read list, and is read by its site: a real run (`moved_values_runs_a.json`) differs when the key changes, or the site is called directly where no run reaches it (a guard for an input a run never builds); the numeric backends read `clamped_salience`, the thematic pull targets and `average_unhappiness_empty` from the configuration |
 | `test_slipnet_link_lengths.py` | 6 | The Slipnet's link lengths against the reference Scheme |
 | `test_slipnet_node.py` | 20 | The 59-node Slipnet: its nodes, its links, its clamps and its spreading |
 | `test_temperature.py` | 2 | Temperature updating against the seeded coefficients |

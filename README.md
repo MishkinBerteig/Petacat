@@ -28,7 +28,7 @@ license change was authorised by Dr. Marshall directly (see
 > end-to-end. Episodic Memory (Metacat-Mode learning) shapes the runs that inherit it: a run
 > declines an answer already held for the same problem and rules, so repeating a
 > problem across Metacat Mode's [episodic runs](#persistence-modes-and-episodic-runs)
-> (which are Metacat Mode and not Training Mode) explores a different answer each time. It ships with 5,588 test cases covering the engine, the API, and the
+> (which are Metacat Mode and not Training Mode) explores a different answer each time. It ships with 5,926 test cases covering the engine, the API, and the
 > help/config system, run on both the CPU and the GPU numeric backends. Underneath the seven components sits an execution
 > substrate — three [persistence modes](#persistence-modes-and-episodic-runs),
 > a [GPU numeric substrate](#the-numeric-substrate), and
@@ -429,7 +429,7 @@ time (the global one, which Metacat Mode uses, unless you open a Training Mode S
   **Urgency Levels**, **Formula Coefficients**, **Demo Problems**, **Enum Tables**, **Theme Dimensions**,
   **Posting Rules**, **Commentary Templates**, **Slipnet Layout** and **Help Topics** (the in-app help
   text, backed by `seed_data/help_topics.en.json`): editable tables over the seed data's 59 nodes, 202
-  links, 27 codelet types, 79 formula coefficients and the rest
+  links, 27 codelet types, 188 formula coefficients and the rest
 - **History**: the journal, with undo
 - **Database (all modes)**: browse any table, edit the safe ones
 
@@ -455,8 +455,8 @@ Petacat has two test suites:
   plugin against the serial runs it claims to equal), `lockstep` (Petacat's decision
   traces against Metacat's), and `e2e` (full HTTP
   stack against a running database). All eight run in a single command against
-  the local Postgres — 5,588 cases, which includes the numeric matrix's second
-  pass over the 911 backend-sensitive tests. See
+  the local Postgres — 5,926 cases, which includes the numeric matrix's second
+  pass over the 1005 backend-sensitive tests. See
   [TESTING.md](TESTING.md) for the layer breakdown, the numeric backend matrix,
   the session ceiling, the unit-test rules, determinism requirements, test-double
   conventions, how to run the suite under the free-threaded interpreter, and what
@@ -1608,7 +1608,13 @@ parameter, coefficient or urgency level, so changing one changes the behaviour i
 numeric backend and every engine path: the activation ceiling (`max_activation`), the theme
 ceiling (`max_theme_activation`), `concept_activation_importance_threshold`,
 `jootsing_count_scale`, `probabilistic_activation_exponent`, the four
-`*_string_salience_*_weight` coefficients and `max_raw_importance`. A posting rule's
+`*_string_salience_*_weight` coefficients and `max_raw_importance`. The fixed values the
+structure, formula, perception and rule code used to return or assign (a strength of 100 for a
+spanning group, an unhappiness of 0 for a spanning object, the clips at the top of a scale, the
+exponents 3 and 2 and one half of the support and admission formulas, the costs of a rule's
+clauses) are formula coefficients too, 109 of them added by stage 5, and
+`tests/seed_unit/test_every_moved_value_reaches_its_site_a.py` shows each one reaching its
+site. A posting rule's
 `urgency_level` names a tier of `urgency_levels` rather than repeating its number. A test
 (`tests/architecture/test_declared_read_list.py`) fails on any stored name that nothing reads,
 and `tests/module/test_wired_numbers.py` changes each wired number and sees the run move.
@@ -1726,7 +1732,7 @@ files are not read again (see [`seed_data/README.md`](seed_data/README.md) and
 | `codelet_types.json` | 27 codelet types with Python execute bodies |
 | `engine_params.json` | Runtime parameters and thresholds |
 | `urgency_levels.json` | 7 urgency bin values |
-| `formula_coefficients.json` | 79 formula weights |
+| `formula_coefficients.json` | 188 formula weights |
 | `theme_dimensions.json` | 9 conceptual dimensions |
 | `demo_problems.json` | 41 pre-configured analogy problems |
 | `posting_rules.json` | Codelet posting rules |

@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Any, Callable, Mapping
 from server.engine.formulas import round_exact
 from server.engine.numeric.backend import exact_backend_for, select_backend
 from server.engine.roles import Roles, absent, resolve_roles
+from server.engine.run_binding import constants
 from server.engine.numeric.layout import (
     ActivationParams,
     jump_probability,
@@ -500,7 +501,7 @@ class SlipnetNode:
         asked.
         """
         if self.intrinsic_link_length is None:
-            return 100.0
+            return max(0.0, 100.0 - constants().link_length_unset)
         if self.fully_active():
             shrunk = self.shrunk_link_length()
             if shrunk is not None:
@@ -901,7 +902,7 @@ class SlipnetLink:
         # so an unlabelled non-fixed link reads 0 — association 100 — rather than a
         # made-up midpoint.  Unreachable with the shipped seeds: every one of the 202
         # links is either fixed-length or labelled by a node that carries a length.
-        return 0
+        return constants().link_length_unset
 
     def intrinsic_degree_of_association(self) -> float:
         """Scheme: slipnet.ss:330-333. Always uses intrinsic length, never shrunk."""
@@ -910,7 +911,8 @@ class SlipnetLink:
         if self.label_node is not None:
             if self.label_node.intrinsic_link_length is not None:
                 return max(0.0, 100.0 - self.label_node.intrinsic_link_length)
-        return 100.0  # length 0 — see ``link_length``
+        # An unset length — see ``link_length``.
+        return max(0.0, 100.0 - constants().link_length_unset)
 
     def degree_of_association(self) -> float:
         """Scheme: slipnet.ss:334-339. Dynamic — uses shrunk length when label is fully active."""

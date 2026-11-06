@@ -27,7 +27,7 @@ def test_an_empty_rack_has_no_probabilities():
 
 
 def test_temperature_changes_the_weighting_of_the_bins():
-    table = urgency_value_table(7, 10, 15)
+    table = urgency_value_table(7, 10, 15, 1)
     per_bin = [{"low": 1}, {}, {}, {}, {}, {}, {"high": 1}]
     hot = type_selection_probabilities(per_bin, table.row(100))
     cold = type_selection_probabilities(per_bin, table.row(0))
@@ -47,7 +47,7 @@ class _Meta:
 
 class _Rack:
     meta = _Meta()
-    urgency_table = urgency_value_table(7, 10, 15)
+    urgency_table = urgency_value_table(7, 10, 15, 1)
     total_count = 3
     clamped_urgencies = {"b": 91}
     bins = [_Bin(0, ["a", "a"])] + [_Bin(i, []) for i in range(1, 6)] + [_Bin(6, ["b"])]

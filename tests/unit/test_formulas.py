@@ -14,7 +14,7 @@ from server.engine.formulas import (
 
 
 class _FakeMeta:
-    """The two formula coefficients ``temp_adjusted_probability`` reads,
+    """The formula coefficients ``temp_adjusted_probability`` and ``bond_degree_of_assoc`` read,
     supplied by the test rather than by ``seed_data/``."""
 
     def __init__(self, sqrt_base=100.0, scale=10.0):
@@ -23,7 +23,16 @@ class _FakeMeta:
             "low_prob_scale_factor": scale,
             "low_prob_threshold": 0.5,
             "bond_degree_of_assoc_scale": 11.0,
+            "bond_degree_of_assoc_exponent": 0.5,
+            "urgency_ceiling": 100.0,
+            "low_prob_sqrt_exponent": 0.5,
+            "low_prob_min_decade_factor": 1.0,
+            "low_prob_target_offset": 1.0,
         }
+
+    @property
+    def formula_coefficients(self):
+        return self._coeffs
 
     def get_formula_coeff(self, name):
         return self._coeffs[name]

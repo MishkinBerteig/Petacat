@@ -8,9 +8,9 @@ Scheme source: bonds.ss
 
 from __future__ import annotations
 
-import math
 from typing import TYPE_CHECKING, Any
 
+from server.engine.formulas import pow_exact
 from server.engine.slipnet import holds_role, opposite_node
 from server.engine.run_binding import constants
 from server.engine.workspace_structures import WorkspaceStructure
@@ -103,11 +103,15 @@ class Bond(WorkspaceStructure):
         internal strength of 49 rather than 67, and the length bonds that a reading
         like ``mrrjjj`` as one-two-three depends on were dying at the evaluator.
         """
+        rc = constants()
         return min(
-            100.0,
+            rc.bond_degree_of_assoc_ceiling,
             round(
-                constants().bond_degree_of_assoc_scale
-                * math.sqrt(max(0.0, self.bond_category.degree_of_assoc()))
+                rc.bond_degree_of_assoc_scale
+                * pow_exact(
+                    max(0.0, self.bond_category.degree_of_assoc()),
+                    rc.bond_degree_of_assoc_exponent,
+                )
             ),
         )
 
@@ -127,16 +131,17 @@ class Bond(WorkspaceStructure):
         First count truly disjoint supporting bonds, then compute density
         and combine as density_adjustment * number_factor.
         """
+        rc = constants()
         num_supporting = self.get_num_of_local_supporting_bonds()
         if num_supporting == 0:
-            return 0.0
+            return rc.bond_local_support_unsupported
 
         density = self.get_local_density(rng)
-        adjusted_density = 100.0 * math.sqrt(density / 100.0)
+        adjusted_density = 100.0 * pow_exact(density / 100.0, rc.local_support_density_exponent)
         number_factor = min(
-            1.0,
-            constants().local_support_number_factor_base
-            ** (1.0 / max(1, num_supporting ** 3)),
+            rc.local_support_number_factor_ceiling,
+            rc.local_support_number_factor_base
+            ** (1.0 / max(1, num_supporting ** rc.local_support_number_exponent)),
         )
         return round(adjusted_density * number_factor)
 
@@ -191,8 +196,9 @@ class Bond(WorkspaceStructure):
         update.  *rng* is the one the calling codelet is drawing from, threaded
         down from :meth:`WorkspaceStructure.update_strength`.
         """
+        rc = constants()
         if self.string is None:
-            return 100.0
+            return rc.bond_local_density_no_string
 
         # Trace seam: the walk's draws concern this bond (lockstep spec §5.3).
         previous = rng.trace_about(self)
@@ -202,7 +208,7 @@ class Bond(WorkspaceStructure):
         num_of_bond_slots = len(left_neighbors) + len(right_neighbors)
 
         if num_of_bond_slots == 0:
-            return 100.0
+            return rc.bond_local_density_spanning
 
         num_similar = 0
         # For left neighbors, check their right_bond

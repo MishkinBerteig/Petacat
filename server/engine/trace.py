@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Any
 
 from server.engine.formulas import weighted_average
 from server.engine.ids import KIND_TRACE_EVENT, next_id
+from server.engine.run_binding import constants
 
 if TYPE_CHECKING:
     from server.engine.slipnet import Slipnet
@@ -345,7 +346,7 @@ class ClampEvent(TraceEvent):
 
     def get_strength(self) -> float:
         """Override — clamp events are always maximally strong."""
-        return 100.0
+        return constants().clamp_event_strength
 
     # ------------------------------------------------------------------
     # Activate / deactivate  (Scheme: trace.ss clamp-event activate/deactivate)
@@ -545,7 +546,7 @@ class SnagEvent(TraceEvent):
         # The old test was ``hasattr(structure, "structure_type")``, and no structure
         # class in the port has that attribute — so bonds were never excluded.
         if isinstance(structure, Bond):
-            return 0.0
+            return constants().bond_event_progress
         if hasattr(structure, "get_strength"):
             return structure.get_strength()
         if hasattr(structure, "strength"):
@@ -554,7 +555,7 @@ class SnagEvent(TraceEvent):
 
     def get_strength(self) -> float:
         """Override — snag events are always maximally strong."""
-        return 100.0
+        return constants().snag_event_strength
 
     # ------------------------------------------------------------------
     # Activate / deactivate  (Scheme: trace.ss snag-event activate/deactivate)
@@ -922,12 +923,13 @@ def _associated_concept_pattern(
     ``None`` where there is none, and the Slipnet's ``max_activation`` *ceiling*, or ``None``
     for a clamp event built before its Slipnet is known (``activate`` derives it again)."""
     pairs: list[tuple[str, float | None]] = []
+    suppressed = constants().clamp_suppressed_concept_activation
     for dimension, relation, activation in theme_pattern_entries(theme_pattern):
         pairs.append((dimension, ceiling))
         if relation == "opposite" and opposite:
             # An entry that names no activation is at full activation, so positive.
             positive = activation is None or activation > 0
-            pairs.append((opposite.name, ceiling if positive else 0.0))
+            pairs.append((opposite.name, ceiling if positive else suppressed))
     # ``(remove-duplicates (flatmap ...))`` (``trace.ss:1506``): ``remove-duplicates``
     # keeps the LAST occurrence (``utilities.ss:915-929``, DISCREPANCIES5 C-2), so a
     # pair named twice sits where it is named last.  Clamping follows this order and

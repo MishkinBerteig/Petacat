@@ -760,6 +760,8 @@ class Themespace:
         # ``%max-theme-activation%``: a theme's probability of firing is its activation as
         # a fraction of the ceiling, cubed.
         max_theme_activation = float(self.meta.get_param("max_theme_activation"))
+        dimension_exponent = self.meta.get_formula_coeff("theme_dimension_node_activation_exponent")  # 3
+        relation_exponent = self.meta.get_formula_coeff("theme_relation_node_activation_exponent")  # 3
 
         # ``update-slipnet-activations`` (``slipnet.ss:379``): ``get-all-active-themes``,
         # i.e. the existing themes of pressured types in ``all-themes`` order.
@@ -771,7 +773,7 @@ class Themespace:
             rng.trace_about(theme)
 
             # Activate dimension node: probability = (|activation|/100)^3
-            abs_prob = (abs(theme.activation) / max_theme_activation) ** 3
+            abs_prob = (abs(theme.activation) / max_theme_activation) ** dimension_exponent
             if rng.prob(abs_prob):
                 dim_node = slipnet.nodes.get(theme.dimension)
                 if dim_node and not dim_node.frozen:
@@ -784,7 +786,7 @@ class Themespace:
                 rel_node = slipnet.relation(theme.relation)
                 if not rel_node:
                     continue
-                rel_prob = (theme.activation / max_theme_activation) ** 3
+                rel_prob = (theme.activation / max_theme_activation) ** relation_exponent
                 if rng.prob(rel_prob):
                     if not rel_node.frozen:
                         rel_node.activation_buffer += workspace_activation
@@ -917,9 +919,10 @@ def pick_theme_conjunction(
     """
     themes: list[Theme] = []
     ceiling = themespace.meta.get_param("max_theme_activation")
+    exponent = themespace.meta.get_formula_coeff("theme_conjunction_admission_exponent")  # 2
     for cluster in themespace.get_clusters(theme_type):
         max_positive = cluster.get_max_positive_theme_activation()
-        if not rng.prob(share_of_ceiling(max_positive, ceiling) ** 2):
+        if not rng.prob(share_of_ceiling(max_positive, ceiling) ** exponent):
             continue
         theme = cluster.pick_positive_theme(rng)
         if theme is not None:

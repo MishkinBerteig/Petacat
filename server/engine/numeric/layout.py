@@ -482,6 +482,9 @@ class SalienceWeights:
     inter_unhappiness: float
     inter_importance: float
     inter_total: float
+    #: The salience a snag-clamped object is held at (``clamped_salience``), kept in the form
+    #: the configuration holds it (the integer 100), because it is assigned unrounded.
+    clamped: Any
 
     @classmethod
     def from_metadata(cls, meta: Any) -> SalienceWeights:
@@ -495,7 +498,7 @@ class SalienceWeights:
             iu, ii, intra_total = 1.0, 0.0, 1.0
         if inter_total == 0.0:
             eu, ei, inter_total = 1.0, 0.0, 1.0
-        return cls(iu, ii, intra_total, eu, ei, inter_total)
+        return cls(iu, ii, intra_total, eu, ei, inter_total, meta.get_formula_coeff("clamped_salience"))
 
 
 @dataclass

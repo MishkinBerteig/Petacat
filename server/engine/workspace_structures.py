@@ -119,7 +119,12 @@ class WorkspaceStructure:
 
         w2 = 1.0 - thematic_weight
         total = thematic_weight + w2
-        pole = 100.0 if compatibility > 0 else 0.0
+        rc = constants()
+        pole = (
+            rc.thematic_pull_positive_target
+            if compatibility > 0
+            else rc.thematic_pull_negative_target
+        )
         self.strength = round((pole * thematic_weight + intrinsic_strength * w2) / total)
 
     # ``calculate_internal_strength()`` and ``calculate_external_strength(rng)`` are

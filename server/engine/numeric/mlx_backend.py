@@ -67,6 +67,7 @@ import numpy as np
 
 from server.engine.numeric import metal_kernels
 from server.engine.numeric.backend import UNAVAILABLE_REASONS, Backend, SlipnetSession
+from server.engine.run_binding import constants
 from server.engine.numeric.layout import (
     STRING_ANSWER,
     STRING_INITIAL,
@@ -483,7 +484,8 @@ class MlxBackend(Backend):
                 ),
             )
 
-            hundred = mx.full((n,), 100.0, dtype=dt)
+            #: The salience a clamped object is held at (``clamped_salience``).
+            hundred = mx.full((n,), float(batch.weights.clamped), dtype=dt)
             # MLX materialises a bare Python float as float32 even against a
             # float64 array, so ``0.2 * rel`` in the mlx-cpu backend was computed
             # in single precision: 0.2*56.5 + 0.8*19 came back 26.50000039488077
@@ -566,7 +568,12 @@ class MlxBackend(Backend):
             safe_denominator = mx.where(
                 denominator == 0.0, mx.ones_like(denominator), denominator
             )
-            target = mx.where(comp > 0.0, 100.0, 0.0)
+            rc = constants()
+            target = mx.where(
+                comp > 0.0,
+                float(rc.thematic_pull_positive_target),
+                float(rc.thematic_pull_negative_target),
+            )
             thematic = mx.where(
                 denominator == 0.0,
                 mx.zeros_like(denominator),
@@ -579,7 +586,7 @@ class MlxBackend(Backend):
     ) -> int:
         n = len(values)
         if n == 0:
-            return 100
+            return constants().average_unhappiness_empty
         with mx.stream(self.device):
             a = mx.array(list(values), dtype=self.dtype)
             w = mx.array(list(relative_importance), dtype=self.dtype)

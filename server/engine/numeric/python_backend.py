@@ -18,6 +18,7 @@ import math
 from typing import Sequence
 
 from server.engine.numeric.backend import Backend, SlipnetSession
+from server.engine.run_binding import constants
 from server.engine.numeric.layout import (
     STRING_ANSWER,
     STRING_INITIAL,
@@ -336,6 +337,7 @@ class PythonBackend(Backend):
         w = batch.weights
         iu, ii, it = w.intra_unhappiness, w.intra_importance, w.intra_total
         eu, ei, et = w.inter_unhappiness, w.inter_importance, w.inter_total
+        clamped_salience = w.clamped
 
         avg_unhappy: list[int] = []
         s_intra: list[int] = []
@@ -368,7 +370,7 @@ class PythonBackend(Backend):
 
             # intra-string salience (workspace-objects.ss:524-530)
             if batch.salience_clamped[i]:
-                s_intra.append(100)
+                s_intra.append(clamped_salience)
             else:
                 s_intra.append(round((iu * intra + ii * ri) / it))
 
@@ -377,7 +379,7 @@ class PythonBackend(Backend):
             prev_h = batch.prev_horizontal_salience[i]
             prev_v = batch.prev_vertical_salience[i]
             if batch.salience_clamped[i]:
-                new_h, new_v = 100, 100
+                new_h, new_v = clamped_salience, clamped_salience
             elif stype == STRING_INITIAL:
                 new_h = round((eu * h + ei * ri) / et)
                 new_v = round((eu * v + ei * ri) / et)
@@ -433,6 +435,9 @@ class PythonBackend(Backend):
         two list-building passes through a generic helper.
         """
         out: list[int] = []
+        rc = constants()
+        positive_pole = rc.thematic_pull_positive_target
+        negative_pole = rc.thematic_pull_negative_target
         for i in range(len(internal)):
             w_int = internal[i]
             w_ext = 100.0 - w_int
@@ -447,7 +452,7 @@ class PythonBackend(Backend):
                 continue
             other = 1.0 - weight
             denominator = weight + other
-            target = 100.0 if comp > 0 else 0.0
+            target = positive_pole if comp > 0 else negative_pole
             if denominator == 0:
                 out.append(0)
             else:
@@ -459,7 +464,7 @@ class PythonBackend(Backend):
     ) -> int:
         n = len(values)
         if n == 0:
-            return 100
+            return constants().average_unhappiness_empty
         total_weight = sum(relative_importance)
         if total_weight == 0:
             # ``weighted-average`` (``utilities.ss:388-392``) returns 0 on zero

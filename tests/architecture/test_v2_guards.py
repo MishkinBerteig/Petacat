@@ -25,7 +25,7 @@ ROOT = Path(__file__).resolve().parents[2]
 #: The engine tree nothing may change without re-basing this: the last engine commit of the final
 #: Metacat cleanup, which removed the code nothing used and read in what the database held.  The
 #: C and S packages left the tree alone; engine work moves this commit on purpose.
-ENGINE_BASELINE = "1f3a384"
+ENGINE_BASELINE = "52d4f35"
 #: The only commits that touched the engine between EN11's close-out (``0ce7f5d``) and the
 #: baseline; all are allowed engine work.
 ENGINE_COMMITS_AFTER_EN11 = {

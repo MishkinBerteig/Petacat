@@ -232,13 +232,12 @@ class Bridge(WorkspaceStructure):
         avg_cm_strength * num_cm_factor * coherence_factor [* singleton_factor]
         Uses relevant-distinguishing CMs; if none, returns 0.
         """
+        rc = constants()
         rel_dist_cms = self.get_relevant_distinguishing_concept_mappings()
         if not rel_dist_cms:
-            return 0.0
+            return rc.bridge_no_mapping_internal_strength
 
         avg_strength = sum(cm.strength() for cm in rel_dist_cms) / len(rel_dist_cms)
-
-        rc = constants()
 
         # Number-of-CMs factor
         n = len(rel_dist_cms)
@@ -261,7 +260,7 @@ class Bridge(WorkspaceStructure):
         if self.is_horizontal:
             result *= self._singleton_factor()
 
-        return min(100.0, round(result))
+        return min(rc.bridge_internal_strength_ceiling, round(result))
 
     def _is_internally_coherent(self) -> bool:
         """Check if CMs support each other.
@@ -298,15 +297,16 @@ class Bridge(WorkspaceStructure):
         problems like "abc => aabbcc" could never be described at all.
         """
         o1, o2 = self.object1, self.object2
+        unpenalised = constants().bridge_singleton_factor_unpenalised
         if _is_singleton_letter(o1):
-            return 1.0 if not _is_group(o2) else self._singleton_mismatch_factor()
+            return unpenalised if not _is_group(o2) else self._singleton_mismatch_factor()
         if _is_singleton_letter(o2):
-            return 1.0 if not _is_group(o1) else self._singleton_mismatch_factor()
+            return unpenalised if not _is_group(o1) else self._singleton_mismatch_factor()
         if _is_singleton_group(o1):
-            return 1.0 if _is_group(o2) else self._singleton_mismatch_factor()
+            return unpenalised if _is_group(o2) else self._singleton_mismatch_factor()
         if _is_singleton_group(o2):
-            return 1.0 if _is_group(o1) else self._singleton_mismatch_factor()
-        return 1.0
+            return unpenalised if _is_group(o1) else self._singleton_mismatch_factor()
+        return unpenalised
 
     @staticmethod
     def _singleton_mismatch_factor() -> float:
@@ -321,11 +321,12 @@ class Bridge(WorkspaceStructure):
         external strength counts peers, it does not walk neighbours.
         """
         # Check for spanning singleton letter
+        rc = constants()
         if self._is_spanning_singleton():
-            return 100.0
-        # Sum of supporting bridge strengths, capped at 100
+            return rc.bridge_spanning_singleton_external_strength
+        # Sum of supporting bridge strengths, capped
         support = self._get_supporting_bridge_strength()
-        return min(100.0, round(support))
+        return min(rc.bridge_external_strength_ceiling, round(support))
 
     def _is_spanning_singleton(self) -> bool:
         """Does *either* object span its whole string as a lone letter?
@@ -457,12 +458,14 @@ class Bridge(WorkspaceStructure):
         even if the latter outnumber the former" (§4.1.2, p.143).
         """
         values = self.get_theme_support_values()
+        rc = constants()
         if not values:
-            return 0.0
-        neg_weight = constants().bridge_theme_negative_weight_multiplier * len(values)
-        weights = [(neg_weight if v < 0 else 1.0) * abs(v) for v in values]
+            return rc.bridge_theme_support_none
+        neg_weight = rc.bridge_theme_negative_weight_multiplier * len(values)
+        pos_weight = rc.bridge_theme_positive_weight_multiplier
+        weights = [(neg_weight if v < 0 else pos_weight) * abs(v) for v in values]
         if not any(weights):
-            return 0.0
+            return rc.bridge_theme_support_none
         return sum(v * w for v, w in zip(values, weights)) / sum(weights)
 
     def get_theme_support_values(self) -> list[float]:
@@ -479,14 +482,15 @@ class Bridge(WorkspaceStructure):
         if themespace is None:
             return []
         values: list[float] = []
-        max_activation = constants().max_theme_activation
+        rc = constants()
+        max_activation = rc.max_theme_activation
         for theme in themespace.get_active_themes(self.theme_type):
             if self.incompatible_with_theme(theme):
                 values.append(-theme.activation / max_activation)
             elif self.supported_by_theme(theme):
                 values.append(theme.activation / max_activation)
             else:
-                values.append(0.0)
+                values.append(rc.bridge_theme_support_unrelated)
         return values
 
     def incompatible_with_theme(self, theme: Any) -> bool:

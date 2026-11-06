@@ -72,13 +72,13 @@ def test_degree_of_support_equals_the_exact_product_for_every_whole_strength(mon
 def test_concept_mapping_strength_and_slippability_are_exact_for_every_association_and_depth() -> None:
     """``50 * (1 + (30/100)**2)`` is 54.50000000000001 in floats and exactly 54.5 (rounds to 54);
     ``50 * (1 - (90/100)**2)`` is 9.500000000000002 against exactly 9.5 (rounds to 10)."""
-    assert _rounded_depth_product(50, 30, 2, 1) == 54
-    assert _rounded_depth_product(50, 90, 2, -1) == 10
+    assert _rounded_depth_product(50, 30, 2, 1, 1) == 54
+    assert _rounded_depth_product(50, 90, 2, -1, 1) == 10
     for assoc in range(100):
         for depth in range(101):
-            assert _rounded_depth_product(assoc, depth, 2, 1) == round(Fraction(assoc) * (1 + Fraction(depth, 100) ** 2))
-            assert _rounded_depth_product(assoc, depth, 2, -1) == round(Fraction(assoc) * (1 - Fraction(depth, 100) ** 2))
-            assert _rounded_depth_product(assoc, float(depth), 2, 1) == _rounded_depth_product(assoc, depth, 2, 1)
+            assert _rounded_depth_product(assoc, depth, 2, 1, 1) == round(Fraction(assoc) * (1 + Fraction(depth, 100) ** 2))
+            assert _rounded_depth_product(assoc, depth, 2, -1, 1) == round(Fraction(assoc) * (1 - Fraction(depth, 100) ** 2))
+            assert _rounded_depth_product(assoc, float(depth), 2, 1, 1) == _rounded_depth_product(assoc, depth, 2, 1, 1)
 
 
 def test_rule_quality_is_exact_for_every_uniformity_abstractness_and_reachable_succinctness() -> None:

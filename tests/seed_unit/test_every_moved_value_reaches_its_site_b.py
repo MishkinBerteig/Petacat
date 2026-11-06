@@ -166,6 +166,7 @@ def _fingerprint(meta, problem, answer, seed, episode, cap):
     return last
 
 
+@pytest.mark.numeric_matrix
 @pytest.mark.parametrize(
     "key,table,value,problem,answer,seed,episode,cap",
     RUN_ROWS,
@@ -220,6 +221,7 @@ CHAIN = [
 ]
 
 
+@pytest.mark.numeric_matrix
 def test_a_differing_theme_weight_reaches_the_reminding_of_a_chain_of_runs(meta):
     """``answer_distance_differing_theme_weight``: answers of different problems that hold a
     theme in different relations are closer or further apart, which moves how strongly the
